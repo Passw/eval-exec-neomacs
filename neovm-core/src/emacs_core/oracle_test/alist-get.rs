@@ -2,7 +2,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_alist_get_basic() {
@@ -42,7 +42,7 @@ fn oracle_prop_alist_get_with_equal_test() {
 
     let form = r#"(alist-get "key" '(("key" . "val") ("other" . "x"))
                               nil nil 'equal)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -54,7 +54,7 @@ fn oracle_prop_assoc_vs_assq() {
                     (assq 'a '((a . 1) (b . 2)))
                     (assoc "hello" '(("hello" . 1) ("world" . 2)))
                     (assq "hello" '(("hello" . 1) ("world" . 2))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn oracle_prop_assoc_with_test_fn() {
 
     let form = r#"(assoc "HELLO" '(("hello" . 1) ("world" . 2))
                          'string-equal)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]

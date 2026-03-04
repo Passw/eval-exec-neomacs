@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // %s with various types: string, number, symbol, list, vector, nil, t, cons
@@ -173,7 +173,7 @@ fn oracle_prop_format_comprehensive_percent_c() {
       ;; Unicode characters
       (format "%c" 955)
       (format "%c" 8364))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Suffix trie construction
@@ -100,7 +100,7 @@ fn oracle_prop_suffix_trie_construction() {
     (fmakunbound 'neovm--st-build)
     (fmakunbound 'neovm--st-count-nodes)
     (fmakunbound 'neovm--st-count-ends)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ fn oracle_prop_suffix_trie_substring_search() {
     (fmakunbound 'neovm--st2-insert)
     (fmakunbound 'neovm--st2-build)
     (fmakunbound 'neovm--st2-search)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_suffix_trie_longest_repeated() {
     (fmakunbound 'neovm--st3-build)
     (fmakunbound 'neovm--st3-branching-children)
     (fmakunbound 'neovm--st3-longest-repeated)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -361,7 +361,7 @@ fn oracle_prop_suffix_trie_suffix_counting() {
     (fmakunbound 'neovm--st4-build)
     (fmakunbound 'neovm--st4-count-suffixes)
     (fmakunbound 'neovm--st4-pattern-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -466,7 +466,7 @@ fn oracle_prop_suffix_trie_wildcard_matching() {
     (fmakunbound 'neovm--st5-build)
     (fmakunbound 'neovm--st5-wildcard-match)
     (fmakunbound 'neovm--st5-has-match)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -565,5 +565,5 @@ fn oracle_prop_suffix_trie_longest_common_substring() {
     (fmakunbound 'neovm--st6-build)
     (fmakunbound 'neovm--st6-match-length)
     (fmakunbound 'neovm--st6-lcs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

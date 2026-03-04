@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // DFA for tokenizing identifiers, numbers, and operators
@@ -100,7 +100,7 @@ fn oracle_prop_parser_sm_dfa_tokenizer() {
         (funcall 'neovm--psm-dfa-tokenize "(x + y) * z"))
     (fmakunbound 'neovm--psm-char-class)
     (fmakunbound 'neovm--psm-dfa-tokenize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +213,7 @@ Inputs: alpha, digit, op, ws, other."
     (fmakunbound 'neovm--psm-build-table)
     (fmakunbound 'neovm--psm-classify)
     (fmakunbound 'neovm--psm-run-dfa)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ fn oracle_prop_parser_sm_structured_lexer() {
           (list toks reconstructed)))
     (fmakunbound 'neovm--psm-lex)
     (makunbound 'neovm--psm-kw-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -430,7 +430,7 @@ fn oracle_prop_parser_sm_csv_parser() {
           (list rows counts (apply '= counts))))
     (fmakunbound 'neovm--psm-csv-parse-row)
     (fmakunbound 'neovm--psm-csv-parse)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -540,7 +540,7 @@ fn oracle_prop_parser_sm_html_tag_parser() {
         ;; Multiple attributes
         (funcall 'neovm--psm-parse-html-tag "<meta name=\"viewport\" content=\"width=device-width\">"))
     (fmakunbound 'neovm--psm-parse-html-tag)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -674,5 +674,5 @@ fn oracle_prop_parser_sm_html_stream() {
     (fmakunbound 'neovm--psm2-parse-tag)
     (fmakunbound 'neovm--psm2-extract-tags)
     (fmakunbound 'neovm--psm2-validate-nesting)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Dynamic vs lexical binding behavior difference
@@ -33,7 +33,7 @@ fn oracle_prop_dynamic_vs_lexical_scoping() {
                                 ;; Lexical: still sees 'global-lex (defining scope)
                                 (funcall read-lex))))))
                     (makunbound 'neovm--test-dyn-scope)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ fn oracle_prop_dynamic_deeply_nested_same_var() {
                         (setq results (cons (funcall reader) results))
                         (nreverse results))
                     (makunbound 'neovm--test-nest-v)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ fn oracle_prop_dynamic_unwind_on_error_cascade() {
                                       neovm--test-ue-b)))
                     (makunbound 'neovm--test-ue-a)
                     (makunbound 'neovm--test-ue-b)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ fn oracle_prop_dynamic_closure_capture_vs_dynamic() {
                                 ;; Verify prefix (lexical) stays, mode (dynamic) changes
                                 (list r1 r2 r3 r4))))))
                     (makunbound 'neovm--test-dc-mode)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ fn oracle_prop_dynamic_environment_context_system() {
                         (setq results (cons (funcall get-context) results))
                         (nreverse results))
                     (makunbound 'neovm--test-ctx-stack)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +224,7 @@ fn oracle_prop_dynamic_aspect_oriented_tracing() {
                             (let ((r2 (funcall traced-call 'mul mul r1 5)))
                               (list r1 r2 (nreverse neovm--test-trace-log))))))
                     (makunbound 'neovm--test-trace-log)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ fn oracle_prop_dynamic_condition_case_unwind_protect_interaction() {
                         (nreverse neovm--test-cwu-log))
                     (makunbound 'neovm--test-cwu-val)
                     (makunbound 'neovm--test-cwu-log)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -299,5 +299,5 @@ fn oracle_prop_dynamic_binding_catch_throw_unwind() {
                         ;; After catch, dynamic binding should be restored to 'base
                         (list result neovm--test-ct-v))
                     (makunbound 'neovm--test-ct-v)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

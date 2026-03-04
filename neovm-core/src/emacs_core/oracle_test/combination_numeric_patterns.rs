@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // GCD/LCM with fold over multiple numbers
@@ -65,7 +65,7 @@ fn oracle_prop_numpat_gcd_lcm_multi() {
     (fmakunbound 'neovm--test-lcm2)
     (fmakunbound 'neovm--test-gcd-list)
     (fmakunbound 'neovm--test-lcm-list)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +109,7 @@ fn oracle_prop_numpat_modular_exponentiation() {
           (= (% (* a b) m)
              (% (* (% a m) (% b m)) m))))
     (fmakunbound 'neovm--test-powmod)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ fn oracle_prop_numpat_sieve_and_factorize() {
               (list factors (= product 2520))))))
     (fmakunbound 'neovm--test-sieve)
     (fmakunbound 'neovm--test-factorize)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ fn oracle_prop_numpat_base_conversion() {
     (fmakunbound 'neovm--test-to-base)
     (fmakunbound 'neovm--test-from-base)
     (makunbound 'neovm--test-digits)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -325,7 +325,7 @@ fn oracle_prop_numpat_matrix_multiply() {
     (fmakunbound 'neovm--test-mat-transpose)
     (fmakunbound 'neovm--test-dot-product)
     (fmakunbound 'neovm--test-mat-mul)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -362,7 +362,7 @@ fn oracle_prop_numpat_newton_cube_root() {
                         results))))
         (nreverse results))
     (fmakunbound 'neovm--test-cbrt-newton)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -427,7 +427,7 @@ fn oracle_prop_numpat_horner_with_derivative() {
                 (< (abs (- r 3.0)) 1e-4))))))
     (fmakunbound 'neovm--test-horner-deriv)
     (fmakunbound 'neovm--test-newton-root)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -480,5 +480,5 @@ fn oracle_prop_numpat_integer_partitions() {
            (length (funcall 'neovm--test-list-partitions 6 6))))
     (fmakunbound 'neovm--test-partition-count)
     (fmakunbound 'neovm--test-list-partitions)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

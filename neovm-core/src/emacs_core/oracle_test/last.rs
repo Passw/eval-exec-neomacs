@@ -2,7 +2,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_last_basic() {
@@ -37,7 +37,7 @@ fn oracle_prop_last_dotted() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // last on a dotted list
-    assert_oracle_parity("(last '(1 2 . 3))");
+    assert_oracle_parity_with_bootstrap("(last '(1 2 . 3))");
 }
 
 #[test]

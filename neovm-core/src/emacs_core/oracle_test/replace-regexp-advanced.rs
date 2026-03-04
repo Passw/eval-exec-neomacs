@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Backreferences \1, \2 with multiple capture groups
@@ -69,7 +69,7 @@ fn oracle_prop_replace_regexp_adv_fixedcase_literal_combinations() {
     (replace-regexp-in-string "HELLO" "goodbye" text nil nil)
     ;; FIXEDCASE=t with same
     (replace-regexp-in-string "HELLO" "goodbye" text t nil)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ fn oracle_prop_replace_regexp_adv_subexp_group_replacement() {
   (replace-regexp-in-string
     "\\(prefix-\\([0-9]+\\)-suffix\\)" "XXX"
     "prefix-42-suffix prefix-99-suffix" nil nil nil 2))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ fn oracle_prop_replace_regexp_adv_chained_pipeline() {
        ;; Step 4: convert commas to spaces within
        (s5 (replace-regexp-in-string "," " " s4)))
   (list s1 s2 s3 s4 s5))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -225,7 +225,7 @@ fn oracle_prop_replace_regexp_adv_complex_patterns() {
   ;; Optional group: match with or without prefix
   (replace-regexp-in-string "\\(un\\)?happy" "MOOD"
     "I am happy but unhappy about it"))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

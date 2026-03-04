@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // apply with spread args — prefix arguments spliced before tail list
@@ -18,7 +18,7 @@ fn oracle_prop_apply_lambda_spread_args_multi_prefix() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // apply with 4 prefix args plus a tail list
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(apply (lambda (a b c d e f) (list a b c d e f))
              10 20 30 40 '(50 60))"#,
     );
@@ -40,7 +40,7 @@ fn oracle_prop_apply_lambda_funcall_vs_apply_equivalence() {
    (apply fn 3 4 '(5))
    (equal (funcall fn 3 4 5) (apply fn '(3 4 5)))
    (equal (apply fn 3 '(4 5)) (apply fn 3 4 '(5)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -122,7 +122,7 @@ fn oracle_prop_apply_lambda_as_data_in_alist() {
    (funcall sq-fn (funcall add-fn 3 4))
    ;; Apply from alist lookup
    (apply (cdr (assq 'add ops)) '(100 200))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +154,7 @@ fn oracle_prop_apply_lambda_in_hash_table() {
             7)
    ;; apply over hash lookup
    (apply (gethash 'double dispatch) '(50))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ fn oracle_prop_apply_lambda_self_referencing() {
        (funcall 'neovm--test-self-ref-fib 10))
     (fmakunbound 'neovm--test-self-ref-factorial)
     (fmakunbound 'neovm--test-self-ref-fib)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ fn oracle_prop_apply_lambda_function_vs_quote() {
   ;; They produce the same result
   (equal (funcall #'(lambda (x) (1+ x)) 41)
          (funcall '(lambda (x) (1+ x)) 41)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +242,7 @@ fn oracle_prop_apply_lambda_empty_args() {
   (funcall (lambda (&rest xs) (length xs)))
   ;; &optional with no args: all nil
   (funcall (lambda (&optional a b c) (list a b c))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -269,7 +269,7 @@ fn oracle_prop_apply_lambda_many_arguments() {
   (apply 'min (number-sequence -50 50))
   ;; Nested apply: apply a lambda that itself uses apply
   (apply (lambda (&rest xs) (apply '* xs)) '(1 2 3 4 5)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -296,7 +296,7 @@ fn oracle_prop_apply_lambda_closure_mutation() {
        (list (funcall add5 3)
              (funcall add10 3)
              (funcall add5 (funcall add10 0)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -325,5 +325,5 @@ fn oracle_prop_apply_lambda_returning_lambda() {
      (dolist (fn pipeline)
        (setq val (funcall fn val)))
      val)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

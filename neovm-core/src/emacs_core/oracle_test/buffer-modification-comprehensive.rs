@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // insert with various argument types and counts
@@ -32,7 +32,7 @@ fn oracle_prop_buffer_mod_insert_multi_strings_and_chars() {
           (insert "start" ?- ?> "end" ?! ?.)
           (let ((r5 (buffer-string)))
             (list r1 r2 r3 r4 r5)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ fn oracle_prop_buffer_mod_insert_before_markers_vs_insert() {
           (list :before before-m1 before-m2
                 :after-insert after-insert-m1 after-insert-m2 buf1
                 :after-ibm after-ibm-m1 after-ibm-m2 buf2))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ fn oracle_prop_buffer_mod_insert_char_comprehensive() {
           (insert-char ?_ 3)
           (let ((r5 (buffer-string)))
             (list r1 r2 r3 r4 r5 (point))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ fn oracle_prop_buffer_mod_delete_region_ranges() {
             (delete-region 4 2)
             (let ((r6 (buffer-string)))
               (list r1 r2 r3 r4 r5 r6))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ fn oracle_prop_buffer_mod_delete_char_comprehensive() {
         (delete-char -2)
         (let ((r4 (list (buffer-string) (point))))
           (list r1 r2 r3 r4))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +209,7 @@ fn oracle_prop_buffer_mod_delete_and_extract_region() {
                   extracted3 buf3
                   extracted4 buf4
                   extracted5 buf5)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -241,7 +241,7 @@ fn oracle_prop_buffer_mod_erase_buffer_states() {
         (erase-buffer)
         (let ((r4 (list (buffer-string) (point))))
           (list r1 r2 r3 r4))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ fn oracle_prop_buffer_mod_subst_char_in_region() {
       (subst-char-in-region (point-min) (point-max) ?Z ?Q)
       (let ((r3 (buffer-string)))
         (list r1 r2 r3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +295,7 @@ fn oracle_prop_buffer_mod_transpose_regions() {
       (transpose-regions 1 3 6 8)
       (let ((r3 (buffer-string)))
         (list r1 r2 r3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -332,7 +332,7 @@ fn oracle_prop_buffer_mod_insert_delete_sequence_point_tracking() {
     (delete-region 4 8)
     (push (list :after-del-region (buffer-string) (point)) trace)
     (nreverse trace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -367,7 +367,7 @@ fn oracle_prop_buffer_mod_marker_behavior_during_modifications() {
       (push (list :after-prepend (marker-position m1) (marker-position m2) (marker-position m3)
                   (buffer-string)) trace)
       (nreverse trace))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -400,7 +400,7 @@ fn oracle_prop_buffer_mod_narrowing_interactions() {
     (widen)
     (push (list :widened (buffer-string) (point-min) (point-max)) trace)
     (nreverse trace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -428,7 +428,7 @@ fn oracle_prop_buffer_mod_change_functions_side_effects() {
     ;; Change log should record the modifications
     (list :log (nreverse change-log)
           :final (buffer-string))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -469,7 +469,7 @@ fn oracle_prop_buffer_mod_structured_document_building() {
           (insert "# Config file\n")
           (let ((r4 (buffer-string)))
             (list r1 r2 r3 r4)))))))"##;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -573,7 +573,7 @@ fn oracle_prop_buffer_mod_search_replace_complex() {
           (replace-match "AT")
           (setq count2 (1+ count2)))
         (list r1 :re-count count2 :buf2 (buffer-string))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -599,7 +599,7 @@ fn oracle_prop_buffer_mod_multibyte_operations() {
       (delete-char 1)
       (let ((r3 (list (buffer-string) (point))))
         (list r1 r2 r3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

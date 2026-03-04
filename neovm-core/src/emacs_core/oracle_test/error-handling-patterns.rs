@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Error propagation and recovery chains
@@ -27,7 +27,7 @@ fn oracle_prop_error_retry_pattern() {
                           (setq result (format \"success on %d\" attempt)))
                       (error nil)))
                   (list result attempt))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn oracle_prop_error_selective_handling() {
                     (funcall handle-error 'void-variable \"x\")
                     (funcall handle-error 'wrong-type-argument \"bad\")
                     (funcall handle-error 'error \"generic\")))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn oracle_prop_error_in_mapcar() {
                              results (cons 'error results)))))
                   (list (nreverse results)
                         (nreverse errors)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -125,7 +125,7 @@ fn oracle_prop_error_with_resource_management() {
                             (funcall release 'A)))
                       (error nil))
                     (list resources (nreverse log))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ fn oracle_prop_error_wrap_and_rethrow() {
                                (list (format \"wrapped: %s\"
                                              (car (cdr inner-err)))))))
                   (error (car (cdr outer-err))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -166,7 +166,7 @@ fn oracle_prop_error_accumulate_in_loop() {
                          (setq failures (cons item failures)))))
                     (list (nreverse successes)
                           (nreverse failures)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ fn oracle_prop_error_safe_state_machine() {
                        (list state
                              (nreverse history)
                              (car (cdr err)))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]

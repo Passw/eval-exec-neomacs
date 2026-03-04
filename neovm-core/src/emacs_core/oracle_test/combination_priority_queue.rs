@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Min-heap: insert, peek, extract-min with bubble-up and sift-down
@@ -86,7 +86,7 @@ fn oracle_prop_priority_queue_min_heap_basic() {
     (fmakunbound 'neovm--pq-sift-down)
     (fmakunbound 'neovm--pq-insert)
     (fmakunbound 'neovm--pq-extract-min)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +160,7 @@ fn oracle_prop_priority_queue_max_heap() {
     (fmakunbound 'neovm--mxh-sift-down)
     (fmakunbound 'neovm--mxh-insert)
     (fmakunbound 'neovm--mxh-extract-max)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ fn oracle_prop_priority_queue_heapify() {
     (fmakunbound 'neovm--hfy-build)
     (fmakunbound 'neovm--hfy-drain)
     (fmakunbound 'neovm--hfy-valid-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -309,7 +309,7 @@ fn oracle_prop_priority_queue_heap_sort() {
     (fmakunbound 'neovm--hst-swap)
     (fmakunbound 'neovm--hst-max-sift)
     (fmakunbound 'neovm--hst-sort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -493,7 +493,7 @@ fn oracle_prop_priority_queue_k_way_merge() {
     (fmakunbound 'neovm--kwm-push)
     (fmakunbound 'neovm--kwm-pop)
     (fmakunbound 'neovm--kwm-merge)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -573,7 +573,7 @@ fn oracle_prop_priority_queue_kth_smallest() {
     (fmakunbound 'neovm--kth-up-max)
     (fmakunbound 'neovm--kth-down-max)
     (fmakunbound 'neovm--kth-smallest)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -686,5 +686,5 @@ fn oracle_prop_priority_queue_running_median() {
     (fmakunbound 'neovm--med-push-max)
     (fmakunbound 'neovm--med-pop-max)
     (fmakunbound 'neovm--med-add)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // defvar with docstring and initial value - full lifecycle
@@ -43,7 +43,7 @@ fn oracle_prop_defvar_setq_docstring_lifecycle() {
   (makunbound 'neovm--dsq-a)
   (makunbound 'neovm--dsq-b)
   (makunbound 'neovm--dsq-c))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ fn oracle_prop_defvar_setq_multiple_variables() {
   (makunbound 'neovm--dsq-m2)
   (makunbound 'neovm--dsq-m3)
   (makunbound 'neovm--dsq-m4))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ fn oracle_prop_defvar_setq_set_computed_symbol() {
   (makunbound 'neovm--dsq-dyn-a)
   (makunbound 'neovm--dsq-dyn-b)
   (makunbound 'neovm--dsq-dyn-c))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ fn oracle_prop_defvar_setq_declare_special_only() {
        neovm--dsq-special-only)
     (fmakunbound 'neovm--dsq-read-special)
     (makunbound 'neovm--dsq-special-only)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -334,7 +334,7 @@ fn oracle_prop_defvar_setq_variable_registry() {
     (fmakunbound 'neovm--dsq-reg-reset)
     (fmakunbound 'neovm--dsq-reg-info)
     (makunbound 'neovm--dsq-registry)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -422,5 +422,5 @@ fn oracle_prop_defvar_setq_config_management() {
     (makunbound 'neovm--dsq-cfg-log-level)
     (makunbound 'neovm--dsq-cfg-max-retries)
     (makunbound 'neovm--dsq-cfg-timeout)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

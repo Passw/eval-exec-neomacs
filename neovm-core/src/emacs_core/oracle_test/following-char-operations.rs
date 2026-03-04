@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // following-char at various positions
@@ -31,7 +31,7 @@ fn oracle_prop_following_char_various_positions() {
         (forward-char 1))
       (setq results (cons (nreverse all-chars) results)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ fn oracle_prop_following_char_at_eob() {
               (= at-eob 0)
               (= at-pmax 0)
               (= in-empty 0))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ fn oracle_prop_char_after_explicit_pos() {
    (let ((p (point)))
      (char-after 1)
      (= (point) p))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ fn oracle_prop_char_after_nil_uses_point() {
           (progn
             (goto-char 7)
             (list (char-after nil) (char-after) (char-after 7))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +137,7 @@ fn oracle_prop_char_after_nil_at_eob() {
     (setq results (cons (null (char-after (point-max))) results))  ;; t
     (setq results (cons (= (progn (goto-char (point-max)) (following-char)) 0) results))  ;; t
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +195,7 @@ fn oracle_prop_char_after_classification_loop() {
            (t (setq other-count (+ other-count len))))))
       (list rev-tokens
             (list 'alpha alpha-count 'digit digit-count 'other other-count)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -276,5 +276,5 @@ fn oracle_prop_char_after_balanced_parens() {
            (buffer-substring 1 (1+ outer-close))
            (buffer-substring 12 (1+ inner-close))
            (buffer-substring 18 (1+ expr-close))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

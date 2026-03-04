@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // + with 0, 1, 2, many args and mixed types
@@ -213,7 +213,7 @@ fn oracle_prop_number_arith_comp_division_by_zero_errors() {
   ;; Float division by zero does NOT error
   (floatp (/ 1.0 0.0))
   (floatp (/ -1.0 0.0)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -296,7 +296,7 @@ fn oracle_prop_number_arith_comp_percent_mod_exhaustive() {
     (mod -7 3)
     (% 7 -3)
     (mod 7 -3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -340,7 +340,7 @@ fn oracle_prop_number_arith_comp_ash_exhaustive() {
   (= (ash 1 0) 1)
   (= (ash 1 10) 1024)
   (= (ash 1 20) 1048576))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -423,7 +423,7 @@ fn oracle_prop_number_arith_comp_rounding_one_arg_all_modes() {
                   (ceiling v)
                   (round v)))
           vals))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -447,7 +447,7 @@ fn oracle_prop_number_arith_comp_rounding_two_arg_comprehensive() {
              (ceiling n d)
              (round n d))))
    pairs))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -472,7 +472,7 @@ fn oracle_prop_number_arith_comp_rounding_float_divisor_mixed() {
   ;; Rounding with integer that divides evenly
   (truncate 12 4) (floor 12 4) (ceiling 12 4) (round 12 4)
   (truncate -12 4) (floor -12 4) (ceiling -12 4) (round -12 4))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -509,7 +509,7 @@ fn oracle_prop_number_arith_comp_expt_comprehensive() {
   ;; Large exponent
   (expt 2 30)
   (> (expt 2 40) (expt 2 30)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -599,7 +599,7 @@ fn oracle_prop_number_arith_comp_type_promotion_tracking() {
   (= (truncate (float 42)) 42)
   (integerp (floor (float -7)))
   (= (floor (float -7)) -7))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -729,7 +729,7 @@ fn oracle_prop_number_arith_comp_float_rounding_functions() {
     (fceiling 5)
     (fround 5)
     (ftruncate 5)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

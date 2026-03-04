@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // FIRST set computation
@@ -146,7 +146,7 @@ fn oracle_prop_ll1_first_sets() {
     (fmakunbound 'neovm--ll1-set-add)
     (fmakunbound 'neovm--ll1-set-union)
     (fmakunbound 'neovm--ll1-compute-first)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +284,7 @@ fn oracle_prop_ll1_follow_sets() {
     (fmakunbound 'neovm--ll2-first-of-seq)
     (fmakunbound 'neovm--ll2-compute-first)
     (fmakunbound 'neovm--ll2-compute-follow)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -429,7 +429,7 @@ fn oracle_prop_ll1_parse_table() {
     (fmakunbound 'neovm--ll3-compute-follow)
     (fmakunbound 'neovm--ll3-build-table)
     (fmakunbound 'neovm--ll3-table-to-alist)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -596,7 +596,7 @@ fn oracle_prop_ll1_predictive_parse() {
     (fmakunbound 'neovm--ll4-compute-follow)
     (fmakunbound 'neovm--ll4-build-table)
     (fmakunbound 'neovm--ll4-parse)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -715,7 +715,7 @@ fn oracle_prop_ll1_statement_grammar() {
     (fmakunbound 'neovm--ll5-compute-first)
     (fmakunbound 'neovm--ll5-compute-follow)
     (fmakunbound 'neovm--ll5-build-table)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -886,5 +886,5 @@ fn oracle_prop_ll1_error_recovery() {
     (fmakunbound 'neovm--ll6-compute-follow)
     (fmakunbound 'neovm--ll6-build-table)
     (fmakunbound 'neovm--ll6-parse-recover)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

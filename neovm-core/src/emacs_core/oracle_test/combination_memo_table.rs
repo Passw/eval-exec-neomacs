@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Generic memoize wrapper with hit/miss statistics
@@ -83,7 +83,7 @@ fn oracle_prop_memo_generic_wrapper_with_stats() {
                               :actual-calls-first calls-after-first
                               :actual-calls-second calls-after-second))))))))))
     (fmakunbound 'neovm--test-make-memoized)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ fn oracle_prop_memo_multi_arg() {
                     :strs (list c1 c2 c3 c4)
                     :str-stats (funcall stats2))))))
     (fmakunbound 'neovm--test-make-memo2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ fn oracle_prop_memo_recursive_fibonacci() {
     (fmakunbound 'neovm--test-memo-fib)
     (makunbound 'neovm--test-fib-cache)
     (makunbound 'neovm--test-fib-calls)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +245,7 @@ fn oracle_prop_memo_catalan_numbers() {
                 :recurrence-valid recurrence-ok)))
     (fmakunbound 'neovm--test-catalan)
     (makunbound 'neovm--test-catalan-cache)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +302,7 @@ fn oracle_prop_memo_partition_function() {
     (fmakunbound 'neovm--test-partition)
     (fmakunbound 'neovm--test-partitions)
     (makunbound 'neovm--test-part-cache)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -378,7 +378,7 @@ fn oracle_prop_memo_bounded_lru_cache() {
                       (list :r1 r1 :r2 r2 :r3 r3 :r4 r4 :r5 r5
                             :s1 s1 :s2 s2 :s3 s3 :s4 s4)))))))))
     (fmakunbound 'neovm--test-make-bounded-memo)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

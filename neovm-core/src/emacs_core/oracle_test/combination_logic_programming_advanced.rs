@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Prolog-style unification with compound terms (functors)
@@ -98,7 +98,7 @@ fn oracle_prop_logic_prog_adv_compound_unification() {
     (fmakunbound 'neovm--lpa-occurs-p)
     (fmakunbound 'neovm--lpa-unify)
     (fmakunbound 'neovm--lpa-apply-subst)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ fn oracle_prop_logic_prog_adv_resolution_with_cut() {
     (fmakunbound 'neovm--lpa-rename-inner)
     (fmakunbound 'neovm--lpa-resolve)
     (fmakunbound 'neovm--lpa-resolve-conj)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -421,7 +421,7 @@ fn oracle_prop_logic_prog_adv_arithmetic_eval() {
     (fmakunbound 'neovm--lpa-walk)
     (fmakunbound 'neovm--lpa-apply-subst)
     (fmakunbound 'neovm--lpa-arith)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -490,7 +490,7 @@ fn oracle_prop_logic_prog_adv_list_reverse_permutation() {
     (fmakunbound 'neovm--lpa-logic-reverse)
     (fmakunbound 'neovm--lpa-select)
     (fmakunbound 'neovm--lpa-permutations)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -587,7 +587,7 @@ fn oracle_prop_logic_prog_adv_negation_as_failure() {
     (fmakunbound 'neovm--lpa-apply-subst)
     (fmakunbound 'neovm--lpa-query-facts)
     (fmakunbound 'neovm--lpa-not)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

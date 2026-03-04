@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Variable interpolation: {{var}} replacement from an alist context
@@ -62,7 +62,7 @@ fn oracle_prop_template_variable_interpolation() {
           ;; Numeric value interpolation
           (funcall 'neovm--tpl-interpolate "Age: {{age}}" ctx)))
     (fmakunbound 'neovm--tpl-interpolate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@ fn oracle_prop_template_conditional_blocks() {
                    "{%if premium%}VIP{%else%}Free{%endif%}"
                    ctx-admin)))
     (fmakunbound 'neovm--tpl-eval-cond)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ fn oracle_prop_template_loop_blocks() {
           ;; No foreach blocks - pass through
           (funcall 'neovm--tpl-foreach "no loops here" ctx)))
     (fmakunbound 'neovm--tpl-foreach)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -307,7 +307,7 @@ fn oracle_prop_template_combined_features() {
     (fmakunbound 'neovm--tpl-eval-cond)
     (fmakunbound 'neovm--tpl-foreach)
     (fmakunbound 'neovm--tpl-render)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -367,7 +367,7 @@ fn oracle_prop_template_inheritance_include() {
                    "{%include nav%} | {%include nav%}"
                    templates)))
     (fmakunbound 'neovm--tpl-include)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -446,7 +446,7 @@ fn oracle_prop_template_escape_sequences() {
           (funcall 'neovm--tpl-html-escape "a < b & c > d \"quoted\" it's")))
     (fmakunbound 'neovm--tpl-html-escape)
     (fmakunbound 'neovm--tpl-render-escaped)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -527,5 +527,5 @@ fn oracle_prop_template_compile_to_ops() {
           (length (funcall 'neovm--tpl-compile "a{{b}}c{{d}}e{{f}}g"))))
     (fmakunbound 'neovm--tpl-compile)
     (fmakunbound 'neovm--tpl-exec-ops)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

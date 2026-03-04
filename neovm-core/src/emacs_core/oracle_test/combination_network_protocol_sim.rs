@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Packet routing with hop count and TTL
@@ -92,7 +92,7 @@ fn oracle_prop_network_protocol_packet_routing() {
               (nth 5 p1) (nth 5 p3)))
     (fmakunbound 'neovm--nps-lookup-route)
     (fmakunbound 'neovm--nps-route-packet)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -406,7 +406,7 @@ fn oracle_prop_network_protocol_dns_resolution() {
          (car r4)))
     (fmakunbound 'neovm--nps-dns-query)
     (fmakunbound 'neovm--nps-dns-resolve)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@
 //! Data represented as list-of-alists.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // SELECT with column projection and WHERE with comparison operators
@@ -67,7 +67,7 @@ fn oracle_prop_ql_select_where_basic() {
     (fmakunbound 'neovm--ql-project)
     (fmakunbound 'neovm--ql-where)
     (fmakunbound 'neovm--ql-select)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ fn oracle_prop_ql_order_by_limit() {
     (fmakunbound 'neovm--ql-order-by)
     (fmakunbound 'neovm--ql-limit)
     (fmakunbound 'neovm--ql-offset)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -216,7 +216,7 @@ fn oracle_prop_ql_aggregate_functions() {
     (fmakunbound 'neovm--ql-agg-sum)
     (fmakunbound 'neovm--ql-agg-min)
     (fmakunbound 'neovm--ql-agg-max)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +287,7 @@ fn oracle_prop_ql_distinct_union() {
     (fmakunbound 'neovm--ql-distinct)
     (fmakunbound 'neovm--ql-union)
     (fmakunbound 'neovm--ql-union-all)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -372,7 +372,7 @@ fn oracle_prop_ql_nested_subqueries() {
     (fmakunbound 'neovm--ql-filter)
     (fmakunbound 'neovm--ql-proj)
     (fmakunbound 'neovm--ql-col-values)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -463,7 +463,7 @@ fn oracle_prop_ql_join_operations() {
     (fmakunbound 'neovm--ql-inner-join)
     (fmakunbound 'neovm--ql-left-join)
     (fmakunbound 'neovm--ql-cross-join)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -564,7 +564,7 @@ fn oracle_prop_ql_full_pipeline() {
     (fmakunbound 'neovm--ql2-group-by)
     (fmakunbound 'neovm--ql2-order-by)
     (fmakunbound 'neovm--ql2-limit)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -621,5 +621,5 @@ fn oracle_prop_ql_having_clause() {
                                                 (cdr (assq 'total r))))
                               agg)
                       (lambda (a b) (string< (car a) (car b))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

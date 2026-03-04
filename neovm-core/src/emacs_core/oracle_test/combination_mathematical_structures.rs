@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Rational number arithmetic (add, mul, simplify with GCD)
@@ -99,7 +99,7 @@ fn oracle_prop_math_rational_arithmetic() {
     (fmakunbound 'neovm--test-rat-div)
     (fmakunbound 'neovm--test-rat-equal)
     (fmakunbound 'neovm--test-rat-to-string)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ fn oracle_prop_math_complex_arithmetic() {
     (fmakunbound 'neovm--test-cx-conjugate)
     (fmakunbound 'neovm--test-cx-magnitude-sq)
     (fmakunbound 'neovm--test-cx-to-string)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -308,7 +308,7 @@ fn oracle_prop_math_polynomial_operations() {
     (fmakunbound 'neovm--test-poly-mul)
     (fmakunbound 'neovm--test-poly-eval)
     (fmakunbound 'neovm--test-poly-to-string)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -425,7 +425,7 @@ fn oracle_prop_math_permutation_group() {
     (fmakunbound 'neovm--test-perm-apply)
     (fmakunbound 'neovm--test-perm-order)
     (fmakunbound 'neovm--test-perm-cycles)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -529,7 +529,7 @@ fn oracle_prop_math_set_theory() {
     (fmakunbound 'neovm--test-set-symmetric-diff)
     (fmakunbound 'neovm--test-power-set)
     (fmakunbound 'neovm--test-cartesian-product)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -626,7 +626,7 @@ fn oracle_prop_math_interval_arithmetic() {
     (fmakunbound 'neovm--test-iv-intersect)
     (fmakunbound 'neovm--test-iv-union-hull)
     (fmakunbound 'neovm--test-iv-subset)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -775,5 +775,5 @@ fn oracle_prop_math_matrix_operations() {
     (fmakunbound 'neovm--test-mat-transpose)
     (fmakunbound 'neovm--test-mat-det)
     (fmakunbound 'neovm--test-mat-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

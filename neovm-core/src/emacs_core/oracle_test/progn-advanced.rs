@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // progn with side effects and return value
@@ -31,7 +31,7 @@ fn oracle_prop_progn_side_effects_and_return() {
            ;; Return value is this last expression
            (format "final=%d" counter))))
     (list result counter (nreverse trace))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ fn oracle_prop_progn_nested_in_let_if_cond() {
                    (setq log (cons 'large log))
                    'large))))
         (list a b r1 r2 (nreverse log))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +137,7 @@ fn oracle_prop_progn_with_condition_case() {
             (list 'error-caught (car err))))))
     ;; step1 and step2 should have been logged, step3 should not
     (list result (nreverse log))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ fn oracle_prop_progn_build_state_pipeline() {
   (list (gethash "status" state)
         (gethash "count" state)
         (gethash "items" state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ fn oracle_prop_progn_in_macro_expansion() {
                    (+ x 5))))))
         (list result neovm--trace))
     (fmakunbound 'neovm--test-with-trace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +254,7 @@ fn oracle_prop_progn_implicit_body_forms() {
       (setq resource 'released)
       (setq trace (cons (list 'cleanup-resource resource) trace))))
   (list sum (nreverse trace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,5 +285,5 @@ fn oracle_prop_progn_deeply_nested_return() {
                      0)))))))
     ;; 10 + (3 * 7) = 31
     (list result (nreverse log))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

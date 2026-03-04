@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 2D vector operations and basic kinematics
@@ -91,7 +91,7 @@ fn oracle_prop_physics_2d_vector_operations() {
     (fmakunbound 'neovm--phys-vmag-sq)
     (fmakunbound 'neovm--phys-vneg)
     (fmakunbound 'neovm--phys-kinematic-step)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ fn oracle_prop_physics_verlet_integration() {
                     (nth 5 traj) (nth 3 traj) dt))))
     (fmakunbound 'neovm--verlet-step)
     (fmakunbound 'neovm--verlet-velocity)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -239,7 +239,7 @@ fn oracle_prop_physics_collision_detection() {
     (fmakunbound 'neovm--phys-point-in-rect)
     (fmakunbound 'neovm--phys-circle-rect-collide)
     (fmakunbound 'neovm--phys-sweep-collide)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -361,7 +361,7 @@ fn oracle_prop_physics_nbody_gravity() {
     (fmakunbound 'neovm--nbody-total-accel)
     (fmakunbound 'neovm--nbody-step)
     (fmakunbound 'neovm--nbody-kinetic-energy)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -435,7 +435,7 @@ fn oracle_prop_physics_spring_mass() {
     (fmakunbound 'neovm--spring-step)
     (fmakunbound 'neovm--spring-simulate)
     (fmakunbound 'neovm--spring-energy)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -535,7 +535,7 @@ fn oracle_prop_physics_projectile_with_drag() {
     (fmakunbound 'neovm--proj-simulate)
     (fmakunbound 'neovm--proj-range)
     (fmakunbound 'neovm--proj-max-height)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -621,5 +621,5 @@ fn oracle_prop_physics_collision_response() {
     (fmakunbound 'neovm--coll-inelastic)
     (fmakunbound 'neovm--coll-partial)
     (fmakunbound 'neovm--coll-momentum)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

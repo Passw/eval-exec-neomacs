@@ -3,7 +3,7 @@
 //! ASCII table building, thousands separators, and paragraph reflow.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Word wrapping with greedy algorithm
@@ -73,7 +73,7 @@ fn oracle_prop_textfmt_word_wrap_greedy() {
          ;; Edge: single long word
          (funcall 'neovm--test-word-wrap "supercalifragilistic" 10)))
     (fmakunbound 'neovm--test-word-wrap)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +118,7 @@ fn oracle_prop_textfmt_center_align() {
                                 (<= (abs (- left-spaces right-spaces)) 1)))))
                         centered))))
     (fmakunbound 'neovm--test-center)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ fn oracle_prop_textfmt_justify() {
                   ;; Verify word content preserved
                   (mapcar (lambda (j) (length (split-string j " " t))) justified)))))
     (fmakunbound 'neovm--test-justify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -272,7 +272,7 @@ fn oracle_prop_textfmt_ascii_table() {
            ;; Row count
            (length data-rows))))
     (fmakunbound 'neovm--test-build-table)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ fn oracle_prop_textfmt_thousands_separator() {
                     (list n (funcall 'neovm--test-format-number n sep gs))))
                 test-cases))
     (fmakunbound 'neovm--test-format-number)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -433,7 +433,7 @@ Short paragraph."))
          ;; Reflow to 100 columns (wider -- should produce fewer lines)
          (length (funcall 'neovm--test-reflow text 100))))
     (fmakunbound 'neovm--test-reflow)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -497,5 +497,5 @@ fn oracle_prop_textfmt_column_truncation() {
            ;; Verify truncation happened where expected
            (length formatted))))
     (fmakunbound 'neovm--test-format-columns)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

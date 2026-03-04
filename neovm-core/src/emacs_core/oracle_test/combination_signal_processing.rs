@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Moving average filter
@@ -78,7 +78,7 @@ Returns a list of averaged values (shorter by window-size - 1)."
            (list mn mx))))
     (fmakunbound 'neovm--sp-moving-average)
     (makunbound 'neovm--sp-ma-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ ALPHA is in [0, 1]. Returns smoothed signal (same length)."
            ok)
          :step-smooth-last-3 (last step-smooth 3)))
     (fmakunbound 'neovm--sp-exp-smooth)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +247,7 @@ Returns list of (index . value) pairs."
     (fmakunbound 'neovm--sp-find-peaks)
     (fmakunbound 'neovm--sp-find-valleys)
     (makunbound 'neovm--sp-peak-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -321,7 +321,7 @@ Returns list of floats."
              (setq prev v))
            ok)))
     (fmakunbound 'neovm--sp-normalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +395,7 @@ Output length = len(signal) + len(kernel) - 1."
          :gauss-last-3 (last gauss-conv 3)))
     (fmakunbound 'neovm--sp-convolve)
     (makunbound 'neovm--sp-conv-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -506,7 +506,7 @@ Inverse of differentiation."
     (fmakunbound 'neovm--sp-diff)
     (fmakunbound 'neovm--sp-diff2)
     (fmakunbound 'neovm--sp-integrate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -619,5 +619,5 @@ fn oracle_prop_sigproc_full_pipeline() {
     (fmakunbound 'neovm--sp-norm)
     (fmakunbound 'neovm--sp-stats)
     (makunbound 'neovm--sp-pipeline-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

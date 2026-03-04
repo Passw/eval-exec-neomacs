@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 /// Shared JSON parser preamble: all parser functions.
 /// The parser works by maintaining a position index into the input string,
@@ -293,7 +293,7 @@ fn oracle_prop_json_parse_numbers() {
         PARSER_PREAMBLE = PARSER_PREAMBLE,
         PARSER_CLEANUP = PARSER_CLEANUP
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -327,7 +327,7 @@ fn oracle_prop_json_parse_booleans_null() {
         PARSER_PREAMBLE = PARSER_PREAMBLE,
         PARSER_CLEANUP = PARSER_CLEANUP
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -365,7 +365,7 @@ fn oracle_prop_json_parse_arrays() {
         PARSER_PREAMBLE = PARSER_PREAMBLE,
         PARSER_CLEANUP = PARSER_CLEANUP
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -404,7 +404,7 @@ fn oracle_prop_json_parse_objects() {
         PARSER_PREAMBLE = PARSER_PREAMBLE,
         PARSER_CLEANUP = PARSER_CLEANUP
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -440,7 +440,7 @@ fn oracle_prop_json_parse_errors() {
         PARSER_PREAMBLE = PARSER_PREAMBLE,
         PARSER_CLEANUP = PARSER_CLEANUP
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -506,5 +506,5 @@ fn oracle_prop_json_parse_complex_query() {
         PARSER_PREAMBLE = PARSER_PREAMBLE,
         PARSER_CLEANUP = PARSER_CLEANUP
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }

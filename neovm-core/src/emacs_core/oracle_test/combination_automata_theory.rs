@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Pushdown automaton simulation: accept balanced parentheses variants
@@ -91,7 +91,7 @@ fn oracle_prop_automata_pushdown_automaton() {
           (list (nth 0 result) (nth 1 result) (nth 2 result))))
     (makunbound 'neovm--test-pda-trans)
     (fmakunbound 'neovm--test-pda-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ fn oracle_prop_automata_turing_machine_single_tape() {
                          neovm--test-tm-inc 'scan '(done) nil "111" 100)))
     (makunbound 'neovm--test-tm-inc)
     (fmakunbound 'neovm--test-tm-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +276,7 @@ fn oracle_prop_automata_multi_tape_turing_machine() {
         (funcall 'neovm--test-mt-run "" 200))
     (makunbound 'neovm--test-mt-trans)
     (fmakunbound 'neovm--test-mt-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -582,7 +582,7 @@ fn oracle_prop_automata_regular_language_operations() {
     (fmakunbound 'neovm--test-nfa-star)
     (fmakunbound 'neovm--test-nfa-eps-closure)
     (fmakunbound 'neovm--test-nfa-simulate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -696,7 +696,7 @@ fn oracle_prop_automata_dfa_minimization() {
             (puthash '(Q . ?0) 'Q t3) (puthash '(Q . ?1) 'Q t3)
             (funcall 'neovm--test-dfa-minimize '(Q) '(?0 ?1) t3 'Q '(Q)))))
     (fmakunbound 'neovm--test-dfa-minimize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -793,5 +793,5 @@ fn oracle_prop_automata_language_equivalence() {
           (funcall 'neovm--test-dfa-equivalent
                    t1 'q0 '(q0) t2 'r0 nil '(?a ?b))))
     (fmakunbound 'neovm--test-dfa-equivalent)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

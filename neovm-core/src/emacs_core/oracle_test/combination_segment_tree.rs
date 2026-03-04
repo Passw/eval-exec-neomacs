@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Build segment tree from array and range sum queries
@@ -76,7 +76,7 @@ fn oracle_prop_segment_tree_build_and_range_sum() {
           (funcall 'neovm--st-query-sum st 6 7))) ;; 28
     (fmakunbound 'neovm--st-build)
     (fmakunbound 'neovm--st-query-sum)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ fn oracle_prop_segment_tree_point_update() {
     (fmakunbound 'neovm--st2-build)
     (fmakunbound 'neovm--st2-update)
     (fmakunbound 'neovm--st2-query)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -257,7 +257,7 @@ fn oracle_prop_segment_tree_range_minimum() {
     (fmakunbound 'neovm--stmin-build)
     (fmakunbound 'neovm--stmin-query)
     (fmakunbound 'neovm--stmin-update)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -379,7 +379,7 @@ fn oracle_prop_segment_tree_lazy_propagation() {
     (fmakunbound 'neovm--stlazy-push)
     (fmakunbound 'neovm--stlazy-range-add)
     (fmakunbound 'neovm--stlazy-query-sum)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -465,7 +465,7 @@ fn oracle_prop_segment_tree_merge() {
     (fmakunbound 'neovm--stm-build)
     (fmakunbound 'neovm--stm-query)
     (fmakunbound 'neovm--stm-merge)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -551,7 +551,7 @@ fn oracle_prop_segment_tree_range_max_query() {
     (fmakunbound 'neovm--stmax-build)
     (fmakunbound 'neovm--stmax-query)
     (fmakunbound 'neovm--stmax-update)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -641,5 +641,5 @@ fn oracle_prop_segment_tree_frequency_counting() {
     (fmakunbound 'neovm--stf-create)
     (fmakunbound 'neovm--stf-add)
     (fmakunbound 'neovm--stf-count-range)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

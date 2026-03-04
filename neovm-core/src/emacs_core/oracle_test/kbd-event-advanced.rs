@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // kbd with all modifier prefixes and combinations
@@ -117,7 +117,7 @@ fn oracle_prop_kbd_event_function_keys() {
   (kbd "M-<down>")
   (kbd "S-<left>")
   (kbd "C-M-<right>"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ fn oracle_prop_kbd_event_key_description_roundtrip() {
   (equal (key-description (kbd "C-x C-f")) "C-x C-f")
   (equal (key-description (kbd "M-x")) "M-x")
   (equal (key-description (kbd "C-M-a")) "C-M-a"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ fn oracle_prop_kbd_event_convert_list_extended() {
   (event-convert-list '(control meta mouse-3))
   (event-convert-list '(down-mouse-1))
   (event-convert-list '(double-mouse-1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +247,7 @@ fn oracle_prop_kbd_event_single_key_description_comprehensive() {
   ;; Verify consistency: single-key of kbd result
   (equal (single-key-description (aref (kbd "C-a") 0)) "C-a")
   (equal (single-key-description (aref (kbd "M-x") 0)) "M-x"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

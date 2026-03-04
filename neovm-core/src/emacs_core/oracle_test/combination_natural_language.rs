@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Tokenizer: split text into words on whitespace and punctuation
@@ -52,7 +52,7 @@ fn oracle_prop_nlp_tokenizer() {
         ;; Punctuation-heavy
         (funcall 'neovm--nlp-tokenize "Hello...World!!! How's it going?"))
     (fmakunbound 'neovm--nlp-tokenize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +109,7 @@ fn oracle_prop_nlp_ngrams() {
         (funcall 'neovm--nlp-ngrams '("x" "y" "z") 3))
     (fmakunbound 'neovm--nlp-ngrams)
     (fmakunbound 'neovm--nlp-char-ngrams)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -187,7 +187,7 @@ fn oracle_prop_nlp_bag_of_words_and_frequency() {
     (fmakunbound 'neovm--nlp-bow)
     (fmakunbound 'neovm--nlp-bow-to-alist)
     (fmakunbound 'neovm--nlp-top-n)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +254,7 @@ fn oracle_prop_nlp_levenshtein() {
             (+ (funcall 'neovm--nlp-levenshtein "abc" "mno")
                (funcall 'neovm--nlp-levenshtein "mno" "xyz"))))
     (fmakunbound 'neovm--nlp-levenshtein)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +317,7 @@ fn oracle_prop_nlp_lcs() {
         (= (car (funcall 'neovm--nlp-lcs "algorithm" "altruistic"))
            (car (funcall 'neovm--nlp-lcs "altruistic" "algorithm"))))
     (fmakunbound 'neovm--nlp-lcs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -385,7 +385,7 @@ fn oracle_prop_nlp_stemmer() {
         (let ((s1 (funcall 'neovm--nlp-stem "organizing")))
           (list s1 (funcall 'neovm--nlp-stem s1))))
     (fmakunbound 'neovm--nlp-stem)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -469,5 +469,5 @@ fn oracle_prop_nlp_jaccard_similarity() {
     (fmakunbound 'neovm--nlp-jac-inter-size)
     (fmakunbound 'neovm--nlp-jac-union-size)
     (fmakunbound 'neovm--nlp-jaccard)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

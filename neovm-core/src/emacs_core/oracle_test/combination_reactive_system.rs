@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Observable/Observer: subscribe, notify, unsubscribe
@@ -105,7 +105,7 @@ fn oracle_prop_combination_reactive_observable_observer() {
     (fmakunbound 'neovm--rs-get-value)
     (makunbound 'neovm--rs-observables)
     (makunbound 'neovm--rs-event-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ fn oracle_prop_combination_reactive_signal_slot() {
     (fmakunbound 'neovm--rs2-emit)
     (makunbound 'neovm--rs2-signals)
     (makunbound 'neovm--rs2-results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ fn oracle_prop_combination_reactive_computed_properties() {
     (makunbound 'neovm--rs3-cells)
     (makunbound 'neovm--rs3-computeds)
     (makunbound 'neovm--rs3-eval-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -398,7 +398,7 @@ fn oracle_prop_combination_reactive_dataflow_graph() {
     (makunbound 'neovm--rs4-nodes)
     (makunbound 'neovm--rs4-edges)
     (makunbound 'neovm--rs4-prop-order)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -500,7 +500,7 @@ fn oracle_prop_combination_reactive_glitch_prevention() {
     (fmakunbound 'neovm--rs5-set-a-glitchy)
     (makunbound 'neovm--rs5-vals)
     (makunbound 'neovm--rs5-snapshots)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -605,7 +605,7 @@ fn oracle_prop_combination_reactive_batch_updates() {
     (makunbound 'neovm--rs6-batch-mode)
     (makunbound 'neovm--rs6-dirty)
     (makunbound 'neovm--rs6-notify-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -695,5 +695,5 @@ fn oracle_prop_combination_reactive_dispose_pattern() {
     (makunbound 'neovm--rs7-subs)
     (makunbound 'neovm--rs7-active)
     (makunbound 'neovm--rs7-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

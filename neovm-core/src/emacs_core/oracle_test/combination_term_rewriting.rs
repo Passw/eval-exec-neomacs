@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Core term rewriting: pattern matching with variables
@@ -188,7 +188,7 @@ fn oracle_prop_term_rewriting_single_step() {
     (fmakunbound 'neovm--tr2-subst)
     (fmakunbound 'neovm--tr2-try-rules)
     (fmakunbound 'neovm--tr2-step)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -298,7 +298,7 @@ fn oracle_prop_term_rewriting_fixpoint() {
     (fmakunbound 'neovm--tr3-try-rules)
     (fmakunbound 'neovm--tr3-step)
     (fmakunbound 'neovm--tr3-normalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -417,7 +417,7 @@ fn oracle_prop_term_rewriting_algebra_simplify() {
     (fmakunbound 'neovm--tr4-try-rules)
     (fmakunbound 'neovm--tr4-step)
     (fmakunbound 'neovm--tr4-normalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -541,7 +541,7 @@ fn oracle_prop_term_rewriting_boolean_normalize() {
     (fmakunbound 'neovm--tr5-try-rules)
     (fmakunbound 'neovm--tr5-step)
     (fmakunbound 'neovm--tr5-normalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

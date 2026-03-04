@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // rassoc / rassq (reverse association)
@@ -18,7 +18,7 @@ fn oracle_prop_rassoc_basic() {
                     (list (rassoc 1 alist)
                           (rassoc 2 alist)
                           (rassoc 4 alist)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -33,7 +33,7 @@ fn oracle_prop_rassoc_string_keys() {
                     (list (rassoc "dev" alist)
                           (rassoc "qa" alist)
                           (rassoc "hr" alist)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn oracle_prop_rassq_vs_rassoc() {
                           (let ((al2 '((1 . "hello") (2 . "world"))))
                             (list (rassq "hello" al2)
                                   (rassoc "hello" al2)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ fn oracle_prop_assoc_testfn() {
                      ;; Default (equal) comparison
                      (assoc "HELLO" alist)
                      (assoc "hello" alist)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ fn oracle_prop_alist_get_default() {
                           (alist-get 'age alist)
                           (alist-get 'missing alist)
                           (alist-get 'missing alist 'default-val)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn oracle_prop_alist_get_remove() {
                           (alist-get 'b alist nil t)
                           (alist-get 'd alist)
                           (alist-get 'd alist 'default)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ fn oracle_prop_copy_alist_independence() {
                             ;; share structure (shallow copy)
                             (eq (cdr (assq 'b orig))
                                 (cdr (assq 'b copy))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ fn oracle_prop_alist_record_system() {
                                 (funcall record-get r3 'role)
                                 (funcall record-get r3 'team)
                                 (funcall record-get r3 'missing 'N/A))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +210,7 @@ fn oracle_prop_alist_indexed_db() {
                               (sort qa #'string-lessp)
                               (length eng)
                               (length qa)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -244,5 +244,5 @@ fn oracle_prop_alist_set_operations() {
                           (list (nreverse inter)
                                 (nreverse diff)
                                 (nreverse sym-diff))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

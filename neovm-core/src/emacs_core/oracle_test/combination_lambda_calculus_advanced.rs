@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Lambda term representation and free variables
@@ -66,7 +66,7 @@ fn oracle_prop_lc_adv_free_variables() {
         (funcall 'neovm--lca-free-vars
           '(lam x (app (lam x (var x)) (var x)))))
     (fmakunbound 'neovm--lca-free-vars)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ fn oracle_prop_lc_adv_alpha_conversion() {
     (fmakunbound 'neovm--lca-fresh-var)
     (fmakunbound 'neovm--lca-rename)
     (fmakunbound 'neovm--lca-alpha-convert)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -277,7 +277,7 @@ fn oracle_prop_lc_adv_substitution_and_beta() {
     (fmakunbound 'neovm--lca-rename)
     (fmakunbound 'neovm--lca-subst)
     (fmakunbound 'neovm--lca-beta-step)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -400,7 +400,7 @@ fn oracle_prop_lc_adv_normal_order_evaluation() {
     (fmakunbound 'neovm--lca-subst)
     (fmakunbound 'neovm--lca-beta-step)
     (fmakunbound 'neovm--lca-normalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -471,7 +471,7 @@ fn oracle_prop_lc_adv_church_numerals() {
             ;; SUCC structure check
             (and (consp SUCC) (eq (car SUCC) 'lam) t))))
     (fmakunbound 'neovm--lca-church-to-int)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -615,7 +615,7 @@ fn oracle_prop_lc_adv_church_booleans() {
     (fmakunbound 'neovm--lca-beta-step)
     (fmakunbound 'neovm--lca-normalize)
     (fmakunbound 'neovm--lca-to-bool)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -694,5 +694,5 @@ fn oracle_prop_lc_adv_ski_combinators() {
           '(app (app (app S I) I) a) 20))
     (fmakunbound 'neovm--lca-cl-step)
     (fmakunbound 'neovm--lca-cl-normalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

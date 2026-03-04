@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Generator/iterator protocol using closures
@@ -55,7 +55,7 @@ fn oracle_prop_concurrent_generator_protocol() {
         (funcall reset-fn)
         (let ((after-reset (funcall take-fn 5)))
           (list first-8 next1 next2 after-reset))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ fn oracle_prop_concurrent_round_robin_scheduler() {
         (t2 (funcall make-task 'B 2))
         (t3 (funcall make-task 'C 4)))
     (funcall scheduler (list t1 t2 t3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ fn oracle_prop_concurrent_producer_consumer() {
       (list (nreverse processed)
             (length (nreverse log))
             (null queue)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -217,7 +217,7 @@ fn oracle_prop_concurrent_coroutine_cps() {
     (fmakunbound 'neovm--cps-step3)
     (fmakunbound 'neovm--cps-pipeline)
     (makunbound 'neovm--cps-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_concurrent_event_loop() {
     (list (length (nreverse log))
           ;; Return the log in chronological order
           (nreverse log))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -330,7 +330,7 @@ fn oracle_prop_concurrent_pipeline_transformers() {
      (funcall (nth 3 s1))
      (funcall (nth 3 s2))
      (funcall (nth 3 s3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -394,7 +394,7 @@ fn oracle_prop_concurrent_actor_model() {
                 (funcall receive-fn 'inc)
                 (funcall process-fn))
               (funcall state-fn))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -463,5 +463,5 @@ fn oracle_prop_concurrent_work_stealing() {
      (funcall size1)
      (funcall size2)
      (length (nreverse log)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

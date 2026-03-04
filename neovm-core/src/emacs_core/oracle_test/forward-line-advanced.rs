@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Return value semantics: 0 on success, remaining lines on partial movement
@@ -49,7 +49,7 @@ fn oracle_prop_forward_line_return_value_semantics() {
           (ret (forward-line 1)))
       (setq results (cons (list 'fwd-from-last-line ret (point)) results)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -205,7 +205,7 @@ fn oracle_prop_forward_line_with_narrowing() {
                                        (buffer-substring (point) (line-end-position)))
                                 results))))))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -370,5 +370,5 @@ fn oracle_prop_forward_line_with_bol_eol() {
                                    (buffer-substring (point) (line-end-position)))
                             results))))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

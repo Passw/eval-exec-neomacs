@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Sparse matrix creation, set, get operations
@@ -100,7 +100,7 @@ fn oracle_prop_sparse_matrix_basic_operations() {
     (fmakunbound 'neovm--sm-set)
     (fmakunbound 'neovm--sm-get)
     (fmakunbound 'neovm--sm-nnz)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +197,7 @@ fn oracle_prop_sparse_matrix_addition() {
     (fmakunbound 'neovm--sma-get)
     (fmakunbound 'neovm--sma-nnz)
     (fmakunbound 'neovm--sma-add)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -303,7 +303,7 @@ fn oracle_prop_sparse_matrix_scale_and_transpose() {
     (fmakunbound 'neovm--smt-nnz)
     (fmakunbound 'neovm--smt-scale)
     (fmakunbound 'neovm--smt-transpose)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -409,7 +409,7 @@ fn oracle_prop_sparse_matrix_vector_multiply() {
     (fmakunbound 'neovm--smv-get)
     (fmakunbound 'neovm--smv-matvec)
     (fmakunbound 'neovm--smv-dense-matvec)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -515,7 +515,7 @@ fn oracle_prop_sparse_matrix_dense_conversion() {
     (fmakunbound 'neovm--smd-nnz)
     (fmakunbound 'neovm--smd-to-dense)
     (fmakunbound 'neovm--smd-from-dense)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -641,7 +641,7 @@ fn oracle_prop_sparse_matrix_multiplication() {
     (fmakunbound 'neovm--smm-nnz)
     (fmakunbound 'neovm--smm-multiply)
     (fmakunbound 'neovm--smm-to-dense)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -763,5 +763,5 @@ fn oracle_prop_sparse_matrix_row_col_operations() {
     (fmakunbound 'neovm--smr-row-sums)
     (fmakunbound 'neovm--smr-col-sums)
     (fmakunbound 'neovm--smr-sparsity-pct)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

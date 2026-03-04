@@ -16,7 +16,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 /// Returns the Elisp source for the CEK machine runtime.
 fn cek_machine_preamble() -> &'static str {
@@ -227,7 +227,7 @@ fn oracle_prop_cek_basic_arithmetic() {
         preamble = cek_machine_preamble(),
         cleanup = cek_machine_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +264,7 @@ fn oracle_prop_cek_closure_and_application() {
         preamble = cek_machine_preamble(),
         cleanup = cek_machine_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -312,7 +312,7 @@ fn oracle_prop_cek_if_then_else() {
         preamble = cek_machine_preamble(),
         cleanup = cek_machine_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -396,7 +396,7 @@ fn oracle_prop_cek_recursive_functions() {
         preamble = cek_machine_preamble(),
         cleanup = cek_machine_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -450,7 +450,7 @@ fn oracle_prop_cek_church_encoding() {
         preamble = cek_machine_preamble(),
         cleanup = cek_machine_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -491,7 +491,7 @@ fn oracle_prop_cek_step_trace() {
         preamble = cek_machine_preamble(),
         cleanup = cek_machine_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -544,5 +544,5 @@ fn oracle_prop_cek_environment_scoping() {
         preamble = cek_machine_preamble(),
         cleanup = cek_machine_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }

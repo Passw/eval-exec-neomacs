@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // defmacro with various parameter patterns (&rest, &optional, &body)
@@ -82,7 +82,7 @@ fn oracle_prop_macro_parameter_patterns() {
     (fmakunbound 'neovm--mcp-sum-all)
     (fmakunbound 'neovm--mcp-first-and-rest)
     (fmakunbound 'neovm--mcp-with-timer)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ fn oracle_prop_nested_macro_definitions() {
     (fmakunbound 'neovm--mcp-with-alias)
     (fmakunbound 'neovm--mcp-my-list)
     (fmakunbound 'neovm--mcp-add-ten)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ fn oracle_prop_macro_generating_macros() {
     (fmakunbound 'neovm--mcp-define-binop)
     (fmakunbound 'neovm--mcp-add)
     (fmakunbound 'neovm--mcp-mul)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -316,7 +316,7 @@ fn oracle_prop_backquote_in_macros() {
     (fmakunbound 'neovm--mcp-let-and-do)
     (fmakunbound 'neovm--mcp-make-template)
     (fmakunbound 'neovm--mcp-optional-body)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -393,7 +393,7 @@ fn oracle_prop_macro_gensym_hygiene() {
     (fmakunbound 'neovm--mcp-once)
     (fmakunbound 'neovm--mcp-collect-n)
     (fmakunbound 'neovm--mcp-safe-max)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -616,7 +616,7 @@ fn oracle_prop_macro_data_transform_dsl() {
     (fmakunbound 'neovm--mcp-t-inc)
     (fmakunbound 'neovm--mcp-t-square)
     (fmakunbound 'neovm--mcp-t-negate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -687,5 +687,5 @@ fn oracle_prop_macro_compile_time_computation() {
     (fmakunbound 'neovm--mcp-ct-pow2-table)
     (fmakunbound 'neovm--mcp-unroll)
     (fmakunbound 'neovm--mcp-ct-repeat-string)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

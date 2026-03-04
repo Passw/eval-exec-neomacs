@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Propositional formula evaluation and truth tables
@@ -227,7 +227,7 @@ fn oracle_prop_proof_demorgan_transformations() {
        ;; Already in NNF (no change needed)
        (funcall 'neovm--pa-push-neg '(and (not p) q)))
     (fmakunbound 'neovm--pa-push-neg)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ fn oracle_prop_proof_tree_natural_deduction() {
                   '(and-intro (and p r) (assumption p) (assumption q))
                   assumes)))
     (fmakunbound 'neovm--pa-validate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -545,5 +545,5 @@ fn oracle_prop_proof_hypothetical_reasoning() {
        ;; Nested conditional: (implies p (implies q p))
        (funcall 'neovm--pa-derive '(implies p (implies q p)) nil 5))
     (fmakunbound 'neovm--pa-derive)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

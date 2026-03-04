@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Default separator (whitespace) behavior
@@ -95,7 +95,7 @@ fn oracle_prop_split_string_omit_nulls_combinations() {
   ;; Regex separator with omit-nulls
   (split-string "::a::b::" ":+" nil)
   (split-string "::a::b::" ":+" t))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +155,7 @@ fn oracle_prop_split_string_boundary_and_consecutive() {
   ;; Two consecutive separator chars only
   (split-string "::" ":" nil)
   (split-string "::" ":" t))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ fn oracle_prop_split_string_csv_parsing() {
     (fmakunbound 'neovm--csv-parse-field)
     (fmakunbound 'neovm--csv-parse-row)
     (fmakunbound 'neovm--csv-parse)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,7 +285,7 @@ fn oracle_prop_split_string_path_manipulation() {
     (fmakunbound 'neovm--path-basename)
     (fmakunbound 'neovm--path-extension)
     (fmakunbound 'neovm--path-normalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -373,7 +373,7 @@ fn oracle_prop_split_string_log_parsing() {
     (fmakunbound 'neovm--parse-log-line)
     (fmakunbound 'neovm--filter-logs)
     (fmakunbound 'neovm--log-summary)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

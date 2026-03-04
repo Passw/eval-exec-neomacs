@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Return value semantics: exact position of first difference
@@ -210,7 +210,7 @@ fn oracle_prop_compare_strings_common_prefix_search() {
                             (substring s1 0 len)))))
                 tests))
     (fmakunbound 'neovm--test-common-prefix-len)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -249,7 +249,7 @@ fn oracle_prop_compare_strings_sort_by_substring() {
                                  (and (integerp r) (< r 0)))))))
                   (list sorted-mid sorted-prefix sorted-ci)))))))
     (fmakunbound 'neovm--test-substr-less-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

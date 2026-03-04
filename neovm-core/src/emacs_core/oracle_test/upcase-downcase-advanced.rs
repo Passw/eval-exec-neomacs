@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // upcase/downcase on mixed-case strings with non-alpha characters
@@ -28,7 +28,7 @@ fn oracle_prop_case_mixed_with_non_alpha() {
       (downcase "mixed123CASE_test.value")
       (upcase "a1b2c3!@#d4e5")
       (downcase "A1B2C3!@#D4E5"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ fn oracle_prop_capitalize_word_boundaries() {
       (capitalize "mixed--double__separators..here")
       (capitalize "123hello-456world")
       (capitalize "  leading-spaces  trailing  "))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ fn oracle_prop_upcase_initials_multiword() {
       (upcase-initials "")
       (upcase-initials "   spaces   between   ")
       (upcase-initials "one"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ fn oracle_prop_case_char_integers() {
       ;; non-alpha roundtrip
       (= (upcase ?5) ?5)
       (= (downcase ?5) ?5))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ fn oracle_prop_case_preserves_structure() {
           (string-equal (downcase up) (downcase original))
           ;; upcase of downcase equals upcase of original
           (string-equal (upcase down) (upcase original))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ fn oracle_prop_case_fold_search_simulation() {
     (fmakunbound 'neovm--test-ci-member)
     (fmakunbound 'neovm--test-ci-assoc)
     (fmakunbound 'neovm--test-ci-sort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -274,7 +274,7 @@ fn oracle_prop_case_style_converter() {
     (fmakunbound 'neovm--test-to-kebab)
     (fmakunbound 'neovm--test-to-camel)
     (fmakunbound 'neovm--test-to-pascal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -330,5 +330,5 @@ fn oracle_prop_title_case_with_exceptions() {
         (funcall 'neovm--test-title-case "HELLO WORLD")
         (funcall 'neovm--test-title-case "single"))
     (fmakunbound 'neovm--test-title-case)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

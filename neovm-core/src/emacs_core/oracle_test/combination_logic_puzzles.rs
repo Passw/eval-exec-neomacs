@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Sudoku row/column constraint checker
@@ -95,7 +95,7 @@ fn oracle_prop_sudoku_constraint_checker() {
     (fmakunbound 'neovm--lp-sudoku-valid-group)
     (fmakunbound 'neovm--lp-sudoku-check)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ fn oracle_prop_eight_puzzle_moves() {
     (fmakunbound 'neovm--lp-puzzle-moves)
     (fmakunbound 'neovm--lp-puzzle-goal-p)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +254,7 @@ fn oracle_prop_map_coloring() {
     (fmakunbound 'neovm--lp-color-solve)
     (fmakunbound 'neovm--lp-color-bt)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -307,7 +307,7 @@ fn oracle_prop_cryptarithmetic_solver() {
             all-valid)))
     (fmakunbound 'neovm--lp-crypto-solve)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -390,7 +390,7 @@ fn oracle_prop_sat_checker() {
     (fmakunbound 'neovm--lp-sat-eval-formula)
     (fmakunbound 'neovm--lp-sat-solve)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -475,5 +475,5 @@ fn oracle_prop_logic_gate_simulator() {
     (fmakunbound 'neovm--lp-half-adder)
     (fmakunbound 'neovm--lp-full-adder)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

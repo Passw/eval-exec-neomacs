@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Multi-level feedback queue with 4 priority levels
@@ -177,7 +177,7 @@ fn oracle_prop_combination_os_scheduler_priority_aging() {
     (fmakunbound 'neovm--age-wait)
     (fmakunbound 'neovm--age-tick-wait)
     (fmakunbound 'neovm--age-simulate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -406,7 +406,7 @@ fn oracle_prop_combination_os_scheduler_cpu_utilization() {
           (nth 0 r3) (nth 1 r3) (nth 2 r3)))
 
     (fmakunbound 'neovm--util-schedule)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

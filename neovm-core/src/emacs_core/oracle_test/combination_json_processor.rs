@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Path-based querying of nested alist structures
@@ -77,7 +77,7 @@ fn oracle_prop_json_proc_path_query() {
           (funcall 'neovm--jp-get-path data "meta.version")))
     (fmakunbound 'neovm--jp-split)
     (fmakunbound 'neovm--jp-get-path)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +261,7 @@ fn oracle_prop_json_proc_flatten() {
             ;; Total number of leaf entries
             (length flat))))
     (fmakunbound 'neovm--jp-flatten)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,7 +323,7 @@ fn oracle_prop_json_proc_diff() {
             ;; Unchanged keys
             (cdr (assq 'unchanged diff)))))
     (fmakunbound 'neovm--jp-diff)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

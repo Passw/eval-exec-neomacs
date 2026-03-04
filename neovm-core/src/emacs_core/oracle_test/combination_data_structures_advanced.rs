@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Doubly-linked list using vectors of (prev, value, next)
@@ -99,7 +99,7 @@ fn oracle_prop_ds_adv_doubly_linked_list() {
                           (let ((fwd2 (funcall to-list-fwd))
                                 (bwd2 (funcall to-list-bwd)))
                             (list fwd1 bwd1 fwd2 bwd2)))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ fn oracle_prop_ds_adv_avl_bst() {
                               (aref (aref nodes root) 0))))
                       (fmakunbound 'neovm--avl-insert)
                       (fmakunbound 'neovm--avl-inorder))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +283,7 @@ fn oracle_prop_ds_adv_skip_list_like() {
                           (length (aref layers 0))
                           (length (aref layers 1))
                           (length (aref layers 2))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -472,7 +472,7 @@ fn oracle_prop_ds_adv_trie_autocomplete() {
                                   ;; Count total unique completions from ""
                                   (length (funcall autocomplete ""))))
                             (fmakunbound 'neovm--trie-collect))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -561,5 +561,5 @@ fn oracle_prop_ds_adv_priority_queue_heap() {
                           ;; Heap is now empty
                           size
                           (funcall heap-peek))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

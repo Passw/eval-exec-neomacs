@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Build sorted array of all suffixes with original indices
@@ -46,7 +46,7 @@ fn oracle_prop_suffix_array_build() {
        ;; With repetition
        (funcall 'neovm--sa-build "abcabc"))
     (fmakunbound 'neovm--sa-build)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ fn oracle_prop_suffix_array_binary_search() {
     (fmakunbound 'neovm--sa-prefix-p)
     (fmakunbound 'neovm--sa-compare)
     (fmakunbound 'neovm--sa-search)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +208,7 @@ fn oracle_prop_suffix_array_lcp() {
     (fmakunbound 'neovm--sa-lcp-pair)
     (fmakunbound 'neovm--sa-build-sorted)
     (fmakunbound 'neovm--sa-compute-lcp)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -271,7 +271,7 @@ fn oracle_prop_suffix_array_count_occurrences() {
          (car (funcall 'neovm--sa-count-pattern sa "abracadabra"))))
     (fmakunbound 'neovm--sa-count-build)
     (fmakunbound 'neovm--sa-count-pattern)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -340,7 +340,7 @@ fn oracle_prop_suffix_array_longest_repeated() {
     (fmakunbound 'neovm--sa-lr-lcp)
     (fmakunbound 'neovm--sa-lr-build)
     (fmakunbound 'neovm--sa-longest-repeated)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -412,5 +412,5 @@ fn oracle_prop_suffix_array_multi_pattern_search() {
     (fmakunbound 'neovm--sa-mp-build)
     (fmakunbound 'neovm--sa-mp-find-all)
     (fmakunbound 'neovm--sa-mp-search-all)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

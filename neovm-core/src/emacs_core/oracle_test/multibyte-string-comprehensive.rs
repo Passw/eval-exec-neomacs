@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // string-to-multibyte / string-to-unibyte
@@ -133,7 +133,7 @@ fn oracle_prop_multibyte_char_to_string_unicode() {
                    (char-to-string #x263a))))
     (list (length s) (substring s 0 2))))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -205,7 +205,7 @@ fn oracle_prop_multibyte_char_width() {
   ;; Halfwidth Katakana
   (char-width #xff71))  ;; halfwidth A (katakana)
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,7 +288,7 @@ fn oracle_prop_multibyte_string_to_list_vector() {
          (rebuilt (concat v)))
     (string= orig rebuilt)))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -331,7 +331,7 @@ fn oracle_prop_multibyte_regex_matching() {
     (string-match "a.*b" "aXXbYYb")
     (match-string 0 "aXXbYYb")))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

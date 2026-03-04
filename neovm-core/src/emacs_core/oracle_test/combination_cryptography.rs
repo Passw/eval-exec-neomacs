@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // XOR cipher (encrypt/decrypt roundtrip)
@@ -48,7 +48,7 @@ fn oracle_prop_crypto_xor_cipher() {
                                                   results))))
                                   (nreverse results)))
                               messages)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ fn oracle_prop_crypto_djb2_hash() {
                           (not (= (nth 8 hashes) (nth 9 hashes)))
                           ;; Return actual hash values for parity
                           hashes))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +155,7 @@ fn oracle_prop_crypto_block_cipher_spn() {
                                               ;; Roundtrip check
                                               (= pt (funcall decrypt-block ct)))))
                                     plaintexts))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +213,7 @@ fn oracle_prop_crypto_hmac_like() {
                           (>= h1 0) (>= h3 0) (>= h4 0) (>= h5 0) (>= h6 0)
                           ;; Return values for exact parity check
                           h1 h3 h4 h5 h6))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +258,7 @@ fn oracle_prop_crypto_lcg_rng() {
                                 (mapcar (lambda (x) (and (>= x 1) (< x 100))) ranged)
                                 ;; Ranged values
                                 ranged)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -326,5 +326,5 @@ fn oracle_prop_crypto_bloom_filter() {
                           (funcall bloom-maybe-contains "fig")
                           (funcall bloom-maybe-contains "grape")
                           (funcall bloom-maybe-contains "zzzzz")))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

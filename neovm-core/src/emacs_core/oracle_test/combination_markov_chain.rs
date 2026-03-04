@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Build bigram transition table from word list
@@ -68,7 +68,7 @@ fn oracle_prop_markov_build_transition_table() {
                                        (symbol-name (car b)))))))
     (fmakunbound 'neovm--mc-build-table)
     (fmakunbound 'neovm--mc-table-to-sorted-alist)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ fn oracle_prop_markov_generate_deterministic() {
     (fmakunbound 'neovm--mc-build)
     (fmakunbound 'neovm--mc-most-likely)
     (fmakunbound 'neovm--mc-generate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +204,7 @@ fn oracle_prop_markov_trigram_table() {
           (gethash '(to . eat) table)))
     (fmakunbound 'neovm--mc-build-trigram)
     (fmakunbound 'neovm--mc-trigram-to-sorted)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +284,7 @@ fn oracle_prop_markov_probability_distribution() {
     (fmakunbound 'neovm--mc-build-freq)
     (fmakunbound 'neovm--mc-probabilities)
     (fmakunbound 'neovm--mc-all-probs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -372,7 +372,7 @@ fn oracle_prop_markov_most_common_transitions() {
     (fmakunbound 'neovm--mc-all-transitions)
     (fmakunbound 'neovm--mc-top-k)
     (fmakunbound 'neovm--mc-hub-states)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -480,5 +480,5 @@ fn oracle_prop_markov_state_space_exploration() {
     (fmakunbound 'neovm--mc-absorbing-states)
     (fmakunbound 'neovm--mc-all-states)
     (fmakunbound 'neovm--mc-self-loops)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Range iterator: generates (from, from+step, ...) up to (exclusive) to
@@ -54,7 +54,7 @@ fn oracle_prop_iter_range_iterator() {
        (funcall 'neovm--iter-collect (funcall 'neovm--iter-range 1 1000 100)))
     (fmakunbound 'neovm--iter-range)
     (fmakunbound 'neovm--iter-collect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -289,7 +289,7 @@ fn oracle_prop_iter_take_drop_iterators() {
     (fmakunbound 'neovm--iter-take)
     (fmakunbound 'neovm--iter-drop)
     (fmakunbound 'neovm--iter-collect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -365,7 +365,7 @@ fn oracle_prop_iter_chain_iterator() {
     (fmakunbound 'neovm--iter-range)
     (fmakunbound 'neovm--iter-chain)
     (fmakunbound 'neovm--iter-collect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -437,7 +437,7 @@ fn oracle_prop_iter_zip_iterator() {
     (fmakunbound 'neovm--iter-range)
     (fmakunbound 'neovm--iter-zip)
     (fmakunbound 'neovm--iter-collect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -593,7 +593,7 @@ fn oracle_prop_iter_lazy_pipeline() {
     (fmakunbound 'neovm--iter-zip)
     (fmakunbound 'neovm--iter-collect)
     (fmakunbound 'neovm--iter-is-prime)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

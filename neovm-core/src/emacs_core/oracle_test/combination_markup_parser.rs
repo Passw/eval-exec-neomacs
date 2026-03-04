@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Parse inline markup: bold, italic, code spans
@@ -118,7 +118,7 @@ fn oracle_prop_markup_parse_inline() {
         ;; Empty
         (funcall 'neovm--test-mp-parse-inline ""))
     (fmakunbound 'neovm--test-mp-parse-inline)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ fn oracle_prop_markup_parse_blocks() {
         (funcall 'neovm--test-mp-parse-blocks ""))
     (fmakunbound 'neovm--test-mp-split-lines)
     (fmakunbound 'neovm--test-mp-parse-blocks)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +295,7 @@ fn oracle_prop_markup_parse_links() {
         ;; Link with path
         (funcall 'neovm--test-mp-parse-links "See [docs](/path/to/docs)"))
     (fmakunbound 'neovm--test-mp-parse-links)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -435,7 +435,7 @@ fn oracle_prop_markup_full_document_parse() {
     (fmakunbound 'neovm--test-mf-split-lines)
     (fmakunbound 'neovm--test-mf-parse-inline)
     (fmakunbound 'neovm--test-mf-parse-document)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -624,7 +624,7 @@ fn oracle_prop_markup_visitor_pattern() {
     (fmakunbound 'neovm--test-mv-visit-inline)
     (fmakunbound 'neovm--test-mv-visit-document)
     (makunbound 'neovm--test-mv-stats)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -708,7 +708,7 @@ fn oracle_prop_markup_ast_transformer() {
             transformed)))
     (fmakunbound 'neovm--test-mt-transform-inline)
     (fmakunbound 'neovm--test-mt-transform-document)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // k-d tree: insertion and basic structure
@@ -100,7 +100,7 @@ fn oracle_prop_kd_tree_insertion_and_structure() {
     (fmakunbound 'neovm--kd-build-sequential)
     (fmakunbound 'neovm--kd-inorder)
     (fmakunbound 'neovm--kd-size)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ fn oracle_prop_kd_tree_nearest_neighbor() {
     (fmakunbound 'neovm--kd-nn-helper)
     (fmakunbound 'neovm--kd-nearest)
     (fmakunbound 'neovm--kd-brute-nearest)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -454,7 +454,7 @@ fn oracle_prop_kd_tree_balanced_construction() {
     (fmakunbound 'neovm--kd-inorder)
     (fmakunbound 'neovm--kd-insert)
     (fmakunbound 'neovm--kd-build-seq)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -571,7 +571,7 @@ fn oracle_prop_kd_tree_k_nearest_neighbors() {
     (fmakunbound 'neovm--kd-knn-helper)
     (fmakunbound 'neovm--kd-knn)
     (fmakunbound 'neovm--kd-brute-knn)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -722,7 +722,7 @@ fn oracle_prop_kd_tree_depth_balance_stats() {
     (fmakunbound 'neovm--kd-size)
     (fmakunbound 'neovm--kd-leaf-count)
     (fmakunbound 'neovm--kd-internal-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -836,5 +836,5 @@ fn oracle_prop_kd_tree_collinear_points() {
     (fmakunbound 'neovm--kd-nearest)
     (fmakunbound 'neovm--kd-depth)
     (fmakunbound 'neovm--kd-size)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

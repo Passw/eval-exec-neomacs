@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Dynamically constructed forms with list/cons/append
@@ -42,7 +42,7 @@ fn oracle_prop_eval2_dynamic_form_construction() {
                                                               var-names)))))
                          (progn-result (eval progn-form)))
                     (list results nested-result progn-result))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ fn oracle_prop_eval2_dynamic_scoping_side_effects() {
                                  (r5 (eval 'neovm--ev2-counter)))
                             (list r1 r2 r3 r4 r5)))
                       (makunbound 'neovm--ev2-counter)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ fn oracle_prop_eval2_backquote_construction() {
                       (list r1 r2 r3 r4 r5
                             ;; Verify form structure
                             form1 form3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ fn oracle_prop_eval2_nested_eval_levels() {
                                            (quote " ")
                                            (quote "world"))))))
                     (list r1 r2 r3 r4 r5 r6))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -187,7 +187,7 @@ fn oracle_prop_eval2_constructed_binding_forms() {
                     (unwind-protect
                         (list r1 r2 r3 r4)
                       (fmakunbound 'neovm--ev2-square)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -238,7 +238,7 @@ fn oracle_prop_eval2_dispatch_table() {
                                   commands)))
                     (list r-add r-sub r-mul r-pow r-mod r-avg r-unk
                           batch-results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +286,7 @@ fn oracle_prop_eval2_error_propagation() {
                          (r8 (funcall safe-eval
                                       '(if t (+ 1 "bad") 'ok))))
                     (list r1 r2 r3 r4 r5 r6 r7 r8))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -341,5 +341,5 @@ fn oracle_prop_eval2_eval_vs_funcall() {
                                 e-map f-map (equal e-map f-map)))
                       (fmakunbound 'neovm--ev2-adder)
                       (fmakunbound 'neovm--ev2-formatter)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

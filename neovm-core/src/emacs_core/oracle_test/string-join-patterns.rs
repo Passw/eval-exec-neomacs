@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic string-join with various separators
@@ -32,7 +32,7 @@ fn oracle_prop_string_join_basic_separators() {
   (string-join '("/usr/bin" "/usr/local/bin" "/home/user/bin") ":")
   ;; Semicolon separator
   (string-join '("a=1" "b=2" "c=3") ";"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ fn oracle_prop_string_join_empty_separator() {
   (string-join '("left" "right") "")
   ;; Empty strings only with empty separator
   (string-join '("" "" "" "") ""))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ fn oracle_prop_string_join_empty_list_and_edges() {
   ;; Length checks
   (length (string-join nil ","))
   (length (string-join '("ab" "cd") "-")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ fn oracle_prop_string_join_path_building() {
     (setq results (cons url results)))
 
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -298,7 +298,7 @@ fn oracle_prop_string_join_roundtrip_composition() {
 
   ;; Number list to formatted string
   (string-join (mapcar #'number-to-string '(1 2 3 4 5)) ", "))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

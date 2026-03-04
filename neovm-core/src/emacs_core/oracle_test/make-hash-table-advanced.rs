@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // :test parameter — eq, eql, equal with different key types
@@ -38,7 +38,7 @@ fn oracle_prop_make_hash_table_test_eq() {
                         ;; Different object, same structure: NOT found under eq
                         (gethash (list 1 2 3) h)
                         (hash-table-count h))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn oracle_prop_make_hash_table_test_eql() {
                         ;; Different cons, same structure: not found (eql = eq for lists)
                         (gethash (list 'a 'b) h)
                         (hash-table-count h))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -102,7 +102,7 @@ fn oracle_prop_make_hash_table_test_equal() {
                       ;; Vector lookup
                       (gethash (vector 1 2 3) h)
                       (hash-table-count h)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ fn oracle_prop_make_hash_table_size_parameter() {
                               (gethash 0 h1)
                               (gethash 25 h1)
                               (gethash 49 h1)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ fn oracle_prop_make_hash_table_weakness_parameter() {
                       (hash-table-p h-nil)
                       (hash-table-p h-key)
                       (hash-table-p h-val)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -225,7 +225,7 @@ fn oracle_prop_make_hash_table_rehash_params() {
                           (gethash 50 h1)
                           (gethash "key-50" h2)
                           (gethash 50 h3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +258,7 @@ fn oracle_prop_make_hash_table_accessors() {
                           (hash-table-rehash-size h)
                           (hash-table-rehash-threshold h)))
                       tables))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -303,7 +303,7 @@ fn oracle_prop_make_hash_table_structural_key_patterns() {
                       (gethash '(2025 3 1) h 'not-found)
                       ;; Count
                       (hash-table-count h)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,7 +351,7 @@ fn oracle_prop_make_hash_table_benchmark_creation() {
                      (nth 2 cfg)))
           configs))
     (fmakunbound 'neovm--mht-create-and-populate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -416,5 +416,5 @@ fn oracle_prop_make_hash_table_scope_chain() {
             ;; Only global
             (funcall 'neovm--mht-scope-lookup (list global) 'x))))
     (fmakunbound 'neovm--mht-scope-lookup)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

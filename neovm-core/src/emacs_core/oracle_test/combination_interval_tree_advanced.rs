@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Interval tree with delete and rebalance (max propagation)
@@ -158,7 +158,7 @@ fn oracle_prop_interval_tree_adv_insert_delete() {
     (fmakunbound 'neovm--itadv-inorder)
     (fmakunbound 'neovm--itadv-min-node)
     (fmakunbound 'neovm--itadv-delete)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -239,7 +239,7 @@ fn oracle_prop_interval_tree_adv_stabbing_query() {
     (fmakunbound 'neovm--itadv-stab)
     (fmakunbound 'neovm--itadv-stab-count)
     (fmakunbound 'neovm--itadv-max-depth-point)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -330,7 +330,7 @@ fn oracle_prop_interval_tree_adv_union_intersection() {
     (fmakunbound 'neovm--itadv-union)
     (fmakunbound 'neovm--itadv-intersect)
     (fmakunbound 'neovm--itadv-complement)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -390,7 +390,7 @@ fn oracle_prop_interval_tree_adv_sweep_line() {
                   '((1 3 "T1") (3 5 "T2") (5 7 "T3")))))
     (fmakunbound 'neovm--itadv-all-intersections)
     (fmakunbound 'neovm--itadv-overlap-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -483,7 +483,7 @@ fn oracle_prop_interval_tree_adv_scheduling() {
     (fmakunbound 'neovm--itadv-schedule-max)
     (fmakunbound 'neovm--itadv-min-removals)
     (fmakunbound 'neovm--itadv-schedule-weighted)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -572,7 +572,7 @@ fn oracle_prop_interval_tree_adv_gap_finding() {
     (fmakunbound 'neovm--itadv-total-gap)
     (fmakunbound 'neovm--itadv-coverage-pct)
     (fmakunbound 'neovm--itadv-largest-gap)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -649,7 +649,7 @@ fn oracle_prop_interval_tree_adv_range_coverage() {
     (fmakunbound 'neovm--itadv-total-coverage)
     (fmakunbound 'neovm--itadv-redundancy)
     (fmakunbound 'neovm--itadv-density)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -725,7 +725,7 @@ fn oracle_prop_interval_tree_adv_partitioning() {
        (funcall 'neovm--itadv-partition '((1 5) (2 6) (3 7))))
     (fmakunbound 'neovm--itadv-min-rooms)
     (fmakunbound 'neovm--itadv-partition)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -781,5 +781,5 @@ fn oracle_prop_interval_tree_adv_flatten() {
        ;; Three stacked at same point
        (funcall 'neovm--itadv-flatten '((1 5 "A") (1 5 "B") (1 5 "C"))))
     (fmakunbound 'neovm--itadv-flatten)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

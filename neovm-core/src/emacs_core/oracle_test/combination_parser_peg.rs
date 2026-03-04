@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // PEG core: literal matching, sequence, ordered choice
@@ -145,7 +145,7 @@ fn oracle_prop_peg_core_operators() {
          (funcall 'neovm--peg-parse '(choice (lit "ab") (lit "a"))
                   "abcdef" grammar)))
     (fmakunbound 'neovm--peg-parse)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ fn oracle_prop_peg_repetition_operators() {
          ;; not-predicate: fails when sub succeeds
          (funcall 'neovm--peg2-parse '(not-pred (lit "ba")) "bad" g)))
     (fmakunbound 'neovm--peg2-parse)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +329,7 @@ fn oracle_prop_peg_named_rules() {
     (fmakunbound 'neovm--peg3-parse)
     (fmakunbound 'neovm--peg3-is-letter)
     (fmakunbound 'neovm--peg3-is-digit)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -431,7 +431,7 @@ fn oracle_prop_peg_arithmetic_expressions() {
          (funcall 'neovm--peg4-parse '(rule expr) "+3" grammar)))
     (fmakunbound 'neovm--peg4-parse)
     (fmakunbound 'neovm--peg4-is-digit)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -535,7 +535,7 @@ fn oracle_prop_peg_json_like_structures() {
          (car (funcall 'neovm--peg5-parse '(rule word) "hello123" grammar))))
     (fmakunbound 'neovm--peg5-parse)
     (fmakunbound 'neovm--peg5-is-alnum)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

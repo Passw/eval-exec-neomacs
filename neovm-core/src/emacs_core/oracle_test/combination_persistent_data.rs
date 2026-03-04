@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Persistent list with O(1) prepend and structural sharing verification
@@ -103,7 +103,7 @@ fn oracle_prop_persistent_data_list_operations() {
     (fmakunbound 'neovm--pdl-split)
     (fmakunbound 'neovm--pdl-insert-at)
     (fmakunbound 'neovm--pdl-remove-at)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ fn oracle_prop_persistent_data_alist_versioned() {
     (fmakunbound 'neovm--pda-merge)
     (fmakunbound 'neovm--pda-keys)
     (fmakunbound 'neovm--pda-to-alist)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -356,7 +356,7 @@ fn oracle_prop_persistent_data_vector_path_copy() {
     (fmakunbound 'neovm--pdv-set)
     (fmakunbound 'neovm--pdv-to-list)
     (fmakunbound 'neovm--pdv-push)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -415,7 +415,7 @@ fn oracle_prop_persistent_data_sharing_stress() {
    (length chain0) (length chain1) (length chain4)
    ;; Count versions
    (length versions)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -541,7 +541,7 @@ fn oracle_prop_persistent_data_undo_history() {
     (fmakunbound 'neovm--puh-undo)
     (fmakunbound 'neovm--puh-can-undo)
     (fmakunbound 'neovm--puh-history-path)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -661,7 +661,7 @@ fn oracle_prop_persistent_data_sorted_map() {
     (fmakunbound 'neovm--psm-values)
     (fmakunbound 'neovm--psm-range)
     (fmakunbound 'neovm--psm-merge)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -798,5 +798,5 @@ fn oracle_prop_persistent_data_zipper() {
     (fmakunbound 'neovm--pz-go-up)
     (fmakunbound 'neovm--pz-edit)
     (fmakunbound 'neovm--pz-to-tree)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

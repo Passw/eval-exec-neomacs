@@ -5,7 +5,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 use proptest::prelude::*;
 
 use super::common::{
-    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm,
+    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
 };
 
 #[test]
@@ -28,7 +28,7 @@ fn oracle_prop_string_equal_wrong_type_error() {
 fn oracle_prop_string_equal_alias_smoke() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(string= "abc" "abc")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string= "abc" "abc")"#);
 }
 
 proptest! {

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic persistent queue: enqueue, dequeue, peek, empty
@@ -113,7 +113,7 @@ fn oracle_prop_persistent_queue_basic_ops() {
     (fmakunbound 'neovm--pq-dequeue)
     (fmakunbound 'neovm--pq-peek)
     (fmakunbound 'neovm--pq-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +237,7 @@ fn oracle_prop_persistent_queue_batch_ops() {
     (fmakunbound 'neovm--pq-dequeue-n)
     (fmakunbound 'neovm--pq-drain)
     (fmakunbound 'neovm--pq-from-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -362,7 +362,7 @@ fn oracle_prop_persistent_queue_priority() {
     (fmakunbound 'neovm--ppq-priorities)
     (fmakunbound 'neovm--ppq-merge)
     (fmakunbound 'neovm--ppq-drain)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -492,7 +492,7 @@ fn oracle_prop_persistent_queue_circular_buffer() {
     (fmakunbound 'neovm--cb-peek-newest)
     (fmakunbound 'neovm--cb-to-list)
     (fmakunbound 'neovm--cb-add-all)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -603,7 +603,7 @@ fn oracle_prop_persistent_queue_bfs() {
     (fmakunbound 'neovm--bq-dequeue)
     (fmakunbound 'neovm--bq-bfs)
     (fmakunbound 'neovm--bq-bfs-levels)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -728,5 +728,5 @@ fn oracle_prop_persistent_queue_deque() {
     (fmakunbound 'neovm--dq-pop-front)
     (fmakunbound 'neovm--dq-pop-back)
     (fmakunbound 'neovm--dq-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

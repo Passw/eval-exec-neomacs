@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Levenshtein distance (manual implementation vs string-distance)
@@ -27,7 +27,7 @@ fn oracle_prop_stralgos_edit_distance_verify() {
                              (b (cadr pair)))
                          (list a b (string-distance a b))))
                      pairs))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ fn oracle_prop_stralgos_longest_common_prefix() {
                      (funcall lcp '("abc" "abc" "abc"))
                      (funcall lcp '(""))
                      (funcall lcp nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +84,7 @@ fn oracle_prop_stralgos_is_rotation() {
                      (funcall is-rotation "abc" "abc")
                      (funcall is-rotation "a" "a")
                      (funcall is-rotation "ab" "ba")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@ fn oracle_prop_stralgos_rle_roundtrip() {
                                  (funcall rle-decode encoded)
                                  (string= s (funcall rle-decode encoded)))))
                        inputs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ fn oracle_prop_stralgos_caesar_cipher() {
                                     (setq ok nil)))
                                 (setq shift (1+ shift)))
                               ok))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ fn oracle_prop_stralgos_word_frequency() {
                                 (or (> (cdr a) (cdr b))
                                     (and (= (cdr a) (cdr b))
                                          (string< (car a) (car b)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -261,5 +261,5 @@ fn oracle_prop_stralgos_palindrome() {
                      (funcall is-palindrome "Was it a car or a cat I saw")
                      (funcall is-palindrome "")
                      (funcall is-palindrome "a")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

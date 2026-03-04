@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Earliest Deadline First (EDF) scheduling
@@ -61,7 +61,7 @@ fn oracle_prop_sched_earliest_deadline_first() {
                                     ;; Total time used
                                     (apply #'+ (mapcar (lambda (j) (nth 1 j)) jobs))))))
                       (fmakunbound 'neovm--test-edf-schedule)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ fn oracle_prop_sched_interval_scheduling() {
                                                        (- (nth 2 iv) (nth 1 iv)))
                                                      selected)))))
                       (fmakunbound 'neovm--test-interval-schedule)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +191,7 @@ fn oracle_prop_sched_topological_sort() {
                           '(x y z p q)
                           '((x . y) (y . z) (p . q))))
                       (fmakunbound 'neovm--test-topo-sort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -259,7 +259,7 @@ fn oracle_prop_sched_bin_packing_first_fit() {
                                   ;; Total wasted space
                                   (apply #'+ (mapcar #'car result)))))
                       (fmakunbound 'neovm--test-bin-pack)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -334,7 +334,7 @@ fn oracle_prop_sched_round_robin() {
                                     ;; Total execution time = clock at end
                                     (nth 1 (car log))))))
                       (fmakunbound 'neovm--test-round-robin)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -448,5 +448,5 @@ fn oracle_prop_sched_priority_preemptive() {
                                     ;; Verify all processes completed
                                     (= (length info) (length processes))))))
                       (fmakunbound 'neovm--test-priority-schedule)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

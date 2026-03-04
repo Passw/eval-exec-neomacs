@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // sort with string< predicate
@@ -16,7 +16,7 @@ fn oracle_prop_sort_alg_string_less_predicate() {
 
     let form = r#"(sort (list "zebra" "apple" "mango" "banana" "cherry" "apricot" "avocado")
                         'string<)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -26,7 +26,7 @@ fn oracle_prop_sort_alg_string_less_case_sensitivity() {
     // string< is case-sensitive: uppercase < lowercase in ASCII
     let form = r#"(sort (list "banana" "Apple" "cherry" "Banana" "apple" "Cherry")
                         'string<)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ fn oracle_prop_sort_alg_multi_field_comparator() {
                            ((< (nth 1 a) (nth 1 b)) nil)
                            ;; Tertiary: name ascending
                            (t (string< (nth 2 a) (nth 2 b)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ fn oracle_prop_sort_alg_stability_indexed() {
                                (9 . 5) (2 . 6) (6 . 7) (5 . 8) (3 . 9))))
                   (sort (copy-sequence data)
                         (lambda (a b) (< (car a) (car b)))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -85,7 +85,7 @@ fn oracle_prop_sort_alg_stability_string_groups() {
     let form = r#"(sort (list "cat" "apple" "ant" "banana" "cherry" "avocado" "blueberry")
                         (lambda (a b)
                           (< (aref a 0) (aref b 0))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ fn oracle_prop_sort_alg_alist_by_nested_value() {
                              ((> sx sy) t)
                              ((< sx sy) nil)
                              (t (string< (symbol-name gx) (symbol-name gy))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +135,7 @@ fn oracle_prop_sort_alg_destructive_mutation() {
                     ;; original may have been mutated (first cons cell may point elsewhere)
                     ;; but sorted is definitely correct
                     sorted))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ fn oracle_prop_sort_alg_ascending_then_reverse() {
 
     let form = "(let ((data (list 3 1 4 1 5 9 2 6 5 3 5)))
                   (nreverse (sort data '<)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +197,7 @@ fn oracle_prop_sort_alg_elisp_merge_sort() {
           (equal my-sorted builtin-sorted)))
     (fmakunbound 'neovm--test-merge)
     (fmakunbound 'neovm--test-msort)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,5 +232,5 @@ fn oracle_prop_sort_alg_group_by_consecutive() {
                          (grouped (funcall group-consecutive sorted
                                           (lambda (x) (mod x 3)))))
                     (list sorted grouped)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

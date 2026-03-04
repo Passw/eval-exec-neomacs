@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Extended sign domain with interval narrowing
@@ -108,7 +108,7 @@ fn oracle_prop_abs_interp_extended_sign_domain() {
     (funcall 'neovm--esd-meet 'neg 'neg)       ;; neg
     ;; Absorption: join(a, meet(a,b)) = a
     (funcall 'neovm--esd-join 'non-neg (funcall 'neovm--esd-meet 'non-neg 'pos))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +204,7 @@ fn oracle_prop_abs_interp_extended_arithmetic() {
     (funcall 'neovm--ea-div 'zero 'pos)          ;; zero
     (funcall 'neovm--ea-div 'pos 'zero)          ;; bot (div by zero)
     (funcall 'neovm--ea-div 'bot 'pos)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -344,7 +344,7 @@ fn oracle_prop_abs_interp_transfer_functions_advanced() {
           (funcall 'neovm--ait-get final2 'x)   ;; top
           (funcall 'neovm--ait-get final2 'y)   ;; top (join pos and neg)
           (funcall 'neovm--ait-get final2 'z))))))"#; // top (top * top)
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -456,7 +456,7 @@ fn oracle_prop_abs_interp_widening_fixpoint() {
       (list (cons 'x 'pos) (cons 'y 'pos))
       (lambda (s) (funcall 'neovm--aiw-set s 'x (funcall 'neovm--aiw-add (funcall 'neovm--aiw-get s 'x) (funcall 'neovm--aiw-get s 'y))))
       20)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -611,7 +611,7 @@ fn oracle_prop_abs_interp_cfg_analysis() {
               (funcall 'neovm--aicfg-get b4-2 'y)  ;; top (join pos neg)
               (funcall 'neovm--aicfg-get b4-2 'z)  ;; top (pos + top)
               )))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -704,5 +704,5 @@ fn oracle_prop_abs_interp_factorial_analysis() {
           (funcall 'neovm--aif-add (funcall 'neovm--aif-fibonacci 'pos) (funcall 'neovm--aif-fibonacci 'pos))
           ;; fact(zero) + fib(zero) = pos (1 + 0 = 1)
           (funcall 'neovm--aif-add (funcall 'neovm--aif-factorial 'zero) (funcall 'neovm--aif-fibonacci 'zero)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

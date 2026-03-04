@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // CNF representation and basic clause operations
@@ -205,7 +205,7 @@ fn oracle_prop_sat_unit_propagation() {
     (fmakunbound 'neovm--sat-up-clause-falsified-p)
     (fmakunbound 'neovm--sat-unit-propagate)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -452,7 +452,7 @@ fn oracle_prop_sat_dpll_algorithm() {
     (fmakunbound 'neovm--sat-d-copy-assign)
     (fmakunbound 'neovm--sat-d-solve)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

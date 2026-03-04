@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Test 1: list, cons, and list* via apply — various arities and nesting
@@ -36,7 +36,7 @@ fn oracle_prop_list_creation_list_cons_and_list_star() {
   (apply #'list 1 2 '(3 4 5))
   ;; Deep nesting
   (list (list (list (list 'deep)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ fn oracle_prop_list_creation_make_list_comprehensive() {
   (let ((lst (make-list 4 'same)))
     (and (eq (nth 0 lst) (nth 1 lst))
          (eq (nth 2 lst) (nth 3 lst)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ fn oracle_prop_list_creation_number_sequence_params() {
   (number-sequence -3 3)
   ;; Float sequence
   (number-sequence 0 10 3))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ fn oracle_prop_list_creation_nthcdr_nth_boundaries() {
     (nth 0 nil)
     ;; nthcdr on nil
     (nthcdr 5 nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ fn oracle_prop_list_creation_take_ntake() {
       (ntake 6 c3))
     ;; take preserves original
     (progn (take 2 lst) lst)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +267,7 @@ fn oracle_prop_list_creation_dotted_pair_operations() {
   ;; Converting between dotted and proper
   (append '(1 2) 3)
   (append '(1 2) '(3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -303,7 +303,7 @@ fn oracle_prop_list_creation_append_comprehensive() {
   (let ((x '(1 2 3)))
     (append x '(4 5))
     x))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -412,5 +412,5 @@ fn oracle_prop_list_creation_operation_interactions() {
     (take 3 (reverse (number-sequence 1 8)))
     ;; nthcdr of butlast
     (nthcdr 2 (butlast seq 2))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Matrix add, sub, mul, transpose — unified helper definitions
@@ -134,7 +134,7 @@ fn oracle_prop_linear_algebra_basic_ops() {
     (fmakunbound 'neovm--la-mul)
     (fmakunbound 'neovm--la-scale)
     (fmakunbound 'neovm--la-eye)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ fn oracle_prop_linear_algebra_gaussian_elimination() {
     (fmakunbound 'neovm--la-ge-ref)
     (fmakunbound 'neovm--la-ge-set)
     (fmakunbound 'neovm--la-ge)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ fn oracle_prop_linear_algebra_lu_decomposition() {
     (fmakunbound 'neovm--la-lu-set)
     (fmakunbound 'neovm--la-lu-make-zero)
     (fmakunbound 'neovm--la-lu)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -369,7 +369,7 @@ fn oracle_prop_linear_algebra_matrix_inverse() {
     (fmakunbound 'neovm--la-inv-set)
     (fmakunbound 'neovm--la-inv-augment)
     (fmakunbound 'neovm--la-inv)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -470,7 +470,7 @@ fn oracle_prop_linear_algebra_solve_system() {
     (fmakunbound 'neovm--la-solve-fwd)
     (fmakunbound 'neovm--la-solve-back)
     (fmakunbound 'neovm--la-solve)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -547,7 +547,7 @@ fn oracle_prop_linear_algebra_power_iteration() {
     (fmakunbound 'neovm--la-pi-matvec)
     (fmakunbound 'neovm--la-pi-max-abs)
     (fmakunbound 'neovm--la-power-iter)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -626,5 +626,5 @@ fn oracle_prop_linear_algebra_rank() {
     (fmakunbound 'neovm--la-rank-set)
     (fmakunbound 'neovm--la-rank-echelon)
     (fmakunbound 'neovm--la-rank)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

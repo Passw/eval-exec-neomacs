@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Terminal and non-terminal representation
@@ -58,7 +58,7 @@ fn oracle_prop_railroad_terminal_nonterminal() {
            (funcall 'neovm--rr-node-width '(terminal "abcdef"))))
     (fmakunbound 'neovm--rr-render-node)
     (fmakunbound 'neovm--rr-node-width)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ fn oracle_prop_railroad_sequence() {
         (funcall 'neovm--rrs-render-sequence nil))
     (fmakunbound 'neovm--rrs-render-node)
     (fmakunbound 'neovm--rrs-render-sequence)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ fn oracle_prop_railroad_choice() {
     (fmakunbound 'neovm--rrc-render-node)
     (fmakunbound 'neovm--rrc-pad-to)
     (fmakunbound 'neovm--rrc-render-choice)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -248,7 +248,7 @@ fn oracle_prop_railroad_optional_repetition() {
     (fmakunbound 'neovm--rro-render-optional)
     (fmakunbound 'neovm--rro-render-one-or-more)
     (fmakunbound 'neovm--rro-render-zero-or-more)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -347,7 +347,7 @@ fn oracle_prop_railroad_full_ascii_art() {
         (funcall 'neovm--rrf-render
                  '(choice (terminal "true") (terminal "false") (nonterminal "expr"))))
     (fmakunbound 'neovm--rrf-render)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -448,7 +448,7 @@ fn oracle_prop_railroad_arithmetic_grammar() {
     (fmakunbound 'neovm--rrg-define-grammar)
     (fmakunbound 'neovm--rrg-render-rule)
     (fmakunbound 'neovm--rrg-stats)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -517,5 +517,5 @@ fn oracle_prop_railroad_width_and_centering() {
     (fmakunbound 'neovm--rrw-render)
     (fmakunbound 'neovm--rrw-center)
     (fmakunbound 'neovm--rrw-box)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

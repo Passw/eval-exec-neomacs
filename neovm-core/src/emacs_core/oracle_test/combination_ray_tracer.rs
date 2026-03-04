@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 3D vector primitive operations
@@ -97,7 +97,7 @@ fn oracle_prop_combination_ray_tracer_vec3_ops() {
     (fmakunbound 'neovm--rt-vcross)
     (fmakunbound 'neovm--rt-vlength)
     (fmakunbound 'neovm--rt-vnormalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ fn oracle_prop_combination_ray_tracer_sphere_intersection() {
     (fmakunbound 'neovm--rt2-vscale)
     (fmakunbound 'neovm--rt2-vdot)
     (fmakunbound 'neovm--rt2-intersect-sphere)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +229,7 @@ fn oracle_prop_combination_ray_tracer_plane_intersection() {
     (fmakunbound 'neovm--rt3-vadd)
     (fmakunbound 'neovm--rt3-intersect-plane)
     (fmakunbound 'neovm--rt3-ray-at)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -291,7 +291,7 @@ fn oracle_prop_combination_ray_tracer_lambertian_shading() {
     (fmakunbound 'neovm--rt4-vnormalize)
     (fmakunbound 'neovm--rt4-lambertian)
     (fmakunbound 'neovm--rt4-color-scale)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -361,7 +361,7 @@ fn oracle_prop_combination_ray_tracer_shadow_rays() {
     (fmakunbound 'neovm--rt5-vnormalize)
     (fmakunbound 'neovm--rt5-intersect-sphere)
     (fmakunbound 'neovm--rt5-in-shadow)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -435,7 +435,7 @@ fn oracle_prop_combination_ray_tracer_scene_nearest_hit() {
     (fmakunbound 'neovm--rt6-vadd)
     (fmakunbound 'neovm--rt6-intersect-sphere)
     (fmakunbound 'neovm--rt6-trace-scene)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -516,5 +516,5 @@ fn oracle_prop_combination_ray_tracer_color_mixing() {
     (fmakunbound 'neovm--rt7-color-clamp)
     (fmakunbound 'neovm--rt7-color-lerp)
     (fmakunbound 'neovm--rt7-color-to-int)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // eq vs eql vs equal on all types
@@ -47,7 +47,7 @@ fn oracle_prop_eq_eql_equal_all_types() {
    (list (eq [1 2] [1 2]) (equal [1 2] [1 2])
          (let ((v [1 2])) (eq v v))
          (equal [] []))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ fn oracle_prop_equal_deeply_nested() {
    (equal '(()) '(()))
    (equal '(nil) '(nil))
    (equal '((nil)) '((nil)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ fn oracle_prop_string_equal_vs_equal() {
   (string-equal "abc" "ab")
   ;; Symbols that look like numbers
   (string-equal '42 "42"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ fn oracle_prop_numeric_eq_vs_equal_sign() {
   ;; Arithmetic results
   (= (+ 1 2) 3) (= (* 2 3) 6)
   (eql (+ 1 2) 3) (eql (+ 1.0 2.0) 3.0))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ fn oracle_prop_compare_strings_all_params() {
   (compare-strings "abc" 0 0 "xyz" 0 0)
   ;; Overlapping range results
   (compare-strings "abcdef" 0 3 "abxdef" 0 3))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ fn oracle_prop_compare_strings_ignore_case() {
   (compare-strings "HELLO WORLD" nil nil "hello world" nil nil t)
   ;; Partial match with case folding
   (compare-strings "FoObAr" 0 3 "fOo" nil nil t))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -274,7 +274,7 @@ fn oracle_prop_custom_deep_equal() {
                               (if (funcall 'neovm--deep-eq a b) t nil)))))
                 test-cases))
     (fmakunbound 'neovm--deep-eq)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 1D elementary cellular automata: multiple rules compared
@@ -99,7 +99,7 @@ fn oracle_prop_cellular_elementary_multi_rule() {
     (fmakunbound 'neovm--ca-run-1d)
     (fmakunbound 'neovm--ca-population)
     (fmakunbound 'neovm--ca-to-string)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +197,7 @@ fn oracle_prop_cellular_rule110_patterns() {
     (fmakunbound 'neovm--ca-population)
     (fmakunbound 'neovm--ca-is-fixed-point)
     (fmakunbound 'neovm--ca-find-period)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ fn oracle_prop_cellular_game_of_life_basic() {
     (fmakunbound 'neovm--gol-step)
     (fmakunbound 'neovm--gol-population)
     (fmakunbound 'neovm--gol-to-sorted-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -438,7 +438,7 @@ fn oracle_prop_cellular_gol_pattern_detection() {
     (fmakunbound 'neovm--gol-to-sorted-list)
     (fmakunbound 'neovm--gol-population)
     (fmakunbound 'neovm--gol-classify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -535,7 +535,7 @@ fn oracle_prop_cellular_gol_generation_tracking() {
     (fmakunbound 'neovm--gol-step)
     (fmakunbound 'neovm--gol-population)
     (fmakunbound 'neovm--gol-bounding-box)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -662,7 +662,7 @@ fn oracle_prop_cellular_grid_operations() {
     (fmakunbound 'neovm--gol-reflect-h)
     (fmakunbound 'neovm--gol-reflect-v)
     (fmakunbound 'neovm--gol-same-pattern-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -767,5 +767,5 @@ fn oracle_prop_cellular_1d_spacetime_analysis() {
     (fmakunbound 'neovm--ca-activity)
     (fmakunbound 'neovm--ca-hamming)
     (fmakunbound 'neovm--ca-sensitivity)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

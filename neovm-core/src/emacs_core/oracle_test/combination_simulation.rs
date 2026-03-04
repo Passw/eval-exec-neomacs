@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 1D Cellular automaton (Rule 30)
@@ -61,7 +61,7 @@ fn oracle_prop_sim_cellular_automaton_rule30() {
     (fmakunbound 'neovm--test-rule30)
     (fmakunbound 'neovm--test-ca-step)
     (fmakunbound 'neovm--test-ca-to-string)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ fn oracle_prop_sim_bank_accounts() {
     (fmakunbound 'neovm--test-bank-withdraw)
     (fmakunbound 'neovm--test-bank-interest)
     (fmakunbound 'neovm--test-bank-transfer)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ fn oracle_prop_sim_inventory_management() {
     (fmakunbound 'neovm--test-inv-value)
     (fmakunbound 'neovm--test-inv-needs-reorder)
     (fmakunbound 'neovm--test-inv-report)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -296,7 +296,7 @@ fn oracle_prop_sim_projectile_motion() {
     (fmakunbound 'neovm--test-proj-create)
     (fmakunbound 'neovm--test-proj-step)
     (fmakunbound 'neovm--test-proj-simulate)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -399,7 +399,7 @@ fn oracle_prop_sim_weather_state_machine() {
     (fmakunbound 'neovm--test-lcg-next)
     (fmakunbound 'neovm--test-weather-transition)
     (fmakunbound 'neovm--test-weather-simulate)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -545,5 +545,5 @@ fn oracle_prop_sim_cellular_automaton_rule110() {
     (fmakunbound 'neovm--test-rule110)
     (fmakunbound 'neovm--test-ca110-step)
     (fmakunbound 'neovm--test-ca-count-live)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

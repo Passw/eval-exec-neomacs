@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Various lengths: 0, 1, boundary, and moderately large
@@ -35,7 +35,7 @@ fn oracle_prop_make_string_adv_various_lengths() {
                             (string= s (make-string 500 ?#))))
                     ;; Very large
                     (length (make-string 10000 ?a)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ fn oracle_prop_make_string_adv_multibyte_chars() {
                     ;; Mixing: make-string produces uniform, then compare with hand-built
                     (let ((s (make-string 3 ?\u00f1)))  ; n-tilde
                       (equal s (string ?\u00f1 ?\u00f1 ?\u00f1))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ fn oracle_prop_make_string_adv_aset_modification() {
                       (let ((ref s))
                         (aset ref 1 ?B)
                         (list s ref (eq s ref)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -158,7 +158,7 @@ fn oracle_prop_make_string_adv_with_concat() {
                       (dotimes (i 5)
                         (setq s (concat s (make-string (1+ i) ?#) " ")))
                       s))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ fn oracle_prop_make_string_adv_padding_patterns() {
     (fmakunbound 'neovm--test-rpad)
     (fmakunbound 'neovm--test-lpad)
     (fmakunbound 'neovm--test-center)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -336,7 +336,7 @@ fn oracle_prop_make_string_adv_formatting_utilities() {
     (fmakunbound 'neovm--test-text-box)
     (fmakunbound 'neovm--test-progress-bar)
     (fmakunbound 'neovm--test-tree-indent)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -393,5 +393,5 @@ fn oracle_prop_make_string_adv_string_building_algorithms() {
                           (aset rev (- len 1 i) (aref s i))
                           (setq i (1+ i))))
                       rev))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

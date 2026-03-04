@@ -4,7 +4,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use proptest::prelude::*;
 
-use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_recursion_factorial() {
@@ -40,7 +40,7 @@ fn oracle_prop_recursion_fibonacci() {
                   (unwind-protect
                       (mapcar 'neovm--test-fib '(0 1 2 3 4 5 6 7 8 9 10))
                     (fmakunbound 'neovm--test-fib)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -143,7 +143,7 @@ fn oracle_prop_recursion_tree_depth() {
                             (funcall 'neovm--test-tree-depth '(a (b (c))))
                             (funcall 'neovm--test-tree-depth '((a b) (c d))))
                     (fmakunbound 'neovm--test-tree-depth)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -185,7 +185,7 @@ fn oracle_prop_recursion_map_tree() {
                   (unwind-protect
                       (funcall 'neovm--test-map-tree '1+ '(1 (2 3) ((4) 5)))
                     (fmakunbound 'neovm--test-map-tree)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -207,7 +207,7 @@ fn oracle_prop_recursion_with_catch_throw() {
                         (catch 'found (funcall 'neovm--test-find-deep '(1 (2 (3 4) 5) 6) 4))
                         (catch 'found (funcall 'neovm--test-find-deep '(1 (2 (3 4) 5) 6) 99)))
                     (fmakunbound 'neovm--test-find-deep)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 proptest! {

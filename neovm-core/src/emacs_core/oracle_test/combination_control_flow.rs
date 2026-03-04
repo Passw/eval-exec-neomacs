@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 1. Nested condition-case with different error types
@@ -41,7 +41,7 @@ fn oracle_prop_cf_nested_condition_case_different_errors() {
       (funcall try-eval (lambda () (symbol-value 'neovm--unbound-xyz-var)))
       ;; Wrong type -> outer handler (skip inner and middle)
       (funcall try-eval (lambda () (car 42))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ fn oracle_prop_cf_catch_throw_deep_recursion() {
             (funcall 'neovm--test-tree-find tree 99 0)
             'not-found)))
     (fmakunbound 'neovm--test-tree-find)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ fn oracle_prop_cf_unwind_protect_cleanup_ordering() {
     (error nil))
   ;; Log should show: body-start, then cleanups 3, 2, 1
   (nreverse cleanup-log))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ fn oracle_prop_cf_state_machine_transition_table() {
   (list state
         (apply #'string (nreverse collected))
         i))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ fn oracle_prop_cf_cooperative_scheduling() {
   (list (nreverse log)
         task-a-state
         task-b-state))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +245,7 @@ fn oracle_prop_cf_error_retry_with_counter() {
         (nreverse results))
     (fmakunbound 'neovm--test-flaky-op)
     (makunbound 'neovm--test-attempt-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +287,7 @@ fn oracle_prop_cf_prog1_preserving_value() {
             (setq a 'inner-side))
         (setq b 'outer-side))
       (list a b))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -352,7 +352,7 @@ fn oracle_prop_cf_exception_safe_resource_management() {
     (fmakunbound 'neovm--test-with-transaction)
     (makunbound 'neovm--test-txn-log)
     (makunbound 'neovm--test-txn-data)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -394,7 +394,7 @@ fn oracle_prop_cf_coroutine_pipeline() {
                               ;; Type error abort
                               (r3 (funcall pipeline "bad" stages)))
                           (list r1 r2 r3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -434,7 +434,7 @@ fn oracle_prop_cf_trampoline_mutual_recursion() {
                  (funcall 'neovm--test-collatz-bounce 12 0)))
     (fmakunbound 'neovm--test-trampoline)
     (fmakunbound 'neovm--test-collatz-bounce)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // char-to-string and string-to-char roundtrip
@@ -45,7 +45,7 @@ fn oracle_prop_char_ops_comprehensive_roundtrip() {
  (string= (char-to-string ?\n) "\n")
  (string= (char-to-string ?\t) "\t"))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ fn oracle_prop_char_ops_comprehensive_char_width() {
  ;; Fullwidth latin A (U+FF21) should be width 2
  (char-width #xff21))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ fn oracle_prop_char_ops_comprehensive_char_equal() {
     (char-equal ?\t ?\t)
     (char-equal ?a ?\n))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ fn oracle_prop_char_ops_comprehensive_characterp() {
  ;; Zero is a valid character
  (characterp 0))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -327,7 +327,7 @@ fn oracle_prop_char_ops_comprehensive_downcase_upcase() {
  (characterp (downcase ?A))
  (characterp (upcase ?a)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -382,7 +382,7 @@ fn oracle_prop_char_ops_comprehensive_char_table() {
       ;; char-table-p on the category table (built-in)
       (char-table-p (standard-syntax-table))))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -419,7 +419,7 @@ fn oracle_prop_char_ops_comprehensive_max_char() {
  (>= (max-char) ?é)
  (>= (max-char) #x10FFFF))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -481,5 +481,5 @@ fn oracle_prop_char_ops_comprehensive_caesar_cipher() {
                  (>= (aref shifted 1) ?a) (<= (aref shifted 1) ?z)))))
     (fmakunbound 'neovm--caesar-shift)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

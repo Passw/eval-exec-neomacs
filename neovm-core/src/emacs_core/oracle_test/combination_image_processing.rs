@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // 2D matrix as image + convolution with kernels
@@ -108,7 +108,7 @@ fn oracle_prop_imgproc_convolution_kernels() {
     (fmakunbound 'neovm--img-rows)
     (fmakunbound 'neovm--img-cols)
     (fmakunbound 'neovm--img-convolve)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +165,7 @@ Bins values into NUM-BINS buckets over [0, MAX-VAL]."
          ;; All uniform pixels in same bin
          :uniform-single-bin (= (apply 'max hist-uni) 4)))
     (fmakunbound 'neovm--img-histogram)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +230,7 @@ fn oracle_prop_imgproc_threshold() {
                         (setq r (1+ r)))
                       cnt)))
     (fmakunbound 'neovm--img-threshold)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -334,7 +334,7 @@ Pixel is 1 if center OR any 4-neighbor is 1."
     (fmakunbound 'neovm--img-erode)
     (fmakunbound 'neovm--img-dilate)
     (fmakunbound 'neovm--img-count-fg)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

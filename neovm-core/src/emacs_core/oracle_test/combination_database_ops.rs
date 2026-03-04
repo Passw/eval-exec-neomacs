@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Full database engine: INSERT, SELECT with WHERE, column projection
@@ -88,7 +88,7 @@ fn oracle_prop_db_ops_insert_select_where_project() {
     (fmakunbound 'neovm--db-select)
     (makunbound 'neovm--db-tables)
     (makunbound 'neovm--db-next-ids)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ fn oracle_prop_db_ops_update_delete() {
           (length table-after-delete)
           ;; Final table names
           (mapcar (lambda (row) (cdr (assq 'name row))) table-after-delete))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -227,7 +227,7 @@ fn oracle_prop_db_ops_order_by() {
               (funcall order-by-multi table
                        (list (cons 'dept #'string<)
                              (cons 'name #'string<)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -316,7 +316,7 @@ fn oracle_prop_db_ops_group_by_aggregation() {
           (list
             (sort results (lambda (a b) (string< (car a) (car b))))
             (sort region-results (lambda (a b) (string< (car a) (car b))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -388,7 +388,7 @@ fn oracle_prop_db_ops_inner_join() {
                                    (cdr (assq 'proj-name r))))
                  emp-dept-proj)
          (lambda (a b) (string< (car a) (car b))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -514,7 +514,7 @@ fn oracle_prop_db_ops_full_query_pipeline() {
       (funcall query-pipeline orders nil 'product
                '((max-amt max amount) (min-amt min amount) (avg-amt avg amount))
                'product #'string< nil))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -578,7 +578,7 @@ fn oracle_prop_db_ops_having_clause() {
         (list
           (sort all-results (lambda (a b) (string< (car a) (car b))))
           (sort results (lambda (a b) (string< (car a) (car b)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -652,5 +652,5 @@ fn oracle_prop_db_ops_subquery_pattern() {
             (lambda (a b) (if (equal (cadr a) (cadr b))
                               (< (caddr a) (caddr b))
                             (string< (cadr a) (cadr b))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

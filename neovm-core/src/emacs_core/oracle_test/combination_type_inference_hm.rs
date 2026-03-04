@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Type representation and basic operations
@@ -318,7 +318,7 @@ fn oracle_prop_hm_unification() {
     (fmakunbound 'neovm--hm-u-bind)
     (fmakunbound 'neovm--hm-u-unify)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -877,5 +877,5 @@ fn oracle_prop_hm_occurs_check_detailed() {
     (fmakunbound 'neovm--hm-oc-occurs)
     (fmakunbound 'neovm--hm-oc-unify)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

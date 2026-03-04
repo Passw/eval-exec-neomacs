@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Copy list and verify structural independence via nested mutation
@@ -35,7 +35,7 @@ fn oracle_prop_copy_sequence_advanced_list_independence() {
                     (eq orig copy)
                     ;; The cdrs should NOT be eq (top-level spine is copied)
                     (eq (cdr orig) (cdr copy))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -64,7 +64,7 @@ fn oracle_prop_copy_sequence_advanced_vector_independence() {
                     (eq orig copy)
                     (length orig)
                     (length copy)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ fn oracle_prop_copy_sequence_advanced_shallow_semantics() {
                         ;; Original's inner2 is also mutated (shared!)
                         (aref (cadr orig) 0)
                         (aref (cadr copy) 0)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +172,7 @@ fn oracle_prop_copy_sequence_advanced_alist_isolation() {
                         ;; Verify the rest of copy is untouched
                         (cdr (assq 'b copy))
                         (cdr (assq 'c copy))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ fn oracle_prop_copy_sequence_advanced_sort_copy() {
                     (let* ((words (list "banana" "apple" "cherry" "date"))
                            (sorted-words (sort (copy-sequence words) #'string<)))
                       (list words sorted-words))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -265,7 +265,7 @@ fn oracle_prop_copy_sequence_advanced_pipeline() {
                       (aset bv-copy 3 t)
                       (list (aref bv 0) (aref bv 3)
                             (aref bv-copy 0) (aref bv-copy 3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

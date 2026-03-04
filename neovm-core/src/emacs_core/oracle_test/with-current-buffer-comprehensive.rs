@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Preserving and restoring current buffer across with-current-buffer
@@ -41,7 +41,7 @@ fn oracle_prop_wcb_comp_preserve_restore_current_buffer() {
                (with-current-buffer buf-b (buffer-string)))))))
     (kill-buffer buf-a)
     (kill-buffer buf-b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ fn oracle_prop_wcb_comp_deeply_nested_four_levels() {
             (eq (current-buffer) b1))))
     (kill-buffer b1) (kill-buffer b2)
     (kill-buffer b3) (kill-buffer b4)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ fn oracle_prop_wcb_comp_interaction_with_set_buffer() {
                   (eq (current-buffer) orig)))))
     (kill-buffer buf-a)
     (kill-buffer buf-b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ fn oracle_prop_wcb_comp_with_temp_buffer_inside() {
                       ;; Original is preserved after everything
                       ))))))
     (kill-buffer buf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +189,7 @@ fn oracle_prop_wcb_comp_buffer_local_variable_access() {
            (local-variable-p 'neovm--test-var-wcbc))))
     (kill-buffer buf-a)
     (kill-buffer buf-b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +233,7 @@ fn oracle_prop_wcb_comp_point_mark_preservation() {
            (buffer-substring 1 8))))
     (kill-buffer buf-a)
     (kill-buffer buf-b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -277,7 +277,7 @@ fn oracle_prop_wcb_comp_narrowing_context_isolation() {
                (list wide (point-min) (point-max)))))))
     (kill-buffer buf-a)
     (kill-buffer buf-b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -316,7 +316,7 @@ fn oracle_prop_wcb_comp_error_handling_restores_buffer() {
                         (with-current-buffer buf2 (buffer-string)))))
              (kill-buffer buf2)))))
     (kill-buffer buf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -358,7 +358,7 @@ fn oracle_prop_wcb_comp_generated_buffer_names() {
                    (setq all-unique nil))))
              all-unique))))
     (dolist (b bufs) (when (buffer-live-p b) (kill-buffer b)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -404,7 +404,7 @@ fn oracle_prop_wcb_comp_buffer_state_isolation() {
             (with-current-buffer b2 (buffer-modified-p))))))
     (kill-buffer b1)
     (kill-buffer b2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -444,5 +444,5 @@ fn oracle_prop_wcb_comp_save_excursion_interaction() {
                  (goto-char 1)
                  (buffer-substring 1 4)))))))
     (kill-buffer buf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

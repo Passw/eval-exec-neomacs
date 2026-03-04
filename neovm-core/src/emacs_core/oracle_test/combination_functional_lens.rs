@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Getter/setter lens construction
@@ -74,7 +74,7 @@ fn oracle_prop_functional_lens_basic_construction() {
     (fmakunbound 'neovm--lens-get)
     (fmakunbound 'neovm--lens-set)
     (fmakunbound 'neovm--lens-over)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ fn oracle_prop_functional_lens_composition() {
     (fmakunbound 'neovm--lens-set)
     (fmakunbound 'neovm--lens-over)
     (fmakunbound 'neovm--lens-compose)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +220,7 @@ fn oracle_prop_functional_lens_laws() {
     (fmakunbound 'neovm--lens-make)
     (fmakunbound 'neovm--lens-get)
     (fmakunbound 'neovm--lens-set)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,7 +288,7 @@ fn oracle_prop_functional_lens_prism() {
     (fmakunbound 'neovm--prism-preview)
     (fmakunbound 'neovm--prism-review)
     (fmakunbound 'neovm--prism-over)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -381,7 +381,7 @@ fn oracle_prop_functional_lens_traversal() {
     (fmakunbound 'neovm--lens-then-traverse)
     (fmakunbound 'neovm--traversal-get-all)
     (fmakunbound 'neovm--traversal-over-all)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -450,7 +450,7 @@ fn oracle_prop_functional_lens_pipeline() {
     (fmakunbound 'neovm--lens-set)
     (fmakunbound 'neovm--lens-over)
     (fmakunbound 'neovm--lens-pipeline)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -532,5 +532,5 @@ fn oracle_prop_functional_lens_record_update() {
     (fmakunbound 'neovm--lens-set)
     (fmakunbound 'neovm--lens-over)
     (fmakunbound 'neovm--lens-compose)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

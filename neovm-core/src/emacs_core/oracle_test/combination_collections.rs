@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Flatten arbitrarily nested lists
@@ -41,7 +41,7 @@ fn oracle_prop_coll_flatten_nested() {
                      (funcall my-flatten '(((((42))))))
                      ;; Flat to begin with
                      (funcall my-flatten nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ fn oracle_prop_coll_tree_rotations() {
                          (funcall tree-inorder
                                   (funcall rotate-right
                                            (funcall rotate-left tree)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ fn oracle_prop_coll_permutations_combinations() {
                      (funcall combinations '(a b c d) 4)
                      ;; C(4,1) = 4
                      (length (funcall combinations '(a b c d) 1))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +230,7 @@ fn oracle_prop_coll_multi_partition() {
                               '(1 2 3 4 5 6 7 8 9 10 11 12)
                               (list (lambda (x) (= (% x 3) 0))
                                     (lambda (x) (= (% x 2) 0))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,7 +290,7 @@ fn oracle_prop_coll_interleave_transpose() {
                               (funcall transpose '((a b c) (d e f))))
                      ;; Transpose 1x4
                      (funcall transpose '((1 2 3 4)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -342,7 +342,7 @@ fn oracle_prop_coll_frequency_histogram() {
                          (apply #'+ (mapcar #'cdr freq))
                          ;; Number of unique items
                          (length freq)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -399,7 +399,7 @@ fn oracle_prop_coll_zip_unzip() {
                      (funcall unzip (funcall zip '(x y z) '(10 20 30)))
                      ;; Zip with itself (duplicate)
                      (funcall zip '(1 2 3) '(1 2 3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -445,5 +445,5 @@ fn oracle_prop_coll_group_by() {
                      (funcall group-by
                               (lambda (x) (* (/ x 10) 10))
                               '(3 15 7 22 31 8 19 25 2 37))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

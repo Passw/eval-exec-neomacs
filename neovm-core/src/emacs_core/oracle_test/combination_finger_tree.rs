@@ -10,7 +10,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 /// Returns Elisp code defining the finger tree functions.
 fn finger_tree_preamble() -> &'static str {
@@ -315,7 +315,7 @@ fn oracle_prop_finger_tree_push_left_right() {
         preamble = finger_tree_preamble(),
         cleanup = finger_tree_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -357,7 +357,7 @@ fn oracle_prop_finger_tree_pop_left_right() {
         preamble = finger_tree_preamble(),
         cleanup = finger_tree_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -401,7 +401,7 @@ fn oracle_prop_finger_tree_many_elements() {
         preamble = finger_tree_preamble(),
         cleanup = finger_tree_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -437,7 +437,7 @@ fn oracle_prop_finger_tree_roundtrip() {
         preamble = finger_tree_preamble(),
         cleanup = finger_tree_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -495,7 +495,7 @@ fn oracle_prop_finger_tree_deque_operations() {
         preamble = finger_tree_preamble(),
         cleanup = finger_tree_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -562,7 +562,7 @@ fn oracle_prop_finger_tree_indexed_access() {
         preamble = finger_tree_preamble(),
         cleanup = finger_tree_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -615,5 +615,5 @@ fn oracle_prop_finger_tree_concatenation() {
         preamble = finger_tree_preamble(),
         cleanup = finger_tree_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }

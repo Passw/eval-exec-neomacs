@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Interval tree core: insert and augmented max
@@ -95,7 +95,7 @@ fn oracle_prop_interval_tree_insert() {
     (fmakunbound 'neovm--itree-node)
     (fmakunbound 'neovm--itree-insert)
     (fmakunbound 'neovm--itree-inorder)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +201,7 @@ fn oracle_prop_interval_tree_point_query() {
     (fmakunbound 'neovm--itree-node)
     (fmakunbound 'neovm--itree-insert)
     (fmakunbound 'neovm--itree-point-query)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -316,7 +316,7 @@ fn oracle_prop_interval_tree_overlap_query() {
     (fmakunbound 'neovm--itree-insert)
     (fmakunbound 'neovm--itree-overlaps-p)
     (fmakunbound 'neovm--itree-overlap-query)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -400,7 +400,7 @@ fn oracle_prop_interval_tree_merge_overlapping() {
     (fmakunbound 'neovm--interval-merge)
     (fmakunbound 'neovm--interval-covers-p)
     (fmakunbound 'neovm--interval-gaps)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -510,7 +510,7 @@ fn oracle_prop_interval_tree_scheduling() {
     (fmakunbound 'neovm--sched-conflicts)
     (fmakunbound 'neovm--sched-free-slots)
     (fmakunbound 'neovm--sched-total-busy)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -590,5 +590,5 @@ fn oracle_prop_interval_tree_count_and_size() {
     (fmakunbound 'neovm--iv-total-span)
     (fmakunbound 'neovm--iv-max-overlap)
     (fmakunbound 'neovm--iv-contains-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

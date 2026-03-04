@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Tokenizer: converts input string into a list of tokens
@@ -97,7 +97,7 @@ fn oracle_prop_rd_parser_tokenizer() {
     (fmakunbound 'neovm--rdp-is-alnum)
     (fmakunbound 'neovm--rdp-tokenize)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +297,7 @@ fn oracle_prop_rd_parser_ast_construction() {
     (fmakunbound 'neovm--rdp2-parse)
     (makunbound 'neovm--rdp2-tokens)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -452,7 +452,7 @@ fn oracle_prop_rd_parser_ast_pretty_print() {
     (fmakunbound 'neovm--rdp3-to-prefix)
     (makunbound 'neovm--rdp3-tokens)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -648,7 +648,7 @@ fn oracle_prop_rd_parser_ast_evaluator() {
     (fmakunbound 'neovm--rdp4-eval-expr)
     (makunbound 'neovm--rdp4-tokens)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -806,7 +806,7 @@ fn oracle_prop_rd_parser_algebraic_identities() {
     (fmakunbound 'neovm--rdp5-calc)
     (makunbound 'neovm--rdp5-tokens)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -955,5 +955,5 @@ fn oracle_prop_rd_parser_error_recovery() {
     (makunbound 'neovm--rdp6-tokens)
     (makunbound 'neovm--rdp6-errors)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // string-distance edge cases and symmetry
@@ -40,7 +40,7 @@ fn oracle_prop_string_distance_edge_cases_and_symmetry() {
                        (string-distance b a)))))
           pairs))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ fn oracle_prop_string_distance_byte_mode() {
   (string-distance "algorithm" "altruistic" t)
   (string-distance "intention" "execution" t))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ fn oracle_prop_string_comparison_functions() {
                 (compare-strings a nil nil b nil nil t))))
           pairs))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -192,7 +192,7 @@ fn oracle_prop_fuzzy_string_matching() {
     (fmakunbound 'neovm--sd-fuzzy-score)
     (fmakunbound 'neovm--sd-fuzzy-match)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -244,7 +244,7 @@ fn oracle_prop_autocomplete_ranking() {
                  "buf" "build" "bulk" "bufferp" "bug-report"))
     (fmakunbound 'neovm--sd-rank-candidates)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +295,7 @@ fn oracle_prop_line_diff_algorithm() {
     (fmakunbound 'neovm--sd-find-closest)
     (fmakunbound 'neovm--sd-diff-docs)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -326,5 +326,5 @@ fn oracle_prop_string_distance_triangle_inequality() {
               (setq examples (cons (list a b c ab bc ac) examples)))))))
     (list violations total (null examples))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

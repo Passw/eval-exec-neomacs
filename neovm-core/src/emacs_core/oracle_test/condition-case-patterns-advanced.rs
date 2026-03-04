@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Exhaustive error symbol testing
@@ -39,7 +39,7 @@ fn oracle_prop_ccpat_adv_exhaustive_error_symbols() {
   ;; error: generic signal
   (condition-case e (signal 'error '("custom message"))
     (error (list 'generic (car e) (cadr e)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ fn oracle_prop_ccpat_adv_handler_priority() {
     (arith-error 'arith-no)
     (wrong-type-argument 'wta-no)
     (error 'generic-caught)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ fn oracle_prop_ccpat_adv_default_handler_t() {
   (condition-case e (signal 'file-error '("test"))
     (arith-error 'arith-no)
     (t (list 't-caught (car e)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ fn oracle_prop_ccpat_adv_nested_different_types() {
              (file-error
               (list 'outer-caught-file (cadr outer-err))))))
       (list r1 r2))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ fn oracle_prop_ccpat_adv_retry_logic() {
     (list 'attempts attempt
           'final final-result
           'log (nreverse results))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ fn oracle_prop_ccpat_adv_error_chain_unwinding() {
     (fmakunbound 'neovm--ccpa-level3)
     (fmakunbound 'neovm--ccpa-level2)
     (fmakunbound 'neovm--ccpa-level1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -307,7 +307,7 @@ fn oracle_prop_ccpat_adv_no_error_passthrough() {
     (wrong-type-argument 'no)
     (void-variable 'no)
     (error 'no)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -345,7 +345,7 @@ fn oracle_prop_ccpat_adv_error_data_extraction() {
   (condition-case e (aref [1 2 3] 99)
     (args-out-of-range
      (list (car e) (length e)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

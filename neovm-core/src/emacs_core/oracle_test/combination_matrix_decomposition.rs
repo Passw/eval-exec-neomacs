@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Vector-of-vectors matrix representation and basic access
@@ -91,7 +91,7 @@ fn oracle_prop_matrix_decomp_vector_representation() {
     (fmakunbound 'neovm--md-row-list)
     (fmakunbound 'neovm--md-col-list)
     (fmakunbound 'neovm--md-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -182,7 +182,7 @@ fn oracle_prop_matrix_decomp_multiplication() {
     (fmakunbound 'neovm--md-cols)
     (fmakunbound 'neovm--md-to-list)
     (fmakunbound 'neovm--md-mult)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +253,7 @@ fn oracle_prop_matrix_decomp_transpose() {
     (fmakunbound 'neovm--md-from-list)
     (fmakunbound 'neovm--md-to-list)
     (fmakunbound 'neovm--md-transpose)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -336,7 +336,7 @@ fn oracle_prop_matrix_decomp_recursive_determinant() {
     (fmakunbound 'neovm--md-from-list)
     (fmakunbound 'neovm--md-minor)
     (fmakunbound 'neovm--md-det)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -440,7 +440,7 @@ fn oracle_prop_matrix_decomp_row_echelon() {
     (fmakunbound 'neovm--md-to-list)
     (fmakunbound 'neovm--md-copy)
     (fmakunbound 'neovm--md-ref-form)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -614,7 +614,7 @@ fn oracle_prop_matrix_decomp_inverse() {
     (fmakunbound 'neovm--md-mult)
     (fmakunbound 'neovm--md-identity)
     (fmakunbound 'neovm--md-scale)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -733,7 +733,7 @@ fn oracle_prop_matrix_decomp_solve_systems() {
     (fmakunbound 'neovm--md-solve)
     (fmakunbound 'neovm--md-dot)
     (fmakunbound 'neovm--md-verify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -895,5 +895,5 @@ fn oracle_prop_matrix_decomp_trace_and_properties() {
     (fmakunbound 'neovm--md-scale)
     (fmakunbound 'neovm--md-minor)
     (fmakunbound 'neovm--md-det)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -5,7 +5,7 @@
 //! chaotic iteration, and very busy expressions analysis.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Lattice operations: join, meet, bottom, top for a flat integer lattice
@@ -105,7 +105,7 @@ fn oracle_prop_dataflow_flat_lattice_operations() {
     (fmakunbound 'neovm--fl-meet)
     (fmakunbound 'neovm--fl-env-join)
     (fmakunbound 'neovm--fl-env-meet)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ fn oracle_prop_dataflow_transfer_functions() {
     (fmakunbound 'neovm--tf-join)
     (fmakunbound 'neovm--tf-eval-expr)
     (fmakunbound 'neovm--tf-apply)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ fn oracle_prop_dataflow_worklist_algorithm() {
     (fmakunbound 'neovm--wl-set-union)
     (fmakunbound 'neovm--wl-set-diff)
     (fmakunbound 'neovm--wl-set-equal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -453,7 +453,7 @@ fn oracle_prop_dataflow_constant_propagation() {
     (fmakunbound 'neovm--cp-eval)
     (fmakunbound 'neovm--cp-transfer)
     (fmakunbound 'neovm--cp-analyze)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -541,7 +541,7 @@ fn oracle_prop_dataflow_interval_analysis() {
     (fmakunbound 'neovm--ia-sub)
     (fmakunbound 'neovm--ia-mul)
     (fmakunbound 'neovm--ia-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -675,7 +675,7 @@ fn oracle_prop_dataflow_forward_vs_backward() {
     (fmakunbound 'neovm--fb-equal)
     (fmakunbound 'neovm--fb-forward)
     (fmakunbound 'neovm--fb-backward)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -760,7 +760,7 @@ fn oracle_prop_dataflow_chaotic_iteration() {
     (fmakunbound 'neovm--ci-diff)
     (fmakunbound 'neovm--ci-equal)
     (fmakunbound 'neovm--ci-live-vars)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -894,7 +894,7 @@ fn oracle_prop_dataflow_very_busy_expressions() {
     (fmakunbound 'neovm--vb-equal)
     (fmakunbound 'neovm--vb-gen-kill)
     (fmakunbound 'neovm--vb-analyze)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -1015,5 +1015,5 @@ Return list of (instr live-before live-after is-dead)."
     (fmakunbound 'neovm--dc-equal)
     (fmakunbound 'neovm--dc-intra-block-liveness)
     (fmakunbound 'neovm--dc-analyze)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

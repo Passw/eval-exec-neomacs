@@ -3,7 +3,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // mapc (like mapcar but returns the original list)
@@ -19,7 +19,7 @@ fn oracle_prop_mapc_basic() {
                                           (setq log (cons (* x x) log)))
                                         '(1 2 3 4 5))))
                       (list result (nreverse log))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -35,7 +35,7 @@ fn oracle_prop_mapc_side_effects() {
                           (gethash "b" h)
                           (gethash "c" h)
                           (hash-table-count h)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ fn oracle_prop_mapconcat_separator() {
                     (mapconcat #'number-to-string '(1 2 3 4 5) "-")
                     (mapconcat #'identity '("hello" "world") " ")
                     (mapconcat #'upcase '("foo" "bar" "baz") "::"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn oracle_prop_mapconcat_complex_transform() {
                        (format "%s = '%s'" (car pair) (cdr pair)))
                      conditions
                      " AND "))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ fn oracle_prop_mapcar_with_index() {
                               (setq idx (1+ idx))
                               (cons idx x))
                             '(a b c d e)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -111,7 +111,7 @@ fn oracle_prop_mapcar_nested_transform() {
                                   (upcase cell)))
                               row))
                     '(("name" 1 2) ("data" 3 4) ("info" 5 6)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ fn oracle_prop_map_pipeline() {
                                      (number-to-string (nth 1 r))))
                            labeled
                            "; ")))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +191,7 @@ fn oracle_prop_map_zip_combine() {
                                    (cdr pair))))
                        (nreverse result)
                        "&")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -239,5 +239,5 @@ fn oracle_prop_mapconcat_recursive() {
                                    (active . t)
                                    (scores . (95 87 92))))
                       (fmakunbound 'neovm--test-to-json)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

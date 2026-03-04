@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Integer arithmetic edge cases: fixnum boundaries
@@ -118,7 +118,7 @@ fn oracle_prop_number_comprehensive_float_special_values() {
    (isnan (- pinf pinf))
    ;; 0 * infinity gives NaN
    (isnan (* 0.0 pinf))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn oracle_prop_number_comprehensive_float_precision_edge_cases() {
         (fround 3.5)
         (ftruncate 2.9)
         (ftruncate -2.9)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +186,7 @@ fn oracle_prop_number_comprehensive_rounding_with_divisor() {
              (ceiling n d)
              (round n d))))
    pairs))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -231,7 +231,7 @@ fn oracle_prop_number_comprehensive_rounding_float_divisor() {
   (round 9 2)    ;; 4.5 -> 4 (even)
   (round 11 2)   ;; 5.5 -> 6 (even)
   )"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_number_comprehensive_mod_vs_percent_comprehensive() {
    (mod 42 1)
    (mod -42 1)
    (mod 0 1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ fn oracle_prop_number_comprehensive_ash_comprehensive() {
   (ash 1 40)
   (ash 1 50)
   (> (ash 1 60) (ash 1 50)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -385,7 +385,7 @@ fn oracle_prop_number_comprehensive_bitwise_operations() {
           (= (funcall manual-popcount 7) (logcount 7))
           (= (funcall manual-popcount 255) (logcount 255))
           (= (funcall manual-popcount 1023) (logcount 1023)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -534,5 +534,5 @@ fn oracle_prop_number_comprehensive_number_theory_combo() {
     (fmakunbound 'neovm--noc-lcm)
     (fmakunbound 'neovm--noc-isqrt)
     (fmakunbound 'neovm--noc-powmod)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

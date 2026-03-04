@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Matrix creation: zeros, identity, from nested list
@@ -64,7 +64,7 @@ fn oracle_prop_matrix_creation() {
     (fmakunbound 'neovm--test-mat-zeros)
     (fmakunbound 'neovm--test-mat-identity)
     (fmakunbound 'neovm--test-mat-ref)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ fn oracle_prop_matrix_add_and_scalar_mult() {
                    (funcall 'neovm--test-mat-scale 3 b))))
     (fmakunbound 'neovm--test-mat-add)
     (fmakunbound 'neovm--test-mat-scale)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +193,7 @@ fn oracle_prop_matrix_multiplication() {
     (fmakunbound 'neovm--test-mat-transpose)
     (fmakunbound 'neovm--test-dot)
     (fmakunbound 'neovm--test-mat-mult)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -239,7 +239,7 @@ fn oracle_prop_matrix_transpose() {
         ;; Square matrix
         (funcall 'neovm--test-mat-transpose '((1 2) (3 4))))
     (fmakunbound 'neovm--test-mat-transpose)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +295,7 @@ fn oracle_prop_matrix_determinant() {
         (funcall 'neovm--test-det2x2 '((0 1) (1 0))))
     (fmakunbound 'neovm--test-det2x2)
     (fmakunbound 'neovm--test-det3x3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -360,7 +360,7 @@ fn oracle_prop_matrix_inverse_2x2() {
     (fmakunbound 'neovm--test-mat-adjugate2x2)
     (fmakunbound 'neovm--test-dot2)
     (fmakunbound 'neovm--test-mmul2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -467,7 +467,7 @@ fn oracle_prop_matrix_gaussian_elimination() {
     (fmakunbound 'neovm--test-mat-set)
     (fmakunbound 'neovm--test-mat-get)
     (fmakunbound 'neovm--test-gauss-solve)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -517,5 +517,5 @@ fn oracle_prop_matrix_trace_and_frobenius() {
                (funcall 'neovm--test-mat-trace mt)))))
     (fmakunbound 'neovm--test-mat-trace)
     (fmakunbound 'neovm--test-mat-frobenius-sq)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

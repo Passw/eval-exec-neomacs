@@ -9,7 +9,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Matrix creation and element access
@@ -87,7 +87,7 @@ fn oracle_prop_matrix_creation_and_access() {
     (fmakunbound 'neovm--mc-cols)
     (fmakunbound 'neovm--mc-row)
     (fmakunbound 'neovm--mc-col)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ fn oracle_prop_matrix_arithmetic() {
     (fmakunbound 'neovm--mc-add)
     (fmakunbound 'neovm--mc-sub)
     (fmakunbound 'neovm--mc-scale)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ fn oracle_prop_matrix_transpose_and_identity() {
         (funcall 'neovm--mc-transpose '((1 2) (3 4))))
     (fmakunbound 'neovm--mc-transpose)
     (fmakunbound 'neovm--mc-identity)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +306,7 @@ fn oracle_prop_matrix_mult_comprehensive() {
     (fmakunbound 'neovm--mc-dot)
     (fmakunbound 'neovm--mc-mult)
     (fmakunbound 'neovm--mc-identity)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -381,7 +381,7 @@ fn oracle_prop_matrix_determinant_general() {
         (funcall 'neovm--mc-minor '((1 2 3) (4 5 6) (7 8 9)) 1 1))
     (fmakunbound 'neovm--mc-minor)
     (fmakunbound 'neovm--mc-det)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -448,7 +448,7 @@ fn oracle_prop_matrix_trace_and_hadamard() {
         (funcall 'neovm--mc-hadamard '((2 3) (4 5)) '((2 3) (4 5))))
     (fmakunbound 'neovm--mc-trace)
     (fmakunbound 'neovm--mc-hadamard)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -507,7 +507,7 @@ fn oracle_prop_matrix_kronecker_product() {
         ;; Kronecker with zero matrix
         (funcall 'neovm--mc-kronecker '((1 2) (3 4)) '((0 0) (0 0))))
     (fmakunbound 'neovm--mc-kronecker)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -600,7 +600,7 @@ fn oracle_prop_matrix_row_echelon() {
     (fmakunbound 'neovm--mc-set!)
     (fmakunbound 'neovm--mc-swap-rows!)
     (fmakunbound 'neovm--mc-ref)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -655,7 +655,7 @@ fn oracle_prop_matrix_equality_epsilon() {
         ;; Single element
         (funcall 'neovm--mc-approx-equal '((3.14)) '((3.14159)) 0.01))
     (fmakunbound 'neovm--mc-approx-equal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -754,7 +754,7 @@ fn oracle_prop_matrix_power() {
     (fmakunbound 'neovm--mc-mult)
     (fmakunbound 'neovm--mc-identity)
     (fmakunbound 'neovm--mc-power)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -835,7 +835,7 @@ fn oracle_prop_matrix_linear_solver() {
     (fmakunbound 'neovm--mc-get)
     (fmakunbound 'neovm--mc-set!)
     (fmakunbound 'neovm--mc-solve)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -907,7 +907,7 @@ fn oracle_prop_matrix_from_list_and_frobenius() {
     (fmakunbound 'neovm--mc-to-list)
     (fmakunbound 'neovm--mc-frobenius-sq)
     (fmakunbound 'neovm--mc-map)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -1012,5 +1012,5 @@ fn oracle_prop_matrix_integration_properties() {
     (fmakunbound 'neovm--mc-trace)
     (fmakunbound 'neovm--mc-transpose)
     (fmakunbound 'neovm--mc-scale)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

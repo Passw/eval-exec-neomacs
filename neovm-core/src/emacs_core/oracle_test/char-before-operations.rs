@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // char-before at various positions
@@ -49,7 +49,7 @@ fn oracle_prop_char_before_optional_pos() {
     (list without-arg with-nil-arg with-explicit
           (eq without-arg with-nil-arg)
           (eq with-nil-arg with-explicit))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -68,7 +68,7 @@ fn oracle_prop_char_before_at_beginning() {
         (at-bob-pmin (char-before (point-min))))
     ;; All should be nil because there is no character before position 1
     (list at-bob-no-arg at-bob-explicit at-bob-pmin)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -94,7 +94,7 @@ fn oracle_prop_preceding_char_behavior() {
     (goto-char 2)
     (setq results (cons (preceding-char) results))  ;; ?A = 65
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ fn oracle_prop_char_before_vs_char_after() {
     (setq results (cons (list 'before-1 (char-before 1)) results))
     (setq results (cons (list 'after-max (char-after (1+ (point-max)))) results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +201,7 @@ fn oracle_prop_char_before_backward_scan() {
                     (setq chars3 (cons (char-before p) chars3))
                     (setq p (1- p)))
                   (apply #'string chars3))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -227,7 +227,7 @@ fn oracle_prop_char_before_multibyte() {
    ;; Compare with char-after for consistency
    (eq (char-before 3) (char-after 2))
    (eq (char-before 5) (char-after 4))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -264,5 +264,5 @@ fn oracle_prop_char_before_frequency_scan() {
            (when (or (null max-entry) (> (cdr e) (cdr max-entry)))
              (setq max-entry e)))
          (cons (char-to-string (car max-entry)) (cdr max-entry)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

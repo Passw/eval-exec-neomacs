@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // nconc with many arguments and edge cases
@@ -42,7 +42,7 @@ fn oracle_prop_nconc_nreverse_many_args() {
   (let ((b (list 10 20)))
     (let ((r (nconc nil b)))
       (list r (eq r b)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ fn oracle_prop_nconc_nreverse_inplace_reversal() {
          (lst (list obj1 obj2)))
     (let ((rev (nreverse lst)))
       (list (eq (car rev) obj2) (eq (cadr rev) obj1)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ fn oracle_prop_nconc_nreverse_efficient_building() {
     (fmakunbound 'neovm--test-filter-transform-consrev)
     (fmakunbound 'neovm--test-filter-transform-nconc)
     (fmakunbound 'neovm--test-filter-transform-mapcar)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ fn oracle_prop_nconc_nreverse_sort_destructive() {
   ;; Sort stability test: sort by first element of pairs, check order
   (let ((pairs (list '(2 . a) '(1 . b) '(3 . c) '(1 . d) '(2 . e))))
     (sort (copy-sequence pairs) (lambda (a b) (< (car a) (car b))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_nconc_nreverse_shared_structure() {
                         ;; After nreverse, tail points to what was the last cell
                         (let ((rev-tail (nreverse (copy-sequence tail))))
                           rev-tail))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -353,5 +353,5 @@ fn oracle_prop_nconc_nreverse_build_structures() {
     (fmakunbound 'neovm--test-add-edge)
     (fmakunbound 'neovm--test-neighbors)
     (fmakunbound 'neovm--test-bfs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

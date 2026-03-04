@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // CPS transform of arithmetic expressions with an explicit converter
@@ -82,7 +82,7 @@ fn oracle_prop_cps_arithmetic_expression_converter() {
                 exprs))
     (fmakunbound 'neovm--cps-adv-direct-eval)
     (fmakunbound 'neovm--cps-adv-cps-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ fn oracle_prop_cps_administrative_beta_reduction() {
                 exprs))
     (fmakunbound 'neovm--cps-adv-transform)
     (fmakunbound 'neovm--cps-adv-count-nodes)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -308,7 +308,7 @@ fn oracle_prop_cps_defunctionalization() {
     (fmakunbound 'neovm--cps-adv-apply-cont)
     (fmakunbound 'neovm--cps-adv-defunc-eval)
     (fmakunbound 'neovm--cps-adv-defunc-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -382,7 +382,7 @@ fn oracle_prop_cps_multiple_return_values() {
     (fmakunbound 'neovm--cps-adv-minmax-k)
     (fmakunbound 'neovm--cps-adv-stats-k)
     (fmakunbound 'neovm--cps-adv-divmod-sum-k)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -486,7 +486,7 @@ fn oracle_prop_cps_abort_resume_continuations() {
     (fmakunbound 'neovm--cps-adv-safe-nth)
     (fmakunbound 'neovm--cps-adv-with-handler)
     (fmakunbound 'neovm--cps-adv-with-resume)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -580,7 +580,7 @@ fn oracle_prop_cps_trampoline_advanced() {
     (fmakunbound 'neovm--cps-adv-list-sum-k)
     (fmakunbound 'neovm--cps-adv-reverse-k)
     (fmakunbound 'neovm--cps-adv-map-k)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -757,7 +757,7 @@ fn oracle_prop_cps_selective_effectful() {
     (fmakunbound 'neovm--cps-adv-pure-eval)
     (fmakunbound 'neovm--cps-adv-selective)
     (fmakunbound 'neovm--cps-adv-selective-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

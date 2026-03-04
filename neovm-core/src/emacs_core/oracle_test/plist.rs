@@ -2,7 +2,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_plist_get_basic() {
@@ -59,7 +59,7 @@ fn oracle_prop_plist_member_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // plist-member returns the tail starting from the matching key
-    assert_oracle_parity("(plist-member '(:a 1 :b 2 :c 3) :b)");
+    assert_oracle_parity_with_bootstrap("(plist-member '(:a 1 :b 2 :c 3) :b)");
 }
 
 #[test]
@@ -81,7 +81,7 @@ fn oracle_prop_plist_chained_puts() {
                   (list (plist-get pl :x)
                         (plist-get pl :y)
                         (plist-get pl :z)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -98,5 +98,5 @@ fn oracle_prop_plist_complex_values() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(plist-get '(:data (1 2 3) :name \"test\" :flag t) :data)";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

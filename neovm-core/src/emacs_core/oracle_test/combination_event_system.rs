@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Event emitter: on, off, emit with multiple event types
@@ -98,7 +98,7 @@ fn oracle_prop_event_system_on_off_emit() {
     (fmakunbound 'neovm--test-es-emit)
     (makunbound 'neovm--test-es-listeners)
     (makunbound 'neovm--test-es-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ fn oracle_prop_event_system_priority_listeners() {
     (fmakunbound 'neovm--test-ep-on)
     (fmakunbound 'neovm--test-ep-emit)
     (makunbound 'neovm--test-ep-listeners)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +267,7 @@ fn oracle_prop_event_system_once_listeners() {
     (fmakunbound 'neovm--test-eo-emit)
     (makunbound 'neovm--test-eo-listeners)
     (makunbound 'neovm--test-eo-results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -341,7 +341,7 @@ fn oracle_prop_event_system_bubbling_stop_propagation() {
           (funcall 'neovm--test-eb-bubble panel "normal")))
     (fmakunbound 'neovm--test-eb-make-node)
     (fmakunbound 'neovm--test-eb-bubble)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -416,7 +416,7 @@ fn oracle_prop_event_system_wildcard_listeners() {
     (fmakunbound 'neovm--test-ew-on)
     (fmakunbound 'neovm--test-ew-emit)
     (makunbound 'neovm--test-ew-listeners)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -516,7 +516,7 @@ fn oracle_prop_event_system_history_replay() {
     (fmakunbound 'neovm--test-eh-replay)
     (makunbound 'neovm--test-eh-listeners)
     (makunbound 'neovm--test-eh-history)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -624,5 +624,5 @@ fn oracle_prop_event_system_async_queue() {
     (makunbound 'neovm--test-eq-queue)
     (makunbound 'neovm--test-eq-handlers)
     (makunbound 'neovm--test-eq-processed)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

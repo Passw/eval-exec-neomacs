@@ -2,7 +2,7 @@
 //! with optional step, including float sequences and edge cases.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic integer range
@@ -13,7 +13,7 @@ fn oracle_prop_number_sequence_integer_range() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = r#"(number-sequence 1 10)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -21,7 +21,7 @@ fn oracle_prop_number_sequence_negative_range() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = r#"(number-sequence -5 5)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -32,9 +32,9 @@ fn oracle_prop_number_sequence_negative_range() {
 fn oracle_prop_number_sequence_custom_step() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(number-sequence 0 20 5)");
-    assert_oracle_parity("(number-sequence 1 15 3)");
-    assert_oracle_parity("(number-sequence 2 2 1)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0 20 5)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 1 15 3)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 2 2 1)");
 }
 
 // ---------------------------------------------------------------------------
@@ -45,9 +45,9 @@ fn oracle_prop_number_sequence_custom_step() {
 fn oracle_prop_number_sequence_descending() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(number-sequence 10 1 -1)");
-    assert_oracle_parity("(number-sequence 100 0 -25)");
-    assert_oracle_parity("(number-sequence 5 -10 -3)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 10 1 -1)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 100 0 -25)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 5 -10 -3)");
 }
 
 // ---------------------------------------------------------------------------
@@ -85,10 +85,10 @@ fn oracle_prop_number_sequence_from_gt_to_positive_step() {
 fn oracle_prop_number_sequence_single_element() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(number-sequence 7 7)");
-    assert_oracle_parity("(number-sequence 0 0)");
-    assert_oracle_parity("(number-sequence -3 -3)");
-    assert_oracle_parity("(number-sequence 42 42 100)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 7 7)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0 0)");
+    assert_oracle_parity_with_bootstrap("(number-sequence -3 -3)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 42 42 100)");
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +104,7 @@ fn oracle_prop_number_sequence_index_into_vector() {
     let form = r#"(let ((data [10 20 30 40 50 60 70 80 90 100])
                         (indices (number-sequence 0 9 2)))
                     (mapcar (lambda (i) (aref data i)) indices))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ fn oracle_prop_number_sequence_multiplication_table() {
                         (lambda (c) (* r c))
                         (number-sequence 1 5)))
                      rows))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ fn oracle_prop_number_sequence_triangular_numbers() {
                     (lambda (n)
                       (apply #'+ (number-sequence 1 n)))
                     (number-sequence 1 10))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -169,5 +169,5 @@ fn oracle_prop_number_sequence_sieve_primes() {
                         (when (aref sieve n)
                           (setq primes (cons n primes))))
                       (nreverse primes)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

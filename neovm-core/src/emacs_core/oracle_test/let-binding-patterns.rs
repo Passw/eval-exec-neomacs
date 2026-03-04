@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Nested let/let* combinations: evaluation order and scoping
@@ -50,7 +50,7 @@ fn oracle_prop_let_bind_nested_let_letstar() {
              (s (apply #'+ v)))              ; 90
         (let ((v (mapcar (lambda (x) (/ (* x 100) s)) v)))  ; percentages
           (list v s))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ fn oracle_prop_let_bind_let_over_lambda() {
                         contents (nreverse all) empty-pop)))))))
     (fmakunbound 'neovm--lb-make-stack)
     (fmakunbound 'neovm--lb-send)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ fn oracle_prop_let_bind_dynamic_interaction() {
     (fmakunbound 'neovm--lb-with-context)
     (makunbound 'neovm--lb-dyn-x)
     (makunbound 'neovm--lb-dyn-y)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_let_bind_destructuring() {
                     (apply #'+ diagonal)
                     (apply #'+ anti-diag))))))
     (fmakunbound 'neovm--lb-destructure)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +329,7 @@ fn oracle_prop_let_bind_loop_scope() {
                     (append left right))
                 (if tree (list tree) nil)))))
     (funcall flatten '((1 (2 3)) (4 nil 5) ((6 7) 8)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -484,5 +484,5 @@ fn oracle_prop_let_bind_environment_chain() {
     (fmakunbound 'neovm--lb-env-define)
     (fmakunbound 'neovm--lb-env-lookup)
     (fmakunbound 'neovm--lb-env-set)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

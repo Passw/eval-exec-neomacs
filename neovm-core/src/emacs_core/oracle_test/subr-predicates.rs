@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // subrp
@@ -20,7 +20,7 @@ fn oracle_prop_subrp() {
                         (subrp (lambda (x) x))
                         (subrp 42)
                         (subrp nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -35,7 +35,7 @@ fn oracle_prop_subr_arity() {
                         (subr-arity (symbol-function 'cons))
                         (subr-arity (symbol-function '+))
                         (subr-arity (symbol-function 'list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ fn oracle_prop_commandp_basic() {
                     (commandp (lambda () (interactive) 42))
                     ;; Symbols
                     (commandp '+))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ fn oracle_prop_functionp_comprehensive() {
                         (functionp 42)
                         (functionp "hello")
                         (functionp '(1 2 3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ fn oracle_prop_subr_introspect_framework() {
                                             (when arity (cdr arity)))
                                       results)))))
                     (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -137,5 +137,5 @@ fn oracle_prop_subr_arity_dispatch() {
                      ;; concat works with 0 args
                      (funcall call-with-defaults
                               'concat nil nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

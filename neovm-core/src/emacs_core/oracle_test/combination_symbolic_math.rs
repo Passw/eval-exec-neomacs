@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Symbolic differentiation: d/dx of algebraic expressions
@@ -72,7 +72,7 @@ fn oracle_prop_symmath_differentiation() {
        ;; d/dx(x^2 + 3*x + 5)
        (funcall 'neovm--sm-deriv '(+ (+ (expt x 2) (* 3 x)) 5) 'x))
     (fmakunbound 'neovm--sm-deriv)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ fn oracle_prop_symmath_simplification() {
        ;; (+ (* 2 3) (* 1 x)) -> (+ 6 x)
        (funcall 'neovm--sm-simplify '(+ (* 2 3) (* 1 x))))
     (fmakunbound 'neovm--sm-simplify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ fn oracle_prop_symmath_eval_with_bindings() {
              (funcall 'neovm--sm-eval 'w env)
            (error (list 'error (cadr err))))))
     (fmakunbound 'neovm--sm-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -318,7 +318,7 @@ fn oracle_prop_symmath_polynomial_ops() {
     (fmakunbound 'neovm--sm-poly-mul)
     (fmakunbound 'neovm--sm-poly-eval)
     (fmakunbound 'neovm--sm-poly-to-string)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -409,7 +409,7 @@ fn oracle_prop_symmath_deriv_then_simplify() {
     (fmakunbound 'neovm--sm-d)
     (fmakunbound 'neovm--sm-s)
     (fmakunbound 'neovm--sm-simplify-fix)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -486,7 +486,7 @@ fn oracle_prop_symmath_simple_integration() {
        ;; integral of constant 0
        (funcall 'neovm--sm-integrate 0 'x))
     (fmakunbound 'neovm--sm-integrate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -564,5 +564,5 @@ fn oracle_prop_symmath_expression_tree_ops() {
     (fmakunbound 'neovm--sm-size)
     (fmakunbound 'neovm--sm-vars)
     (fmakunbound 'neovm--sm-subst)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

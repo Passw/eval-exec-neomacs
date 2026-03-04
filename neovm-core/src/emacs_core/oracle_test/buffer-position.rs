@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // count-lines
@@ -51,7 +51,7 @@ fn oracle_prop_line_number_at_pos() {
                      (line-number-at-pos 8)
                      (line-number-at-pos 9)
                      (line-number-at-pos (point-max))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -66,7 +66,7 @@ fn oracle_prop_line_number_at_pos_no_arg() {
                       (forward-line 2)
                       (let ((at-third (line-number-at-pos)))
                         (list at-start at-third))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ fn oracle_prop_current_column() {
                       (goto-char 15) ;; after "  " indent
                       (setq cols (cons (current-column) cols))
                       (nreverse cols)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ fn oracle_prop_move_to_column_basic() {
                     (goto-char (point-min))
                     (let ((result (move-to-column 6)))
                       (list result (current-column) (point))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -139,7 +139,7 @@ fn oracle_prop_move_to_column_past_end() {
                     (goto-char (point-min))
                     (let ((result (move-to-column 100)))
                       (list result (current-column) (point))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ fn oracle_prop_buffer_position_align_columns() {
                                         records))))
                         (forward-line 1))
                       (nreverse records)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -227,5 +227,5 @@ fn oracle_prop_buffer_position_line_operations() {
                                   max-line (nth 0 m))))
                         (list (nreverse metrics)
                               (list 'longest max-line max-len)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

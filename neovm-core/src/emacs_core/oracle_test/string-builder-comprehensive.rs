@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Test 1: concat with many arguments, mixed types, edge cases
@@ -41,7 +41,7 @@ fn oracle_prop_string_builder_concat_many_args() {
   (length (concat "abcdefghij" "klmnopqrst" "uvwxyz"))
   ;; Unicode strings
   (concat "\u00e9" "l\u00e8ve"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ fn oracle_prop_string_builder_string_from_chars() {
   (= (string-to-char "hello") ?h)
   ;; Empty string from no chars yields ""
   (string))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +220,7 @@ fn oracle_prop_string_builder_substring_extraction() {
       (concat upper " " rest))
     ;; substring-no-properties equivalent (no text props to strip here)
     (substring-no-properties "plain text" 0 5)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -345,7 +345,7 @@ fn oracle_prop_string_builder_with_output_to_string() {
         (when (> i 0) (princ ", "))
         (princ (* i i))
         (setq i (1+ i))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

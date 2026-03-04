@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Map/filter/reduce pipeline with complex transformations
@@ -31,7 +31,7 @@ fn oracle_prop_fp_map_filter_reduce_pipeline() {
                 ;; Sum
                 (total (let ((s 0)) (dolist (x big) (setq s (+ s x))) s)))
            (list evens squared big total))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -66,7 +66,7 @@ fn oracle_prop_fp_nested_map_pipeline() {
                                               s))
                                           transposed)))
                     (list doubled row-sums col-sums)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ fn oracle_prop_fp_zip_unzip() {
                       ;; Roundtrip: unzip(zip(a,b)) == (a, b)
                       (equal (car unzipped) names)
                       (equal (cadr unzipped) ages))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +152,7 @@ fn oracle_prop_fp_group_by_partition() {
                       (funcall group-by
                                (lambda (x) (cond ((< x 5) 1) ((< x 9) 2) (t 3)))
                                nums))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +197,7 @@ fn oracle_prop_fp_transducer_compose() {
                                        (lambda (acc x) (cons x acc))
                                        nil '(1 2 3 4 5 6 7 8))))
                 (list result1 (nreverse result2))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +247,7 @@ fn oracle_prop_fp_maybe_monad() {
                       (funcall chain '((a . 100) (b . 0) (c . 25))
                                (lambda (alist) (cdr (assq 'a alist)))
                                (lambda (x) (funcall safe-div x 5))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -298,7 +298,7 @@ fn oracle_prop_fp_lazy_thunks() {
                           (nreverse result))))
                   (fmakunbound 'neovm--test-naturals-from)
                   (fmakunbound 'neovm--test-fibs-from))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]

@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Zero-length strings and boundary conditions
@@ -156,7 +156,7 @@ fn oracle_prop_make_string_unicode_codepoints() {
           (equal latin cjk)
           (< (string-bytes latin) (string-bytes cjk))
           (= (length latin) (length greek) (length cjk)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ fn oracle_prop_make_string_with_string_operations() {
   (string< (make-string 3 ?a) (make-string 4 ?a))
   (string= (make-string 3 ?a) (make-string 3 ?a))
   (string= (make-string 3 ?a) (make-string 4 ?a)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -328,5 +328,5 @@ fn oracle_prop_make_string_string_algorithm_patterns() {
                      (pad-len (max 0 (- 5 (length s)))))
                 (concat (make-string pad-len ?0) s)))
             nums)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

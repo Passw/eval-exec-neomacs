@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Closure-based objects with method dispatch via symbol messages
@@ -88,7 +88,7 @@ fn oracle_prop_obj_sys_closure_dispatch() {
                     ;; Prove isolation: c1 operations didn't affect c2
                     (funcall c2 'get))))))))
     (fmakunbound 'neovm--os-make-counter)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -300,7 +300,7 @@ fn oracle_prop_obj_sys_mixins_multiple_inheritance() {
     (fmakunbound 'neovm--os-mixin-compose)
     (fmakunbound 'neovm--os-mixin-call)
     (fmakunbound 'neovm--os-mixin-list-methods)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -394,7 +394,7 @@ fn oracle_prop_obj_sys_encapsulation_accessors() {
             ;; Introspection
             (funcall p1 'fields))))
     (fmakunbound 'neovm--os-make-class)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -492,7 +492,7 @@ fn oracle_prop_obj_sys_polymorphism_virtual_dispatch() {
     (fmakunbound 'neovm--os-prop)
     (fmakunbound 'neovm--os-dispatch)
     (makunbound 'neovm--os-vtables)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -589,7 +589,7 @@ fn oracle_prop_obj_sys_introspection() {
     (fmakunbound 'neovm--os-class-ancestors)
     (fmakunbound 'neovm--os-class-is-a)
     (makunbound 'neovm--os-class-registry)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -711,5 +711,5 @@ fn oracle_prop_obj_sys_factory_pattern() {
     (makunbound 'neovm--os-factory-registry)
     (makunbound 'neovm--os-factory-defaults)
     (makunbound 'neovm--os-factory-cache)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

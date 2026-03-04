@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // dolist result form captures accumulated state and loop var (nil after loop)
@@ -44,7 +44,7 @@ fn oracle_prop_dolist_dotimes_comp_dotimes_result_form_index_value() {
                                         :final-k k
                                         :length (length cubes)))
                       (setq cubes (cons (* k k k) cubes))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -64,7 +64,7 @@ fn oracle_prop_dolist_dotimes_comp_dolist_early_throw() {
                         (when (and (> x 20) (= (% x 5) 0))
                           (throw 'found (list :value x :inspected inspected))))
                       (list :value nil :inspected inspected)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +83,7 @@ fn oracle_prop_dolist_dotimes_comp_dotimes_early_throw() {
                         (when (>= cumsum 50)
                           (throw 'threshold (list :index i :cumsum cumsum))))
                       (list :index -1 :cumsum cumsum)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ fn oracle_prop_dolist_dotimes_comp_nested_mixed() {
                           (setq table (cons (cons label (nreverse row)) table)))
                         (setq row-idx (1+ row-idx))))
                     (nreverse table))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -134,7 +134,7 @@ fn oracle_prop_dolist_dotimes_comp_accumulation_stats() {
                       (when (< n running-min) (setq running-min n))
                       (when (> n running-max) (setq running-max n))
                       (setq trace (cons (list n running-min running-max running-sum) trace))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ fn oracle_prop_dolist_dotimes_comp_dolist_various_list_types() {
                     (dolist (x '(foo bar baz quux))
                       (setq results (cons (length (symbol-name x)) results)))
                     (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +195,7 @@ fn oracle_prop_dolist_dotimes_comp_dotimes_index_patterns() {
                           :triangular (nreverse triangular)
                           :even-indices (nreverse even-indices)
                           :vec-results (nreverse vec-results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -217,7 +217,7 @@ fn oracle_prop_dolist_dotimes_comp_variable_scoping() {
                         ;; x restored after inner let
                         (setq log (cons (list :restored x) log))))
                     (nreverse log))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ fn oracle_prop_dolist_dotimes_comp_side_effects_in_body() {
                           :ht-c (gethash "c" ht)
                           :pairs pairs
                           :vec vec))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +276,7 @@ fn oracle_prop_dolist_dotimes_comp_sieve_of_eratosthenes() {
                         (when (aref sieve i)
                           (setq primes (cons i primes))))
                       (nreverse primes)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -301,5 +301,5 @@ fn oracle_prop_dolist_dotimes_comp_nested_dotimes_catch() {
                                          :values (list (aref nums i) (aref nums j))
                                          :sum target)))))
                       nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

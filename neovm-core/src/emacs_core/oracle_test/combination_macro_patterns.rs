@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // defmacro with &rest body wrapping (timing/logging wrapper)
@@ -38,7 +38,7 @@ fn oracle_prop_macro_rest_body_wrapping() {
                             (list r1 (nreverse neovm--test-trace-log))))
                       (fmakunbound 'neovm--test-with-trace)
                       (makunbound 'neovm--test-trace-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ fn oracle_prop_macro_generating_multiple_defuns() {
                                      neovm--person-age neovm--person-set-age neovm--person-age-p
                                      neovm--person-email neovm--person-set-email neovm--person-email-p))
                         (fmakunbound sym))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ fn oracle_prop_macro_macroexpand_inspection() {
                              (neovm--test-swap x y)
                              (list x y))))
                       (fmakunbound 'neovm--test-swap)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +152,7 @@ fn oracle_prop_macro_nested_expansion() {
                              (list a b c))))
                       (fmakunbound 'neovm--test-bind-default)
                       (fmakunbound 'neovm--test-with-defaults)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ fn oracle_prop_macro_gensym_make_symbol() {
                           ;; tmp should be unaffected by the macro
                           (list x y tmp))
                       (fmakunbound 'neovm--test-swap-safe)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -238,7 +238,7 @@ fn oracle_prop_macro_iteration_constructs() {
                                                                (symbol-name (car b))))))))
                       (fmakunbound 'neovm--test-do-alist)
                       (fmakunbound 'neovm--test-do-hash)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -277,7 +277,7 @@ fn oracle_prop_macro_backquote_splicing() {
                            (funcall 'neovm--test-process 3)))
                       (fmakunbound 'neovm--test-defpipeline)
                       (fmakunbound 'neovm--test-process)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -317,5 +317,5 @@ fn oracle_prop_macro_conditional_compilation() {
                       (fmakunbound 'neovm--test-add)
                       (fmakunbound 'neovm--test-div)
                       (makunbound 'neovm--test-debug-mode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

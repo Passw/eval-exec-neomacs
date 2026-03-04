@@ -3,7 +3,7 @@
 //! aggregation, fixed-width record parsing, and circular buffer simulation.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // In-buffer binary search on sorted lines
@@ -53,7 +53,7 @@ fn oracle_prop_bufadv_binary_search_sorted_lines() {
           (funcall 'neovm--buf-bsearch 10)
           (funcall 'neovm--buf-bsearch 95)))
     (fmakunbound 'neovm--buf-bsearch)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +109,7 @@ fn oracle_prop_bufadv_longest_common_subsequence() {
         (funcall 'neovm--lcs "ABC" "ABC")
         (funcall 'neovm--lcs "ABC" "DEF"))
     (fmakunbound 'neovm--lcs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ fn oracle_prop_bufadv_fixed_width_records() {
                           avg-age
                           (car max-score-rec)
                           (mapcar #'car sorted)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +306,7 @@ fn oracle_prop_bufadv_circular_buffer_simulation() {
     (fmakunbound 'neovm--ring-push)
     (fmakunbound 'neovm--ring-pop)
     (fmakunbound 'neovm--ring-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -361,5 +361,5 @@ fn oracle_prop_bufadv_run_length_encoding() {
               (string= d2 s2)))
     (fmakunbound 'neovm--rle-encode)
     (fmakunbound 'neovm--rle-decode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

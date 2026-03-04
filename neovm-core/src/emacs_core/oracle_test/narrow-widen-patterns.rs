@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Triple-nested narrowing with progressive restriction and widen at each level
@@ -55,7 +55,7 @@ fn oracle_prop_narrow_widen_triple_nested_progressive() {
     (setq results (cons (list 'L0-restored (point-min) (point-max)
                                (buffer-size)) results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +160,7 @@ fn oracle_prop_narrow_widen_search_confinement() {
     (let ((after-widen-found (search-forward "snake" nil t)))
       (setq results (cons (list 'snake-after-widen (not (null after-widen-found))) results)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +263,7 @@ fn oracle_prop_narrow_widen_save_restriction_widen_pattern() {
     ;; Back to double-narrow
     (setq results (cons (list 'double-narrow-restored (buffer-string)) results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -328,7 +328,7 @@ fn oracle_prop_narrow_widen_multiple_buffers() {
         (nreverse results))
     (kill-buffer buf-a)
     (kill-buffer buf-b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

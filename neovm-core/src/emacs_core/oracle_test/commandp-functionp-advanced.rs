@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Comprehensive predicate matrix across many object types
@@ -84,7 +84,7 @@ fn oracle_prop_fboundp_fset_lifecycle() {
         (setq results (cons (funcall 'neovm--test-fbp-fn1 3 4) results))
         (nreverse results))
     (fmakunbound 'neovm--test-fbp-fn1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ fn oracle_prop_defalias_chain_indirect_function() {
     (fmakunbound 'neovm--test-chain-a)
     (fmakunbound 'neovm--test-chain-b)
     (fmakunbound 'neovm--test-chain-c)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ fn oracle_prop_macro_vs_function_predicates() {
     (fmakunbound 'neovm--test-mac1)
     (fmakunbound 'neovm--test-fn1)
     (fmakunbound 'neovm--test-cmd1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ fn oracle_prop_function_classifier() {
     (fmakunbound 'neovm--test-cls-mac)
     (fmakunbound 'neovm--test-cls-cmd)
     (fmakunbound 'neovm--test-cls-alias)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ fn oracle_prop_closure_predicate_tests() {
                        (subrp cmd)
                        ;; indirect-function on closures returns itself
                        (eq (indirect-function c1) c1))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -321,5 +321,5 @@ fn oracle_prop_defalias_commandp_arity_interaction() {
     (fmakunbound 'neovm--test-da-fn)
     (fmakunbound 'neovm--test-da-cmd)
     (fmakunbound 'neovm--test-da-chain)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

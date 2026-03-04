@@ -5,7 +5,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 use proptest::prelude::*;
 use std::sync::OnceLock;
 
-use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 fn oracle_combination_proptest_failure_path() -> &'static str {
     static PATH: OnceLock<&'static str> = OnceLock::new();
@@ -92,7 +92,7 @@ fn oracle_prop_combination_macro_expansion_side_effect_count() {
                             (neovm--combo-expander 1)
                             expands)
                     (fmakunbound 'neovm--combo-expander)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn oracle_prop_combination_eval_defmacro_then_expand_and_eval() {
                         (neovm--combo-eval-m + 2 3)
                         (funcall (lambda (f) (neovm--combo-eval-m f 10 4)) '-))
                     (fmakunbound 'neovm--combo-eval-m)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -130,7 +130,7 @@ fn oracle_prop_combination_nested_condition_case_throw_and_cleanup() {
                             (setq state (cons 'cleanup state))))
                       (error (list 'err (car err))))
                     (nreverse state)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -146,7 +146,7 @@ fn oracle_prop_combination_macroexpand_env_override_then_eval() {
                                            '((neovm--combo-mx . (lambda (x) (list '- x 1))))))
                         (eval (macroexpand '(neovm--combo-mx 7))))
                     (fmakunbound 'neovm--combo-mx)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -164,7 +164,7 @@ fn oracle_prop_combination_apply_with_symbol_function_mutation() {
                             (apply sym '(2)))
                           (apply orig '(2))))
                     (fmakunbound sym)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -182,7 +182,7 @@ fn oracle_prop_combination_nested_unwind_cleanup_stack_order() {
                             (setq log (cons 'inner-clean log)))
                         (setq log (cons 'outer-clean log))))
                     log))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -200,7 +200,7 @@ fn oracle_prop_combination_macro_guards_apply_with_condition_case() {
                         (neovm--combo-guarded-call '+ '(1 2 3))
                         (neovm--combo-guarded-call 'car '(1)))
                     (fmakunbound 'neovm--combo-guarded-call)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -238,7 +238,7 @@ fn oracle_prop_combination_eval_macro_with_lexenv_shadowing() {
                           (eval '(neovm--combo-eval-env x))
                           (eval '(neovm--combo-eval-env x) '((x . 11)))))
                     (fmakunbound 'neovm--combo-eval-env)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -289,7 +289,7 @@ fn oracle_prop_combination_macro_generated_unwind_with_nonlocal_exit() {
                                   (setq x 2)))))
                           x)
                       (fmakunbound 'neovm--combo-wrap))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -460,7 +460,7 @@ fn oracle_prop_combination_eval_macroexpand_error_recovery() {
                             (eval (macroexpand '(neovm--combo-bad-macro '(9 8))))
                           (error (car err))))
                     (fmakunbound 'neovm--combo-bad-macro)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -480,7 +480,7 @@ fn oracle_prop_combination_unwind_cleanup_with_mutating_closure_state() {
                       (setq x (funcall f 10)))
                     x
                     (funcall f 1)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -498,7 +498,7 @@ fn oracle_prop_combination_macro_generated_tags_and_nonlocal_exit() {
                         (neovm--combo-with-tag 'neovm--t1 11)
                         (neovm--combo-with-tag 'neovm--t2 22))
                     (fmakunbound 'neovm--combo-with-tag)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -512,7 +512,7 @@ fn oracle_prop_combination_runtime_macro_definition_lifecycle() {
                         (eval '(neovm--combo-runtime 5))
                         (macroexpand '(neovm--combo-runtime 9)))
                     (fmakunbound 'neovm--combo-runtime)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -526,7 +526,7 @@ fn oracle_prop_combination_direct_dynamic_tag_catch_throw() {
                     (condition-case err
                         (catch tag (throw 'neovm--combo-other 1))
                       (no-catch (car err)))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -542,7 +542,7 @@ fn oracle_prop_combination_macro_parameterized_tag_simple() {
                         (let ((tg 'neovm--combo-b))
                           (neovm--combo-catch-throw-param tg 4)))
                     (fmakunbound 'neovm--combo-catch-throw-param)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -558,7 +558,7 @@ fn oracle_prop_combination_macroexpanded_tag_form_eval_roundtrip() {
                                 '(neovm--combo-catch-throw-param 'neovm--combo-c 9))))
                         (list expanded (eval expanded)))
                     (fmakunbound 'neovm--combo-catch-throw-param)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -570,7 +570,7 @@ fn oracle_prop_combination_eval_constructed_catch_throw_runtime_tag() {
                                    (list 'quote tag)
                                    (list 'throw (list 'quote tag) 77))))
                   (eval form))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -588,7 +588,7 @@ fn oracle_prop_combination_apply_eval_macro_generated_throw() {
                                           'neovm--combo-ap
                                           13)))))
                     (fmakunbound 'neovm--combo-build-throw)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -600,7 +600,7 @@ fn oracle_prop_combination_dynamic_tag_with_condition_case_without_macro() {
                     (condition-case err
                         (throw tag 31)
                       (error (list 'err (car err))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -618,7 +618,7 @@ fn oracle_prop_combination_macro_tag_with_condition_case_expansion_and_eval() {
                             (b (macroexpand '(neovm--combo-with-tag-cc 'neovm--combo-c2 42))))
                         (list a b (eval a) (eval b)))
                     (fmakunbound 'neovm--combo-with-tag-cc)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -632,7 +632,7 @@ fn oracle_prop_combination_eval_macroexpanded_lambda_with_lexenv() {
                       (let ((f (eval '(neovm--combo-make-adder x) '((x . 9)))))
                         (list (funcall f 1) (apply f '(2))))
                     (fmakunbound 'neovm--combo-make-adder)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -651,7 +651,7 @@ fn oracle_prop_combination_unwind_cleanup_rebinds_function_seen_by_eval() {
                         (funcall sym 3)
                         (eval (list sym 3)))
                     (fmakunbound sym)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -668,7 +668,7 @@ fn oracle_prop_combination_macro_runtime_redefinition_changes_future_expansion()
                           (macroexpand '(neovm--combo-rdef 7))
                           (neovm--combo-rdef 7)))
                     (fmakunbound 'neovm--combo-rdef)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -680,7 +680,7 @@ fn oracle_prop_combination_dynamic_tag_throw_inside_unwind_protect() {
                     (unwind-protect
                         (throw tag 55)
                       'cleanup)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -694,7 +694,7 @@ fn oracle_prop_combination_dynamic_tag_throw_in_condition_case_inside_unwind() {
                             (throw tag 66)
                           (error (list 'err (car err))))
                       'cleanup)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -707,7 +707,7 @@ fn oracle_prop_combination_no_catch_handler_rethrows_to_outer_catch() {
                         (throw 'neovm--combo-other 1)
                       (no-catch
                        (throw tag (list 'rescued (car err)))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -724,7 +724,7 @@ fn oracle_prop_combination_macro_wrapped_condition_case_throw_with_dynamic_tag()
                         (catch tag
                           (neovm--combo-cc-throw tag 77)))
                     (fmakunbound 'neovm--combo-cc-throw)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -734,7 +734,7 @@ fn oracle_prop_combination_apply_throw_with_dynamic_tag() {
     let form = "(let ((tag 'neovm--combo-apply-tag))
                   (catch tag
                     (apply #'throw (list tag 88))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -747,7 +747,7 @@ fn oracle_prop_combination_throw_through_condition_case_unrelated_error_handlers
                         (progn (throw tag 91) 'tail)
                       (arith-error 'arith)
                       (wrong-type-argument 'wta))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -761,7 +761,7 @@ fn oracle_prop_combination_throw_through_multiple_condition_case_layers() {
                             (throw tag 92)
                           (wrong-type-argument 'inner))
                       (arith-error 'outer))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -778,7 +778,7 @@ fn oracle_prop_combination_throw_through_condition_case_and_unwind_cleanup() {
                             (setq x 1))
                         (error 'caught)))
                     x))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -790,7 +790,7 @@ fn oracle_prop_combination_apply_throw_inside_condition_case_to_outer_catch() {
                     (condition-case nil
                         (apply #'throw (list tag 94))
                       (error 'caught))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -801,7 +801,7 @@ fn oracle_prop_combination_throw_not_caught_by_condition_case_error_clause() {
                   (condition-case nil
                       (throw 'neovm--combo-cc-basic-tag 95)
                     (error 'caught)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -883,7 +883,7 @@ fn oracle_prop_combination_catch_throw_non_symbol_tag_basics() {
                   (catch 1 (throw 1 'int-tag))
                   (let ((tag (list 'a)))
                     (catch tag (throw tag 'cons-tag))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -894,7 +894,7 @@ fn oracle_prop_combination_catch_throw_tag_identity_uses_eq() {
                   (let ((tag (list 'a)))
                     (catch tag (throw (list 'a) 'mismatch)))
                 (no-catch (car err)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -906,7 +906,7 @@ fn oracle_prop_combination_catch_tag_expression_evaluated_once() {
                     (catch (progn (setq n (1+ n)) 'neovm--combo-once-tag)
                       (throw 'neovm--combo-once-tag n))
                     n))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -918,7 +918,7 @@ fn oracle_prop_combination_non_symbol_tag_throw_through_condition_case() {
                     (condition-case nil
                         (throw tag 96)
                       (error 'caught))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -930,7 +930,7 @@ fn oracle_prop_combination_throw_through_condition_case_with_no_catch_clause() {
                       (throw 'neovm--combo-nc-tag 97)
                     (no-catch (list 'handled (car err)))
                     (error 'caught)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -943,7 +943,7 @@ fn oracle_prop_combination_non_symbol_throw_with_no_catch_clause() {
                         (throw tag 98)
                       (no-catch (list 'handled (car err)))
                       (error 'caught))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -954,7 +954,7 @@ fn oracle_prop_combination_throw_from_funcall_inside_condition_case() {
                   (condition-case nil
                       (funcall (lambda () (throw 'neovm--combo-funcall-tag 99)))
                     (error 'caught)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -970,7 +970,7 @@ fn oracle_prop_combination_throw_from_while_inside_condition_case() {
                             (if (= i 3)
                                 (throw 'neovm--combo-while-tag i))))
                       (error 'caught))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -989,7 +989,7 @@ fn oracle_prop_combination_throw_from_condition_case_handler_to_outer_catch() {
                              (throw 'neovm--combo-handler-tag 'handled)
                            (setq log (cons 'cleanup log))))))
                     (nreverse log)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -1004,7 +1004,7 @@ fn oracle_prop_combination_no_catch_payload_shape_outside_catch() {
                      (car (cdr err))
                      (car (cdr (cdr err)))))
                   (error 'caught))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -1024,7 +1024,7 @@ fn oracle_prop_combination_prog1_unwind_throw_cleanup_order() {
                         (setq log (cons 'tail log))))
                     x
                     (nreverse log)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -1040,7 +1040,7 @@ fn oracle_prop_combination_throw_from_error_handler_lambda() {
                      (funcall
                       (lambda ()
                         (throw 'neovm--combo-handler-lambda-tag 123))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -1662,7 +1662,7 @@ fn oracle_prop_combination_macro_float_eq_call_shape_matrix() {
                       (eval '(neovm--combo-m-float-aeq 1.0 1.0))
                       (let ((y x)) (eq x y))
                       (memq 1.0 '(1.0 2.0)))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -1688,7 +1688,7 @@ fn oracle_prop_combination_macro_float_eq_funcall_apply_matrix() {
                           (funcall 'eq g h)
                           (apply 'eq (list g h))
                           (eq g h))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -1717,7 +1717,7 @@ fn oracle_prop_combination_macro_float_eq_hash_table_key_identity() {
                       (list
                         (neovm--combo-m-ht-get k1 ht)
                         (neovm--combo-m-ht-get k2 ht)))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -1771,7 +1771,7 @@ fn oracle_prop_combination_macro_eval_quoted_symbol_arg_lambda_call() {
                           (eval '(funcall (neovm--combo-m-min-caller 'funcall) n))
                           (eval '(funcall (neovm--combo-m-min-caller 'apply) n)))
                       (fmakunbound 'neovm--combo-m-min-caller))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]

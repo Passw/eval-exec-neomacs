@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // All basic value types in one comprehensive test
@@ -92,7 +92,7 @@ fn oracle_prop_prin1_comp_nested_structures() {
                      (:nil . nil)
                      (:t . t)
                      (:list . (a b c)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ fn oracle_prop_prin1_comp_circular_with_print_circle() {
     (let* ((inner '(shared data))
            (v (vector inner 42 inner)))
       (prin1-to-string v))))"##;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +195,7 @@ fn oracle_prop_prin1_comp_unicode_strings() {
   (prin1-to-string (string ?\u200e ?\u200f))
   ;; Long Unicode string
   (prin1-to-string (make-string 50 ?\u00e9)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_prin1_comp_dotted_pairs_comprehensive() {
   (prin1-to-string '(head . (a b c)))
   ;; Cons chain that forms an improper list ending in a vector
   (prin1-to-string (cons 1 (cons 2 [3 4]))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -413,5 +413,5 @@ fn oracle_prop_prin1_comp_roundtrip_complex() {
              (match (equal val restored)))
         (list match (length printed))))
     test-values))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

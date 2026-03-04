@@ -4,7 +4,7 @@
 //! polynomial ring operations, and GCD via Euclidean algorithm in polynomial ring.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Group operations and verification: closure, associativity, identity, inverse
@@ -117,7 +117,7 @@ fn oracle_prop_algebra_adv_dihedral_group_d3() {
     (fmakunbound 'neovm--d3-inverse)
     (fmakunbound 'neovm--d3-identity)
     (fmakunbound 'neovm--d3-equal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ fn oracle_prop_algebra_adv_cyclic_group_generators() {
                       (lambda (a b) (< (length (cadr a)) (length (cadr b))))))))
     (fmakunbound 'neovm--cyc-order)
     (fmakunbound 'neovm--cyc-generate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -244,7 +244,7 @@ fn oracle_prop_algebra_adv_crt_homomorphism() {
     (fmakunbound 'neovm--crt-phi)
     (fmakunbound 'neovm--crt-prod-op)
     (fmakunbound 'neovm--crt-inverse)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -316,7 +316,7 @@ fn oracle_prop_algebra_adv_ring_structure() {
     (fmakunbound 'neovm--ring-mul)
     (fmakunbound 'neovm--ring-add)
     (fmakunbound 'neovm--ring-pow)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -441,7 +441,7 @@ fn oracle_prop_algebra_adv_polynomial_ring_ops() {
     (fmakunbound 'neovm--poly-derivative)
     (fmakunbound 'neovm--poly-neg)
     (fmakunbound 'neovm--poly-sub)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -610,5 +610,5 @@ fn oracle_prop_algebra_adv_polynomial_gcd() {
     (fmakunbound 'neovm--poly-divmod)
     (fmakunbound 'neovm--poly-gcd)
     (fmakunbound 'neovm--poly-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

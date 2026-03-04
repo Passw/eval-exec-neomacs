@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Formula evaluation and truth table generation
@@ -112,7 +112,7 @@ fn oracle_prop_logic_engine_eval_and_truth_table() {
     (fmakunbound 'neovm--logic-vars)
     (fmakunbound 'neovm--logic-all-envs)
     (fmakunbound 'neovm--logic-truth-table)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -249,7 +249,7 @@ fn oracle_prop_logic_engine_taut_contra_sat() {
     (fmakunbound 'neovm--logic-contradiction-p)
     (fmakunbound 'neovm--logic-satisfiable-p)
     (fmakunbound 'neovm--logic-find-sat)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -363,7 +363,7 @@ fn oracle_prop_logic_engine_simplify() {
        ;; (not (and p (not q))) -> (or (not p) q)
        (funcall 'neovm--logic-simplify '(not (and p (not q)))))
     (fmakunbound 'neovm--logic-simplify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -486,7 +486,7 @@ fn oracle_prop_logic_engine_cnf() {
     (fmakunbound 'neovm--logic-nnf)
     (fmakunbound 'neovm--logic-dist-or)
     (fmakunbound 'neovm--logic-to-cnf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -583,7 +583,7 @@ fn oracle_prop_logic_engine_dnf() {
     (fmakunbound 'neovm--logic-nnf)
     (fmakunbound 'neovm--logic-dist-and)
     (fmakunbound 'neovm--logic-to-dnf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -727,7 +727,7 @@ fn oracle_prop_logic_engine_resolution() {
     (fmakunbound 'neovm--logic-has-empty-p)
     (fmakunbound 'neovm--logic-clause-in-set-p)
     (fmakunbound 'neovm--logic-resolution)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -872,7 +872,7 @@ fn oracle_prop_logic_engine_simplify_verify() {
     (fmakunbound 'neovm--logic-all-envs)
     (fmakunbound 'neovm--logic-simplify)
     (fmakunbound 'neovm--logic-equiv-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -978,5 +978,5 @@ fn oracle_prop_logic_engine_three_var_complex() {
     (fmakunbound 'neovm--logic-eval)
     (fmakunbound 'neovm--logic-all-envs)
     (fmakunbound 'neovm--logic-count-true)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

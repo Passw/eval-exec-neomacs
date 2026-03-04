@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Symbolic value representation and basic constraint generation
@@ -88,7 +88,7 @@ fn oracle_prop_combination_symbolic_value_representation() {
     (fmakunbound 'neovm--sym-unop)
     (fmakunbound 'neovm--sym-type)
     (fmakunbound 'neovm--sym-simplify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ fn oracle_prop_combination_symbolic_path_conditions() {
     (fmakunbound 'neovm--pc-constraints)
     (fmakunbound 'neovm--pc-fork)
     (fmakunbound 'neovm--pc-to-string)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +258,7 @@ fn oracle_prop_combination_symbolic_branch_exploration() {
     (fmakunbound 'neovm--se-pc)
     (fmakunbound 'neovm--se-trace)
     (fmakunbound 'neovm--se-exec)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ fn oracle_prop_combination_symbolic_loop_bounds() {
                                3))
            (fmakunbound 'neovm--count-depth))))
     (fmakunbound 'neovm--unroll-loop)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -386,7 +386,7 @@ fn oracle_prop_combination_symbolic_array_access() {
     (fmakunbound 'neovm--sa-empty)
     (fmakunbound 'neovm--sa-write)
     (fmakunbound 'neovm--sa-read)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -489,7 +489,7 @@ fn oracle_prop_combination_symbolic_constraint_solver() {
     (fmakunbound 'neovm--cs-set)
     (fmakunbound 'neovm--cs-constrain)
     (fmakunbound 'neovm--cs-solve)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -584,5 +584,5 @@ fn oracle_prop_combination_symbolic_full_pipeline() {
                        paths2))))))
     (fmakunbound 'neovm--pipe-exec)
     (fmakunbound 'neovm--pipe-feasible)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

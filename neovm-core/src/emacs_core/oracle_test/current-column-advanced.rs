@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // current-column at various positions in a multi-line buffer
@@ -42,7 +42,7 @@ fn oracle_prop_current_column_various_positions() {
                       (end-of-line)
                       (setq results (cons (current-column) results))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ fn oracle_prop_current_column_tabs_custom_width() {
                       (forward-char 1)
                       (setq results (cons (current-column) results)))
                     (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ fn oracle_prop_move_to_column_basic() {
                       (let ((r (move-to-column 16)))
                         (setq results (cons (list r (current-column) (point)) results)))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -345,5 +345,5 @@ fn oracle_prop_current_column_control_chars() {
                       (move-to-column 3)
                       (setq results (cons (list 'mtc-3 (current-column) (point)) results))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

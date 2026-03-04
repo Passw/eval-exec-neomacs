@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // mapconcat with identity and diverse separator strings
@@ -111,7 +111,7 @@ fn oracle_prop_mapconcat_patterns_empty_separator() {
                  (setq counter (1+ counter))
                  (format "%d:%s" counter s))
                '("a" "b" "c") "")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ fn oracle_prop_mapconcat_patterns_empty_sequences() {
   ;; Compare empty list and empty vector results
   (equal (mapconcat #'identity nil ",")
          (mapconcat #'identity [] ",")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ fn oracle_prop_mapconcat_patterns_vectors() {
              "\n")
   ;; Vector with upcase transformation
   (mapconcat #'upcase ["hello" "world" "test" "data"] " "))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -371,7 +371,7 @@ fn oracle_prop_mapconcat_patterns_nested_2d_formatting() {
     (fmakunbound 'neovm--mc-format-matrix)
     (fmakunbound 'neovm--mc-format-config)
     (fmakunbound 'neovm--mc-tree-to-string)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

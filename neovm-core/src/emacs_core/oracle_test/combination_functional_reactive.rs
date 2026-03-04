@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Signals: time-varying values as closures
@@ -95,7 +95,7 @@ fn oracle_prop_frp_signals_as_closures() {
     (fmakunbound 'neovm--frp-sig-set)
     (fmakunbound 'neovm--frp-sig-watch)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +200,7 @@ fn oracle_prop_frp_derived_signals() {
     (fmakunbound 'neovm--frp-d-derive)
     (makunbound 'neovm--frp-d-signals)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -309,7 +309,7 @@ fn oracle_prop_frp_signal_combinators() {
     (fmakunbound 'neovm--frp-sig-distinct)
     (fmakunbound 'neovm--frp-sig-window)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -406,7 +406,7 @@ fn oracle_prop_frp_event_streams() {
     (makunbound 'neovm--frp-es-channels)
     (makunbound 'neovm--frp-es-log)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -531,7 +531,7 @@ fn oracle_prop_frp_reactive_counter() {
     (makunbound 'neovm--frp-rc-history)
     (makunbound 'neovm--frp-rc-derived)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

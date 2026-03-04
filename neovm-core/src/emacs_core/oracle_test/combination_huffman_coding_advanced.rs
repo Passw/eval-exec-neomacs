@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Canonical Huffman codes: codes are generated in a canonical order
@@ -238,7 +238,7 @@ fn oracle_prop_huffman_adv_tree_serialization() {
     (fmakunbound 'neovm--hts-deserialize)
     (fmakunbound 'neovm--hts-gen-codes)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +395,7 @@ fn oracle_prop_huffman_adv_optimal_code_length() {
     (fmakunbound 'neovm--hol-pq-insert)
     (fmakunbound 'neovm--hol-analyze)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -468,7 +468,7 @@ fn oracle_prop_huffman_adv_compression_ratio_analysis() {
     (fmakunbound 'neovm--hcr-pq-insert)
     (fmakunbound 'neovm--hcr-ratio)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -615,7 +615,7 @@ fn oracle_prop_huffman_adv_full_binary_tree_property() {
     (fmakunbound 'neovm--hfb-pq-insert)
     (fmakunbound 'neovm--hfb-verify)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

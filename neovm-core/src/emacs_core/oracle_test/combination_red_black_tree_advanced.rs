@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Shared RB-tree preamble used by all tests in this file.
@@ -309,7 +309,7 @@ fn oracle_prop_rbtree_adv_insert_rebalancing() {
          (not (null (funcall 'neovm--rb2-black-height tree)))))
     {RB_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,7 +351,7 @@ fn oracle_prop_rbtree_adv_insertion_orders() {
                  (funcall 'neovm--rb2-valid-p dup-tree)))))
     {RB_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -385,7 +385,7 @@ fn oracle_prop_rbtree_adv_delete_min() {
            (funcall 'neovm--rb2-size tree4))))
     {RB_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -425,7 +425,7 @@ fn oracle_prop_rbtree_adv_inorder_traversal() {
          (list is-sorted (length sorted))))
     {RB_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -466,7 +466,7 @@ fn oracle_prop_rbtree_adv_black_height_validation() {
                (funcall 'neovm--rb2-valid-p tree2))))
     {RB_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -510,7 +510,7 @@ fn oracle_prop_rbtree_adv_range_queries() {
          (funcall 'neovm--rb2-max tree)))
     {RB_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -562,5 +562,5 @@ fn oracle_prop_rbtree_adv_bulk_operations() {
                  (funcall 'neovm--rb2-search tree2 100)))))
     {RB_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }

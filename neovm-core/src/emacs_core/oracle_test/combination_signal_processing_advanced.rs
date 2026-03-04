@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Discrete Fourier Transform (DFT) — real-valued input
@@ -282,7 +282,7 @@ fn oracle_prop_sigproc_adv_convolution_types() {
     (fmakunbound 'neovm--conv-linear)
     (fmakunbound 'neovm--conv-circular)
     (makunbound 'neovm--conv-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -453,7 +453,7 @@ Uses partial windows at edges."
     (fmakunbound 'neovm--ma-valid)
     (fmakunbound 'neovm--ma-same)
     (makunbound 'neovm--ma-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

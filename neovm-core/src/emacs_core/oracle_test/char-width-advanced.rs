@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // char-width across the full ASCII range and special categories
@@ -42,7 +42,7 @@ fn oracle_prop_char_width_ascii_exhaustive() {
         (setq consistent nil)))
     (setq results (cons consistent results)))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

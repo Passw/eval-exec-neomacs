@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Build expression tree from infix token list and evaluate
@@ -141,7 +141,7 @@ fn oracle_prop_expr_tree_build_and_eval() {
     (fmakunbound 'neovm--et-parse)
     (fmakunbound 'neovm--et-eval)
     (makunbound 'neovm--et-tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +200,7 @@ fn oracle_prop_expr_tree_to_prefix() {
         (funcall 'neovm--et-to-prefix 'x))
     (fmakunbound 'neovm--et-to-prefix)
     (fmakunbound 'neovm--et-to-prefix-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -291,7 +291,7 @@ fn oracle_prop_expr_tree_to_postfix() {
     (fmakunbound 'neovm--et-to-postfix)
     (fmakunbound 'neovm--et-to-postfix-list)
     (fmakunbound 'neovm--et-eval-postfix)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -365,7 +365,7 @@ fn oracle_prop_expr_tree_differentiation() {
         ;; d/dx(x^2 + 3*x + 5)
         (funcall 'neovm--et-deriv '(+ (+ (expt x 2) (* 3 x)) 5) 'x))
     (fmakunbound 'neovm--et-deriv)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -485,7 +485,7 @@ fn oracle_prop_expr_tree_simplification() {
         (funcall 'neovm--et-simplify-fix '(+ x x)))
     (fmakunbound 'neovm--et-simplify)
     (fmakunbound 'neovm--et-simplify-fix)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -595,7 +595,7 @@ fn oracle_prop_expr_tree_deriv_simplify_pipeline() {
     (fmakunbound 'neovm--et2-simp)
     (fmakunbound 'neovm--et2-fix)
     (fmakunbound 'neovm--et2-d-simp)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -709,5 +709,5 @@ fn oracle_prop_expr_tree_properties_and_infix() {
     (fmakunbound 'neovm--et-leaf-count)
     (fmakunbound 'neovm--et-to-infix)
     (fmakunbound 'neovm--et-vars)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // line-beginning-position / line-end-position with N argument
@@ -175,7 +175,7 @@ fn oracle_prop_line_position_empty_lines() {
                             all-lbp)))
       (setq results (cons (cons 'all-lines (nreverse all-lbp)) results)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -447,5 +447,5 @@ fn oracle_prop_line_position_extract_line_range() {
                      (buffer-substring (point-min)
                                        (point-max))))))
     (fmakunbound 'neovm--test-extract-lines)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

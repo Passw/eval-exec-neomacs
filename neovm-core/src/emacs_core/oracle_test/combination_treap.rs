@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Treap core: insert with rotations, search, in-order traversal
@@ -170,7 +170,7 @@ fn oracle_prop_treap_insert_search_traverse() {
       ;; Root should have highest priority (30 has pri=90)
       (funcall 'neovm--tr-key t9)
       (funcall 'neovm--tr-pri t9))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,7 +323,7 @@ fn oracle_prop_treap_split() {
                 (funcall 'neovm--tr-heap-valid (cdr pair35))
                 (funcall 'neovm--tr-heap-valid (car pair50))
                 (funcall 'neovm--tr-heap-valid (cdr pair50))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -449,7 +449,7 @@ fn oracle_prop_treap_merge() {
           (funcall 'neovm--tr-heap-valid single-merge)
           ;; Root is 5 (pri 100 > 50)
           (funcall 'neovm--tr-key single-merge))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -596,7 +596,7 @@ fn oracle_prop_treap_range_count() {
       (funcall 'neovm--tr-range-keys tree 5 5)
       ;; Range [1, 99]: all keys
       (funcall 'neovm--tr-range-keys tree 1 99))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -742,7 +742,7 @@ fn oracle_prop_treap_split_merge_insert() {
           (funcall 'neovm--tr-inorder t-dup)
           ;; 40 should still be there exactly once
           (length (funcall 'neovm--tr-inorder t-dup)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -875,5 +875,5 @@ fn oracle_prop_treap_kth_smallest() {
       ;; Min/max of empty
       (funcall 'neovm--tr-min nil)
       (funcall 'neovm--tr-max nil))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

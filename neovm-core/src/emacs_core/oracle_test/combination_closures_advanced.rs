@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Closure capturing mutable state: counter factory with step
@@ -49,7 +49,7 @@ fn oracle_prop_closure_counter_factory() {
                          ;; c2 unaffected
                          (funcall peek2)   ;; 110
                          ))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ fn oracle_prop_closure_iterator_protocol() {
                          ;; Empty list
                          (funcall iter-to-list
                                   (funcall make-list-iter nil))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ fn oracle_prop_closure_callback_higher_order() {
                                 (list odds
                                       (= (+ (length evens) (length odds))
                                          (length numbers))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ fn oracle_prop_closure_loop_capture() {
                     (setq closures (nreverse closures))
                     ;; Call each closure — should get 0,1,2,3,4
                     (mapcar #'funcall closures))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -200,7 +200,7 @@ fn oracle_prop_closure_loop_capture_mutation() {
                       (let ((after (mapcar (lambda (c) (funcall (car c)))
                                           closures)))
                         (list initial after))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ fn oracle_prop_closure_generator_fibonacci() {
                       (dotimes (_ 12)
                         (setq results (cons (funcall fib) results)))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -258,7 +258,7 @@ fn oracle_prop_closure_generator_collatz() {
                        (funcall collect (funcall make-collatz-gen 6))
                        (funcall collect (funcall make-collatz-gen 11))
                        (length (funcall collect (funcall make-collatz-gen 27))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +313,7 @@ fn oracle_prop_closure_object_system() {
                        (funcall send s 'pop)      ;; 10
                        (funcall send s 'size)     ;; 0
                        )))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -367,7 +367,7 @@ fn oracle_prop_closure_memoize_with_stats() {
                          (funcall call 1)       ;; 1
                          (funcall call 3)       ;; 6 (cached)
                          (funcall stats)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -421,5 +421,5 @@ fn oracle_prop_closure_event_emitter() {
                          (funcall count 'hover)   ;; 1
                          (funcall count 'keydown) ;; 0
                          ))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

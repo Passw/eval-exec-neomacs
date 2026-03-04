@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // replace-match: FIXEDCASE parameter (nil vs t)
@@ -33,7 +33,7 @@ fn oracle_prop_replace_match_fixedcase_nil_adapts_case() {
         (string-match "world" s)
         (setq results (cons (replace-match "planet" nil nil s) results)))
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn oracle_prop_replace_match_fixedcase_t_exact_replacement() {
         (string-match "lowercase" s)
         (setq results (cons (replace-match "SCREAMING" t nil s) results)))
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +74,7 @@ fn oracle_prop_replace_match_literal_nil_expands_backslashes() {
         (replace-match "\\2->\\1" t nil s)
         ;; \\ = literal backslash in replacement
         (replace-match "\\1\\\\\\2" t nil s)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -92,7 +92,7 @@ fn oracle_prop_replace_match_literal_t_no_backslash_expansion() {
         (replace-match "\\1->\\2" t t s)
         ;; With LITERAL=t, backslash is literal
         (replace-match "a\\b\\c" t t s)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +118,7 @@ fn oracle_prop_replace_match_subexp_replace_specific_group() {
         (match-string 0 s)
         (match-string 1 s)
         (match-string 2 s)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ fn oracle_prop_replace_match_after_re_search_forward_in_buffer() {
           (list whole-match dollars cents
                 after-first
                 (buffer-string)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ fn oracle_prop_replace_match_after_string_match_multiple_groups() {
               (replace-match "09" t t s 4)
               ;; Full match replacement with back-refs
               (replace-match "\\3/\\2/\\1 \\4:\\5:\\6" t nil s))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +208,7 @@ fn oracle_prop_replace_match_backreferences_swap_and_transform() {
         (string-match "rgb(\\([0-9]+\\),\\([0-9]+\\),\\([0-9]+\\))" s)
         (setq results (cons (replace-match "R=\\1 G=\\2 B=\\3" t nil s) results)))
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -259,7 +259,7 @@ fn oracle_prop_replace_match_template_engine() {
             (test--expand-template "result: {{name}}" '(("name" . "a.b*c+d"))))))
       ;; Cleanup
       (fmakunbound 'test--expand-template))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -327,7 +327,7 @@ fn oracle_prop_replace_match_case_preserving_replacement() {
       (fmakunbound 'test--detect-case-pattern)
       (fmakunbound 'test--apply-case-pattern)
       (fmakunbound 'test--case-preserving-replace))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -360,7 +360,7 @@ fn oracle_prop_replace_match_buffer_multipass_with_counting() {
                 round2-count
                 (buffer-string)
                 (buffer-size)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -393,5 +393,5 @@ fn oracle_prop_replace_match_save_match_data_interaction() {
             (list outer-whole outer-key outer-val
                   restored-key restored-val
                   replaced)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

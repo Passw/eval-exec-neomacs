@@ -3,7 +3,7 @@
 //! continuation-passing style, and monadic patterns.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Higher-order composition: compose, pipe, partial
@@ -32,7 +32,7 @@ fn oracle_prop_funcadv_compose_pipe_partial() {
                             (funcall f2 3)   ;; same
                             (funcall add10and 5)   ;; 4+6+5 = 15
                             (funcall add10and 100))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ fn oracle_prop_funcadv_church_numerals() {
     (fmakunbound 'neovm--church-add)
     (fmakunbound 'neovm--church-mul)
     (fmakunbound 'neovm--church-to-int)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ fn oracle_prop_funcadv_y_combinator() {
                               (funcall fib 0)
                               (funcall fib 1)
                               (funcall fib 10)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +155,7 @@ fn oracle_prop_funcadv_fold_derived_operations() {
                         (funcall my-filter #'evenp '(1 2 3 4 5 6 7 8))
                         (funcall my-reverse '(a b c d e))
                         (funcall my-flatten '(1 (2 3) (4 (5 6)) 7)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +193,7 @@ fn oracle_prop_funcadv_trampoline() {
     (fmakunbound 'neovm--trampoline)
     (fmakunbound 'neovm--tsum-helper)
     (fmakunbound 'neovm--tsum)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +228,7 @@ fn oracle_prop_funcadv_cps_tree_sum() {
         (funcall 'neovm--tree-sum '((10 20) (30 (40 50)))))
     (fmakunbound 'neovm--tree-sum-cps)
     (fmakunbound 'neovm--tree-sum)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -282,7 +282,7 @@ fn oracle_prop_funcadv_maybe_monad() {
                                       (lambda (ph)
                                         (funcall safe-assq 'area-code ph)))))))
                           (list chain1 chain2 city missing)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

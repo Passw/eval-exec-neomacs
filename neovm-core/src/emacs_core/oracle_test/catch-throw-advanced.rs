@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // catch / throw basics revisited with complex values
@@ -20,7 +20,7 @@ fn oracle_prop_catch_throw_complex_value() {
                            (list 'result
                                  '(nested data)
                                  (cons "key" "val"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -46,7 +46,7 @@ fn oracle_prop_catch_nested_different_tags() {
                         (catch 'inner
                           (throw 'inner 'inner-result))
                         'after))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -71,7 +71,7 @@ fn oracle_prop_catch_same_tag_nested() {
                         (catch 'tag
                           (throw 'tag 'inner-val))
                         'after-inner))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ fn oracle_prop_catch_early_return_pattern() {
                     (when (> x 8)
                       (throw 'found (list 'found x))))
                   'not-found)";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn oracle_prop_catch_break_nested_loops() {
                         (when (= (* x y) 60)
                           (throw 'break (list x y)))))
                     'not-found))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -153,7 +153,7 @@ fn oracle_prop_catch_accumulate_then_bail() {
                                    (list 'negative-found sum))
                           (setq sum (+ sum item))))
                       sum)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +193,7 @@ fn oracle_prop_catch_throw_nested_unwind() {
                                  (setq log (cons 'inner-cleanup log)))
                              (setq log (cons 'outer-cleanup log))))))
                     (list result (nreverse log))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -227,5 +227,5 @@ fn oracle_prop_catch_multi_tag_dispatch() {
                     (funcall process-items '(1 2 3 4 5))
                     (funcall process-items '(1 2 3 stop 4 5))
                     (funcall process-items '(1 2 fail 3 4))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

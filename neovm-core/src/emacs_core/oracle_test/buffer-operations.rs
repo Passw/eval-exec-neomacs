@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // bobp / eobp / bolp / eolp
@@ -31,7 +31,7 @@ fn oracle_prop_bobp_eobp_with_content() {
                       (goto-char (point-min))
                       (let ((at-start (list (bobp) (eobp))))
                         (list at-start at-end))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -55,7 +55,7 @@ fn oracle_prop_bolp_eolp() {
                       (forward-char 2)
                       (setq results (cons (list (bolp) (eolp)) results))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ fn oracle_prop_char_before() {
                           (char-before 1)
                           (char-before 3)
                           (char-before 7)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -85,7 +85,7 @@ fn oracle_prop_following_preceding_char() {
                     (goto-char 3)
                     (list (following-char)
                           (preceding-char)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -99,7 +99,7 @@ fn oracle_prop_following_char_at_boundaries() {
                       (goto-char (point-max))
                       (let ((at-end (following-char)))
                         (list at-start at-end))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ fn oracle_prop_buffer_size() {
                       (insert "hello world")
                       (let ((with-content (buffer-size)))
                         (list empty-size with-content))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ fn oracle_prop_erase_buffer() {
                       (erase-buffer)
                       (list before (buffer-size)
                             (point) (point-min) (point-max))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +173,7 @@ fn oracle_prop_buffer_word_extraction() {
                                            start (match-beginning 0))))
                               (setq words (split-string region))))))
                       words))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -201,7 +201,7 @@ fn oracle_prop_buffer_line_operations() {
                                       count (1+ count))))))
                         (forward-line 1))
                       (list (nreverse lines) count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]

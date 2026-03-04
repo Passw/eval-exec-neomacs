@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Comprehensive upcase/downcase on chars and strings: edge cases
@@ -50,7 +50,7 @@ fn oracle_prop_upcase_downcase_comprehensive() {
       ;; Long string
       (upcase "the quick brown fox jumps over the lazy dog")
       (downcase "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ fn oracle_prop_capitalize_complex_boundaries() {
 
       ;; Complex mixed separators
       (capitalize "one.two-three_four five/six"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +157,7 @@ fn oracle_prop_upcase_initials_advanced() {
       ;; camelCase detection: initials on camelCase input
       (upcase-initials "camelCase test")
       (upcase-initials "already PascalCase"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -251,7 +251,7 @@ fn oracle_prop_case_multibyte_chars() {
       ;; Case conversion preserves non-letter multibyte chars
       (let ((s "price: 100"))
         (list (upcase s) (downcase s))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,7 +351,7 @@ fn oracle_prop_case_combined_string_ops() {
     (fmakunbound 'neovm--test-normalize-identifier)
     (fmakunbound 'neovm--test-to-title)
     (fmakunbound 'neovm--test-case-insensitive-sort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -462,5 +462,5 @@ fn oracle_prop_case_slug_generator() {
         (funcall 'neovm--test-slugify "a")
         (funcall 'neovm--test-slugify ""))
     (fmakunbound 'neovm--test-slugify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

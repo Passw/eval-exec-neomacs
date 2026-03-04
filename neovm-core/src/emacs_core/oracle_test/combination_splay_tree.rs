@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Splay tree core: rotations, splay, insert
@@ -176,7 +176,7 @@ fn oracle_prop_splay_tree_insert_and_splay() {
           (fmakunbound 'neovm--st-rotate-right) (fmakunbound 'neovm--st-rotate-left)
           (fmakunbound 'neovm--st-splay) (fmakunbound 'neovm--st-insert)
           (fmakunbound 'neovm--st-inorder))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -296,7 +296,7 @@ fn oracle_prop_splay_tree_search_moves_to_root() {
           (fmakunbound 'neovm--st-rotate-right) (fmakunbound 'neovm--st-rotate-left)
           (fmakunbound 'neovm--st-splay) (fmakunbound 'neovm--st-insert)
           (fmakunbound 'neovm--st-search))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -419,7 +419,7 @@ fn oracle_prop_splay_tree_delete() {
                   (fmakunbound 'neovm--st-splay) (fmakunbound 'neovm--st-insert)
                   (fmakunbound 'neovm--st-inorder) (fmakunbound 'neovm--st-max)
                   (fmakunbound 'neovm--st-delete))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -636,7 +636,7 @@ fn oracle_prop_splay_tree_sequential_access() {
             (fmakunbound 'neovm--st-rotate-right) (fmakunbound 'neovm--st-rotate-left)
             (fmakunbound 'neovm--st-splay) (fmakunbound 'neovm--st-insert)
             (fmakunbound 'neovm--st-inorder) (fmakunbound 'neovm--st-height)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -738,7 +738,7 @@ fn oracle_prop_splay_tree_duplicates_and_size() {
               (fmakunbound 'neovm--st-rotate-right) (fmakunbound 'neovm--st-rotate-left)
               (fmakunbound 'neovm--st-splay) (fmakunbound 'neovm--st-insert)
               (fmakunbound 'neovm--st-inorder) (fmakunbound 'neovm--st-size))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -853,5 +853,5 @@ fn oracle_prop_splay_tree_small_trees() {
         (fmakunbound 'neovm--st-rotate-right) (fmakunbound 'neovm--st-rotate-left)
         (fmakunbound 'neovm--st-splay) (fmakunbound 'neovm--st-insert)
         (fmakunbound 'neovm--st-inorder)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

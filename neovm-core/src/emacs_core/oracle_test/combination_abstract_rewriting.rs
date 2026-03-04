@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Reduction relation representation and one-step successors
@@ -50,7 +50,7 @@ fn oracle_prop_ars_reduction_relation() {
           (funcall 'neovm--ars-successors rel 'z)))
     (fmakunbound 'neovm--ars-successors)
     (fmakunbound 'neovm--ars-is-reducible)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ fn oracle_prop_ars_reflexive_transitive_closure() {
           (funcall 'neovm--ars-reachable rel 'e)))
     (fmakunbound 'neovm--ars-successors)
     (fmakunbound 'neovm--ars-reachable)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ fn oracle_prop_ars_normal_forms() {
     (fmakunbound 'neovm--ars-normal-form-p)
     (fmakunbound 'neovm--ars-all-normal-forms)
     (fmakunbound 'neovm--ars-reachable-nfs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_ars_church_rosser() {
     (fmakunbound 'neovm--ars-reachable-set)
     (fmakunbound 'neovm--ars-have-common-reduct)
     (fmakunbound 'neovm--ars-church-rosser-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -347,7 +347,7 @@ fn oracle_prop_ars_diamond_property() {
     (fmakunbound 'neovm--ars-successors)
     (fmakunbound 'neovm--ars-diamond-at)
     (fmakunbound 'neovm--ars-diamond-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -454,7 +454,7 @@ fn oracle_prop_ars_newmans_lemma() {
     (fmakunbound 'neovm--ars-reachable-set)
     (fmakunbound 'neovm--ars-terminating-p)
     (fmakunbound 'neovm--ars-locally-confluent-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -506,7 +506,7 @@ fn oracle_prop_ars_reduction_sequences() {
           (mapcar #'length (funcall 'neovm--ars-all-paths rel 'a 10))))
     (fmakunbound 'neovm--ars-successors)
     (fmakunbound 'neovm--ars-all-paths)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -593,7 +593,7 @@ fn oracle_prop_ars_strongly_normalizing() {
     (fmakunbound 'neovm--ars-successors)
     (fmakunbound 'neovm--ars-strongly-normalizing-p)
     (fmakunbound 'neovm--ars-all-sn-terms)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -666,7 +666,7 @@ fn oracle_prop_ars_head_reduction_strategy() {
     (fmakunbound 'neovm--ars-successors)
     (fmakunbound 'neovm--ars-head-reduce)
     (fmakunbound 'neovm--ars-rightmost-reduce)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -734,7 +734,7 @@ fn oracle_prop_ars_parallel_reduction() {
     (fmakunbound 'neovm--ars-par-rules)
     (fmakunbound 'neovm--ars-par-reduce-step)
     (fmakunbound 'neovm--ars-par-reduce-full)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -801,5 +801,5 @@ fn oracle_prop_ars_reduction_graph_analysis() {
           (funcall 'neovm--ars-sources-and-sinks rel)))
     (fmakunbound 'neovm--ars-graph-degrees)
     (fmakunbound 'neovm--ars-sources-and-sinks)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

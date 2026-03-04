@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Hierarchical config with defaults, user overrides, and env overrides
@@ -98,7 +98,7 @@ fn oracle_prop_config_hierarchical_merge() {
     (fmakunbound 'neovm--test-config-merge)
     (fmakunbound 'neovm--test-config-deep-merge)
     (fmakunbound 'neovm--test-config-get)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ fn oracle_prop_config_validation() {
             schema)))
     (fmakunbound 'neovm--test-validate-field)
     (fmakunbound 'neovm--test-validate-config)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +286,7 @@ fn oracle_prop_config_computed_values() {
               (cdr (assoc 'max-idle result2))
               (cdr (assoc 'max-total result2))))))
     (fmakunbound 'neovm--test-apply-derivations)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -367,7 +367,7 @@ fn oracle_prop_config_diff() {
                   (length (cdr (assoc 'changed diff2)))))))
     (fmakunbound 'neovm--test-config-diff)
     (fmakunbound 'neovm--test-config-apply-diff)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -475,7 +475,7 @@ fn oracle_prop_config_inheritance() {
     (fmakunbound 'neovm--test-resolve-profile)
     (fmakunbound 'neovm--test-inheritance-chain)
     (makunbound 'neovm--test-config-profiles)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -634,5 +634,5 @@ fn oracle_prop_config_watcher_system() {
     (makunbound 'neovm--test-cw-config)
     (makunbound 'neovm--test-cw-watchers)
     (makunbound 'neovm--test-cw-change-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Reaching definitions analysis via fixed-point iteration
@@ -163,7 +163,7 @@ Return alist of (label . (IN OUT)) for each block."
     (fmakunbound 'neovm--test-set-union)
     (fmakunbound 'neovm--test-set-diff)
     (fmakunbound 'neovm--test-set-equal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -294,7 +294,7 @@ DEF = variables defined in the block."
     (fmakunbound 'neovm--test-set-union-syms)
     (fmakunbound 'neovm--test-set-diff-syms)
     (fmakunbound 'neovm--test-set-equal-syms)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -459,7 +459,7 @@ fn oracle_prop_dataflow_available_expressions() {
     (fmakunbound 'neovm--test-set-union-str)
     (fmakunbound 'neovm--test-set-diff-str)
     (fmakunbound 'neovm--test-set-equal-str)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -608,7 +608,7 @@ fn oracle_prop_dataflow_use_def_chains() {
     (fmakunbound 'neovm--test-ud-set-union)
     (fmakunbound 'neovm--test-ud-set-diff)
     (fmakunbound 'neovm--test-ud-set-equal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -719,7 +719,7 @@ fn oracle_prop_dataflow_loop_reaching_defs() {
     (fmakunbound 'neovm--test-lrd-union)
     (fmakunbound 'neovm--test-lrd-diff)
     (fmakunbound 'neovm--test-lrd-equal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // All escape sequences
@@ -63,7 +63,7 @@ fn oracle_prop_char_literal_control_chars_full_alphabet() {
                           (= ?\C-m 13)   ;; CR (same as ?\r)
                           (= ?\C-[ 27))) ;; ESC (same as ?\e)
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ fn oracle_prop_char_literal_arithmetic_and_ranges() {
                             ;; Convert uppercase to lowercase by adding offset
                             (= (+ ?A case-offset) ?a)
                             (= (+ ?M case-offset) ?m))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -249,7 +249,7 @@ fn oracle_prop_char_literal_hex_and_octal_escapes() {
                     ;; Unicode escapes in strings, verify via string-to-char
                     (= (string-to-char "\u00e9") ?é)
                     (= (string-to-char "\u65e5") ?日))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,5 +320,5 @@ fn oracle_prop_char_literal_vigenere_cipher() {
                             ;; Verify different keys produce different ciphertext
                             (let ((enc2 (funcall vigenere-encrypt plain "other")))
                               (not (string= encrypted enc2))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

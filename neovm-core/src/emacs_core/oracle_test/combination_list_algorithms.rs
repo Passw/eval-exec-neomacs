@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Merge two sorted lists maintaining order
@@ -59,7 +59,7 @@ fn oracle_prop_listalgo_merge_sorted() {
           (equal sorted (funcall 'neovm--test-merge-sorted left right))))
     (fmakunbound 'neovm--test-merge-sorted)
     (fmakunbound 'neovm--test-merge-k-sorted)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +109,7 @@ fn oracle_prop_listalgo_remove_duplicates() {
         (funcall 'neovm--test-remove-dups '(1 \"a\" 2 \"a\" 1 3)))
     (fmakunbound 'neovm--test-remove-dups)
     (fmakunbound 'neovm--test-remove-dups-naive)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ fn oracle_prop_listalgo_rotate() {
                  (funcall 'neovm--test-rotate
                           (funcall 'neovm--test-rotate orig 3) -3))))
     (fmakunbound 'neovm--test-rotate)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +224,7 @@ fn oracle_prop_listalgo_partition() {
             (funcall 'neovm--test-quickselect lst 8)))) ;; max
     (fmakunbound 'neovm--test-partition3)
     (fmakunbound 'neovm--test-quickselect)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -291,7 +291,7 @@ fn oracle_prop_listalgo_zip_unzip() {
     (fmakunbound 'neovm--test-zip-with)
     (fmakunbound 'neovm--test-unzip)
     (fmakunbound 'neovm--test-zip3)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -371,7 +371,7 @@ fn oracle_prop_listalgo_rle() {
     (fmakunbound 'neovm--test-rle-encode)
     (fmakunbound 'neovm--test-rle-decode)
     (fmakunbound 'neovm--test-rle-compact)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -450,7 +450,7 @@ fn oracle_prop_listalgo_longest_increasing_subsequence() {
         (length (funcall 'neovm--test-lis '(0 8 4 12 2 10 6 14 1 9 5 13 3 11 7 15))))
     (fmakunbound 'neovm--test-lis)
     (fmakunbound 'neovm--test-is-increasing)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

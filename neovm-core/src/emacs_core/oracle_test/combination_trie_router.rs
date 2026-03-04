@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic trie router: registration and exact matching
@@ -105,7 +105,7 @@ fn oracle_prop_trie_router_exact_match() {
     (fmakunbound 'neovm--tr-add-route)
     (fmakunbound 'neovm--tr-match-exact)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ fn oracle_prop_trie_router_path_params() {
     (fmakunbound 'neovm--tr2-match)
     (fmakunbound 'neovm--tr2-match-rec)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -332,7 +332,7 @@ fn oracle_prop_trie_router_wildcard() {
     (fmakunbound 'neovm--tr3-match)
     (fmakunbound 'neovm--tr3-match-rec)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -440,7 +440,7 @@ fn oracle_prop_trie_router_method_routing() {
     (fmakunbound 'neovm--tr4-match)
     (fmakunbound 'neovm--tr4-allowed-methods)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -564,7 +564,7 @@ fn oracle_prop_trie_router_middleware_chain() {
     (fmakunbound 'neovm--tr5-add-route)
     (fmakunbound 'neovm--tr5-dispatch)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -690,7 +690,7 @@ fn oracle_prop_trie_router_priority() {
     (fmakunbound 'neovm--tr6-match)
     (fmakunbound 'neovm--tr6-match-rec)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -793,5 +793,5 @@ fn oracle_prop_trie_router_list_routes() {
     (fmakunbound 'neovm--tr7-list-routes)
     (fmakunbound 'neovm--tr7-walk)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Function composition chains (compose, pipe, partial)
@@ -43,7 +43,7 @@ fn oracle_prop_compose_pipe_chain() {
                      (funcall (funcall pipe add1 double square) 3)
                      ;; pipe with negate: 5 -> double -> negate -> add1 = -(5*2)+1 = -9
                      (funcall (funcall pipe double negate add1) 5))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +84,7 @@ fn oracle_prop_currying_partial_application() {
                      (funcall (funcall partial sub 100) 30)  ;; 70
                      ;; partial with no initial args (identity wrapper)
                      (funcall (funcall partial add) 3 4))))"; // 7
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ fn oracle_prop_fold_complex_accumulators() {
                                   (cons (cons x 1) acc)))
                               nil
                               '(a a a b b c a a))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ fn oracle_prop_trampoline_mutual_recursion() {
                      (funcall trampoline (lambda () (funcall is-odd-thunk 7)))    ;; t
                      (funcall trampoline (lambda () (funcall is-odd-thunk 8)))))) ;; nil
 ";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -218,7 +218,7 @@ fn oracle_prop_church_encoding() {
                      (funcall ch-to-int three)     ;; 3
                      (funcall ch-to-int four)      ;; 4
                      (funcall ch-to-int six))))"; // 6
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +263,7 @@ fn oracle_prop_y_combinator() {
                      (funcall fib 6)     ;; 8
                      (funcall fib 10)))) ;; 55
 ";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ fn oracle_prop_higher_order_toolkit() {
                                      (lambda (x) (funcall iterate #'1+ x 3))
                                      (lambda (x) (funcall iterate (lambda (y) (* 2 y)) x 3)))
                             5)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -360,5 +360,5 @@ fn oracle_prop_endomorphism_monoid() {
                        ;; Different input through same pipeline
                        (funcall combined 0)       ;; ((((0+1)*2)-3)^2 = (-1)^2 = 1
                        (funcall combined 10)))))"; // ((((10+1)*2)-3)^2 = (22-3)^2 = 361
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Quicksort with median-of-three pivot selection
@@ -93,7 +93,7 @@ fn oracle_prop_sorting_quicksort_median_pivot() {
     (fmakunbound 'neovm--test-partition)
     (fmakunbound 'neovm--test-qsort)
     (fmakunbound 'neovm--test-quicksort)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ fn oracle_prop_sorting_insertion_sort() {
                (sort (list 5 3 1 4 2) #'<)))
     (fmakunbound 'neovm--test-insert-sorted)
     (fmakunbound 'neovm--test-insertion-sort)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -192,7 +192,7 @@ fn oracle_prop_sorting_counting_sort() {
           (equal (funcall 'neovm--test-counting-sort data 9)
                  (sort (copy-sequence data) #'<))))
     (fmakunbound 'neovm--test-counting-sort)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +253,7 @@ fn oracle_prop_sorting_radix_sort_strings() {
                         '("dog" "cat" "ant" "bat" "cow"))
                (sort (list "dog" "cat" "ant" "bat" "cow") #'string<)))
     (fmakunbound 'neovm--test-radix-sort-strings)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -335,7 +335,7 @@ fn oracle_prop_sorting_stability_verification() {
     (fmakunbound 'neovm--test-tag-with-indices)
     (fmakunbound 'neovm--test-is-stable)
     (fmakunbound 'neovm--test-stable-sort)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -401,5 +401,5 @@ fn oracle_prop_sorting_multi_key_sort() {
               (sort counts (lambda (a b) (string< (car a) (car b))))))))
     (fmakunbound 'neovm--test-make-employee)
     (fmakunbound 'neovm--test-multi-key-compare)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

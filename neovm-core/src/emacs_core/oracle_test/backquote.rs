@@ -4,7 +4,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use proptest::prelude::*;
 
-use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_backquote_simple() {
@@ -60,7 +60,7 @@ fn oracle_prop_backquote_in_defmacro() {
                       (list (neovm--test-bq-when t 1 2 3)
                             (neovm--test-bq-when nil 'unreachable))
                     (fmakunbound 'neovm--test-bq-when)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn oracle_prop_backquote_vector() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(let ((x 2)) `[1 ,x 3])";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -117,7 +117,7 @@ fn oracle_prop_backquote_condition_case_macro() {
                       (list (neovm--test-bq-safe (+ 1 2) 'oops)
                             (neovm--test-bq-safe (car 1) 'oops))
                     (fmakunbound 'neovm--test-bq-safe)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 proptest! {

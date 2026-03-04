@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // time-add and time-subtract with various representations
@@ -41,7 +41,7 @@ fn oracle_prop_time_add_subtract_arithmetic() {
      ;; time-add with negative float
      (let ((r (float-time (time-add 100.0 -30.0))))
        (and (>= r 69.99) (<= r 70.01))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ fn oracle_prop_time_equal_p_representations() {
    ;; Integer representation
    (time-equal-p 100 100)
    (time-equal-p 100 200)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +204,7 @@ fn oracle_prop_time_convert_representations() {
    (time-convert 0 'integer)
    ;; Large value
    (time-convert 1000000 'integer)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

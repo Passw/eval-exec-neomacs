@@ -5,7 +5,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use proptest::prelude::*;
 
-use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-vector
@@ -15,17 +15,17 @@ use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, asser
 fn oracle_prop_make_vector_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(make-vector 5 0)");
-    assert_oracle_parity("(make-vector 3 nil)");
-    assert_oracle_parity("(make-vector 0 42)");
-    assert_oracle_parity("(make-vector 4 'hello)");
+    assert_oracle_parity_with_bootstrap("(make-vector 5 0)");
+    assert_oracle_parity_with_bootstrap("(make-vector 3 nil)");
+    assert_oracle_parity_with_bootstrap("(make-vector 0 42)");
+    assert_oracle_parity_with_bootstrap("(make-vector 4 'hello)");
 }
 
 #[test]
 fn oracle_prop_make_vector_with_string_init() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(make-vector 3 "test")"#);
+    assert_oracle_parity_with_bootstrap(r#"(make-vector 3 "test")"#);
 }
 
 #[test]
@@ -39,7 +39,7 @@ fn oracle_prop_make_vector_modify() {
                   (aset v 4 30)
                   (list (aref v 0) (aref v 1) (aref v 2)
                         (aref v 3) (aref v 4)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -50,11 +50,11 @@ fn oracle_prop_make_vector_modify() {
 fn oracle_prop_vconcat_vectors() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(vconcat [1 2 3] [4 5 6])");
-    assert_oracle_parity("(vconcat [1] [2] [3])");
-    assert_oracle_parity("(vconcat [] [1 2])");
-    assert_oracle_parity("(vconcat [1 2] [])");
-    assert_oracle_parity("(vconcat)");
+    assert_oracle_parity_with_bootstrap("(vconcat [1 2 3] [4 5 6])");
+    assert_oracle_parity_with_bootstrap("(vconcat [1] [2] [3])");
+    assert_oracle_parity_with_bootstrap("(vconcat [] [1 2])");
+    assert_oracle_parity_with_bootstrap("(vconcat [1 2] [])");
+    assert_oracle_parity_with_bootstrap("(vconcat)");
 }
 
 #[test]
@@ -62,9 +62,9 @@ fn oracle_prop_vconcat_lists() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // vconcat can accept lists
-    assert_oracle_parity("(vconcat '(1 2 3))");
-    assert_oracle_parity("(vconcat '(a b) '(c d))");
-    assert_oracle_parity("(vconcat [1 2] '(3 4))");
+    assert_oracle_parity_with_bootstrap("(vconcat '(1 2 3))");
+    assert_oracle_parity_with_bootstrap("(vconcat '(a b) '(c d))");
+    assert_oracle_parity_with_bootstrap("(vconcat [1 2] '(3 4))");
 }
 
 #[test]
@@ -72,15 +72,15 @@ fn oracle_prop_vconcat_strings() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // vconcat converts strings to vectors of char codes
-    assert_oracle_parity(r#"(vconcat "abc")"#);
-    assert_oracle_parity(r#"(vconcat "hi" [33])"#);
+    assert_oracle_parity_with_bootstrap(r#"(vconcat "abc")"#);
+    assert_oracle_parity_with_bootstrap(r#"(vconcat "hi" [33])"#);
 }
 
 #[test]
 fn oracle_prop_vconcat_multiple_types() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(vconcat [1 2] '(3 4) "AB")"#);
+    assert_oracle_parity_with_bootstrap(r#"(vconcat [1 2] '(3 4) "AB")"#);
 }
 
 // ---------------------------------------------------------------------------
@@ -91,23 +91,23 @@ fn oracle_prop_vconcat_multiple_types() {
 fn oracle_prop_vectorp_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(vectorp [1 2 3])");
-    assert_oracle_parity("(vectorp [])");
-    assert_oracle_parity("(vectorp '(1 2 3))");
-    assert_oracle_parity("(vectorp nil)");
-    assert_oracle_parity("(vectorp 42)");
-    assert_oracle_parity(r#"(vectorp "hello")"#);
+    assert_oracle_parity_with_bootstrap("(vectorp [1 2 3])");
+    assert_oracle_parity_with_bootstrap("(vectorp [])");
+    assert_oracle_parity_with_bootstrap("(vectorp '(1 2 3))");
+    assert_oracle_parity_with_bootstrap("(vectorp nil)");
+    assert_oracle_parity_with_bootstrap("(vectorp 42)");
+    assert_oracle_parity_with_bootstrap(r#"(vectorp "hello")"#);
 }
 
 #[test]
 fn oracle_prop_arrayp_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(arrayp [1 2 3])");
-    assert_oracle_parity(r#"(arrayp "hello")"#);
-    assert_oracle_parity("(arrayp '(1 2 3))");
-    assert_oracle_parity("(arrayp nil)");
-    assert_oracle_parity("(arrayp 42)");
+    assert_oracle_parity_with_bootstrap("(arrayp [1 2 3])");
+    assert_oracle_parity_with_bootstrap(r#"(arrayp "hello")"#);
+    assert_oracle_parity_with_bootstrap("(arrayp '(1 2 3))");
+    assert_oracle_parity_with_bootstrap("(arrayp nil)");
+    assert_oracle_parity_with_bootstrap("(arrayp 42)");
 }
 
 // ---------------------------------------------------------------------------
@@ -118,26 +118,26 @@ fn oracle_prop_arrayp_basic() {
 fn oracle_prop_elt_vector() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(elt [10 20 30 40] 0)");
-    assert_oracle_parity("(elt [10 20 30 40] 2)");
-    assert_oracle_parity("(elt [10 20 30 40] 3)");
+    assert_oracle_parity_with_bootstrap("(elt [10 20 30 40] 0)");
+    assert_oracle_parity_with_bootstrap("(elt [10 20 30 40] 2)");
+    assert_oracle_parity_with_bootstrap("(elt [10 20 30 40] 3)");
 }
 
 #[test]
 fn oracle_prop_elt_list() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(elt '(a b c d) 0)");
-    assert_oracle_parity("(elt '(a b c d) 2)");
-    assert_oracle_parity("(elt '(a b c d) 3)");
+    assert_oracle_parity_with_bootstrap("(elt '(a b c d) 0)");
+    assert_oracle_parity_with_bootstrap("(elt '(a b c d) 2)");
+    assert_oracle_parity_with_bootstrap("(elt '(a b c d) 3)");
 }
 
 #[test]
 fn oracle_prop_elt_string() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(elt "hello" 0)"#);
-    assert_oracle_parity(r#"(elt "hello" 4)"#);
+    assert_oracle_parity_with_bootstrap(r#"(elt "hello" 0)"#);
+    assert_oracle_parity_with_bootstrap(r#"(elt "hello" 4)"#);
 }
 
 #[test]
@@ -149,7 +149,7 @@ fn oracle_prop_elt_complex_sequence_dispatch() {
                         (lst '(x y z))
                         (str "ABC"))
                     (list (elt vec 1) (elt lst 1) (elt str 1)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -160,11 +160,11 @@ fn oracle_prop_elt_complex_sequence_dispatch() {
 fn oracle_prop_delete_from_list() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(delete 3 (list 1 2 3 4 3 5))");
-    assert_oracle_parity("(delete 'b (list 'a 'b 'c 'b 'd))");
-    assert_oracle_parity("(delete 99 (list 1 2 3))");
-    assert_oracle_parity("(delete 1 (list 1))");
-    assert_oracle_parity("(delete 1 nil)");
+    assert_oracle_parity_with_bootstrap("(delete 3 (list 1 2 3 4 3 5))");
+    assert_oracle_parity_with_bootstrap("(delete 'b (list 'a 'b 'c 'b 'd))");
+    assert_oracle_parity_with_bootstrap("(delete 99 (list 1 2 3))");
+    assert_oracle_parity_with_bootstrap("(delete 1 (list 1))");
+    assert_oracle_parity_with_bootstrap("(delete 1 nil)");
 }
 
 #[test]
@@ -173,7 +173,7 @@ fn oracle_prop_delete_string_from_list() {
 
     // delete uses equal comparison
     let form = r####"(delete "hello" (list "hello" "world" "hello" "foo"))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -181,8 +181,8 @@ fn oracle_prop_delete_from_vector() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // delete on vectors returns a new vector
-    assert_oracle_parity("(delete 3 [1 2 3 4 3 5])");
-    assert_oracle_parity("(delete 99 [1 2 3])");
+    assert_oracle_parity_with_bootstrap("(delete 3 [1 2 3 4 3 5])");
+    assert_oracle_parity_with_bootstrap("(delete 99 [1 2 3])");
 }
 
 // ---------------------------------------------------------------------------
@@ -202,10 +202,10 @@ fn oracle_prop_number_sequence_basic() {
 fn oracle_prop_number_sequence_with_step() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(number-sequence 0 10 2)");
-    assert_oracle_parity("(number-sequence 0 10 3)");
-    assert_oracle_parity("(number-sequence 10 0 -2)");
-    assert_oracle_parity("(number-sequence 5 -5 -3)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0 10 2)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0 10 3)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 10 0 -2)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 5 -5 -3)");
 }
 
 #[test]
@@ -220,8 +220,8 @@ fn oracle_prop_number_sequence_float() {
 fn oracle_prop_number_sequence_single() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(number-sequence 42 42)");
-    assert_oracle_parity("(number-sequence 42 42 5)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 42 42)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 42 42 5)");
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ fn oracle_prop_vector_as_lookup_table() {
                           (setq result
                                 (cons (cons i (aref freq i)) result))))
                       (nreverse result)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -265,7 +265,7 @@ fn oracle_prop_vector_matrix_operations() {
                     (aset r 3 (+ (* (aref a 2) (aref b 1))
                                  (* (aref a 3) (aref b 3))))
                     r))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -278,7 +278,7 @@ fn oracle_prop_vconcat_flatten_nested() {
                     (dolist (chunk chunks)
                       (setq result (vconcat result chunk)))
                     result))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

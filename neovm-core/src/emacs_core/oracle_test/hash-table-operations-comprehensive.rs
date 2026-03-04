@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-hash-table: all keyword arguments
@@ -44,7 +44,7 @@ fn oracle_prop_hash_table_ops_make_all_kwargs() {
                       ;; non-hash-table checks
                       (hash-table-p nil) (hash-table-p '(a b))
                       (hash-table-p [1 2 3]) (hash-table-p "string")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ fn oracle_prop_hash_table_ops_gethash_default() {
                       ;; Default is not stored
                       (gethash 'missing h 'temp)
                       (gethash 'missing h)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ fn oracle_prop_hash_table_ops_puthash_overwrite() {
                                 (gethash "k1" h)
                                 (gethash "k2" h)
                                 (gethash "k3" h))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ fn oracle_prop_hash_table_ops_remhash_cycle() {
                                   (gethash 2 h 'gone)
                                   (gethash 6 h)
                                   (gethash 7 h)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ fn oracle_prop_hash_table_ops_clrhash_reuse() {
                               (gethash "0" h 'not-found)
                               (gethash "new-1" h)
                               (gethash "new-2" h)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -260,7 +260,7 @@ fn oracle_prop_hash_table_ops_copy_independence() {
                         (= (hash-table-rehash-size orig) (hash-table-rehash-size copy))
                         (= (hash-table-rehash-threshold orig)
                            (hash-table-rehash-threshold copy)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,7 +288,7 @@ fn oracle_prop_hash_table_ops_keys_and_values() {
                         (list ks vs
                               ks2 vs2
                               (length ks) (length ks2)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -326,7 +326,7 @@ fn oracle_prop_hash_table_ops_test_eq_eql_equal() {
                         ;; List keys: only equal works
                         (progn (puthash '(1 2) 'list-val h-equal)
                                (gethash '(1 2) h-equal)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

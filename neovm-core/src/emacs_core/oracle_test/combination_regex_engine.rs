@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Regex parser: tokenize and parse regex string into AST
@@ -174,7 +174,7 @@ fn oracle_prop_regex_engine_parser() {
     (fmakunbound 'neovm--re-parse-expr)
     (fmakunbound 'neovm--re-parse)
     (makunbound 'neovm--re-tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -402,7 +402,7 @@ fn oracle_prop_regex_engine_nfa_compiler() {
     (fmakunbound 'neovm--re-compile)
     (makunbound 'neovm--re-state-counter)
     (makunbound 'neovm--re-tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -656,7 +656,7 @@ fn oracle_prop_regex_engine_nfa_simulator() {
     (fmakunbound 'neovm--re-match-full)
     (makunbound 'neovm--re-state-counter)
     (makunbound 'neovm--re-tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -914,7 +914,7 @@ fn oracle_prop_regex_engine_search() {
     (fmakunbound 'neovm--re-find-all)
     (makunbound 'neovm--re-state-counter)
     (makunbound 'neovm--re-tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -1147,7 +1147,7 @@ fn oracle_prop_regex_engine_edge_cases() {
     (fmakunbound 'neovm--re-match-full)
     (makunbound 'neovm--re-state-counter)
     (makunbound 'neovm--re-tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -1370,5 +1370,5 @@ fn oracle_prop_regex_engine_practical() {
     (fmakunbound 'neovm--re-batch-test)
     (makunbound 'neovm--re-state-counter)
     (makunbound 'neovm--re-tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

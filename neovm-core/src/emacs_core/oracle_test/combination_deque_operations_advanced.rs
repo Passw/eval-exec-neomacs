@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Shared deque preamble (same core as combination_deque_operations)
@@ -182,7 +182,7 @@ fn oracle_prop_deque_circular_buffer() {
     (fmakunbound 'neovm--dqa-cbuf-size)
     {DEQUE_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +242,7 @@ fn oracle_prop_deque_sliding_window_min() {
     (fmakunbound 'neovm--dqa-sliding-min)
     {DEQUE_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -309,7 +309,7 @@ fn oracle_prop_deque_reverse_rotate() {
     (fmakunbound 'neovm--dqa-rotate-right)
     {DEQUE_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -418,7 +418,7 @@ fn oracle_prop_deque_bfs_graph() {
     (fmakunbound 'neovm--dqa-bfs)
     {DEQUE_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -474,7 +474,7 @@ fn oracle_prop_deque_priority_advanced() {
     (fmakunbound 'neovm--dqa-pdq-insert)
     {DEQUE_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -514,7 +514,7 @@ fn oracle_prop_deque_stress_many_elements() {
                       (length remaining)))))))
     {DEQUE_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -570,7 +570,7 @@ fn oracle_prop_deque_palindrome_advanced() {
     (fmakunbound 'neovm--dqa-palindrome-p)
     {DEQUE_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -626,7 +626,7 @@ fn oracle_prop_deque_sliding_window_max_min() {
     (fmakunbound 'neovm--dqa-sliding-maxmin)
     {DEQUE_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -693,5 +693,5 @@ fn oracle_prop_deque_interleave_and_split() {
     (fmakunbound 'neovm--dqa-split)
     {DEQUE_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }

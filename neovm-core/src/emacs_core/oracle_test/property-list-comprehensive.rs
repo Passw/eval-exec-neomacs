@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // plist-get with all key types: symbols, keywords, integers
@@ -47,7 +47,7 @@ fn oracle_prop_plist_get_all_key_types() {
       ;; Empty plist
       (plist-get nil :a)
       (plist-get '() 'x))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ fn oracle_prop_plist_put_comprehensive() {
                           (plist-put nil :z 99)
                           ;; plist-put returns the plist
                           (plist-get (plist-put '(:w 1) :w 2) :w)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ fn oracle_prop_plist_member_comprehensive() {
                      ;; Length of tail
                      (length (plist-member pl :a))
                      (length (plist-member pl :d))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -271,7 +271,7 @@ fn oracle_prop_multiple_symbol_plists() {
         (setplist 'neovm--pltest-a nil)
         (setplist 'neovm--pltest-b nil)
         (setplist 'neovm--pltest-c nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +313,7 @@ fn oracle_prop_large_plist_operations() {
          (dotimes (i 10)
            (setq sum (+ sum (plist-get pl (intern (format ":k%d" i))))))
          sum)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -356,7 +356,7 @@ fn oracle_prop_nested_plist_deep_access() {
                      (plist-get (plist-get config :server) :nonexistent)
                      ;; Missing top-level key
                      (plist-get config :missing)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -420,7 +420,7 @@ fn oracle_prop_plist_iteration_while_loop() {
                          (setq count (1+ count))
                          (setq rest (cddr rest)))
                        count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -461,7 +461,7 @@ fn oracle_prop_plist_alist_conversion() {
                        ;; Conversion preserves order
                        (funcall plist-to-alist '(:first 1 :second 2 :third 3))
                        (funcall alist-to-plist '((:first . 1) (:second . 2) (:third . 3))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -525,7 +525,7 @@ fn oracle_prop_plist_merge_patterns() {
                        (funcall plist-remove '(:x 1 :y 2 :z 3) :y)
                        (funcall plist-remove '(:x 1 :y 2 :z 3) :z)
                        (funcall plist-remove '(:x 1 :y 2 :z 3) :w))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -565,7 +565,7 @@ fn oracle_prop_plist_config_store() {
                        (funcall plist-get-or config :width 80)
                        ;; Full config
                        config)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -635,7 +635,7 @@ fn oracle_prop_plist_equality_check() {
                      (funcall plist-equal-p
                               '(:data (1 2 3) :nested (:x 1))
                               '(:nested (:x 1) :data (1 2 3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -681,7 +681,7 @@ fn oracle_prop_plist_event_registry() {
                      (funcall handler-count :click)
                      (funcall handler-count :hover)
                      (funcall handler-count :scroll)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -742,5 +742,5 @@ fn oracle_prop_plist_select_reject_transform() {
                        ;; Map values: stringify
                        (funcall plist-map-values '(:a 1 :b 2)
                                 (lambda (v) (format "%d" v))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

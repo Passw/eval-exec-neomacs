@@ -3,7 +3,7 @@
 //! multiple consecutive backward searches, and reverse key=value parsing.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic backward literal search
@@ -22,7 +22,7 @@ fn oracle_prop_search_backward_basic_literal() {
           ;; Search again to find earlier "the"
           (let ((pos2 (search-backward "the" nil t)))
             (list pos2 (buffer-substring pos2 (+ pos2 3)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -49,7 +49,7 @@ fn oracle_prop_search_backward_with_bound() {
          ;; Bound past everything -- should return nil
          (too-tight (search-backward "marker" (1- pos-max) t)))
     (list last-marker bounded tight-bound too-tight)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ fn oracle_prop_search_backward_noerror_variants() {
                   r2                           ;; error caught
                   r3                           ;; successful search position
                   (point))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +104,7 @@ fn oracle_prop_search_backward_count() {
         (c-big (progn (goto-char (point-max))
                        (search-backward "x" nil t 100))))
     (list c1 c4 c-big)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ fn oracle_prop_search_backward_vs_re_search_backward() {
            (list 'literal-bracket lit-bracket)
            (list 'regex-bracket regex-bracket)
            (= lit-bracket regex-bracket)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ fn oracle_prop_search_backward_multiple_consecutive() {
             (setq sections (cons (list name section-start lines) sections)))
           (goto-char section-start))))
     sections))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,5 +262,5 @@ rotate=true"))
            (cdr (assoc "workers" (cdr (assoc "server" parsed))))
            (cdr (assoc "level" (cdr (assoc "logging" parsed)))))))
     (fmakunbound 'neovm--test-parse-config-backward)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

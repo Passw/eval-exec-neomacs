@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Constant folding: evaluate compile-time-known expressions
@@ -76,7 +76,7 @@ fn oracle_prop_compiler_opt_constant_folding() {
         (list folded1 folded2 folded3 folded4 folded5 folded6))
     (fmakunbound 'neovm--copt-cf-fold)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -365,7 +365,7 @@ fn oracle_prop_compiler_opt_strength_reduction() {
     (fmakunbound 'neovm--copt-sr-power-of-2-p)
     (fmakunbound 'neovm--copt-sr-reduce)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

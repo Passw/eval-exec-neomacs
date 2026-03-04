@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Closure capturing variables from outer let with shadowing
@@ -22,7 +22,7 @@ fn oracle_prop_closure_capture_with_shadowing() {
         (let ((x 999) (y 999))
           ;; x and y here are different bindings; closure sees x=2, y=10, z=100
           (funcall f))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ fn oracle_prop_closures_shared_environment_stack() {
                 (funcall items)
                 (funcall size)
                 (funcall peek)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ fn oracle_prop_closure_mapcar_complex_callback() {
                                        (if (= (% x 2) 0) x nil))
                                      step2)))))
           (list step1 step2 step3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ fn oracle_prop_closure_factory_pattern() {
           (funcall valid-score 101)
           (funcall html-bold "hello")
           (funcall parens "test"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +210,7 @@ fn oracle_prop_closure_rest_args_advanced() {
           (funcall prod 2 3 4)
           (funcall sum)
           (funcall prod))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -259,5 +259,5 @@ fn oracle_prop_closure_object_system_dispatch() {
           (funcall acct2 'balance)
           (funcall acct1 'history)
           (length (funcall acct2 'history)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

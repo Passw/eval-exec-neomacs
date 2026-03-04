@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // selected-window basic properties and identity checks
@@ -28,7 +28,7 @@ fn oracle_prop_window_selected_window_basic_properties() {
        (point-matches (= (window-point w) (point))))
   (list is-window is-live same-again buf-is-current has-point point-matches))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ fn oracle_prop_window_start_end_relationship() {
           start-in-range
           (= start (window-start)))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ fn oracle_prop_window_list_properties() {
                            ok)))
   (list is-list non-empty all-windows all-live selected-in-list all-have-buffers))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +169,7 @@ fn oracle_prop_window_dedicated_default() {
        (both-same (eq ded ded-nil-arg)))
   (list ded both-same (or (null ded) (eq ded t) t)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ fn oracle_prop_window_parameters_round_trip() {
         (equal val-b '(1 2 3))
         (listp params-alist)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -241,7 +241,7 @@ fn oracle_prop_window_dimensions() {
         (>= width-total width)
         (>= height-total height)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +264,7 @@ fn oracle_prop_window_live_p_type_dispatch() {
       (windowp nil)
       (windowp 42))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

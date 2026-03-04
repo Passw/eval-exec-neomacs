@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Enhanced DPLL with clause learning (simplified 1UIP)
@@ -131,7 +131,7 @@ fn oracle_prop_sat_adv_dpll_with_learning() {
     (fmakunbound 'neovm--sal-propagate)
     (fmakunbound 'neovm--sal-solve)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +213,7 @@ fn oracle_prop_sat_adv_watched_literals() {
     (fmakunbound 'neovm--swl-init-watches)
     (fmakunbound 'neovm--swl-propagate)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -677,7 +677,7 @@ fn oracle_prop_sat_adv_2sat_with_model() {
     (fmakunbound 'neovm--s2m-solve)
     (fmakunbound 'neovm--s2m-verify)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -800,7 +800,7 @@ fn oracle_prop_sat_adv_model_counting() {
     (fmakunbound 'neovm--smc-eval-cnf)
     (fmakunbound 'neovm--smc-count)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

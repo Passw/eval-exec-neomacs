@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // charsetp on various charset names (valid and invalid)
@@ -30,7 +30,7 @@ fn oracle_prop_charset_advanced_charsetp_various() {
   ;; Verify the type returned by charsetp
   (eq (charsetp 'ascii) t)
   (eq (charsetp 'nonexistent-charset-xyz-999) nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +55,7 @@ fn oracle_prop_charset_advanced_encode_decode_roundtrip() {
            (decoded (decode-char 'unicode encoded)))
       (setq results (cons (list ch encoded decoded (= ch decoded)) results))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ fn oracle_prop_charset_advanced_char_charset_ranges() {
   ;; Emoji in supplementary plane vs BMP
   (eq (char-charset #x1F600) 'unicode)
   (eq (char-charset ?A) 'ascii))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ fn oracle_prop_charset_advanced_max_char() {
   ;; encode-char at boundary values
   (encode-char 0 'unicode)
   (encode-char (max-char t) 'unicode))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ fn oracle_prop_charset_advanced_characterp_integerp() {
   (characterp (max-char))
   (natnump (1+ (max-char)))
   (characterp (1+ (max-char))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ fn oracle_prop_charset_advanced_unicode_block_classification() {
                         (encode-char ch 'unicode)))
                 test-chars))
     (fmakunbound 'neovm--ca-classify-char)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ fn oracle_prop_charset_advanced_multibyte_string_analysis() {
         ;; Single character
         (funcall 'neovm--ca-analyze-string "X"))
     (fmakunbound 'neovm--ca-analyze-string)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,5 +290,5 @@ fn oracle_prop_charset_advanced_encode_char_membership() {
     (= ch (decode-char 'ascii (encode-char ch 'ascii))))
   (let ((ch #x1F600))
     (= ch (decode-char 'unicode (encode-char ch 'unicode)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

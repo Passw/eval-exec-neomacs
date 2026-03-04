@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // seq-map-indexed and seq-do with side-effects
@@ -107,7 +107,7 @@ fn oracle_prop_seq_ext_into_and_concatenate() {
   (seq-into nil 'vector)
   ;; seq-concatenate with mixed types into list
   (seq-concatenate 'list "ab" [99 100] '(1 2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ fn oracle_prop_seq_ext_position_and_contains() {
     (seq-position '(10 20 30) 10)
     (seq-position '(10 20 30) 30)
     (seq-position nil 1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -326,5 +326,5 @@ fn oracle_prop_seq_ext_reduce_complex_accumulations() {
     runs
     ;; Zipped pairs
     pairs))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

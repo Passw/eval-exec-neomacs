@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // expt: integer and float, positive and negative exponents
@@ -43,7 +43,7 @@ fn oracle_prop_expt_comprehensive() {
   ;; Identity: x^1 = x
   (= (expt 42 1) 42)
   (= (expt 3.14 1) 3.14))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -72,7 +72,7 @@ fn oracle_prop_expt_laws_verification() {
     ;; a^0 = 1
     (= (expt a 0) 1.0)
     (= (expt b 0) 1.0)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ fn oracle_prop_sqrt_precision_and_identities() {
     (< (abs (- (sqrt (/ a b))
                (/ (sqrt a) (sqrt b))))
        1e-10)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ fn oracle_prop_log_comprehensive() {
   ;; exp(log(x)) roundtrip
   (let ((x 42.0))
     (< (abs (- (exp (log x)) x)) 1e-8)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -239,7 +239,7 @@ fn oracle_prop_compound_interest_calculations() {
     (fmakunbound 'neovm--test-doubling-time)
     (fmakunbound 'neovm--test-continuous-compound)
     (fmakunbound 'neovm--test-effective-rate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ fn oracle_prop_geometric_series_and_log_scale() {
     (fmakunbound 'neovm--test-to-decibels)
     (fmakunbound 'neovm--test-from-decibels)
     (fmakunbound 'neovm--test-richter-energy-ratio)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -423,7 +423,7 @@ fn oracle_prop_newtons_method_root_finding() {
     (fmakunbound 'neovm--test-newton-sqrt)
     (fmakunbound 'neovm--test-newton-cbrt)
     (fmakunbound 'neovm--test-newton-nthroot)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -505,5 +505,5 @@ fn oracle_prop_exp_log_numerical_algorithms() {
     (fmakunbound 'neovm--test-log-sum-exp)
     (fmakunbound 'neovm--test-softmax)
     (fmakunbound 'neovm--test-entropy)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

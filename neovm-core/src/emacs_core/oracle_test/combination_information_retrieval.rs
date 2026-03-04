@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Tokenizer with stop-word removal and term frequency computation
@@ -64,7 +64,7 @@ fn oracle_prop_ir_tokenizer_and_term_frequency() {
     (fmakunbound 'neovm--test-ir-tokenize)
     (fmakunbound 'neovm--test-ir-term-freq)
     (fmakunbound 'neovm--test-ir-tf-to-alist)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +189,7 @@ fn oracle_prop_ir_inverted_index_and_boolean_query() {
     (fmakunbound 'neovm--test-ir-union-lists)
     (fmakunbound 'neovm--test-ir-difference)
     (fmakunbound 'neovm--test-ir-query)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +263,7 @@ fn oracle_prop_ir_tfidf_computation() {
     (fmakunbound 'neovm--test-ir-compute-tf)
     (fmakunbound 'neovm--test-ir-compute-idf)
     (fmakunbound 'neovm--test-ir-tfidf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -344,7 +344,7 @@ fn oracle_prop_ir_cosine_similarity() {
     (fmakunbound 'neovm--test-ir-magnitude)
     (fmakunbound 'neovm--test-ir-cosine-sim)
     (fmakunbound 'neovm--test-ir-tf-vector)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -436,7 +436,7 @@ fn oracle_prop_ir_bm25_scoring() {
     (fmakunbound 'neovm--test-ir-bm25-idf)
     (fmakunbound 'neovm--test-ir-bm25-term-score)
     (fmakunbound 'neovm--test-ir-bm25-score)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -523,7 +523,7 @@ fn oracle_prop_ir_document_ranking() {
               all-zero))))
     (fmakunbound 'neovm--test-ir-simple-score)
     (fmakunbound 'neovm--test-ir-rank)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -591,5 +591,5 @@ fn oracle_prop_ir_jaccard_similarity() {
           (funcall 'neovm--test-ir-jaccard s1 nil)))
     (fmakunbound 'neovm--test-ir-to-set)
     (fmakunbound 'neovm--test-ir-jaccard)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

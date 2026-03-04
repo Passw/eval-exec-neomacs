@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // elt on lists, vectors, and strings with combined access
@@ -36,7 +36,7 @@ fn oracle_prop_elt_polymorphic_access() {
                                    (integerp (elt my-str 0))  ;; char code
                                    (= (elt my-str 0) ?A))))
                         (list (nreverse results) type-checks))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ fn oracle_prop_aref_aset_bool_vector_sieve() {
                           (setq primes (cons i primes)))
                         (setq i (1+ i)))
                       (nreverse primes)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ fn oracle_prop_aref_aset_char_table_category_map() {
                                    (aref ct ?@)
                                    (aref ct ?#))))
                         (list (nreverse result) special-checks))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ fn oracle_prop_aref_aset_sparse_matrix_ops() {
                                       (list (aref dense 0) (aref dense 1)
                                             (aref dense 2) (aref dense 3)))
                               result))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ fn oracle_prop_elt_aset_frequency_table_with_sorting() {
                             (setq dist (cons (cons k (aref counts k)) dist)))
                           (setq k (1+ k)))
                         (list (nreverse dist) mode-len max-count))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -271,7 +271,7 @@ fn oracle_prop_aref_aset_game_of_life_step() {
                                    (nreverse cells)))))
                           (list (funcall collect-live grid)
                                 (funcall collect-live next))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -319,7 +319,7 @@ fn oracle_prop_aref_aset_string_caesar_rot13() {
                                                       (- 26 s))
                                              plain))
                                     shifts))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -362,5 +362,5 @@ fn oracle_prop_elt_nested_path_traversal() {
                        (dolist (p paths)
                          (setq leaves (cons (funcall path-get tree p) leaves)))
                        (nreverse leaves))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

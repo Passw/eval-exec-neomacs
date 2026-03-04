@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // KMP (Knuth-Morris-Pratt) pattern matching
@@ -72,7 +72,7 @@ fn oracle_prop_string_algo_kmp() {
         (list f1 f2 f3 s1 s2 s3 s4 s5 s6 s7))
     (fmakunbound 'neovm--test-kmp-failure)
     (fmakunbound 'neovm--test-kmp-search)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ fn oracle_prop_string_algo_boyer_moore_like() {
         (list r1 r2 r3 r4 r5 verify))
     (fmakunbound 'neovm--test-bm-bad-char-table)
     (fmakunbound 'neovm--test-bm-search)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ fn oracle_prop_string_algo_rabin_karp() {
     (fmakunbound 'neovm--test-rk-search)
     (makunbound 'neovm--test-rk-base)
     (makunbound 'neovm--test-rk-prime)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ fn oracle_prop_string_algo_rotation_check() {
     (fmakunbound 'neovm--test-rot-check-concat)
     (fmakunbound 'neovm--test-rot-check-brute)
     (fmakunbound 'neovm--test-rot-amount)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -406,7 +406,7 @@ fn oracle_prop_string_algo_longest_palindrome() {
     (fmakunbound 'neovm--test-pal-expand)
     (fmakunbound 'neovm--test-pal-longest)
     (fmakunbound 'neovm--test-pal-is-palindrome)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -510,5 +510,5 @@ fn oracle_prop_string_algo_interleaving() {
         (list r1 r2 r3 r4 r5 r6 r7 r8 constructed r9 r10))
     (fmakunbound 'neovm--test-interleave-check)
     (fmakunbound 'neovm--test-interleave-construct)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

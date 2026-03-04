@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Recursive descent arithmetic expression parser
@@ -111,7 +111,7 @@ fn oracle_prop_parsing_recursive_descent_expr() {
     (fmakunbound 'neovm--test-parse-term)
     (fmakunbound 'neovm--test-parse-expr)
     (fmakunbound 'neovm--test-eval-expr)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,7 +288,7 @@ fn oracle_prop_parsing_ini_config() {
           ;; All section names
           (mapcar 'car config)))
     (fmakunbound 'neovm--test-parse-ini)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -439,7 +439,7 @@ fn oracle_prop_parsing_json_like() {
     (fmakunbound 'neovm--test-json-parse)
     (makunbound 'neovm--test-json-pos)
     (makunbound 'neovm--test-json-input)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -614,7 +614,7 @@ fn oracle_prop_parsing_tokenizer_parser_pipeline() {
     (fmakunbound 'neovm--test-lang-parse)
     (fmakunbound 'neovm--test-lang-eval-expr)
     (fmakunbound 'neovm--test-lang-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -710,7 +710,7 @@ fn oracle_prop_parsing_template_interpolation() {
     (fmakunbound 'neovm--test-tpl-parse)
     (fmakunbound 'neovm--test-tpl-render)
     (fmakunbound 'neovm--test-tpl-expand)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -770,5 +770,5 @@ fn oracle_prop_parsing_balanced_delimiters() {
         (funcall 'neovm--test-check-balanced "hello (world) [foo] {bar}")
         (funcall 'neovm--test-check-balanced "((({"))
     (fmakunbound 'neovm--test-check-balanced)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

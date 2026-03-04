@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // JSON tokenizer: numbers, strings (with escapes), booleans, null, punctuation
@@ -284,7 +284,7 @@ fn oracle_prop_rd_adv_json_parser_full() {
     (fmakunbound 'neovm--jp-parse)
     (makunbound 'neovm--jp-tokens)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -423,7 +423,7 @@ fn oracle_prop_rd_adv_json_deep_nesting() {
     (fmakunbound 'neovm--jpn-parse)
     (makunbound 'neovm--jpn-tokens)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -616,7 +616,7 @@ fn oracle_prop_rd_adv_json_ast_queries() {
     (fmakunbound 'neovm--jpq-collect-leaves)
     (makunbound 'neovm--jpq-tokens)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -771,7 +771,7 @@ fn oracle_prop_rd_adv_json_error_recovery() {
     (makunbound 'neovm--jpe-tokens)
     (makunbound 'neovm--jpe-errors)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -933,5 +933,5 @@ fn oracle_prop_rd_adv_json_serialize_roundtrip() {
     (fmakunbound 'neovm--jps-serialize)
     (makunbound 'neovm--jps-tokens)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

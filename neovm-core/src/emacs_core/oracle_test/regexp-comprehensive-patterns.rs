@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // string-match vs string-match-p: side effects on match-data
@@ -27,7 +27,7 @@ fn oracle_prop_regexp_string_match_vs_match_p_side_effects() {
         (let ((md2 (match-data)))
           ;; md1 and md2 should be equal since string-match-p doesn't change it
           (list 'md1 md1 'md2 md2 'equal (equal md1 md2)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // Verify string-match DOES overwrite match-data
     let form2 = r#"(progn
@@ -37,7 +37,7 @@ fn oracle_prop_regexp_string_match_vs_match_p_side_effects() {
         (let ((second-md (match-data)))
           (list 'first first-md 'second second-md
                 'different (not (equal first-md second-md))))))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // string-match-p returns same match position as string-match
     let form3 = r#"(let ((s "hello world"))
@@ -47,7 +47,7 @@ fn oracle_prop_regexp_string_match_vs_match_p_side_effects() {
             (string-match-p "o" s)
             (string-match-p "xyz" s)
             (string-match "xyz" s)))"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ fn oracle_prop_regexp_re_search_forward_all_params() {
           ;; Search again with same bound - should NOT find second "aaa"
           (let ((r2 (re-search-forward "aaa" 8 t)))
             (list r1 p1 r2 (point))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // NOERROR parameter: nil => error, t => return nil, other => move to limit
     let form2 = r#"(with-temp-buffer
@@ -115,7 +115,7 @@ fn oracle_prop_regexp_re_search_forward_all_params() {
       ;; NOERROR = t: return nil on failure, point unchanged
       (let ((r (re-search-forward "xyz" nil t)))
         (list r (point))))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // NOERROR = non-nil non-t: move point to limit on failure
     let form3 = r#"(with-temp-buffer
@@ -123,7 +123,7 @@ fn oracle_prop_regexp_re_search_forward_all_params() {
       (goto-char (point-min))
       (let ((r (re-search-forward "xyz" nil 'move)))
         (list r (point) (= (point) (point-max)))))"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 
     // COUNT parameter: find Nth occurrence
     let form4 = r#"(with-temp-buffer
@@ -131,7 +131,7 @@ fn oracle_prop_regexp_re_search_forward_all_params() {
       (goto-char (point-min))
       (let ((r (re-search-forward "xx" nil t 3)))
         (list r (point))))"#;
-    assert_oracle_parity(form4);
+    assert_oracle_parity_with_bootstrap(form4);
 }
 
 #[test]
@@ -148,7 +148,7 @@ fn oracle_prop_regexp_re_search_backward_all_params() {
           ;; Backward search with bound at 1 - should find first "aaa"
           (let ((r2 (re-search-backward "aaa" 1 t)))
             (list r1 p1 r2 (point))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // re-search-backward with COUNT
     let form2 = r#"(with-temp-buffer
@@ -156,7 +156,7 @@ fn oracle_prop_regexp_re_search_backward_all_params() {
       (goto-char (point-max))
       (let ((r (re-search-backward "ab" nil t 2)))
         (list r (point))))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // NOERROR with backward search
     let form3 = r#"(with-temp-buffer
@@ -168,7 +168,7 @@ fn oracle_prop_regexp_re_search_backward_all_params() {
         (let ((r2 (re-search-backward "xyz" nil 'move))
               (p2 (point)))
           (list r1 p1 r2 p2))))"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 }
 
 // ---------------------------------------------------------------------------
@@ -180,14 +180,14 @@ fn oracle_prop_regexp_complex_patterns() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Alternation with grouping
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(progn
           (string-match "\\(cat\\|dog\\|bird\\)" "I have a dog")
           (match-string 1 "I have a dog"))"#,
     );
 
     // Nested groups
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(progn
           (string-match "\\(\\([0-9]+\\)-\\([0-9]+\\)\\)" "date: 2025-03")
           (list (match-string 0 "date: 2025-03")
@@ -197,20 +197,20 @@ fn oracle_prop_regexp_complex_patterns() {
     );
 
     // Character classes: [:alpha:], [:digit:], [:space:]
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(progn
           (string-match "[[:digit:]]+" "abc 42 def")
           (match-string 0 "abc 42 def"))"#,
     );
 
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(progn
           (string-match "[[:alpha:]]+" "123 hello 456")
           (match-string 0 "123 hello 456"))"#,
     );
 
     // Repetition: *, +, ?, counted
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(list
           (string-match "ab*c" "ac")
           (string-match "ab*c" "abc")
@@ -223,7 +223,7 @@ fn oracle_prop_regexp_complex_patterns() {
     );
 
     // Shy groups \\(?: ... \\) don't capture
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(progn
           (string-match "\\(?:foo\\|bar\\)-\\([0-9]+\\)" "bar-99")
           (list (match-string 0 "bar-99")
@@ -256,7 +256,7 @@ fn oracle_prop_regexp_match_accessors_subgroups() {
        ;; Group 3: tld
        (match-beginning 3) (match-end 3)
        (match-string 3 "user@example.com")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // Unmatched optional group returns nil
     let form2 = r#"(progn
@@ -266,13 +266,13 @@ fn oracle_prop_regexp_match_accessors_subgroups() {
             (match-string 3 "foo")
             (match-beginning 2)
             (match-end 2)))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // match-data as a flat list of integers
     let form3 = r#"(progn
       (string-match "\\(ab\\)\\(cd\\)\\(ef\\)" "xabcdefx")
       (match-data))"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 }
 
 // ---------------------------------------------------------------------------
@@ -411,7 +411,7 @@ fn oracle_prop_regexp_iterative_search_collecting() {
                             (match-string 1))
                       matches)))
         (nreverse matches)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // Collect all matches of a pattern in a string using string-match + START
     let form2 = r#"(let ((s "aa123bb456cc789dd")
@@ -421,7 +421,7 @@ fn oracle_prop_regexp_iterative_search_collecting() {
         (setq nums (cons (list (match-beginning 0) (match-string 0 s)) nums))
         (setq pos (match-end 0)))
       (nreverse nums))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 }
 
 // ---------------------------------------------------------------------------
@@ -455,5 +455,5 @@ fn oracle_prop_regexp_tokenizer() {
           (unless matched
             (setq pos (1+ pos)))))
       (nreverse tokens))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

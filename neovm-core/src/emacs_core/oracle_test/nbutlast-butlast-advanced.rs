@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // butlast with default (remove last element)
@@ -23,7 +23,7 @@ fn oracle_prop_nbutlast_butlast_default_n() {
   (let ((orig (list 10 20 30 40)))
     (let ((result (butlast orig)))
       (list result orig (length orig)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -40,7 +40,7 @@ fn oracle_prop_nbutlast_butlast_explicit_n() {
   (butlast '(1 2 3 4 5) 2)
   (butlast '(1 2 3 4 5) 3)
   (butlast '(1 2 3 4 5) 4))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ fn oracle_prop_nbutlast_sliding_window() {
                             (funcall window-full-p win))
                       snapshots)))
         (nreverse snapshots)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

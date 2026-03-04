@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-keymap and make-sparse-keymap: structural differences and prompt
@@ -91,7 +91,7 @@ fn oracle_prop_keymap_comprehensive_define_key_sequences() {
    ;; Lambda binding is a function
    (functionp (lookup-key m [?l]))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +186,7 @@ fn oracle_prop_keymap_comprehensive_parent_inheritance() {
    ;; But gc -> c still works for c's own binding
    (lookup-key gc [?c])))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +235,7 @@ fn oracle_prop_keymap_comprehensive_copy_independence_deep() {
        (keymapp orig)
        (keymapp copy)))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ fn oracle_prop_keymap_comprehensive_keymapp_edge_cases() {
    (set-keymap-parent child (make-sparse-keymap))
    (keymapp child)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

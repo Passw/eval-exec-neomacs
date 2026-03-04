@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic defalias creating a function alias to a built-in
@@ -25,7 +25,7 @@ fn oracle_prop_defalias_basic_alias() {
         (funcall 'neovm--da-add)
         (fboundp 'neovm--da-add))
     (fmakunbound 'neovm--da-add)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ fn oracle_prop_defalias_overwrite_existing() {
           (let ((r3 (funcall 'neovm--da-overwrite 5)))
             (list r1 r2 r3))))
     (fmakunbound 'neovm--da-overwrite)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ fn oracle_prop_defalias_to_lambda_complex() {
         ;; Use mapcar with the defalias'd function
         (mapcar 'neovm--da-classify '(-100 -1 0 1 9 10 99 100 1000)))
     (fmakunbound 'neovm--da-classify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ fn oracle_prop_defalias_chain() {
     (fmakunbound 'neovm--da-a)
     (fmakunbound 'neovm--da-b)
     (fmakunbound 'neovm--da-c)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +167,7 @@ fn oracle_prop_defalias_symbol_function_introspection() {
             (funcall 'neovm--da-intr-copy 'hello 'world))))
     (fmakunbound 'neovm--da-intr)
     (fmakunbound 'neovm--da-intr-copy)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ fn oracle_prop_defalias_fboundp_fmakunbound_lifecycle() {
     (fmakunbound 'neovm--da-lc)
     (setq results (cons (fboundp 'neovm--da-lc) results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -272,7 +272,7 @@ fn oracle_prop_defalias_dispatch_table() {
     (fmakunbound 'neovm--dispatch-length)
     (fmakunbound 'neovm--dispatch-run)
     (makunbound 'neovm--dispatch-table)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -333,5 +333,5 @@ fn oracle_prop_defalias_predicate_composition() {
     (fmakunbound 'neovm--pred-even)
     (fmakunbound 'neovm--pred-pos-even)
     (fmakunbound 'neovm--pred-neg-or-even)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

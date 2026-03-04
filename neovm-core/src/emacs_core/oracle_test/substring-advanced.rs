@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // substring with positive FROM and TO
@@ -36,7 +36,7 @@ fn oracle_prop_substring_positive_from_and_to() {
   (substring "hello world" 3 8)
   ;; Numeric-like content
   (substring "0123456789" 3 7))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ fn oracle_prop_substring_nil_to() {
   ;; On short string
   (substring "ab" 1 nil)
   (substring "ab" 1))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ fn oracle_prop_substring_negative_indices() {
   ;; Negative TO = -0 doesn't exist, but -1 skips last char
   (substring "hello" 0 -1)
   (substring "hello" 1 -1))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ fn oracle_prop_substring_from_equals_to() {
   ;; FROM=TO on single-char string
   (substring "X" 0 0)
   (substring "X" 1 1))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +155,7 @@ fn oracle_prop_substring_empty_string() {
      ;; substring makes a copy
      (let ((sub (substring s 0)))
        (string= sub s)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -182,7 +182,7 @@ fn oracle_prop_substring_single_arg() {
   (string= (substring "test" 2) "st")
   (string= (substring "test" -2) "st")
   (string= (substring "test" 4) ""))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ fn oracle_prop_substring_string_splitting() {
     (fmakunbound 'neovm--split-at-pos)
     (fmakunbound 'neovm--find-char)
     (fmakunbound 'neovm--split-string-by-char)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -330,7 +330,7 @@ fn oracle_prop_substring_rotation_and_permutation() {
     (fmakunbound 'neovm--rotate-right)
     (fmakunbound 'neovm--reverse-string)
     (fmakunbound 'neovm--is-rotation-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -399,7 +399,7 @@ fn oracle_prop_substring_sliding_window_and_chunks() {
     (fmakunbound 'neovm--sliding-window)
     (fmakunbound 'neovm--chunk-string)
     (fmakunbound 'neovm--has-repeated-substring-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // nconc with multiple args (3+ lists including empty)
@@ -34,7 +34,7 @@ fn oracle_prop_nconc_adv_multi_arg_combinations() {
                       (eq (nthcdr 2 a) b)
                       ;; Verify final element
                       (car (last result))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ fn oracle_prop_nconc_adv_nil_args_positions() {
   (nconc nil)
   ;; Non-list last arg (dotted pair result)
   (nconc (list 1 2) 3))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ fn oracle_prop_nconc_adv_vs_append_mutation_diff() {
                       (eq original2 nconced)
                       ;; original1 and appended are NOT eq
                       (eq original1 appended)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +135,7 @@ fn oracle_prop_nconc_adv_nreverse_efficient_build() {
                     (list acc-cons
                           acc-nconc
                           (equal acc-cons acc-nconc)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +172,7 @@ fn oracle_prop_nconc_adv_setcar_setcdr_deep_mutation() {
                           ;; Add new pair by setcdr on last
                           (setcdr (last alist) (list (cons 'd 4)))
                           (list r1 r2 alist)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ fn oracle_prop_nconc_adv_delete_delq_semantics() {
                          ;; Deleting from nil
                          (d7 (delq 'a nil)))
                     (list d1 d2 d3 d4 d5 d6 d7))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ fn oracle_prop_nconc_adv_inplace_flatten() {
         ;; Mixed atoms and nested
         (funcall 'neovm--test-flatten '(a (b c) () (d (e () f)) g)))
     (fmakunbound 'neovm--test-flatten)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,5 +281,5 @@ fn oracle_prop_nconc_adv_aliasing_structure_sharing() {
                         ;; before snapshots for comparison
                         before-a
                         before-b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

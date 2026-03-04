@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // condition-case with multiple handlers and :no-error clause
@@ -163,7 +163,7 @@ fn oracle_prop_error_comprehensive_error_vs_user_error() {
   (condition-case err
       (user-error "test message B")
     (error (error-message-string err))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +220,7 @@ fn oracle_prop_error_comprehensive_nested_condition_case_selective() {
 
    ;; Final trace
    (nreverse trace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +287,7 @@ fn oracle_prop_error_comprehensive_unwind_protect_all_exit_paths() {
 
    ;; Final execution order log
    (nreverse log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -350,7 +350,7 @@ fn oracle_prop_error_comprehensive_propagation_through_call_chain() {
     (fmakunbound 'neovm--ehc-level2)
     (fmakunbound 'neovm--ehc-level2-safe)
     (fmakunbound 'neovm--ehc-level3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -400,7 +400,7 @@ fn oracle_prop_error_comprehensive_ignore_errors() {
         (if (< y 30)
             (+ x y)
           0)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -436,7 +436,7 @@ fn oracle_prop_error_comprehensive_with_demoted_errors() {
   ;; with-demoted-errors returns nil on error, not the error itself
   (let ((result (with-demoted-errors "Err: %S" (error "test"))))
     (list 'result result (null result))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -514,7 +514,7 @@ fn oracle_prop_error_comprehensive_recovery_state_machine() {
 
     (fmakunbound 'neovm--ehc-safe-divide)
     (fmakunbound 'neovm--ehc-try-strategies)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -558,5 +558,5 @@ fn oracle_prop_error_comprehensive_condition_case_t_handler() {
        (list sym
              (upcase msg)
              (length msg))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

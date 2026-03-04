@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Multiple cleanup forms
@@ -25,7 +25,7 @@ fn oracle_prop_unwind_protect_multiple_cleanup_forms() {
                       (setq log (cons 'clean2 log))
                       (setq log (cons 'clean3 log)))
                     (nreverse log))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -62,7 +62,7 @@ fn oracle_prop_unwind_protect_cleanup_on_throw() {
                         (setq log (cons 'cleanup-ran log))
                         (setq log (cons 'cleanup-2-ran log))))
                     (nreverse log))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn oracle_prop_unwind_protect_throw_preserves_value_through_cleanup() {
                                  (throw 'exit '(complex data 42))
                                (setq cleanup-ran t)))))
                       (list result cleanup-ran)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ fn oracle_prop_unwind_protect_cleanup_on_signal() {
                       (arith-error
                        (setq log (cons (list 'caught (car err)) log))))
                     (nreverse log))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ fn oracle_prop_unwind_protect_nested_lifo_ordering() {
                           (setq log (cons 'outer log)))
                       (error nil))
                     (nreverse log))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -167,7 +167,7 @@ fn oracle_prop_unwind_protect_error_in_cleanup() {
                           'body-value
                         (error "cleanup exploded"))
                     (error (list 'caught (cadr err))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -181,7 +181,7 @@ fn oracle_prop_unwind_protect_error_in_cleanup_overrides_body_error() {
                           (error "body error")
                         (error "cleanup error"))
                     (error (cadr err)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -199,7 +199,7 @@ fn oracle_prop_unwind_protect_partial_cleanup_on_cleanup_error() {
                           (setq log (cons 'c3 log)))
                       (error nil))
                     (nreverse log))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +220,7 @@ fn oracle_prop_unwind_protect_preserves_body_return_value() {
                                  (list 'computed counter))
                              (setq counter 999))))
                       (list result counter)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -234,7 +234,7 @@ fn oracle_prop_unwind_protect_preserves_nil_body_value() {
                                nil
                              (setq side 'cleaned))))
                       (list result side)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ fn oracle_prop_unwind_protect_raii_pattern() {
                               (funcall release 'db-conn)))
                         (error nil))
                       (list (nreverse operations) resources)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +313,7 @@ fn oracle_prop_unwind_protect_dynamic_binding_restoration() {
                           (funcall restore-state))
                         (setq log (cons (list 'final current-state) log))
                         (nreverse log))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -337,7 +337,7 @@ fn oracle_prop_unwind_protect_condition_case_interaction() {
                       (error
                        (setq log (cons (list 'caught-outer (cadr outer-err)) log))))
                     (nreverse log))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -357,5 +357,5 @@ fn oracle_prop_unwind_protect_loop_with_early_exit() {
                                   (throw 'done 'stopped-at-c)))
                             (setq log (cons (list 'cleanup item) log))))))
                     (nreverse log))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

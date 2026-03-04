@@ -2,7 +2,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_condition_case_multiple_handlers() {
@@ -24,7 +24,7 @@ fn oracle_prop_condition_case_multiple_handlers() {
                     (wrong-type-argument 'wta)
                     (arith-error 'arith)
                     (error 'generic)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn oracle_prop_condition_case_var_binding() {
                   (signal 'wrong-type-argument '(numberp \"hello\"))
                   (wrong-type-argument
                    (list 'caught (car err) (cadr err) (caddr err))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn oracle_prop_condition_case_handler_body_multiple_forms() {
                      (setq log (cons 'second log))
                      (setq log (cons (car err) log))
                      (nreverse log))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -88,7 +88,7 @@ fn oracle_prop_condition_case_nested_different_handlers() {
                      'inner-wta))
                   (arith-error
                    (list 'outer-arith (car outer-err))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -105,7 +105,7 @@ fn oracle_prop_condition_case_rethrow_pattern() {
                          (signal (car inner) (cdr inner))))
                     (error
                      (list 'final logged (cdr err)))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn oracle_prop_condition_case_debug_on_error_pattern() {
                           (/ 1 0)
                         (error (list 'error (car err))))
                     (/ 1 0)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -151,5 +151,5 @@ fn oracle_prop_condition_case_signal_in_handler() {
                      (signal 'error
                              (list \"wrapped\" (cdr inner)))))
                   (error (list 'final (car outer) (cadr outer))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

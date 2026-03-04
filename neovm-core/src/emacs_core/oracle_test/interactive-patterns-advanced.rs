@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Interactive lambda with different interactive specs
@@ -31,7 +31,7 @@ fn oracle_prop_interactive_lambda_specs() {
                       (funcall cmd-no-args)
                       (funcall cmd-with-spec 42)
                       (funcall cmd-list-spec 10 20)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ fn oracle_prop_funcall_apply_interactive() {
         (commandp 'neovm--test-icmd-greet))
     (fmakunbound 'neovm--test-icmd-add)
     (fmakunbound 'neovm--test-icmd-greet)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ fn oracle_prop_interactive_list_form_complex() {
                       (commandp cmd)
                       ;; But we can call the interactive spec manually
                       (funcall cmd 10))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ fn oracle_prop_command_dispatch_system() {
     (fmakunbound 'neovm--test-dispatch-mul)
     (fmakunbound 'neovm--test-dispatch-neg)
     (fmakunbound 'neovm--test-dispatch-sq)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -299,7 +299,7 @@ fn oracle_prop_command_registration_introspection() {
     (put 'neovm--test-reg-cmd2 'category nil)
     (put 'neovm--test-reg-cmd3 'doc nil)
     (put 'neovm--test-reg-cmd3 'category nil)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

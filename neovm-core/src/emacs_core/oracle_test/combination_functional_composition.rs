@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // compose: right-to-left function composition
@@ -61,7 +61,7 @@ fn oracle_prop_fcomp_compose_right_to_left() {
                   (= (funcall left 4) (funcall right 4))))))
     (fmakunbound 'neovm--test-compose2)
     (fmakunbound 'neovm--test-compose)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ fn oracle_prop_fcomp_pipe_left_to_right() {
                                    (nreverse r))))))
     (fmakunbound 'neovm--test-pipe)
     (fmakunbound 'neovm--test-pipe-val)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ fn oracle_prop_fcomp_partial_application() {
     (fmakunbound 'neovm--test-partial)
     (fmakunbound 'neovm--test-curry)
     (fmakunbound 'neovm--test-curry3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -249,7 +249,7 @@ fn oracle_prop_fcomp_memoize_wrapper() {
           ;; Results are consistent
           (= (funcall memo :call 15) (funcall memo :call 15))))
     (fmakunbound 'neovm--test-memoize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ fn oracle_prop_fcomp_retry_wrapper() {
                     (car result2)
                     (car result3))))))
     (fmakunbound 'neovm--test-with-retry)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -414,7 +414,7 @@ fn oracle_prop_fcomp_throttle_debounce_simulation() {
                       (funcall debounced :log)))))))
     (fmakunbound 'neovm--test-make-throttle)
     (fmakunbound 'neovm--test-make-debounce)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -473,7 +473,7 @@ fn oracle_prop_fcomp_juxtaposition() {
             (funcall both-ops 10 3))))
     (fmakunbound 'neovm--test-juxt)
     (fmakunbound 'neovm--test-juxt-pred)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -534,5 +534,5 @@ fn oracle_prop_fcomp_middleware_chain() {
     (fmakunbound 'neovm--test-wrap-logging)
     (fmakunbound 'neovm--test-wrap-auth)
     (fmakunbound 'neovm--test-wrap-transform)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Kahn's algorithm (BFS-based) with detailed step tracking
@@ -79,7 +79,7 @@ fn oracle_prop_toposort_adv_kahn_with_steps() {
         (funcall 'neovm--tsa-kahn-steps
                  '(("a" . ()) ("b" . ()) ("c" . ()))))
     (fmakunbound 'neovm--tsa-kahn-steps)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ fn oracle_prop_toposort_adv_dfs_based() {
         (funcall 'neovm--tsa-dfs-toposort
                  '(("x" . ("x")))))
     (fmakunbound 'neovm--tsa-dfs-toposort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -248,7 +248,7 @@ fn oracle_prop_toposort_adv_all_orderings() {
         (funcall 'neovm--tsa-all-toposorts
                  '(("a" . ("b" "c")) ("b" . ()) ("c" . ()))))
     (fmakunbound 'neovm--tsa-all-toposorts)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -335,7 +335,7 @@ fn oracle_prop_toposort_adv_cycle_report() {
                                  ("c" . ("d")) ("d" . ("c"))))))
           (list 'found-cycle (not (null result)))))
     (fmakunbound 'neovm--tsa-find-cycle)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -410,7 +410,7 @@ fn oracle_prop_toposort_adv_lexicographic_smallest() {
                  '(("f" . ()) ("e" . ("f")) ("d" . ("f"))
                    ("c" . ("d" "e")) ("b" . ("c")) ("a" . ("b" "c")))))
     (fmakunbound 'neovm--tsa-lex-smallest)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -513,7 +513,7 @@ fn oracle_prop_toposort_adv_package_dependency() {
                    ("parser"  . ())
                    ("math-lib" . ()))))
     (fmakunbound 'neovm--tsa-resolve-deps)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -610,5 +610,5 @@ fn oracle_prop_toposort_adv_critical_path() {
                    ("c" 5 "a")
                    ("d" 1 "b" "c"))))
     (fmakunbound 'neovm--tsa-critical-path)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // upcase-initials: comprehensive string patterns
@@ -67,7 +67,7 @@ fn oracle_prop_upcase_initials_patterns_comprehensive() {
   ;; Punctuation-heavy
   (upcase-initials "hello, world!")
   (upcase-initials "one.two.three"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +118,7 @@ fn oracle_prop_upcase_initials_patterns_vs_capitalize() {
               (setq count (1+ count))))
           count))
     (fmakunbound 'neovm--uip-compare)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ fn oracle_prop_upcase_initials_patterns_char_vs_string() {
           (setq all-ok nil))
         (setq ch (1+ ch))))
     all-ok))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +295,7 @@ fn oracle_prop_upcase_initials_patterns_title_case() {
     (fmakunbound 'neovm--uip-title-case)
     (fmakunbound 'neovm--uip-simple-title)
     (makunbound 'neovm--uip-small-words)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -400,7 +400,7 @@ fn oracle_prop_upcase_initials_patterns_case_conversion() {
     (fmakunbound 'neovm--uip-to-snake)
     (fmakunbound 'neovm--uip-to-screaming)
     (fmakunbound 'neovm--uip-to-kebab)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -465,5 +465,5 @@ fn oracle_prop_upcase_initials_patterns_cross_comparison() {
                 (setq invariants-ok nil)))
             invariants-ok)))
     (fmakunbound 'neovm--uip-all-conversions)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

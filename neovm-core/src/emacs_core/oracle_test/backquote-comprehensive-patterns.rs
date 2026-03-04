@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Deeply nested backquotes: backquote inside backquote (3+ levels)
@@ -18,7 +18,7 @@ fn oracle_prop_backquote_comprehensive_triple_nested() {
     // leaving inner backquotes with their own comma patterns intact
     let form = r#"(let ((a 1) (b 2))
                     `(outer ,a `(middle ,a ,,b `(inner ,a ,,a ,,,b))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn oracle_prop_backquote_comprehensive_nested_eval_chain() {
                       (list template
                             (eval template)
                             (eval (eval template)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ fn oracle_prop_backquote_comprehensive_splice_nested_positions() {
                      `(before ,@'(only) after)
                      ;; Splice with dotted pair context
                      `(,@xs . final)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn oracle_prop_backquote_comprehensive_splice_computed_lists() {
                                 (nreverse r)))
                     ;; Splice reverse
                     `(reversed ,@(reverse '(a b c d))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ fn oracle_prop_backquote_comprehensive_let_construction() {
                     (let ((form `(let ,(mapcar #'list vars vals)
                                   (list ,@(mapcar (lambda (v) `(* ,v 2)) vars)))))
                       (list form (eval form))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn oracle_prop_backquote_comprehensive_nested_let_star() {
     let form = r#"(let ((chain '((x 1) (y (+ x 2)) (z (* y 3)))))
                     (let ((form `(let* ,chain (list x y z))))
                       (eval form)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +137,7 @@ fn oracle_prop_backquote_comprehensive_macro_with_gensym() {
        (neovm--test-bqc-with-timing "nested"
          (neovm--test-bqc-with-timing "inner" 42)))
     (fmakunbound 'neovm--test-bqc-with-timing)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn oracle_prop_backquote_comprehensive_macro_generating_cond() {
        ;; Verify macroexpansion shape
        (car (macroexpand '(neovm--test-bqc-dispatch x (a 1) (b 2)))))
     (fmakunbound 'neovm--test-bqc-dispatch)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +195,7 @@ fn oracle_prop_backquote_comprehensive_vector_in_backquote() {
                      `[,x ,y ,(+ x y)]
                      `(list [,x] [,y] [,(* x y)])
                      `[head ,@(list 1 2 3) tail]))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -218,7 +218,7 @@ fn oracle_prop_backquote_comprehensive_computed_symbols() {
                                      suffixes))))
                       ;; Eval each form
                       (mapcar #'eval forms)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -241,7 +241,7 @@ fn oracle_prop_backquote_comprehensive_defun_family() {
     (fmakunbound 'neovm--bqc-add)
     (fmakunbound 'neovm--bqc-sub)
     (fmakunbound 'neovm--bqc-mul)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +267,7 @@ fn oracle_prop_backquote_comprehensive_quote_interactions() {
                      ;; Backquote producing backquote (meta-level)
                      (let ((inner `(list 1 2 ,(+ 1 2))))
                        `(eval ',inner))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -302,5 +302,5 @@ fn oracle_prop_backquote_comprehensive_conditional_splicing() {
                            (when include-debug
                              (setq forms (cons '(debug-check) forms)))
                            (nreverse forms)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

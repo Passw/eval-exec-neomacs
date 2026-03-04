@@ -4,7 +4,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use proptest::prelude::*;
 
-use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_abs_positive() {
@@ -34,8 +34,8 @@ fn oracle_prop_abs_zero() {
 fn oracle_prop_abs_float() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(abs -3.14)");
-    assert_oracle_parity("(abs 2.5)");
+    assert_oracle_parity_with_bootstrap("(abs -3.14)");
+    assert_oracle_parity_with_bootstrap("(abs 2.5)");
 }
 
 proptest! {

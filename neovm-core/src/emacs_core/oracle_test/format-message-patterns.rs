@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // message returns formatted string, format-message basics
@@ -191,7 +191,7 @@ fn oracle_prop_format_message_curly_quotes() {
     (format-message "The function `%s' takes %d args" "cons" 2)
     (format-message "Set `%s' to %S for `%s'" "x" 42 "feature")))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

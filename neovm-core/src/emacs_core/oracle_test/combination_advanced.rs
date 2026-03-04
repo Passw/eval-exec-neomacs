@@ -4,7 +4,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use proptest::prelude::*;
 
-use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Interpreter / evaluator patterns
@@ -115,7 +115,7 @@ fn oracle_prop_adv_observer_pattern() {
                     (funcall fire 'click)
                     (funcall fire 'hover)
                     (nreverse event-log)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +197,7 @@ fn oracle_prop_adv_tokenizer() {
                       (while (re-search-forward "\\b\\w+\\b" nil t)
                         (setq words (cons (match-string 0) words)))
                       (nreverse words)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

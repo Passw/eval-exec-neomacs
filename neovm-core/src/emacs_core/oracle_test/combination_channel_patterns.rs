@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Bounded channel: send/receive with capacity, overflow handling
@@ -86,7 +86,7 @@ fn oracle_prop_channel_bounded_send_receive() {
       (funcall drain)
       ;; Stats
       (funcall stats))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ fn oracle_prop_channel_fan_out() {
           (funcall (cdr (assq :drain c1)))
           (funcall (cdr (assq :drain c2)))
           (funcall (cdr (assq :drain c3))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +219,7 @@ fn oracle_prop_channel_fan_in() {
                   r)
                 (lambda (a b) (string< (symbol-name (car a))
                                        (symbol-name (car b))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -299,7 +299,7 @@ fn oracle_prop_channel_request_reply() {
                     (cons (funcall call-server 'add (list i (* i 10)))
                           results)))
             (nreverse results)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -403,7 +403,7 @@ fn oracle_prop_channel_pub_sub() {
     (fmakunbound 'neovm--ps-receive-topic)
     (makunbound 'neovm--ps-subscriptions)
     (makunbound 'neovm--ps-mailboxes)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -514,7 +514,7 @@ fn oracle_prop_channel_pipeline() {
               (let ((out2 (funcall (cdr (assq :drain ch3)))))
                 ;; All should pass filter since 20*2+5=45, 30*2+5=65, 40*2+5=85
                 out2))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

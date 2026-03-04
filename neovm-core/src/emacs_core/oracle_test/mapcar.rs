@@ -4,7 +4,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use proptest::prelude::*;
 
-use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_mapcar_basic() {
@@ -61,7 +61,7 @@ fn oracle_prop_mapcar_with_condition_case() {
                       (/ 100 x)
                     (arith-error 'inf)))
                 '(10 5 0 2))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -92,7 +92,7 @@ fn oracle_prop_mapcar_with_side_effects() {
     let form = "(let ((acc nil))
                   (mapcar (lambda (x) (setq acc (cons x acc))) '(1 2 3))
                   acc)";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // char-syntax for letters, digits, whitespace, punctuation
@@ -41,7 +41,7 @@ fn oracle_prop_char_syntax_adv_basic_categories() {
                      (char-syntax ?\[) (char-syntax ?\])
                      ;; String delimiter
                      (char-syntax ?\")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ fn oracle_prop_char_syntax_adv_class_to_char_all() {
                             (= (cdr (assq 6 mapping)) ?\")   ;; string -> "
                             (= (cdr (assq 7 mapping)) ?\\))) ;; escape -> \
                     )"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ fn oracle_prop_char_syntax_adv_matching_paren_extended() {
                        ;; Guillemets
                        (matching-paren 171)
                        (matching-paren 187))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

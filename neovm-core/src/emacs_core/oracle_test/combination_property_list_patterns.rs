@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // plist-get/plist-put deep chains building complex objects
@@ -63,7 +63,7 @@ fn oracle_prop_plist_deep_chain_building() {
              (list (plist-get updated :age)
                    (plist-get updated :adult))))))
     (fmakunbound 'neovm--test-plist-deep-dummy)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ fn oracle_prop_plist_as_struct() {
                (list (funcall point-x translated)
                      (funcall point-y translated)))))))
     (fmakunbound 'neovm--test-plist-struct-dummy)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ fn oracle_prop_plist_member_existence() {
          (when (plist-member pl k)
            (setq count (1+ count))))
        count))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ fn oracle_prop_plist_alist_conversion() {
                  (cons (car pair)
                        (funcall plist-to-alist (cdr pair))))
                outer-al)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +286,7 @@ fn oracle_prop_plist_merge_override() {
         ;; cache should be merged
         (plist-get (plist-get deep :cache) :enabled)  ;; t
         (plist-get (plist-get deep :cache) :ttl))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -347,7 +347,7 @@ fn oracle_prop_plist_schema_validation() {
                    (funcall validate-schema user-schema r3)
                    (funcall validate-schema user-schema r4))))))))
     (fmakunbound 'neovm--test-plist-schema-dummy)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -494,5 +494,5 @@ fn oracle_prop_plist_event_system() {
              (plist-get r1 :type)
              (plist-get r2 :type)))))
     (fmakunbound 'neovm--test-plist-event-dummy)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

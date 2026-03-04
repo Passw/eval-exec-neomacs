@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Simple transformation macros
@@ -37,7 +37,7 @@ fn oracle_prop_defmacro_simple_transformation() {
                       (fmakunbound 'neovm--pat-negate)
                       (fmakunbound 'neovm--pat-square)
                       (fmakunbound 'neovm--pat-swap-args)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ fn oracle_prop_defmacro_rest_body() {
                             (setq s (concat s "c"))))
                       (fmakunbound 'neovm--pat-with-accumulator)
                       (fmakunbound 'neovm--pat-collecting)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ fn oracle_prop_defmacro_optional_params() {
                           (neovm--pat-if2 t 'yes 'no))
                       (fmakunbound 'neovm--pat-with-default)
                       (fmakunbound 'neovm--pat-if2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ fn oracle_prop_defmacro_macroexpand_verification() {
                                             (neovm--pat-triple 2)))))
                       (fmakunbound 'neovm--pat-triple)
                       (fmakunbound 'neovm--pat-and2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ fn oracle_prop_defmacro_generates_defun() {
                       (fmakunbound 'neovm--pat-get-color)
                       (fmakunbound 'neovm--pat-set-color)
                       (makunbound 'neovm--pat-store-color)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -208,7 +208,7 @@ fn oracle_prop_defmacro_generates_defun_with_body() {
                       (fmakunbound 'neovm--pat-defmemo)
                       (fmakunbound 'neovm--pat-add)
                       (makunbound 'neovm--pat-memo-cache-neovm--pat-add)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ fn oracle_prop_defmacro_gensym_hygiene() {
                           (nreverse results))
                       (fmakunbound 'neovm--pat-swap-bad)
                       (fmakunbound 'neovm--pat-swap-good)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +306,7 @@ fn oracle_prop_defmacro_anaphoric_macros() {
                       (fmakunbound 'neovm--pat-aif)
                       (fmakunbound 'neovm--pat-awhen)
                       (fmakunbound 'neovm--pat-aand)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -348,7 +348,7 @@ fn oracle_prop_defmacro_loop_with_break_continue() {
                       (fmakunbound 'neovm--pat-loop-for)
                       (fmakunbound 'neovm--pat-loop-break)
                       (fmakunbound 'neovm--pat-loop-continue)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -380,5 +380,5 @@ fn oracle_prop_defmacro_loop_collect_and_filter() {
                             (> (length s) 3)
                             (length s)))
                       (fmakunbound 'neovm--pat-do-collect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

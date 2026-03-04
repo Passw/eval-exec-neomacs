@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // delete-char
@@ -19,7 +19,7 @@ fn oracle_prop_delete_char_forward() {
                     (goto-char (point-min))
                     (delete-char 3)
                     (buffer-string))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn oracle_prop_delete_char_backward() {
                     (goto-char (point-max))
                     (delete-char -3)
                     (buffer-string))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -43,7 +43,7 @@ fn oracle_prop_delete_char_middle() {
                     (goto-char 6)  ;; before "world"
                     (delete-char 5) ;; delete "world"
                     (list (buffer-string) (point)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ fn oracle_prop_delete_region_basic() {
                     (insert "0123456789")
                     (delete-region 4 8)
                     (list (buffer-string) (point)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -69,7 +69,7 @@ fn oracle_prop_delete_region_entire() {
                     (insert "hello world")
                     (delete-region (point-min) (point-max))
                     (list (buffer-string) (buffer-size) (point)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ fn oracle_prop_delete_and_extract() {
                       (list extracted
                             (buffer-string)
                             (point))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ fn oracle_prop_erase_buffer() {
                             (buffer-size)
                             (buffer-string)
                             (point))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -197,5 +197,5 @@ fn oracle_prop_delete_word_by_word() {
                                   (cons word deleted-words)))))
                       (list (nreverse deleted-words)
                             (buffer-string))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

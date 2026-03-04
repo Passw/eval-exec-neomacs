@@ -9,7 +9,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // prin1-to-string for all types
@@ -79,7 +79,7 @@ fn oracle_prop_read_print_comprehensive_round_trips() {
              (read-back (car (read-from-string printed))))
         (equal v read-back)))
     test-values))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ fn oracle_prop_read_print_comprehensive_read_from_string_positions() {
 
   ;; Read vector with mixed types
   (car (read-from-string "[1 \"two\" three (4 . 5)]")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ fn oracle_prop_read_print_comprehensive_print_escape_newlines() {
   ;; Combination: string with both newlines and tabs
   (let ((print-escape-newlines t))
     (prin1-to-string "a\nb\tc\nd")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ fn oracle_prop_read_print_comprehensive_print_length() {
   ;; print-length on nested lists applies per level
   (let ((print-length 2))
     (prin1-to-string '((1 2 3) (4 5 6) (7 8 9)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ fn oracle_prop_read_print_comprehensive_print_level() {
   ;; Combined print-level and print-length
   (let ((print-level 2) (print-length 2))
     (prin1-to-string '((1 2 3 4) (5 (6 7) 8 9) (10 11)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -251,7 +251,7 @@ fn oracle_prop_read_print_comprehensive_print_circle() {
     (let ((cell (cons nil nil)))
       (setcar cell cell)
       (prin1-to-string cell))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +283,7 @@ fn oracle_prop_read_print_comprehensive_print_quoted() {
   ;; backquote forms
   (let ((print-quoted t))
     (prin1-to-string ''(a b c))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +317,7 @@ fn oracle_prop_read_print_comprehensive_format_percent_S() {
   ;; %S with special characters in strings
   (format "%S" "has\"quote")
   (format "%S" "has\\backslash"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -353,5 +353,5 @@ fn oracle_prop_read_print_comprehensive_reader_macros() {
   (let ((print-circle t))
     (let ((obj (car (read-from-string "(#1=(x y) #1#)"))))
       (eq (car obj) (cadr obj)))))"##;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

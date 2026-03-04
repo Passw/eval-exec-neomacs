@@ -5,7 +5,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 use proptest::prelude::*;
 use std::sync::OnceLock;
 
-use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 use super::progn_ast::arb_progn_form;
 
 fn oracle_progn_proptest_failure_path() -> &'static str {
@@ -184,7 +184,7 @@ fn oracle_prop_progn_nonlocal_exit_with_cleanup_and_post_state() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(let ((x 'start)) (list (catch 'neovm--pg-tag (progn (setq x 'entered) (unwind-protect (throw 'neovm--pg-tag 'boom) (setq x 'cleaned)) 'tail)) x))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 proptest! {
@@ -348,6 +348,6 @@ proptest! {
     ) {
         return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
-        assert_oracle_parity(&form);
+        assert_oracle_parity_with_bootstrap(&form);
     }
 }

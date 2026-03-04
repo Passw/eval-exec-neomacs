@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // interactive-form extraction from different function types
@@ -166,7 +166,7 @@ fn oracle_prop_interactive_spec_codes_basic() {
     (fmakunbound 'neovm--test-spec-x)
     (fmakunbound 'neovm--test-spec-X)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ fn oracle_prop_interactive_spec_codes_buffer_file() {
     (fmakunbound 'neovm--test-spec-F)
     (fmakunbound 'neovm--test-spec-D)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ fn oracle_prop_interactive_list_form_advanced() {
     (fmakunbound 'neovm--test-list-conditional)
     (fmakunbound 'neovm--test-list-nested)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -339,7 +339,7 @@ fn oracle_prop_interactive_prefix_arg() {
   ;; current-prefix-arg is nil when no prefix is active
   current-prefix-arg)
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -474,7 +474,7 @@ fn oracle_prop_interactive_defalias() {
     (fmakunbound 'neovm--test-defalias-orig)
     (fmakunbound 'neovm--test-defalias-alias)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -535,7 +535,7 @@ fn oracle_prop_interactive_command_framework() {
     (fmakunbound 'neovm--test-fw-cmd-repeat)
     (fmakunbound 'neovm--test-fw-cmd-count)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -577,7 +577,7 @@ fn oracle_prop_interactive_optional_rest_params() {
     (fmakunbound 'neovm--test-opt-cmd)
     (fmakunbound 'neovm--test-rest-cmd)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -627,7 +627,7 @@ fn oracle_prop_interactive_spec_char_key() {
     (fmakunbound 'neovm--test-spec-z)
     (fmakunbound 'neovm--test-spec-Z)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -671,7 +671,7 @@ fn oracle_prop_interactive_list_spec_buffer_state() {
     (fmakunbound 'neovm--test-bufstate-cmd)
     (fmakunbound 'neovm--test-bufprops-cmd)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -719,5 +719,5 @@ fn oracle_prop_interactive_spec_special_chars() {
     (fmakunbound 'neovm--test-star-p-cmd)
     (fmakunbound 'neovm--test-star-caret-p)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

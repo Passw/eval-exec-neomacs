@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Simplified Base64 encoding (pure Elisp, ASCII subset)
@@ -72,7 +72,7 @@ fn oracle_prop_encoding_base64_simple() {
                         (funcall encode "Ma")
                         (funcall encode "M")
                         (funcall encode "Hello!"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +135,7 @@ fn oracle_prop_encoding_url_percent() {
                                     (list encoded
                                           (equal s (funcall url-decode encoded)))))
                                 inputs))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +180,7 @@ fn oracle_prop_encoding_roman_numerals() {
                                 (let ((roman (funcall to-roman n)))
                                   (list n roman (funcall from-roman roman))))
                               nums)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +245,7 @@ fn oracle_prop_encoding_morse_code() {
                                       (list w encoded
                                             (funcall decode encoded))))
                                   words)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -303,7 +303,7 @@ fn oracle_prop_encoding_prefix_free() {
                                   (list n encoded
                                         (funcall gamma-decode encoded))))
                               test-values)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -339,5 +339,5 @@ fn oracle_prop_encoding_checksum_xor() {
                       (mapcar (lambda (s)
                                 (cons s (funcall checksum s)))
                               inputs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

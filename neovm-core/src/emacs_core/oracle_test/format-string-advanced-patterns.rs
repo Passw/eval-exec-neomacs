@@ -5,7 +5,7 @@
 //! and format producing very long strings.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // %s (princ) vs %S (prin1) differences with various types
@@ -266,35 +266,35 @@ fn oracle_prop_format_diverse_arg_types() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // nil and t
-    assert_oracle_parity(r#"(format "%s %s %S %S" nil t nil t)"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%s %s %S %S" nil t nil t)"#);
 
     // Symbols
-    assert_oracle_parity(r#"(format "sym: %s %S" 'hello 'hello)"#);
-    assert_oracle_parity(r#"(format "%s" 'with-special-chars)"#);
-    assert_oracle_parity(r#"(format "%S" 'with-special-chars)"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "sym: %s %S" 'hello 'hello)"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%s" 'with-special-chars)"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%S" 'with-special-chars)"#);
 
     // Lists
-    assert_oracle_parity(r#"(format "%s" '(1 2 3))"#);
-    assert_oracle_parity(r#"(format "%S" '(1 "two" three))"#);
-    assert_oracle_parity(r#"(format "%s" '(a . b))"#);
-    assert_oracle_parity(r#"(format "%S" '(a b . c))"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%s" '(1 2 3))"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%S" '(1 "two" three))"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%s" '(a . b))"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%S" '(a b . c))"#);
 
     // Vectors
-    assert_oracle_parity(r#"(format "%s" [1 2 3])"#);
-    assert_oracle_parity(r#"(format "%S" [1 "two" three])"#);
-    assert_oracle_parity(r#"(format "%s" [])"#);
-    assert_oracle_parity(r#"(format "%S" [])"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%s" [1 2 3])"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%S" [1 "two" three])"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%s" [])"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%S" [])"#);
 
     // Integers as %s
-    assert_oracle_parity(r#"(format "%s" 42)"#);
-    assert_oracle_parity(r#"(format "%S" 42)"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%s" 42)"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%S" 42)"#);
 
     // Floats as %s
-    assert_oracle_parity(r#"(format "%s" 3.14)"#);
-    assert_oracle_parity(r#"(format "%S" 3.14)"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%s" 3.14)"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%S" 3.14)"#);
 
     // Mixed in one call
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(format "%s|%S|%s|%S|%s"
                                     nil '(a b) [1 2] "text" 42)"#,
     );
@@ -308,11 +308,11 @@ fn oracle_prop_format_diverse_arg_types() {
 fn oracle_prop_format_literal_percent() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(format "100%%")"#);
-    assert_oracle_parity(r#"(format "%d%%" 50)"#);
-    assert_oracle_parity(r#"(format "%%d = %d" 42)"#);
-    assert_oracle_parity(r#"(format "%%%%")"#);
-    assert_oracle_parity(r#"(format "%s is %d%% complete" "task" 75)"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "100%%")"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%d%%" 50)"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%%d = %d" 42)"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%%%%")"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%s is %d%% complete" "task" 75)"#);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,17 +323,17 @@ fn oracle_prop_format_literal_percent() {
 fn oracle_prop_format_unicode_strings() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(format "%s" "cafe\u0301")"#);
-    assert_oracle_parity(r#"(format "%s %s" "hello" "world")"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%s" "cafe\u0301")"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%s %s" "hello" "world")"#);
 
     // Width with unicode (interesting because char width != byte width)
-    assert_oracle_parity(r#"(format "%s" "\u03b1\u03b2\u03b3")"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%s" "\u03b1\u03b2\u03b3")"#);
 
     // Mixed ASCII and unicode
-    assert_oracle_parity(r#"(format "Greek: %s, Number: %d" "\u03c0" 314)"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "Greek: %s, Number: %d" "\u03c0" 314)"#);
 
     // CJK characters
-    assert_oracle_parity(r#"(format "%s" "\u4e16\u754c")"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%s" "\u4e16\u754c")"#);
 }
 
 // ---------------------------------------------------------------------------
@@ -432,19 +432,19 @@ fn oracle_prop_format_table_alignment() {
 fn oracle_prop_format_nested_structures() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(format "%S" '((1 2) (3 4) (5 6)))"#);
-    assert_oracle_parity(r#"(format "%S" '((a . 1) (b . 2) (c . 3)))"#);
-    assert_oracle_parity(r#"(format "%S" '(lambda (x) (* x x)))"#);
-    assert_oracle_parity(r#"(format "%S" (list 'quote (list 1 2 3)))"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%S" '((1 2) (3 4) (5 6)))"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%S" '((a . 1) (b . 2) (c . 3)))"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%S" '(lambda (x) (* x x)))"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%S" (list 'quote (list 1 2 3)))"#);
 
     // Deep nesting
-    assert_oracle_parity(r#"(format "%S" '(a (b (c (d (e))))))"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%S" '(a (b (c (d (e))))))"#);
 
     // Mixed types in deep structure
-    assert_oracle_parity(r#"(format "%S" (list 1 "two" 'three [4 5] '(6 . 7)))"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%S" (list 1 "two" 'three [4 5] '(6 . 7)))"#);
 
     // Empty collections
-    assert_oracle_parity(r#"(format "%S %S %S" nil '() [])"#);
+    assert_oracle_parity_with_bootstrap(r#"(format "%S %S %S" nil '() [])"#);
 }
 
 // ---------------------------------------------------------------------------

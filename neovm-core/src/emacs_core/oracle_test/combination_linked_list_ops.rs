@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // List rotation: left and right by N positions, with wrap-around
@@ -61,7 +61,7 @@ fn oracle_prop_linkedlist_rotation_advanced() {
           (equal result (funcall 'neovm--ll-rotate-left lst 3))))
     (fmakunbound 'neovm--ll-rotate-left)
     (fmakunbound 'neovm--ll-rotate-right)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ fn oracle_prop_linkedlist_interleave_zip() {
     (fmakunbound 'neovm--ll-interleave)
     (fmakunbound 'neovm--ll-deinterleave)
     (fmakunbound 'neovm--ll-zip-longest)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ fn oracle_prop_linkedlist_rle_advanced() {
     (fmakunbound 'neovm--ll-rle-encode)
     (fmakunbound 'neovm--ll-rle-decode)
     (fmakunbound 'neovm--ll-rle-compression-ratio)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -275,7 +275,7 @@ fn oracle_prop_linkedlist_partition_by_predicate() {
     (fmakunbound 'neovm--ll-partition)
     (fmakunbound 'neovm--ll-partition-n)
     (fmakunbound 'neovm--ll-chunk)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -332,7 +332,7 @@ fn oracle_prop_linkedlist_group_by() {
                  (lambda (x) (cond ((> x 0) 'pos) ((< x 0) 'neg) (t 'zero)))
                  '(3 -1 0 5 -2 0 7 -4 0 1)))
     (fmakunbound 'neovm--ll-group-by)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -397,7 +397,7 @@ fn oracle_prop_linkedlist_sliding_window() {
     (fmakunbound 'neovm--ll-windows)
     (fmakunbound 'neovm--ll-moving-avg)
     (fmakunbound 'neovm--ll-max-window)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -466,5 +466,5 @@ fn oracle_prop_linkedlist_frequency_histogram() {
     (fmakunbound 'neovm--ll-histogram)
     (fmakunbound 'neovm--ll-top-k)
     (fmakunbound 'neovm--ll-mode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

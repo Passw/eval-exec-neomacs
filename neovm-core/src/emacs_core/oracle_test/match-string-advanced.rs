@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // match-string with numbered groups after string-match
@@ -35,7 +35,7 @@ fn oracle_prop_match_string_numbered_groups() {
       (match-end 2)
       (match-beginning 3)
       (match-end 3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ fn oracle_prop_match_string_string_match_vs_buffer_search() {
           (funcall 'neovm--test-extract-via-buffer-search re text)))
     (fmakunbound 'neovm--test-extract-via-string-match)
     (fmakunbound 'neovm--test-extract-via-buffer-search)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ fn oracle_prop_match_string_consecutive_matches() {
                  "\\([0-2][0-9]\\):\\([0-5][0-9]\\)"
                  "Wake 06:30, lunch 12:00, sleep 23:45"))
     (fmakunbound 'neovm--test-find-all-matches)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ fn oracle_prop_match_string_optional_groups() {
                                 (match-string 2 "hello"))
                           results)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +186,7 @@ fn oracle_prop_match_string_parse_dates() {
         (funcall 'neovm--test-parse-date "12/25/2025")
         (funcall 'neovm--test-parse-date "not-a-date"))
     (fmakunbound 'neovm--test-parse-date)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -234,7 +234,7 @@ fn oracle_prop_match_string_parse_config_lines() {
                "[database]\nhost = \"localhost\"\nport = 5432\n# timeout in seconds\ntimeout = 30\n\n[logging]\nlevel = \"debug\"\nfile = \"/var/log/app.log\"")
     (fmakunbound 'neovm--test-parse-config-line)
     (fmakunbound 'neovm--test-parse-config)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ fn oracle_prop_match_string_url_parser() {
         (funcall 'neovm--test-parse-url "https://simple.host")
         (funcall 'neovm--test-parse-url "not-a-url"))
     (fmakunbound 'neovm--test-parse-url)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -315,5 +315,5 @@ fn oracle_prop_match_string_nested_groups() {
                     (match-string 4 s))
                   results)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

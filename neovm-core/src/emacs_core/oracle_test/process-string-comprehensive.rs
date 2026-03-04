@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // string-match + match-string + replace-match pipeline
@@ -41,7 +41,7 @@ fn oracle_prop_process_string_match_replace_pipeline() {
         (= rev-num 42)
         (string= year "2025")))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ fn oracle_prop_process_string_nested_group_extraction() {
         (string= reversed-args "arg3, arg2, arg1")
         (string= args-str "arg1, arg2, arg3")))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ fn oracle_prop_process_string_split_mapconcat_transform() {
         formatted
         (string= roles-upper "ENGINEER, DESIGNER, MANAGER")))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ fn oracle_prop_process_string_concat_substring_number_chain() {
         (string= last-octet-str "100")
         padded))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +258,7 @@ fn oracle_prop_process_string_case_conversion_pipeline() {
         (string= initials-up "Hello World")
         normalized))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -375,7 +375,7 @@ fn oracle_prop_process_string_tokenizer_loop() {
           (equal (mapcar #'car result)
                  '(ident op number op ident op number op string)))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -428,5 +428,5 @@ fn oracle_prop_process_string_multibyte_operations() {
         (= ch-back 72)
         cjk-multi))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

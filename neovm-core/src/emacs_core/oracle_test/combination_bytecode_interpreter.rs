@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Core bytecode VM infrastructure
@@ -196,7 +196,7 @@ fn oracle_prop_bci_basic_arithmetic() {
         VM_PREAMBLE = VM_PREAMBLE,
         VM_CLEANUP = VM_CLEANUP
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ fn oracle_prop_bci_dup_swap() {
         VM_PREAMBLE = VM_PREAMBLE,
         VM_CLEANUP = VM_CLEANUP
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -298,7 +298,7 @@ fn oracle_prop_bci_branching() {
         VM_PREAMBLE = VM_PREAMBLE,
         VM_CLEANUP = VM_CLEANUP
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,7 +351,7 @@ fn oracle_prop_bci_factorial() {
         VM_PREAMBLE = VM_PREAMBLE,
         VM_CLEANUP = VM_CLEANUP
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -437,7 +437,7 @@ fn oracle_prop_bci_fibonacci() {
         VM_PREAMBLE = VM_PREAMBLE,
         VM_CLEANUP = VM_CLEANUP
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -493,7 +493,7 @@ fn oracle_prop_bci_call_ret() {
         VM_PREAMBLE = VM_PREAMBLE,
         VM_CLEANUP = VM_CLEANUP
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -557,5 +557,5 @@ fn oracle_prop_bci_expression_compiler() {
         VM_PREAMBLE = VM_PREAMBLE,
         VM_CLEANUP = VM_CLEANUP
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }

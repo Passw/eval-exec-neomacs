@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // let with many bindings (10+)
@@ -30,7 +30,7 @@ fn oracle_prop_let_many_bindings() {
        ;; Use all in a single expression
        (+ (* a b) (* c d) (* e f) (* g h)
           (* i j) (* k l) (* m n) o)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ fn oracle_prop_let_parallel_binding_complex() {
         (let ((sum (+ new-a new-b new-c))  ;; 12
               (orig-sum (+ a b c)))         ;; still 6 from outer
           (list new-a new-b new-c sum orig-sum))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ fn oracle_prop_let_nil_bindings() {
       (list a b c d e
             (null a) (null b) (null c) (null e)
             (not (null d))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn oracle_prop_let_nil_binding_then_setq() {
         (setq count (1+ count))
         (setq result (cons (* i i) result)))
       (list (nreverse result) count))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ fn oracle_prop_let_shadowing_deep() {
       ;; After middle let, x is back to 'outer
       (setq log (cons (list 'back-to-0 x) log))
       (nreverse log))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ fn oracle_prop_let_closure_scope_capture() {
                   (cons (lambda () val) makers)))))
       ;; Call all closures and collect results
       (mapcar #'funcall (nreverse makers)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -160,7 +160,7 @@ fn oracle_prop_let_adder_factory() {
          (mapcar (lambda (f) (funcall f 0)) fns)
          (mapcar (lambda (f) (funcall f 42)) fns)
          (mapcar (lambda (f) (funcall f -10)) fns))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ fn oracle_prop_let_complex_init_expressions() {
          (/ sum count)
          (- max-val min-val)
          (apply #'+ squares))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -253,5 +253,5 @@ fn oracle_prop_let_state_encapsulation() {
            (funcall send c2 'get)
            (funcall send c1 'history)
            (funcall send c2 'history)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Basic parsers: literal string, character class, any-char
@@ -86,7 +86,7 @@ fn oracle_prop_parser_comb_basic_parsers() {
     (fmakunbound 'neovm--pc-char-class)
     (fmakunbound 'neovm--pc-any-char)
     (fmakunbound 'neovm--pc-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +200,7 @@ fn oracle_prop_parser_comb_combinators() {
     (fmakunbound 'neovm--pc2-many)
     (fmakunbound 'neovm--pc2-optional)
     (fmakunbound 'neovm--pc2-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ fn oracle_prop_parser_comb_map() {
     (fmakunbound 'neovm--pc3-and-then)
     (fmakunbound 'neovm--pc3-or-else)
     (fmakunbound 'neovm--pc3-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -455,7 +455,7 @@ fn oracle_prop_parser_comb_recursive() {
     (fmakunbound 'neovm--pc4-lazy)
     (fmakunbound 'neovm--pc4-build-paren-parser)
     (makunbound 'neovm--pc4-paren-parser)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -591,7 +591,7 @@ fn oracle_prop_parser_comb_arithmetic() {
     (fmakunbound 'neovm--pc5-term)
     (fmakunbound 'neovm--pc5-eval)
     (makunbound 'neovm--pc5-expr-fn)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -710,7 +710,7 @@ fn oracle_prop_parser_comb_sexp() {
     (fmakunbound 'neovm--pc6-list)
     (fmakunbound 'neovm--pc6-parse)
     (makunbound 'neovm--pc6-sexp-fn)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -823,5 +823,5 @@ fn oracle_prop_parser_comb_csv() {
     (fmakunbound 'neovm--pc7-field)
     (fmakunbound 'neovm--pc7-row)
     (fmakunbound 'neovm--pc7-csv)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

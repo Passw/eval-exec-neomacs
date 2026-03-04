@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Multi-clause cond with various return forms
@@ -26,7 +26,7 @@ fn oracle_prop_cond_multi_clause() {
                             (t 'huge)))))
                     (mapcar classify
                             '(-5 0 3 42 500 9999 "hello" nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ fn oracle_prop_cond_multi_body() {
                       (setq log (cons 'large log))
                       'large))
                     (list (nreverse log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ fn oracle_prop_cond_pattern_dispatch() {
                                   '(+ 1 2 3)
                                   '(lambda (a b) body)
                                   '(foo bar baz))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ fn oracle_prop_cond_clause_returns_test() {
                     (cond ('hello))      ;; returns hello
                     (cond (nil) (nil) ('found-it)))  ;; third
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ fn oracle_prop_cond_nested_dispatch() {
                      (funcall format-value 'string "hello")
                      (funcall format-value 'string "a very long string indeed")
                      (funcall format-value 'float 3.14)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -200,5 +200,5 @@ fn oracle_prop_cond_type_system() {
                        (funcall type-check '(if flag 1 2) env)
                        (funcall type-check '(if flag "a" "b") env)
                        (funcall type-check '(if x 1 2) env))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

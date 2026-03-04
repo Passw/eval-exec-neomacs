@@ -6,7 +6,7 @@
 //! unwind-protect, interaction with condition-case, signal vs throw
 //! differences, and tag identity (eq vs equal).
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 // ---------------------------------------------------------------------------
@@ -48,7 +48,7 @@ fn oracle_prop_catch_comprehensive_same_tag_nesting() {
         'inner-no-throw)
       (throw 'tag 'hit-outer))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@ fn oracle_prop_catch_comprehensive_different_tag_nesting() {
         (catch 'level-3
           (throw 'level-0 'escaped-all))))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +135,7 @@ fn oracle_prop_catch_comprehensive_throw_across_functions() {
     (fmakunbound 'neovm--test-ctc-indirect)
     (fmakunbound 'neovm--test-ctc-deep)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ fn oracle_prop_catch_comprehensive_throw_value_types() {
   ;; character
   (catch 'tag (throw 'tag ?A)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +214,7 @@ fn oracle_prop_catch_comprehensive_no_throw() {
   ;; Empty catch body
   (catch 'tag))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -259,7 +259,7 @@ fn oracle_prop_catch_comprehensive_unwind_protect() {
     ;; Complete log
     (nreverse log)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -311,7 +311,7 @@ fn oracle_prop_catch_comprehensive_condition_case_interaction() {
           (signal 'void-variable '(undefined-var))
         (void-variable 'signal-caught)))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -383,7 +383,7 @@ fn oracle_prop_catch_comprehensive_dynamic_extent() {
           (neovm--test-ctc-dyn-call-in-catch (lambda () 4))))
     (fmakunbound 'neovm--test-ctc-dyn-call-in-catch)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -438,7 +438,7 @@ fn oracle_prop_catch_comprehensive_early_return_complex() {
     (fmakunbound 'neovm--test-ctc-accum-until)
     (fmakunbound 'neovm--test-ctc-nested-search)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -478,7 +478,7 @@ fn oracle_prop_catch_comprehensive_complex_throw_values() {
                 (* n (funcall factorial (1- n))))))
       (throw 'tag (funcall factorial 6)))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -523,5 +523,5 @@ fn oracle_prop_catch_comprehensive_signal_vs_throw() {
       (throw 'no-such-catch-tag 'value)
     (no-catch (list 'no-catch-error (car (cdr err))))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

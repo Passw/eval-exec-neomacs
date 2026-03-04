@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Round-robin scheduling with configurable time quantum
@@ -94,7 +94,7 @@ fn oracle_prop_sched_adv_round_robin() {
                         (setq total (+ total turnaround))))
                     total)))))
     (fmakunbound 'neovm--test-round-robin)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +189,7 @@ fn oracle_prop_sched_adv_priority_with_aging() {
                       (setq total-wait (+ total-wait wait))))
                   total-wait))))
     (fmakunbound 'neovm--test-priority-aging)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -259,7 +259,7 @@ fn oracle_prop_sched_adv_shortest_job_first() {
                 ;; Average waiting time * length (sum)
                 (apply #'+ (mapcar #'cadr (nth 2 result))))))
     (fmakunbound 'neovm--test-sjf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -345,7 +345,7 @@ fn oracle_prop_sched_adv_srtf() {
                 (apply #'+ (mapcar #'cadr (nth 2 result))))))
     (fmakunbound 'neovm--test-srtf)
     (fmakunbound 'nth-1-plus-2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -436,7 +436,7 @@ fn oracle_prop_sched_adv_multi_level_feedback_queue() {
                 (nth 1 result)
                 (length (nth 0 result)))))
     (fmakunbound 'neovm--test-mlfq)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -516,7 +516,7 @@ fn oracle_prop_sched_adv_edf_preemptive() {
                 ;; Number of context switches
                 (1- (length (nth 0 result))))))
     (fmakunbound 'neovm--test-edf-preemptive)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -603,5 +603,5 @@ fn oracle_prop_sched_adv_gantt_and_metrics() {
     (fmakunbound 'neovm--test-fcfs)
     (fmakunbound 'neovm--test-metrics)
     (fmakunbound 'neovm--test-format-gantt)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

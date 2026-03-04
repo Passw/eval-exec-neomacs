@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Basic provide/featurep/features interaction
@@ -37,7 +37,7 @@ fn oracle_prop_provide_require_basic_feature_lifecycle() {
          (provide 'neovm--test-feat-beta)))
     (setq features (delq 'neovm--test-feat-alpha features))
     (setq features (delq 'neovm--test-feat-beta features))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ fn oracle_prop_provide_require_already_provided() {
          ;; require returns the feature symbol
          (eq (require 'neovm--test-feat-gamma) 'neovm--test-feat-gamma)))
     (setq features (delq 'neovm--test-feat-gamma features))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ fn oracle_prop_provide_require_multiple_features_ordering() {
     (setq features (delq 'neovm--test-feat-one features))
     (setq features (delq 'neovm--test-feat-two features))
     (setq features (delq 'neovm--test-feat-three features))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ fn oracle_prop_provide_require_dependency_chain() {
     (setq features (delq 'neovm--test-dep-b features))
     (setq features (delq 'neovm--test-dep-c features))
     (makunbound 'neovm--test-dep-load-order)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +287,7 @@ fn oracle_prop_provide_require_conditional_patterns() {
           ((featurep 'neovm--test-cond-present) 'path-b)
           (t 'path-default))))
     (setq features (delq 'neovm--test-cond-present features))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -358,5 +358,5 @@ fn oracle_prop_provide_require_features_list_manipulation() {
                ;; Require after re-provide works
                (eq (require 'neovm--test-removable) 'neovm--test-removable))))))
     (setq features (delq 'neovm--test-removable features))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

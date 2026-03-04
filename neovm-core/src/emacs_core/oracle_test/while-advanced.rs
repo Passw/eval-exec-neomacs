@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // while with multiple state variables
@@ -21,7 +21,7 @@ fn oracle_prop_while_fibonacci_generator() {
                     (let ((next (+ a b)))
                       (setq a b b next)))
                   (nreverse result))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -37,7 +37,7 @@ fn oracle_prop_while_collatz_sequence() {
                       (setq n (+ (* 3 n) 1))))
                   (setq steps (cons 1 steps))
                   (list (length steps) (apply #'max (nreverse steps))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -64,7 +64,7 @@ fn oracle_prop_while_running_statistics() {
                     (setq remaining (cdr remaining)))
                   (list n sum min-val max-val
                         (/ (float sum) n)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +84,7 @@ fn oracle_prop_while_nested_multiplication_table() {
                       (setq result (cons (nreverse row) result)))
                     (setq i (1+ i)))
                   (nreverse result))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -106,7 +106,7 @@ fn oracle_prop_while_nested_find_pairs() {
                           (setq inner (cdr inner))))
                       (setq outer (cdr outer))))
                   (nreverse pairs))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -168,5 +168,5 @@ fn oracle_prop_while_buffer_tokenizer() {
                                            (match-string 2)))
                                     tokens)))
                       (nreverse tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

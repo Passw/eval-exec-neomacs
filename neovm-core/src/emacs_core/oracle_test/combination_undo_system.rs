@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic undo/redo with command pattern: execute, undo, redo
@@ -166,7 +166,7 @@ fn oracle_prop_undo_system_basic_execute_undo_redo() {
     (makunbound 'neovm--undo-doc)
     (makunbound 'neovm--undo-stack)
     (makunbound 'neovm--redo-stack)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,7 +290,7 @@ fn oracle_prop_undo_system_compound_commands() {
     (makunbound 'neovm--undo2-state)
     (makunbound 'neovm--undo2-stack)
     (makunbound 'neovm--undo2-redo)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -385,7 +385,7 @@ fn oracle_prop_undo_system_history_traversal() {
     (fmakunbound 'neovm--hist-can-redo)
     (makunbound 'neovm--hist-states)
     (makunbound 'neovm--hist-cursor)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -585,7 +585,7 @@ fn oracle_prop_undo_system_selective_undo() {
     (makunbound 'neovm--sel-items)
     (makunbound 'neovm--sel-log)
     (makunbound 'neovm--sel-counter)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -701,7 +701,7 @@ fn oracle_prop_undo_system_calculator() {
     (makunbound 'neovm--calc-stack)
     (makunbound 'neovm--calc-undo)
     (makunbound 'neovm--calc-redo)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -824,5 +824,5 @@ fn oracle_prop_undo_system_branching_tree() {
     (fmakunbound 'neovm--utree-count-nodes)
     (makunbound 'neovm--utree-root)
     (makunbound 'neovm--utree-current)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // START-POS: systematic exploration of offset behavior
@@ -38,7 +38,7 @@ fn oracle_prop_string_search_adv_start_pos_systematic() {
     (string-search "b" haystack 4)
     (string-search "b" haystack 5)
     (string-search "b" haystack 8)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ fn oracle_prop_string_search_adv_case_sensitivity() {
   ;; Both bindings should return nil for string-search
   (let ((case-fold-search t))
     (string-search "HELLO" "HELLO WORLD")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ fn oracle_prop_string_search_adv_empty_strings() {
   (string-search "" "x" 1)
   (string-search "x" "x" 0)
   (string-search "x" "x" 1))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ fn oracle_prop_string_search_adv_find_all_occurrences() {
     (funcall find-all "," "one,two,,four,five")
     ;; Longer needle with multiple matches
     (funcall find-all "the" "the cat on the mat ate the rat")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +191,7 @@ fn oracle_prop_string_search_adv_with_substring_extraction() {
            (host (substring host-port 0 colon-pos))
            (port (substring host-port (1+ colon-pos))))
       (list scheme host port path))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +235,7 @@ fn oracle_prop_string_search_adv_vs_string_match() {
                     (string-match (regexp-quote word) text))
               results)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -282,5 +282,5 @@ fn oracle_prop_string_search_adv_boundary_conditions() {
       (setq results (cons pos results))
       (setq pos (+ pos 2)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

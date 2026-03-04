@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-vector with various inits, vector constructor, vconcat
@@ -43,7 +43,7 @@ fn oracle_prop_vector_creation_comprehensive() {
   (length (make-vector 100 0))
   (length (vector 'a 'b 'c 'd 'e))
   (length (vconcat [1 2] '(3 4 5))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ fn oracle_prop_vector_aref_aset_boundaries() {
   (condition-case err
       (aset [1 2 3] 3 'x)
     (args-out-of-range (list 'caught (car err)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ fn oracle_prop_nested_vectors_deep_access() {
               (dotimes (k (length inner))
                 (setq result (cons (aref inner k) result)))))))
       (nreverse result))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +195,7 @@ fn oracle_prop_fillarray_vector_comprehensive() {
     (list (eq (aref v 0) (aref v 1))
           (eq (aref v 1) (aref v 2))
           (eq (aref v 0) shared-list))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ fn oracle_prop_vector_equal_comparison() {
   ;; Deep nesting equality
   (equal [[[1]]] [[[1]]])
   (equal [[[1]]] [[[2]]]))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -360,7 +360,7 @@ fn oracle_prop_vector_data_structures() {
     (fmakunbound 'neovm--test-make-table)
     (fmakunbound 'neovm--test-table-find)
     (fmakunbound 'neovm--test-table-filter)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -397,5 +397,5 @@ fn oracle_prop_vector_sort_comprehensive() {
     (list (= (seq-reduce #'+ orig 0)
              (seq-reduce #'+ sorted 0))
           (= (length orig) (length sorted)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

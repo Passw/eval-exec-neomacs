@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // apply with various argument patterns
@@ -14,13 +14,13 @@ use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 fn oracle_prop_apply_builtin_functions() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(apply #'+ '(1 2 3 4 5))");
-    assert_oracle_parity("(apply #'* '(1 2 3 4 5))");
-    assert_oracle_parity("(apply #'max '(3 1 4 1 5 9))");
-    assert_oracle_parity("(apply #'min '(3 1 4 1 5 9))");
-    assert_oracle_parity("(apply #'concat '(\"a\" \"b\" \"c\"))");
-    assert_oracle_parity("(apply #'list '(1 2 3))");
-    assert_oracle_parity("(apply #'vector '(1 2 3))");
+    assert_oracle_parity_with_bootstrap("(apply #'+ '(1 2 3 4 5))");
+    assert_oracle_parity_with_bootstrap("(apply #'* '(1 2 3 4 5))");
+    assert_oracle_parity_with_bootstrap("(apply #'max '(3 1 4 1 5 9))");
+    assert_oracle_parity_with_bootstrap("(apply #'min '(3 1 4 1 5 9))");
+    assert_oracle_parity_with_bootstrap("(apply #'concat '(\"a\" \"b\" \"c\"))");
+    assert_oracle_parity_with_bootstrap("(apply #'list '(1 2 3))");
+    assert_oracle_parity_with_bootstrap("(apply #'vector '(1 2 3))");
 }
 
 #[test]
@@ -28,17 +28,17 @@ fn oracle_prop_apply_with_leading_args() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // apply with individual args before the list
-    assert_oracle_parity("(apply #'+ 1 2 '(3 4 5))");
-    assert_oracle_parity("(apply #'list 'a 'b '(c d e))");
-    assert_oracle_parity("(apply #'concat \"x\" '(\"y\" \"z\"))");
+    assert_oracle_parity_with_bootstrap("(apply #'+ 1 2 '(3 4 5))");
+    assert_oracle_parity_with_bootstrap("(apply #'list 'a 'b '(c d e))");
+    assert_oracle_parity_with_bootstrap("(apply #'concat \"x\" '(\"y\" \"z\"))");
 }
 
 #[test]
 fn oracle_prop_apply_with_lambda() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(apply (lambda (a b c) (+ (* a b) c)) '(3 4 5))");
-    assert_oracle_parity("(apply (lambda (a &rest r) (cons a r)) 1 '(2 3 4))");
+    assert_oracle_parity_with_bootstrap("(apply (lambda (a b c) (+ (* a b) c)) '(3 4 5))");
+    assert_oracle_parity_with_bootstrap("(apply (lambda (a &rest r) (cons a r)) 1 '(2 3 4))");
 }
 
 #[test]
@@ -48,17 +48,17 @@ fn oracle_prop_apply_with_optional_args() {
     let form = "(apply (lambda (a &optional b c)
                          (list a (or b 'default-b) (or c 'default-c)))
                        '(1))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     let form = "(apply (lambda (a &optional b c)
                          (list a (or b 'default-b) (or c 'default-c)))
                        '(1 2))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     let form = "(apply (lambda (a &optional b c)
                          (list a (or b 'default-b) (or c 'default-c)))
                        '(1 2 3))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -66,21 +66,21 @@ fn oracle_prop_apply_with_rest_args() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(apply (lambda (&rest args) (length args)) '(a b c d))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     let form = "(apply (lambda (x &rest args)
                          (cons x (length args)))
                        1 2 '(3 4 5))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
 fn oracle_prop_apply_empty_list() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(apply #'+ '())");
-    assert_oracle_parity("(apply #'* '())");
-    assert_oracle_parity("(apply #'list '())");
+    assert_oracle_parity_with_bootstrap("(apply #'+ '())");
+    assert_oracle_parity_with_bootstrap("(apply #'* '())");
+    assert_oracle_parity_with_bootstrap("(apply #'list '())");
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ fn oracle_prop_apply_variadic_compose() {
                                         (lambda (x) (* x x))))))
                     (list (funcall transform 3)
                           (funcall transform 5))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -128,7 +128,7 @@ fn oracle_prop_apply_dispatch_table() {
                     (list (funcall dispatch '+ '(1 2 3))
                           (funcall dispatch '* '(2 3 4))
                           (funcall dispatch 'max '(5 2 8 1)))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -138,5 +138,5 @@ fn oracle_prop_apply_spread_args() {
     // Use apply to spread a list as args to format
     let form = r#"(let ((args-list '("hello %s, you are %d" "world" 42)))
                     (apply #'format args-list))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

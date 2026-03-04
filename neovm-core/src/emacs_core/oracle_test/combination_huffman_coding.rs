@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Build frequency table from text
@@ -74,7 +74,7 @@ fn oracle_prop_huffman_priority_queue() {
                             (setq result (cons (car popped) result)
                                   q (cdr popped))))
                         (nreverse result))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ fn oracle_prop_huffman_tree_and_codes() {
                                     ;; 'd' appears 1 time, should have longer code
                                     (length d-code)
                                     (<= (length a-code) (length d-code)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -338,7 +338,7 @@ fn oracle_prop_huffman_compression_ratio() {
                      (funcall compute-ratio "abcdefghij")
                      ;; Single char
                      (funcall compute-ratio "xxxxx")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

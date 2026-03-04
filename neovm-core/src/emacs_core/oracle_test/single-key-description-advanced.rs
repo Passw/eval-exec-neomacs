@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Printable characters: letters, digits, punctuation, space
@@ -39,7 +39,7 @@ fn oracle_prop_skd_printable_characters() {
   (single-key-description ?{)
   (single-key-description ?}))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ fn oracle_prop_skd_control_characters() {
   ;; C-@ is NUL
   (single-key-description ?\C-@))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +104,7 @@ fn oracle_prop_skd_meta_combinations() {
   (single-key-description (event-convert-list '(super meta ?f)))
   (single-key-description (event-convert-list '(hyper meta ?h))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ fn oracle_prop_skd_no_angles_parameter() {
   (single-key-description ?\C-x t)
   (single-key-description ?\M-a t))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ fn oracle_prop_skd_super_hyper_modifiers() {
     (equal (single-key-description k1)
            (single-key-description k2))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -332,5 +332,5 @@ fn oracle_prop_skd_batch_categorize_keys() {
     (fmakunbound 'neovm--skd-categorize-key)
     (fmakunbound 'neovm--skd-batch-describe)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

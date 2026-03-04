@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Persistent stack with full API and structural sharing proofs
@@ -109,7 +109,7 @@ fn oracle_prop_persistent_data_advanced_stack() {
     (fmakunbound 'neovm--pda-stk-concat)
     (fmakunbound 'neovm--pda-stk-map)
     (fmakunbound 'neovm--pda-stk-filter)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +262,7 @@ fn oracle_prop_persistent_data_advanced_functional_map() {
     (fmakunbound 'neovm--pda-bst-insert)
     (fmakunbound 'neovm--pda-bst-lookup)
     (fmakunbound 'neovm--pda-bst-keys)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ fn oracle_prop_persistent_data_advanced_sharing_verification() {
        ;; Lengths verify no mutation
        (length base) (length v1) (length v3)
        (length m3) (length m3a) (length m3b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -439,7 +439,7 @@ fn oracle_prop_persistent_data_advanced_trie_vector() {
     (fmakunbound 'neovm--pda-tv-set)
     (fmakunbound 'neovm--pda-tv-to-list)
     (makunbound 'neovm--pda-tv-chunk)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -549,7 +549,7 @@ fn oracle_prop_persistent_data_advanced_version_history() {
     (fmakunbound 'neovm--pda-vh-parents)
     (fmakunbound 'neovm--pda-vh-ancestors)
     (fmakunbound 'neovm--pda-vh-common-ancestor)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -652,7 +652,7 @@ fn oracle_prop_persistent_data_advanced_transactions() {
     (fmakunbound 'neovm--pda-tx-commit)
     (fmakunbound 'neovm--pda-tx-rollback)
     (fmakunbound 'neovm--pda-tx-commit-if)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -760,5 +760,5 @@ fn oracle_prop_persistent_data_advanced_deque() {
     (fmakunbound 'neovm--pda-dq-pop-back)
     (fmakunbound 'neovm--pda-dq-to-list)
     (fmakunbound 'neovm--pda-dq-size)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

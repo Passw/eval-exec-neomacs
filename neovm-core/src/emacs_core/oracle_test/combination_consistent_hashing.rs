@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Helper: hash ring infrastructure used by all tests
@@ -166,7 +166,7 @@ fn oracle_prop_consistent_hash_basics() {
         prelude = hash_ring_prelude(),
         cleanup = hash_ring_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ fn oracle_prop_consistent_hash_node_addition() {
         prelude = hash_ring_prelude(),
         cleanup = hash_ring_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_consistent_hash_node_removal() {
         prelude = hash_ring_prelude(),
         cleanup = hash_ring_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ fn oracle_prop_consistent_hash_load_distribution() {
         prelude = hash_ring_prelude(),
         cleanup = hash_ring_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -369,7 +369,7 @@ fn oracle_prop_consistent_hash_vnode_impact() {
         prelude = hash_ring_prelude(),
         cleanup = hash_ring_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -423,5 +423,5 @@ fn oracle_prop_consistent_hash_full_lifecycle() {
         prelude = hash_ring_prelude(),
         cleanup = hash_ring_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }

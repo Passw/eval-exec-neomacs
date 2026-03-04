@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Lexer: source string -> token stream
@@ -85,7 +85,7 @@ fn oracle_prop_compiler_lexer() {
        (funcall 'neovm--test-lex "let result = foo(1, 2) + bar(3);")
        (funcall 'neovm--test-lex "a == b != c <= d"))
     (fmakunbound 'neovm--test-lex)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +189,7 @@ fn oracle_prop_compiler_ast_builder() {
     (fmakunbound 'neovm--test-ast-expr)
     (fmakunbound 'neovm--test-ast-parse)
     (makunbound 'neovm--test-ast-toks)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ fn oracle_prop_compiler_constant_folding() {
                 '(binop "*" (binop "+" (ref "x") (lit 0))
                         (binop "*" (lit 1) (ref "y")))))
     (fmakunbound 'neovm--test-cf-fold)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -390,7 +390,7 @@ fn oracle_prop_compiler_scope_analysis() {
                 '("a")))
     (fmakunbound 'neovm--test-sa-refs)
     (fmakunbound 'neovm--test-sa-analyze)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -482,7 +482,7 @@ fn oracle_prop_compiler_codegen_stack_machine() {
                 test-cases))
     (fmakunbound 'neovm--test-cg-emit)
     (fmakunbound 'neovm--test-cg-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -698,5 +698,5 @@ fn oracle_prop_compiler_end_to_end() {
     (fmakunbound 'neovm--test-e2e-vm-run)
     (fmakunbound 'neovm--test-e2e-compile-run)
     (makunbound 'neovm--test-e2e-toks)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

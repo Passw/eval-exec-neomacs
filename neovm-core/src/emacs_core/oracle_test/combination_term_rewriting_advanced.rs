@@ -5,7 +5,7 @@
 //! ground term generation, and rewrite rule composition.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // String rewriting systems (word rewriting with string rules)
@@ -66,7 +66,7 @@ fn oracle_prop_term_rewriting_string_rewrite_system() {
          (funcall 'neovm--srs-normalize rules "aaa" 10)))
     (fmakunbound 'neovm--srs-step)
     (fmakunbound 'neovm--srs-normalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -134,7 +134,7 @@ fn oracle_prop_term_rewriting_ground_term_generation() {
                '((zero . 0) (s . 1) (plus . 2))
                2)
     (fmakunbound 'neovm--gt-generate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -239,7 +239,7 @@ fn oracle_prop_term_rewriting_rule_composition() {
     (fmakunbound 'neovm--rc-step)
     (fmakunbound 'neovm--rc-normalize)
     (fmakunbound 'neovm--rc-compose)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -336,7 +336,7 @@ fn oracle_prop_term_rewriting_critical_pairs() {
     (fmakunbound 'neovm--cp-subst)
     (fmakunbound 'neovm--cp-rename)
     (fmakunbound 'neovm--cp-compute)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -441,7 +441,7 @@ fn oracle_prop_term_rewriting_confluence_check() {
     (fmakunbound 'neovm--cc-step)
     (fmakunbound 'neovm--cc-normalize)
     (fmakunbound 'neovm--cc-check-joinable)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -549,7 +549,7 @@ fn oracle_prop_term_rewriting_knuth_bendix_basic() {
     (fmakunbound 'neovm--kb-orient)
     (fmakunbound 'neovm--kb-step)
     (fmakunbound 'neovm--kb-normalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -672,7 +672,7 @@ fn oracle_prop_term_rewriting_multi_sorted() {
     (fmakunbound 'neovm--ms-sort)
     (fmakunbound 'neovm--ms-step)
     (fmakunbound 'neovm--ms-normalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -760,7 +760,7 @@ fn oracle_prop_term_rewriting_lambda_calculus() {
     (fmakunbound 'neovm--lc-subst)
     (fmakunbound 'neovm--lc-beta-step)
     (fmakunbound 'neovm--lc-normalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -868,7 +868,7 @@ fn oracle_prop_term_rewriting_strategies() {
     (fmakunbound 'neovm--st-outer-step)
     (fmakunbound 'neovm--st-inner-step)
     (fmakunbound 'neovm--st-normalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -941,5 +941,5 @@ fn oracle_prop_term_rewriting_ac_normalization() {
     (fmakunbound 'neovm--ac-flatten)
     (fmakunbound 'neovm--ac-sort-args)
     (fmakunbound 'neovm--ac-normalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -5,7 +5,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 use proptest::prelude::*;
 
 use super::common::{
-    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm,
+    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
 };
 
 #[test]
@@ -44,8 +44,8 @@ fn oracle_prop_boundp_nil() {
 fn oracle_prop_symbolp_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(symbolp "x")"#);
-    assert_oracle_parity("(symbolp 'x)");
+    assert_oracle_parity_with_bootstrap(r#"(symbolp "x")"#);
+    assert_oracle_parity_with_bootstrap("(symbolp 'x)");
 }
 
 #[test]

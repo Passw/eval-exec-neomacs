@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // signal with custom error symbols (define via put)
@@ -42,7 +42,7 @@ fn oracle_prop_signal_adv_custom_error_symbol() {
              (error-message-string err)))))
       (put 'neovm-test-custom-err 'error-conditions nil)
       (put 'neovm-test-custom-err 'error-message nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ fn oracle_prop_signal_adv_complex_data_payloads() {
          (let ((v (cadr err)))
            (list (aref v 0) (aref v 1) (aref v 2)
                  (caddr err))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,7 +162,7 @@ fn oracle_prop_signal_adv_builtin_hierarchy_catch() {
         (arith-error 'wrong-match)
         (wrong-type-argument 'correct-match)
         (error 'fallback)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +197,7 @@ fn oracle_prop_signal_adv_error_function() {
             (error
              (error "outer wraps: %s" (cadr inner))))
         (error (cadr outer))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +235,7 @@ fn oracle_prop_signal_adv_user_error_vs_error() {
       (condition-case err
           (user-error "Invalid input: %S (expected %s)" '(a b) "number")
         (user-error (cadr err))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -303,7 +303,7 @@ fn oracle_prop_signal_adv_classification_recovery() {
       (put 'neovm-test-retryable 'error-conditions nil)
       (put 'neovm-test-defaultable 'error-conditions nil)
       (put 'neovm-test-fatal 'error-conditions nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,5 +351,5 @@ fn oracle_prop_signal_adv_error_wrapping_chaining() {
           (caddr final-err)
           ;; Error symbol is still 'error
           (car final-err)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

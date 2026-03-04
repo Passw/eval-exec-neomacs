@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Data processing pipeline with stages (extract, transform, load)
@@ -111,7 +111,7 @@ fn oracle_prop_workflow_etl_pipeline() {
     (fmakunbound 'neovm--test-etl-extract)
     (fmakunbound 'neovm--test-etl-transform)
     (fmakunbound 'neovm--test-etl-load)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +186,7 @@ fn oracle_prop_workflow_validation_short_circuit() {
           (funcall 'neovm--test-run-pipeline validators "OK")))
     (fmakunbound 'neovm--test-make-validator)
     (fmakunbound 'neovm--test-run-pipeline)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -289,7 +289,7 @@ fn oracle_prop_workflow_map_reduce() {
     (fmakunbound 'neovm--test-reduce-phase)
     (fmakunbound 'neovm--test-word-freq-mapper)
     (fmakunbound 'neovm--test-word-freq-reducer)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -358,7 +358,7 @@ fn oracle_prop_workflow_error_recovery_pipeline() {
              (input '("25" "0" "abc" "16" "-3" "100" "49" "" "9")))
         (funcall 'neovm--test-resilient-pipeline stages input))
     (fmakunbound 'neovm--test-resilient-pipeline)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -471,7 +471,7 @@ fn oracle_prop_workflow_conditional_branching() {
     (fmakunbound 'neovm--test-add-end)
     (fmakunbound 'neovm--test-run-workflow)
     (makunbound 'neovm--test-workflow)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -560,5 +560,5 @@ fn oracle_prop_workflow_audit_trail() {
     (fmakunbound 'neovm--test-audit-wrap)
     (fmakunbound 'neovm--test-run-audited-pipeline)
     (makunbound 'neovm--test-audit-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

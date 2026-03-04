@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 1. Earley parser with nullable/epsilon productions and chained nullables
@@ -152,7 +152,7 @@ fn oracle_prop_earley_advanced_nullable_chain() {
     (fmakunbound 'neovm--epa-complete)
     (fmakunbound 'neovm--epa-parse)
     (fmakunbound 'neovm--epa-ok-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +283,7 @@ fn oracle_prop_earley_advanced_left_recursive() {
     (fmakunbound 'neovm--epb-complete)
     (fmakunbound 'neovm--epb-parse)
     (fmakunbound 'neovm--epb-ok-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -428,7 +428,7 @@ fn oracle_prop_earley_advanced_parse_forest_count() {
     (fmakunbound 'neovm--epc-parse)
     (fmakunbound 'neovm--epc-count)
     (fmakunbound 'neovm--epc-count-all-complete)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -571,7 +571,7 @@ fn oracle_prop_earley_advanced_priority_grammar() {
     (fmakunbound 'neovm--epd-complete)
     (fmakunbound 'neovm--epd-parse)
     (fmakunbound 'neovm--epd-ok-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -698,7 +698,7 @@ fn oracle_prop_earley_advanced_furthest_match() {
     (fmakunbound 'neovm--epe-complete)
     (fmakunbound 'neovm--epe-parse)
     (fmakunbound 'neovm--epe-furthest)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -819,7 +819,7 @@ fn oracle_prop_earley_advanced_right_vs_left_recursive() {
     (fmakunbound 'neovm--epf-complete)
     (fmakunbound 'neovm--epf-parse)
     (fmakunbound 'neovm--epf-ok-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -947,5 +947,5 @@ fn oracle_prop_earley_advanced_indirect_left_recursion() {
     (fmakunbound 'neovm--epg-complete)
     (fmakunbound 'neovm--epg-parse)
     (fmakunbound 'neovm--epg-ok-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

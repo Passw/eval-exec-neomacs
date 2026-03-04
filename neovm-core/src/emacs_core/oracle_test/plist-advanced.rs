@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // plist-get / plist-put / plist-member with all value types
@@ -39,7 +39,7 @@ fn oracle_prop_plist_all_value_types() {
                           (plist-get pl :vec)
                           (plist-get pl :pair)
                           (plist-get pl :nested)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +74,7 @@ fn oracle_prop_plist_create_vs_update() {
                           (plist-get pl :b)
                           (plist-get pl :c)
                           (length pl)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ fn oracle_prop_plist_member_tail_semantics() {
                      ;; Can get remaining keys from tail
                      (let ((tail (plist-member pl :b)))
                        (length tail))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ fn oracle_prop_symbol_plist_full_lifecycle() {
         (setq results (cons (get 'neovm--test-sym-pl 'nonexistent) results))
         (nreverse results))
     (setplist 'neovm--test-sym-pl nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ fn oracle_prop_put_get_shorthand() {
                 ;; Missing key
                 (get 'neovm--test-pg 'missing))))
     (setplist 'neovm--test-pg nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ fn oracle_prop_plist_record_system() {
                               ;; Read fields from valid record
                               (plist-get r1 :name)
                               (plist-get r1 :tags)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -300,7 +300,7 @@ fn oracle_prop_plist_merge_and_diff() {
                        (funcall plist-intersect p1 p2)
                        ;; Keys of p1
                        (funcall plist-keys p1))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -355,5 +355,5 @@ fn oracle_prop_plist_config_inheritance() {
                        ;; Has checks
                        (funcall config-has final :host)
                        (funcall config-has final :nonexistent))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

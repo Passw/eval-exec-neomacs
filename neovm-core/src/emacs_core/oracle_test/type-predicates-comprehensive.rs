@@ -9,7 +9,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // type-of for all types
@@ -130,7 +130,7 @@ fn oracle_prop_collection_predicates_comprehensive() {
                   (listp v) (nlistp v) (atom v)))
           values))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn oracle_prop_list_predicate_edge_cases() {
   ;; nlistp on non-lists
   (nlistp 42) (nlistp "hi") (nlistp [1 2]) (nlistp 'sym))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ fn oracle_prop_function_predicates_comprehensive() {
   ;; Macros are not functionp
   (functionp (symbol-function 'when)))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +258,7 @@ fn oracle_prop_boolean_keyword_predicates_comprehensive() {
           (null 0) (not 0)
           (null '()) (not '()))))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -300,7 +300,7 @@ fn oracle_prop_special_type_predicates_comprehensive() {
   (hash-table-p '((a . 1)))
   (hash-table-p [1 2 3]))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -468,5 +468,5 @@ fn oracle_prop_type_pattern_matching() {
     (fmakunbound 'neovm--tpm-match-types)
     (fmakunbound 'neovm--tpm-dispatch)))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

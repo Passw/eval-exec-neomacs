@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Block structure and simple hash function
@@ -259,7 +259,7 @@ fn oracle_prop_combination_blockchain_transaction_pool() {
     (fmakunbound 'neovm--bc4-pick-txs)
     (fmakunbound 'neovm--bc4-total-fees)
     (makunbound 'neovm--bc4-pool)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -425,7 +425,7 @@ fn oracle_prop_combination_blockchain_fork_resolution() {
     (fmakunbound 'neovm--bc6-chain-length)
     (fmakunbound 'neovm--bc6-chain-valid-p)
     (fmakunbound 'neovm--bc6-resolve-fork)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -528,5 +528,5 @@ fn oracle_prop_combination_blockchain_full_integration() {
     (fmakunbound 'neovm--bc7-balances)
     (makunbound 'neovm--bc7-chain)
     (makunbound 'neovm--bc7-pending)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // S-expression serialization: prin1-to-string + read-from-string roundtrip
@@ -125,7 +125,7 @@ fn oracle_prop_serialization_json_like_format() {
             (test--json-serialize '(1 2 3)))))
       ;; Cleanup
       (fmakunbound 'test--json-serialize))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ fn oracle_prop_serialization_csv_format() {
       (fmakunbound 'test--csv-serialize-row)
       (fmakunbound 'test--csv-serialize-table)
       (fmakunbound 'test--csv-parse-row))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -439,7 +439,7 @@ Returns list of unpacked values."
       (fmakunbound 'test--unpack-u32-be)
       (fmakunbound 'test--pack-record)
       (fmakunbound 'test--unpack-record))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -510,5 +510,5 @@ fn oracle_prop_serialization_tagged_plist_format() {
       ;; Cleanup
       (fmakunbound 'test--tagged-serialize)
       (fmakunbound 'test--tagged-deserialize))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Macro with backquote and splicing
@@ -28,7 +28,7 @@ fn oracle_prop_defmacro_when_unless() {
                         (neovm--test-my-unless t 4 5 6))
                     (fmakunbound 'neovm--test-my-when)
                     (fmakunbound 'neovm--test-my-unless)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -64,7 +64,7 @@ fn oracle_prop_macroexpand_basic() {
                         (macroexpand '(neovm--test-double 5))
                         (eval (macroexpand '(neovm--test-double 5))))
                     (fmakunbound 'neovm--test-double)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn oracle_prop_defmacro_while_collect() {
                   (unwind-protect
                       (neovm--test-collect-while i 1 (<= i 10) (* i 2))
                     (fmakunbound 'neovm--test-collect-while)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ fn oracle_prop_defmacro_cond_like() {
                         (neovm--test-match 'x
                           (a 1) (b 2) (otherwise 99)))
                     (fmakunbound 'neovm--test-match)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +160,7 @@ fn oracle_prop_defmacro_swap() {
                         (neovm--test-swap x y)
                         (list x y))
                     (fmakunbound 'neovm--test-swap)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -185,5 +185,5 @@ fn oracle_prop_defmacro_push_pop() {
                           (list a b stack)))
                     (fmakunbound 'neovm--test-push!)
                     (fmakunbound 'neovm--test-pop!)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

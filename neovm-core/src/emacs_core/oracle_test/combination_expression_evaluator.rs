@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Tokenizer: string -> token list
@@ -82,7 +82,7 @@ fn oracle_prop_expr_eval_tokenizer() {
         (funcall 'neovm--ee-tokenize "let x = 5")
         (funcall 'neovm--ee-tokenize ""))
     (fmakunbound 'neovm--ee-tokenize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ fn oracle_prop_expr_eval_arithmetic_precedence() {
     (fmakunbound 'neovm--ee2-parse-expr)
     (fmakunbound 'neovm--ee2-eval)
     (makunbound 'neovm--ee2-tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +317,7 @@ fn oracle_prop_expr_eval_variables_and_let() {
                       (- d (+ a b))))
                  nil))
     (fmakunbound 'neovm--ee3-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -431,7 +431,7 @@ fn oracle_prop_expr_eval_comparisons_and_booleans() {
                       (if (== n 0) 0 1)))
                  nil))
     (fmakunbound 'neovm--ee4-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -561,7 +561,7 @@ fn oracle_prop_expr_eval_functions() {
                 (funcall 'neovm--ee5-eval '(call fib 7) env)
                 (funcall 'neovm--ee5-eval '(call fib 10) env))))
     (fmakunbound 'neovm--ee5-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -807,5 +807,5 @@ fn oracle_prop_expr_eval_error_handling() {
     (fmakunbound 'neovm--ee7-ok-p)
     (fmakunbound 'neovm--ee7-val)
     (fmakunbound 'neovm--ee7-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

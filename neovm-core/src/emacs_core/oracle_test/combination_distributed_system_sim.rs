@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Vector clocks for causality tracking
@@ -101,7 +101,7 @@ fn oracle_prop_combination_dist_sys_vector_clocks() {
     (fmakunbound 'neovm--test-vc-compare)
     (fmakunbound 'neovm--test-vc-send)
     (fmakunbound 'neovm--test-vc-receive)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ fn oracle_prop_combination_dist_sys_lamport_timestamps() {
                                                (plist-get e :timestamp)))
                                        sorted)))))
     (makunbound 'neovm--test-lt-events)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -345,7 +345,7 @@ fn oracle_prop_combination_dist_sys_bully_election() {
          ;; Single node alive
          (funcall 'neovm--test-bully-elect all-nodes '(3) 3)))
     (fmakunbound 'neovm--test-bully-elect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -437,7 +437,7 @@ fn oracle_prop_combination_dist_sys_consistent_hashing() {
     (fmakunbound 'neovm--test-ch-add-node)
     (fmakunbound 'neovm--test-ch-lookup)
     (fmakunbound 'neovm--test-ch-remove-node)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -513,7 +513,7 @@ fn oracle_prop_combination_dist_sys_gossip_protocol() {
                 '(("x" . 100) ("y" . 200) ("z" . 300))
                 2))
     (fmakunbound 'neovm--test-gossip-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -606,5 +606,5 @@ fn oracle_prop_combination_dist_sys_split_brain() {
                   3)))
     (fmakunbound 'neovm--test-sb-find-components)
     (fmakunbound 'neovm--test-sb-detect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

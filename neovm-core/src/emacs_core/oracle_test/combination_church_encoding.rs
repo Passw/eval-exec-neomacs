@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Church numerals: constructing 0..5, converting to integers
@@ -56,7 +56,7 @@ fn oracle_prop_church_encoding_numerals() {
    ;; Church numeral as function application count
    (funcall (funcall c3 (lambda (s) (concat s "!"))) "hi")
    (funcall (funcall c5 (lambda (n) (* n 2))) 1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ fn oracle_prop_church_encoding_arithmetic() {
    (funcall to-int (funcall mul (funcall add c2 c3) c2))
    ;; (2*3) + (4*1) = 10
    (funcall to-int (funcall add (funcall mul c2 c3) (funcall mul c4 c1)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ fn oracle_prop_church_encoding_booleans() {
            (funcall to-bool (funcall xor ctrue cfalse))
            (funcall to-bool (funcall xor cfalse ctrue))
            (funcall to-bool (funcall xor cfalse cfalse))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -227,7 +227,7 @@ fn oracle_prop_church_encoding_pairs() {
        (list (funcall ccar swapped) (funcall ccdr swapped)))
      ;; Pair equality check
      (and (= (funcall ccar p1) 10) (= (funcall ccdr p1) 20)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +297,7 @@ fn oracle_prop_church_encoding_predecessor() {
    (funcall to-int (funcall pred (funcall pred c5)))  ;; 3
    ;; pred applied 4 times to 4 = 0
    (funcall to-int (funcall pred (funcall pred (funcall pred (funcall pred c4)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -492,7 +492,7 @@ fn oracle_prop_church_encoding_comparisons() {
       (funcall to-int (funcall cmax c2 c5))
       (funcall to-int (funcall cmin c4 c1))
       (funcall to-int (funcall cmax c4 c1))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -539,5 +539,5 @@ fn oracle_prop_church_encoding_roundtrip_validation() {
               results))
       (setq k (1+ k)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

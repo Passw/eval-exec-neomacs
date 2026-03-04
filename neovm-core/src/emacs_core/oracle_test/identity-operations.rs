@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // identity with various types
@@ -90,7 +90,7 @@ fn oracle_prop_identity_higher_order_functions() {
   ;; identity in nested mapcar
   (mapcar (lambda (lst) (mapcar #'identity lst))
           '((1 2) (3 4) (5 6))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +157,7 @@ fn oracle_prop_identity_default_function_parameter() {
                  #'length))
     (fmakunbound 'neovm--test-transform-list)
     (fmakunbound 'neovm--test-reduce)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ fn oracle_prop_identity_composition_chains() {
               (setq val (funcall f val)))
             val)))
     (fmakunbound 'neovm--test-compose2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +286,7 @@ fn oracle_prop_identity_filter_partition() {
     (fmakunbound 'neovm--test-filter)
     (fmakunbound 'neovm--test-remove)
     (fmakunbound 'neovm--test-partition)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +364,7 @@ fn oracle_prop_identity_dispatch_wrapper() {
           (funcall combined 10)))
     (fmakunbound 'neovm--test-make-processor)
     (fmakunbound 'neovm--test-make-validator)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -440,7 +440,7 @@ fn oracle_prop_identity_sort_dedup_group() {
     (fmakunbound 'neovm--test-sort-by)
     (fmakunbound 'neovm--test-group-by)
     (fmakunbound 'neovm--test-dedup)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -506,5 +506,5 @@ fn oracle_prop_identity_eq_preservation_and_caching() {
           (funcall c2 :size)
           (funcall c2 :keys)))
     (fmakunbound 'neovm--test-make-cache)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

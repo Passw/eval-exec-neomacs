@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Core Union-Find: make-set, find, union, connected-p
@@ -110,7 +110,7 @@ fn oracle_prop_union_find_core() {
     (fmakunbound 'neovm--uf-find)
     (fmakunbound 'neovm--uf-union)
     (fmakunbound 'neovm--uf-connected-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ fn oracle_prop_union_find_component_count() {
     (fmakunbound 'neovm--uf2-find)
     (fmakunbound 'neovm--uf2-union)
     (fmakunbound 'neovm--uf2-count-components)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -279,7 +279,7 @@ fn oracle_prop_union_find_kruskal_mst() {
     (fmakunbound 'neovm--uf3-union)
     (fmakunbound 'neovm--uf3-connected-p)
     (fmakunbound 'neovm--uf3-kruskal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -369,7 +369,7 @@ fn oracle_prop_union_find_equivalence_classes() {
     (fmakunbound 'neovm--uf4-union)
     (fmakunbound 'neovm--uf4-classes)
     (fmakunbound 'neovm--uf4-class-size)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -442,7 +442,7 @@ fn oracle_prop_union_find_path_compression() {
     (fmakunbound 'neovm--uf5-find)
     (fmakunbound 'neovm--uf5-union-simple)
     (fmakunbound 'neovm--uf5-parent)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -514,7 +514,7 @@ fn oracle_prop_union_find_string_keys() {
     (fmakunbound 'neovm--uf6-find)
     (fmakunbound 'neovm--uf6-union)
     (fmakunbound 'neovm--uf6-connected-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -582,5 +582,5 @@ fn oracle_prop_union_find_idempotent() {
     (fmakunbound 'neovm--uf7-find)
     (fmakunbound 'neovm--uf7-union)
     (fmakunbound 'neovm--uf7-connected-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

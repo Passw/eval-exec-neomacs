@@ -9,7 +9,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // cons with all value types
@@ -95,7 +95,7 @@ fn oracle_prop_list_arity_range() {
       ;; length of list results
       (length (list 1 2 3 4 5))
       (length (list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +137,7 @@ fn oracle_prop_dotted_pair_operations() {
         (equal (cons 'a 'b) (cons 'a 'b))
         (equal (cons 1 2) (cons 1 2))
         (eq (cons 'a 'b) (cons 'a 'b))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ fn oracle_prop_deeply_nested_cons() {
               (nthcdr 2 right)
               (nthcdr 3 right)
               (nthcdr 4 right))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +313,7 @@ fn oracle_prop_nthcdr_on_dotted_lists() {
       (nth 0 '(10 20 30 . 40))
       (nth 1 '(10 20 30 . 40))
       (nth 2 '(10 20 30 . 40)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -398,7 +398,7 @@ fn oracle_prop_last_on_various_lists() {
       (cdr (last '(1 2 3)))
       (car (last '(a b . c)))
       (cdr (last '(a b . c))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -593,7 +593,7 @@ fn oracle_prop_make_list_and_number_sequence() {
       ;; reverse of number-sequence
       (reverse (number-sequence 1 5))
       (equal (reverse (number-sequence 1 5)) (number-sequence 5 1 -1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -644,7 +644,7 @@ fn oracle_prop_cons_mutation_comprehensive() {
         (setcar (nthcdr 3 l) 4)
         (setcar (nthcdr 4 l) 5)
         l))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -687,7 +687,7 @@ fn oracle_prop_cons_alist_integration() {
                 (assq 'a list-alist)
                 (cdr (assq 'a dotted-alist))
                 (cdr (assq 'a list-alist))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -733,7 +733,7 @@ fn oracle_prop_append_nconc_cons_combinations() {
       (append '(1) '(2) '(3) '(4) '(5) '(6) '(7) '(8) '(9) '(10))
       ;; Nested append
       (append (append '(1 2) '(3)) (append '(4) '(5 6))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -773,5 +773,5 @@ fn oracle_prop_membership_operations_on_cons() {
       (memq 'a '(a b . c))
       (memq 'b '(a b . c))
       (member 2 '(1 2 . 3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

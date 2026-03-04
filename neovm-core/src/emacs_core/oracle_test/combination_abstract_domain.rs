@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Interval domain: representation, join, meet, widening, narrowing
@@ -110,7 +110,7 @@ fn oracle_prop_abstract_domain_interval_lattice_ops() {
     (fmakunbound 'neovm--iad-meet)
     (fmakunbound 'neovm--iad-widen)
     (fmakunbound 'neovm--iad-narrow)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +214,7 @@ fn oracle_prop_abstract_domain_sign_transfer_functions() {
     (fmakunbound 'neovm--sd-mul)
     (fmakunbound 'neovm--sd-abs)
     (fmakunbound 'neovm--sd-div)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +329,7 @@ fn oracle_prop_abstract_domain_congruence_domain() {
     (fmakunbound 'neovm--cd-meet)
     (fmakunbound 'neovm--cd-add)
     (fmakunbound 'neovm--cd-mul)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -424,7 +424,7 @@ fn oracle_prop_abstract_domain_reduced_product() {
     (fmakunbound 'neovm--rp-itv-meet)
     (fmakunbound 'neovm--rp-sign-meet)
     (fmakunbound 'neovm--rp-reduce)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -574,7 +574,7 @@ fn oracle_prop_abstract_domain_loop_widening_narrowing() {
     (fmakunbound 'neovm--lw-state-widen)
     (fmakunbound 'neovm--lw-state-eq)
     (fmakunbound 'neovm--lw-analyze)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -733,5 +733,5 @@ fn oracle_prop_abstract_domain_compound_transfer_functions() {
     (fmakunbound 'neovm--ctf-isub)
     (fmakunbound 'neovm--ctf-imul)
     (fmakunbound 'neovm--ctf-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

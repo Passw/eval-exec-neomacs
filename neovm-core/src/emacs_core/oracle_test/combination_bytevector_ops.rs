@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // string-bytes and aref on unibyte strings
@@ -49,7 +49,7 @@ fn oracle_prop_bytevector_string_bytes_aref() {
     ;; Comparison
     (string= s1 s3)
     (string< s2 s1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ fn oracle_prop_bytevector_build_binary() {
     (fmakunbound 'neovm--test-unpack-uint16-be)
     (fmakunbound 'neovm--test-pack-uint32-be)
     (fmakunbound 'neovm--test-unpack-uint32-be)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +236,7 @@ fn oracle_prop_bytevector_xor_rotate() {
     (fmakunbound 'neovm--test-rotate-byte-left)
     (fmakunbound 'neovm--test-rotate-byte-right)
     (fmakunbound 'neovm--test-rotate-bytes)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -311,7 +311,7 @@ fn oracle_prop_bytevector_checksum() {
     (fmakunbound 'neovm--test-fletcher16)
     (fmakunbound 'neovm--test-adler32)
     (fmakunbound 'neovm--test-crc8)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -419,7 +419,7 @@ fn oracle_prop_bytevector_hex_conversion() {
     (fmakunbound 'neovm--test-bytes-to-hex)
     (fmakunbound 'neovm--test-hex-to-bytes)
     (fmakunbound 'neovm--test-hex-dump)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -524,7 +524,7 @@ fn oracle_prop_bytevector_base64_like() {
           (list encoded (string= binary decoded))))
     (fmakunbound 'neovm--test-b64-encode)
     (fmakunbound 'neovm--test-b64-decode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -628,7 +628,7 @@ fn oracle_prop_bytevector_pattern_search() {
     (fmakunbound 'neovm--test-byte-find)
     (fmakunbound 'neovm--test-byte-find-all)
     (fmakunbound 'neovm--test-byte-replace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -707,5 +707,5 @@ fn oracle_prop_bytevector_histogram() {
           (= total (length s))))
     (fmakunbound 'neovm--test-byte-histogram)
     (fmakunbound 'neovm--test-byte-entropy)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

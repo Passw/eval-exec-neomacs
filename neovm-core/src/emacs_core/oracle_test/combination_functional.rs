@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Higher-order function combinators
@@ -33,7 +33,7 @@ fn oracle_prop_functional_compose_chain() {
                     (list (funcall add1-then-double 3)
                           (funcall double-then-square 3)
                           (funcall triple-compose 3))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -52,7 +52,7 @@ fn oracle_prop_functional_partial_application() {
                       (list (funcall add5 10)
                             (funcall add5 0)
                             (funcall mul-by-2-3 7)))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn oracle_prop_functional_flip() {
                           (rdiv (funcall flip div)))
                       (list (funcall rsub 3 10)
                             (funcall rdiv 2 10)))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ fn oracle_prop_functional_foldl() {
                     ;; Max
                     (funcall foldl (lambda (a b) (if (> a b) a b))
                              0 '(3 1 4 1 5 9 2 6))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -122,7 +122,7 @@ fn oracle_prop_functional_foldr() {
                  (lambda (x acc) (- x acc))
                  0 '(1 2 3)))
     (fmakunbound 'neovm--test-foldr)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +154,7 @@ fn oracle_prop_functional_filter_partition() {
                       (funcall partition #'evenp nums)
                       (funcall filter-fn
                                (lambda (x) (> x 5)) nums))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -183,7 +183,7 @@ fn oracle_prop_functional_group_by() {
                   (funcall group-by
                            (lambda (x) (% x 3))
                            '(1 2 3 4 5 6 7 8 9)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ fn oracle_prop_functional_pipeline() {
                                (nreverse result))))
                         (sort filtered
                               (lambda (a b) (> (cdr a) (cdr b)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,7 +290,7 @@ fn oracle_prop_functional_mapcat() {
                     (funcall mapcat
                              (lambda (s) (split-string s \" \"))
                              '(\"hello world\" \"foo bar baz\"))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -312,7 +312,7 @@ fn oracle_prop_functional_scan() {
                     (funcall scan #'* 1 '(1 2 3 4 5))
                     ;; Running max
                     (funcall scan #'max 0 '(3 1 4 1 5 9 2 6))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -364,5 +364,5 @@ fn oracle_prop_functional_data_processing_dsl() {
                                                (lambda (r)
                                                  (> (cdr (assq 'age r)) 27))
                                                dataset)))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

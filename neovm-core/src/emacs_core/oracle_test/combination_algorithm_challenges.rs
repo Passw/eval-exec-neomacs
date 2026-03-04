@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // N-Queens solver (backtracking)
@@ -45,7 +45,7 @@ fn oracle_prop_algo_challenge_nqueens() {
            (funcall 'neovm--nq-solve 6 (make-vector 6 -1) 0))
         (fmakunbound 'neovm--nq-safe-p)
         (fmakunbound 'neovm--nq-solve)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ fn oracle_prop_algo_challenge_knapsack() {
                            (setq j (- j (aref weights (1- i)))))
                          (setq i (1- i)))
                        (list (aref (aref dp n) capacity) items))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ fn oracle_prop_algo_challenge_lis() {
                            (setq seq (cons (aref arr idx) seq))
                            (setq idx (aref parent idx)))
                          (list max-len seq)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ fn oracle_prop_algo_challenge_balanced_parens() {
         (fmakunbound 'neovm--bp-fact)
         (fmakunbound 'neovm--bp-catalan)
         (makunbound 'neovm--bp-results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ fn oracle_prop_algo_challenge_huffman() {
         (fmakunbound 'neovm--huf-insert)
         (fmakunbound 'neovm--huf-build)
         (fmakunbound 'neovm--huf-codes)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -311,7 +311,7 @@ fn oracle_prop_algo_challenge_shortest_path() {
                                                   (symbol-name (car b)))))))
         (fmakunbound 'neovm--dj-pq-insert)
         (fmakunbound 'neovm--dj-shortest)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -370,5 +370,5 @@ fn oracle_prop_algo_challenge_topological_sort() {
                         (setq new-q (cons nbr new-q)))
                       (setq queue (nreverse new-q))))))))
           (nreverse result))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

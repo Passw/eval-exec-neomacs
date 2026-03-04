@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Multi-base parsing: base 10, 16, 8, 2 with various inputs
@@ -51,7 +51,7 @@ fn oracle_prop_string_to_number_multi_base() {
   (string-to-number "11111111" 2)
   (string-to-number "-101" 2)
   (string-to-number "10000000" 2))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ fn oracle_prop_string_to_number_edge_cases() {
   ;; Max-ish integers
   (string-to-number "536870911")
   (string-to-number "-536870912"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +208,7 @@ fn oracle_prop_string_to_number_roundtrip() {
     (mapcar (lambda (n)
               (= n (string-to-number (number-to-string n))))
             nums)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Multi-step string transformation pipeline
@@ -60,7 +60,7 @@ fn oracle_prop_string_transformation_pipeline() {
        (funcall 'neovm--test-str-pipeline "")
        (funcall 'neovm--test-str-pipeline "single"))
     (fmakunbound 'neovm--test-str-pipeline)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ fn oracle_prop_string_state_machine_tokenizer() {
        (funcall 'neovm--test-sm-tokenize "\"escaped \\\"quote\\\"\"")
        (funcall 'neovm--test-sm-tokenize ""))
     (fmakunbound 'neovm--test-sm-tokenize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -218,7 +218,7 @@ fn oracle_prop_string_template_engine_nested() {
                 "{{a}}"
                 '(("a" . "{{b}}") ("b" . "{{c}}") ("c" . "final")) 0))
     (fmakunbound 'neovm--test-tpl-resolve)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +297,7 @@ fn oracle_prop_string_csv_parser_quoted() {
                 "id,name,bio\n1,Alice,\"Likes coding, reading\"\n2,Bob,\"Said \"\"hello\"\"\"\n3,Carol,simple"))
     (fmakunbound 'neovm--test-csv-parse-row)
     (fmakunbound 'neovm--test-csv-parse)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -354,7 +354,7 @@ fn oracle_prop_string_longest_common_subsequence() {
        ;; Longer strings
        (funcall 'neovm--test-lcs "thequickbrownfox" "thefastbrowndog"))
     (fmakunbound 'neovm--test-lcs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -421,7 +421,7 @@ fn oracle_prop_string_base16_encode_decode() {
     (fmakunbound 'neovm--test-hex-encode)
     (fmakunbound 'neovm--test-hex-val)
     (fmakunbound 'neovm--test-hex-decode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -480,5 +480,5 @@ fn oracle_prop_string_run_length_encoding() {
            (list (length s) (length encoded)))))
     (fmakunbound 'neovm--test-rle-encode)
     (fmakunbound 'neovm--test-rle-decode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

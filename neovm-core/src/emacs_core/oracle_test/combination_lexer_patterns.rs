@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Core lexer: tokenize identifiers, numbers, operators, parens
@@ -137,7 +137,7 @@ fn oracle_prop_lexer_basic_tokens() {
       (funcall 'neovm--lex-tokenize "x = 42 + y")
     (fmakunbound 'neovm--lex-tokenize)
     (makunbound 'neovm--lex-keywords)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ fn oracle_prop_lexer_string_literals() {
        (funcall 'neovm--lex2-tokenize "print(\"result\", 42)"))
     (fmakunbound 'neovm--lex2-tokenize)
     (makunbound 'neovm--lex2-keywords)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -383,7 +383,7 @@ fn oracle_prop_lexer_multiline_tracking() {
            (car (last tokens)))))
     (fmakunbound 'neovm--lex3-tokenize)
     (makunbound 'neovm--lex3-keywords)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -523,7 +523,7 @@ fn oracle_prop_lexer_with_comments() {
            (nth 2 (car (last tokens))))))
     (fmakunbound 'neovm--lex4-tokenize)
     (makunbound 'neovm--lex4-keywords)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -645,7 +645,7 @@ fn oracle_prop_lexer_token_analysis() {
     (fmakunbound 'neovm--lex5-count-types)
     (fmakunbound 'neovm--lex5-find-identifiers)
     (makunbound 'neovm--lex5-keywords)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -873,5 +873,5 @@ fn oracle_prop_lexer_full_pipeline() {
     (fmakunbound 'neovm--lex7-tokenize)
     (fmakunbound 'neovm--lex7-stats)
     (makunbound 'neovm--lex7-keywords)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

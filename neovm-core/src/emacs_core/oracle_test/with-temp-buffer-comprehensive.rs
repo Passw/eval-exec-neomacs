@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic insert and extract pattern
@@ -63,7 +63,7 @@ fn oracle_prop_with_temp_buffer_multiple_operations() {
         (goto-char (point-max))
         (insert " <<<")
         (list after-delete after-upcase after-prefix (buffer-string))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ fn oracle_prop_with_temp_buffer_nested_independent() {
       (let ((outer-after (buffer-string)))
         (list outer-before inner-result outer-after
               (string= outer-before outer-after))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn oracle_prop_with_temp_buffer_triple_nested() {
                  (list l2-str l3-result (buffer-string)))))))
       ;; After L2 exits, L1 buffer still intact
       (list l1-str l2-result (buffer-string)))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ fn oracle_prop_with_temp_buffer_complex_return() {
             (length parsed)
             (assoc "key2" parsed)
             (cdr (assoc "key3" parsed))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ fn oracle_prop_with_temp_buffer_state_isolation() {
         (string= (buffer-string) main-content)
         main-point
         sub-result))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -205,7 +205,7 @@ fn oracle_prop_with_temp_buffer_error_handling() {
   (with-temp-buffer
     (insert "post-error recovery")
     (buffer-string)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -224,7 +224,7 @@ fn oracle_prop_with_temp_buffer_error_preserves_outer() {
     ;; Outer buffer must be unchanged
     (list (string= (buffer-string) outer-str)
           (buffer-string))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -256,7 +256,7 @@ fn oracle_prop_with_temp_buffer_narrowing() {
           (widen)
           (list narrowed-str narrowed-min narrowed-max narrowed-size
                 upcased (buffer-string)))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -327,5 +327,5 @@ fn oracle_prop_with_temp_buffer_search_replace_loop() {
       (replace-match "dog" t t)
       (setq count (1+ count)))
     (list (buffer-string) count)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

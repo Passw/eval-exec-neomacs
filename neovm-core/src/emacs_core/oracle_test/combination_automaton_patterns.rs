@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // DFA simulation: recognizing binary multiples of 5
@@ -83,7 +83,7 @@ fn oracle_prop_auto_dfa_multiples_of_5() {
     (fmakunbound 'neovm--auto-dfa5-run)
     (fmakunbound 'neovm--auto-int-to-bin)
     (makunbound 'neovm--auto-dfa5-trans)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +237,7 @@ fn oracle_prop_auto_nfa_to_dfa_subset_construction() {
     (fmakunbound 'neovm--auto-run-dfa)
     (fmakunbound 'neovm--auto-run-nfa)
     (makunbound 'neovm--auto-nfa)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ fn oracle_prop_auto_pda_balanced_parens() {
         ;; Deep nesting
         (funcall 'neovm--auto-pda-check "(((((((()))))))"))
     (fmakunbound 'neovm--auto-pda-check)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -397,7 +397,7 @@ fn oracle_prop_auto_cellular_rule30() {
     (fmakunbound 'neovm--auto-ca-step)
     (fmakunbound 'neovm--auto-ca-run)
     (fmakunbound 'neovm--auto-ca-density)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -468,7 +468,7 @@ fn oracle_prop_auto_cellular_rule110() {
     (fmakunbound 'neovm--auto-r110-step)
     (fmakunbound 'neovm--auto-r110-to-string)
     (fmakunbound 'neovm--auto-r110-population)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -552,7 +552,7 @@ fn oracle_prop_auto_mealy_parity_checker() {
     (fmakunbound 'neovm--auto-mealy-parity)
     (fmakunbound 'neovm--auto-mealy-frame)
     (fmakunbound 'neovm--auto-mealy-verify-frame)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -645,5 +645,5 @@ fn oracle_prop_auto_moore_traffic_light() {
     (makunbound 'neovm--auto-tl-trans)
     (makunbound 'neovm--auto-tl-output)
     (makunbound 'neovm--auto-tl-duration)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

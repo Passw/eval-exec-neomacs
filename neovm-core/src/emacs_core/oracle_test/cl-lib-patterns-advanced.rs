@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // dotimes with complex result forms
@@ -23,7 +23,7 @@ fn oracle_prop_cl_adv_dotimes_result_accumulates_vector() {
                     (dotimes (i 8 v)
                       (setq fact (if (= i 0) 1 (* fact i)))
                       (aset v i fact)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ fn oracle_prop_cl_adv_dolist_result_partition() {
                       (if (= (% x 2) 0)
                           (setq evens (cons x evens))
                         (setq odds (cons x odds)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ fn oracle_prop_cl_adv_nested_dolist_cartesian_filter() {
                         (when (> (+ a b) 7)
                           (setq result (cons (cons a b) result)))))
                     (nreverse result))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +104,7 @@ fn oracle_prop_cl_adv_loop_collect_when_with_index() {
                         (setq result (cons (list idx x) result)))
                       (setq idx (1+ idx)))
                     (nreverse result))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@ fn oracle_prop_cl_adv_reduce_nested_alist_merge() {
                     (sort merged (lambda (x y)
                                    (string< (symbol-name (car x))
                                             (symbol-name (car y))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

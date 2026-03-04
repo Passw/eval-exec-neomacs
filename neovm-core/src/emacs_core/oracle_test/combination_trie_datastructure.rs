@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Trie construction and basic insert/search
@@ -116,7 +116,7 @@ fn oracle_prop_trie_insert_and_search() {
     (fmakunbound 'neovm--trie-insert)
     (fmakunbound 'neovm--trie-search)
     (fmakunbound 'neovm--trie-starts-with)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ fn oracle_prop_trie_count_with_prefix() {
     (fmakunbound 'neovm--trie-find-node)
     (fmakunbound 'neovm--trie-count-from)
     (fmakunbound 'neovm--trie-count-prefix)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +297,7 @@ fn oracle_prop_trie_autocomplete() {
     (fmakunbound 'neovm--trie-find-node)
     (fmakunbound 'neovm--trie-collect-words)
     (fmakunbound 'neovm--trie-autocomplete)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -525,7 +525,7 @@ fn oracle_prop_trie_word_frequency() {
     (fmakunbound 'neovm--ftrie-insert)
     (fmakunbound 'neovm--ftrie-frequency)
     (fmakunbound 'neovm--ftrie-top-words)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -649,5 +649,5 @@ fn oracle_prop_trie_realistic_dictionary() {
     (fmakunbound 'neovm--trie-collect-words)
     (fmakunbound 'neovm--trie-autocomplete)
     (fmakunbound 'neovm--trie-count-from)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // read-from-string with START parameter and sequential reads
@@ -29,7 +29,7 @@ fn oracle_prop_read_from_string_start_offsets() {
                      (cdr (read-from-string s 0))
                      (cdr (read-from-string s 4))
                      (cdr (read-from-string s 10))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -47,7 +47,7 @@ fn oracle_prop_read_from_string_sequential_forms() {
                             (setq pos (cdr result))))
                       (error nil))
                     (list (length forms) (nreverse forms)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn oracle_prop_read_from_string_all_data_types() {
                           (car (read-from-string "'quoted"))
                           (car (read-from-string "#'symbol-function")))))
                     (mapcar #'type-of types))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ fn oracle_prop_prin1_vs_format_differences() {
                         ;; prin1 and %S should agree
                         (string= (prin1-to-string v) (format "%S" v))))
                      vals))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -155,7 +155,7 @@ fn oracle_prop_prin1_to_string_all_types() {
                     ;; Characters
                     (prin1-to-string ?A)
                     (prin1-to-string ?\n))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ fn oracle_prop_read_eval_print_loop_with_errors() {
                                            results))))))
                       (error nil))
                     (nreverse results))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -210,7 +210,7 @@ fn oracle_prop_serialization_roundtrip_complex() {
                               (restored (car (read-from-string printed))))
                          (list (equal orig restored) printed)))
                      structures))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,5 +243,5 @@ fn oracle_prop_read_build_alist_from_kv_string() {
                          (equal alist
                                 (car (read-from-string
                                        (prin1-to-string alist))))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

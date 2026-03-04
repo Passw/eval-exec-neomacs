@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // eval with LEXICAL parameter: nil, t, alist
@@ -41,7 +41,7 @@ fn oracle_prop_eval_comp_lexical_parameter_modes() {
     (funcall f))
   ;; Alist with let inside eval that shadows alist binding
   (eval '(let ((x 999)) x) '((x . 1))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ fn oracle_prop_eval_comp_symbol_evaluation() {
   (eval 'my-var '((my-var . "lexical-value")))
   ;; Constant symbols: t, nil, keywords
   (list (eval 't) (eval 'nil) (eval ':test-kw)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ fn oracle_prop_eval_comp_function_calls() {
   (eval '(funcall (lambda (n) (* n n)) 7))
   ;; apply inside eval
   (eval '(apply '+ '(1 2 3 4 5))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +195,7 @@ fn oracle_prop_eval_comp_special_forms() {
                (progn (setq result 'body) result)
              (setq result 'cleanup))
            result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +228,7 @@ fn oracle_prop_eval_comp_quoted_forms() {
   (eval '(quote if))
   (eval '(quote let))
   (eval '(quote progn)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +261,7 @@ fn oracle_prop_eval_comp_nested_eval() {
     counter)
   ;; eval with constructed nested form
   (eval (list 'eval (list 'quote (list '+ 100 200)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -318,7 +318,7 @@ fn oracle_prop_eval_comp_constructed_forms() {
   ;; (simpler: just chain lets)
   (eval '(let* ((a 1) (b (+ a 1)) (c (+ b 1)) (d (+ c 1)) (e (+ d 1)))
            (list a b c d e))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -356,5 +356,5 @@ fn oracle_prop_eval_comp_errors_and_edge_cases() {
   (eval nil)
   ;; eval t
   (eval t))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

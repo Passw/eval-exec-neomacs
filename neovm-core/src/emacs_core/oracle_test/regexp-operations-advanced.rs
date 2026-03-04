@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // regexp-quote: exhaustive special character coverage
@@ -96,7 +96,7 @@ fn oracle_prop_regexp_ops_adv_nested_groups_extraction() {
             (setq results (cons (list full fname arg-list (length arg-list)) results)))
           (setq start mend)))
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ fn oracle_prop_regexp_ops_adv_non_greedy_matching() {
         (let ((nested "<div><span>inner</span></div>"))
           (string-match "<div>\\([^<]*\\)" nested)
           (match-string 1 nested))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ fn oracle_prop_regexp_ops_adv_alternation_complex() {
         (setq results (cons (match-string 1 s) results)))
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -274,7 +274,7 @@ fn oracle_prop_regexp_ops_adv_structured_data_extractor() {
           (mapcar #'test--parse-log-entry logs)))
       ;; Cleanup
       (fmakunbound 'test--parse-log-entry))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -326,5 +326,5 @@ fn oracle_prop_regexp_ops_adv_url_parser() {
       ;; Cleanup
       (fmakunbound 'test--parse-url)
       (fmakunbound 'test--parse-query-string))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -4,7 +4,7 @@ use proptest::prelude::*;
 use std::sync::OnceLock;
 
 use super::common::{
-    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm,
+    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
     return_if_neovm_enable_oracle_proptest_not_set,
 };
 
@@ -41,7 +41,7 @@ fn oracle_prop_lambda_multiple_closures_share_state() {
 fn oracle_prop_lambda_returns_lambda_and_captures_parameter() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         "(let ((mk (lambda (n) (lambda (x) (+ x n))))) (let ((f (funcall mk 3))) (funcall f 4)))",
     );
 }
@@ -159,7 +159,7 @@ proptest! {
             "(funcall (funcall (lambda (n) (lambda (x) (+ x n))) {}) {})",
             n, x
         );
-        assert_oracle_parity(&form);
+        assert_oracle_parity_with_bootstrap(&form);
     }
 
     #[test]

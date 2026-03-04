@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // setcar/setcdr: deep nested structure mutation
@@ -45,7 +45,7 @@ fn oracle_prop_setcar_setcdr_deep_nested_mutation() {
           (eq (car root) branch1)
           (eq (cdr root) branch2)
           (eq (car (car root)) leaf1))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ fn oracle_prop_setcar_setcdr_circular_detection() {
        (when (eq slow fast)
          (setq found t)))
      (list found steps))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ fn oracle_prop_setcar_setcdr_alist_modification() {
    (cdr (assq 'grade alist))
    (cdr (assq 'active alist))
    (length alist)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ fn oracle_prop_setcar_setcdr_incremental_list_building() {
          (last-cell (last result)))
     (list result sum len (eq tail last-cell)
           (car tail) (car result))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ fn oracle_prop_setcar_setcdr_inplace_reverse() {
             (equal doubly-reversed original-items)
             ;; The first-cell should now be at the head again
             (eq first-cell doubly-reversed)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -426,5 +426,5 @@ fn oracle_prop_setcar_setcdr_ring_buffer_queue() {
         (setq ptr (cdr ptr)))
       (setq results (cons sum results))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

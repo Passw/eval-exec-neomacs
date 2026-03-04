@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // proper-list-p with dotted pairs, improper lists, circular lists
@@ -42,7 +42,7 @@ fn oracle_prop_proper_list_predicates_dotted_and_circular() {
                       (proper-list-p 'symbol)
                       (proper-list-p t)
                       (proper-list-p [1 2 3])))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ fn oracle_prop_proper_list_predicates_type_discrimination() {
                                     (if (null v) 'nil-special
                                       (eq (consp v) (not (atom v))))))
                             values))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ fn oracle_prop_proper_list_predicates_deeply_nested() {
                       (listp (caaar deep1))
                       (consp (caaar deep1))
                       (atom (caaaar deep1))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +197,7 @@ fn oracle_prop_proper_list_predicates_safe_length_analysis() {
                                 check-results))))
                 (nreverse check-results))))))
     (fmakunbound 'neovm--test-classify-structure)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +266,7 @@ fn oracle_prop_proper_list_predicates_dispatch_tree() {
         (mapcar (lambda (v) (funcall 'neovm--test-process-value v))
                 test-values))
     (fmakunbound 'neovm--test-process-value)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +302,7 @@ fn oracle_prop_proper_list_predicates_invariant_checks() {
                               (cons (list v inv1 inv2 inv3 inv4 inv5 pass)
                                     details))))
                     (list all-pass (nreverse details)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -352,5 +352,5 @@ fn oracle_prop_proper_list_predicates_filter_heterogeneous() {
                           (unless (null a)
                             (unless (nlistp a) (setq check nil))))
                         check)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

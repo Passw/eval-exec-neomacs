@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Direct recursion: power function, GCD, digit sum, palindrome check
@@ -76,7 +76,7 @@ fn oracle_prop_recursion_comprehensive_direct_multi() {
     (fmakunbound 'neovm--rcp-gcd)
     (fmakunbound 'neovm--rcp-digit-sum)
     (fmakunbound 'neovm--rcp-palindrome-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ fn oracle_prop_recursion_comprehensive_mutual_parser() {
     (fmakunbound 'neovm--rcp-classify-a)
     (fmakunbound 'neovm--rcp-classify-b)
     (makunbound 'neovm--rcp-toks)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +261,7 @@ fn oracle_prop_recursion_comprehensive_tail_recursive() {
     (fmakunbound 'neovm--rcp-bsearch)
     (fmakunbound 'neovm--rcp-fact-notail)
     (fmakunbound 'neovm--rcp-len-tail)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -342,7 +342,7 @@ fn oracle_prop_recursion_comprehensive_tree_recursive() {
     (fmakunbound 'neovm--rcp-subset-sum)
     (fmakunbound 'neovm--rcp-powerset)
     (fmakunbound 'neovm--rcp-catalan)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -427,7 +427,7 @@ fn oracle_prop_recursion_comprehensive_nested_list_ops() {
     (fmakunbound 'neovm--rcp-deep-replace)
     (fmakunbound 'neovm--rcp-collect-atoms)
     (fmakunbound 'neovm--rcp-deep-zip)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -509,7 +509,7 @@ fn oracle_prop_recursion_comprehensive_memoized() {
     (fmakunbound 'neovm--rcp-fib-memo)
     (fmakunbound 'neovm--rcp-stairs-memo)
     (fmakunbound 'neovm--rcp-partition-memo)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -599,7 +599,7 @@ fn oracle_prop_recursion_comprehensive_indirect_funcall() {
     (fmakunbound 'neovm--rcp-y-fact)
     (fmakunbound 'neovm--rcp-compose-chain)
     (fmakunbound 'neovm--rcp-dispatch)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -687,7 +687,7 @@ fn oracle_prop_recursion_comprehensive_mathematical_structures() {
     (fmakunbound 'neovm--rcp-pascal-triangle)
     (fmakunbound 'neovm--rcp-stern-brocot)
     (fmakunbound 'neovm--rcp-permutations)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -771,7 +771,7 @@ fn oracle_prop_recursion_comprehensive_sorting() {
     (fmakunbound 'neovm--rcp-split)
     (fmakunbound 'neovm--rcp-merge-sort)
     (fmakunbound 'neovm--rcp-quick-sort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -869,5 +869,5 @@ fn oracle_prop_recursion_comprehensive_bst_operations() {
     (fmakunbound 'neovm--rcp-bst-height)
     (fmakunbound 'neovm--rcp-bst-min)
     (fmakunbound 'neovm--rcp-bst-from-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Integer format specs
@@ -81,7 +81,7 @@ fn oracle_prop_format_char() {
                         (format "%c" ?a)
                         (format "%c" ?Z)
                         (format "%c%c%c" ?H ?i ?!))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ fn oracle_prop_format_s_vs_S() {
                         (format "%S" '(a b c))
                         (format "%s" nil)
                         (format "%S" nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ fn oracle_prop_format_literal_percent() {
     let form = r#"(list (format "100%%")
                         (format "%d%%" 42)
                         (format "%%s is not a format"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

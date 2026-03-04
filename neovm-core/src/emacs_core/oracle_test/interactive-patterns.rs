@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Alist patterns (commonly used for configuration)
@@ -69,7 +69,7 @@ fn oracle_prop_interactive_format_table() {
                     (mapcar (lambda (row)
                               (format "%d: %s (%d)" (car row) (cadr row) (caddr row)))
                             rows))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ fn oracle_prop_interactive_string_replace_pattern() {
                                     "_"
                                   (char-to-string c)))
                               "hello-world-foo" "")"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ fn oracle_prop_interactive_cond_dispatch() {
                             ((< x 100) 'medium)
                             (t 'large)))
                         '(-5 0 3 42 200))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

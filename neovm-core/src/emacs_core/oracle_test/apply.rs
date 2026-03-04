@@ -5,7 +5,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 use proptest::prelude::*;
 
 use super::common::{
-    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm,
+    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
 };
 
 #[test]
@@ -61,16 +61,16 @@ fn oracle_prop_apply_lambda_optional_and_rest_binding() {
 fn oracle_prop_apply_improper_tail_error_shape() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(condition-case err (apply 'list '(1 . 2)) (error err))");
+    assert_oracle_parity_with_bootstrap("(condition-case err (apply 'list '(1 . 2)) (error err))");
 }
 
 #[test]
 fn oracle_prop_apply_nil_t_and_special_form_call_targets() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(condition-case err (apply nil nil) (error err))");
-    assert_oracle_parity("(condition-case err (apply t nil) (error err))");
-    assert_oracle_parity("(condition-case err (apply 'if '(t 1 2)) (error err))");
+    assert_oracle_parity_with_bootstrap("(condition-case err (apply nil nil) (error err))");
+    assert_oracle_parity_with_bootstrap("(condition-case err (apply t nil) (error err))");
+    assert_oracle_parity_with_bootstrap("(condition-case err (apply 'if '(t 1 2)) (error err))");
 }
 
 #[test]
@@ -86,10 +86,10 @@ fn oracle_prop_apply_autoload_object_error_payload_shape() {
 fn oracle_prop_apply_keyword_function_cell_controls_behavior() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         "(let ((orig (symbol-function :k))) (unwind-protect (progn (fset :k 'car) (apply :k '((1 2)))) (fset :k orig)))",
     );
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         "(let ((orig (symbol-function :k))) (unwind-protect (progn (fset :k 1) (condition-case err (apply :k nil) (error err))) (fset :k orig)))",
     );
 }
@@ -98,21 +98,21 @@ fn oracle_prop_apply_keyword_function_cell_controls_behavior() {
 fn oracle_prop_apply_zero_args_error_shape() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(condition-case err (apply) (error err))");
+    assert_oracle_parity_with_bootstrap("(condition-case err (apply) (error err))");
 }
 
 #[test]
 fn oracle_prop_apply_single_arg_error_shape() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(condition-case err (apply '+) (error err))");
+    assert_oracle_parity_with_bootstrap("(condition-case err (apply '+) (error err))");
 }
 
 #[test]
 fn oracle_prop_apply_non_list_tail_error_shape() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(condition-case err (apply 'list [1 2]) (error err))");
+    assert_oracle_parity_with_bootstrap("(condition-case err (apply 'list [1 2]) (error err))");
 }
 
 #[test]
@@ -137,7 +137,7 @@ fn oracle_prop_apply_subr_object_ignores_symbol_rebinding() {
 fn oracle_prop_apply_forwards_keyword_arguments() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(apply 'sort (list (list 3 1 2) #'< :key #'identity))");
+    assert_oracle_parity_with_bootstrap("(apply 'sort (list (list 3 1 2) #'< :key #'identity))");
 }
 
 #[test]
@@ -178,7 +178,7 @@ fn oracle_prop_apply_dotted_parameter_lambda_parity() {
 fn oracle_prop_apply_non_callable_list_error_shape() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(condition-case err (apply '(1 2 3) '(4)) (error err))");
+    assert_oracle_parity_with_bootstrap("(condition-case err (apply '(1 2 3) '(4)) (error err))");
 }
 
 #[test]
@@ -211,7 +211,7 @@ fn oracle_prop_apply_unfbound_symbol_error_shape() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(condition-case err (let ((sym (make-symbol \"neovm-apply-unbound\"))) (apply sym nil)) (error err))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 proptest! {

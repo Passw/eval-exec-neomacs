@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic get/put round-trip with various value types
@@ -39,7 +39,7 @@ fn oracle_prop_symbol_plist_basic_get_put() {
           ;; put returns the value
           (put 'neovm--spp-basic 'new-prop 'hello)))
     (setplist 'neovm--spp-basic nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +83,7 @@ fn oracle_prop_symbol_plist_setplist_replace() {
 
         (nreverse trace))
     (setplist 'neovm--spp-repl nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +125,7 @@ fn oracle_prop_symbol_plist_full_list_retrieval() {
                 (plist-put pl 'a 999)
                 (get 'neovm--spp-full 'a))))))
     (setplist 'neovm--spp-full nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +165,7 @@ fn oracle_prop_symbol_plist_multiple_properties() {
         (setq snapshots (cons (length (symbol-plist 'neovm--spp-multi)) snapshots))
         (nreverse snapshots))
     (setplist 'neovm--spp-multi nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +237,7 @@ fn oracle_prop_symbol_plist_object_system() {
     (dolist (s '(neovm--spp-obj-counter1 neovm--spp-obj-counter2
                  neovm--spp-obj-account1))
       (setplist s nil))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +310,7 @@ fn oracle_prop_symbol_plist_property_inheritance() {
                   (funcall inh-get 'neovm--spp-inh-base :color)))))
     (dolist (s '(neovm--spp-inh-base neovm--spp-inh-mid neovm--spp-inh-leaf))
       (setplist s nil))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -409,5 +409,5 @@ fn oracle_prop_symbol_plist_metadata_annotations() {
                  neovm--spp-ann-fn4))
       (setplist s nil))
     (makunbound 'neovm--spp-ann-registry)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Sieve of Eratosthenes with segmented prime counting
@@ -59,7 +59,7 @@ fn oracle_prop_iteralgo_sieve_with_prime_gaps() {
               'between gap-start gap-end
               'first-5 (take 5 primes)
               'last-5 (last primes 5))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ fn oracle_prop_iteralgo_binary_search_insertion_point() {
      (funcall bsearch sorted 10)
      (funcall bsearch sorted 50)
      (funcall bsearch sorted 100))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ fn oracle_prop_iteralgo_rpn_calculator() {
        ;; 15 7 1 1 + - / 3 * 2 1 1 + + - => complex
        (funcall 'neovm--rpn-eval '(15 7 1 1 + - / 3 * 2 1 1 + + -)))
     (fmakunbound 'neovm--rpn-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ fn oracle_prop_iteralgo_rle_with_frequency_table() {
             (list 'encoded encoded
                   'run-length-freq freq-list
                   'roundtrip-ok (equal input decoded))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +242,7 @@ fn oracle_prop_iteralgo_topological_sort_kahn() {
       ;; Verify: result length should equal number of nodes (no cycle)
       (list 'order (nreverse result)
             'valid (= (length result) (length all-nodes))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -311,5 +311,5 @@ fn oracle_prop_iteralgo_matrix_transpose_multiply() {
     (fmakunbound 'neovm--mat-ref)
     (fmakunbound 'neovm--mat-transpose)
     (fmakunbound 'neovm--mat-multiply)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

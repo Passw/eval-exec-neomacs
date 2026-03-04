@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Core binary min-heap: insert and extract-min with numeric keys
@@ -124,7 +124,7 @@ fn oracle_prop_heap_insert_extract_min() {
     (fmakunbound 'neovm--heap-extract-min)
     (fmakunbound 'neovm--heap-peek)
     (fmakunbound 'neovm--heap-size)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ fn oracle_prop_heap_heapify() {
     (fmakunbound 'neovm--hp-sift-down)
     (fmakunbound 'neovm--hp-heapify)
     (fmakunbound 'neovm--hp-drain)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -305,7 +305,7 @@ fn oracle_prop_heap_sort() {
     (fmakunbound 'neovm--hs-swap)
     (fmakunbound 'neovm--hs-sift-down-max)
     (fmakunbound 'neovm--hs-heapsort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -412,7 +412,7 @@ fn oracle_prop_heap_priority_queue_pairs() {
     (fmakunbound 'neovm--pq-sift-down)
     (fmakunbound 'neovm--pq-enqueue)
     (fmakunbound 'neovm--pq-dequeue)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -509,7 +509,7 @@ fn oracle_prop_heap_string_priority() {
     (fmakunbound 'neovm--shp-sift-down)
     (fmakunbound 'neovm--shp-insert)
     (fmakunbound 'neovm--shp-extract)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -622,7 +622,7 @@ fn oracle_prop_heap_max_and_k_smallest() {
     (fmakunbound 'neovm--mh-insert)
     (fmakunbound 'neovm--mh-extract-max)
     (fmakunbound 'neovm--mh-k-smallest)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -737,5 +737,5 @@ fn oracle_prop_heap_merge_k_sorted_lists() {
     (fmakunbound 'neovm--mk-insert)
     (fmakunbound 'neovm--mk-extract)
     (fmakunbound 'neovm--mk-merge)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

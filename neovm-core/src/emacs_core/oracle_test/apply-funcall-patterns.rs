@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // apply with spread args and variable-length argument lists
@@ -51,7 +51,7 @@ fn oracle_prop_apply_funcall_spread_and_varargs() {
                 (apply #'+ (funcall make-args 10))
                 (apply #'* (funcall make-args 6)))))
     (fmakunbound 'neovm--test-spread-apply)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ fn oracle_prop_apply_funcall_in_loops() {
     (fmakunbound 'neovm--test-fold-right)
     (fmakunbound 'neovm--test-scan)
     (fmakunbound 'neovm--test-iterate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ fn oracle_prop_apply_funcall_lambda_closures() {
                 (apply (funcall make-fn 'count) '(a b c d e f)))))
     (fmakunbound 'neovm--test-make-adder)
     (fmakunbound 'neovm--test-make-counter)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -365,7 +365,7 @@ fn oracle_prop_apply_funcall_partial_curry() {
     (fmakunbound 'neovm--test-rpartial)
     (fmakunbound 'neovm--test-flip)
     (fmakunbound 'neovm--test-complement)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -446,7 +446,7 @@ fn oracle_prop_apply_funcall_compose_patterns() {
     (fmakunbound 'neovm--test-compose)
     (fmakunbound 'neovm--test-pipe)
     (fmakunbound 'neovm--test-on)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -532,7 +532,7 @@ fn oracle_prop_apply_funcall_memoize() {
                 (funcall memo-pow 5 3))))
     (fmakunbound 'neovm--test-memoize)
     (fmakunbound 'neovm--test-memoize2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -603,5 +603,5 @@ fn oracle_prop_apply_funcall_trampoline() {
     (fmakunbound 'neovm--test-trampoline)
     (fmakunbound 'neovm--test-factorial-tramp)
     (fmakunbound 'neovm--test-even-odd-tramp)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

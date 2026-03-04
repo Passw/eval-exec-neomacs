@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Greedy graph coloring algorithm
@@ -65,7 +65,7 @@ fn oracle_prop_graph_coloring_greedy() {
                                 (setq max-c (max max-c (gethash node colors))))
                               (1+ max-c)))))))
     (fmakunbound 'neovm--gc-greedy-color)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ fn oracle_prop_graph_coloring_k_colorable() {
     (fmakunbound 'neovm--gc-is-safe)
     (fmakunbound 'neovm--gc-backtrack)
     (fmakunbound 'neovm--gc-k-colorable)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ fn oracle_prop_graph_coloring_chromatic_number() {
     (fmakunbound 'neovm--gc-is-safe)
     (fmakunbound 'neovm--gc-backtrack)
     (fmakunbound 'neovm--gc-chromatic-number)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ fn oracle_prop_graph_coloring_ordering_effects() {
     (fmakunbound 'neovm--gc-greedy-color)
     (fmakunbound 'neovm--gc-count-colors)
     (fmakunbound 'neovm--gc-verify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -409,7 +409,7 @@ fn oracle_prop_graph_coloring_register_allocation() {
                                        (symbol-name (car b)))))))))
     (fmakunbound 'neovm--gc-greedy-color)
     (fmakunbound 'neovm--gc-build-interference)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -562,5 +562,5 @@ fn oracle_prop_graph_coloring_sudoku_4x4() {
     (fmakunbound 'neovm--gc-sudoku-solve)
     (fmakunbound 'neovm--gc-board-to-list)
     (fmakunbound 'neovm--gc-verify-sudoku)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

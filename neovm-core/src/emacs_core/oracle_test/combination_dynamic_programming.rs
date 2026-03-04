@@ -3,7 +3,7 @@
 //! 0/1 knapsack, coin change, and Kadane's maximum subarray.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Fibonacci: top-down memoization vs bottom-up tabulation
@@ -60,7 +60,7 @@ fn oracle_prop_dp_fibonacci_memoized_and_tabulated() {
                 (funcall 'neovm--test-fib-tab 20)))) ;; 6765
     (fmakunbound 'neovm--test-fib-memo)
     (fmakunbound 'neovm--test-fib-tab)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ fn oracle_prop_dp_edit_distance() {
                     (list s1 s2 (car (funcall 'neovm--test-edit-distance s1 s2)))))
                 test-cases))
     (fmakunbound 'neovm--test-edit-distance)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ fn oracle_prop_dp_lcs_with_backtrack() {
                       (list s1 s2 (car result) (cadr result)))))
                 test-cases))
     (fmakunbound 'neovm--test-lcs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -260,7 +260,7 @@ fn oracle_prop_dp_knapsack_01() {
                 [10]
                 [42]))
     (fmakunbound 'neovm--test-knapsack)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ fn oracle_prop_dp_coin_change() {
        ;; Single denomination
        (funcall 'neovm--test-coin-change '(3) 9))
     (fmakunbound 'neovm--test-coin-change)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -375,7 +375,7 @@ fn oracle_prop_dp_kadanes_max_subarray() {
        ;; Mixed with large valley
        (funcall 'neovm--test-kadane [5 4 -1 7 8 -100 3 4 5 6]))
     (fmakunbound 'neovm--test-kadane)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -444,5 +444,5 @@ fn oracle_prop_dp_matrix_chain_multiplication() {
        (funcall 'neovm--test-mcm [10 20 30]))
     (fmakunbound 'neovm--test-mcm)
     (fmakunbound 'neovm--test-mcm-paren)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

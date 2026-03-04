@@ -6,7 +6,7 @@
 //! cycle extraction.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Tarjan's Strongly Connected Components
@@ -93,7 +93,7 @@ fn oracle_prop_graph_adv_tarjan_scc() {
             (list 'dag-sccs (length s3) (= (length s3) 3)))))
     (fmakunbound 'neovm--tarjan-scc)
     (fmakunbound 'neovm--tarjan-visit)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +169,7 @@ fn oracle_prop_graph_adv_dijkstra() {
                     (gethash 'B dist))))))
     (fmakunbound 'neovm--dijkstra)
     (fmakunbound 'neovm--dj-path)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ fn oracle_prop_graph_adv_bipartite_check() {
                    (4 . (3 1)))))
           (funcall 'neovm--is-bipartite g '(1 2 3 4))))
     (fmakunbound 'neovm--is-bipartite)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +310,7 @@ fn oracle_prop_graph_adv_cycle_extraction() {
           '(a b c d)))
     (fmakunbound 'neovm--find-cycle)
     (fmakunbound 'neovm--fc-visit)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -452,7 +452,7 @@ fn oracle_prop_graph_adv_topo_sort_all_orderings() {
           (list order (funcall 'neovm--verify-topo g order))))
     (fmakunbound 'neovm--kahn-topo)
     (fmakunbound 'neovm--verify-topo)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -525,7 +525,7 @@ fn oracle_prop_graph_adv_bridge_finding() {
           (funcall 'neovm--find-bridges g '(0 1 2 3))))
     (fmakunbound 'neovm--find-bridges)
     (fmakunbound 'neovm--bridge-dfs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -599,7 +599,7 @@ fn oracle_prop_graph_adv_eulerian_detection() {
           '((1 . (2 4)) (2 . (1 3)) (3 . (2 4)) (4 . (3 1)))
           '(1 2 3 4)))
     (fmakunbound 'neovm--euler-check)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -684,7 +684,7 @@ fn oracle_prop_graph_adv_kruskal_mst() {
     (fmakunbound 'neovm--uf-find)
     (fmakunbound 'neovm--uf-union)
     (fmakunbound 'neovm--kruskal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -749,7 +749,7 @@ fn oracle_prop_graph_adv_prim_mst() {
             (3 . ((1 . 3) (2 . 2))))
           '(1 2 3)))
     (fmakunbound 'neovm--prim-mst)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -803,7 +803,7 @@ fn oracle_prop_graph_adv_degree_analysis() {
           '((a . (b)) (b . (c)) (c . (a)))
           '(a b c)))
     (fmakunbound 'neovm--degree-analysis)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -846,5 +846,5 @@ fn oracle_prop_graph_adv_transpose() {
           '((x . (x y)) (y . (z)) (z . ()))
           '(x y z)))
     (fmakunbound 'neovm--transpose-graph)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // eval basic forms
@@ -14,11 +14,11 @@ use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 fn oracle_prop_eval_quoted_forms() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(eval '(+ 1 2 3))");
-    assert_oracle_parity("(eval '(list 1 2 3))");
-    assert_oracle_parity("(eval ''hello)");
-    assert_oracle_parity("(eval 42)");
-    assert_oracle_parity(r#"(eval "hello")"#);
+    assert_oracle_parity_with_bootstrap("(eval '(+ 1 2 3))");
+    assert_oracle_parity_with_bootstrap("(eval '(list 1 2 3))");
+    assert_oracle_parity_with_bootstrap("(eval ''hello)");
+    assert_oracle_parity_with_bootstrap("(eval 42)");
+    assert_oracle_parity_with_bootstrap(r#"(eval "hello")"#);
 }
 
 #[test]
@@ -37,7 +37,7 @@ fn oracle_prop_eval_constructed_forms() {
 fn oracle_prop_eval_nested() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(eval (eval '(quote (+ 1 2))))");
+    assert_oracle_parity_with_bootstrap("(eval (eval '(quote (+ 1 2))))");
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ fn oracle_prop_eval_code_generation() {
                         (add10 (eval (funcall gen-adder 10))))
                     (list (funcall add5 3)
                           (funcall add10 3))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -109,7 +109,7 @@ fn oracle_prop_eval_template_expansion() {
                     (let ((record '((name . alice) (age . 30))))
                       (list (funcall is-alice record)
                             (funcall is-bob record)))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -154,5 +154,5 @@ fn oracle_prop_eval_test_framework() {
                       (setq failed (1+ failed)
                             failures (cons (cdr test) failures))))
                   (list passed failed (nreverse failures)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

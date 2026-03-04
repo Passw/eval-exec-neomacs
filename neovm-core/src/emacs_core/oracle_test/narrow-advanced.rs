@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // nested save-restriction/widen: inner widen does not escape outer narrowing
@@ -35,7 +35,7 @@ fn oracle_prop_narrow_nested_save_restriction_widen() {
     ;; Fully widened
     (setq results (cons (list 'fully-wide (buffer-string)) results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -64,7 +64,7 @@ fn oracle_prop_narrow_marker_outside_region() {
         (list m1-pos m2-pos m3-pos pmin pmax
               ;; buffer-string only shows narrowed region
               (buffer-string))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ fn oracle_prop_narrow_point_clamping() {
             (list before-narrow-point
                   after-narrow-point pmin pmax
                   clamped-low clamped-high within)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ fn oracle_prop_narrow_re_search_confined() {
             (elder-found (progn (goto-char (point-min))
                                 (re-search-forward "elderberry" nil t))))
         (list (nreverse matches) apple-found elder-found)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +230,7 @@ fn oracle_prop_narrow_sequential_modify_cycles() {
       (setq snapshots (cons (list 'cycle3-narrow (buffer-string)) snapshots)))
     (setq snapshots (cons (list 'cycle3-wide (buffer-string)) snapshots))
     (nreverse snapshots)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -259,7 +259,7 @@ fn oracle_prop_narrow_delete_within_region() {
         (list before before-size
               after after-size
               (buffer-string))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

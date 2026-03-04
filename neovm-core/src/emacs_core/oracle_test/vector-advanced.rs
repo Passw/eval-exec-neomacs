@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // vconcat with multiple heterogeneous arguments
@@ -26,7 +26,7 @@ fn oracle_prop_vconcat_multi_heterogeneous() {
                       (vconcat nil v1 nil)
                       (vconcat '() [99] "Z" '(100))
                       (vconcat v1 v1 v1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ fn oracle_prop_make_vector_edge_cases() {
                       (length v3) (aref v3 1)
                       (length v4)
                       v5))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ fn oracle_prop_nested_vectors_2d_array() {
                           (aref (aref matrix 0) 1)   ;; 0+1=1
                           (aref (aref matrix 2) 0)   ;; 2+0=2
                           (nreverse sums))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ fn oracle_prop_fillarray_vector_vs_string() {
                             ;; fillarray returns the array itself
                             (eq (fillarray (make-vector 2 0) 1)
                                 (fillarray (make-vector 2 0) 1)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ fn oracle_prop_vector_sort_custom_predicate() {
                     (list v1 v2
                           (append v3 nil)  ;; convert to list for easier comparison
                           v4 v5))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ fn oracle_prop_vector_as_stack() {
                               (funcall pop-fn)
                               (funcall pop-fn)
                               (funcall pop-fn))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -244,7 +244,7 @@ fn oracle_prop_vector_circular_buffer() {
                               (funcall dequeue)
                               (funcall dequeue)
                               count)))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -310,5 +310,5 @@ fn oracle_prop_vector_matrix_transpose() {
                         ;; Cross-check specific cells
                         (= (aref (aref mat 1) 2) (aref (aref trans 2) 1))
                         (= (aref (aref mat 2) 0) (aref (aref trans 0) 2))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

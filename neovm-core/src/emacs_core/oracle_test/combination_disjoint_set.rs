@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Core operations: make-set, find with path compression, union by rank
@@ -135,7 +135,7 @@ fn oracle_prop_disjoint_set_core_operations() {
     (fmakunbound 'neovm--ds-find)
     (fmakunbound 'neovm--ds-union)
     (fmakunbound 'neovm--ds-same-set-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ fn oracle_prop_disjoint_set_path_compression_verification() {
     (fmakunbound 'neovm--ds2-union-simple)
     (fmakunbound 'neovm--ds2-parent)
     (fmakunbound 'neovm--ds2-depth)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -342,7 +342,7 @@ fn oracle_prop_disjoint_set_union_by_rank() {
     (fmakunbound 'neovm--ds3-union)
     (fmakunbound 'neovm--ds3-rank)
     (fmakunbound 'neovm--ds3-root)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -428,7 +428,7 @@ fn oracle_prop_disjoint_set_component_counting() {
     (fmakunbound 'neovm--ds4-find)
     (fmakunbound 'neovm--ds4-union)
     (fmakunbound 'neovm--ds4-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -544,7 +544,7 @@ fn oracle_prop_disjoint_set_kruskal_mst() {
     (fmakunbound 'neovm--ds5-same-p)
     (fmakunbound 'neovm--ds5-sort-edges)
     (fmakunbound 'neovm--ds5-kruskal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -652,7 +652,7 @@ fn oracle_prop_disjoint_set_equivalence_classes() {
     (fmakunbound 'neovm--ds6-union)
     (fmakunbound 'neovm--ds6-classes)
     (fmakunbound 'neovm--ds6-class-size)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -737,5 +737,5 @@ fn oracle_prop_disjoint_set_mixed_key_types() {
     (fmakunbound 'neovm--ds7-find)
     (fmakunbound 'neovm--ds7-union)
     (fmakunbound 'neovm--ds7-same-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

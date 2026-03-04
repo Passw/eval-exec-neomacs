@@ -2,7 +2,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_err_kind, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // coding-system-p for various coding systems
@@ -25,7 +25,7 @@ fn oracle_prop_coding_system_p_standard_systems() {
   (coding-system-p 'no-such-coding-system-xyz)
   (coding-system-p nil)
   (coding-system-p 42))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -48,7 +48,7 @@ fn oracle_prop_coding_system_base_variants() {
   (coding-system-base 'raw-text-unix)
   (coding-system-base 'undecided)
   (coding-system-base 'undecided-unix))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ fn oracle_prop_coding_system_eol_type_all_variants() {
     (if (vectorp eol)
         (list 'vector (length eol))
       eol)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ fn oracle_prop_coding_system_aliases_membership() {
     ;; latin-1 aliases
     (let ((l1-aliases (coding-system-aliases 'latin-1)))
       (consp l1-aliases))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ fn oracle_prop_coding_system_plist_detailed_inspection() {
     ;; Verify plist is a proper list with even length
     (= 0 (% (length utf8-pl) 2))
     (= 0 (% (length raw-pl) 2))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ fn oracle_prop_check_coding_system_valid_and_errors() {
   (check-coding-system 'undecided)
   (check-coding-system 'utf-8-unix)
   (check-coding-system nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -185,7 +185,7 @@ fn oracle_prop_coding_system_priority_list_structure() {
       all-valid)
     ;; Length is positive
     (> (length (coding-system-priority-list)) 0)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -216,7 +216,7 @@ fn oracle_prop_coding_metadata_roundtrip_consistency() {
                     (eq (plist-get pl :name) base))
                   results))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,5 +242,5 @@ fn oracle_prop_coding_metadata_classification_table() {
         (setq type-counts (cons (cons ctype 1) type-counts)))))
   ;; Sort by count descending for deterministic output
   (sort type-counts (lambda (a b) (> (cdr a) (cdr b)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

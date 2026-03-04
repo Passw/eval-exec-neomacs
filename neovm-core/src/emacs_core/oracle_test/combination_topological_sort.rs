@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic topological sort — simple DAG with deterministic output
@@ -94,7 +94,7 @@ fn oracle_prop_toposort_basic_dag() {
                     ("f" . ()))))
         (funcall 'neovm--ts-toposort dag))
     (fmakunbound 'neovm--ts-toposort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +173,7 @@ fn oracle_prop_toposort_cycle_detection() {
                    ("c" . ("d"))
                    ("d" . ()))))
     (fmakunbound 'neovm--ts2-toposort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +230,7 @@ fn oracle_prop_toposort_in_degree_computation() {
                    ("m" . ("t"))
                    ("t" . ()))))
     (fmakunbound 'neovm--ts-in-degrees)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -343,7 +343,7 @@ fn oracle_prop_toposort_package_manager() {
                 (length order))))))
     (fmakunbound 'neovm--pkg-toposort)
     (fmakunbound 'neovm--pkg-build-order)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -461,7 +461,7 @@ fn oracle_prop_toposort_task_scheduling() {
         (funcall 'neovm--task-schedule tasks))
     (fmakunbound 'neovm--task-toposort)
     (fmakunbound 'neovm--task-schedule)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -572,7 +572,7 @@ fn oracle_prop_toposort_level_grouping() {
                    ("b" . ("c"))
                    ("c" . ("a")))))
     (fmakunbound 'neovm--ts-levels)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -649,5 +649,5 @@ fn oracle_prop_toposort_transitive_reduction() {
                    ("c" . ()))))
     (fmakunbound 'neovm--tr-reachable)
     (fmakunbound 'neovm--tr-reduce)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

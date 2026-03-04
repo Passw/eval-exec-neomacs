@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Table formatting with aligned columns (variable width)
@@ -65,7 +65,7 @@ fn oracle_prop_strfmt_table_aligned_columns() {
                   (unless (= (length line) expected-len)
                     (setq all-same nil)))
                 (list all-same expected-len)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -308,7 +308,7 @@ fn oracle_prop_strfmt_unified_diff() {
               (= (- additions deletions)
                  (- (length new) (length old)))))
     (fmakunbound 'neovm--test-diff-lcs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

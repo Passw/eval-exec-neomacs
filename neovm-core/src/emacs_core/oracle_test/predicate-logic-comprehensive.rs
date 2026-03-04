@@ -4,7 +4,7 @@
 //! char-tables, bool-vectors, functions (lambdas, subrs), buffers, markers.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // null, atom, listp, consp, nlistp — systematic cross-type testing
@@ -31,7 +31,7 @@ fn oracle_prop_predicate_null_atom_listp_consp_nlistp_cross_type() {
           (setq row (cons (if (funcall pred val) t nil) row)))
         (setq results (cons (cons pred-name (nreverse row)) results))))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -52,7 +52,7 @@ fn oracle_prop_predicate_numeric_predicates_cross_type() {
     (mapcar #'floatp values)
     (mapcar #'natnump values)
     (mapcar #'zerop (list 0 0.0 -0 -0.0 1 -1 0.1))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ fn oracle_prop_predicate_stringp_vectorp_symbolp_keywordp() {
     (mapcar #'vectorp values)
     (mapcar #'symbolp values)
     (mapcar #'keywordp values)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ fn oracle_prop_predicate_functionp_subrp_comprehensive() {
   (subrp nil)
   (subrp 42)
   (subrp "hello"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ fn oracle_prop_predicate_hashtable_chartable_boolvector() {
     (char-table-p bv)
     (bool-vector-p ht)
     (bool-vector-p ct)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ fn oracle_prop_predicate_characterp_comprehensive() {
   (characterp 'a)
   (characterp '(65))
   (characterp [65]))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +230,7 @@ fn oracle_prop_predicate_booleanp_exhaustive() {
   (booleanp [])
   (booleanp (lambda () t))
   (booleanp (make-hash-table)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,7 +323,7 @@ fn oracle_prop_predicate_invariants_mutual_exclusivity() {
                     (if (>= val 0) t nil))
           (setq natnump-ok nil))))
     (list consp-atom-ok listp-ok nlistp-ok numberp-ok natnump-ok)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +364,7 @@ fn oracle_prop_predicate_edge_cases_special_values() {
   (eq 'nil nil)
   (booleanp 'nil)
   (null 'nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -394,5 +394,5 @@ fn oracle_prop_predicate_nested_application() {
   (mapcar #'stringp '("a" 1 nil "b" t ""))
   (mapcar #'symbolp '(foo bar 1 nil t :kw "str"))
   (mapcar #'consp '(nil (1) (a . b) t 42 "x" [1])))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

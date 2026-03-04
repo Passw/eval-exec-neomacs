@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // map-char-table with single-char entries and accumulation
@@ -64,7 +64,7 @@ fn oracle_prop_char_table_comprehensive_map_ranges() {
     (char-table-range ct ?Z)
     (char-table-range ct ?a)
     (length result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ fn oracle_prop_char_table_comprehensive_deep_parent_chain() {
     (progn
       (set-char-table-parent l2 root)
       (char-table-range l3 ?3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ fn oracle_prop_char_table_comprehensive_map_with_default() {
     (char-table-range ct ?x)
     (char-table-range ct ?5)
     (char-table-range ct ?A)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -225,7 +225,7 @@ fn oracle_prop_char_table_comprehensive_subtypes() {
   (let ((ct (make-char-table 'generic)))
     (set-char-table-range ct ?a 42)
     (char-table-subtype ct)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ fn oracle_prop_char_table_comprehensive_transliteration() {
         (list ciphered
               (concat (nreverse decrypted))
               (string= input (concat (nreverse decrypted))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -377,7 +377,7 @@ fn oracle_prop_char_table_comprehensive_scoring_function() {
             (list s1 s2 (> s1 s2)))))
     (fmakunbound 'neovm--ct-build-scores)
     (fmakunbound 'neovm--ct-score-word)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

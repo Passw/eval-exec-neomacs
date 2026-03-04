@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // funcall with 0 through 10+ arguments
@@ -18,33 +18,33 @@ fn oracle_prop_funcall_arg_count_sweep() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // 0 args
-    assert_oracle_parity("(funcall (lambda () 'zero-args))");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda () 'zero-args))");
     // 1 arg
-    assert_oracle_parity("(funcall (lambda (a) a) 'one)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (a) a) 'one)");
     // 2 args
-    assert_oracle_parity("(funcall (lambda (a b) (list a b)) 1 2)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (a b) (list a b)) 1 2)");
     // 3 args
-    assert_oracle_parity("(funcall (lambda (a b c) (+ a b c)) 10 20 30)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (a b c) (+ a b c)) 10 20 30)");
     // 4 args
-    assert_oracle_parity("(funcall (lambda (a b c d) (* (+ a b) (+ c d))) 1 2 3 4)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (a b c d) (* (+ a b) (+ c d))) 1 2 3 4)");
     // 5 args
-    assert_oracle_parity("(funcall (lambda (a b c d e) (list e d c b a)) 1 2 3 4 5)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (a b c d e) (list e d c b a)) 1 2 3 4 5)");
     // 6 args
-    assert_oracle_parity("(funcall (lambda (a b c d e f) (+ a b c d e f)) 1 2 3 4 5 6)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (a b c d e f) (+ a b c d e f)) 1 2 3 4 5 6)");
     // 7 args
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         "(funcall (lambda (a b c d e f g) (list a (+ b c) (+ d e f g))) 1 2 3 4 5 6 7)",
     );
     // 8 args via built-in +
-    assert_oracle_parity("(funcall #'+ 1 2 3 4 5 6 7 8)");
+    assert_oracle_parity_with_bootstrap("(funcall #'+ 1 2 3 4 5 6 7 8)");
     // 9 args
-    assert_oracle_parity("(funcall #'+ 1 2 3 4 5 6 7 8 9)");
+    assert_oracle_parity_with_bootstrap("(funcall #'+ 1 2 3 4 5 6 7 8 9)");
     // 10 args
-    assert_oracle_parity("(funcall #'+ 1 2 3 4 5 6 7 8 9 10)");
+    assert_oracle_parity_with_bootstrap("(funcall #'+ 1 2 3 4 5 6 7 8 9 10)");
     // 12 args via list
-    assert_oracle_parity("(funcall #'list 'a 'b 'c 'd 'e 'f 'g 'h 'i 'j 'k 'l)");
+    assert_oracle_parity_with_bootstrap("(funcall #'list 'a 'b 'c 'd 'e 'f 'g 'h 'i 'j 'k 'l)");
     // 15 args via concat
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(funcall #'concat "a" "b" "c" "d" "e" "f" "g" "h" "i" "j" "k" "l" "m" "n" "o")"#,
     );
 }
@@ -58,7 +58,7 @@ fn oracle_prop_funcall_apply_equivalence() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // funcall with explicit args should equal apply with those args as a list
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((f (lambda (a b c) (+ a b c))))
              (list (= (funcall f 10 20 30)
                        (apply f '(10 20 30)))
@@ -69,7 +69,7 @@ fn oracle_prop_funcall_apply_equivalence() {
     );
 
     // Equivalence with &rest
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((f (lambda (&rest xs) (apply #'+ xs))))
              (list (equal (funcall f) (apply f nil))
                    (equal (funcall f 1) (apply f '(1)))
@@ -78,7 +78,7 @@ fn oracle_prop_funcall_apply_equivalence() {
     );
 
     // Equivalence with &optional
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((f (lambda (a &optional b c) (list a b c))))
              (list (equal (funcall f 1) (apply f '(1)))
                    (equal (funcall f 1 2) (apply f 1 '(2)))
@@ -86,7 +86,7 @@ fn oracle_prop_funcall_apply_equivalence() {
     );
 
     // Equivalence with subrs
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(list (equal (funcall #'list 1 2 3) (apply #'list '(1 2 3)))
                (equal (funcall #'+ 10 20) (apply #'+ '(10 20)))
                (equal (funcall #'cons 'a 'b) (apply #'cons '(a b)))
@@ -103,27 +103,27 @@ fn oracle_prop_apply_spreading_comprehensive() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // 0 spread args + full list
-    assert_oracle_parity("(apply #'+ '(1 2 3 4 5))");
+    assert_oracle_parity_with_bootstrap("(apply #'+ '(1 2 3 4 5))");
     // 1 spread + list
-    assert_oracle_parity("(apply #'+ 100 '(1 2))");
+    assert_oracle_parity_with_bootstrap("(apply #'+ 100 '(1 2))");
     // 2 spread + list
-    assert_oracle_parity("(apply #'list 'a 'b '(c d))");
+    assert_oracle_parity_with_bootstrap("(apply #'list 'a 'b '(c d))");
     // 3 spread + list
-    assert_oracle_parity("(apply #'+ 1 2 3 '(4 5 6))");
+    assert_oracle_parity_with_bootstrap("(apply #'+ 1 2 3 '(4 5 6))");
     // 4 spread + list
-    assert_oracle_parity("(apply #'list 'a 'b 'c 'd '(e f))");
+    assert_oracle_parity_with_bootstrap("(apply #'list 'a 'b 'c 'd '(e f))");
     // 5 spread + empty list (all from spread)
-    assert_oracle_parity("(apply #'+ 1 2 3 4 5 '())");
+    assert_oracle_parity_with_bootstrap("(apply #'+ 1 2 3 4 5 '())");
     // 6 spread + nil
-    assert_oracle_parity("(apply #'list 1 2 3 4 5 6 nil)");
+    assert_oracle_parity_with_bootstrap("(apply #'list 1 2 3 4 5 6 nil)");
     // Spread args are complex expressions
-    assert_oracle_parity("(apply #'+ (* 2 3) (+ 4 5) (- 10 3) '((+ 1 1)))");
+    assert_oracle_parity_with_bootstrap("(apply #'+ (* 2 3) (+ 4 5) (- 10 3) '((+ 1 1)))");
     // Apply with cons-constructed final arg
-    assert_oracle_parity("(apply #'list 'head (cons 'a (cons 'b nil)))");
+    assert_oracle_parity_with_bootstrap("(apply #'list 'head (cons 'a (cons 'b nil)))");
     // Apply with append-constructed final arg
-    assert_oracle_parity("(apply #'+ (append '(1 2) '(3 4)))");
+    assert_oracle_parity_with_bootstrap("(apply #'+ (append '(1 2) '(3 4)))");
     // Apply with mapcar-constructed final arg
-    assert_oracle_parity("(apply #'+ (mapcar #'1+ '(0 1 2 3 4)))");
+    assert_oracle_parity_with_bootstrap("(apply #'+ (mapcar #'1+ '(0 1 2 3 4)))");
 }
 
 // ---------------------------------------------------------------------------
@@ -135,21 +135,21 @@ fn oracle_prop_apply_empty_and_nil_args() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // apply + with empty list => 0
-    assert_oracle_parity("(apply #'+ '())");
+    assert_oracle_parity_with_bootstrap("(apply #'+ '())");
     // apply + with nil => 0
-    assert_oracle_parity("(apply #'+ nil)");
+    assert_oracle_parity_with_bootstrap("(apply #'+ nil)");
     // apply list with nil => ()
-    assert_oracle_parity("(apply #'list nil)");
+    assert_oracle_parity_with_bootstrap("(apply #'list nil)");
     // apply list with empty list => ()
-    assert_oracle_parity("(apply #'list '())");
+    assert_oracle_parity_with_bootstrap("(apply #'list '())");
     // apply concat with nil => ""
-    assert_oracle_parity("(apply #'concat nil)");
+    assert_oracle_parity_with_bootstrap("(apply #'concat nil)");
     // apply with spread args and empty final list
-    assert_oracle_parity("(apply #'list 'a 'b 'c '())");
+    assert_oracle_parity_with_bootstrap("(apply #'list 'a 'b 'c '())");
     // apply with only a single-element list
-    assert_oracle_parity("(apply #'1+ '(41))");
+    assert_oracle_parity_with_bootstrap("(apply #'1+ '(41))");
     // apply with deeply nested argument construction
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         "(apply #'+ (let ((r nil)) (dotimes (i 10) (setq r (cons (1+ i) r))) (nreverse r)))",
     );
 }
@@ -163,7 +163,7 @@ fn oracle_prop_funcall_apply_closures_mutable_state() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Counter closure called via funcall and apply
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((n 0))
              (let ((inc (lambda (&optional amount)
                           (setq n (+ n (or amount 1)))
@@ -177,7 +177,7 @@ fn oracle_prop_funcall_apply_closures_mutable_state() {
     );
 
     // Closure over a list, mutated via nconc
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((log nil))
              (let ((logger (lambda (&rest msgs)
                              (setq log (append log msgs))
@@ -190,7 +190,7 @@ fn oracle_prop_funcall_apply_closures_mutable_state() {
     );
 
     // Closure factory: each call creates a new closure sharing state
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((state 0))
              (let ((make-adder (lambda (base)
                                  (lambda (x)
@@ -215,44 +215,44 @@ fn oracle_prop_funcall_apply_subr_variety() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Arithmetic subrs
-    assert_oracle_parity("(funcall #'+ 1 2 3)");
-    assert_oracle_parity("(funcall #'- 10 3 2)");
-    assert_oracle_parity("(funcall #'* 2 3 4)");
-    assert_oracle_parity("(funcall #'/ 100 5 4)");
-    assert_oracle_parity("(funcall #'% 17 5)");
-    assert_oracle_parity("(funcall #'mod 17 5)");
+    assert_oracle_parity_with_bootstrap("(funcall #'+ 1 2 3)");
+    assert_oracle_parity_with_bootstrap("(funcall #'- 10 3 2)");
+    assert_oracle_parity_with_bootstrap("(funcall #'* 2 3 4)");
+    assert_oracle_parity_with_bootstrap("(funcall #'/ 100 5 4)");
+    assert_oracle_parity_with_bootstrap("(funcall #'% 17 5)");
+    assert_oracle_parity_with_bootstrap("(funcall #'mod 17 5)");
 
     // Comparison subrs
-    assert_oracle_parity("(funcall #'< 1 2 3)");
-    assert_oracle_parity("(funcall #'> 3 2 1)");
-    assert_oracle_parity("(funcall #'= 5 5 5)");
-    assert_oracle_parity("(funcall #'<= 1 1 2)");
-    assert_oracle_parity("(funcall #'>= 3 3 2)");
+    assert_oracle_parity_with_bootstrap("(funcall #'< 1 2 3)");
+    assert_oracle_parity_with_bootstrap("(funcall #'> 3 2 1)");
+    assert_oracle_parity_with_bootstrap("(funcall #'= 5 5 5)");
+    assert_oracle_parity_with_bootstrap("(funcall #'<= 1 1 2)");
+    assert_oracle_parity_with_bootstrap("(funcall #'>= 3 3 2)");
 
     // String subrs
-    assert_oracle_parity(r#"(funcall #'concat "hello" " " "world")"#);
-    assert_oracle_parity(r#"(funcall #'string-to-number "42")"#);
-    assert_oracle_parity(r#"(funcall #'substring "hello world" 6)"#);
-    assert_oracle_parity(r#"(funcall #'upcase "abc")"#);
+    assert_oracle_parity_with_bootstrap(r#"(funcall #'concat "hello" " " "world")"#);
+    assert_oracle_parity_with_bootstrap(r#"(funcall #'string-to-number "42")"#);
+    assert_oracle_parity_with_bootstrap(r#"(funcall #'substring "hello world" 6)"#);
+    assert_oracle_parity_with_bootstrap(r#"(funcall #'upcase "abc")"#);
 
     // List subrs
-    assert_oracle_parity("(funcall #'cons 'a '(b c))");
-    assert_oracle_parity("(funcall #'car '(1 2 3))");
-    assert_oracle_parity("(funcall #'cdr '(1 2 3))");
-    assert_oracle_parity("(funcall #'length '(a b c d))");
-    assert_oracle_parity("(funcall #'nth 2 '(a b c d))");
-    assert_oracle_parity("(funcall #'nthcdr 2 '(a b c d))");
-    assert_oracle_parity("(funcall #'reverse '(1 2 3 4 5))");
-    assert_oracle_parity("(funcall #'append '(1 2) '(3 4) '(5))");
+    assert_oracle_parity_with_bootstrap("(funcall #'cons 'a '(b c))");
+    assert_oracle_parity_with_bootstrap("(funcall #'car '(1 2 3))");
+    assert_oracle_parity_with_bootstrap("(funcall #'cdr '(1 2 3))");
+    assert_oracle_parity_with_bootstrap("(funcall #'length '(a b c d))");
+    assert_oracle_parity_with_bootstrap("(funcall #'nth 2 '(a b c d))");
+    assert_oracle_parity_with_bootstrap("(funcall #'nthcdr 2 '(a b c d))");
+    assert_oracle_parity_with_bootstrap("(funcall #'reverse '(1 2 3 4 5))");
+    assert_oracle_parity_with_bootstrap("(funcall #'append '(1 2) '(3 4) '(5))");
 
     // Predicate subrs
-    assert_oracle_parity("(funcall #'null nil)");
-    assert_oracle_parity("(funcall #'null t)");
-    assert_oracle_parity("(funcall #'numberp 42)");
-    assert_oracle_parity("(funcall #'stringp \"hi\")");
-    assert_oracle_parity("(funcall #'symbolp 'foo)");
-    assert_oracle_parity("(funcall #'consp '(1))");
-    assert_oracle_parity("(funcall #'listp '(1 2))");
+    assert_oracle_parity_with_bootstrap("(funcall #'null nil)");
+    assert_oracle_parity_with_bootstrap("(funcall #'null t)");
+    assert_oracle_parity_with_bootstrap("(funcall #'numberp 42)");
+    assert_oracle_parity_with_bootstrap("(funcall #'stringp \"hi\")");
+    assert_oracle_parity_with_bootstrap("(funcall #'symbolp 'foo)");
+    assert_oracle_parity_with_bootstrap("(funcall #'consp '(1))");
+    assert_oracle_parity_with_bootstrap("(funcall #'listp '(1 2))");
 }
 
 // ---------------------------------------------------------------------------
@@ -264,25 +264,25 @@ fn oracle_prop_apply_non_list_final_arg_errors() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // apply with integer as final arg
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(condition-case err
              (apply #'+ 1 2 3)
            (wrong-type-argument (list 'got-error (car err))))"#,
     );
     // apply with string as final arg
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(condition-case err
              (apply #'+ "not-a-list")
            (wrong-type-argument (list 'got-error (car err))))"#,
     );
     // apply with symbol as final arg (not nil)
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(condition-case err
              (apply #'+ 'not-a-list)
            (wrong-type-argument (list 'got-error (car err))))"#,
     );
     // apply with vector as final arg
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(condition-case err
              (apply #'+ [1 2 3])
            (wrong-type-argument (list 'got-error (car err))))"#,
@@ -329,7 +329,7 @@ fn oracle_prop_nested_funcall_apply_deep() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // 4-level currying
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((f (lambda (a)
                      (lambda (b)
                        (lambda (c)
@@ -338,13 +338,13 @@ fn oracle_prop_nested_funcall_apply_deep() {
     );
 
     // funcall result as arg to apply
-    assert_oracle_parity(r#"(apply #'+ (funcall #'list 1 2 3 4 5))"#);
+    assert_oracle_parity_with_bootstrap(r#"(apply #'+ (funcall #'list 1 2 3 4 5))"#);
 
     // apply result as arg to funcall
-    assert_oracle_parity(r#"(funcall #'1+ (apply #'+ '(1 2 3 4)))"#);
+    assert_oracle_parity_with_bootstrap(r#"(funcall #'1+ (apply #'+ '(1 2 3 4)))"#);
 
     // Double composition
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((compose (lambda (f g) (lambda (&rest args) (funcall f (apply g args))))))
              (let ((add1-then-double (funcall compose (lambda (x) (* x 2)) #'+))
                    (double-then-add1 (funcall compose #'1+ (lambda (&rest xs) (* 2 (apply #'+ xs))))))
@@ -353,7 +353,7 @@ fn oracle_prop_nested_funcall_apply_deep() {
     );
 
     // Pipeline of 5 functions
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((pipe (lambda (fns val)
                          (let ((result val))
                            (dolist (f fns result)
@@ -380,7 +380,7 @@ fn oracle_prop_nested_funcall_apply_deep() {
                 (funcall 'neovm--test-fac-is-odd 21))
         (fmakunbound 'neovm--test-fac-is-even)
         (fmakunbound 'neovm--test-fac-is-odd)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -392,32 +392,32 @@ fn oracle_prop_funcall_rest_arg_combinations() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Pure &rest, 0 args
-    assert_oracle_parity("(funcall (lambda (&rest xs) (length xs)))");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (&rest xs) (length xs)))");
     // Pure &rest, 1 arg
-    assert_oracle_parity("(funcall (lambda (&rest xs) xs) 42)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (&rest xs) xs) 42)");
     // Pure &rest, many args
-    assert_oracle_parity("(funcall (lambda (&rest xs) xs) 1 2 3 4 5 6 7 8)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (&rest xs) xs) 1 2 3 4 5 6 7 8)");
 
     // 1 required + &rest, 0 rest
-    assert_oracle_parity("(funcall (lambda (a &rest xs) (list a xs)) 'only)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (a &rest xs) (list a xs)) 'only)");
     // 1 required + &rest, many rest
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         "(funcall (lambda (a &rest xs) (list a (length xs) (apply #'+ xs))) 'h 1 2 3 4 5)",
     );
 
     // 2 required + &rest
-    assert_oracle_parity("(funcall (lambda (a b &rest xs) (list a b xs)) 1 2)");
-    assert_oracle_parity("(funcall (lambda (a b &rest xs) (list a b xs)) 1 2 3 4 5)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (a b &rest xs) (list a b xs)) 1 2)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (a b &rest xs) (list a b xs)) 1 2 3 4 5)");
 
     // 1 required + 1 optional + &rest
-    assert_oracle_parity("(funcall (lambda (a &optional b &rest xs) (list a b xs)) 1)");
-    assert_oracle_parity("(funcall (lambda (a &optional b &rest xs) (list a b xs)) 1 2)");
-    assert_oracle_parity("(funcall (lambda (a &optional b &rest xs) (list a b xs)) 1 2 3 4)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (a &optional b &rest xs) (list a b xs)) 1)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (a &optional b &rest xs) (list a b xs)) 1 2)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (a &optional b &rest xs) (list a b xs)) 1 2 3 4)");
 
     // 2 optional + &rest
-    assert_oracle_parity("(funcall (lambda (&optional a b &rest xs) (list a b xs)))");
-    assert_oracle_parity("(funcall (lambda (&optional a b &rest xs) (list a b xs)) 'x)");
-    assert_oracle_parity("(funcall (lambda (&optional a b &rest xs) (list a b xs)) 'x 'y 'z1 'z2)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (&optional a b &rest xs) (list a b xs)))");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (&optional a b &rest xs) (list a b xs)) 'x)");
+    assert_oracle_parity_with_bootstrap("(funcall (lambda (&optional a b &rest xs) (list a b xs)) 'x 'y 'z1 'z2)");
 }
 
 // ---------------------------------------------------------------------------
@@ -429,15 +429,15 @@ fn oracle_prop_apply_spreading_with_rest() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // apply + rest: spread args contribute to both fixed and rest
-    assert_oracle_parity("(apply (lambda (a &rest xs) (cons a xs)) 'first '(second third))");
-    assert_oracle_parity("(apply (lambda (a b &rest xs) (list a b xs)) 1 2 '(3 4 5))");
-    assert_oracle_parity("(apply (lambda (a b &rest xs) (list a b xs)) 1 '(2))");
+    assert_oracle_parity_with_bootstrap("(apply (lambda (a &rest xs) (cons a xs)) 'first '(second third))");
+    assert_oracle_parity_with_bootstrap("(apply (lambda (a b &rest xs) (list a b xs)) 1 2 '(3 4 5))");
+    assert_oracle_parity_with_bootstrap("(apply (lambda (a b &rest xs) (list a b xs)) 1 '(2))");
 
     // apply where all args come from the spread list
-    assert_oracle_parity("(apply (lambda (a b c &rest xs) (list a b c xs)) '(10 20 30 40 50))");
+    assert_oracle_parity_with_bootstrap("(apply (lambda (a b c &rest xs) (list a b c xs)) '(10 20 30 40 50))");
 
     // apply with dynamically constructed arg list
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((args (number-sequence 1 10)))
              (apply (lambda (&rest xs) (apply #'+ xs)) args))"#,
     );
@@ -452,7 +452,7 @@ fn oracle_prop_funcall_higher_order_composition() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // map + filter + reduce via funcall
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((my-filter (lambda (pred lst)
                               (let ((result nil))
                                 (dolist (x lst (nreverse result))
@@ -471,7 +471,7 @@ fn oracle_prop_funcall_higher_order_composition() {
     );
 
     // Partial application helper
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((partial (lambda (f &rest initial-args)
                             (lambda (&rest more-args)
                               (apply f (append initial-args more-args))))))
@@ -485,7 +485,7 @@ fn oracle_prop_funcall_higher_order_composition() {
     );
 
     // Function dispatch table using alist + funcall
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((dispatch '((add . +) (sub . -) (mul . *) (div . /))))
              (let ((run-op (lambda (op &rest args)
                              (let ((fn (cdr (assq op dispatch))))
@@ -525,7 +525,7 @@ fn oracle_prop_funcall_symbol_function_indirection() {
               (funcall #'neovm--test-fac-triple 5)
               (funcall (symbol-function 'neovm--test-fac-triple) 5)))
         (fmakunbound 'neovm--test-fac-triple)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -537,49 +537,49 @@ fn oracle_prop_funcall_wrong_arg_count_errors() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Too few args to fixed-arity lambda
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(condition-case err
              (funcall (lambda (a b c) (+ a b c)) 1 2)
            (wrong-number-of-arguments 'too-few))"#,
     );
 
     // Too many args to fixed-arity lambda
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(condition-case err
              (funcall (lambda (a b) (+ a b)) 1 2 3)
            (wrong-number-of-arguments 'too-many))"#,
     );
 
     // Too few for required + optional (need at least 1)
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(condition-case err
              (funcall (lambda (a &optional b) (list a b)))
            (wrong-number-of-arguments 'too-few))"#,
     );
 
     // Too many for required + optional (no &rest)
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(condition-case err
              (funcall (lambda (a &optional b) (list a b)) 1 2 3)
            (wrong-number-of-arguments 'too-many))"#,
     );
 
     // funcall with non-function value
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(condition-case err
              (funcall 42)
            (invalid-function (list 'invalid-function (cadr err))))"#,
     );
 
     // funcall with void symbol
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(condition-case err
              (funcall 'neovm--test-fac-nonexistent-fn123)
            (void-function (list 'void (cadr err))))"#,
     );
 
     // apply with too few for required params
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(condition-case err
              (apply (lambda (a b c) (+ a b c)) '(1))
            (wrong-number-of-arguments 'too-few-apply))"#,
@@ -595,7 +595,7 @@ fn oracle_prop_funcall_apply_self_application() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Factorial via self-passing
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((fact (lambda (self n)
                          (if (<= n 1) 1
                            (* n (funcall self self (1- n)))))))
@@ -607,7 +607,7 @@ fn oracle_prop_funcall_apply_self_application() {
     );
 
     // Fibonacci via self-passing with memoization
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((memo (make-hash-table :test 'eql)))
              (let ((fib (lambda (self n)
                           (or (gethash n memo)
@@ -621,7 +621,7 @@ fn oracle_prop_funcall_apply_self_application() {
     );
 
     // Trampoline pattern: functions return thunks until non-function
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((trampoline (lambda (fn &rest args)
                                 (let ((result (apply fn args)))
                                   (while (functionp result)
@@ -649,7 +649,7 @@ fn oracle_prop_funcall_apply_data_structure_ops() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Use funcall to build and query hash tables
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((ht (make-hash-table :test 'equal)))
              (let ((set-val (lambda (k v) (puthash k v ht)))
                    (get-val (lambda (k) (gethash k ht 'missing))))
@@ -664,7 +664,7 @@ fn oracle_prop_funcall_apply_data_structure_ops() {
     );
 
     // Use apply with vector operations
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((v [10 20 30 40 50]))
              (list (apply #'+ (append v nil))
                    (funcall #'aref v 0)
@@ -673,7 +673,7 @@ fn oracle_prop_funcall_apply_data_structure_ops() {
     );
 
     // Reduce over a vector via funcall
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((vec [3 1 4 1 5 9 2 6]))
              (let ((max-val (aref vec 0))
                    (min-val (aref vec 0))

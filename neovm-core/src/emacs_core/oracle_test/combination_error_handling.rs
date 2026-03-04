@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Nested condition-case with different error types
@@ -40,7 +40,7 @@ fn oracle_prop_nested_condition_case_type_dispatch() {
                    (funcall dispatch 'void-variable '(undefined-var))
                    ;; Falls through inner, caught by outer generic error
                    (funcall dispatch 'file-error '(\"not found\"))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ fn oracle_prop_custom_error_data_propagation() {
                        (setq results (cons (list 'nested-data (cdr err))
                                            results))))
                     (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ fn oracle_prop_unwind_protect_ordering_nested_errors() {
                         (setq log (cons 'cleanup-3 log)))
                     (error nil))
                   (nreverse log))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +137,7 @@ fn oracle_prop_condition_case_catch_throw_interaction() {
                              (error
                               (setq log (cons 'handler log)))))))
                     (list result (nreverse log))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn oracle_prop_error_inside_catch_caught_by_condition_case() {
                               (setq log (cons 'caught-error log))
                               'error-handled)))))
                     (list result (nreverse log))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ fn oracle_prop_error_recovery_retry_with_backoff() {
                            (setq attempt-log
                                  (cons (list 'err (cadr err)) attempt-log))))))
                     (list final-result (nreverse attempt-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -250,5 +250,5 @@ fn oracle_prop_unwind_protect_with_throw_and_error() {
                      (setq log (cons (list 'error (cdr err)) log))))
                   ;; catch returns the thrown value, cleanup still ran
                   (nreverse log))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

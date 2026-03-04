@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // move-to-column with FORCE parameter
@@ -78,7 +78,7 @@ fn oracle_prop_current_column_tab_stops() {
                       (forward-char 3) ;; skip three tabs
                       (setq results (cons (current-column) results))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -99,7 +99,7 @@ fn oracle_prop_current_column_multibyte() {
                       (forward-char 1)
                       (setq results (cons (current-column) results))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ fn oracle_prop_line_number_at_pos_with_narrowing() {
                                         (line-number-at-pos (point-max) t))))
                         (widen)
                         (list normal narrowed absolute))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,5 +262,5 @@ fn oracle_prop_rectangular_region_extraction() {
                       ;; Also compute width of each extracted piece
                       (let ((widths (mapcar 'length (reverse rect))))
                         (list (nreverse rect) widths))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

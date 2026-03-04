@@ -2,7 +2,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_type_of_integer() {
@@ -83,7 +83,7 @@ fn oracle_prop_type_of_vector() {
 fn oracle_prop_type_of_hash_table() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(type-of (make-hash-table))");
+    assert_oracle_parity_with_bootstrap("(type-of (make-hash-table))");
 }
 
 #[test]
@@ -113,5 +113,5 @@ fn oracle_prop_type_of_mapped_over_list() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = r####"(mapcar 'type-of (list 1 "s" 'sym '(a) [v] 3.0))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

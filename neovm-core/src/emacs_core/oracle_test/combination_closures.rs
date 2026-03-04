@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Closure as counter (mutable closed-over state)
@@ -33,7 +33,7 @@ fn oracle_prop_closure_counter() {
                             (funcall c1)     ;; 1
                             (funcall c2))))" ;; 103
     ;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ fn oracle_prop_closure_accumulator() {
                               ;; Add more
                               (progn (funcall add 'd) (funcall count))
                               (funcall get)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -94,7 +94,7 @@ fn oracle_prop_closure_compose() {
                        (funcall (funcall compose inc double) 3)  ;; 3*2+1=7
                        ;; pipe: left-to-right
                        (funcall (funcall pipe inc double square) 3))))"#; // ((3+1)*2)^2=64
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +129,7 @@ fn oracle_prop_closure_iterator() {
                               (funcall make-range-iter 0 10 2))
                      (funcall iter-collect
                               (funcall make-range-iter 10 10))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ fn oracle_prop_closure_memoize() {
                          call-count               ;; 2
                          (funcall expensive 3 4)  ;; 25, cached
                          call-count))))"#; // still 2
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ fn oracle_prop_closure_observable() {
                         (funcall set-val 30)
                         (list (funcall get-val)
                               (nreverse log)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -251,5 +251,5 @@ fn oracle_prop_closure_middleware() {
                         (list
                          (funcall stack "hello")
                          (funcall stack "world")))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

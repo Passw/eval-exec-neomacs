@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // encode-char converting characters to charset representation
@@ -35,7 +35,7 @@ fn oracle_prop_decode_encode_char_encode_basic() {
       (setq results (cons (list :ascii-reject ch encoded (null encoded))
                           results))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ fn oracle_prop_decode_encode_char_decode_basic() {
                                 (and decoded (= code decoded)))
                           results))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

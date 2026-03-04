@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Tokenizer for calculator input
@@ -82,7 +82,7 @@ fn oracle_prop_calc_repl_tokenizer() {
         (funcall 'neovm--cr-tokenize "123.456 + 789")
         (funcall 'neovm--cr-tokenize "foo_bar = baz_1 + 42"))
     (fmakunbound 'neovm--cr-tokenize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +295,7 @@ fn oracle_prop_calc_repl_parser_evaluator() {
     (makunbound 'neovm--cr2-env)
     (makunbound 'neovm--cr2-ans)
     (makunbound 'neovm--cr2-history)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -450,7 +450,7 @@ fn oracle_prop_calc_repl_error_handling() {
     (fmakunbound 'neovm--cr3-eval-line)
     (makunbound 'neovm--cr3-toks)
     (makunbound 'neovm--cr3-env)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -602,7 +602,7 @@ fn oracle_prop_calc_repl_history_and_ans() {
     (makunbound 'neovm--cr4-env)
     (makunbound 'neovm--cr4-ans)
     (makunbound 'neovm--cr4-hist)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -754,7 +754,7 @@ fn oracle_prop_calc_repl_multi_statement() {
     (fmakunbound 'neovm--cr5-process)
     (makunbound 'neovm--cr5-toks)
     (makunbound 'neovm--cr5-env)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -928,5 +928,5 @@ fn oracle_prop_calc_repl_builtin_functions() {
     (fmakunbound 'neovm--cr6-eval)
     (makunbound 'neovm--cr6-toks)
     (makunbound 'neovm--cr6-env)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

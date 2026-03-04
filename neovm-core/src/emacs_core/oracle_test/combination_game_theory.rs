@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Payoff matrix representation and lookup
@@ -69,7 +69,7 @@ fn oracle_prop_combination_game_theory_payoff_matrix() {
     (fmakunbound 'neovm--gt-payoff)
     (fmakunbound 'neovm--gt-p1-payoff)
     (fmakunbound 'neovm--gt-p2-payoff)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ fn oracle_prop_combination_game_theory_dominant_strategy() {
     (fmakunbound 'neovm--gt-p2-dominates)
     (fmakunbound 'neovm--gt-find-dominant-p1)
     (fmakunbound 'neovm--gt-find-dominant-p2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -497,7 +497,7 @@ fn oracle_prop_combination_game_theory_zero_sum_minimax() {
     (fmakunbound 'neovm--zs-maximin)
     (fmakunbound 'neovm--zs-minimax)
     (fmakunbound 'neovm--zs-saddle-point)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -558,5 +558,5 @@ fn oracle_prop_combination_game_theory_mixed_strategy() {
        (funcall 'neovm--ms-compute 4 1 2 3))
     (fmakunbound 'neovm--ms-compute)
     (fmakunbound 'neovm--ms-verify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

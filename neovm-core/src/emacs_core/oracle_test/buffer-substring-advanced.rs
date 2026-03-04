@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // buffer-substring with properties vs without
@@ -95,7 +95,7 @@ fn oracle_prop_buffer_substring_multibyte_chars() {
                             (length nihon)
                             ;; Verify string-bytes differs from string length for multibyte
                             (> (string-bytes full) (length full)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ fn oracle_prop_buffer_substring_delete_and_extract_vs_manual() {
                               (string= remaining1 remaining2)
                               extracted1
                               remaining1))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +209,7 @@ fn oracle_prop_buffer_substring_line_diff() {
                               (setq diffs (cons (list 'added i lb) diffs)))))
                           (setq a (cdr a) b (cdr b) i (1+ i))))
                       (nreverse diffs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ fn oracle_prop_buffer_substring_extract_reconstruct() {
                                 original
                                 ;; Verify lengths match
                                 (= (length reversed) (length original)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -294,5 +294,5 @@ fn oracle_prop_buffer_string_vs_substring_full_range() {
                                   results)))
                     ;; All should be t
                     (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

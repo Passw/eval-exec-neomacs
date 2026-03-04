@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Three-address code generation from AST
@@ -96,7 +96,7 @@ fn oracle_prop_codegen_three_address() {
     (makunbound 'neovm--tac-counter)
     (fmakunbound 'neovm--tac-fresh)
     (fmakunbound 'neovm--tac-gen)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

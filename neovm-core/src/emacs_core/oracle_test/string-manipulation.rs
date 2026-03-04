@@ -4,15 +4,15 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use proptest::prelude::*;
 
-use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_string_width() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(string-width "hello")"#);
-    assert_oracle_parity(r#"(string-width "")"#);
-    assert_oracle_parity(r#"(string-width "abc")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-width "hello")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-width "")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-width "abc")"#);
 }
 
 #[test]
@@ -44,61 +44,61 @@ fn oracle_prop_string_suffix_p() {
 fn oracle_prop_string_trim() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(string-trim "  hello  ")"#);
-    assert_oracle_parity(r#"(string-trim "\t\nhello\n\t")"#);
-    assert_oracle_parity(r#"(string-trim "hello")"#);
-    assert_oracle_parity(r#"(string-trim "")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "  hello  ")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "\t\nhello\n\t")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "hello")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "")"#);
 }
 
 #[test]
 fn oracle_prop_string_trim_left() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(string-trim-left "  hello  ")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim-left "  hello  ")"#);
 }
 
 #[test]
 fn oracle_prop_string_trim_right() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(string-trim-right "  hello  ")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim-right "  hello  ")"#);
 }
 
 #[test]
 fn oracle_prop_string_join() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(string-join '("a" "b" "c") "-")"#);
-    assert_oracle_parity(r#"(string-join '("a" "b" "c") "")"#);
-    assert_oracle_parity(r#"(string-join '("only") ",")"#);
-    assert_oracle_parity(r#"(string-join nil ",")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-join '("a" "b" "c") "-")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-join '("a" "b" "c") "")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-join '("only") ",")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-join nil ",")"#);
 }
 
 #[test]
 fn oracle_prop_split_string_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(split-string "a-b-c" "-")"#);
-    assert_oracle_parity(r#"(split-string "hello world" " ")"#);
-    assert_oracle_parity(r#"(split-string "no-split" "X")"#);
+    assert_oracle_parity_with_bootstrap(r#"(split-string "a-b-c" "-")"#);
+    assert_oracle_parity_with_bootstrap(r#"(split-string "hello world" " ")"#);
+    assert_oracle_parity_with_bootstrap(r#"(split-string "no-split" "X")"#);
 }
 
 #[test]
 fn oracle_prop_string_replace() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(string-replace "world" "emacs" "hello world")"#);
-    assert_oracle_parity(r#"(string-replace "x" "y" "no match")"#);
-    assert_oracle_parity(r#"(string-replace "a" "bb" "banana")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-replace "world" "emacs" "hello world")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-replace "x" "y" "no match")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-replace "a" "bb" "banana")"#);
 }
 
 #[test]
 fn oracle_prop_string_search() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(string-search "world" "hello world")"#);
-    assert_oracle_parity(r#"(string-search "xyz" "hello world")"#);
-    assert_oracle_parity(r#"(string-search "l" "hello" 3)"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-search "world" "hello world")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-search "xyz" "hello world")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-search "l" "hello" 3)"#);
 }
 
 proptest! {

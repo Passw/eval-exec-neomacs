@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Process representation and sequential composition
@@ -387,7 +387,7 @@ fn oracle_prop_process_algebra_channel_communication() {
     (fmakunbound 'neovm--pa4-send)
     (fmakunbound 'neovm--pa4-recv)
     (fmakunbound 'neovm--pa4-sync)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

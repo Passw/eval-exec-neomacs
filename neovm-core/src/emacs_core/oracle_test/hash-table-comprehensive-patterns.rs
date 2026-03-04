@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-hash-table with all keyword arguments
@@ -57,7 +57,7 @@ fn oracle_prop_hash_table_all_keyword_args() {
                       (hash-table-p 42)
                       (hash-table-p "not a table")
                       (hash-table-p nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ fn oracle_prop_hash_table_test_function_semantics() {
                             ;; Same cons cells
                             (gethash l1 h-eq)
                             (gethash l1 h-equal))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ fn oracle_prop_hash_table_gethash_default_and_remhash() {
                       (setq results (cons (remhash 'a h) results))
                       (setq results (cons (hash-table-count h) results))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ fn oracle_prop_hash_table_clrhash_and_reuse() {
                                                    (hash-table-p h))
                                              snapshots))
                       (nreverse snapshots)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ fn oracle_prop_hash_table_maphash_complex_lambdas() {
                             (sort passing #'string<)
                             (sort grade-list
                                   (lambda (a b) (string< (car a) (car b)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -307,7 +307,7 @@ fn oracle_prop_hash_table_copy_independence_thorough() {
                           (gethash 5 copy)
                           (gethash "str-key" copy)
                           (gethash 4 copy 'not-here)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -363,7 +363,7 @@ fn oracle_prop_hash_table_nested_tables() {
                         ;; hash-table-p on inner values
                         (hash-table-p (gethash 'user1 outer))
                         (hash-table-p (gethash "hobbies" inner1)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -415,7 +415,7 @@ fn oracle_prop_hash_table_mixed_key_types() {
                       ;; Count shouldn't change on overwrite
                       (setq results (cons (hash-table-count h) results))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -451,7 +451,7 @@ fn oracle_prop_hash_table_metadata_dynamic() {
                       ;; test is preserved throughout
                       (setq trace (cons (list 'test-preserved (hash-table-test h)) trace))
                       (nreverse trace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -505,5 +505,5 @@ fn oracle_prop_hash_table_frequency_counter() {
                               (sort common #'string<)
                               (hash-table-count freq)
                               (sort groups (lambda (a b) (> (car a) (car b))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

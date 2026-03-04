@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Register file: create, read, write, bulk operations
@@ -74,7 +74,7 @@ fn oracle_prop_regvm_register_file() {
     (fmakunbound 'neovm--regvm-set)
     (fmakunbound 'neovm--regvm-dump)
     (fmakunbound 'neovm--regvm-copy)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +264,7 @@ fn oracle_prop_regvm_conditional_jumps() {
                          '(HALT))         ;; 5: done
                  '((0 . 5)) 200))
     (fmakunbound 'neovm--regvm2-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -378,7 +378,7 @@ fn oracle_prop_regvm_call_stack() {
                          '(HALT))          ;; 5
                  nil 100))
     (fmakunbound 'neovm--regvm3-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -455,7 +455,7 @@ fn oracle_prop_regvm_fibonacci() {
             (setq results (cons (car (funcall 'neovm--regvm-fib-run n)) results)))
           (nreverse results)))
     (fmakunbound 'neovm--regvm-fib-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -515,7 +515,7 @@ fn oracle_prop_regvm_factorial() {
         (mapcar (lambda (n) (car (funcall 'neovm--regvm-fact-run n)))
                 '(0 1 2 3 4 5 6 7 8 9 10)))
     (fmakunbound 'neovm--regvm-fact-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -592,5 +592,5 @@ fn oracle_prop_regvm_instruction_encoding() {
     (fmakunbound 'neovm--regvm-encode)
     (fmakunbound 'neovm--regvm-decode)
     (makunbound 'neovm--regvm-opcodes)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

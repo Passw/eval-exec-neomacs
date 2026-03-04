@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // setq: multiple pairs with cross-referencing values
@@ -26,7 +26,7 @@ fn oracle_prop_setq_setf_multiple_pairs_cross_reference() {
                     (list a b c d e
                           ;; setq returns the last value
                           (setq a 100 b 200 c 300)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +55,7 @@ fn oracle_prop_setq_setf_set_with_computed_symbol() {
               neovm--test-set-target-a))
     (makunbound 'neovm--test-set-target-a)
     (makunbound 'neovm--test-set-target-b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // defvar and defconst creating special variables
@@ -77,7 +77,7 @@ fn oracle_prop_dynamic_comprehensive_let_special() {
         (setq after neovm--test-ls-var)
         (list before during after))
     (makunbound 'neovm--test-ls-var)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ fn oracle_prop_dynamic_comprehensive_visible_in_called_fns() {
     (fmakunbound 'neovm--test-vcf-get-color)
     (fmakunbound 'neovm--test-vcf-format-color)
     (makunbound 'neovm--test-vcf-color)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ fn oracle_prop_dynamic_comprehensive_symbol_value_set() {
         (setq results (cons (symbol-value 'neovm--test-svs-x) results))
         (nreverse results))
     (makunbound 'neovm--test-svs-x)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +180,7 @@ fn oracle_prop_dynamic_comprehensive_boundp_makunbound() {
     (when (boundp 'neovm--test-bm-var)
       (makunbound 'neovm--test-bm-var))
     ))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ fn oracle_prop_dynamic_comprehensive_buffer_local() {
                           (local-variable-p 'neovm--test-bl-var))))))  ;; nil
           (kill-buffer buf)))
     (makunbound 'neovm--test-bl-var)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -293,7 +293,7 @@ fn oracle_prop_dynamic_comprehensive_local_variable_p() {
           (kill-buffer buf2)))
     (makunbound 'neovm--test-lvp-a)
     (makunbound 'neovm--test-lvp-b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -330,7 +330,7 @@ fn oracle_prop_dynamic_comprehensive_lexical_interaction() {
             (setq results (cons (funcall reader) results))
             (nreverse results))))
     (makunbound 'neovm--test-li-dyn)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -369,7 +369,7 @@ fn oracle_prop_dynamic_comprehensive_recursive_dynamic() {
     (fmakunbound 'neovm--test-rd-walk)
     (makunbound 'neovm--test-rd-depth)
     (makunbound 'neovm--test-rd-trace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -408,5 +408,5 @@ fn oracle_prop_dynamic_comprehensive_catch_throw_restore() {
     (makunbound 'neovm--test-ctr-a)
     (makunbound 'neovm--test-ctr-b)
     (makunbound 'neovm--test-ctr-c)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

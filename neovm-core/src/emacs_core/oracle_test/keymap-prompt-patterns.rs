@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // keymapp on various object types
@@ -41,7 +41,7 @@ fn oracle_prop_keymapp_comprehensive() {
                     (keymapp (car (list (make-sparse-keymap))))
                     ;; Copy of a keymap is still a keymap
                     (keymapp (copy-keymap (make-sparse-keymap))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ fn oracle_prop_keymap_parent_lookup_inheritance() {
                                               (lookup-key parent [?b])
                                               (lookup-key parent [?e]))))
                           (list before after parent-state)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ fn oracle_prop_keymap_hierarchical_system() {
                       (eq (keymap-parent prog-mode) text-mode)
                       (eq (keymap-parent text-mode) fundamental)
                       (keymap-parent fundamental)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

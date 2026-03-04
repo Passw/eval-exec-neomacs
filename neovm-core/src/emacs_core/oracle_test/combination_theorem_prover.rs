@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // CNF conversion: propositional logic formula to conjunctive normal form
@@ -120,7 +120,7 @@ fn oracle_prop_theorem_prover_cnf_conversion() {
     (fmakunbound 'neovm--tp-nnf)
     (fmakunbound 'neovm--tp-distribute)
     (fmakunbound 'neovm--tp-to-cnf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ fn oracle_prop_theorem_prover_unification() {
     (fmakunbound 'neovm--tp-walk)
     (fmakunbound 'neovm--tp-unify)
     (fmakunbound 'neovm--tp-apply-subst)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -573,7 +573,7 @@ fn oracle_prop_theorem_prover_skolemization() {
     (fmakunbound 'neovm--tp-fresh-skolem)
     (fmakunbound 'neovm--tp-skolemize)
     (fmakunbound 'neovm--tp-subst-term)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

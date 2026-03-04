@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // delete-region: exhaustive boundary combinations
@@ -192,7 +192,7 @@ fn oracle_prop_delete_region_comp_extract_various() {
            (e3 (delete-and-extract-region 1 4)))
       (setq results (cons (list 'sequential e1 e2 e3 (buffer-string)) results))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -373,7 +373,7 @@ fn oracle_prop_delete_region_comp_size_tracking() {
     (widen)
     (setq log (cons (list 'widened (buffer-size) (point-min) (point-max) (point) (buffer-string)) log))
     (nreverse log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -432,5 +432,5 @@ fn oracle_prop_delete_region_comp_boundary_edge_cases() {
         (progn (delete-char 1) 'no-error)
       (error (setq results (cons (list 'del-char-after-end (car err)) results)))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

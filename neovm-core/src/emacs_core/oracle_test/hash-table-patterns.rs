@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Hash table test parameter
@@ -23,7 +23,7 @@ fn oracle_prop_hash_table_test_eq() {
                             (gethash 'foo h)
                             (gethash 'bar h)
                             (hash-table-test h))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -38,7 +38,7 @@ fn oracle_prop_hash_table_test_eql() {
                           (gethash 1.0 h)
                           (gethash 2 h)
                           (hash-table-test h)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -54,7 +54,7 @@ fn oracle_prop_hash_table_test_equal() {
                           (gethash '(a b) h)
                           (gethash [1 2] h)
                           (hash-table-test h)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ fn oracle_prop_hash_table_size_and_count() {
                               after-count
                               (hash-table-count h)
                               (hash-table-p h)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ fn oracle_prop_hash_table_clrhash() {
                             (hash-table-count h)
                             (gethash 'a h)
                             (hash-table-p h))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -122,7 +122,7 @@ fn oracle_prop_hash_table_copy() {
                             (gethash "z" copy)
                             (hash-table-count orig)
                             (hash-table-count copy))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ fn oracle_prop_hash_table_maphash_collect() {
                       (list (sort keys #'string-lessp)
                             (sort vals #'<)
                             sum)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +173,7 @@ fn oracle_prop_hash_table_frequency_counter() {
                                   (and (= (cdr a) (cdr b))
                                        (string< (symbol-name (car a))
                                                  (symbol-name (car b)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +208,7 @@ fn oracle_prop_hash_table_graph_bfs() {
                                     (append queue
                                             (list neighbor)))))))
                       (nreverse order)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -244,7 +244,7 @@ fn oracle_prop_hash_table_bimap() {
                        ;; Missing
                        (funcall bimap-get-fwd "JP")
                        (funcall bimap-get-rev "Tokyo"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -292,5 +292,5 @@ fn oracle_prop_hash_table_group_pivot() {
                             (lambda (a b)
                               (string< (symbol-name (car a))
                                        (symbol-name (car b)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

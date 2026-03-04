@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Email format validation using regex
@@ -63,7 +63,7 @@ fn oracle_prop_validation_email_format() {
                   test-emails)))
       ;; Cleanup
       (fmakunbound 'test--validate-email))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ fn oracle_prop_validation_date_leap_year() {
       (fmakunbound 'test--leap-year-p)
       (fmakunbound 'test--days-in-month)
       (fmakunbound 'test--validate-date))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ fn oracle_prop_validation_nested_schema_check() {
               user-schema))))
       ;; Cleanup
       (fmakunbound 'test--validate-schema))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -311,7 +311,7 @@ fn oracle_prop_validation_constraint_propagation() {
               (start_date . 20261231) (end_date . 20260101)))))
       ;; Cleanup
       (fmakunbound 'test--validate-constraints))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -399,7 +399,7 @@ Returns (:ok form-data) or (:errors error-list)."
       ;; Cleanup
       (fmakunbound 'test--validate-field)
       (fmakunbound 'test--validate-form))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -553,5 +553,5 @@ Returns (ok . final-value) or (error . first-error-msg)."
               (test--chain-validate "hello world" username-chain)))))
       ;; Cleanup
       (fmakunbound 'test--chain-validate))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

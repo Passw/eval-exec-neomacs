@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Closures with lexical binding simulation and environment chains
@@ -170,7 +170,7 @@ fn oracle_prop_interp2_closures_lexical_env() {
                            (app is-odd 0) (app is-odd 3) (app is-odd 6)))
                 nil))
     (fmakunbound 'neovm--i2-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -377,7 +377,7 @@ fn oracle_prop_interp2_trampoline_tco() {
     (fmakunbound 'neovm--tramp-sum)
     (fmakunbound 'neovm--tramp-countdown-iter)
     (fmakunbound 'neovm--tramp-countdown)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -565,7 +565,7 @@ fn oracle_prop_interp2_error_handling() {
                   (catch validation msg (mklist "invalid" msg)))
                 nil))
     (fmakunbound 'neovm--e-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -702,7 +702,7 @@ fn oracle_prop_interp2_scoping_and_capture() {
                      (app double 21)))
                 nil))
     (fmakunbound 'neovm--i2-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -863,5 +863,5 @@ fn oracle_prop_interp2_mutation_and_sequencing() {
                              (app increment) (app increment))))
                 nil))
     (fmakunbound 'neovm--m-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

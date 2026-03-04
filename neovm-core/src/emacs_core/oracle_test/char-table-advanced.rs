@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-char-table with subtype, set-char-table-range for single/range/default
@@ -35,7 +35,7 @@ fn oracle_prop_char_table_advanced_range_types() {
    ;; Char just outside the range gets default
    (char-table-range ct ?/)
    (char-table-range ct ?:)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ fn oracle_prop_char_table_advanced_parent_chain() {
    (eq (char-table-parent c) p)
    (eq (char-table-parent p) gp)
    (char-table-parent gp)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ fn oracle_prop_char_table_advanced_predicates() {
   (vector-or-char-table-p (make-char-table 'generic))
   (vector-or-char-table-p [1 2 3])
   (vector-or-char-table-p '(1 2 3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ fn oracle_prop_char_table_advanced_parent_override() {
           ;; ?b still inherited
           (after-b (char-table-range child ?b)))
       (list before-a before-b after-a after-b))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ fn oracle_prop_char_table_advanced_case_mapping() {
       (list first-pass
             (concat (nreverse second-output))
             (string= input (concat (nreverse second-output)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,5 +262,5 @@ fn oracle_prop_char_table_advanced_frequency_counter() {
       (char-table-range freq ?r)
       (char-table-range freq ?c)
       (char-table-range freq ?d))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

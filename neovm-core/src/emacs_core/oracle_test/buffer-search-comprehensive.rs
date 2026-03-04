@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // search-forward: all parameters, edge cases
@@ -56,7 +56,7 @@ fn oracle_prop_search_forward_comprehensive_params() {
       (goto-char 5)
       (let ((r (search-forward "" nil t)))
         (list r (point))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -316,7 +316,7 @@ fn oracle_prop_skip_chars_comprehensive() {
       (goto-char (point-min))
       (let ((n (skip-chars-forward "a-z-")))  ;; letters and hyphens
         (list n (point) (buffer-substring (point-min) (point)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

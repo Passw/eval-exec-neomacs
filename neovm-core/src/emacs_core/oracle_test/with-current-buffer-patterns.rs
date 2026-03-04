@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic: switch to a named buffer, operate, return to original
@@ -30,7 +30,7 @@ fn oracle_prop_with_current_buffer_basic_switch() {
                 (eq (current-buffer) buf)
                 (buffer-name buf))))
     (kill-buffer buf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ fn oracle_prop_with_current_buffer_string_vs_object() {
           (let ((via-str (with-current-buffer (buffer-name buf) (buffer-string))))
             (list via-obj via-str (string= via-obj via-str)))))
     (kill-buffer buf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ fn oracle_prop_with_current_buffer_nested() {
     (kill-buffer buf-a)
     (kill-buffer buf-b)
     (kill-buffer buf-c)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ fn oracle_prop_with_current_buffer_buffer_local_vars() {
           (list x-val y-val)))
     (kill-buffer buf-x)
     (kill-buffer buf-y)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ fn oracle_prop_with_current_buffer_cross_buffer_copy() {
                   count))))
     (kill-buffer src)
     (kill-buffer dst)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ fn oracle_prop_with_current_buffer_multi_buffer_state() {
           (nreverse contents)))
     (dolist (b bufs)
       (when (buffer-live-p b) (kill-buffer b)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +235,7 @@ fn oracle_prop_with_current_buffer_inside_save_excursion() {
                   (with-current-buffer buf2 (buffer-string))
                   (buffer-string)))
         (kill-buffer buf2)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +263,7 @@ fn oracle_prop_with_current_buffer_return_and_side_effects() {
               (with-current-buffer buf (point-max))
               (with-current-buffer buf (buffer-size))))
     (kill-buffer buf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -289,7 +289,7 @@ fn oracle_prop_with_current_buffer_multiple_body_forms() {
           (list result (nreverse log)
                 (with-current-buffer buf (buffer-string)))))
     (kill-buffer buf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,5 +323,5 @@ fn oracle_prop_with_current_buffer_error_propagation() {
                 ;; Main buffer should be unchanged
                 (buffer-string)))
       (kill-buffer buf))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

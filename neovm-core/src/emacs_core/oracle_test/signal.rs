@@ -3,7 +3,7 @@
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use super::common::{
-    assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm, run_neovm_eval,
+    assert_err_kind, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm, run_neovm_eval,
     run_oracle_eval,
 };
 
@@ -26,7 +26,7 @@ fn oracle_prop_signal_with_data() {
     let form = "(condition-case err
                   (signal 'error '(\"custom message\"))
                   (error (cdr err)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -36,7 +36,7 @@ fn oracle_prop_signal_void_variable() {
     let form = "(condition-case err
                   (signal 'void-variable '(undefined-var))
                   (void-variable (list (car err) (cadr err))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -125,5 +125,5 @@ fn oracle_prop_signal_user_error() {
     let form = "(condition-case err
                   (signal 'user-error '(\"User made a mistake\"))
                   (user-error (cadr err)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

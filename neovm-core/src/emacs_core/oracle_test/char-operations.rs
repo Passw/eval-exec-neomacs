@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // char-syntax
@@ -39,7 +39,7 @@ fn oracle_prop_char_syntax_classify_string() {
                                     result))
                         (setq i (1+ i))))
                     (concat (nreverse result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ fn oracle_prop_insert_char_basic() {
     let form = r#"(with-temp-buffer
                     (insert-char ?a 5)
                     (buffer-string))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -81,7 +81,7 @@ fn oracle_prop_insert_char_multibyte() {
                     (list (buffer-string)
                           (buffer-size)
                           (length (buffer-string))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn oracle_prop_insert_char_zero_count() {
                     (insert-char ?x 0)
                     (insert "after")
                     (buffer-string))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ fn oracle_prop_char_equal_case_sensitive() {
                         (char-equal ?A ?A)
                         (char-equal ?a ?b)
                         (char-equal ?0 ?0))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -121,7 +121,7 @@ fn oracle_prop_char_equal_case_fold() {
                           (char-equal ?Z ?z)
                           (char-equal ?a ?b)
                           (char-equal ?1 ?1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -133,7 +133,7 @@ fn oracle_prop_char_equal_case_sensitive_explicit() {
                     (list (char-equal ?a ?A)
                           (char-equal ?a ?a)
                           (char-equal ?Z ?z)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ fn oracle_prop_char_width_basic() {
                         (char-width ?\t)
                         (char-width ?日)
                         (char-width ?é))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +167,7 @@ fn oracle_prop_characterp() {
                         (characterp nil)
                         (characterp "a")
                         (characterp 'a))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ fn oracle_prop_max_char() {
     let form = r#"(list (integerp (max-char))
                         (> (max-char) 0)
                         (characterp (max-char)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -257,7 +257,7 @@ fn oracle_prop_char_operations_rot13() {
                           (setq j (1+ j)))
                         (list result
                               (string= double input)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -300,5 +300,5 @@ fn oracle_prop_char_operations_frequency_sorted() {
                             (setq pairs (cdr pairs)
                                   n (1+ n)))
                           (nreverse result)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

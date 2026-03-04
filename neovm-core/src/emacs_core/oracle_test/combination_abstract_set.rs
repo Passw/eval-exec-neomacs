@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Set representation and basic operations: union, intersection, difference
@@ -105,7 +105,7 @@ fn oracle_prop_abstract_set_basic_operations() {
     (fmakunbound 'neovm--as-intersect)
     (fmakunbound 'neovm--as-diff)
     (fmakunbound 'neovm--as-sym-diff)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ fn oracle_prop_abstract_set_power_set() {
     (fmakunbound 'neovm--as-power-set)
     (fmakunbound 'neovm--as-sort-set-of-sets)
     (fmakunbound 'neovm--as-sort-compare)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ fn oracle_prop_abstract_set_cartesian_product() {
             (nreverse diag))))
     (fmakunbound 'neovm--as-cartesian)
     (fmakunbound 'neovm--as-cartesian-3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -339,7 +339,7 @@ fn oracle_prop_abstract_set_algebra_laws() {
     (fmakunbound 'neovm--as2-intersect)
     (fmakunbound 'neovm--as2-diff)
     (fmakunbound 'neovm--as2-complement)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -422,7 +422,7 @@ fn oracle_prop_abstract_set_relation_composition() {
     (fmakunbound 'neovm--as-rel-compose)
     (fmakunbound 'neovm--as-rel-reflexive-closure)
     (fmakunbound 'neovm--as-rel-symmetric-closure)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -525,5 +525,5 @@ fn oracle_prop_abstract_set_transitive_closure() {
     (fmakunbound 'neovm--as3-rel-union)
     (fmakunbound 'neovm--as3-transitive-closure)
     (fmakunbound 'neovm--as3-is-transitive)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

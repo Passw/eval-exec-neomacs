@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // nthcdr edge cases
@@ -23,7 +23,7 @@ fn oracle_prop_nthcdr_comprehensive() {
                           (nthcdr 100 lst) ;; way past end → nil
                           (nthcdr 0 nil)
                           (nthcdr 5 nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -41,7 +41,7 @@ fn oracle_prop_nth_comprehensive() {
                           (nth 5 lst)   ;; past end → nil
                           (nth 99 lst)
                           (nth 0 nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@ fn oracle_prop_last_with_n() {
                           (last lst 0)
                           (last nil)
                           (last nil 3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ fn oracle_prop_butlast_basic() {
                           (butlast lst 6)
                           (butlast nil)
                           (butlast '(solo))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -114,7 +114,7 @@ fn oracle_prop_elt_list_and_vector() {
                         (elt [10 20 30 40 50] 4)
                         (elt "hello" 0)
                         (elt "hello" 4))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ fn oracle_prop_nthcdr_rotate() {
                           (funcall rotate '(1 2 3 4 5) 2)
                           (funcall rotate '(1 2 3 4 5) 4)
                           (funcall rotate '(1 2 3 4 5) 5)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ fn oracle_prop_nthcdr_sliding_window() {
                                       averages)))
                         (setq i (1+ i))))
                     (nreverse averages))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +193,7 @@ fn oracle_prop_nthcdr_chunk() {
                           (funcall chunk '(a b c d e) 2)
                           (funcall chunk '(x) 5)
                           (funcall chunk nil 3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -219,5 +219,5 @@ fn oracle_prop_nthcdr_interleave() {
                           (funcall interleave '(a b c d) '(1 2))
                           (funcall interleave nil '(x y z))
                           (funcall interleave '(solo) nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

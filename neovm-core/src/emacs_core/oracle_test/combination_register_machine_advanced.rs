@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Shared machine definition: full instruction set with stack and subroutines
@@ -256,7 +256,7 @@ fn oracle_prop_register_machine_adv_jgt_jlt_instructions() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -372,7 +372,7 @@ fn oracle_prop_register_machine_adv_subroutine_call_ret() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -415,7 +415,7 @@ fn oracle_prop_register_machine_adv_nested_subroutines() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -659,7 +659,7 @@ fn oracle_prop_register_machine_adv_overflow_detection() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -1010,7 +1010,7 @@ fn oracle_prop_register_machine_adv_multi_subroutine_expression() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------

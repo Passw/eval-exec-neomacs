@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Tokenizer: string to token list
@@ -66,7 +66,7 @@ fn oracle_prop_pratt_parser_tokenizer() {
         (funcall 'neovm--pp-tokenize "((1))"))
     (fmakunbound 'neovm--pp-is-digit)
     (fmakunbound 'neovm--pp-tokenize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ fn oracle_prop_pratt_parser_basic_precedence() {
     (fmakunbound 'neovm--pp-prefix-bp)
     (fmakunbound 'neovm--pp-parse-expr)
     (fmakunbound 'neovm--pp-parse)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ fn oracle_prop_pratt_parser_prefix_ops() {
     (fmakunbound 'neovm--pp-prefix-bp)
     (fmakunbound 'neovm--pp-parse-expr)
     (fmakunbound 'neovm--pp-parse)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -427,7 +427,7 @@ fn oracle_prop_pratt_parser_parens() {
     (fmakunbound 'neovm--pp-prefix-bp)
     (fmakunbound 'neovm--pp-parse-expr)
     (fmakunbound 'neovm--pp-parse)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -582,7 +582,7 @@ fn oracle_prop_pratt_parser_evaluate() {
     (fmakunbound 'neovm--pp-parse)
     (fmakunbound 'neovm--pp-eval-ast)
     (fmakunbound 'neovm--pp-calc)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -867,5 +867,5 @@ fn oracle_prop_pratt_parser_modulo_combined() {
     (fmakunbound 'neovm--pp-parse)
     (fmakunbound 'neovm--pp-eval-ast)
     (fmakunbound 'neovm--pp-calc)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

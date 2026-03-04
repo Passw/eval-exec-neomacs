@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Simple handshake protocol FSM with guard conditions
@@ -148,7 +148,7 @@ fn oracle_prop_proto_fsm_handshake() {
     (fmakunbound 'neovm--pf-run)
     (makunbound 'neovm--pf-transitions)
     (makunbound 'neovm--pf-trace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -294,7 +294,7 @@ fn oracle_prop_proto_fsm_http_request() {
                   (end-headers)
                   (send-response))))
     (fmakunbound 'neovm--pf-http-process)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -402,7 +402,7 @@ fn oracle_prop_proto_fsm_timeout_retry() {
                   disconnect)
                 3))
     (fmakunbound 'neovm--pf-retry-protocol)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -544,7 +544,7 @@ fn oracle_prop_proto_fsm_error_recovery() {
                   finish
                   release)))
     (fmakunbound 'neovm--pf-recovery-fsm)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -634,7 +634,7 @@ fn oracle_prop_proto_fsm_trace_analysis() {
        ;; Empty trace
        (funcall 'neovm--pf-analyze-trace nil))
     (fmakunbound 'neovm--pf-analyze-trace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -764,7 +764,7 @@ fn oracle_prop_proto_fsm_client_server() {
                 '((client request "data")
                   (server respond "error"))))
     (fmakunbound 'neovm--pf-run-protocol)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -846,7 +846,7 @@ fn oracle_prop_proto_fsm_sequence_validator() {
          (funcall 'neovm--pf-validate-sequence rules
                   '((idle connect) (connecting fail)))))
     (fmakunbound 'neovm--pf-validate-sequence)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -951,5 +951,5 @@ fn oracle_prop_proto_fsm_message_codec() {
     (fmakunbound 'neovm--pf-encode)
     (fmakunbound 'neovm--pf-decode)
     (fmakunbound 'neovm--pf-process-messages)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

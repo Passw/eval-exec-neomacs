@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // delete-char with positive COUNT
@@ -28,7 +28,7 @@ fn oracle_prop_delete_char_positive_counts() {
           (goto-char 3)
           (delete-char 2)
           (list after-1 after-4 (buffer-string) (point) (buffer-size)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ fn oracle_prop_delete_char_negative_counts() {
                 after-neg3
                 (point)
                 (buffer-size)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ fn oracle_prop_delete_char_boundary_errors() {
           (list err-forward buf-after-fwd-err
                 err-backward buf-after-bwd-err
                 (buffer-string) (buffer-size)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ fn oracle_prop_delete_list_equal() {
                       from-nil
                       ;; verify original is unchanged
                       original)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ fn oracle_prop_delq_vs_delete_semantics() {
                         delq-result delete-result
                         delq-sym delete-sym
                         delq-int delete-int))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

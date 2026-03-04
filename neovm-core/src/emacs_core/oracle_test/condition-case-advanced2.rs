@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Handler specificity: most-specific-first vs generic catch-all
@@ -49,7 +49,7 @@ fn oracle_prop_cc_adv2_handler_specificity_ordering() {
     (arith-error 'arith)
     (wrong-type-argument 'wta)
     (error (list 'generic-file (car err) (cadr err)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ fn oracle_prop_cc_adv2_resignal_chain() {
      (setq trace (cons 'handler-3 trace))
      (list 'final-trace (nreverse trace)
            'error-data (cdr err3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ fn oracle_prop_cc_adv2_nested_selective_handling() {
    (funcall run-with-handlers (lambda () (signal 'file-error '("nope"))))
    ;; No error: body value returned
    (funcall run-with-handlers (lambda () (+ 10 20)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ fn oracle_prop_cc_adv2_error_data_extraction() {
   ;; error-message-string on manually constructed error data
   (error-message-string '(error "Something went wrong"))
   (error-message-string '(arith-error)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +262,7 @@ fn oracle_prop_cc_adv2_handler_body_side_effects() {
      (list 'all-failed (cdr final-err))))
   (list 'retries retry-count
         'log (nreverse log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ fn oracle_prop_cc_adv2_three_way_interaction() {
 
    ;; Final log showing execution order
    (nreverse log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -365,5 +365,5 @@ fn oracle_prop_cc_adv2_dispatch_table_error_handling() {
                     (length (cddr err)))))))
       (setq results (cons result results))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

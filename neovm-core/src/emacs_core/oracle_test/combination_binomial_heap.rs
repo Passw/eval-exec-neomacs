@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Binomial heap core: merge two heaps, insert, find-min
@@ -240,7 +240,7 @@ fn oracle_prop_binomial_heap_delete_min() {
     (fmakunbound 'neovm--bhd-find-min)
     (fmakunbound 'neovm--bhd-remove-min-tree)
     (fmakunbound 'neovm--bhd-delete-min)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -344,7 +344,7 @@ fn oracle_prop_binomial_heap_merge_property() {
     (fmakunbound 'neovm--bhm-merge)
     (fmakunbound 'neovm--bhm-insert)
     (fmakunbound 'neovm--bhm-find-min)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -483,7 +483,7 @@ fn oracle_prop_binomial_heap_priority_queue() {
     (fmakunbound 'neovm--bhq-find-min)
     (fmakunbound 'neovm--bhq-remove-min-tree)
     (fmakunbound 'neovm--bhq-delete-min)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -598,7 +598,7 @@ fn oracle_prop_binomial_heap_sort() {
     (fmakunbound 'neovm--bhs-remove-min-tree)
     (fmakunbound 'neovm--bhs-delete-min)
     (fmakunbound 'neovm--bhs-sort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -809,5 +809,5 @@ fn oracle_prop_binomial_heap_empty_cases() {
     (fmakunbound 'neovm--bhe-merge)
     (fmakunbound 'neovm--bhe-insert)
     (fmakunbound 'neovm--bhe-find-min)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

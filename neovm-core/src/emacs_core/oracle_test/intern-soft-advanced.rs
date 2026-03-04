@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // intern-soft returns nil for non-existent symbols, intern creates them
@@ -52,7 +52,7 @@ fn oracle_prop_intern_soft_adv_basic_lifecycle() {
               ;; symbol-name roundtrips
               (equal (symbol-name sym-a) (nth 0 names))
               (equal (symbol-name sym-d) (nth 3 names)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ fn oracle_prop_intern_soft_adv_after_makunbound() {
             still-interned
             fboundp-after-fn still-interned-2
             can-rebind))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ fn oracle_prop_intern_soft_adv_symbol_properties() {
         (progn
           (put (nth 1 found-syms) 'extra 'added-later)
           (get (nth 1 syms) 'extra))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -225,7 +225,7 @@ fn oracle_prop_intern_soft_adv_symbol_registry() {
     (fmakunbound 'neovm--isa-reg-lookup)
     (fmakunbound 'neovm--isa-reg-all-names)
     (fmakunbound 'neovm--isa-reg-filter)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -296,7 +296,7 @@ fn oracle_prop_intern_soft_adv_dispatch_table() {
     (fmakunbound 'neovm--isa-disp-register)
     (fmakunbound 'neovm--isa-disp-call)
     (fmakunbound 'neovm--isa-disp-has-op)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -392,7 +392,7 @@ fn oracle_prop_intern_soft_adv_namespace_simulation() {
     (fmakunbound 'neovm--isa-ns-resolve)
     (fmakunbound 'neovm--isa-ns-exports)
     (fmakunbound 'neovm--isa-ns-import)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -526,5 +526,5 @@ fn oracle_prop_intern_soft_adv_event_system() {
     (fmakunbound 'neovm--isa-evt-register)
     (fmakunbound 'neovm--isa-evt-emit)
     (fmakunbound 'neovm--isa-evt-handler-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

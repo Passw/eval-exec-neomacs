@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // FIFO queue: enqueue, dequeue, peek, size, empty?
@@ -93,7 +93,7 @@ fn oracle_prop_qs_fifo_queue() {
     (fmakunbound 'neovm--qs-q-size)
     (fmakunbound 'neovm--qs-q-empty-p)
     (fmakunbound 'neovm--qs-q-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ fn oracle_prop_qs_priority_queue() {
     (fmakunbound 'neovm--qs-pq-peek)
     (fmakunbound 'neovm--qs-pq-size)
     (fmakunbound 'neovm--qs-pq-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +261,7 @@ fn oracle_prop_qs_deque() {
     (fmakunbound 'neovm--qs-dq-pop-back)
     (fmakunbound 'neovm--qs-dq-to-list)
     (fmakunbound 'neovm--qs-dq-size)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,7 +323,7 @@ fn oracle_prop_qs_min_stack() {
     (fmakunbound 'neovm--qs-ms-get-min)
     (fmakunbound 'neovm--qs-ms-size)
     (fmakunbound 'neovm--qs-ms-empty-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -401,7 +401,7 @@ fn oracle_prop_qs_queue_from_two_stacks() {
     (fmakunbound 'neovm--qs-2sq-dequeue)
     (fmakunbound 'neovm--qs-2sq-peek)
     (fmakunbound 'neovm--qs-2sq-size)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -464,7 +464,7 @@ fn oracle_prop_qs_postfix_eval() {
         ;; neg: 5 neg = -5, then + 10 = 5
         (funcall 'neovm--qs-rpn-eval '(5 neg 10 +)))
     (fmakunbound 'neovm--qs-rpn-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -552,7 +552,7 @@ fn oracle_prop_qs_bracket_matching() {
         ;; Complex code-like input
         (funcall 'neovm--qs-bracket-check "if (a[i] > 0) { b[j] = {x, y}; }"))
     (fmakunbound 'neovm--qs-bracket-check)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -610,5 +610,5 @@ fn oracle_prop_qs_monotonic_stack() {
         (funcall 'neovm--qs-daily-temps '(100 90 80 70)))
     (fmakunbound 'neovm--qs-next-greater)
     (fmakunbound 'neovm--qs-daily-temps)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

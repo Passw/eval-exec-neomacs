@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // mapc returns the original list, not mapped values
@@ -24,7 +24,7 @@ fn oracle_prop_mapc_returns_original_list() {
                     (list (eq original returned)
                           returned
                           (length returned)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -46,7 +46,7 @@ fn oracle_prop_mapc_accumulate_side_effects() {
                             (setq call-count (1+ call-count)))
                           '(2 3 5 7 11))
                     (list sum product call-count))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ fn oracle_prop_mapc_vs_mapcar_return_difference() {
                      (equal mapcar-result (nreverse (let ((c nil))
                                                      (mapc (lambda (x) (setq c (cons (* x 10) c))) input)
                                                      c)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ fn oracle_prop_mapc_complex_lambda_string_processing() {
     (makunbound 'neovm--test-mapc-errors)
     (makunbound 'neovm--test-mapc-warnings)
     (makunbound 'neovm--test-mapc-info)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ fn oracle_prop_mapc_nested_lists() {
                 (apply '+ result))))
     (makunbound 'neovm--test-mapc-flat)
     (fmakunbound 'neovm--test-mapc-flatten)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -241,7 +241,7 @@ fn oracle_prop_mapc_chained_pipeline() {
                      graded ", ")
           invalid-count
           (length graded))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ fn oracle_prop_mapc_with_error_handling() {
   (list (nreverse (mapcar (lambda (s) (cdr s)) successes))
         (length failures)
         (mapcar (lambda (f) (cdr f)) (nreverse failures))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -294,5 +294,5 @@ fn oracle_prop_mapc_stateful_closure() {
         (caddr state)
         ;; Compute average (integer division)
         (/ (cadr state) (car state))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // N-Queens solver via backtracking
@@ -275,7 +275,7 @@ fn oracle_prop_constraint_sudoku_solver() {
     (fmakunbound 'neovm--cst-sudoku-bt)
     (fmakunbound 'neovm--cst-sudoku-valid4-p)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -409,7 +409,7 @@ fn oracle_prop_constraint_map_coloring_ac3() {
     (fmakunbound 'neovm--cst-ac3-solve)
     (fmakunbound 'neovm--cst-ac3-bt)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -534,7 +534,7 @@ fn oracle_prop_constraint_2sat_implication() {
     (fmakunbound 'neovm--cst-2sat-check)
     (fmakunbound 'neovm--cst-2sat-verify)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -652,7 +652,7 @@ fn oracle_prop_constraint_cryptarithmetic_puzzle() {
     (fmakunbound 'neovm--cst-crypto-solve-ab-b-ca)
     (fmakunbound 'neovm--cst-crypto-solve-xy-yx-zz)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -774,5 +774,5 @@ fn oracle_prop_constraint_general_csp_framework() {
     (fmakunbound 'neovm--cst-csp-solve)
     (fmakunbound 'neovm--cst-csp-bt)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

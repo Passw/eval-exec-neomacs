@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Forth-like stack-based interpreter
@@ -95,7 +95,7 @@ fn oracle_prop_mini_forth_interpreter() {
        ;; Factorial of 5 via repeated multiply: 1*2*3*4*5
        (funcall 'neovm--test-forth "1 2 * 3 * 4 * 5 *"))
     (fmakunbound 'neovm--test-forth)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ fn oracle_prop_mini_brainfuck() {
        ;; Loop counting to 5: output 5
        (funcall 'neovm--test-bf "+++++."))
     (fmakunbound 'neovm--test-bf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ fn oracle_prop_mini_logo_turtle() {
        (funcall 'neovm--test-turtle
                 '((fd . 50) (bk . 25) (rt . 90) (fd . 30))))
     (fmakunbound 'neovm--test-turtle)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -338,7 +338,7 @@ fn oracle_prop_mini_lisp_metacircular() {
          ;; Quote
          (funcall 'neovm--test-meval '(quote (a b c)) builtins)))
     (fmakunbound 'neovm--test-meval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -439,7 +439,7 @@ fn oracle_prop_mini_calculator() {
                   (print m) (print n))))
     (fmakunbound 'neovm--test-calc-eval)
     (fmakunbound 'neovm--test-calc-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

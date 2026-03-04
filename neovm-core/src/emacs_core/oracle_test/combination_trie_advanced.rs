@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Prefix counting (how many words share a prefix)
@@ -91,7 +91,7 @@ fn oracle_prop_trie_adv_prefix_counting() {
     (fmakunbound 'neovm--ta-find-node)
     (fmakunbound 'neovm--ta-count-words)
     (fmakunbound 'neovm--ta-prefix-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +180,7 @@ fn oracle_prop_trie_adv_wildcard_search() {
     (fmakunbound 'neovm--ta-insert)
     (fmakunbound 'neovm--ta-wildcard-search)
     (fmakunbound 'neovm--ta-wildcard)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +276,7 @@ fn oracle_prop_trie_adv_autocomplete() {
     (fmakunbound 'neovm--ta-find-node)
     (fmakunbound 'neovm--ta-collect)
     (fmakunbound 'neovm--ta-autocomplete)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +364,7 @@ fn oracle_prop_trie_adv_longest_common_prefix() {
     (fmakunbound 'neovm--ta-make)
     (fmakunbound 'neovm--ta-insert)
     (fmakunbound 'neovm--ta-longest-common-prefix)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -482,7 +482,7 @@ fn oracle_prop_trie_adv_frequency_counter() {
     (fmakunbound 'neovm--tf-top-n)
     (fmakunbound 'neovm--tf-unique-count)
     (fmakunbound 'neovm--tf-total-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

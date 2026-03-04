@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // vconcat with no args (empty vector)
@@ -27,7 +27,7 @@ fn oracle_prop_vconcat_no_args() {
       (vconcat '() '() '())
       (vconcat "" "" "")
       (vconcat [] '() "" [] '()))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@ fn oracle_prop_vconcat_single_arg_types() {
               (aref v 4)
               (aref v 5)
               (length v))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ fn oracle_prop_vconcat_mixed_type_args() {
       ;; Order matters - verify left-to-right concatenation
       (equal (vconcat [1] [2] [3]) [1 2 3])
       (equal (vconcat '(a) '(b) '(c)) [a b c]))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +135,7 @@ fn oracle_prop_vconcat_element_type_preservation() {
         ;; But is equal
         (let ((orig [1 2 3]))
           (equal orig (vconcat orig)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ fn oracle_prop_vconcat_nil_handling() {
       ;; Multiple nils should produce empty vector
       (equal (vconcat nil nil nil nil) [])
       (length (vconcat nil nil nil nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +237,7 @@ fn oracle_prop_vconcat_matrix_flattening() {
     (fmakunbound 'neovm--test-flatten-matrix)
     (fmakunbound 'neovm--test-matrix-row)
     (fmakunbound 'neovm--test-matrix-col)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -298,7 +298,7 @@ fn oracle_prop_vconcat_interleave_deinterleave() {
                    (list (vconcat "abc") (vconcat "ABC")))))
     (fmakunbound 'neovm--test-interleave-n)
     (fmakunbound 'neovm--test-deinterleave)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -364,5 +364,5 @@ fn oracle_prop_vconcat_run_length_encoding() {
             (list enc (equal sym-vec dec)))))
     (fmakunbound 'neovm--test-rle-encode)
     (fmakunbound 'neovm--test-rle-decode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

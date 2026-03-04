@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Complex regex with nested groups and quantifiers
@@ -30,7 +30,7 @@ fn oracle_prop_looking_at_nested_groups_quantifiers() {
                             (match-string 4)
                             (match-beginning 0)
                             (match-end 0))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ fn oracle_prop_looking_at_vs_looking_at_p_match_data() {
                               (match-string 0)
                               (match-string 1)
                               (match-string 2)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ fn oracle_prop_looking_at_multiple_positions() {
                                                 (if (looking-at "[!]+") 'punct 'no))
                                           results))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ fn oracle_prop_looking_at_char_classes_alternation() {
                                             (when matched (match-string 1)))
                                       results)))))
                     (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +167,7 @@ fn oracle_prop_looking_at_anchors_and_shy_groups() {
                                         (match-string 1))
                                   results))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +229,7 @@ fn oracle_prop_looking_at_lexer_scanner() {
                                   (setq tokens (cons tok tokens)))))
                             (nreverse tokens)))
                       (fmakunbound 'neovm--test-lex-classify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +263,7 @@ fn oracle_prop_looking_at_lookahead_without_moving() {
                                         results))))
                         (forward-line 1))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -299,5 +299,5 @@ fn oracle_prop_looking_at_with_narrowing() {
                           (list before-narrow
                                 after-narrow-match m0 m1 m2
                                 sees-header sees-footer)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

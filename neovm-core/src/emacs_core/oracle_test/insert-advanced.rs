@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // insert with multiple arguments
@@ -17,7 +17,7 @@ fn oracle_prop_insert_multi_args() {
     let form = r#"(with-temp-buffer
                     (insert "hello" " " "world" "!")
                     (buffer-string))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -28,7 +28,7 @@ fn oracle_prop_insert_mixed_types() {
     let form = r#"(with-temp-buffer
                     (insert ?H "ello" ?\ ?W "orld")
                     (buffer-string))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -40,7 +40,7 @@ fn oracle_prop_insert_at_position() {
                     (goto-char 6)
                     (insert "beautiful ")
                     (list (buffer-string) (point)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn oracle_prop_insert_empty_string() {
     let form = r#"(with-temp-buffer
                     (insert "before" "" "after")
                     (buffer-string))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -146,5 +146,5 @@ fn oracle_prop_insert_and_delete_interleaved() {
                         (insert "---")
                         (setq replacements (1+ replacements)))
                       (list (buffer-string) replacements)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

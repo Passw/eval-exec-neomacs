@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Rope concatenation and basic properties
@@ -120,7 +120,7 @@ fn oracle_prop_rope_ops_concat_and_properties() {
     (fmakunbound 'neovm--rop-to-string)
     (fmakunbound 'neovm--rop-depth)
     (fmakunbound 'neovm--rop-leaf-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +210,7 @@ fn oracle_prop_rope_ops_index() {
     (fmakunbound 'neovm--rop-concat)
     (fmakunbound 'neovm--rop-char-at)
     (fmakunbound 'neovm--rop-to-string)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -311,7 +311,7 @@ fn oracle_prop_rope_ops_split() {
     (fmakunbound 'neovm--rop-concat)
     (fmakunbound 'neovm--rop-to-string)
     (fmakunbound 'neovm--rop-split)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -413,7 +413,7 @@ fn oracle_prop_rope_ops_rebalance() {
     (fmakunbound 'neovm--rop-leaves)
     (fmakunbound 'neovm--rop-from-leaves)
     (fmakunbound 'neovm--rop-rebalance)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -509,7 +509,7 @@ fn oracle_prop_rope_ops_insert_at_position() {
     (fmakunbound 'neovm--rop-to-string)
     (fmakunbound 'neovm--rop-split)
     (fmakunbound 'neovm--rop-insert)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -743,5 +743,5 @@ fn oracle_prop_rope_ops_find_and_replace() {
     (fmakunbound 'neovm--rop-find)
     (fmakunbound 'neovm--rop-replace-first)
     (fmakunbound 'neovm--rop-replace-all)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

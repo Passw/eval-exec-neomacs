@@ -4,7 +4,7 @@
 //! power set generation, and bit manipulation puzzles.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Bitset fundamentals: set, clear, toggle, test individual bits
@@ -81,7 +81,7 @@ fn oracle_prop_bitset_fundamental_operations() {
     (fmakunbound 'neovm--bs-test)
     (fmakunbound 'neovm--bs-from-list)
     (fmakunbound 'neovm--bs-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ fn oracle_prop_bitset_set_operations() {
     (fmakunbound 'neovm--bs-intersection)
     (fmakunbound 'neovm--bs-difference)
     (fmakunbound 'neovm--bs-symmetric-diff)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +209,7 @@ fn oracle_prop_bitset_popcount() {
           (list (nreverse results) pc-a pc-b pc-and pc-or inclusion-exclusion)))
     (fmakunbound 'neovm--bs-popcount)
     (fmakunbound 'neovm--bs-popcount-kernighan)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -279,7 +279,7 @@ fn oracle_prop_bitset_subset_testing() {
     (fmakunbound 'neovm--bs-proper-subset-p)
     (fmakunbound 'neovm--bs-equal-p)
     (fmakunbound 'neovm--bs-disjoint-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -352,7 +352,7 @@ fn oracle_prop_bitset_power_set() {
     (fmakunbound 'neovm--bs-to-list)
     (fmakunbound 'neovm--bs-power-set)
     (fmakunbound 'neovm--bs-popcount)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -455,5 +455,5 @@ fn oracle_prop_bitset_manipulation_puzzles() {
     (fmakunbound 'neovm--bs-reverse-bits)
     (fmakunbound 'neovm--bs-to-gray)
     (fmakunbound 'neovm--bs-from-gray)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

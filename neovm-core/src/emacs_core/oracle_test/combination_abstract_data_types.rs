@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Stack with O(1) min/max tracking
@@ -67,7 +67,7 @@ fn oracle_prop_adt_min_max_stack() {
     (fmakunbound 'neovm--adt-mms-top)
     (fmakunbound 'neovm--adt-mms-min)
     (fmakunbound 'neovm--adt-mms-max)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +154,7 @@ fn oracle_prop_adt_deque() {
     (fmakunbound 'neovm--adt-dq-pop-back)
     (fmakunbound 'neovm--adt-dq-to-list)
     (fmakunbound 'neovm--adt-dq-size)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +262,7 @@ fn oracle_prop_adt_bst_ordered_map() {
     (fmakunbound 'neovm--adt-bst-delete)
     (fmakunbound 'neovm--adt-bst-inorder)
     (fmakunbound 'neovm--adt-bst-range)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -339,7 +339,7 @@ fn oracle_prop_adt_multimap() {
     (fmakunbound 'neovm--adt-mm-keys)
     (fmakunbound 'neovm--adt-mm-count)
     (fmakunbound 'neovm--adt-mm-total-values)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -415,7 +415,7 @@ fn oracle_prop_adt_circular_buffer() {
     (fmakunbound 'neovm--adt-cb-to-list)
     (fmakunbound 'neovm--adt-cb-full-p)
     (fmakunbound 'neovm--adt-cb-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -468,7 +468,7 @@ fn oracle_prop_adt_persistent_list() {
                  (eq (nthcdr 1 orig) (nthcdr 1 mod1))  ;; no: both rebuilt
                  (equal (nthcdr 1 orig) (nthcdr 1 mod2))  ;; content equal
                  (length mod3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -564,7 +564,7 @@ fn oracle_prop_adt_union_find() {
     (fmakunbound 'neovm--adt-uf-union)
     (fmakunbound 'neovm--adt-uf-connected)
     (fmakunbound 'neovm--adt-uf-components)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -645,5 +645,5 @@ fn oracle_prop_adt_interval_tree() {
     (fmakunbound 'neovm--adt-it-overlaps)
     (fmakunbound 'neovm--adt-it-point-query)
     (fmakunbound 'neovm--adt-it-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

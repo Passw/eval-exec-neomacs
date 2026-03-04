@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic ASCII character extraction
@@ -53,7 +53,7 @@ fn oracle_prop_string_to_char_ascii_comprehensive() {
   (= (string-to-char " ") ?\s)
   (= (string-to-char "\n") ?\n)
   (= (string-to-char "\t") ?\t))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ fn oracle_prop_string_to_char_multibyte() {
   ;; Type check: always returns integer
   (integerp (string-to-char "\u00e9"))
   (integerp (string-to-char "\u4e16")))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +124,7 @@ fn oracle_prop_string_to_char_multi_char_strings() {
   (= (string-to-char "\nhello") ?\n)
   ;; String with leading tab
   (= (string-to-char "\thello") ?\t))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ fn oracle_prop_string_to_char_empty_and_edges() {
   ;; Substring result
   (string-to-char (substring "Hello" 1 2))
   (= (string-to-char (substring "Hello" 1 2)) ?e))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ fn oracle_prop_string_to_char_roundtrip_comprehensive() {
   ;; Multibyte roundtrips
   (= (string-to-char (char-to-string 233)) 233)
   (string= (char-to-string (string-to-char "\u00e9")) "\u00e9"))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +252,7 @@ fn oracle_prop_string_to_char_classification_pipeline() {
        (concat (mapcar (lambda (s) (string-to-char s))
                        '("H" "e" "l" "l" "o"))))
     (fmakunbound 'neovm--test-classify-first-char)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -291,5 +291,5 @@ fn oracle_prop_string_to_char_dynamic_construction() {
   (= (string-to-char (concat "" "test")) ?t)
   ;; String with interior multibyte but ASCII first
   (= (string-to-char (concat "a" "\u03b1")) ?a))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

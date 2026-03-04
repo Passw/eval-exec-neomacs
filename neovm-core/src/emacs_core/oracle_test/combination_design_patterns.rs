@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Strategy pattern: interchangeable algorithms
@@ -53,7 +53,7 @@ fn oracle_prop_dp_strategy_pattern() {
           (let ((by-length (funcall make-sorter
                                     (lambda (a b) (< (length a) (length b))))))
             (funcall by-length '("elephant" "cat" "a" "dogs" "be"))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ fn oracle_prop_dp_chain_of_responsibility() {
           (funcall auth '(:type compute :data 21))
           ;; Unknown request (unhandled)
           (funcall auth '(:type unknown :data nil)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ fn oracle_prop_dp_builder_pattern() {
           (list result simple
                 ;; Original builder unchanged (immutable)
                 (funcall qb-build q1)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +247,7 @@ fn oracle_prop_dp_visitor_pattern() {
           ;; Nested negation
           (funcall visit eval-visitor '(neg (neg (num 7))))
           (funcall visit print-visitor '(neg (neg (num 7)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ fn oracle_prop_dp_decorator_pattern() {
             (condition-case err
                 (funcall decorated-add "x" 1)
               (error (cadr err)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -398,5 +398,5 @@ fn oracle_prop_dp_memento_pattern() {
                       (let ((s8 (funcall editor-state)))
                         (list s1 s2 s3 s4 s5 s6 s7
                               (equal s7 s8))))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

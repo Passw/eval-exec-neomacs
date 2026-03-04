@@ -3,7 +3,7 @@
 //! symbol-function inspection, fmakunbound, and complex body side effects.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // defun with &optional: default nil, explicit values, mixed
@@ -37,7 +37,7 @@ fn oracle_prop_defun_optional_args_comprehensive() {
         (neovm--test-opt1 1 nil nil))
     (fmakunbound 'neovm--test-opt1)
     (fmakunbound 'neovm--test-opt2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +74,7 @@ fn oracle_prop_defun_rest_args_comprehensive() {
     (fmakunbound 'neovm--test-rest1)
     (fmakunbound 'neovm--test-rest2)
     (fmakunbound 'neovm--test-opt-rest)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ fn oracle_prop_defun_docstring_patterns() {
     (fmakunbound 'neovm--test-doc1)
     (fmakunbound 'neovm--test-doc2)
     (fmakunbound 'neovm--test-nodoc)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ fn oracle_prop_defun_overwrite_redefinition() {
             (let ((r4 (neovm--test-overwrite 10)))
               (list r1 r2 r3 r4)))))
     (fmakunbound 'neovm--test-overwrite)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ fn oracle_prop_defun_returning_lambda() {
     (fmakunbound 'neovm--test-make-adder)
     (fmakunbound 'neovm--test-make-multiplier)
     (fmakunbound 'neovm--test-compose)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +229,7 @@ fn oracle_prop_defun_mutual_recursion() {
     (fmakunbound 'neovm--test-my-odd-p)
     (fmakunbound 'neovm--test-collatz-a)
     (fmakunbound 'neovm--test-collatz-b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +264,7 @@ fn oracle_prop_defun_nested_definitions() {
     (fmakunbound 'neovm--test-inner)
     (fmakunbound 'neovm--test-outer2)
     (fmakunbound 'neovm--test-inner2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +302,7 @@ fn oracle_prop_defun_symbol_function_fmakunbound() {
         (fboundp 'neovm--nonexistent-fn-xyz))  ;; nil
     (fmakunbound 'neovm--test-sf1)
     (fmakunbound 'neovm--test-sf2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -345,7 +345,7 @@ fn oracle_prop_defun_complex_arglists() {
     (fmakunbound 'neovm--test-complex2)
     (fmakunbound 'neovm--test-complex3)
     (fmakunbound 'neovm--test-complex4)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -388,7 +388,7 @@ fn oracle_prop_defun_body_side_effects() {
     (fmakunbound 'neovm--test-side-effect)
     (fmakunbound 'neovm--test-multi-body)
     (makunbound 'neovm--test-counter)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -432,7 +432,7 @@ fn oracle_prop_defun_interactive_spec() {
     (fmakunbound 'neovm--test-interactive2)
     (fmakunbound 'neovm--test-interactive3)
     (fmakunbound 'neovm--test-non-cmd)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -482,5 +482,5 @@ fn oracle_prop_defun_recursive_accumulator() {
     (fmakunbound 'neovm--test-factorial)
     (fmakunbound 'neovm--test-factorial-acc)
     (fmakunbound 'neovm--test-flatten)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

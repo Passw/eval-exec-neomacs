@@ -5,7 +5,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use proptest::prelude::*;
 
-use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_floor_basic() {
@@ -67,10 +67,10 @@ fn oracle_prop_truncate_basic() {
 fn oracle_prop_float_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(float 42)");
-    assert_oracle_parity("(float 0)");
-    assert_oracle_parity("(float -7)");
-    assert_oracle_parity("(float 3.14)");
+    assert_oracle_parity_with_bootstrap("(float 42)");
+    assert_oracle_parity_with_bootstrap("(float 0)");
+    assert_oracle_parity_with_bootstrap("(float -7)");
+    assert_oracle_parity_with_bootstrap("(float 3.14)");
 }
 
 #[test]
@@ -83,34 +83,34 @@ fn oracle_prop_expt_basic() {
     let (o, n) = eval_oracle_and_neovm("(expt 3 0)");
     assert_ok_eq("1", &o, &n);
 
-    assert_oracle_parity("(expt 2.0 0.5)");
+    assert_oracle_parity_with_bootstrap("(expt 2.0 0.5)");
 }
 
 #[test]
 fn oracle_prop_sqrt_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(sqrt 4.0)");
-    assert_oracle_parity("(sqrt 9.0)");
-    assert_oracle_parity("(sqrt 2.0)");
+    assert_oracle_parity_with_bootstrap("(sqrt 4.0)");
+    assert_oracle_parity_with_bootstrap("(sqrt 9.0)");
+    assert_oracle_parity_with_bootstrap("(sqrt 2.0)");
 }
 
 #[test]
 fn oracle_prop_log_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(log 1)");
-    assert_oracle_parity("(log 10 10)");
+    assert_oracle_parity_with_bootstrap("(log 1)");
+    assert_oracle_parity_with_bootstrap("(log 10 10)");
 }
 
 #[test]
 fn oracle_prop_sin_cos() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(sin 0)");
-    assert_oracle_parity("(cos 0)");
-    assert_oracle_parity("(sin 1.0)");
-    assert_oracle_parity("(cos 1.0)");
+    assert_oracle_parity_with_bootstrap("(sin 0)");
+    assert_oracle_parity_with_bootstrap("(cos 0)");
+    assert_oracle_parity_with_bootstrap("(sin 1.0)");
+    assert_oracle_parity_with_bootstrap("(cos 1.0)");
 }
 
 #[test]
@@ -128,9 +128,9 @@ fn oracle_prop_floor_with_divisor() {
 fn oracle_prop_isnan_and_special_floats() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(isnan 0.0)");
-    assert_oracle_parity("(isnan 1.0)");
-    assert_oracle_parity("(isnan 0.0e+NaN)");
+    assert_oracle_parity_with_bootstrap("(isnan 0.0)");
+    assert_oracle_parity_with_bootstrap("(isnan 1.0)");
+    assert_oracle_parity_with_bootstrap("(isnan 0.0e+NaN)");
 }
 
 proptest! {

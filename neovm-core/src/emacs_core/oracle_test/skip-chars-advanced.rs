@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Character ranges: combined and overlapping
@@ -41,7 +41,7 @@ fn oracle_prop_skip_chars_advanced_hex_range() {
                       (list skipped
                             (point)
                             (buffer-substring 3 (point)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ fn oracle_prop_skip_chars_advanced_negation_complex() {
                             (point)
                             (buffer-substring (point-min) (point))
                             (char-after (point)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -82,7 +82,7 @@ fn oracle_prop_skip_chars_advanced_negation_newline() {
                           (let ((second-skip (skip-chars-forward "^\n")))
                             (list first-skip line1
                                   second-skip (buffer-substring second-start (point))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ fn oracle_prop_skip_chars_advanced_return_count() {
                           (list fwd-count fwd-pos
                                 bwd-count bwd-pos
                                 zero-count)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ fn oracle_prop_skip_chars_backward_from_end_with_limit() {
                               (list skip1 pos1 text1
                                     skip2 pos2 text2
                                     skip3 (point))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ fn oracle_prop_skip_chars_advanced_expression_tokenizer() {
                           (goto-char (point-min))
                           (neovm--test-skip-tokenize))
                       (fmakunbound 'neovm--test-skip-tokenize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -256,7 +256,7 @@ fn oracle_prop_skip_chars_advanced_word_boundary_detection() {
                                     (forward-char 1))))))
                           (nreverse neovm--test-skip-word-results))
                       (makunbound 'neovm--test-skip-word-results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +284,7 @@ fn oracle_prop_skip_chars_advanced_special_chars_in_set() {
                                 (t2 (buffer-substring (point-min) (point))))
                             (list s1 t1
                                   s2 t2))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -324,5 +324,5 @@ fn oracle_prop_skip_chars_advanced_balanced_scan() {
                                               paren-groups))))
                               (setq depth (max 0 (1- depth))))))))
                       (nreverse paren-groups)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

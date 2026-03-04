@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Closure capturing &rest arguments
@@ -43,7 +43,7 @@ fn oracle_prop_oclosure_adv_capture_rest_args() {
           (funcall app-logger)
           ;; Single arg
           (funcall db-logger "ping"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +74,7 @@ fn oracle_prop_oclosure_adv_optional_params_defaults() {
         (funcall make-range 0 20 5)
         (funcall make-range 10 10)
         (funcall make-range 0 3 1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ fn oracle_prop_oclosure_adv_first_class_storage() {
                      (setq val (funcall (cdr pair) val)))
                    val)))
             (list from-list from-table pipeline-result)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -218,7 +218,7 @@ fn oracle_prop_oclosure_adv_lambda_docstring() {
         (functionp undocumented)
         (functionp docstring-only)
         (functionp multi-body-doc)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +302,7 @@ fn oracle_prop_oclosure_adv_module_system() {
                   (funcall m2-cc)   ;; 1 call in m2
                   ;; Independence check
                   (= (funcall m1-cc) (funcall m2-cc)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -367,5 +367,5 @@ fn oracle_prop_oclosure_adv_method_resolution_chain() {
               (funcall square-class 'perimeter 5 5)
               ;; Method not found in any class
               (funcall shape-class 'color))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

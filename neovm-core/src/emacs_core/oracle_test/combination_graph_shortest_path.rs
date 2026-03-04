@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Dijkstra's algorithm: single-source shortest path on weighted graph
@@ -109,7 +109,7 @@ fn oracle_prop_graph_sp_dijkstra() {
     (fmakunbound 'neovm--dj-add-edge)
     (fmakunbound 'neovm--dj-run)
     (fmakunbound 'neovm--dj-path)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ fn oracle_prop_graph_sp_bfs_unweighted() {
               ;; Path length = distance + 1 (includes start)
               (= (length (funcall reconstruct 10))
                  (1+ (gethash 10 dist))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -248,7 +248,7 @@ fn oracle_prop_graph_sp_bellman_ford() {
               neg2))))
     (fmakunbound 'neovm--bf-run)
     (fmakunbound 'neovm--bf-path)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -368,7 +368,7 @@ fn oracle_prop_graph_sp_floyd_warshall() {
     (fmakunbound 'neovm--fw-run)
     (fmakunbound 'neovm--fw-path)
     (makunbound 'neovm--fw-inf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -476,7 +476,7 @@ fn oracle_prop_graph_sp_path_reconstruction() {
     (fmakunbound 'neovm--pr-add)
     (fmakunbound 'neovm--pr-dijkstra)
     (fmakunbound 'neovm--pr-path)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -559,7 +559,7 @@ fn oracle_prop_graph_sp_cycle_detection() {
             (length (cadr r3)))))
     (fmakunbound 'neovm--cd-detect)
     (fmakunbound 'neovm--cd-visit)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -636,5 +636,5 @@ fn oracle_prop_graph_sp_dijkstra_disconnected() {
               (= (gethash 'D dist) 999999)))))
     (fmakunbound 'neovm--dd-add)
     (fmakunbound 'neovm--dd-dijkstra)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

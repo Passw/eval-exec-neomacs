@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // when with various truthy values (not just t)
@@ -24,7 +24,7 @@ fn oracle_prop_when_unless_comp_when_truthy_values() {
                     (when 0 'from-zero)
                     (when "" 'from-empty-string)
                     (when [1 2] 'from-vector))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -43,7 +43,7 @@ fn oracle_prop_when_unless_comp_falsy_conditions() {
                     (unless (car nil) 'unless-car-nil-runs)
                     (when (and nil t) 'should-not-appear)
                     (unless (and nil t) 'unless-and-nil-runs))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ fn oracle_prop_when_unless_comp_multiple_body_forms() {
                               :unless-result unless-result
                               :side-a side-a
                               :side-b side-b))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ fn oracle_prop_when_unless_comp_return_values() {
                     ;; Nested: return value propagation
                     (when t (when t (when t 'deep)))
                     (when t (unless nil (when t 'deep-mixed))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ fn oracle_prop_when_unless_comp_nested_control_flow() {
                                        (format "divisible-by-5:%d" n))))))))
                         (setq results (cons (cons n label) results))))
                     (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ fn oracle_prop_when_unless_comp_complex_conditions() {
                           (setq tag (cons 'extreme-nonzero tag)))
                         (setq results (cons (cons x (nreverse tag)) results))))
                     (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ fn oracle_prop_when_unless_comp_when_inside_let() {
                            (list :shadowed outer)))
                        ;; after when, outer is restored
                        (list :outer-restored outer))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -205,7 +205,7 @@ fn oracle_prop_when_unless_comp_unless_side_effects() {
                       (setq log (cons 'true-comparison log)))
                     ;; Only 2 of 4 unless blocks should have executed
                     (list :counter counter :log (nreverse log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -239,7 +239,7 @@ fn oracle_prop_when_unless_comp_in_iteration_bodies() {
                     (list :evens (nreverse evens)
                           :odds (nreverse odds)
                           :fizzbuzz (nreverse fizzbuzz)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +264,7 @@ fn oracle_prop_when_unless_comp_predicate_conditions() {
                         (unless (atom item) (setq tags (cons :non-atom tags)))
                         (setq results (cons (cons item (nreverse tags)) results))))
                     (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +306,7 @@ fn oracle_prop_when_unless_comp_guard_clause_pattern() {
         (funcall 'neovm--test-validate-and-process '(hello world))
         (funcall 'neovm--test-validate-and-process '(42)))
     (fmakunbound 'neovm--test-validate-and-process)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -352,5 +352,5 @@ fn oracle_prop_when_unless_comp_config_validator() {
                      (funcall validate-config '(:name "app" :port 99999))
                      (funcall validate-config '(:name "app" :port 3000 :timeout 600))
                      (funcall validate-config nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

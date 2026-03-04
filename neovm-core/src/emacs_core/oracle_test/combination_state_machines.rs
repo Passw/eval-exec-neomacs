@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // DFA-based tokenizer: identifiers, numbers, strings, operators
@@ -94,7 +94,7 @@ fn oracle_prop_sm_dfa_tokenizer() {
         (funcall 'neovm--test-tokenize "\"hello\" != \"world\"")
         (funcall 'neovm--test-tokenize ""))
     (fmakunbound 'neovm--test-tokenize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ fn oracle_prop_sm_balanced_parens() {
         (funcall 'neovm--test-balanced "")
         (funcall 'neovm--test-balanced "{[(])}"))
     (fmakunbound 'neovm--test-balanced)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -217,7 +217,7 @@ fn oracle_prop_sm_protocol_parser() {
         (funcall 'neovm--test-parse-request "GET /path")
         (funcall 'neovm--test-parse-request "bad request"))
     (fmakunbound 'neovm--test-parse-request)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,7 +290,7 @@ fn oracle_prop_sm_mealy_transliteration() {
         (funcall 'neovm--test-mealy "chest")
         (funcall 'neovm--test-mealy "sc"))
     (fmakunbound 'neovm--test-mealy)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -402,7 +402,7 @@ fn oracle_prop_sm_pda_expression_parser() {
     (fmakunbound 'neovm--test-eval-expr)
     (makunbound 'neovm--test-parse-pos)
     (makunbound 'neovm--test-parse-input)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -471,7 +471,7 @@ fn oracle_prop_sm_glob_pattern_matcher() {
         (funcall 'neovm--test-glob-match "a*b*c" "abc")
         (funcall 'neovm--test-glob-match "a*b*c" "ac"))
     (fmakunbound 'neovm--test-glob-match)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -548,7 +548,7 @@ fn oracle_prop_sm_csv_parser() {
         (funcall 'neovm--test-parse-csv "single")
         (funcall 'neovm--test-parse-csv ""))
     (fmakunbound 'neovm--test-parse-csv)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -595,5 +595,5 @@ fn oracle_prop_sm_traffic_light_controller() {
                               (sort result (lambda (a b)
                                              (string-lessp (symbol-name (car a))
                                                            (symbol-name (car b))))))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

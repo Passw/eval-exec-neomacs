@@ -9,7 +9,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Extended expression representation with transcendental functions
@@ -82,7 +82,7 @@ fn oracle_prop_symmath_adv_extended_expressions() {
                                env)))
             (< (abs (- lhs rhs)) 1e-10))))
     (fmakunbound 'neovm--sma-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ fn oracle_prop_symmath_adv_simplification_rules() {
         (funcall 'neovm--sma-simplify-fix '(/ 0 x)))         ;; 0
     (fmakunbound 'neovm--sma-simplify)
     (fmakunbound 'neovm--sma-simplify-fix)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +284,7 @@ fn oracle_prop_symmath_adv_differentiation_chain_rule() {
         ;; Product + chain: d/dx(x * sin(x))
         (funcall 'neovm--sma-diff '(* x (sin x)) 'x))
     (fmakunbound 'neovm--sma-diff)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -377,7 +377,7 @@ fn oracle_prop_symmath_adv_partial_differentiation() {
     (fmakunbound 'neovm--sma-pd)
     (fmakunbound 'neovm--sma-pd-simp)
     (fmakunbound 'neovm--sma-pd-fix)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -513,7 +513,7 @@ fn oracle_prop_symmath_adv_polynomial_gcd() {
     (fmakunbound 'neovm--sma-poly-mul)
     (fmakunbound 'neovm--sma-poly-div)
     (fmakunbound 'neovm--sma-poly-gcd)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -564,7 +564,7 @@ fn oracle_prop_symmath_adv_substitution() {
             (funcall 'neovm--sma-subst step1 'a 1))))
     (fmakunbound 'neovm--sma-subst)
     (fmakunbound 'neovm--sma-subst-all)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -643,7 +643,7 @@ fn oracle_prop_symmath_adv_cse() {
     (fmakunbound 'neovm--sma-cse-walk)
     (fmakunbound 'neovm--sma-cse-find-common)
     (fmakunbound 'neovm--sma-cse-size)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -730,7 +730,7 @@ fn oracle_prop_symmath_adv_diff_simplify_pipeline() {
     (fmakunbound 'neovm--sma-ds-diff)
     (fmakunbound 'neovm--sma-ds-simp)
     (fmakunbound 'neovm--sma-ds-fix)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -826,5 +826,5 @@ fn oracle_prop_symmath_adv_tree_analysis() {
     (fmakunbound 'neovm--sma-size)
     (fmakunbound 'neovm--sma-free-vars)
     (fmakunbound 'neovm--sma-linearp)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

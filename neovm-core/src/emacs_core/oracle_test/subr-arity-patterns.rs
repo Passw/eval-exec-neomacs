@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // subr-arity on diverse built-in function families
@@ -61,7 +61,7 @@ fn oracle_prop_subr_arity_patterns_diverse_families() {
   (subr-arity (symbol-function 'remhash))
   (subr-arity (symbol-function 'maphash))
   (subr-arity (symbol-function 'hash-table-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ fn oracle_prop_subr_arity_patterns_return_value_decomposition() {
                 sort apply signal gethash puthash
                 format message aref aset))
     (fmakunbound 'neovm--sap-decompose)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -249,7 +249,7 @@ fn oracle_prop_subr_arity_patterns_subrp_interaction() {
           (nreverse results)))
     (fmakunbound 'neovm--sap-lambda-fn)
     (fmakunbound 'neovm--sap-test-mac)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -330,7 +330,7 @@ Return (ok), (error MIN MAX ARGC), or (error MIN many ARGC)."
         (funcall 'neovm--sap-valid-arg-range 'make-string))
     (fmakunbound 'neovm--sap-validate-call)
     (fmakunbound 'neovm--sap-valid-arg-range)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -405,7 +405,7 @@ Prefer fixed > optional > variadic. Among equal specificity, prefer lower max."
                   candidates)))
     (fmakunbound 'neovm--sap-find-matching-fns)
     (fmakunbound 'neovm--sap-best-match)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

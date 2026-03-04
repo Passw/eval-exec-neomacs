@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // copy-alist creates new cons cells; copy-sequence does not for alist entries
@@ -47,7 +47,7 @@ fn oracle_prop_copy_alist_vs_copy_sequence_on_alist() {
    (mapcar #'cdr ca)
    (mapcar #'cdr cs)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ fn oracle_prop_copy_sequence_all_types() {
    (equal lst (list 1 2 3 4 5))
    (not (eq lst lst-copy))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ fn oracle_prop_copy_alist_complex_values() {
      ;; equal check on keys
      (equal (mapcar #'car orig) (mapcar #'car cp)))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ fn oracle_prop_deep_copy_recursive() {
          (not (eq (car orig) (car deep)))))
     (fmakunbound 'neovm--deep-copy)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +261,7 @@ fn oracle_prop_snapshot_undo_pattern() {
                     ;; Undo stack is now empty
                     (null undo-stack)))))))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -339,7 +339,7 @@ fn oracle_prop_copy_alist_non_symbol_keys() {
    ;; Full equal check (before modification it would have been equal)
    (equal (mapcar #'car orig) (mapcar #'car cp))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -387,5 +387,5 @@ fn oracle_prop_structural_sharing_detection() {
    (length list-a)
    (length copy-a)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

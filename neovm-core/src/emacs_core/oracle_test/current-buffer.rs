@@ -5,7 +5,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 use proptest::prelude::*;
 
 use super::common::{
-    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm,
+    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
 };
 
 #[test]
@@ -15,7 +15,7 @@ fn oracle_prop_current_buffer_basics() {
     let (oracle, neovm) = eval_oracle_and_neovm("(bufferp (current-buffer))");
     assert_ok_eq("t", &oracle, &neovm);
 
-    assert_oracle_parity("(eq (current-buffer) (current-buffer))");
+    assert_oracle_parity_with_bootstrap("(eq (current-buffer) (current-buffer))");
 }
 
 #[test]

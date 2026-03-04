@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Effect declaration and basic perform
@@ -256,7 +256,7 @@ fn oracle_prop_effect_system_state_effect() {
     (fmakunbound 'neovm--eff3-make-state-handler)
     (fmakunbound 'neovm--eff3-perform)
     (makunbound 'neovm--eff3-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -367,7 +367,7 @@ fn oracle_prop_effect_system_exception_with_resume() {
     (fmakunbound 'neovm--eff4-raise)
     (makunbound 'neovm--eff4-exception-handlers)
     (makunbound 'neovm--eff4-exception-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -480,7 +480,7 @@ fn oracle_prop_effect_system_logging_effect() {
     (fmakunbound 'neovm--eff5-perform)
     (makunbound 'neovm--eff5-log-entries)
     (makunbound 'neovm--eff5-min-level)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -596,5 +596,5 @@ fn oracle_prop_effect_system_composed_program() {
     (makunbound 'neovm--eff6-state)
     (makunbound 'neovm--eff6-logs)
     (makunbound 'neovm--eff6-errors)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

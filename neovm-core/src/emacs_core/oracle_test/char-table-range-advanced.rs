@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // set-char-table-range with single character
@@ -49,7 +49,7 @@ fn oracle_prop_char_table_range_adv_single_char() {
           (char-table-range ct ?a)
           ;; Neighboring char unaffected
           (char-table-range ct ?b))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ fn oracle_prop_char_table_range_adv_cons_range() {
    ;; Verify non-overlapping
    (char-table-range ct ?\s)
    (char-table-range ct ?!)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ fn oracle_prop_char_table_range_adv_nil_range() {
        ct1-a ct2-a ct1-z ct2-z
        ct1-nil ct2-nil
        ct1-a-after ct1-b-after))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

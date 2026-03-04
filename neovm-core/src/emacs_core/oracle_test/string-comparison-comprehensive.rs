@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // string= / string-equal: exact equality with various types
@@ -44,7 +44,7 @@ fn oracle_prop_string_comparison_equal_variants() {
   (string= (make-string 1000 ?a) (make-string 1000 ?a))
   ;; Very long differing strings
   (string= (make-string 1000 ?a) (make-string 1000 ?b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ fn oracle_prop_string_comparison_lessp_ordering() {
   (string< 'abc 'abd)
   ;; Mixed symbol and string
   (string< 'abc "abd"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ fn oracle_prop_string_comparison_greaterp_ordering() {
           (string> a b)))
   ;; Symbols
   (string> 'zebra 'alpha))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ fn oracle_prop_string_comparison_compare_strings_all_params() {
   (compare-strings "hello" nil 5 "hello" nil 5)
   ;; Case-insensitive with mixed ASCII
   (compare-strings "FoO bAr" nil nil "foo bar" nil nil t))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -182,7 +182,7 @@ fn oracle_prop_string_comparison_version_lessp() {
   ;; Real-world versions
   (string-version-lessp "emacs-27.1" "emacs-28.2")
   (string-version-lessp "v2.0.0" "v10.0.0"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ fn oracle_prop_string_comparison_prefix_suffix_ignore_case() {
   ;; Case insensitive
   (string-suffix-p "LLO" "hello" t)
   (string-suffix-p ".TXT" "readme.txt" t))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -257,7 +257,7 @@ fn oracle_prop_string_comparison_mixed_case_locale() {
           (string< a c)))  ;; all should be t
   ;; Unicode strings ordering
   (string< "café" "caff"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,7 +285,7 @@ fn oracle_prop_string_comparison_collate_functions() {
   ;; IGNORE-CASE parameter
   (string-collate-equalp "Hello" "hello" nil t)
   (string-collate-lessp "A" "b" nil t))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -326,7 +326,7 @@ fn oracle_prop_string_comparison_edge_cases() {
           (not (string> a b))
           (not (string= a b))
           (< (compare-strings a nil nil b nil nil) 0))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -358,5 +358,5 @@ fn oracle_prop_string_comparison_sort_predicates() {
    ;; Check stability: equal elements preserve relative order
    ;; (using case-insensitive compare where "Apple" == "apple" never occurs here)
    (sort (list "a" "b" "a" "c" "b") #'string<)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

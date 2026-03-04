@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Game tree representation and traversal
@@ -116,7 +116,7 @@ fn oracle_prop_minimax_advanced_game_tree_representation() {
     (fmakunbound 'neovm--mma-count-leaves)
     (fmakunbound 'neovm--mma-depth)
     (fmakunbound 'neovm--mma-leaf-values)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -217,7 +217,7 @@ fn oracle_prop_minimax_advanced_alpha_beta_counting() {
            (list (car c1) (car c2)))))
     (fmakunbound 'neovm--mma-mm-plain)
     (fmakunbound 'neovm--mma-mm-ab)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -463,7 +463,7 @@ fn oracle_prop_minimax_advanced_move_ordering() {
     (fmakunbound 'neovm--mma-mo-order)
     (fmakunbound 'neovm--mma-mo-ab)
     (fmakunbound 'neovm--mma-mo-ab-unordered)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -544,7 +544,7 @@ fn oracle_prop_minimax_advanced_iterative_deepening() {
                   most-negative-fixnum most-positive-fixnum t)))
     (fmakunbound 'neovm--mma-id-ab)
     (fmakunbound 'neovm--mma-id-search)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

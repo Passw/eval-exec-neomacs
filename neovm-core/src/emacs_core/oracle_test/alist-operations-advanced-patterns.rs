@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // assoc with all TEST param variants: eq, equal, string=, string-equal-ignore-case, custom lambdas
@@ -87,7 +87,7 @@ fn oracle_prop_rassoc_test_param_exhaustive() {
                      (rassoc 'x nil)
                      ;; rassoc with #'equal explicitly
                      (rassoc '(1 2 3) al #'equal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +129,7 @@ fn oracle_prop_assq_vs_assoc_identity_differences() {
                        (list (assq nil nil-al)
                              (assoc nil nil-al)
                              (assq t nil-al)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +233,7 @@ fn oracle_prop_nested_alist_tree_shaped() {
                           (equal (cdr (assq 'port pri)) (cdr (assq 'port rep)))
                           (equal (cdr (assq 'name pri)) (cdr (assq 'name rep)))
                           (equal (cdr (assq 'host pri)) (cdr (assq 'host rep))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +302,7 @@ fn oracle_prop_alist_environment_lookup_chains() {
            (sort all-vars (lambda (a b) (string< (symbol-name a) (symbol-name b)))))))
     (fmakunbound 'neovm--env-lookup)
     (fmakunbound 'neovm--env-extend)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -361,7 +361,7 @@ fn oracle_prop_alist_merge_override_strategies() {
                            ;; Merge empty
                            (funcall last-wins base nil)
                            (funcall last-wins nil patch1))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -483,7 +483,7 @@ fn oracle_prop_alist_conversion_hashtable_plist() {
       (maphash (lambda (k v) (setq al (cons (cons k v) al))) ht)
       (sort al (lambda (x y) (string< (symbol-name (car x))
                                         (symbol-name (car y))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -527,7 +527,7 @@ fn oracle_prop_assoc_string_advanced_patterns() {
                      ;; With nil alist
                      (assoc-string "x" nil)
                      (assoc-string "x" nil t)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -584,7 +584,7 @@ fn oracle_prop_alist_dedup_and_canonicalize() {
             (setq groups (cons (list (car pair) (cdr pair)) groups)))))
       (sort groups (lambda (x y) (string< (symbol-name (car x))
                                             (symbol-name (car y))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -642,7 +642,7 @@ fn oracle_prop_alist_set_operations() {
                        (sort result
                              (lambda (a b) (string< (symbol-name (car a))
                                                      (symbol-name (car b))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -693,7 +693,7 @@ fn oracle_prop_alist_zip_and_unzip() {
             (setq row (cons (cons (car col) (nth i (cdr col))) row)))
           (setq result (cons (nreverse row) result))))
       (nreverse result))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

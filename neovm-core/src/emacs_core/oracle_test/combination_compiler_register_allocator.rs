@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Liveness analysis: def/use chains
@@ -110,7 +110,7 @@ fn oracle_prop_combination_regalloc_liveness_defuse() {
     (fmakunbound 'neovm--ra-extract-defs)
     (fmakunbound 'neovm--ra-extract-uses)
     (fmakunbound 'neovm--ra-liveness)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ fn oracle_prop_combination_regalloc_interference_graph() {
           total-edges))
 
     (fmakunbound 'neovm--ra-build-interference)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ fn oracle_prop_combination_regalloc_graph_coloring() {
     (fmakunbound 'neovm--ra-degree)
     (fmakunbound 'neovm--ra-remove-node)
     (fmakunbound 'neovm--ra-color-graph)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

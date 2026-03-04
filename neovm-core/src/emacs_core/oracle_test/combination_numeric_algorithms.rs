@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // GCD/LCM with extended Euclidean algorithm
@@ -48,7 +48,7 @@ fn oracle_prop_numalgo_extended_gcd_lcm() {
                         results))))
         (nreverse results))
     (fmakunbound 'neovm--test-egcd)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ fn oracle_prop_numalgo_newton_sqrt() {
                         results))))
         (nreverse results))
     (fmakunbound 'neovm--test-newton-sqrt)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ fn oracle_prop_numalgo_horner_polynomial() {
         (nreverse results))
     (fmakunbound 'neovm--test-horner)
     (fmakunbound 'neovm--test-poly-naive)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +214,7 @@ fn oracle_prop_numalgo_statistics() {
     (fmakunbound 'neovm--test-variance)
     (fmakunbound 'neovm--test-stddev)
     (fmakunbound 'neovm--test-median)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,7 +288,7 @@ fn oracle_prop_numalgo_matrix_determinant() {
     (fmakunbound 'neovm--test-mat-ref)
     (fmakunbound 'neovm--test-minor)
     (fmakunbound 'neovm--test-det)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -347,7 +347,7 @@ fn oracle_prop_numalgo_bisection_root_finding() {
             (list (< (abs fval) 1e-8)
                   (< (cdr result) 100)))))
     (fmakunbound 'neovm--test-bisect)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -413,7 +413,7 @@ fn oracle_prop_numalgo_fibonacci_matrix() {
     (fmakunbound 'neovm--test-mat2-pow)
     (fmakunbound 'neovm--test-fib-mat)
     (fmakunbound 'neovm--test-fib-simple)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -462,5 +462,5 @@ fn oracle_prop_numalgo_gradient_descent() {
                   (< (cdr result) 5000)))))
     (fmakunbound 'neovm--test-deriv)
     (fmakunbound 'neovm--test-gd)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -3,7 +3,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_match_data_after_string_match() {
@@ -12,7 +12,7 @@ fn oracle_prop_match_data_after_string_match() {
     let form = r#"(progn
                     (string-match "\\(foo\\)\\(bar\\)" "foobar")
                     (match-data))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -24,7 +24,7 @@ fn oracle_prop_match_data_groups() {
                     (list (match-beginning 0) (match-end 0)
                           (match-beginning 1) (match-end 1)
                           (match-beginning 2) (match-end 2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -36,7 +36,7 @@ fn oracle_prop_match_string_from_string() {
                     (list (match-string 0 "abc-123-def-456")
                           (match-string 1 "abc-123-def-456")
                           (match-string 2 "abc-123-def-456")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -47,7 +47,7 @@ fn oracle_prop_match_string_no_match_group() {
     let form = r#"(progn
                     (string-match "foo" "foobar")
                     (match-string 1 "foobar"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn oracle_prop_save_match_data_restores() {
                       (list orig-begin
                             (match-beginning 1)
                             (= orig-begin (match-beginning 1)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -90,7 +90,7 @@ fn oracle_prop_save_match_data_with_error() {
                             (signal 'error '("boom")))
                         (error nil))
                       (= orig (match-beginning 1))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -106,7 +106,7 @@ fn oracle_prop_match_data_complex_regex() {
                           (match-string 1 "1.2.3")
                           (match-string 2 "1.2.3")
                           (match-string 4 "1.2.3")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -120,7 +120,7 @@ fn oracle_prop_match_data_successive_matches() {
                     (string-match "\\([a-z]+\\)" "hello world" 6)
                     (setq results (cons (match-string 1 "hello world") results))
                     (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -138,5 +138,5 @@ fn oracle_prop_match_data_with_buffer_search() {
                                           (match-string 2))
                                     results)))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

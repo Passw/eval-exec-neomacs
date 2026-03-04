@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // FROM only (single-argument): should produce list of one element
@@ -33,14 +33,14 @@ fn oracle_prop_number_sequence_from_only() {
 fn oracle_prop_number_sequence_from_to_ascending() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(number-sequence 1 5)");
-    assert_oracle_parity("(number-sequence 0 10)");
-    assert_oracle_parity("(number-sequence -3 3)");
-    assert_oracle_parity("(number-sequence -10 -5)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 1 5)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0 10)");
+    assert_oracle_parity_with_bootstrap("(number-sequence -3 3)");
+    assert_oracle_parity_with_bootstrap("(number-sequence -10 -5)");
     // Large range
-    assert_oracle_parity("(length (number-sequence 1 200))");
+    assert_oracle_parity_with_bootstrap("(length (number-sequence 1 200))");
     // Verify first and last elements of a range
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         "(let ((s (number-sequence 50 75)))
            (list (car s) (car (last s)) (length s)))",
     );
@@ -54,16 +54,16 @@ fn oracle_prop_number_sequence_from_to_ascending() {
 fn oracle_prop_number_sequence_positive_incr() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(number-sequence 0 20 5)");
-    assert_oracle_parity("(number-sequence 1 15 3)");
-    assert_oracle_parity("(number-sequence 10 100 10)");
-    assert_oracle_parity("(number-sequence -20 20 7)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0 20 5)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 1 15 3)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 10 100 10)");
+    assert_oracle_parity_with_bootstrap("(number-sequence -20 20 7)");
     // INCR larger than range: only FROM included
-    assert_oracle_parity("(number-sequence 1 5 100)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 1 5 100)");
     // INCR = 1 (same as default)
-    assert_oracle_parity("(number-sequence 3 8 1)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 3 8 1)");
     // INCR = 2 (evens)
-    assert_oracle_parity("(number-sequence 0 20 2)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0 20 2)");
 }
 
 // ---------------------------------------------------------------------------
@@ -74,13 +74,13 @@ fn oracle_prop_number_sequence_positive_incr() {
 fn oracle_prop_number_sequence_descending_negative_incr() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(number-sequence 10 1 -1)");
-    assert_oracle_parity("(number-sequence 100 0 -10)");
-    assert_oracle_parity("(number-sequence 50 -50 -25)");
-    assert_oracle_parity("(number-sequence 5 -5 -3)");
-    assert_oracle_parity("(number-sequence 0 -20 -4)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 10 1 -1)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 100 0 -10)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 50 -50 -25)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 5 -5 -3)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0 -20 -4)");
     // Verify elements
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         "(let ((s (number-sequence 20 5 -3)))
            (list (car s) (car (last s)) (length s)))",
     );
@@ -213,7 +213,7 @@ fn oracle_prop_number_sequence_arithmetic_progressions_filtered() {
                         (mapcar (lambda (n) (* n n)) (number-sequence 1 10))
                         ;; Cubes of first 5 naturals
                         (mapcar (lambda (n) (* n n n)) (number-sequence 1 5)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -274,7 +274,7 @@ fn oracle_prop_number_sequence_mapcar_compositions() {
                         (mapcar (lambda (i)
                                   (cons (nth (1- i) letters) i))
                                 nums))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -319,7 +319,7 @@ fn oracle_prop_number_sequence_matrix_generation() {
                           diagonal
                           row-sums
                           col-sums))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -367,5 +367,5 @@ fn oracle_prop_number_sequence_reduce_patterns() {
                  sum)))
         (list sum product maxval reversed running-max alt-sum))
     (fmakunbound 'neovm--nsadv-fold-left)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

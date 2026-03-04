@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // RB-tree core: node representation, rotations, insert with fix-up
@@ -182,7 +182,7 @@ fn oracle_prop_rbtree_insert_and_fixup() {
     (fmakunbound 'neovm--rb-insert-rec)
     (fmakunbound 'neovm--rb-insert)
     (fmakunbound 'neovm--rb-inorder)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -328,7 +328,7 @@ fn oracle_prop_rbtree_search() {
     (fmakunbound 'neovm--rb-min)
     (fmakunbound 'neovm--rb-max)
     (fmakunbound 'neovm--rb-size)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -517,7 +517,7 @@ fn oracle_prop_rbtree_verify_properties() {
     (fmakunbound 'neovm--rb-black-height)
     (fmakunbound 'neovm--rb-prop-bst)
     (fmakunbound 'neovm--rb-verify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -672,7 +672,7 @@ fn oracle_prop_rbtree_level_order() {
     (fmakunbound 'neovm--rb-level-order)
     (fmakunbound 'neovm--rb-height)
     (fmakunbound 'neovm--rb-count-colors)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -840,7 +840,7 @@ fn oracle_prop_rbtree_range_queries() {
     (fmakunbound 'neovm--rb-ceiling)
     (fmakunbound 'neovm--rb-size)
     (fmakunbound 'neovm--rb-rank)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -1004,5 +1004,5 @@ fn oracle_prop_rbtree_set_operations() {
     (fmakunbound 'neovm--rb-intersection)
     (fmakunbound 'neovm--rb-union)
     (fmakunbound 'neovm--rb-difference)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

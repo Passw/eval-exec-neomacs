@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // random with integer argument: result range, type, and distribution sanity
@@ -47,7 +47,7 @@ fn oracle_prop_random_integer_range_and_type() {
         (unless (and (>= r 0) (< r 1000000000))
           (setq ok nil))))
     ok))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ fn oracle_prop_remainder_vs_mod_sign_semantics() {
   ;; Large values
   (% 1000000007 1000000)
   (mod -1000000007 1000000))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@ fn oracle_prop_ash_large_values_and_boundaries() {
   ;; Negative left shift (same as right shift)
   (ash 1024 -3)
   (= (ash 1024 -3) (ash 1024 -3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ fn oracle_prop_bitwise_multi_arg_and_logcount() {
   (logcount 1024)               ;; 1
   (logcount (1- 1024))          ;; 10 (all bits set below)
   )"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +254,7 @@ fn oracle_prop_gcd_euclidean_algorithm() {
     (fmakunbound 'neovm--test-gcd)
     (fmakunbound 'neovm--test-lcm)
     (fmakunbound 'neovm--test-extended-gcd)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +329,7 @@ fn oracle_prop_bit_manipulation_patterns() {
     (fmakunbound 'neovm--test-power-of-2-p)
     (fmakunbound 'neovm--test-next-power-of-2)
     (fmakunbound 'neovm--test-lowest-set-bit)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -411,7 +411,7 @@ fn oracle_prop_modular_exponentiation_and_primality() {
     (fmakunbound 'neovm--test-mod-exp)
     (fmakunbound 'neovm--test-prime-p)
     (fmakunbound 'neovm--test-euler-totient)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -470,7 +470,7 @@ fn oracle_prop_chinese_remainder_theorem() {
           (list x2 (mod x2 2) (mod x2 3) (mod x2 5))))
     (fmakunbound 'neovm--test-crt-egcd)
     (fmakunbound 'neovm--test-crt2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -541,7 +541,7 @@ fn oracle_prop_modular_fibonacci_and_factorial() {
     (fmakunbound 'neovm--test-fib-mod)
     (fmakunbound 'neovm--test-fact-mod)
     (fmakunbound 'neovm--test-digit-sum)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -606,7 +606,7 @@ fn oracle_prop_sieve_of_eratosthenes_bitwise() {
               (setq twins (cons (list p (+ p 2)) twins))))
           (nreverse twins)))
     (fmakunbound 'neovm--test-sieve)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -683,5 +683,5 @@ fn oracle_prop_bitwise_run_length_encoding() {
     (fmakunbound 'neovm--test-int-to-bits)
     (fmakunbound 'neovm--test-rle-encode)
     (fmakunbound 'neovm--test-rle-decode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -3,7 +3,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // aref on vectors
@@ -15,7 +15,7 @@ fn oracle_prop_aref_vector_basic() {
 
     let form = r#"(let ((v [10 20 30 40 50]))
                     (list (aref v 0) (aref v 2) (aref v 4)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn oracle_prop_aref_vector_nested() {
                           (aref (aref m 2) 2)
                           (aref (aref m 0) 2)
                           (aref (aref m 2) 0)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -43,7 +43,7 @@ fn oracle_prop_aref_string() {
                     (list (aref s 0) (aref s 1) (aref s 4)
                           (= (aref s 0) ?H)
                           (= (aref s 4) ?o)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -56,7 +56,7 @@ fn oracle_prop_aref_string_multibyte() {
                           (aref s 0)
                           (aref s 3)
                           (char-to-string (aref s 3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ fn oracle_prop_aset_vector_basic() {
                     (aset v 4 55)
                     (list (aref v 0) (aref v 1) (aref v 2)
                           (aref v 3) (aref v 4)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn oracle_prop_aset_vector_mixed_types() {
                     (aset v 4 t)
                     (list (aref v 0) (aref v 1) (aref v 2)
                           (aref v 3) (aref v 4)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -102,7 +102,7 @@ fn oracle_prop_aset_return_value() {
                           (aset v 1 42)
                           (aset v 2 '(x y))
                           v))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ fn oracle_prop_aset_string() {
                     (aset s 0 ?H)
                     (aset s 4 ?O)
                     s)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -131,7 +131,7 @@ fn oracle_prop_aset_string_build_alphabet() {
                         (aset s i (+ ?a i))
                         (setq i (1+ i))))
                     s)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ fn oracle_prop_fillarray_vector() {
     let form = r#"(let ((v (vector 1 2 3 4 5)))
                     (fillarray v 0)
                     (list v (aref v 0) (aref v 4)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -155,7 +155,7 @@ fn oracle_prop_fillarray_vector_with_symbol() {
     let form = r#"(let ((v (make-vector 4 nil)))
                     (fillarray v 'x)
                     v)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -165,7 +165,7 @@ fn oracle_prop_fillarray_string() {
     let form = r#"(let ((s (make-string 10 ?a)))
                     (fillarray s ?z)
                     s)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -175,7 +175,7 @@ fn oracle_prop_fillarray_returns_array() {
     // fillarray returns the modified array itself
     let form = r#"(let ((v (vector 1 2 3)))
                     (eq v (fillarray v 0)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +204,7 @@ fn oracle_prop_aref_aset_matrix_transpose() {
                     (list (aref result 0)
                           (aref result 1)
                           (aref result 2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -231,7 +231,7 @@ fn oracle_prop_aref_aset_matrix_multiply() {
                             (setq j (1+ j))))
                         (setq i (1+ i))))
                     (list (aref result 0) (aref result 1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +254,7 @@ fn oracle_prop_aref_aset_histogram() {
                           (aref freq ?l) (aref freq ?o)
                           (aref freq ?\ ) (aref freq ?w)
                           (aref freq ?r) (aref freq ?d)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -280,7 +280,7 @@ fn oracle_prop_aref_aset_bubble_sort() {
                             (setq i (1+ i))))
                         (setq n (1- n))))
                     v)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -327,5 +327,5 @@ fn oracle_prop_aref_aset_ring_buffer() {
                       (setq log (cons (funcall pop) log)) ;; 11
                       (setq log (cons count log)) ;; 0
                       (nreverse log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

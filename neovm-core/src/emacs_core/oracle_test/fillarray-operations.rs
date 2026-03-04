@@ -2,7 +2,7 @@
 //! bool-vectors) with a value in place.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic fillarray on vectors
@@ -17,7 +17,7 @@ fn oracle_prop_fillarray_vector_basic() {
                     (fillarray v 42)
                     (list (aref v 0) (aref v 1) (aref v 2)
                           (aref v 3) (aref v 4) (aref v 5)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -31,7 +31,7 @@ fn oracle_prop_fillarray_string_with_char() {
     let form = r#"(let ((s (copy-sequence "abcdef")))
                     (fillarray s ?z)
                     s)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ fn oracle_prop_fillarray_bool_vector() {
                                              (setq ok nil)))
                                          ok)))
                         (list all-true all-false))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ fn oracle_prop_fillarray_overwrite_existing() {
                       (dotimes (i (length v))
                         (setq result (cons (aref v i) result)))
                       (nreverse result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ fn oracle_prop_fillarray_returns_same_object() {
                       (list (eq v result)
                             (aref v 0)
                             (aref result 3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -122,7 +122,7 @@ fn oracle_prop_fillarray_selective_then_reset() {
                               (append snapshot nil)
                               (aref snapshot 3)
                               (aref snapshot 5)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ fn oracle_prop_fillarray_clear_sparse_table() {
                       (let ((after-3 (aref table 3))
                             (after-5 (aref table 5)))
                         (list before-3 before-5 after-3 after-5))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,5 +162,5 @@ fn oracle_prop_fillarray_string_multibyte() {
     let form = r#"(let ((s (make-string 5 ?a)))
                     (fillarray s ?x)
                     (list s (length s) (aref s 0) (aref s 4)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

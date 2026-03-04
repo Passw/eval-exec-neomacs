@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Deferred computation: lazy evaluation with memoization
@@ -93,7 +93,7 @@ fn oracle_prop_promise_deferred_lazy() {
     (fmakunbound 'neovm--prom-forced-p)
     (fmakunbound 'neovm--prom-defer-map)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +209,7 @@ fn oracle_prop_promise_then_catch_chains() {
     (fmakunbound 'neovm--prom-map)
     (fmakunbound 'neovm--prom-chain)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -307,7 +307,7 @@ fn oracle_prop_promise_all() {
     (fmakunbound 'neovm--pa-all)
     (fmakunbound 'neovm--pa-all-settled)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -412,7 +412,7 @@ fn oracle_prop_promise_race() {
     (fmakunbound 'neovm--pr-any)
     (fmakunbound 'neovm--pr-priority-race)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -566,7 +566,7 @@ fn oracle_prop_promise_combinators() {
     (fmakunbound 'neovm--pc-retry)
     (fmakunbound 'neovm--pc-fallback)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -706,7 +706,7 @@ fn oracle_prop_promise_error_propagation() {
     (fmakunbound 'neovm--pe-check-range)
     (fmakunbound 'neovm--pe-process-record)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -849,5 +849,5 @@ fn oracle_prop_promise_task_scheduler() {
     (fmakunbound 'neovm--pt-make-task)
     (fmakunbound 'neovm--pt-execute)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

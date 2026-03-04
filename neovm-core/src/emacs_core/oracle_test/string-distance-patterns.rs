@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Identity, single operation (insert/delete/substitute), and boundary cases
@@ -54,7 +54,7 @@ fn oracle_prop_string_distance_single_operations() {
 
   (nreverse results))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ fn oracle_prop_string_distance_symmetry_exhaustive() {
         'pairs-checked checked
         'counterexamples counterexamples))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +129,7 @@ fn oracle_prop_string_distance_triangle_inequality_broad() {
         'all-valid (= violations 0)
         'max-slack max-slack))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ fn oracle_prop_string_distance_sort_by_distance() {
           (funcall 'neovm--sdp-sort-by-distance "" words)))
     (fmakunbound 'neovm--sdp-sort-by-distance)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ fn oracle_prop_string_distance_fuzzy_match_scoring() {
     (fmakunbound 'neovm--sdp-fuzzy-score)
     (fmakunbound 'neovm--sdp-fuzzy-top-n)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -336,7 +336,7 @@ fn oracle_prop_string_distance_spell_checker() {
     (fmakunbound 'neovm--sdp-spell-suggest)
     (fmakunbound 'neovm--sdp-spell-check)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -389,5 +389,5 @@ fn oracle_prop_string_distance_byte_vs_char_mode() {
           'max-pair (list max-dist max-pair)
           'min-pair (list min-dist min-pair))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

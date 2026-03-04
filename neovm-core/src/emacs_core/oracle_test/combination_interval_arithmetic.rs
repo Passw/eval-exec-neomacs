@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Interval representation and basic arithmetic
@@ -85,7 +85,7 @@ fn oracle_prop_interval_arith_basic_operations() {
     (fmakunbound 'neovm--ia-sub)
     (fmakunbound 'neovm--ia-mul)
     (fmakunbound 'neovm--ia-div)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +152,7 @@ fn oracle_prop_interval_arith_predicates() {
     (fmakunbound 'neovm--ia-overlap-p)
     (fmakunbound 'neovm--ia-width)
     (fmakunbound 'neovm--ia-mid)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ fn oracle_prop_interval_arith_union_intersection() {
     (fmakunbound 'neovm--ia-intersect)
     (fmakunbound 'neovm--ia-union)
     (fmakunbound 'neovm--ia-merge-all)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -336,7 +336,7 @@ fn oracle_prop_interval_arith_newton_root_finding() {
     (fmakunbound 'neovm--ia-width)
     (fmakunbound 'neovm--ia-newton-step)
     (fmakunbound 'neovm--ia-newton-sqrt2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -453,7 +453,7 @@ fn oracle_prop_interval_arith_uncertainty_propagation() {
     (fmakunbound 'neovm--ia-mul)
     (fmakunbound 'neovm--ia-scale)
     (fmakunbound 'neovm--ia-square)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -553,7 +553,7 @@ fn oracle_prop_interval_arith_bisection_search() {
     (fmakunbound 'neovm--ia-eval-f)
     (fmakunbound 'neovm--ia-contains-zero-p)
     (fmakunbound 'neovm--ia-bisect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -647,5 +647,5 @@ fn oracle_prop_interval_arith_polynomial_evaluation() {
     (fmakunbound 'neovm--ia-mul)
     (fmakunbound 'neovm--ia-horner)
     (fmakunbound 'neovm--ia-naive-poly)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -3,7 +3,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic predicate on various types
@@ -23,7 +23,7 @@ fn oracle_prop_vector_or_char_table_p_basic_types() {
   (vector-or-char-table-p 'foo)
   (vector-or-char-table-p (make-vector 0 nil))
   (vector-or-char-table-p (make-char-table 'generic 0)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ fn oracle_prop_vector_or_char_table_p_polymorphic_aref_aset() {
           ;; Verify unset positions are still nil
           (list (aref vec 1) (aref vec 5) (aref ct ?b) (aref ct ?Z))))
     (fmakunbound 'neovm--test-voct-fill-and-read)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ fn oracle_prop_vector_or_char_table_p_frequency_counter() {
     (fmakunbound 'neovm--test-voct-incr)
     (fmakunbound 'neovm--test-voct-count-elements)
     (fmakunbound 'neovm--test-voct-lookup-many)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -187,5 +187,5 @@ fn oracle_prop_vector_or_char_table_p_nested_containers() {
        (p3 (vectorp vec-of-ct))
        (p4 (char-table-p (aref vec-of-ct 1))))
   (list r1 r2 r3 p1 p2 p3 p4))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

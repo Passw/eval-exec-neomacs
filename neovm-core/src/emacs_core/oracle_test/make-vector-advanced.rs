@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-vector with various init values
@@ -42,7 +42,7 @@ fn oracle_prop_make_vector_various_init() {
                       ;; Mutating through one ref affects the other
                       (progn (setcar (aref v-cons 0) 99)
                              (car (aref v-cons 2)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ fn oracle_prop_vector_function_multi_args() {
                     (aref (vector 'x 'y 'z) 1)
                     ;; Conversion to list
                     (append (vector 10 20 30) nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ fn oracle_prop_vconcat_sequence_merge() {
                     ;; Result types
                     (vectorp (vconcat [1] '(2)))
                     (length (vconcat [1 2] '(3 4 5) "ab")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ fn oracle_prop_vector_growth_simulation() {
                       (funcall dyn-get 9)
                       ;; Capacity should be 16 (2->4->8->16)
                       (length buf))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -392,5 +392,5 @@ fn oracle_prop_vector_union_find() {
                           (dotimes (i n)
                             (puthash (funcall find i) t groups))
                           (hash-table-count groups))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Rope construction from string and basic operations
@@ -101,7 +101,7 @@ fn oracle_prop_rope_construction_and_length() {
     (fmakunbound 'neovm--rope-concat)
     (fmakunbound 'neovm--rope-to-string)
     (fmakunbound 'neovm--rope-depth)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +173,7 @@ fn oracle_prop_rope_index_char_at() {
     (fmakunbound 'neovm--rope-length)
     (fmakunbound 'neovm--rope-concat)
     (fmakunbound 'neovm--rope-char-at)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ fn oracle_prop_rope_split() {
     (fmakunbound 'neovm--rope-concat)
     (fmakunbound 'neovm--rope-to-string)
     (fmakunbound 'neovm--rope-split)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -375,7 +375,7 @@ fn oracle_prop_rope_insert_delete() {
     (fmakunbound 'neovm--rope-split)
     (fmakunbound 'neovm--rope-insert)
     (fmakunbound 'neovm--rope-delete)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -537,7 +537,7 @@ fn oracle_prop_rope_editor_buffer() {
     (fmakunbound 'neovm--re-buf-undo)
     (fmakunbound 'neovm--re-buf-text)
     (fmakunbound 'neovm--re-buf-cursor)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -639,5 +639,5 @@ fn oracle_prop_rope_balance() {
     (fmakunbound 'neovm--rb-collect-leaves)
     (fmakunbound 'neovm--rb-build-balanced)
     (fmakunbound 'neovm--rb-rebalance)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

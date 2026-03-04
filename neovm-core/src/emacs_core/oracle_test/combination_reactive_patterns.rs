@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Observable value with change listeners
@@ -111,7 +111,7 @@ fn oracle_prop_reactive_observable_value() {
     (makunbound 'neovm--rx-obs-listeners)
     (makunbound 'neovm--rx-obs-log)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -217,7 +217,7 @@ fn oracle_prop_reactive_computed_values() {
     (makunbound 'neovm--rx-computed)
     (makunbound 'neovm--rx-eval-log)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -337,7 +337,7 @@ fn oracle_prop_reactive_two_way_binding() {
     (makunbound 'neovm--rx-bind-updating)
     (makunbound 'neovm--rx-bind-log)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -470,7 +470,7 @@ fn oracle_prop_reactive_event_stream() {
     (fmakunbound 'neovm--rx-stream-scan)
     (fmakunbound 'neovm--rx-stream-materialize)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -552,7 +552,7 @@ fn oracle_prop_reactive_debounce() {
     (fmakunbound 'neovm--rx-debounce-process)
     (fmakunbound 'neovm--rx-throttle-process)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

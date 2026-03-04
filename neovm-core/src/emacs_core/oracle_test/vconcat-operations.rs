@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // vconcat two vectors
@@ -18,7 +18,7 @@ fn oracle_prop_vconcat_two_vectors() {
                         (vconcat [a] [b])
                         (vconcat [1] [2 3 4 5])
                         (vconcat [100 200] [300]))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ fn oracle_prop_vconcat_vector_and_list() {
                         (vconcat '(a b) [c d])
                         (vconcat [10] '(20 30 40))
                         (vconcat '(x) '(y) [z]))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -48,7 +48,7 @@ fn oracle_prop_vconcat_vector_and_string() {
                         (vconcat "hello" [33])
                         (vconcat "AB" "CD")
                         (vconcat [0] "x" [255]))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ fn oracle_prop_vconcat_multiple_args() {
                         (vconcat '(a) [b] '(c) [d])
                         (vconcat "A" [66] '(67) "D")
                         (vconcat [1 2] '(3 4) [5 6] '(7 8) [9 10]))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ fn oracle_prop_vconcat_empty_args() {
                         (vconcat [] [1 2] [])
                         (vconcat '() [3 4] '())
                         (vconcat "" [5]))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ fn oracle_prop_vconcat_nil_args() {
                         (vconcat nil [1 2 3])
                         (vconcat [4 5] nil [6])
                         (vconcat nil nil nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ fn oracle_prop_vconcat_matrix_build() {
                             (nreverse diag)
                             off-diag-sum
                             (length matrix))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ fn oracle_prop_vconcat_flatten_chunks() {
                               sum
                               ;; Verify sum is 1+2+...+10 = 55
                               (= sum 55)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -193,5 +193,5 @@ fn oracle_prop_vconcat_interleave() {
                      (funcall interleave [p] [q r s])
                      (funcall interleave [] [a b])
                      (funcall interleave [] [])))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

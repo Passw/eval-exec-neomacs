@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Multiple handlers with specific and general error types
@@ -38,7 +38,7 @@ fn oracle_prop_condition_case_comprehensive_multiple_handlers() {
       (funcall (lambda (a b) (+ a b)) 1 2 3)
     (wrong-number-of-args 'caught-wrong-num-args)
     (error 'too-general)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -67,7 +67,7 @@ fn oracle_prop_condition_case_comprehensive_handler_ordering() {
     (void-variable 'wrong)
     (arith-error 'correct)
     (error 'too-general)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ fn oracle_prop_condition_case_comprehensive_error_catchall() {
   (condition-case err
       (signal 'error '("custom message"))
     (error (list 'caught (cadr err)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ fn oracle_prop_condition_case_comprehensive_resignal() {
      ;; Re-signal as a generic error with additional context
      (signal 'error (list "wrapped" (car inner-err) (cdr inner-err)))))
   (error (list 'outer-caught (cdr outer-err))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -126,7 +126,7 @@ fn oracle_prop_condition_case_comprehensive_resignal_different_type() {
      (signal 'arith-error nil)))
   (arith-error 'retyped-to-arith)
   (error 'generic-catch))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ fn oracle_prop_condition_case_comprehensive_nested_deep() {
     ;; After mid-level catch, no error propagates
     )
   (error 'outer-catch))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -173,7 +173,7 @@ fn oracle_prop_condition_case_comprehensive_nested_independent_errors() {
           (signal 'error '("test"))
         (void-variable 'inner-no-match))
     (error (list 'outer-got-it (cadr e1)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ fn oracle_prop_condition_case_comprehensive_with_unwind_protect() {
               (setq cleanup-ran t))
           (arith-error (list 'caught cleanup-ran))))
   (list result cleanup-ran))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -212,7 +212,7 @@ fn oracle_prop_condition_case_comprehensive_unwind_protect_inside_handler() {
            (+ 1 2))
        (setq trace (cons 'handler-cleanup trace)))))
   (list (nreverse trace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +242,7 @@ fn oracle_prop_condition_case_comprehensive_error_data_extraction() {
      (list 'type (car err)
            'expected (nth 1 err)
            'got-type (type-of (nth 2 err))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ fn oracle_prop_condition_case_comprehensive_signal_complex_data() {
   (condition-case err
       (signal 'error (list [1 2 3] "after-vector"))
     (error (list (aref (cadr err) 1) (caddr err)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -358,7 +358,7 @@ fn oracle_prop_condition_case_comprehensive_no_error_passthrough() {
   (condition-case err
       (list 1 (cons 'a 'b) [3 4 5])
     (error 'never)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -379,7 +379,7 @@ fn oracle_prop_condition_case_comprehensive_handler_multi_forms() {
             (let ((err-type (car err)))
               (list 'handled err-type))))))
     (list result side-effect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -408,5 +408,5 @@ fn oracle_prop_condition_case_comprehensive_var_binding_vs_nil() {
       (arith-error neovm--cctest-outer))
     ;; After condition-case, the let binding should be restored
     ))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

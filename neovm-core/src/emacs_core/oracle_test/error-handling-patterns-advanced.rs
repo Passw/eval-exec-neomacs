@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Retry with exponential backoff simulation
@@ -33,7 +33,7 @@ fn oracle_prop_err_adv_retry_exponential_backoff() {
                             (setq result (format "ok-on-%d" attempt)))
                         (error nil)))
                     (list result attempt (nreverse delays)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ fn oracle_prop_err_adv_circuit_breaker() {
                                 (setq log (cons (list idx 'failed) log)))))))
                         (setq idx (1+ idx))))
                     (list state failure-count (nreverse log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ fn oracle_prop_err_adv_aggregate_all_errors() {
                            (setq errors
                                  (cons (list a b (car (cdr err))) errors))))))
                     (list (nreverse results) (nreverse errors)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ fn oracle_prop_err_adv_timeout_simulation() {
                                     count (1+ count)))
                             (setq result (cons (cons i count) result)))
                           (setq i (1+ i))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ fn oracle_prop_err_adv_fallback_chain() {
                         (funcall try-all 12 strategies)   ; A fails, B succeeds (even)
                         (funcall try-all 15 strategies)   ; A,B fail, C catches
                         (funcall try-all 8 strategies)))) ; A succeeds"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +236,7 @@ fn oracle_prop_err_adv_resource_pool() {
                           (funcall release r1)))
                       ;; Return: pool should be fully restored, log in order
                       (list (length pool) (length in-use) (nreverse log))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -296,5 +296,5 @@ fn oracle_prop_err_adv_transaction_savepoints() {
                       (funcall do-op 'queue-email)
                       (funcall commit)
                       committed))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

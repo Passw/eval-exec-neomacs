@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Base parameter exhaustive: all valid bases with tricky inputs
@@ -72,7 +72,7 @@ fn oracle_prop_string_to_number_comprehensive_all_bases() {
   (string-to-number "g" 16)         ;; no valid digits
   (string-to-number "0xff" 16)      ;; 0x prefix in base 16
   (string-to-number "0XFF" 16))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ fn oracle_prop_string_to_number_comprehensive_whitespace() {
   (string-to-number "ffgg" 16)
   (string-to-number "77abc" 8)
   (string-to-number "101xyz" 2))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -158,7 +158,7 @@ fn oracle_prop_string_to_number_comprehensive_signs() {
   (string-to-number "  -42")
   (string-to-number "  +ff" 16)
   (string-to-number "  -101" 2))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -216,7 +216,7 @@ fn oracle_prop_string_to_number_comprehensive_floats() {
   (string-to-number "1e100")
   (string-to-number "1e200")
   (string-to-number "-1e200"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +252,7 @@ fn oracle_prop_string_to_number_comprehensive_infinity_nan() {
   (floatp (string-to-number "1e-999"))
   (string-to-number "1e-999")       ;; underflow to 0.0
   (string-to-number "-1e-999"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -294,7 +294,7 @@ fn oracle_prop_string_to_number_comprehensive_prefixes() {
   (string-to-number "0000" 16)
   (string-to-number "0000" 8)
   (string-to-number "0000" 2))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -334,7 +334,7 @@ fn oracle_prop_string_to_number_comprehensive_extreme_values() {
   ;; Compare parsed extreme values
   (> (string-to-number "999999999") (string-to-number "999999998"))
   (< (string-to-number "-999999999") (string-to-number "-999999998")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -382,7 +382,7 @@ fn oracle_prop_string_to_number_comprehensive_degenerate() {
   (= 0 (string-to-number "abc"))
   (= 0 (string-to-number " "))
   (integerp (string-to-number "abc")))"##;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Deep vs shallow: cons cells are copied, but cdr values are shared
@@ -31,7 +31,7 @@ fn oracle_prop_copy_alist_deep_vs_shallow() {
                               cdr-shared
                               (cdar orig)
                               (cdar cp)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ fn oracle_prop_copy_alist_modification_independence() {
                      (mapcar #'cdr cp)
                      ;; Lengths differ
                      (list (length orig) (length cp))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ fn oracle_prop_copy_alist_nested_alist_of_alists() {
                             (cdr (assq 'name (cdr (assq 'user orig))))
                             ;; Copy user changed
                             (cdr (assq 'name (cdr (assq 'user cp)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +125,7 @@ fn oracle_prop_copy_alist_merge() {
                          (cdr (assq 'b merged))
                          (cdr (assq 'e merged))
                          (cdr (assq 'a merged))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ fn oracle_prop_copy_alist_difference() {
                                      (nreverse only-b)
                                      (nreverse common))))))
                       (funcall diff alist-a alist-b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ fn oracle_prop_copy_alist_computed_record() {
                             (cdr (assq 'perimeter r2))
                             ;; Original unchanged after scaling
                             (cdr (assq 'width r1)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +245,7 @@ fn oracle_prop_copy_alist_schema_migration() {
                        (mapcar (lambda (r) (cdr (assq 'active r))) v2-rows)
                        ;; Scores preserved
                        (mapcar (lambda (r) (cdr (assq 'score r))) v2-rows))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -292,5 +292,5 @@ fn oracle_prop_copy_alist_serialization_roundtrip() {
                        (equal (cdr (assq 'scores roundtripped)) '(95 88 92))
                        (equal (cdr (assq 'active roundtripped)) t)
                        (equal (cdr (assq 'meta roundtripped)) nil))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

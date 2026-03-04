@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // mapcan: destructive mapcar + nconc (flatMap)
@@ -60,7 +60,7 @@ fn oracle_prop_map_adv_mapcan_flatmap() {
                         (t (list (format "%d" x)))))
                 '(3 0 -1 0 0 2 -5 0 4)))
     (fmakunbound 'neovm--map-adv-divisors)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ fn oracle_prop_map_adv_maphash_patterns() {
                   best-name best-avg
                   above-80
                   summary)))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +201,7 @@ fn oracle_prop_map_adv_index_tracking() {
     (fmakunbound 'neovm--map-adv-enumerate)
     (fmakunbound 'neovm--map-adv-map-pairs)
     (fmakunbound 'neovm--map-adv-sliding-window)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -299,7 +299,7 @@ fn oracle_prop_map_adv_early_termination() {
     (fmakunbound 'neovm--map-adv-take-while)
     (fmakunbound 'neovm--map-adv-map-until)
     (fmakunbound 'neovm--map-adv-reduce-until)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -400,7 +400,7 @@ fn oracle_prop_map_adv_nested_maps() {
     (fmakunbound 'neovm--map-adv-transpose)
     (fmakunbound 'neovm--map-adv-mat-mul)
     (fmakunbound 'neovm--map-adv-group-by)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -449,7 +449,7 @@ fn oracle_prop_map_adv_mapc_return_and_accumulate() {
                                               result)))
                          adj)
                 (sort result (lambda (a b) (string< (car a) (car b))))))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

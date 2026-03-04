@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Lexical vs dynamic binding fundamental differences
@@ -42,7 +42,7 @@ fn oracle_prop_lexical_binding_closure_survives_scope_exit() {
         (g2 (funcall make-getter 'hello))
         (g3 (funcall make-getter '(a b c))))
     (list (funcall g1) (funcall g2) (funcall g3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ fn oracle_prop_lexical_binding_shared_env_stack() {
       (funcall pop-fn)            ;; a
       (funcall pop-fn)            ;; empty
       (funcall size-fn))))"#; // 0
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +157,7 @@ fn oracle_prop_lexical_binding_let_star_sequential_refs() {
       ;; Shadowing a in new let doesn't affect the closure
       (let ((a 999))
         (funcall snapshot)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -201,7 +201,7 @@ fn oracle_prop_lexical_binding_nested_closure_three_levels() {
                 (funcall inner2 6)
                 ;; Re-using mid creates new independent inner
                 (funcall (funcall mid 10) 10)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -226,7 +226,7 @@ fn oracle_prop_lexical_binding_closure_returning_closure_mutation() {
       (funcall log-info "done")
       (list (length history)
             (reverse history)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -256,7 +256,7 @@ fn oracle_prop_lexical_binding_closure_with_mapcar() {
                       zipped))
           (setq i (1+ i))))
       (list results (nreverse zipped)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -284,7 +284,7 @@ fn oracle_prop_lexical_binding_closure_compose_chain() {
             (funcall chain 0)   ;; add1(double(square(0))) = 1
             (funcall chain -2)  ;; add1(double(square(2))) = add1(double(4)) = add1(8) = 9
             (funcall chain 1)))))))  ;; add1(double(square(-1))) = add1(double(1)) = add1(2) = 3"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,7 +323,7 @@ fn oracle_prop_lexical_binding_defvar_special_override() {
     (fmakunbound 'neovm--lbc-read-dyn)
     (fmakunbound 'neovm--lbc-test-dynamic)
     (makunbound 'neovm--lbc-dynvar)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -358,7 +358,7 @@ fn oracle_prop_lexical_binding_defvar_mixed_with_lexical() {
               (funcall 'neovm--lbc-mix-reader)))))
     (fmakunbound 'neovm--lbc-mix-reader)
     (makunbound 'neovm--lbc-mix-dyn)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -408,7 +408,7 @@ fn oracle_prop_lexical_binding_closure_object_dispatch() {
       (length (funcall acct2 'history))
       (funcall acct1 'history)
       (funcall acct2 'history))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -431,5 +431,5 @@ fn oracle_prop_lexical_binding_loop_independent_closures() {
   (let ((reversed-results (mapcar 'funcall fns))
         (forward-results (mapcar 'funcall (reverse fns))))
     (list reversed-results forward-results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

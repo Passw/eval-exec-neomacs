@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Monoid infrastructure: generic monoid operations with verification
@@ -71,7 +71,7 @@ fn oracle_prop_monoid_definition_and_laws() {
     (fmakunbound 'neovm--monoid-identity)
     (fmakunbound 'neovm--monoid-combine)
     (fmakunbound 'neovm--monoid-check-laws)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ fn oracle_prop_monoid_string_concatenation() {
                  (mapcar (lambda (n) (number-to-string n)) '(1 2 3 4 5))))
     (fmakunbound 'neovm--str-mconcat)
     (fmakunbound 'neovm--str-intersperse)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ fn oracle_prop_monoid_list_append() {
                  '(1 2 3 4 5 6 7 8)))
     (fmakunbound 'neovm--list-mconcat)
     (fmakunbound 'neovm--list-flatmap)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +235,7 @@ fn oracle_prop_monoid_sum_product() {
           (funcall 'neovm--monoid-power (cons (lambda (a b) (concat a b)) "") "ha" 3)))
     (fmakunbound 'neovm--generic-mconcat)
     (fmakunbound 'neovm--monoid-power)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -303,7 +303,7 @@ fn oracle_prop_monoid_endomorphism_composition() {
     (fmakunbound 'neovm--endo-compose)
     (fmakunbound 'neovm--endo-mconcat)
     (fmakunbound 'neovm--endo-pipeline)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -373,7 +373,7 @@ fn oracle_prop_monoid_free_monoid() {
     (fmakunbound 'neovm--free-unit)
     (fmakunbound 'neovm--free-combine)
     (fmakunbound 'neovm--free-homomorphism)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -432,5 +432,5 @@ fn oracle_prop_monoid_aggregation_report() {
             ;; Average (integer division)
             (/ (nth 1 result) (nth 0 result)))))
     (fmakunbound 'neovm--multi-mconcat)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

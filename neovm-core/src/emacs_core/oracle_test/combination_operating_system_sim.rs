@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Process table management (create, kill, list, scheduling)
@@ -253,7 +253,7 @@ fn oracle_prop_combination_os_sim_memory_allocation() {
     (fmakunbound 'neovm--os-mem-best-fit)
     (fmakunbound 'neovm--os-mem-worst-fit)
     (fmakunbound 'neovm--os-mem-free)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +329,7 @@ fn oracle_prop_combination_os_sim_page_replacement() {
                 (list (nth 0 fifo2) (nth 0 lru2)))))))
     (fmakunbound 'neovm--os-fifo-replace)
     (fmakunbound 'neovm--os-lru-replace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -443,7 +443,7 @@ fn oracle_prop_combination_os_sim_filesystem() {
     (fmakunbound 'neovm--os-fs-ls)
     (fmakunbound 'neovm--os-fs-find)
     (fmakunbound 'neovm--os-fs-rm)))"##;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -9,7 +9,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic overlay creation and predicates
@@ -44,7 +44,7 @@ fn oracle_prop_overlay_make_and_predicates() {
      (eq (overlay-buffer ov) (current-buffer))
      (eq (overlay-buffer ov2) (current-buffer)))))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +88,7 @@ fn oracle_prop_overlay_put_get_properties() {
              (plist-get props 'priority)
              (plist-get props 'invisible))))))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -134,7 +134,7 @@ fn oracle_prop_overlay_overlays_at_and_in() {
                    (overlays-at 4))
            'string<))))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +172,7 @@ fn oracle_prop_overlay_delete() {
          ;; overlayp still returns t for deleted overlay
          (overlayp ov2))))))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +209,7 @@ fn oracle_prop_overlay_move() {
            ;; Property survives move
            (overlay-get ov 'name)))))))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +287,7 @@ fn oracle_prop_overlay_change_positions() {
      ;; previous-overlay-change from position 1 -> 1 (point-min)
      (previous-overlay-change 1))))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -321,7 +321,7 @@ fn oracle_prop_overlay_lists() {
        (let ((ol2 (overlay-lists)))
          (list (length (car ol2)) (length (cdr ol2))))))))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -406,7 +406,7 @@ fn oracle_prop_overlay_priority_ordering() {
                                (< pa pb))))))
          (mapcar (lambda (o) (overlay-get o 'name)) sorted))))))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -445,7 +445,7 @@ fn oracle_prop_overlay_face_property() {
              (overlay-get ov1 'help-echo)
              (overlay-get ov1 'mouse-face))))))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -520,5 +520,5 @@ fn oracle_prop_overlay_complex_nested_boundaries() {
      ;; Total overlays in buffer
      (length (overlays-in 1 46)))))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

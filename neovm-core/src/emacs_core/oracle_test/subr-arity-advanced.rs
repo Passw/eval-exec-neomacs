@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // subr-arity on core built-in functions
@@ -87,7 +87,7 @@ fn oracle_prop_subr_arity_cons_cell_structure() {
         (funcall 'neovm--sa-validate 'format)
         (funcall 'neovm--sa-validate 'make-vector))
     (fmakunbound 'neovm--sa-validate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ fn oracle_prop_subrp_on_various_types() {
         (subrp 'car)  ;; symbol, not the function itself
         (subrp '+))   ;; symbol, not the function
     (fmakunbound 'neovm--sa-test-lambda)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ fn oracle_prop_subr_arity_rest_many() {
           (concat "a" "b" "c" "d")))    ;; 4 args
     (fmakunbound 'neovm--sa-check-rest)
     (makunbound 'neovm--sa-rest-fns)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +214,7 @@ fn oracle_prop_subr_arity_optional() {
         (assoc 'a '((a . 1) (b . 2)))
         (assoc "x" '(("x" . 1) ("y" . 2)) 'string=))
     (fmakunbound 'neovm--sa-opt-info)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,7 +323,7 @@ fn oracle_prop_subr_arity_introspection_system() {
     (fmakunbound 'neovm--sa-classify)
     (fmakunbound 'neovm--sa-safe-call)
     (fmakunbound 'neovm--sa-registry)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

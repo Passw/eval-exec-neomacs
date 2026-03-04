@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Quoting individual metacharacters: . * + ? [ ] ^ $ \ ( ) { } |
@@ -77,7 +77,7 @@ fn oracle_prop_regexp_quote_empty_string() {
   (string-match (regexp-quote "") "")
   ;; Using empty regexp-quote in concat still works
   (string-match (concat "foo" (regexp-quote "") "bar") "foobar"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ fn oracle_prop_regexp_quote_in_search_functions() {
     (insert "^start of line$")
     (goto-char (point-min))
     (if (looking-at (regexp-quote "^start of line$")) t nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +165,7 @@ fn oracle_prop_regexp_quote_dynamic_pattern_building() {
         ;; Overlapping-position search for meta-heavy pattern
         (funcall 'neovm--rqp-find-all "??" "a??b??c"))
     (fmakunbound 'neovm--rqp-find-all)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ fn oracle_prop_regexp_quote_in_replace() {
     (regexp-quote "f(x) = x^2 + $c")
     "FORMULA"
     "Given f(x) = x^2 + $c, compute f(3)."))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

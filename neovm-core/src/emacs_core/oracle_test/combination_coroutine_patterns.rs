@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic generator: closure-based state machine with yield/resume
@@ -89,7 +89,7 @@ fn oracle_prop_coroutine_basic_generator() {
                 (funcall g :next) (funcall g :next))))
     (fmakunbound 'neovm--test-make-range-gen)
     (fmakunbound 'neovm--test-gen-collect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +186,7 @@ fn oracle_prop_coroutine_stateful_generators() {
     (fmakunbound 'neovm--test-make-factorial-gen)
     (fmakunbound 'neovm--test-make-collatz-gen)
     (fmakunbound 'neovm--test-gen-take)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -269,7 +269,7 @@ fn oracle_prop_coroutine_cooperative_scheduler() {
                 (list log counter))))))
     (fmakunbound 'neovm--test-make-task)
     (fmakunbound 'neovm--test-scheduler)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -372,7 +372,7 @@ fn oracle_prop_coroutine_producer_consumer() {
                 :size (funcall buf :size))))
     (fmakunbound 'neovm--test-make-buffer)
     (fmakunbound 'neovm--test-run-producer-consumer)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -460,7 +460,7 @@ fn oracle_prop_coroutine_interleaved_generators() {
     (fmakunbound 'neovm--test-make-counter-gen)
     (fmakunbound 'neovm--test-interleave)
     (fmakunbound 'neovm--test-zip-generators)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -601,7 +601,7 @@ fn oracle_prop_coroutine_generator_pipeline() {
     (fmakunbound 'neovm--test-gen-take)
     (fmakunbound 'neovm--test-gen-chain)
     (fmakunbound 'neovm--test-gen-collect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -689,7 +689,7 @@ fn oracle_prop_coroutine_state_machine() {
             (list (nreverse outputs)
                   (funcall light :state)))))
     (fmakunbound 'neovm--test-make-state-machine)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -801,5 +801,5 @@ fn oracle_prop_coroutine_gen_accumulator() {
     (fmakunbound 'neovm--test-gen-reduce)
     (fmakunbound 'neovm--test-gen-collect)
     (fmakunbound 'neovm--test-gen-enumerate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

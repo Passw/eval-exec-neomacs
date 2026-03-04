@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic replacement: FROMSTRING, TOSTRING, INSTRING
@@ -32,7 +32,7 @@ fn oracle_prop_string_replace_patterns_basic() {
   (string-replace "a" "xyz" "banana")
   ;; Replacement where TOSTRING is shorter than FROMSTRING
   (string-replace "abc" "z" "abcdefabcghi"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ fn oracle_prop_string_replace_patterns_multiple_occurrences() {
   (string-replace "the" "THE" "the cat and the dog and the bird")
   ;; Replacement that creates what looks like a new match (but shouldn't re-match)
   (string-replace "ab" "a" "aabb"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +83,7 @@ fn oracle_prop_string_replace_patterns_no_match() {
   ;; Result is string-equal to input when no match
   (let ((orig "unchanged"))
     (string-equal orig (string-replace "zzz" "aaa" orig))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ fn oracle_prop_string_replace_patterns_deletion() {
   ;; Cascaded deletion
   (let ((s "a--b--c--d"))
     (string-replace "--" "" s)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ fn oracle_prop_string_replace_patterns_special_chars() {
   (string-replace "|" " or " "a|b|c")
   ;; Combined: replace a regex-like pattern literally
   (string-replace ".*" "STAR" "match .* everything"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ fn oracle_prop_string_replace_patterns_cascaded() {
     s)
   ;; Replacement creating new instances of original pattern does NOT re-match
   (string-replace "ab" "aab" "ab"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ fn oracle_prop_string_replace_patterns_vs_regexp() {
       (string-equal
         (string-replace "foo" "baz" s)
         (replace-regexp-in-string "foo" "baz" s)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -310,5 +310,5 @@ fn oracle_prop_string_replace_patterns_unicode_and_boundaries() {
   (length (string-replace "x" "abcdefghij" "xxxx"))
   ;; Verify the actual long replacement
   (string-replace "x" "ab" "xxx"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

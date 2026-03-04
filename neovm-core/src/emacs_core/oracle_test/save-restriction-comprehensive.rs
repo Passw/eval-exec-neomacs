@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // save-restriction preserving narrowing
@@ -36,7 +36,7 @@ fn oracle_prop_save_restriction_comp_preserves_narrowing_on_normal_exit() {
           (= before-min (point-min))
           (= before-max (point-max)))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -58,7 +58,7 @@ fn oracle_prop_save_restriction_comp_preserves_on_error() {
     (list orig-str (buffer-string)
           (equal orig-str (buffer-string)))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +124,7 @@ fn oracle_prop_save_restriction_comp_widen_reveals_full_buffer() {
     (list narrow-view wide-view re-narrow
           (string= narrow-view re-narrow))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -397,7 +397,7 @@ fn oracle_prop_save_restriction_comp_csv_field_extraction() {
       (setq fields (cons (buffer-string) fields)))
     (nreverse fields)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]

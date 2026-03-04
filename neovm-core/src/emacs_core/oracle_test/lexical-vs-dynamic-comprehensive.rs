@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Closure capture differences: lexical vs dynamic
@@ -57,7 +57,7 @@ fn oracle_prop_lexdyn_closure_capture_dynamic_via_defvar() {
                   ;; After let exits, dynamic binding restored
                   (list r1 r2 r3 (funcall reader))))))))
     (makunbound 'neovm--lvd-dynx)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ fn oracle_prop_lexdyn_let_star_sequential_dependency() {
         (e (list a b c d)))
   ;; a=5, b=10, c=15, d=10, e=(5 10 15 10)
   (list a b c d e))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -110,7 +110,7 @@ fn oracle_prop_lexdyn_let_star_closure_captures_intermediate() {
   ;; After (x (* x 2)), x is a NEW binding = 20, f2 captures this
   ;; After (x (* x 3)), x is a NEW binding = 60, f3 captures this
   (list (funcall f1) (funcall f2) (funcall f3) x))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ fn oracle_prop_lexdyn_defvar_makes_dynamic_in_let() {
         (funcall 'neovm--lvd-read-special))
     (fmakunbound 'neovm--lvd-read-special)
     (makunbound 'neovm--lvd-special)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ fn oracle_prop_lexdyn_funcall_closure_in_different_scope() {
                 (funcall add5 0)
                 (funcall add10 0)
                 (funcall add5 (funcall add10 1))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -214,7 +214,7 @@ fn oracle_prop_lexdyn_closure_passed_to_sort() {
            (lambda (a b) (if (eq direction 'desc) (> a b) (< a b))))))
     (list (sort (copy-sequence data) ascending)
           (sort (copy-sequence data) descending))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +283,7 @@ fn oracle_prop_lexdyn_symbol_value_lexical_vs_dynamic() {
           ;; After let, restored
           (symbol-value 'neovm--lvd-sv-dyn)))
     (makunbound 'neovm--lvd-sv-dyn)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -312,7 +312,7 @@ fn oracle_prop_lexdyn_set_on_dynamic_vs_lexical() {
                     ;; Lexical var unchanged by any set call
                     lex-x)))))
     (makunbound 'neovm--lvd-set-dyn)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -390,7 +390,7 @@ fn oracle_prop_lexdyn_lambda_factory_with_state() {
       (funcall set1 'c)        ;; c
       (funcall get1)           ;; c
       (funcall get2))))"#; // y
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -467,7 +467,7 @@ fn oracle_prop_lexdyn_mixed_complex_interaction() {
                     (let ((r4 (funcall compute 10))) ;; flag=t => 200+10=210
                       (list r1 r2 r3 r4)))))))))
     (makunbound 'neovm--lvd-mix-flag)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -494,7 +494,7 @@ fn oracle_prop_lexdyn_dynamic_controls_lexical_closure_behavior() {
                         ;; After lets, back to normal
                         (funcall transform "World"))))))))
     (makunbound 'neovm--lvd-mode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

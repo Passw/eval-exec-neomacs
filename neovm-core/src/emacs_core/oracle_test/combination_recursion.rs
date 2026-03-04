@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Mutual recursion: even/odd predicates with Collatz-like twist
@@ -39,7 +39,7 @@ fn oracle_prop_recursion_mutual_even_odd() {
                                         results))))
                       (fmakunbound 'neovm--test-my-even-p)
                       (fmakunbound 'neovm--test-my-odd-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -187,7 +187,7 @@ fn oracle_prop_recursion_arithmetic_parser() {
                       (fmakunbound 'neovm--test-parse-factor)
                       (fmakunbound 'neovm--test-eval-ast)
                       (makunbound 'neovm--test-tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ fn oracle_prop_recursion_accumulator_passing() {
                       (fmakunbound 'neovm--test-sum-acc)
                       (fmakunbound 'neovm--test-map-acc)
                       (fmakunbound 'neovm--test-filter-acc)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,7 +288,7 @@ fn oracle_prop_recursion_flatten_depth_limit() {
                                     '((a b) ((c d) (e f)) (((g h))))
                                     1)))
                       (fmakunbound 'neovm--test-flatten-depth)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ fn oracle_prop_recursion_tower_of_hanoi() {
                            (length neovm--test-hanoi-moves)))
                       (fmakunbound 'neovm--test-hanoi)
                       (makunbound 'neovm--test-hanoi-moves)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -393,7 +393,7 @@ fn oracle_prop_recursion_glob_pattern_match() {
                                                (eq expected (if actual t nil)))
                                           results)))))
                       (fmakunbound 'neovm--test-glob-match)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -449,5 +449,5 @@ fn oracle_prop_recursion_mergesort() {
                       (fmakunbound 'neovm--test-split)
                       (fmakunbound 'neovm--test-merge)
                       (fmakunbound 'neovm--test-msort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

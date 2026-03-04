@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Adjacency list with weighted edges and neighbor queries
@@ -55,7 +55,7 @@ fn oracle_prop_graph_pattern_weighted_adjacency() {
                       (sort c-neighbors (lambda (a b) (< (cdr a) (cdr b)))))
                 (list total heaviest c-neighbors))))
         (fmakunbound 'neovm--test-add-weighted-edge)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ fn oracle_prop_graph_pattern_bfs_levels() {
                 (puthash v (cons u (gethash v g nil)) g)))
             (funcall 'neovm--test-bfs-levels g 'a))
         (fmakunbound 'neovm--test-bfs-levels)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ fn oracle_prop_graph_pattern_dfs_cycle_report() {
                     (list 'cyclic-finish (cadr r2)))))
         (fmakunbound 'neovm--test-dfs-find-back-edges)
         (fmakunbound 'neovm--test-dfs-visit-be)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ fn oracle_prop_graph_pattern_shortest_path_reconstruct() {
                         (length path-1-5))))))
         (fmakunbound 'neovm--test-bfs-shortest)
         (fmakunbound 'neovm--test-reconstruct-path)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -311,7 +311,7 @@ fn oracle_prop_graph_pattern_connected_components_stats() {
                                 iso)))
                 (list (length comps) sizes largest isolated comps))))
         (fmakunbound 'neovm--test-find-components)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -404,7 +404,7 @@ fn oracle_prop_graph_pattern_bipartite_check() {
                           results)))
             (nreverse results))
         (fmakunbound 'neovm--test-is-bipartite)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -472,5 +472,5 @@ fn oracle_prop_graph_pattern_topological_sort() {
                       (setq all-ok nil))))
                 (list valid order all-ok))))
         (fmakunbound 'neovm--test-topo-sort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

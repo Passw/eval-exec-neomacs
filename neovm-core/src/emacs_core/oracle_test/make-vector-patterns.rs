@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Nested vectors as 2D matrix with row/column operations
@@ -122,7 +122,7 @@ fn oracle_prop_vector_matrix_operations() {
     (fmakunbound 'neovm--vm-row-sums)
     (fmakunbound 'neovm--vm-col-sums)
     (fmakunbound 'neovm--vm-mat-vec-mult)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +213,7 @@ fn oracle_prop_vector_slice_reverse_rotate() {
     (fmakunbound 'neovm--vp-rotate-right)
     (fmakunbound 'neovm--vp-slice)
     (fmakunbound 'neovm--vp-concat-vecs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -327,7 +327,7 @@ fn oracle_prop_vector_stack_queue() {
     (fmakunbound 'neovm--vp-queue-enqueue)
     (fmakunbound 'neovm--vp-queue-dequeue)
     (fmakunbound 'neovm--vp-queue-size)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -412,7 +412,7 @@ fn oracle_prop_vector_comprehension_patterns() {
     (fmakunbound 'neovm--vp-vreduce)
     (fmakunbound 'neovm--vp-vzip)
     (fmakunbound 'neovm--vp-vflatmap)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -491,7 +491,7 @@ fn oracle_prop_vconcat_advanced_patterns() {
     (fmakunbound 'neovm--vp-interleave)
     (fmakunbound 'neovm--vp-partition)
     (fmakunbound 'neovm--vp-flatten)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -583,7 +583,7 @@ fn oracle_prop_vector_ring_buffer() {
     (fmakunbound 'neovm--vp-ring-contents)
     (fmakunbound 'neovm--vp-ring-newest)
     (fmakunbound 'neovm--vp-ring-oldest)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -685,5 +685,5 @@ fn oracle_prop_vector_sparse_set() {
     (fmakunbound 'neovm--vp-sset-add)
     (fmakunbound 'neovm--vp-sset-remove)
     (fmakunbound 'neovm--vp-sset-elements)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

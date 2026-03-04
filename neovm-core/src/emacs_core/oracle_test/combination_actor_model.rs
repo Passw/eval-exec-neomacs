@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic actor: closure with mailbox, send/receive
@@ -149,7 +149,7 @@ fn oracle_prop_actor_basic_mailbox() {
     (fmakunbound 'neovm--test-run-round)
     (makunbound 'neovm--test-actor-registry)
     (makunbound 'neovm--test-actor-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +276,7 @@ fn oracle_prop_actor_become_behavior() {
     (fmakunbound 'neovm--test-ab-step)
     (makunbound 'neovm--test-ab-registry)
     (makunbound 'neovm--test-ab-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +395,7 @@ fn oracle_prop_actor_supervision() {
     (fmakunbound 'neovm--test-sup-process)
     (makunbound 'neovm--test-sup-actors)
     (makunbound 'neovm--test-sup-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -528,7 +528,7 @@ fn oracle_prop_actor_registry_broadcast() {
     (fmakunbound 'neovm--test-reg-group-states)
     (makunbound 'neovm--test-reg-actors)
     (makunbound 'neovm--test-reg-groups)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -661,7 +661,7 @@ fn oracle_prop_actor_request_reply() {
     (fmakunbound 'neovm--test-rr-get-reply)
     (makunbound 'neovm--test-rr-actors)
     (makunbound 'neovm--test-rr-next-id)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -768,7 +768,7 @@ fn oracle_prop_actor_pipeline() {
     (fmakunbound 'neovm--test-pipe-send)
     (fmakunbound 'neovm--test-pipe-tick)
     (makunbound 'neovm--test-pipe-actors)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -901,5 +901,5 @@ fn oracle_prop_actor_stash_pattern() {
     (fmakunbound 'neovm--test-stash-unstash)
     (fmakunbound 'neovm--test-stash-step)
     (makunbound 'neovm--test-stash-actors)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-syntax-table: with parent, without parent, nested inheritance
@@ -179,7 +179,7 @@ fn oracle_prop_syntax_table_comprehensive_predicates() {
   ;; Current buffer's syntax table
   (with-temp-buffer
     (syntax-table-p (syntax-table))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -309,7 +309,7 @@ fn oracle_prop_syntax_table_comprehensive_string_to_syntax() {
   (car (string-to-syntax " "))
   (car (string-to-syntax "."))
   (car (string-to-syntax "\"")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

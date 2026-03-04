@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Sequential binding dependency chains
@@ -20,7 +20,7 @@ fn oracle_prop_let_star_dependency_chain() {
                        (d (expt c 2))
                        (e (- d a)))
                   (list a b c d e))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -35,7 +35,7 @@ fn oracle_prop_let_star_accumulating() {
                        (min-val (apply #'min items))
                        (range (- max-val min-val)))
                   (list sum count avg max-val min-val range))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ fn oracle_prop_let_star_closure_capture() {
                   (list (funcall get-base)
                         (funcall get-mult)
                         (funcall get-all)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ fn oracle_prop_let_vs_let_star_parallel() {
                     ;; let*: x gets y=2, then y gets new x=2
                     (let* ((x y) (y x))
                       (list x y))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ fn oracle_prop_let_star_builder_pattern() {
                                       host
                                       (plist-get config :port))))
                     (list config url))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -120,5 +120,5 @@ fn oracle_prop_let_star_destructure() {
                        (keys (mapcar #'car nested))
                        (vals (mapcar #'cadr nested)))
                   (list first second a b c keys vals))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

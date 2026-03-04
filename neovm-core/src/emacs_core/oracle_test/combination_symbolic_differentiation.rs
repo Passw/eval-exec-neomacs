@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Core differentiation rules for algebraic and transcendental functions
@@ -110,7 +110,7 @@ fn oracle_prop_symbolic_diff_core_rules() {
        ;; d/dx(ln(x^2 + 1))
        (funcall 'neovm--sd-deriv '(ln (+ (^ x 2) 1)) 'x))
     (fmakunbound 'neovm--sd-deriv)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ fn oracle_prop_symbolic_diff_simplification() {
     (fmakunbound 'neovm--sd-simplify)
     (fmakunbound 'neovm--sd-simplify-fix)
     (fmakunbound 'neovm--sd-deriv)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -304,7 +304,7 @@ fn oracle_prop_symbolic_diff_chain_rule() {
        ;; d/dx(exp(sin(x))) = exp(sin(x)) * cos(x)
        (funcall 'neovm--sd-d '(exp (sin x)) 'x))
     (fmakunbound 'neovm--sd-d)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -411,7 +411,7 @@ fn oracle_prop_symbolic_diff_partial_derivatives() {
     (fmakunbound 'neovm--sd-d)
     (fmakunbound 'neovm--sd-s)
     (fmakunbound 'neovm--sd-sf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -523,7 +523,7 @@ fn oracle_prop_symbolic_diff_gradient() {
     (fmakunbound 'neovm--sd-sf)
     (fmakunbound 'neovm--sd-gradient)
     (fmakunbound 'neovm--sd-laplacian)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -615,5 +615,5 @@ fn oracle_prop_symbolic_diff_quotient_and_complex() {
     (fmakunbound 'neovm--sd-d)
     (fmakunbound 'neovm--sd-s)
     (fmakunbound 'neovm--sd-sf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

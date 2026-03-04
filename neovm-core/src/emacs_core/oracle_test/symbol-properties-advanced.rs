@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // get/put basic round-trip with multiple types
@@ -33,7 +33,7 @@ fn oracle_prop_symbol_props_get_put_roundtrip() {
               (get 'neovm--test-spa-rt 'float-val)
               (get 'neovm--test-spa-rt 'nonexistent)))
     (setplist 'neovm--test-spa-rt nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ fn oracle_prop_symbol_props_plist_reflects_mutations() {
         (setq results (cons (length (symbol-plist 'neovm--test-spa-mut)) results))
         (nreverse results))
     (setplist 'neovm--test-spa-mut nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ fn oracle_prop_symbol_props_setplist_replace() {
                     after-x after-new-a after-new-b after-len
                     empty-pl)))))
     (setplist 'neovm--test-spa-repl nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ fn oracle_prop_symbol_props_multiple_independent_updates() {
               (length (car snapshots))    ;; should be 4 (2 entries = 4 elts)
               (length (cadr snapshots)))) ;; should be 2 (1 entry = 2 elts)
     (setplist 'neovm--test-spa-multi nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ fn oracle_prop_symbol_props_put_return_value() {
             (equal (put 'neovm--test-spa-retv 'd 'sym)
                    (get 'neovm--test-spa-retv 'd)))
     (setplist 'neovm--test-spa-retv nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ fn oracle_prop_symbol_props_metadata_system() {
                  neovm--test-meta-fn-mul
                  neovm--test-meta-fn-old-div))
       (setplist s nil))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -327,7 +327,7 @@ fn oracle_prop_symbol_props_method_dispatch_with_inheritance() {
                  neovm--test-dispatch-dog
                  neovm--test-dispatch-puppy))
       (setplist s nil))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -394,5 +394,5 @@ fn oracle_prop_symbol_props_property_diff() {
           (let ((snap2 (funcall snapshot-plist 'neovm--test-spa-diff)))
             (funcall diff-plists snap1 snap2 plist-keys))))
     (setplist 'neovm--test-spa-diff nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

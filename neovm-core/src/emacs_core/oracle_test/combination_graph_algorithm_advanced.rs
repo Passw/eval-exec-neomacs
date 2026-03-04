@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Dijkstra's shortest path with a priority queue (list-based min-heap)
@@ -71,7 +71,7 @@ fn oracle_prop_graph_adv_dijkstra_shortest_path() {
             (sort pairs (lambda (a b) (string< (symbol-name (car a))
                                                (symbol-name (car b))))))))
     (fmakunbound 'neovm--ga-dijkstra)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ NODES: list of node symbols. EDGES: list of (from . to) pairs."
                 '(A B C D)
                 '((A . B) (C . D))))
     (fmakunbound 'neovm--ga-topo-sort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -225,7 +225,7 @@ fn oracle_prop_graph_adv_tarjan_scc() {
                  '(A B C D E F) adj))
     (fmakunbound 'neovm--ga-tarjan-scc)
     (fmakunbound 'neovm--ga-tarjan-visit)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +286,7 @@ fn oracle_prop_graph_adv_bipartite_check() {
          (funcall 'neovm--ga-is-bipartite '(A B C) adj2)
          (funcall 'neovm--ga-is-bipartite '(center L1 L2 L3 L4) adj3)))
     (fmakunbound 'neovm--ga-is-bipartite)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -345,7 +345,7 @@ Returns 'circuit if Euler circuit, 'path if Euler path, 'neither otherwise."
          (funcall 'neovm--ga-euler-check '(A B C D) adj2)
          (funcall 'neovm--ga-euler-check '(A B C D) adj3)))
     (fmakunbound 'neovm--ga-euler-check)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -421,7 +421,7 @@ fn oracle_prop_graph_adv_prim_mst() {
         ;; MST from A: should have weight 4+1+2+2 = 9 or similar optimal
         (funcall 'neovm--ga-prim-mst '(A B C D E) adj 'A))
     (fmakunbound 'neovm--ga-prim-mst)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -498,7 +498,7 @@ fn oracle_prop_graph_adv_cycle_detection_with_path() {
                  (> (length cycle) 2)))))
     (fmakunbound 'neovm--ga-find-cycle)
     (fmakunbound 'neovm--ga-cycle-dfs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -554,5 +554,5 @@ fn oracle_prop_graph_adv_floyd_warshall() {
              (+ (gethash '(A . B) result)
                 (gethash '(B . C) result)))))
     (fmakunbound 'neovm--ga-floyd-warshall)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

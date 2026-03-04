@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Complex multi-level prefix keymap hierarchy with inheritance
@@ -198,7 +198,7 @@ fn oracle_prop_keymap_ext_reparenting() {
           ;; parent chain verification
           (null (keymap-parent child))
           (eq (keymap-parent parent) gp2))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +236,7 @@ fn oracle_prop_keymap_ext_full_keymap_char_table() {
       ;; Prefix
       (lookup-key full (kbd "C-c C-t"))
       (keymapp (lookup-key full (kbd "C-c"))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

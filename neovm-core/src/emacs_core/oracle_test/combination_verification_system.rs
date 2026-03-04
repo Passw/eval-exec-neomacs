@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Test 1: Precondition/postcondition checking with detailed reports
@@ -83,7 +83,7 @@ fn oracle_prop_verification_pre_post_conditions() {
          ;; gcd precondition failure
          (funcall verified-gcd 0 5)))
     (fmakunbound 'neovm--vfy-check)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ fn oracle_prop_verification_invariant_maintenance() {
       r7
       ;; Invalid creation: init outside bounds
       (funcall make-counter 10 20 5))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +258,7 @@ fn oracle_prop_verification_design_by_contract() {
          ;; Empty vector
          (funcall binary-search-contract [] 1)))
     (fmakunbound 'neovm--vfy-contract)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -400,7 +400,7 @@ fn oracle_prop_verification_hoare_triples() {
     (fmakunbound 'neovm--vfy-hoare)
     (fmakunbound 'neovm--vfy-state-get)
     (fmakunbound 'neovm--vfy-state-set)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -490,7 +490,7 @@ fn oracle_prop_verification_loop_invariant() {
                 (lambda (s) (= s 0))   ;; Wrong: only true at start
                 100))
     (fmakunbound 'neovm--vfy-loop)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -616,5 +616,5 @@ fn oracle_prop_verification_weakest_precondition() {
     (fmakunbound 'neovm--wp-eval-expr)
     (fmakunbound 'neovm--wp-exec-stmt)
     (fmakunbound 'neovm--wp-verify-triple)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

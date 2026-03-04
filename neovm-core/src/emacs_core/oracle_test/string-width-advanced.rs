@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // string-width for pure ASCII strings
@@ -26,7 +26,7 @@ fn oracle_prop_string_width_ascii() {
   (string-width "   ")
   ;; All printable ASCII
   (string-width "!@#$%^&*()_+-=[]{}|;':\",./<>?"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ fn oracle_prop_char_width_various() {
   ;; Some Latin-1 supplement characters
   (char-width ?\u00e9)
   (char-width ?\u00f1))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

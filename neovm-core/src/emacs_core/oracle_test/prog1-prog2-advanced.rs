@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // prog1 returns first form, evaluates all side effects
@@ -33,7 +33,7 @@ fn oracle_prop_prog1_returns_first_evaluates_all() {
     (list r1 r2 r3 r4
           ;; Trace proves all forms evaluated in order
           (nreverse trace))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ fn oracle_prop_prog1_save_state_during_mutation() {
             (setq queue (append queue (list 'w)))
             (list popped1 popped2 top second
                   stack queue front)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

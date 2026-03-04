@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // copy-keymap creates an independent copy (basic mutations)
@@ -52,7 +52,7 @@ fn oracle_prop_copy_keymap_creates_independent_copy() {
           ;; They are not eq
           (eq neovm--ckadv-orig copy)))
     (makunbound 'neovm--ckadv-orig)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ fn oracle_prop_copy_keymap_modify_copy_no_affect_original() {
               (lookup-key copy [?z])
               (lookup-key copy [?w])))))
     (makunbound 'neovm--ckadv-m1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ fn oracle_prop_copy_keymap_parent_inheritance() {
                 (lookup-key copy [?c])))))
     (makunbound 'neovm--ckadv-parent)
     (makunbound 'neovm--ckadv-child)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ fn oracle_prop_copy_keymap_define_key_independence_audit() {
                   snap-copy-3))))))
     (fmakunbound 'neovm--ckadv-snapshot)
     (makunbound 'neovm--ckadv-keys)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

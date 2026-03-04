@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // All coding system variants: utf-8, latin-1, utf-8-unix, raw-text, etc.
@@ -121,7 +121,7 @@ fn oracle_prop_decode_coding_buffer_param() {
   (with-temp-buffer
     (let ((result (decode-coding-string "nocopy-buf" 'utf-8 t t)))
       (list result (buffer-string)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ fn oracle_prop_encode_decode_roundtrip_diverse() {
         (error
          (setq results (cons (list s cs 'encoding-error) results))))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ fn oracle_prop_encode_byte_length_comparison() {
           (string-bytes (encode-coding-string "\U0001F600" 'utf-8)))
     results))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -265,7 +265,7 @@ fn oracle_prop_encode_decode_pipeline() {
                (expected (apply #'concat parts)))
           (string= result expected)))
     (fmakunbound 'neovm--edca-encode-concat)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -304,7 +304,7 @@ fn oracle_prop_encode_decode_batch_categorize() {
                         "\U0001F600\U0001F601")))
         (mapcar (lambda (s) (funcall 'neovm--edca-categorize s)) strings))
     (fmakunbound 'neovm--edca-categorize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -336,7 +336,7 @@ fn oracle_prop_encode_decode_cross_system_matrix() {
          (dec (decode-coding-string enc 'utf-8-unix)))
     (setq results (cons (list 'utf8-to-utf8unix (string= s dec)) results)))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -370,5 +370,5 @@ fn oracle_prop_encode_inspect_bytes() {
           (aref enc 1)    ;; 0xC3
           (aref enc 2)))) ;; 0xA9
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

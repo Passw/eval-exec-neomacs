@@ -2,7 +2,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_closure_captures_variable() {
@@ -58,7 +58,7 @@ fn oracle_prop_closure_independent_captures() {
                         (setq fns (cons (lambda () captured) fns)))
                       (setq i (1+ i))))
                   (mapcar 'funcall (reverse fns)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn oracle_prop_closure_with_condition_case() {
                   (list (funcall safe-div 10 2)
                         (funcall safe-div 10 0)
                         (funcall safe-div 15 3)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -185,5 +185,5 @@ fn oracle_prop_closure_with_optional_args() {
                                (concat (or greeting \"Hello\") \", \" name \"!\"))))
                   (list (funcall greet \"World\")
                         (funcall greet \"World\" \"Hi\")))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

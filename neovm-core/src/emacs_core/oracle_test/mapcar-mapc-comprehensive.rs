@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // mapcar with lambdas, subrs (built-in functions), and quoted symbols
@@ -39,7 +39,7 @@ fn oracle_prop_mapcar_mapc_comp_mapcar_function_types() {
           '(1 2 3 4))
   ;; mapcar with identity function
   (mapcar #'identity '(a b c d)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ fn oracle_prop_mapcar_mapc_comp_mapc_return_and_side_effects() {
     count)
   ;; mapc return value for empty list
   (mapc #'identity nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +252,7 @@ fn oracle_prop_mapcar_mapc_comp_empty_list_mapping() {
   (let ((counter 0))
     (mapcar (lambda (x) (setq counter (1+ counter))) nil)
     counter))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -326,7 +326,7 @@ fn oracle_prop_mapcar_mapc_comp_nested_maps() {
             (mapcar (lambda (x) (* x multiplier))
                     '(1 2 3)))
           '(1 10 100)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -370,5 +370,5 @@ fn oracle_prop_mapcar_mapc_comp_error_handling() {
                (setq errors (cons (list x (cadr err)) errors)))))
           '(10 5 0 25 0 50))
     (list (nreverse successes) (nreverse errors))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

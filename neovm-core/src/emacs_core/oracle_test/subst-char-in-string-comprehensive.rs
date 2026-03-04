@@ -5,7 +5,7 @@
 //! Unicode codepoint edge cases, and combination with other string operations.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic substitution: ASCII chars, single occurrence, multiple occurrences
@@ -16,21 +16,21 @@ fn oracle_prop_subst_char_basic_single_and_multi() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Single occurrence
-    assert_oracle_parity(r#"(subst-char-in-string ?a ?z "abcdef")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?a ?z "abcdef")"#);
     // Multiple occurrences
-    assert_oracle_parity(r#"(subst-char-in-string ?a ?z "banana")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?a ?z "banana")"#);
     // All characters are the target
-    assert_oracle_parity(r#"(subst-char-in-string ?x ?y "xxxxx")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?x ?y "xxxxx")"#);
     // No occurrences of target
-    assert_oracle_parity(r#"(subst-char-in-string ?z ?a "hello world")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?z ?a "hello world")"#);
     // Single character string
-    assert_oracle_parity(r#"(subst-char-in-string ?a ?b "a")"#);
-    assert_oracle_parity(r#"(subst-char-in-string ?a ?b "z")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?a ?b "a")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?a ?b "z")"#);
     // Empty string
-    assert_oracle_parity(r#"(subst-char-in-string ?a ?b "")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?a ?b "")"#);
     // First and last characters
-    assert_oracle_parity(r#"(subst-char-in-string ?h ?H "hello")"#);
-    assert_oracle_parity(r#"(subst-char-in-string ?o ?O "hello")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?h ?H "hello")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?o ?O "hello")"#);
 }
 
 // ---------------------------------------------------------------------------
@@ -41,14 +41,14 @@ fn oracle_prop_subst_char_basic_single_and_multi() {
 fn oracle_prop_subst_char_identity_substitution() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(subst-char-in-string ?a ?a "abcabc")"#);
-    assert_oracle_parity(r#"(subst-char-in-string ?x ?x "")"#);
-    assert_oracle_parity(r#"(subst-char-in-string ?z ?z "zzz")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?a ?a "abcabc")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?x ?x "")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?z ?z "zzz")"#);
 
     // Verify the result is equal to original
     let form = r#"(let ((s "hello world"))
                     (equal s (subst-char-in-string ?x ?x s)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -114,31 +114,31 @@ fn oracle_prop_subst_char_multibyte_chars() {
 
     // Replace ASCII in multibyte string
     let form = r#"(subst-char-in-string ?a ?z "café")"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // Replace multibyte char with ASCII
     let form2 = r#"(subst-char-in-string ?é ?e "café")"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // Replace multibyte with multibyte
     let form3 = r#"(subst-char-in-string ?ü ?u "grüße")"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 
     // CJK characters
     let form4 = r#"(subst-char-in-string ?世 ?地 "世界世界")"#;
-    assert_oracle_parity(form4);
+    assert_oracle_parity_with_bootstrap(form4);
 
     // Emoji replacement
     let form5 = r#"(subst-char-in-string ?a ?b "abc")"#;
-    assert_oracle_parity(form5);
+    assert_oracle_parity_with_bootstrap(form5);
 
     // String entirely of multibyte chars
     let form6 = r#"(subst-char-in-string ?α ?β "αγαδα")"#;
-    assert_oracle_parity(form6);
+    assert_oracle_parity_with_bootstrap(form6);
 
     // Mixed ASCII and Unicode, no match
     let form7 = r#"(subst-char-in-string ?z ?a "héllo wörld")"#;
-    assert_oracle_parity(form7);
+    assert_oracle_parity_with_bootstrap(form7);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ fn oracle_prop_subst_char_chained_substitutions() {
                     (setq s (subst-char-in-string ?l ?L s))
                     (setq s (subst-char-in-string ?o ?O s))
                     s)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // Swap two characters using temporary
     let form2 = r#"(let ((s "aXbXc"))
@@ -164,7 +164,7 @@ fn oracle_prop_subst_char_chained_substitutions() {
                      (setq s (subst-char-in-string ?a ?X s))
                      (setq s (subst-char-in-string ?~ ?a s))
                      s)"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // Replace all vowels with dots, one at a time
     let form3 = r#"(let ((s "beautiful"))
@@ -174,7 +174,7 @@ fn oracle_prop_subst_char_chained_substitutions() {
                      (setq s (subst-char-in-string ?o ?. s))
                      (setq s (subst-char-in-string ?u ?. s))
                      s)"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 }
 
 // ---------------------------------------------------------------------------
@@ -189,30 +189,30 @@ fn oracle_prop_subst_char_combined_with_string_ops() {
     let form = r#"(concat (subst-char-in-string ?- ?_ "foo-bar")
                           "."
                           (subst-char-in-string ?- ?_ "baz-qux"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // subst on substring result
     let form2 = r#"(subst-char-in-string ?l ?r (substring "hello world" 0 5))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // upcase then subst
     let form3 = r#"(subst-char-in-string ?L ?* (upcase "hello"))"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 
     // subst in mapconcat result
     let form4 = r#"(subst-char-in-string ?, ?\s
                      (mapconcat #'number-to-string '(1 2 3 4 5) ","))"#;
-    assert_oracle_parity(form4);
+    assert_oracle_parity_with_bootstrap(form4);
 
     // string-to-list after subst
     let form5 = r#"(let ((s (subst-char-in-string ?a ?z "abcabc")))
                      (list s (length s) (string-to-char s)))"#;
-    assert_oracle_parity(form5);
+    assert_oracle_parity_with_bootstrap(form5);
 
     // Nested subst-char calls
     let form6 = r#"(subst-char-in-string ?b ?c
                      (subst-char-in-string ?a ?b "aaa"))"#;
-    assert_oracle_parity(form6);
+    assert_oracle_parity_with_bootstrap(form6);
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +229,7 @@ fn oracle_prop_subst_char_boundary_and_performance() {
                       (list (length result)
                             (= (length result) 200)
                             (string= result (make-string 200 ?y)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // Alternating characters
     let form2 = r#"(let ((s (mapconcat (lambda (i)
@@ -238,12 +238,12 @@ fn oracle_prop_subst_char_boundary_and_performance() {
                      (list s
                            (subst-char-in-string ?a ?x s)
                            (subst-char-in-string ?b ?y s)))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // Substitute in a formatted string
     let form3 = r#"(subst-char-in-string ?/ ?\\
                      (format "%s/%s/%s" "path" "to" "file"))"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 }
 
 // ---------------------------------------------------------------------------
@@ -259,20 +259,20 @@ fn oracle_prop_subst_char_return_type_checks() {
                     (stringp (subst-char-in-string ?a ?b "abc"))
                     (stringp (subst-char-in-string ?x ?y ""))
                     (stringp (subst-char-in-string ?a ?b "zzz")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // Length preserved
     let form2 = r#"(let ((s "hello world"))
                      (= (length s)
                         (length (subst-char-in-string ?o ?0 s))))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // Compare original and result
     let form3 = r#"(let* ((s "test")
                           (r (subst-char-in-string ?z ?a s)))
                      (list (string= s r)
                            (equal s r)))"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,7 +285,7 @@ fn oracle_prop_subst_char_integration_patterns() {
 
     // Path separator conversion (Unix to Windows style)
     let form = r#"(subst-char-in-string ?/ ?\\ "/usr/local/bin")"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // Simple Caesar-shift-like substitution chain
     let form2 = r#"(let ((s "abc"))
@@ -293,24 +293,24 @@ fn oracle_prop_subst_char_integration_patterns() {
                      (setq s (subst-char-in-string ?b ?c s))
                      (setq s (subst-char-in-string ?c ?d s))
                      s)"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // Replace delimiters for CSV-like transform
     let form3 = r#"(subst-char-in-string ?\t ?,
                      "name\tage\tcity")"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 
     // Sanitize filename: replace spaces with hyphens
     let form4 = r#"(subst-char-in-string ?\s ?-
                      "my document name.txt")"#;
-    assert_oracle_parity(form4);
+    assert_oracle_parity_with_bootstrap(form4);
 
     // Multiple passes to normalize whitespace types to space
     let form5 = r#"(let ((s "hello\tworld\nfoo"))
                      (setq s (subst-char-in-string ?\t ?\s s))
                      (setq s (subst-char-in-string ?\n ?\s s))
                      s)"#;
-    assert_oracle_parity(form5);
+    assert_oracle_parity_with_bootstrap(form5);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,23 +323,23 @@ fn oracle_prop_subst_char_codepoint_edges() {
 
     // DEL char (127)
     let form = r#"(subst-char-in-string 127 ?X (string 65 127 66 127 67))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // High ASCII
     let form2 = r#"(subst-char-in-string ?~ ?! "a~b~c")"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // Char 1 (control char)
     let form3 = r#"(subst-char-in-string 1 ?A (string 1 65 1 66))"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 
     // Replace char with same codepoint using numeric notation
     let form4 = r#"(subst-char-in-string 65 66 "ABCABC")"#;
-    assert_oracle_parity(form4);
+    assert_oracle_parity_with_bootstrap(form4);
 
     // Large Unicode codepoints
     let form5 = r#"(subst-char-in-string #x2603 #x2764 (string #x2603 65 #x2603))"#;
-    assert_oracle_parity(form5);
+    assert_oracle_parity_with_bootstrap(form5);
 }
 
 // ---------------------------------------------------------------------------
@@ -377,5 +377,5 @@ fn oracle_prop_subst_char_comprehensive_multi_aspect() {
       ;; Length preservation
       (let ((s "hello world"))
         (= (length (subst-char-in-string ?l ?L s)) (length s))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

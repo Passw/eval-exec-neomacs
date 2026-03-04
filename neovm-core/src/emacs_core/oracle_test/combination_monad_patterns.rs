@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Maybe monad: nil as Nothing, non-nil as Just
@@ -84,7 +84,7 @@ fn oracle_prop_monad_maybe_bind_chain() {
     (fmakunbound 'neovm--maybe-return)
     (fmakunbound 'neovm--maybe-bind)
     (fmakunbound 'neovm--maybe-chain)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ fn oracle_prop_monad_result_bind_chain() {
     (fmakunbound 'neovm--unwrap)
     (fmakunbound 'neovm--result-bind)
     (fmakunbound 'neovm--result-map)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -227,7 +227,7 @@ fn oracle_prop_monad_validation_pipeline() {
             (funcall 'neovm--validate validators
                      '((name . "") (age . 0) (email . "x@y"))))))
     (fmakunbound 'neovm--validate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -300,7 +300,7 @@ fn oracle_prop_monad_list_flatmap_cartesian() {
     (fmakunbound 'neovm--list-return)
     (fmakunbound 'neovm--list-bind)
     (fmakunbound 'neovm--guard)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -519,7 +519,7 @@ fn oracle_prop_monad_writer_logging() {
     (fmakunbound 'neovm--writer-bind)
     (fmakunbound 'neovm--writer-tell)
     (fmakunbound 'neovm--writer-logged)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -596,7 +596,7 @@ fn oracle_prop_monad_combined_maybe_writer() {
     (fmakunbound 'neovm--mw-ok)
     (fmakunbound 'neovm--mw-nothing)
     (fmakunbound 'neovm--mw-bind)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

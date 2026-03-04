@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // maphash with inline lambda collecting keys and values
@@ -44,7 +44,7 @@ fn oracle_prop_maphash_collect_keys_values() {
                             total
                             max-key
                             max-val)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ fn oracle_prop_maphash_count_predicates() {
                             user-count admin-count
                             above-30
                             user-total-age admin-total-age)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +154,7 @@ fn oracle_prop_maphash_invert_hash_table() {
               (sort (gethash 20 inv2) #'string<)
               (gethash 30 inv2)
               (hash-table-count inv2))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -216,7 +216,7 @@ RESOLVE is a function (lambda (key val1 val2) -> merged-val)."
                   (list (hash-table-count m1) (hash-table-count m2)
                         (hash-table-count m3) (hash-table-count m4))))))))
     (fmakunbound 'neovm--ht-merge)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +266,7 @@ fn oracle_prop_maphash_group_entries() {
                           (sort counts (lambda (a b)
                                          (string< (symbol-name (car a))
                                                   (symbol-name (car b)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -325,7 +325,7 @@ fn oracle_prop_maphash_nested_hash_tables() {
                         company-total
                         company-count
                         (sort all-employees #'string<))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -369,7 +369,7 @@ fn oracle_prop_maphash_histogram_statistics() {
                               mode mode-count
                               unique-count total-entries
                               (sort singletons #'<)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -466,5 +466,5 @@ fn oracle_prop_maphash_set_operations() {
     (fmakunbound 'neovm--set-intersection)
     (fmakunbound 'neovm--set-difference)
     (fmakunbound 'neovm--set-symmetric-difference)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

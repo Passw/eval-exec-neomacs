@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // :test parameter semantics — eq vs eql vs equal with edge cases
@@ -64,7 +64,7 @@ fn oracle_prop_hash_table_ops_ext_test_param_edge_cases() {
                                  (hash-table-test h-eq)
                                  (hash-table-test h-eql)
                                  (hash-table-test h-equal)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ fn oracle_prop_hash_table_ops_ext_size_and_rehash_introspection() {
                      ;; hash-table-p
                      (hash-table-p h1)
                      (hash-table-p '(not a hash))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +160,7 @@ fn oracle_prop_hash_table_ops_ext_maphash_accumulate_then_modify() {
                          (sort low-stock #'string<)
                          final-count
                          (sort final-items (lambda (a b) (string< (car a) (car b))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +219,7 @@ fn oracle_prop_hash_table_ops_ext_copy_independence() {
                          (gethash "list" copy)
                          ;; Test function preserved
                          (eq (hash-table-test orig) (hash-table-test copy))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +276,7 @@ fn oracle_prop_hash_table_ops_ext_frequency_counter_multipass() {
                            min-freq
                            (length min-chars)
                            (sort hist-pairs (lambda (a b) (< (car a) (car b)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -345,7 +345,7 @@ fn oracle_prop_hash_table_ops_ext_memoization_fibonacci() {
                 (gethash 15 fib-cache))))))
     (fmakunbound 'neovm--test-memo-fib)
     (fmakunbound 'neovm--test-memo-fact)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -408,7 +408,7 @@ fn oracle_prop_hash_table_ops_ext_merge_with_conflict_resolution() {
                (gethash "theme" merged)     ; "dark" (user)
                (gethash "ssl" merged))))))  ; t (env)
     (fmakunbound 'neovm--test-merge-hash)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -473,5 +473,5 @@ fn oracle_prop_hash_table_ops_ext_lru_cache_simulation() {
                        (gethash "f" cache)
                        ;; Eviction log
                        (nreverse log))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

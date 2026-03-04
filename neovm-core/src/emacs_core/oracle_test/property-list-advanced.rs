@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // symbol-plist / setplist
@@ -24,7 +24,7 @@ fn oracle_prop_symbol_plist_basic() {
                               (plist-get plist 'size)
                               (plist-get plist 'active)))
                     (setplist 'neovm--test-plist-sym nil)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -38,7 +38,7 @@ fn oracle_prop_setplist_replace() {
                       (list (get 'neovm--test-setplist 'old-prop)
                             (get 'neovm--test-setplist 'new-prop))
                     (setplist 'neovm--test-setplist nil)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -54,7 +54,7 @@ fn oracle_prop_plist_keyword_keys() {
                         (plist-get pl :age)
                         (plist-get pl :active)
                         (plist-get pl :missing)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn oracle_prop_plist_put_creates_and_updates() {
                   (list (plist-get pl :a)
                         (plist-get pl :b)
                         (length pl)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn oracle_prop_plist_member_check() {
                   (list (plist-member pl :x)
                         (plist-member pl :y)
                         (plist-member pl :missing)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ fn oracle_prop_plist_merge() {
                   (let ((defaults '(:color blue :size 10 :weight normal))
                         (custom '(:color red :style bold)))
                     (funcall plist-merge defaults custom)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -125,7 +125,7 @@ fn oracle_prop_plist_select_keys() {
                   (funcall plist-select
                            '(:a 1 :b 2 :c 3 :d 4 :e 5)
                            '(:b :d :e)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -156,7 +156,7 @@ fn oracle_prop_plist_to_alist() {
                     (let ((al (funcall plist-to-alist pl)))
                       (let ((roundtrip (funcall alist-to-plist al)))
                         (list al roundtrip (equal pl roundtrip))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn oracle_prop_plist_diff() {
                   (funcall plist-diff
                            '(:a 1 :b 2 :c 3)
                            '(:a 1 :b 20 :d 4)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -216,5 +216,5 @@ fn oracle_prop_plist_as_config() {
                           (setq valid nil
                                 errors (cons "port must be integer" errors)))
                         (list config valid errors))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

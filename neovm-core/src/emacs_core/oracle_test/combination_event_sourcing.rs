@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Event store: append-only log with sequence numbers and timestamps
@@ -72,7 +72,7 @@ fn oracle_prop_combination_event_sourcing_store() {
                                 (funcall get-events-for "order-1"))))
     (makunbound 'neovm--test-es-store)
     (makunbound 'neovm--test-es-seq)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ fn oracle_prop_combination_event_sourcing_aggregate_reconstruction() {
                       :transactions (plist-get state :transactions)
                       :name (plist-get state :name)
                       :history (plist-get state :history))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -187,7 +187,7 @@ fn oracle_prop_combination_event_sourcing_projection() {
                 (sort users (lambda (a b)
                               (string< (plist-get a :user)
                                        (plist-get b :user))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +247,7 @@ fn oracle_prop_combination_event_sourcing_snapshot_replay() {
                             :snapshot-replay (sort (copy-sequence partial-replay) sort-fn)
                             :match (equal (sort (copy-sequence full-replay) sort-fn)
                                           (sort (copy-sequence partial-replay) sort-fn)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -311,7 +311,7 @@ fn oracle_prop_combination_event_sourcing_versioning() {
                                             (lambda (a b)
                                               (string< (plist-get a :customer)
                                                        (plist-get b :customer)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -405,7 +405,7 @@ fn oracle_prop_combination_event_sourcing_saga() {
          (funcall run-saga '(:item "widget" :in-stock t :funds 100
                              :price 50 :valid-address nil :address nil))))
     (makunbound 'neovm--test-saga-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -503,5 +503,5 @@ fn oracle_prop_combination_event_sourcing_command_validation() {
                      ;; Unknown command
                      (funcall validate-command acct
                               '(:type transfer :data (:to "ACC-2")))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

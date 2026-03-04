@@ -3,7 +3,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 1. Observer pattern: register callbacks, notify on change
@@ -56,7 +56,7 @@ fn oracle_prop_pattern_observer() {
     (list current-value
           (length watchers)
           (nreverse log))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +88,7 @@ fn oracle_prop_pattern_strategy_sort_filter() {
                                 (lambda (a b)
                                   (< (abs (- a 5)) (abs (- b 5)))))))
         (list evens big dist-sorted)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ fn oracle_prop_pattern_builder_list() {
     (setcdr tail (list (cdr sub-sentinel))))
   ;; Return everything after the sentinel
   (cdr sentinel))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +172,7 @@ fn oracle_prop_pattern_memoized_fibonacci() {
     (makunbound 'neovm--test-fib-cache)
     (makunbound 'neovm--test-fib-hits)
     (makunbound 'neovm--test-fib-misses)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +224,7 @@ fn oracle_prop_pattern_decorator_wrapping() {
         ;; This should hit the cache (no extra log entries for inner call)
         (funcall decorated 3 4)
         (length (nreverse call-log))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_pattern_pipeline_composition() {
     (setq current (funcall stage current))
     (setq snapshots (cons current snapshots)))
   (nreverse snapshots))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -299,7 +299,7 @@ fn oracle_prop_pattern_topological_sort() {
                    node graph visited result))
         (car result))
     (fmakunbound 'neovm--test-topo-visit)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -385,5 +385,5 @@ fn oracle_prop_pattern_command_with_undo() {
                       (funcall undo)
                       (funcall undo)
                       (list before-undo state undo-stack))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

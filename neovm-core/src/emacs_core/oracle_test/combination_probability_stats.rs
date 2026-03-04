@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Mean, median, mode, variance, stddev
@@ -98,7 +98,7 @@ fn oracle_prop_stats_descriptive() {
     (fmakunbound 'neovm--stat-stddev)
     (fmakunbound 'neovm--stat-median)
     (fmakunbound 'neovm--stat-mode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -326,7 +326,7 @@ fn oracle_prop_stats_zscore_percentile() {
     (fmakunbound 'neovm--stat-zscore)
     (fmakunbound 'neovm--stat-zscores)
     (fmakunbound 'neovm--stat-percentile)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -389,7 +389,7 @@ fn oracle_prop_stats_correlation() {
          :constant-r r-const))
     (fmakunbound 'neovm--stat-mean)
     (fmakunbound 'neovm--stat-correlation)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -446,7 +446,7 @@ fn oracle_prop_stats_chi_square() {
          ;; Skewed should be large
          :skewed-significant (> chi2-skewed 11.07)))
     (fmakunbound 'neovm--stat-chi-square)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -520,5 +520,5 @@ fn oracle_prop_stats_fisher_yates_shuffle() {
     (fmakunbound 'neovm--stat-lcg-next)
     (fmakunbound 'neovm--stat-shuffle)
     (makunbound 'neovm--stat-rng-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

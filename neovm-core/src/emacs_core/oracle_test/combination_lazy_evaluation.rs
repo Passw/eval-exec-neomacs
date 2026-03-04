@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Delay/force and lazy cons/car/cdr primitives
@@ -85,7 +85,7 @@ fn oracle_prop_lazy_delay_force_basics() {
     (fmakunbound 'neovm--lz-car)
     (fmakunbound 'neovm--lz-cdr)
     (fmakunbound 'neovm--lz-take)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ fn oracle_prop_lazy_infinite_streams() {
     (fmakunbound 'neovm--lz2-fib-from)
     (fmakunbound 'neovm--lz2-fib)
     (fmakunbound 'neovm--lz2-squares-from)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +245,7 @@ fn oracle_prop_lazy_prime_sieve() {
     (fmakunbound 'neovm--lz3-filter)
     (fmakunbound 'neovm--lz3-sieve)
     (fmakunbound 'neovm--lz3-primes)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -362,7 +362,7 @@ fn oracle_prop_lazy_stream_operations() {
     (fmakunbound 'neovm--lz4-map)
     (fmakunbound 'neovm--lz4-filter)
     (fmakunbound 'neovm--lz4-zip)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -458,7 +458,7 @@ fn oracle_prop_lazy_merge_sorted_streams() {
     (fmakunbound 'neovm--lz5-take)
     (fmakunbound 'neovm--lz5-multiples)
     (fmakunbound 'neovm--lz5-merge)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -546,5 +546,5 @@ fn oracle_prop_lazy_memoized_streams() {
     (fmakunbound 'neovm--lzm-car)
     (fmakunbound 'neovm--lzm-cdr)
     (fmakunbound 'neovm--lzm-take)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

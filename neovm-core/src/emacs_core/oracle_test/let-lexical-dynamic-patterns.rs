@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Lexical closures capturing let-bound variables
@@ -30,7 +30,7 @@ fn oracle_prop_let_lexical_closure_capture() {
       (dolist (fn closures)
         (setq results (cons (funcall fn) results)))
       (nreverse results))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ fn oracle_prop_let_dynamic_defvar_deep_call_stack() {
     (fmakunbound 'neovm--test-ldp-level2)
     (fmakunbound 'neovm--test-ldp-level3)
     (makunbound 'neovm--test-ldp-config)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ fn oracle_prop_let_star_sequential_chain() {
        (h (mapcar (lambda (x) (* x x)) f))  ; h = (4 16 36 576 484)
        (i (apply #'+ h)))    ; i = 1116
   (list f g h i))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ fn oracle_prop_let_nested_shadowing_lexical_dynamic() {
          (funcall 'neovm--test-ldp-reader lex-var)))
     (fmakunbound 'neovm--test-ldp-reader)
     (makunbound 'neovm--test-ldp-dyn)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +180,7 @@ fn oracle_prop_let_closure_factory() {
        (mapcar negate inputs)
        ;; Composition: triple then double = *6
        (mapcar (lambda (x) (funcall double (funcall triple x))) inputs)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +237,7 @@ fn oracle_prop_let_dynamic_configuration_pattern() {
     (makunbound 'neovm--test-ldp-indent)
     (makunbound 'neovm--test-ldp-prefix)
     (makunbound 'neovm--test-ldp-sep)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -301,7 +301,7 @@ fn oracle_prop_let_condition_case_scope() {
 
         (nreverse results))
     (makunbound 'neovm--test-ldp-flag)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -337,7 +337,7 @@ fn oracle_prop_let_star_closure_accumulator() {
      (funcall acc 'reset)
      (funcall acc 'get)
      (length (nreverse history)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -383,5 +383,5 @@ fn oracle_prop_let_dynamic_unwind_protect_nesting() {
                 (copy-sequence neovm--test-ldp-trace))))
     (fmakunbound 'neovm--test-ldp-log)
     (makunbound 'neovm--test-ldp-trace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

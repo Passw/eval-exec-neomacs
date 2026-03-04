@@ -5,7 +5,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use proptest::prelude::*;
 
-use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // logand
@@ -15,29 +15,29 @@ use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_
 fn oracle_prop_logand_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(logand #xff #x0f)");
-    assert_oracle_parity("(logand #b1010 #b1100)");
-    assert_oracle_parity("(logand 255 0)");
-    assert_oracle_parity("(logand -1 42)");
+    assert_oracle_parity_with_bootstrap("(logand #xff #x0f)");
+    assert_oracle_parity_with_bootstrap("(logand #b1010 #b1100)");
+    assert_oracle_parity_with_bootstrap("(logand 255 0)");
+    assert_oracle_parity_with_bootstrap("(logand -1 42)");
 }
 
 #[test]
 fn oracle_prop_logand_multiple_args() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(logand #xff #x0f #x03)");
-    assert_oracle_parity("(logand 255 127 63 31)");
-    assert_oracle_parity("(logand)");
-    assert_oracle_parity("(logand 42)");
+    assert_oracle_parity_with_bootstrap("(logand #xff #x0f #x03)");
+    assert_oracle_parity_with_bootstrap("(logand 255 127 63 31)");
+    assert_oracle_parity_with_bootstrap("(logand)");
+    assert_oracle_parity_with_bootstrap("(logand 42)");
 }
 
 #[test]
 fn oracle_prop_logand_negative() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(logand -1 -1)");
-    assert_oracle_parity("(logand -256 255)");
-    assert_oracle_parity("(logand -128 127)");
+    assert_oracle_parity_with_bootstrap("(logand -1 -1)");
+    assert_oracle_parity_with_bootstrap("(logand -256 255)");
+    assert_oracle_parity_with_bootstrap("(logand -128 127)");
 }
 
 // ---------------------------------------------------------------------------
@@ -48,26 +48,26 @@ fn oracle_prop_logand_negative() {
 fn oracle_prop_logior_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(logior #x0f #xf0)");
-    assert_oracle_parity("(logior #b1010 #b0101)");
-    assert_oracle_parity("(logior 0 0)");
+    assert_oracle_parity_with_bootstrap("(logior #x0f #xf0)");
+    assert_oracle_parity_with_bootstrap("(logior #b1010 #b0101)");
+    assert_oracle_parity_with_bootstrap("(logior 0 0)");
 }
 
 #[test]
 fn oracle_prop_logior_multiple_args() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(logior 1 2 4 8 16)");
-    assert_oracle_parity("(logior)");
-    assert_oracle_parity("(logior 42)");
+    assert_oracle_parity_with_bootstrap("(logior 1 2 4 8 16)");
+    assert_oracle_parity_with_bootstrap("(logior)");
+    assert_oracle_parity_with_bootstrap("(logior 42)");
 }
 
 #[test]
 fn oracle_prop_logior_negative() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(logior -1 0)");
-    assert_oracle_parity("(logior -128 64)");
+    assert_oracle_parity_with_bootstrap("(logior -1 0)");
+    assert_oracle_parity_with_bootstrap("(logior -128 64)");
 }
 
 // ---------------------------------------------------------------------------
@@ -78,19 +78,19 @@ fn oracle_prop_logior_negative() {
 fn oracle_prop_logxor_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(logxor #xff #x0f)");
-    assert_oracle_parity("(logxor #b1010 #b1100)");
-    assert_oracle_parity("(logxor 42 42)");
-    assert_oracle_parity("(logxor 0 0)");
+    assert_oracle_parity_with_bootstrap("(logxor #xff #x0f)");
+    assert_oracle_parity_with_bootstrap("(logxor #b1010 #b1100)");
+    assert_oracle_parity_with_bootstrap("(logxor 42 42)");
+    assert_oracle_parity_with_bootstrap("(logxor 0 0)");
 }
 
 #[test]
 fn oracle_prop_logxor_multiple_args() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(logxor 1 2 4)");
-    assert_oracle_parity("(logxor)");
-    assert_oracle_parity("(logxor 42)");
+    assert_oracle_parity_with_bootstrap("(logxor 1 2 4)");
+    assert_oracle_parity_with_bootstrap("(logxor)");
+    assert_oracle_parity_with_bootstrap("(logxor 42)");
 }
 
 #[test]
@@ -112,10 +112,10 @@ fn oracle_prop_logxor_self_inverse() {
 fn oracle_prop_lognot_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(lognot 0)");
-    assert_oracle_parity("(lognot -1)");
-    assert_oracle_parity("(lognot 1)");
-    assert_oracle_parity("(lognot 255)");
+    assert_oracle_parity_with_bootstrap("(lognot 0)");
+    assert_oracle_parity_with_bootstrap("(lognot -1)");
+    assert_oracle_parity_with_bootstrap("(lognot 1)");
+    assert_oracle_parity_with_bootstrap("(lognot 255)");
 }
 
 #[test]
@@ -134,22 +134,22 @@ fn oracle_prop_lognot_double_negation() {
 fn oracle_prop_ash_left_shift() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(ash 1 0)");
-    assert_oracle_parity("(ash 1 1)");
-    assert_oracle_parity("(ash 1 8)");
-    assert_oracle_parity("(ash 1 16)");
-    assert_oracle_parity("(ash 5 3)");
+    assert_oracle_parity_with_bootstrap("(ash 1 0)");
+    assert_oracle_parity_with_bootstrap("(ash 1 1)");
+    assert_oracle_parity_with_bootstrap("(ash 1 8)");
+    assert_oracle_parity_with_bootstrap("(ash 1 16)");
+    assert_oracle_parity_with_bootstrap("(ash 5 3)");
 }
 
 #[test]
 fn oracle_prop_ash_right_shift() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(ash 256 -1)");
-    assert_oracle_parity("(ash 256 -4)");
-    assert_oracle_parity("(ash 256 -8)");
-    assert_oracle_parity("(ash 255 -4)");
-    assert_oracle_parity("(ash 1 -1)");
+    assert_oracle_parity_with_bootstrap("(ash 256 -1)");
+    assert_oracle_parity_with_bootstrap("(ash 256 -4)");
+    assert_oracle_parity_with_bootstrap("(ash 256 -8)");
+    assert_oracle_parity_with_bootstrap("(ash 255 -4)");
+    assert_oracle_parity_with_bootstrap("(ash 1 -1)");
 }
 
 #[test]
@@ -157,9 +157,9 @@ fn oracle_prop_ash_negative_values() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Arithmetic shift preserves sign
-    assert_oracle_parity("(ash -1 1)");
-    assert_oracle_parity("(ash -256 -4)");
-    assert_oracle_parity("(ash -128 -1)");
+    assert_oracle_parity_with_bootstrap("(ash -1 1)");
+    assert_oracle_parity_with_bootstrap("(ash -256 -4)");
+    assert_oracle_parity_with_bootstrap("(ash -128 -1)");
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +191,7 @@ fn oracle_prop_bitwise_flag_manipulation() {
                         (list has-read has-write has-exec
                               after-clear-write has-exec-now
                               flags)))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -204,7 +204,7 @@ fn oracle_prop_bitwise_mask_extraction() {
                         (mid (logand (ash packed -4) #xf))
                         (low (logand packed #xf)))
                     (list high mid low)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -224,7 +224,7 @@ fn oracle_prop_bitwise_population_count() {
                         (funcall popcount 7)
                         (funcall popcount 255)
                         (funcall popcount 256)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

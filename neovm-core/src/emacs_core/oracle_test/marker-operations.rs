@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // point-marker / marker-position
@@ -42,7 +42,7 @@ fn oracle_prop_copy_marker() {
                               (eq m1 m2)
                               (= (marker-position m1)
                                  (marker-position m2))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -64,7 +64,7 @@ fn oracle_prop_set_marker() {
                           (set-marker m nil)
                           (list pos1 pos2
                                 (marker-position m))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ fn oracle_prop_marker_bracket_tracking() {
                                 (setq stack (cdr stack)))))))
                         (forward-char 1))
                       (nreverse pairs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

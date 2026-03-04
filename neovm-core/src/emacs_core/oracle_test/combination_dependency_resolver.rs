@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Topological sort with cycle detection (Kahn's algorithm)
@@ -97,7 +97,7 @@ fn oracle_prop_depresolver_topological_sort() {
                  '(a b c d e f)
                  '((a . b) (a . c) (b . d) (c . d) (c . e) (d . f) (e . f))))
     (fmakunbound 'neovm--dep-topo-sort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ fn oracle_prop_depresolver_version_constraints() {
     (fmakunbound 'neovm--dep-version-compare)
     (fmakunbound 'neovm--dep-check-constraint)
     (fmakunbound 'neovm--dep-check-all-constraints)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +253,7 @@ fn oracle_prop_depresolver_full_resolution() {
             (funcall 'neovm--dep-resolve 'cycle-a))))
     (fmakunbound 'neovm--dep-resolve)
     (makunbound 'neovm--dep-registry)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -344,7 +344,7 @@ fn oracle_prop_depresolver_conflict_detection() {
                    (lib-q . ((1 0 0) . (2 0 0))))))
     (fmakunbound 'neovm--dep-ranges-overlap)
     (fmakunbound 'neovm--dep-find-conflicts)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -459,7 +459,7 @@ fn oracle_prop_depresolver_optional_deps_build_order() {
                    'app registry '(analytics))))
     (fmakunbound 'neovm--dep-build-layers)
     (fmakunbound 'neovm--dep-resolve-with-optional)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -524,7 +524,7 @@ fn oracle_prop_depresolver_reverse_deps_impact() {
             (funcall 'neovm--dep-impact 'app rev))))
     (fmakunbound 'neovm--dep-reverse-deps)
     (fmakunbound 'neovm--dep-impact)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -591,5 +591,5 @@ fn oracle_prop_depresolver_install_simulation() {
                    '(html-parser)
                    deps-map)))
     (fmakunbound 'neovm--dep-install-plan)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

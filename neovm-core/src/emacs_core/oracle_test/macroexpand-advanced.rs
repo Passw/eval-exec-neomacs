@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // macroexpand-1 vs macroexpand: single-step vs full expansion
@@ -142,7 +142,7 @@ fn oracle_prop_macroexpand_adv_env_override_chain() {
                        (neovm--mea-inner . nil))))
     (fmakunbound 'neovm--mea-outer)
     (fmakunbound 'neovm--mea-inner)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ fn oracle_prop_macroexpand_adv_side_effects_during_expansion() {
           (list e1 c1 e2 c2 e3 c3)))
     (fmakunbound 'neovm--mea-counted)
     (makunbound 'neovm--mea-expand-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -217,7 +217,7 @@ fn oracle_prop_macroexpand_adv_keyword_binding_macro() {
         (neovm--mea-with-bindings a 3 b 4
           (neovm--mea-with-bindings c (+ a b) (* c c))))
     (fmakunbound 'neovm--mea-with-bindings)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -322,5 +322,5 @@ fn oracle_prop_macroexpand_adv_dispatch_table_macro() {
           (inner (neovm--mea-dispatch 'y (x 200) (y 300) (otherwise 0)))
           (otherwise -1)))
     (fmakunbound 'neovm--mea-dispatch)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

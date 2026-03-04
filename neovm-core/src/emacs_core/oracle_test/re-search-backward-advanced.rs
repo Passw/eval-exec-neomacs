@@ -3,7 +3,7 @@
 //! reverse log scanning, and opening delimiter matching.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic backward search from end of buffer
@@ -17,7 +17,7 @@ fn oracle_prop_re_search_backward_basic_from_end() {
   (goto-char (point-max))
   (let ((pos (re-search-backward "\\b[a-z]+rry\\b" nil t)))
     (list pos (match-string 0) (point))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ fn oracle_prop_re_search_backward_bound_param() {
               (while (re-search-backward "item-\\([0-9]+\\)" nil t)
                 (setq all (cons (match-string 1) all)))
               all)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@ fn oracle_prop_re_search_backward_noerror_param() {
           (let ((pos-before (point)))
             (re-search-backward "ZZZZNOTHERE" nil t)
             (= pos-before (point))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ fn oracle_prop_re_search_backward_match_data() {
           (= end0 end2)             ;; group 0 ends at group 2 end
           (- end0 beg0)             ;; total match length
           (buffer-substring beg0 end0))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +247,7 @@ fn oracle_prop_re_search_backward_find_opening_delimiter() {
                (list r2 (when r2 (buffer-substring r2 (min (+ r2 12) (point-max)))))
                (list r3 (when r3 (buffer-substring r3 (min (+ r3 12) (point-max))))))))))
     (fmakunbound 'neovm--test-find-open-delim)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

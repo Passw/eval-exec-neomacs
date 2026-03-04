@@ -2,7 +2,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_dolist_basic() {
@@ -88,7 +88,7 @@ fn oracle_prop_dolist_nested() {
                     (dolist (y '(1 2))
                       (setq pairs (cons (cons x y) pairs))))
                   (nreverse pairs))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -103,7 +103,7 @@ fn oracle_prop_dolist_with_condition_case() {
                                   (arith-error 'inf))
                                 results)))
                   (nreverse results))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]

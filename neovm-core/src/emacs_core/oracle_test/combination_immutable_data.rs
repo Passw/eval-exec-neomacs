@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Persistent list: cons-based with structural sharing
@@ -80,7 +80,7 @@ fn oracle_prop_immutable_persistent_list() {
     (fmakunbound 'neovm--iml-remove-first)
     (fmakunbound 'neovm--iml-functional-append)
     (fmakunbound 'neovm--iml-take)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ fn oracle_prop_immutable_persistent_alist() {
     (fmakunbound 'neovm--ial-delete)
     (fmakunbound 'neovm--ial-keys)
     (fmakunbound 'neovm--ial-to-unique-alist)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -307,7 +307,7 @@ fn oracle_prop_immutable_persistent_vector() {
     (fmakunbound 'neovm--ipv-get)
     (fmakunbound 'neovm--ipv-set)
     (fmakunbound 'neovm--ipv-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -421,7 +421,7 @@ fn oracle_prop_immutable_undo_redo() {
     (fmakunbound 'neovm--iur-current)
     (fmakunbound 'neovm--iur-can-undo)
     (fmakunbound 'neovm--iur-can-redo)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -476,7 +476,7 @@ fn oracle_prop_immutable_structural_sharing_eq() {
         (equal list-d '(A b c d e f))
         ;; Lengths
         (length list-a) (length list-b) (length list-c) (length list-d)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 1. Multi-clause cond with mixed types in tests and bodies
@@ -32,7 +32,7 @@ fn oracle_prop_cond_comprehensive_mixed_clause_types() {
             (t 'other))
            results)))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -52,7 +52,7 @@ fn oracle_prop_cond_comprehensive_t_default_complex() {
             ((< n 100) (list 'positive n))
             (t (list 'very-positive n (* n n)))))))
   (mapcar categorize '(-500 -42 0 7 999)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ fn oracle_prop_cond_comprehensive_no_match_nil() {
    ((car nil) 'a)
    ((cdr nil) 'b)
    ((nth 5 '(1 2)) 'c)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ fn oracle_prop_cond_comprehensive_multiple_body_forms() {
            (setq trace (cons 'f trace))
            'third))))
     (list result (nreverse trace))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@ fn oracle_prop_cond_comprehensive_single_test_return() {
         (t 'never))
   ;; Assoc as test (returns the found pair)
   (cond ((assoc 'b '((a . 1) (b . 2) (c . 3))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +169,7 @@ fn oracle_prop_cond_comprehensive_deeply_nested() {
    (funcall classify 'square 'red 'big)
    (funcall classify 'square 'red 'small)
    (funcall classify 'triangle 'red 'big)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ fn oracle_prop_cond_comprehensive_side_effects_tracked() {
       (setq counter (1+ counter))
       (setq log (cons (list 'other val counter) log)))))
   (list counter (nreverse log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ fn oracle_prop_cond_comprehensive_complex_tests() {
    (funcall eval-access "eve" 'viewer 2)
    (funcall eval-access "frank" 'banned 10)
    (funcall eval-access "grace" 'viewer 0)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +284,7 @@ fn oracle_prop_cond_comprehensive_in_recursive_defun() {
          (funcall 'neovm--cond-test-eval '(neg (+ x y)) env)
          (funcall 'neovm--cond-test-eval '(let1 a 5 (let1 b 3 (* a (+ b x)))) env)))
     (fmakunbound 'neovm--cond-test-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ fn oracle_prop_cond_comprehensive_cond_vs_if_equivalence() {
      (mapcar via-cond inputs)
      ;; Show actual results from if
      (mapcar via-if inputs))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -354,7 +354,7 @@ fn oracle_prop_cond_comprehensive_stateful_dispatch() {
                         (if (eq old-state state) 'no-op 'transitioned))
                   transitions))))
   (list state (nreverse transitions)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -385,5 +385,5 @@ fn oracle_prop_cond_comprehensive_string_dispatch() {
   (mapcar parse-token
           '("42" "hello" "if" "+" "(" ";" "3" "return"
             "my_var" "==" "}" "\"hi\"" "???" "while" "0" "x1")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

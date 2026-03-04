@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // put-text-property: START, END, PROPERTY, VALUE, OBJECT params
@@ -520,7 +520,7 @@ fn oracle_prop_text_prop_comp_buffer_vs_string_properties() {
                  (length buf-plist) (length sub-plist)
                  buf-face-after sub-face-after
                  npc))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // VM infrastructure: stack operations and arithmetic
@@ -252,7 +252,7 @@ fn oracle_prop_vm_advanced_stack_operations() {
     (fmakunbound 'neovm--vm-peek)
     (fmakunbound 'neovm--vm-step)
     (fmakunbound 'neovm--vm-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -393,7 +393,7 @@ fn oracle_prop_vm_advanced_control_flow() {
     (fmakunbound 'neovm--vm-peek)
     (fmakunbound 'neovm--vm-step)
     (fmakunbound 'neovm--vm-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -493,7 +493,7 @@ fn oracle_prop_vm_advanced_fibonacci() {
     (fmakunbound 'neovm--vm-peek)
     (fmakunbound 'neovm--vm-step)
     (fmakunbound 'neovm--vm-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -604,7 +604,7 @@ fn oracle_prop_vm_advanced_factorial_with_call_ret() {
     (fmakunbound 'neovm--vm-peek)
     (fmakunbound 'neovm--vm-step)
     (fmakunbound 'neovm--vm-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -683,7 +683,7 @@ fn oracle_prop_vm_advanced_string_reverse() {
     (fmakunbound 'neovm--vm-push)
     (fmakunbound 'neovm--vm-pop)
     (fmakunbound 'neovm--vm-peek)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -776,7 +776,7 @@ fn oracle_prop_vm_advanced_gcd() {
     (fmakunbound 'neovm--vm-peek)
     (fmakunbound 'neovm--vm-step)
     (fmakunbound 'neovm--vm-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -881,5 +881,5 @@ fn oracle_prop_vm_advanced_power_and_expression() {
     (fmakunbound 'neovm--vm-peek)
     (fmakunbound 'neovm--vm-step)
     (fmakunbound 'neovm--vm-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

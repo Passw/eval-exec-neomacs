@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // 1D Gradient descent on a quadratic
@@ -251,7 +251,7 @@ fn oracle_prop_optimization_simulated_annealing() {
     (fmakunbound 'neovm--opt-sa-neighbor)
     (fmakunbound 'neovm--opt-sa-accept)
     (fmakunbound 'neovm--opt-sa-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -456,7 +456,7 @@ fn oracle_prop_optimization_golden_section_search() {
          (funcall 'neovm--opt-gs-f 8000)))
     (fmakunbound 'neovm--opt-gs-f)
     (fmakunbound 'neovm--opt-gs-search)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -678,5 +678,5 @@ fn oracle_prop_optimization_nelder_mead_2d() {
     (fmakunbound 'neovm--opt-nm-contract)
     (fmakunbound 'neovm--opt-nm-step)
     (fmakunbound 'neovm--opt-nm-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

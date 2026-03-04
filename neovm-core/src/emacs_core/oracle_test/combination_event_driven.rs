@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Event emitter: subscribe, unsubscribe, emit
@@ -72,7 +72,7 @@ fn oracle_prop_event_emitter_basic() {
               (nreverse neovm--test-evem-log)))
     (makunbound 'neovm--test-evem-registry)
     (makunbound 'neovm--test-evem-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ fn oracle_prop_event_bubbling() {
          (funcall bubble container "hover" nil)
          ;; Event at root (no parent to bubble to)
          (funcall bubble root "resize" nil))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ fn oracle_prop_event_filtering() {
          ;; unknown event type: none match
          (funcall dispatch-event handlers
                   '(:type heartbeat :user "system" :detail nil)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +252,7 @@ fn oracle_prop_event_once_only_handlers() {
                   (nreverse neovm--test-once-log)))))
     (makunbound 'neovm--test-once-handlers)
     (makunbound 'neovm--test-once-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -337,7 +337,7 @@ fn oracle_prop_event_queue_deferred() {
         (setq q (funcall eq-enqueue q '(:type refund :id "R1" :amount 50)))
         ;; Process with max-depth 10
         (funcall eq-process q 10)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -427,5 +427,5 @@ fn oracle_prop_event_middleware_chain() {
            (length (plist-get r1 :trace))
            ;; Log entry from r1
            (plist-get (plist-get r1 :final) :log-entry)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // In-memory table with insert/select/update/delete
@@ -70,7 +70,7 @@ fn oracle_prop_db_table_crud() {
                             (let ((after-delete (length table)))
                               (list after-insert age-30 bob-age
                                     after-delete)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ fn oracle_prop_db_index_based_lookup() {
                             alice-ids
                             bob-ids
                             (sort alice-depts #'string<))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ fn oracle_prop_db_join_tables() {
                                     (cons (list (cdr (assq 'name emp)) dept-name)
                                           joined)))))
                         (nreverse joined))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ fn oracle_prop_db_group_by_aggregation() {
                         ;; Sort by product name for deterministic output
                         (sort results
                               (lambda (a b) (string< (car a) (car b)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ fn oracle_prop_db_transaction_log_with_undo() {
                                              (gethash "y" store)
                                              (gethash "z" store))))
                             (list before during after))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -318,5 +318,5 @@ fn oracle_prop_db_query_builder() {
                                           (funcall q-not (funcall where-eq 'dept "eng"))
                                           (funcall where-lt 'age 30))
                                  data))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

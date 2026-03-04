@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Basic LRU cache: fixed capacity, get/put, eviction
@@ -86,7 +86,7 @@ fn oracle_prop_lru_cache_basic() {
     (fmakunbound 'neovm--lru-put)
     (fmakunbound 'neovm--lru-keys)
     (fmakunbound 'neovm--lru-size)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ fn oracle_prop_lru_cache_update_existing() {
     (fmakunbound 'neovm--lru2-create)
     (fmakunbound 'neovm--lru2-get)
     (fmakunbound 'neovm--lru2-put)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ fn oracle_prop_lru_cache_eviction_order() {
     (fmakunbound 'neovm--lru3-create)
     (fmakunbound 'neovm--lru3-get)
     (fmakunbound 'neovm--lru3-put)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,7 +285,7 @@ fn oracle_prop_lru_cache_hit_miss_ratio() {
     (fmakunbound 'neovm--lrus-get)
     (fmakunbound 'neovm--lrus-put)
     (fmakunbound 'neovm--lrus-stats)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -371,7 +371,7 @@ fn oracle_prop_lru_cache_ttl() {
     (fmakunbound 'neovm--lrut-advance-time)
     (fmakunbound 'neovm--lrut-put)
     (fmakunbound 'neovm--lrut-get)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -466,7 +466,7 @@ fn oracle_prop_lru_cache_two_level() {
     (fmakunbound 'neovm--lru2l-level-put)
     (fmakunbound 'neovm--lru2l-create)
     (fmakunbound 'neovm--lru2l-get)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -521,5 +521,5 @@ fn oracle_prop_lru_cache_capacity_one() {
     (fmakunbound 'neovm--lru1-create)
     (fmakunbound 'neovm--lru1-get)
     (fmakunbound 'neovm--lru1-put)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

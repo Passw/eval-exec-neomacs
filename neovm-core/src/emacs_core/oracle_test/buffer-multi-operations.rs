@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Multi-buffer creation, switching, and content isolation
@@ -156,7 +156,7 @@ fn oracle_prop_buffer_kill_lifecycle() {
     (when (buffer-live-p b1) (kill-buffer b1))
     (when (buffer-live-p b2) (kill-buffer b2))
     (when (buffer-live-p b3) (kill-buffer b3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +204,7 @@ fn oracle_prop_buffer_local_variables() {
       (when (buffer-live-p buf-x) (kill-buffer buf-x))
       (when (buffer-live-p buf-y) (kill-buffer buf-y))
       (makunbound 'neovm--bmo-test-var))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -272,7 +272,7 @@ fn oracle_prop_cross_buffer_text_aggregation() {
     (when (buffer-live-p src1) (kill-buffer src1))
     (when (buffer-live-p src2) (kill-buffer src2))
     (when (buffer-live-p dest) (kill-buffer dest))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,7 +323,7 @@ fn oracle_prop_nested_with_current_buffer_save_excursion() {
                   p-point-after p-buf-after))))))
     (when (buffer-live-p buf-p) (kill-buffer buf-p))
     (when (buffer-live-p buf-q) (kill-buffer buf-q))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -368,7 +368,7 @@ fn oracle_prop_buffer_local_default_and_kill_local() {
                   (default-value 'neovm--bmo-kill-var))))))
       (when (buffer-live-p buf) (kill-buffer buf))
       (makunbound 'neovm--bmo-kill-var))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -420,5 +420,5 @@ fn oracle_prop_buffer_list_batch_operations() {
                 sizes-after)))))
     (dolist (b bufs)
       (when (buffer-live-p b) (kill-buffer b)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

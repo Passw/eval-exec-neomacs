@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Nested with-temp-buffer (buffer within buffer)
@@ -34,7 +34,7 @@ fn oracle_prop_nested_with_temp_buffer() {
             (buffer-size) (point)
             (buffer-string)
             inner-result))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ fn oracle_prop_get_buffer_create_and_predicates() {
                 (sz (buffer-size)))
             (list name-before live-before content sz))))
     (kill-buffer buf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ fn oracle_prop_set_buffer_current_buffer_switching() {
                 (eq (current-buffer) (current-buffer)))))
     (kill-buffer buf-a)
     (kill-buffer buf-b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +152,7 @@ fn oracle_prop_buffer_size_vs_point_max_vs_length() {
          (list sz2 pm2 pm-min2 len2)
          ;; After widen: restored
          (list sz3 pm3 len3))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -275,5 +275,5 @@ fn oracle_prop_buffer_local_simulation_with_alist() {
          (length buffer-vars)))
     (fmakunbound 'neovm--bvar-set)
     (fmakunbound 'neovm--bvar-get)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

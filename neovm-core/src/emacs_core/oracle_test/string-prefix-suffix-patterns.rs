@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // string-prefix-p basic matching
@@ -40,7 +40,7 @@ fn oracle_prop_string_prefix_p_basic() {
   ;; Return type is boolean-like (t or nil)
   (if (string-prefix-p "a" "abc") 'yes 'no)
   (if (string-prefix-p "z" "abc") 'yes 'no))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +74,7 @@ fn oracle_prop_string_suffix_p_basic() {
   ;; Path suffix
   (string-suffix-p "/bin" "/usr/local/bin")
   (string-suffix-p "/lib" "/usr/local/bin"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ fn oracle_prop_string_prefix_suffix_case_sensitivity() {
   ;; Mixed case with multi-byte (ASCII)
   (string-prefix-p "ABC" "abcdef" t)
   (string-suffix-p "DEF" "abcdef" t))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +152,7 @@ fn oracle_prop_string_prefix_suffix_empty_string() {
   (string-suffix-p "" "test" t)
   (string-prefix-p "" "" t)
   (string-suffix-p "" "" t))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +186,7 @@ fn oracle_prop_string_prefix_suffix_self_identity() {
           (string-suffix-p "cba" s)
           (string-prefix-p "a" s)
           (string-suffix-p "a" s))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +262,7 @@ fn oracle_prop_string_prefix_suffix_common_in_list() {
                (mapcar (lambda (s) (string-suffix-p sfx s)) strs))))
     (fmakunbound 'neovm--common-prefix)
     (fmakunbound 'neovm--common-suffix)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -350,7 +350,7 @@ fn oracle_prop_string_prefix_suffix_categorization() {
     (fmakunbound 'neovm--categorize-url)
     (fmakunbound 'neovm--filter-by-prefix)
     (fmakunbound 'neovm--filter-by-suffix)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -400,5 +400,5 @@ fn oracle_prop_string_prefix_suffix_with_split_join() {
                       (and (string-prefix-p pat s)
                            (string-suffix-p pat s)))))
             test-cases)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

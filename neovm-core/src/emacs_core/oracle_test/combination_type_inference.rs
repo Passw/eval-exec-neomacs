@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Type environment: create, extend, lookup with lexical scoping
@@ -72,7 +72,7 @@ fn oracle_prop_type_infer_type_environment() {
     (fmakunbound 'neovm--ti-env-lookup)
     (fmakunbound 'neovm--ti-env-extend-many)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ fn oracle_prop_type_infer_type_variables_and_substitution() {
     (fmakunbound 'neovm--ti-free-tvars)
     (makunbound 'neovm--ti-tvar-counter)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +310,7 @@ fn oracle_prop_type_infer_unification() {
     (fmakunbound 'neovm--ti-u-compose)
     (fmakunbound 'neovm--ti-u-unify)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -496,7 +496,7 @@ fn oracle_prop_type_infer_type_checking_expressions() {
     (fmakunbound 'neovm--ti-tc-infer)
     (makunbound 'neovm--ti-tc-counter)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -590,7 +590,7 @@ fn oracle_prop_type_infer_constraint_generation() {
     (fmakunbound 'neovm--ti-cg-generate)
     (makunbound 'neovm--ti-cg-counter)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -712,7 +712,7 @@ fn oracle_prop_type_infer_constraint_solving() {
     (fmakunbound 'neovm--ti-cs-unify-one)
     (fmakunbound 'neovm--ti-cs-solve)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -837,5 +837,5 @@ fn oracle_prop_type_infer_polymorphism() {
     (fmakunbound 'neovm--ti-poly-instantiate)
     (makunbound 'neovm--ti-poly-counter)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

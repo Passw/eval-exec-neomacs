@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Bidirectional type checking (check mode vs synthesis mode)
@@ -96,7 +96,7 @@ fn oracle_prop_type_system_adv_bidirectional() {
     (fmakunbound 'neovm--ts-type-equal)
     (fmakunbound 'neovm--ts-synth)
     (fmakunbound 'neovm--ts-check)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ fn oracle_prop_type_system_adv_unification_occurs_check() {
     (fmakunbound 'neovm--ts-subst-apply)
     (fmakunbound 'neovm--ts-occurs-in)
     (fmakunbound 'neovm--ts-unify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ fn oracle_prop_type_system_adv_subtype_variance() {
        ;; Reflexivity
        (funcall 'neovm--ts-is-subtype '(-> (int) (bool)) '(-> (int) (bool))))
     (fmakunbound 'neovm--ts-is-subtype)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ Each field is (name . type)."
          (funcall 'neovm--ts-record-subtype point3d numpoint)))
     (fmakunbound 'neovm--ts-base-subtype)
     (fmakunbound 'neovm--ts-record-subtype)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -403,7 +403,7 @@ fn oracle_prop_type_system_adv_union_intersection() {
        (funcall 'neovm--ts-subtype-ext '(int) '(union (inter (int) (number)) (string))))
     (fmakunbound 'neovm--ts-base-eq-or-sub)
     (fmakunbound 'neovm--ts-subtype-ext)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -472,7 +472,7 @@ fn oracle_prop_type_system_adv_generic_instantiation() {
          (funcall 'neovm--ts-instantiate id-type '((-> (int) (bool))))))
     (fmakunbound 'neovm--ts-instantiate)
     (fmakunbound 'neovm--ts-inst-apply)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -554,5 +554,5 @@ fn oracle_prop_type_system_adv_hm_let_generalization() {
     (fmakunbound 'neovm--ts-hm-free-vars)
     (fmakunbound 'neovm--ts-hm-env-free-vars)
     (fmakunbound 'neovm--ts-hm-generalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

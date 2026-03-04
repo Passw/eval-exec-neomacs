@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // delete-char with positive N: delete forward
@@ -220,7 +220,7 @@ fn oracle_prop_delete_char_boundary_errors() {
       (delete-char -1)
       'no-error)
   (error (list 'got-error (car err))))"#;
-    assert_oracle_parity(form1);
+    assert_oracle_parity_with_bootstrap(form1);
 
     // Trying to delete past end should signal an error
     let form2 = r#"(condition-case err
@@ -230,7 +230,7 @@ fn oracle_prop_delete_char_boundary_errors() {
       (delete-char 1)
       'no-error)
   (error (list 'got-error (car err))))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // Trying to delete more chars than available (forward)
     let form3 = r#"(condition-case err
@@ -240,7 +240,7 @@ fn oracle_prop_delete_char_boundary_errors() {
       (delete-char 10)
       'no-error)
   (error (list 'got-error (car err))))"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 
     // Trying to delete more chars than available (backward)
     let form4 = r#"(condition-case err
@@ -250,7 +250,7 @@ fn oracle_prop_delete_char_boundary_errors() {
       (delete-char -10)
       'no-error)
   (error (list 'got-error (car err))))"#;
-    assert_oracle_parity(form4);
+    assert_oracle_parity_with_bootstrap(form4);
 
     // Delete in empty buffer (should error for any N != 0)
     let form5 = r#"(condition-case err
@@ -258,7 +258,7 @@ fn oracle_prop_delete_char_boundary_errors() {
       (delete-char 1)
       'no-error)
   (error (list 'got-error (car err))))"#;
-    assert_oracle_parity(form5);
+    assert_oracle_parity_with_bootstrap(form5);
 
     // Delete exact remaining chars (should succeed, not error)
     let form6 = r#"(with-temp-buffer
@@ -266,7 +266,7 @@ fn oracle_prop_delete_char_boundary_errors() {
   (goto-char 2)
   (delete-char 2)
   (list (buffer-string) (point)))"#;
-    assert_oracle_parity(form6);
+    assert_oracle_parity_with_bootstrap(form6);
 }
 
 // ---------------------------------------------------------------------------
@@ -352,7 +352,7 @@ fn oracle_prop_delete_char_processing_pipeline() {
           (setq deleted (1+ deleted))
           (delete-char 1))))
     (list (buffer-string) kept deleted (point) (buffer-size))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -456,5 +456,5 @@ fn oracle_prop_delete_char_interleaved_with_insert() {
       (goto-char (point-max))
       (insert "]")
       (list step1 step2 (buffer-string) (buffer-size) (point)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

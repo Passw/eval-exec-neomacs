@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Dynamic vs lexical binding interactions
@@ -25,7 +25,7 @@ fn oracle_prop_dynamic_let_rebinding() {
                           (let ((inner (funcall read-outer)))
                             (list neovm--test-dyn-var inner))))
                     (makunbound 'neovm--test-dyn-var)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -61,7 +61,7 @@ fn oracle_prop_dynamic_restore_on_error() {
                           (error nil))
                         neovm--test-restore-var)
                     (makunbound 'neovm--test-restore-var)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ fn oracle_prop_symbol_value_basic() {
                       (list (symbol-value 'neovm--test-sv-var)
                             (boundp 'neovm--test-sv-var))
                     (makunbound 'neovm--test-sv-var)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -95,7 +95,7 @@ fn oracle_prop_set_and_symbol_value() {
                           (list via-sv via-name
                                 (= via-sv via-name))))
                     (makunbound 'neovm--test-set-var)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn oracle_prop_makunbound_then_boundp() {
                   (let ((before (boundp 'neovm--test-mkub-var)))
                     (makunbound 'neovm--test-mkub-var)
                     (list before (boundp 'neovm--test-mkub-var))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ fn oracle_prop_dynamic_callback_pattern() {
                           ;; Back to default
                           (funcall formatter \"hello\")))
                     (makunbound 'neovm--test-output-format)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -168,7 +168,7 @@ fn oracle_prop_dynamic_with_multiple_vars() {
                     (makunbound 'neovm--test-mv-a)
                     (makunbound 'neovm--test-mv-b)
                     (makunbound 'neovm--test-mv-c)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,5 +202,5 @@ fn oracle_prop_dynamic_context_stack() {
                           (funcall emit \"root-end\"))
                         (nreverse lines))
                     (makunbound 'neovm--test-indent-level)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

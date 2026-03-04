@@ -5,7 +5,7 @@
 //! and group center computation.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Cayley table (operation table) for Z/5Z and verification of group axioms
@@ -72,7 +72,7 @@ fn oracle_prop_algebra_groups_cayley_table() {
     (fmakunbound 'neovm--grp-verify-closure)
     (fmakunbound 'neovm--grp-z-add)
     (fmakunbound 'neovm--grp-z-mul)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ fn oracle_prop_algebra_groups_cyclic_generation() {
             check)))
     (fmakunbound 'neovm--grp-generate-cyclic)
     (fmakunbound 'neovm--grp-element-order)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ fn oracle_prop_algebra_groups_subgroup_lagrange() {
             (sort sizes #'<))))
     (fmakunbound 'neovm--grp-is-subgroup)
     (fmakunbound 'neovm--grp-all-cyclic-subgroups)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ fn oracle_prop_algebra_groups_symmetric_s4_permutations() {
     (fmakunbound 'neovm--grp-perm-inverse)
     (fmakunbound 'neovm--grp-perm-order)
     (fmakunbound 'neovm--grp-perm-cycle-type)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -414,7 +414,7 @@ fn oracle_prop_algebra_groups_dihedral_group() {
     (fmakunbound 'neovm--grp-dihedral-mul)
     (fmakunbound 'neovm--grp-dihedral-inv)
     (fmakunbound 'neovm--grp-dihedral-elements)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -498,7 +498,7 @@ fn oracle_prop_algebra_groups_center_computation() {
     (fmakunbound 'neovm--grp-d4-mul)
     (fmakunbound 'neovm--grp-center)
     (fmakunbound 'neovm--grp-commutator)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -565,7 +565,7 @@ fn oracle_prop_algebra_groups_homomorphism_verification() {
                 (nreverse kernel))))))
     (fmakunbound 'neovm--grp-phi)
     (fmakunbound 'neovm--grp-prod-add)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -640,5 +640,5 @@ fn oracle_prop_algebra_groups_coset_decomposition() {
             (list rep0 rep1 sum-rep result-coset))))
     (fmakunbound 'neovm--grp-left-cosets)
     (fmakunbound 'neovm--grp-right-cosets)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

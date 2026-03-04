@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // narrow-to-region with boundary edge cases and point-min/point-max
@@ -102,7 +102,7 @@ fn oracle_prop_narrow_widen_restore_full_buffer() {
                                     (string= (buffer-string) full-text))
                                results)))))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ fn oracle_prop_narrow_triple_nested_save_restriction() {
     ;; After level 1 save-restriction, back to full buffer
     (setq results (cons (list 'back-to-level0 (point-min) (point-max) (buffer-string)) results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ fn oracle_prop_narrow_search_operations() {
                                   (when found (point)))
                              results))))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ fn oracle_prop_narrow_insert_delete_within() {
       (setq results (cons (list 'after-replace (buffer-string)) results)))
     (setq results (cons (list 'full-after-replace (buffer-string)) results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ fn oracle_prop_narrow_line_number_at_pos() {
       (goto-char (point-max))
       (setq results (cons (list 'narrow-at-max (line-number-at-pos)) results)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -333,7 +333,7 @@ fn oracle_prop_narrow_buffer_substring_interaction() {
                                 (buffer-substring 15 20)) ;; "opqrs"
                            results)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -392,5 +392,5 @@ fn oracle_prop_narrow_accumulate_section_stats() {
                           sections)))))
         (setq i (1+ i))))
     (nreverse sections)))"###;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

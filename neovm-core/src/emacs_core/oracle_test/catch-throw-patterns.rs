@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Non-local return from deep call stack
@@ -44,7 +44,7 @@ fn oracle_prop_catch_throw_deep_nonlocal_return() {
                       (let ((result (catch 'escape
                                       (funcall level1 level2 level3 level4 level5))))
                         (list result (nreverse trail)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ fn oracle_prop_catch_throw_same_tag_innermost_catches() {
                                   ;; This throw goes to outer
                                   (throw 'done (list 'from-outer r2))))))
                       (list r1 (nreverse results))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ fn oracle_prop_catch_throw_complex_values() {
                     (catch 'tag
                       (throw 'tag nil)
                       'never-reached))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ fn oracle_prop_catch_throw_crossing_condition_case() {
                                   (setq log (cons 'caught-signal log))
                                   'signal-caught)))))
                         (list result result2 (nreverse log)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +191,7 @@ fn oracle_prop_catch_throw_crossing_unwind_protect() {
                       (list result
                             (nreverse cleanups)
                             resources)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +228,7 @@ fn oracle_prop_catch_no_throw_return_values() {
                       (if (> 3 2)
                           'yes
                         (throw 'tag 'no))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +258,7 @@ fn oracle_prop_catch_throw_coroutine_simulation() {
                             (setq collected (cons val collected)))))
                       (list (nreverse collected)
                             gen-current)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -318,5 +318,5 @@ fn oracle_prop_catch_throw_exception_handling() {
                        (if (and (consp exc) (eq (car exc) 'ok))
                            (cadr exc)
                          (funcall handle-exception exc)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

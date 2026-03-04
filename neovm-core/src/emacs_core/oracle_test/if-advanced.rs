@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // if with complex test expressions (and/or combinations)
@@ -39,7 +39,7 @@ fn oracle_prop_if_complex_predicates() {
                       'complex-true 'complex-false))
                  results))))
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +74,7 @@ fn oracle_prop_if_progn_bodies_and_returns() {
             ;; if with else that has multiple forms (implicit progn)
             (r4 (if nil 'nope 'first-else 'second-else 'third-else)))
         (list r1 r2 r3 r4 (nreverse log))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ fn oracle_prop_when_unless_return_values() {
        (when "" 'empty-string-truthy)
        ;; Side effect log
        (nreverse side)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +160,7 @@ fn oracle_prop_if_cond_nested_dispatch() {
        (funcall classify 'triangle 30 30)
        (funcall classify 'triangle 40 20)
        (funcall classify 'polygon 10 10)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +201,7 @@ fn oracle_prop_cond_fallthrough_and_catchall() {
           (let ((decade (/ x 10)))
             (list 'medium decade)))
          ((>= x 50) 'large))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -244,7 +244,7 @@ fn oracle_prop_if_side_effects_both_branches() {
                     (setq n (- n i))))
                 n))))
         (list vals (nreverse trace))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -316,7 +316,7 @@ fn oracle_prop_if_decision_tree() {
          (funcall 'neovm--test-dt-classify tree
                   '((has-fur . 1) (has-feathers . 0) (can-fly . 0) (has-claws . 1) (size . 200)))))
     (fmakunbound 'neovm--test-dt-classify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -421,5 +421,5 @@ fn oracle_prop_cond_pattern_matching_simulation() {
                 cases))
     (fmakunbound 'neovm--test-expr-simplify)
     (fmakunbound 'neovm--test-expr-pretty)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 1. NEWTEXT: plain string replacement (all other params default/nil)
@@ -137,7 +137,7 @@ fn oracle_prop_replace_match_literal_exhaustive() {
         (replace-match "a\\\\b" t t s)
         ;; LITERAL=t: plain string (no backslashes)
         (replace-match "replacement" t t s)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +261,7 @@ fn oracle_prop_replace_match_string_match_vs_re_search() {
                 (string= str-g0 (nth 1 buf-results))
                 (string= str-g1 (nth 2 buf-results))
                 (string= str-g2 (nth 3 buf-results))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -361,7 +361,7 @@ fn oracle_prop_replace_match_backrefs_complex_pipeline() {
       (fmakunbound 'test--reformat-date)
       (fmakunbound 'test--swap-names)
       (fmakunbound 'test--wrap-groups))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -394,7 +394,7 @@ fn oracle_prop_replace_match_iterative_buffer_replacement() {
           (list cat-count after-cat
                 count (buffer-string)
                 (buffer-size)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

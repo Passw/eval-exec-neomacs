@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Network representation and capacity graph construction
@@ -62,7 +62,7 @@ fn oracle_prop_network_flow_graph_construction() {
          (hash-table-count cap)))
     (fmakunbound 'neovm--nf-edge-key)
     (fmakunbound 'neovm--nf-build-graph)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ fn oracle_prop_network_flow_bfs_augmenting_path() {
             'no-path)))
     (fmakunbound 'neovm--nf-ek)
     (fmakunbound 'neovm--nf-bfs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -216,7 +216,7 @@ fn oracle_prop_network_flow_edmonds_karp_simple() {
     (fmakunbound 'neovm--ek-key)
     (fmakunbound 'neovm--ek-bfs)
     (fmakunbound 'neovm--ek-maxflow)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -296,7 +296,7 @@ fn oracle_prop_network_flow_larger_network() {
     (fmakunbound 'neovm--ek2-key)
     (fmakunbound 'neovm--ek2-bfs)
     (fmakunbound 'neovm--ek2-maxflow)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -398,7 +398,7 @@ fn oracle_prop_network_flow_residual_graph() {
     (fmakunbound 'neovm--nfr-key)
     (fmakunbound 'neovm--nfr-bfs)
     (fmakunbound 'neovm--nfr-maxflow-with-residual)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -509,7 +509,7 @@ fn oracle_prop_network_flow_min_cut() {
     (fmakunbound 'neovm--mc-bfs)
     (fmakunbound 'neovm--mc-reachable)
     (fmakunbound 'neovm--mc-compute)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -599,7 +599,7 @@ fn oracle_prop_network_flow_multi_source_sink() {
     (fmakunbound 'neovm--ms-key)
     (fmakunbound 'neovm--ms-bfs)
     (fmakunbound 'neovm--ms-maxflow)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -697,5 +697,5 @@ fn oracle_prop_network_flow_bipartite_matching() {
     (fmakunbound 'neovm--bm-key)
     (fmakunbound 'neovm--bm-bfs)
     (fmakunbound 'neovm--bm-maxflow)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

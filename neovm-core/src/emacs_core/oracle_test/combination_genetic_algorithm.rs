@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Chromosome representation and fitness function
@@ -82,7 +82,7 @@ fn oracle_prop_ga_chromosome_and_fitness() {
     (fmakunbound 'neovm--ga-fitness)
     (fmakunbound 'neovm--ga-make-random-chromosome)
     (fmakunbound 'neovm--ga-chrom-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ fn oracle_prop_ga_tournament_selection() {
     (fmakunbound 'neovm--ga2-fitness)
     (fmakunbound 'neovm--ga2-tournament)
     (fmakunbound 'neovm--ga2-select)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_ga_crossover_and_mutation() {
     (fmakunbound 'neovm--ga3-crossover)
     (fmakunbound 'neovm--ga3-mutate)
     (fmakunbound 'neovm--ga3-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -370,7 +370,7 @@ fn oracle_prop_ga_population_management() {
     (fmakunbound 'neovm--ga4-stats)
     (fmakunbound 'neovm--ga4-hamming)
     (fmakunbound 'neovm--ga4-diversity)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -542,7 +542,7 @@ fn oracle_prop_ga_full_evolution() {
     (fmakunbound 'neovm--ga5-mutate)
     (fmakunbound 'neovm--ga5-evolve-gen)
     (fmakunbound 'neovm--ga5-best-fitness)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -631,7 +631,7 @@ fn oracle_prop_ga_roulette_selection() {
     (fmakunbound 'neovm--ga6-fitness)
     (fmakunbound 'neovm--ga6-cumulative-fitness)
     (fmakunbound 'neovm--ga6-roulette)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -730,5 +730,5 @@ fn oracle_prop_ga_advanced_crossover_operators() {
     (fmakunbound 'neovm--ga7-two-point-crossover)
     (fmakunbound 'neovm--ga7-uniform-crossover)
     (fmakunbound 'neovm--ga7-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Protocol definition and single-step transition
@@ -90,7 +90,7 @@ fn oracle_prop_protocol_definition_and_step() {
     (fmakunbound 'neovm--pv-initial)
     (fmakunbound 'neovm--pv-find-transition)
     (fmakunbound 'neovm--pv-step)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ fn oracle_prop_protocol_reachability_bfs() {
                     (memq 'orphan2 reach))))))
     (fmakunbound 'neovm--pv-reachable-states)
     (fmakunbound 'neovm--pv-events-from)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ fn oracle_prop_protocol_safety_checking() {
           '(a b)))
     (fmakunbound 'neovm--pv-reachable)
     (fmakunbound 'neovm--pv-check-safety)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -337,7 +337,7 @@ fn oracle_prop_protocol_deadlock_freedom() {
           'a
           '(done)))
     (fmakunbound 'neovm--pv-check-deadlock-free)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -404,7 +404,7 @@ fn oracle_prop_protocol_trace_generation() {
           ;; Empty event list
           (funcall 'neovm--pv-run-trace trs 'idle '())))
     (fmakunbound 'neovm--pv-run-trace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -573,7 +573,7 @@ fn oracle_prop_protocol_liveness_checking() {
             (list 'branch 'right nil 'goal2 nil))
           'init '(goal1 goal2) '(goal1 goal2)))
     (fmakunbound 'neovm--pv-check-liveness)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -665,7 +665,7 @@ fn oracle_prop_protocol_composition() {
                   (nth 3 result)
                   (nth 5 result)))))
     (fmakunbound 'neovm--pv-compose)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -761,7 +761,7 @@ fn oracle_prop_protocol_bisimulation() {
         (funcall 'neovm--pv-check-bisimilar nil 'a nil 'p))
     (fmakunbound 'neovm--pv-enabled-events)
     (fmakunbound 'neovm--pv-check-bisimilar)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -824,7 +824,7 @@ fn oracle_prop_protocol_path_finding() {
           ;; Path from middle
           (funcall 'neovm--pv-find-path trs 'c 'e)))
     (fmakunbound 'neovm--pv-find-path)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -907,7 +907,7 @@ fn oracle_prop_protocol_invariant_checking() {
           (lambda (state ctx)
             (memq state '(a b c)))))
     (fmakunbound 'neovm--pv-check-invariant)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -989,5 +989,5 @@ fn oracle_prop_protocol_state_space_stats() {
           (list (list 'loop 'tick nil 'loop nil))
           'loop))
     (fmakunbound 'neovm--pv-state-stats)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

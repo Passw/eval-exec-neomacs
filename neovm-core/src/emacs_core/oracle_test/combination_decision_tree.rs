@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Entropy computation
@@ -62,7 +62,7 @@ fn oracle_prop_decision_tree_entropy() {
     (fmakunbound 'neovm--dt-log2)
     (fmakunbound 'neovm--dt-entropy)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +160,7 @@ fn oracle_prop_decision_tree_info_gain() {
     (fmakunbound 'neovm--dt-info-gain)
     (fmakunbound 'neovm--dt-best-split)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ fn oracle_prop_decision_tree_id3_build() {
     (fmakunbound 'neovm--dt-build)
     (fmakunbound 'neovm--dt-classify)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -394,7 +394,7 @@ fn oracle_prop_decision_tree_numeric_threshold() {
     (fmakunbound 'neovm--dt-entropy)
     (fmakunbound 'neovm--dt-best-threshold)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -465,7 +465,7 @@ fn oracle_prop_decision_tree_serialization() {
     (fmakunbound 'neovm--dt-count-nodes)
     (fmakunbound 'neovm--dt-depth)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -576,7 +576,7 @@ fn oracle_prop_decision_tree_pruning() {
     (fmakunbound 'neovm--dt-majority-label)
     (fmakunbound 'neovm--dt-prune)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -684,5 +684,5 @@ fn oracle_prop_decision_tree_cross_validation() {
     (fmakunbound 'neovm--dt-cv-split)
     (fmakunbound 'neovm--dt-cv-run)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

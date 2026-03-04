@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // ash (arithmetic shift) advanced patterns
@@ -32,7 +32,7 @@ fn oracle_prop_ash_power_of_two_generation() {
           (ash 1 10)
           (ash 1 20)
           (ash 1 30))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn oracle_prop_ash_right_shift_sign_extension() {
   ;; Negative left-then-right
   (let ((x -100))
     (ash (ash x 4) -4)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -81,7 +81,7 @@ fn oracle_prop_ash_multiply_divide_equivalence() {
                                 left3 right3)
                           results))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ fn oracle_prop_bitfield_pack_unpack_rgb() {
     (fmakunbound 'neovm--test-pack-rgb)
     (fmakunbound 'neovm--test-unpack-rgb)
     (fmakunbound 'neovm--test-blend-rgb)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -216,7 +216,7 @@ fn oracle_prop_bitfield_ip_address_manipulation() {
     (fmakunbound 'neovm--test-network-addr)
     (fmakunbound 'neovm--test-broadcast-addr)
     (fmakunbound 'neovm--test-same-subnet)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -319,7 +319,7 @@ fn oracle_prop_bitmask_permission_system() {
     (makunbound 'neovm--test-perm-other-r)
     (makunbound 'neovm--test-perm-other-w)
     (makunbound 'neovm--test-perm-other-x)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -432,7 +432,7 @@ fn oracle_prop_bitwise_algorithms_combined() {
     (fmakunbound 'neovm--test-xor-checksum)
     (fmakunbound 'neovm--test-clz8)
     (fmakunbound 'neovm--test-highest-bit)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -505,7 +505,7 @@ fn oracle_prop_bitwise_boolean_algebra() {
     ;; Idempotent: A | A == A, A & A == A
     (= (logior a a) a)
     (= (logand a a) a)))"#;
-    assert_oracle_parity(form_fixed);
+    assert_oracle_parity_with_bootstrap(form_fixed);
 }
 
 // ---------------------------------------------------------------------------
@@ -567,5 +567,5 @@ fn oracle_prop_bitfield_date_packing() {
     (fmakunbound 'neovm--test-pack-datetime)
     (fmakunbound 'neovm--test-unpack-datetime)
     (fmakunbound 'neovm--test-datetime-cmp)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

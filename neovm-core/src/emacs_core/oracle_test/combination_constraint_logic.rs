@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Finite domain variables with propagation
@@ -94,7 +94,7 @@ fn oracle_prop_constraint_logic_finite_domains() {
     (fmakunbound 'neovm--cl-fd-constrain)
     (fmakunbound 'neovm--cl-fd-intersect)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ fn oracle_prop_constraint_logic_arithmetic_constraints() {
     (fmakunbound 'neovm--cl-arith-bt)
     (fmakunbound 'neovm--cl-arith-get)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -304,7 +304,7 @@ fn oracle_prop_constraint_logic_all_different() {
     (fmakunbound 'neovm--cl-ad-bt2)
     (fmakunbound 'neovm--cl-ad-count-perms)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -652,7 +652,7 @@ fn oracle_prop_constraint_logic_zebra_puzzle() {
     (fmakunbound 'neovm--cl-zebra-solve)
     (fmakunbound 'neovm--cl-zebra-perms)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -740,5 +740,5 @@ fn oracle_prop_constraint_logic_magic_square() {
     (fmakunbound 'neovm--cl-magic-solve)
     (fmakunbound 'neovm--cl-magic-bt)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Mutual recursion: Collatz-like with two functions
@@ -34,7 +34,7 @@ fn oracle_prop_recursion_advanced_mutual_collatz() {
            (funcall 'neovm--radv-step-even 12 nil))
         (fmakunbound 'neovm--radv-step-even)
         (fmakunbound 'neovm--radv-step-odd)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ fn oracle_prop_recursion_advanced_tree_operations() {
         (fmakunbound 'neovm--radv-tree-count)
         (fmakunbound 'neovm--radv-tree-fold)
         (fmakunbound 'neovm--radv-tree-map)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ fn oracle_prop_recursion_advanced_recursive_descent_parser() {
         (fmakunbound 'neovm--radv-parse-term)
         (fmakunbound 'neovm--radv-parse-factor)
         (makunbound 'neovm--radv-tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ fn oracle_prop_recursion_advanced_accumulator_passing() {
         (fmakunbound 'neovm--radv-rev-acc)
         (fmakunbound 'neovm--radv-flat-acc)
         (fmakunbound 'neovm--radv-map-acc)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -301,7 +301,7 @@ fn oracle_prop_recursion_advanced_pattern_matcher() {
                     '((any (any any)) any)
                     '((1 (2 3)) 4)))
         (fmakunbound 'neovm--radv-pmatch)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -339,7 +339,7 @@ fn oracle_prop_recursion_advanced_alist_tree_flattener() {
                         (doc . ((readme . "Hello"))))))
             (funcall 'neovm--radv-flatten-dir tree ""))
         (fmakunbound 'neovm--radv-flatten-dir)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -383,5 +383,5 @@ fn oracle_prop_recursion_advanced_towers_of_hanoi() {
              (length neovm--radv-hanoi-moves)))
         (fmakunbound 'neovm--radv-hanoi)
         (makunbound 'neovm--radv-hanoi-moves)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

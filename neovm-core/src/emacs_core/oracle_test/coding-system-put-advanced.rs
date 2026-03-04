@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // coding-system-put modifying a property and reading it back
@@ -32,7 +32,7 @@ fn oracle_prop_coding_system_put_basic_roundtrip() {
                    'utf-8))))
     ;; Cleanup: remove the property by setting nil
     (coding-system-put 'utf-8 :neovm-cspa-test-key nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ fn oracle_prop_coding_system_put_value_types() {
   (coding-system-put 'utf-8 :neovm-cspa-list-prop nil)
   (coding-system-put 'utf-8 :neovm-cspa-cons-prop nil)
   (coding-system-put 'utf-8 :neovm-cspa-nil-prop nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ fn oracle_prop_coding_system_put_various_keys() {
   (coding-system-put 'utf-8 :neovm-cspa-key-e nil)
   (coding-system-put 'latin-1 :neovm-cspa-key-b nil)
   (coding-system-put 'raw-text :neovm-cspa-key-c nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ fn oracle_prop_coding_system_put_inspect_intrinsic_props() {
         ;; plist length should be even (key-value pairs)
         (= 0 (mod (length plist) 2)))))
    systems))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ fn oracle_prop_coding_system_put_overwrite_semantics() {
                   results))
       (nreverse results))
   (coding-system-put 'utf-8 :neovm-cspa-ow-test nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ fn oracle_prop_coding_system_put_inspection_report() {
          :latin1-base (coding-system-base 'latin-1)))
     (coding-system-put 'utf-8 :neovm-cspa-annotation nil)
     (fmakunbound 'neovm--cspa-build-report)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -337,5 +337,5 @@ fn oracle_prop_coding_system_put_hash_registry() {
     (fmakunbound 'neovm--cspa-register)
     (fmakunbound 'neovm--cspa-query-by-type)
     (makunbound 'neovm--cspa-registry)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Property-list-based objects with get/put for fields
@@ -44,7 +44,7 @@ fn oracle_prop_oop_plist_objects() {
                          ;; Original p1 unchanged
                          (funcall point-x p1)             ;; 3
                          (plist-get p1 :type)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +88,7 @@ fn oracle_prop_oop_closure_encapsulation() {
                         (list (funcall balance)
                               fail-result
                               (funcall history)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ fn oracle_prop_oop_prototype_chain() {
                        (let ((child2 (funcall obj-set child 'color "brown")))
                          (list (funcall obj-get child2 'color)
                                (funcall obj-get parent 'color))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ fn oracle_prop_oop_mixin_pattern() {
                                (funcall mixin-call task2 all-methods 'less-than task1)
                                (funcall mixin-call task1 all-methods 'equal-to task2)
                                (funcall mixin-call task1 all-methods 'serialize))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,5 +351,5 @@ fn oracle_prop_oop_event_emitter() {
                             (list r1 r2 r3 r4
                                   c1 c2 c3 r5
                                   (nreverse log)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

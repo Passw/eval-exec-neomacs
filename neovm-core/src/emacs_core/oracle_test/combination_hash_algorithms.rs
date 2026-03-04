@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Two-sum problem using hash table
@@ -59,7 +59,7 @@ fn oracle_prop_hash_algo_two_sum() {
                            (nth (cadr indices) nums)))
             nil)))
     (fmakunbound 'neovm--test-two-sum)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ fn oracle_prop_hash_algo_anagram_grouping() {
                          '("eat" "tea" "tan" "ate" "nat" "bat"))))
     (fmakunbound 'neovm--test-sort-string)
     (fmakunbound 'neovm--test-group-anagrams)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ fn oracle_prop_hash_algo_lru_cache() {
     (fmakunbound 'neovm--test-lru-get)
     (fmakunbound 'neovm--test-lru-put)
     (fmakunbound 'neovm--test-lru-keys)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +283,7 @@ fn oracle_prop_hash_algo_frequency_encoding() {
     (fmakunbound 'neovm--test-freq-to-sorted)
     (fmakunbound 'neovm--test-assign-codes)
     (fmakunbound 'neovm--test-encode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -344,7 +344,7 @@ fn oracle_prop_hash_algo_nested_duplicate_detection() {
                  '((x (y z)) (a (y z)) (x (y z)))))
     (fmakunbound 'neovm--test-walk)
     (fmakunbound 'neovm--test-find-duplicates)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -454,5 +454,5 @@ fn oracle_prop_hash_algo_set_operations() {
     (fmakunbound 'neovm--test-set-intersection)
     (fmakunbound 'neovm--test-set-sym-diff)
     (fmakunbound 'neovm--test-set-subset-p)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

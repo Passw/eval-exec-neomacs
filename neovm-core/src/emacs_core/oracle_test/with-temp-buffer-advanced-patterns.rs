@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Multiple insert/delete/search cycles
@@ -46,7 +46,7 @@ fn oracle_prop_with_temp_buffer_adv_multi_cycle_insert_delete_search() {
               (delete-region (point-min) (point))
               (list after-cycle1 after-cycle2 after-cycle3
                     (buffer-string) count))))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn oracle_prop_with_temp_buffer_adv_deeply_nested_accumulate() {
           (list v1 v2 v3 v4
                 (buffer-string)
                 (string= (buffer-string) "seed")))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ fn oracle_prop_with_temp_buffer_adv_save_excursion_nested() {
             (list p1 p2 p3 (point) (buffer-string))))))
     ;; After all save-excursions, point restored
     (list (point) (buffer-string))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -256,7 +256,7 @@ fn oracle_prop_with_temp_buffer_adv_buffer_local_vars() {
           ;; so the buffer-local binding is gone.
           (list before result neovm--wtba-testvar)))
     (makunbound 'neovm--wtba-testvar)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,7 +290,7 @@ fn oracle_prop_with_temp_buffer_adv_return_hash_table() {
         (gethash "city" ht)
         (gethash "lang" ht)
         (gethash "missing" ht 'default)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -361,7 +361,7 @@ fn oracle_prop_with_temp_buffer_adv_text_properties_multiple_faces() {
     ;; Position 10 (j): source=test only -- note: property at pos 10 is the last char
     (get-text-property 10 'source)
     (get-text-property 10 'category)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -466,7 +466,7 @@ fn oracle_prop_with_temp_buffer_adv_string_builder_with_conditionals() {
                  (setq first nil))))
            (buffer-string))))
     (list result-plain result-filtered)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -489,7 +489,7 @@ fn oracle_prop_with_temp_buffer_adv_unwind_protect_inside() {
           (setq cleanup-ran t)))
     (error
      (list 'caught (cadr err) cleanup-ran))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -521,7 +521,7 @@ fn oracle_prop_with_temp_buffer_adv_error_in_nested_does_not_corrupt() {
             (buffer-string)
             (string= outer1 (buffer-string))
             mid-result))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

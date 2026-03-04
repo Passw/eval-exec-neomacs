@@ -5,7 +5,7 @@
 //! reachability analysis, safety property checking, liveness property
 //! checking, and counterexample generation.
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 /// Returns the Elisp preamble defining the model checker infrastructure.
@@ -264,7 +264,7 @@ fn oracle_prop_mc_kripke_construction() {
         preamble = model_checker_preamble(),
         cleanup = model_checker_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -304,7 +304,7 @@ fn oracle_prop_mc_ex_ax_operators() {
         preamble = model_checker_preamble(),
         cleanup = model_checker_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -338,7 +338,7 @@ fn oracle_prop_mc_ef_af_operators() {
         preamble = model_checker_preamble(),
         cleanup = model_checker_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -379,7 +379,7 @@ fn oracle_prop_mc_eg_ag_operators() {
         preamble = model_checker_preamble(),
         cleanup = model_checker_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -423,7 +423,7 @@ fn oracle_prop_mc_eu_operator() {
         preamble = model_checker_preamble(),
         cleanup = model_checker_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -482,7 +482,7 @@ fn oracle_prop_mc_reachability_and_safety() {
         preamble = model_checker_preamble(),
         cleanup = model_checker_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -542,7 +542,7 @@ fn oracle_prop_mc_liveness_and_counterexample() {
         preamble = model_checker_preamble(),
         cleanup = model_checker_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -605,7 +605,7 @@ fn oracle_prop_mc_mutual_exclusion() {
         preamble = model_checker_preamble(),
         cleanup = model_checker_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -650,5 +650,5 @@ fn oracle_prop_mc_complex_ctl_formulas() {
         preamble = model_checker_preamble(),
         cleanup = model_checker_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }

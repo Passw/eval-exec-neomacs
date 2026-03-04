@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Core pattern matching engine: literal, wildcard, cons, binding
@@ -89,7 +89,7 @@ fn oracle_prop_pattern_match_core_engine() {
         ;; Cons pattern fails on non-cons
         (funcall 'neovm--pm-match '(cpat (bind a) (bind b)) 42 nil))
     (fmakunbound 'neovm--pm-match)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +167,7 @@ fn oracle_prop_pattern_match_list_destructuring() {
           (funcall 'neovm--pm-match '(literal nil) '(1) nil)))
     (fmakunbound 'neovm--pm-match)
     (fmakunbound 'neovm--pm-list-pat)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +252,7 @@ fn oracle_prop_pattern_match_guards() {
           (list 'guard '(bind n) (lambda (v _b) (= 0 (% v 2))))
           43 nil))
     (fmakunbound 'neovm--pm-match)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -328,7 +328,7 @@ fn oracle_prop_pattern_match_or_patterns() {
           '(orp (bind first) (bind second))
           99 nil))
     (fmakunbound 'neovm--pm-match)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -506,7 +506,7 @@ fn oracle_prop_pattern_match_deep_nesting() {
           (funcall 'neovm--pm-match pat data nil)))
     (fmakunbound 'neovm--pm-match)
     (fmakunbound 'neovm--pm-list-pat)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -606,7 +606,7 @@ fn oracle_prop_pattern_match_expression_evaluator() {
     (fmakunbound 'neovm--pm-match)
     (fmakunbound 'neovm--pm-list-pat)
     (fmakunbound 'neovm--pm-eval-expr)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -678,5 +678,5 @@ fn oracle_prop_pattern_match_failure_handling() {
                 'count (length failures)
                 'results (nreverse failures))))
     (fmakunbound 'neovm--pm-match)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -5,7 +5,7 @@
 //! and property interval manipulation.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // add-text-properties: additive merging across overlapping intervals
@@ -206,7 +206,7 @@ fn oracle_prop_tpm_buffer_text_property_operations() {
             (next-from-bold (next-single-property-change 5 'face)))
         (list r1 r2 r3 r4 r5 r6 r7 r8 r9 r10
               next-face next-from-bold)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

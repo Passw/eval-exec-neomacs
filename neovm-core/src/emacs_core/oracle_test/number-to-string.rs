@@ -5,7 +5,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 use proptest::prelude::*;
 
 use super::common::{
-    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
     run_neovm_eval, run_oracle_eval,
 };
 
@@ -47,8 +47,8 @@ fn oracle_prop_number_to_string_wrong_type() {
 fn oracle_prop_number_to_string_large_numbers() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(number-to-string 1000000)");
-    assert_oracle_parity("(number-to-string -999999)");
+    assert_oracle_parity_with_bootstrap("(number-to-string 1000000)");
+    assert_oracle_parity_with_bootstrap("(number-to-string -999999)");
 }
 
 proptest! {

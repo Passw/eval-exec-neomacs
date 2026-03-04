@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // DAG node/edge representation and basic queries
@@ -105,7 +105,7 @@ fn oracle_prop_dag_representation_and_queries() {
     (fmakunbound 'neovm--dag-successors)
     (fmakunbound 'neovm--dag-predecessors)
     (fmakunbound 'neovm--dag-edge-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +197,7 @@ fn oracle_prop_dag_topological_ordering() {
                 (puthash "z" '("x") cyclic)
                 (funcall 'neovm--dag-topo-dfs cyclic))))))
     (fmakunbound 'neovm--dag-topo-dfs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -299,7 +299,7 @@ fn oracle_prop_dag_longest_path() {
             ;; vs a(3)->b(5)->e(1)->f(4) = 13
             (= (car result) 15))))
     (fmakunbound 'neovm--dag-longest-path)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -363,7 +363,7 @@ fn oracle_prop_dag_all_paths() {
             ;; Paths from a to t
             (funcall 'neovm--dag-all-paths adj "a" "t"))))
     (fmakunbound 'neovm--dag-all-paths)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -561,7 +561,7 @@ fn oracle_prop_dag_transitive_reduction() {
           (puthash "e" nil adj5)
           (funcall 'neovm--dag-trans-reduce adj5)))
     (fmakunbound 'neovm--dag-trans-reduce)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -646,5 +646,5 @@ fn oracle_prop_dag_depth_and_width() {
           (puthash "b1" '("b2") adj) (puthash "b2" '("b3") adj) (puthash "b3" nil adj)
           (funcall 'neovm--dag-depth-width adj)))
     (fmakunbound 'neovm--dag-depth-width)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

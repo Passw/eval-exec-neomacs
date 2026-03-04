@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Print various primitive types
@@ -75,7 +75,7 @@ fn oracle_prop_prin1_adv_nested_lists_and_vectors() {
   (prin1-to-string '([1 2] [3 4]))
   ;; Complex nesting
   (prin1-to-string '((name . "Alice") (scores . [95 87 92]) (tags . (:math :science)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +104,7 @@ fn oracle_prop_prin1_adv_dotted_pairs() {
   (prin1-to-string '(a . nil))
   ;; Dotted pair with vector
   (prin1-to-string '(key . [1 2 3])))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +235,7 @@ fn oracle_prop_prin1_adv_roundtrip_complex_structures() {
              (match (equal orig restored)))
         (list match printed)))
     structures))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -296,5 +296,5 @@ fn oracle_prop_prin1_adv_serialize_record_system() {
     (fmakunbound 'neovm--test-record-get)
     (fmakunbound 'neovm--test-serialize-db)
     (fmakunbound 'neovm--test-deserialize-db)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

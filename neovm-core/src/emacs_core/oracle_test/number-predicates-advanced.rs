@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // zerop edge cases: negative zero, float zero variants, large near-zero
@@ -42,7 +42,7 @@ fn oracle_prop_number_predicates_advanced_zerop_edges() {
                    (zerop (- 5.0 5.0))
                    (zerop (* 0 999999))
                    (zerop (* 0.0 1.0e300)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +84,7 @@ fn oracle_prop_number_predicates_advanced_natnump_comprehensive() {
                    (eq (natnump 0) (wholenump 0))
                    (eq (natnump -1) (wholenump -1))
                    (eq (natnump 3.14) (wholenump 3.14)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ fn oracle_prop_number_predicates_advanced_type_boundaries() {
                    (floatp (/ 1.0 3))
                    ;; Integer division stays integer
                    (integerp (/ 10 3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +173,7 @@ fn oracle_prop_number_predicates_advanced_numberp_discrimination() {
                               (integerp v)
                               (floatp v)))
                       values)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +213,7 @@ fn oracle_prop_number_predicates_advanced_booleanp_strict() {
                    ;; and/or can return non-boolean truthy values
                    (booleanp (and 1 2 3))
                    (booleanp (or 1 2 3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +262,7 @@ fn oracle_prop_number_predicates_advanced_filter_partition() {
                           (when (numberp x)
                             (setq num-sum (+ num-sum x))))
                         num-sum))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -396,5 +396,5 @@ fn oracle_prop_number_predicates_advanced_dispatch_accumulator() {
                     ;; Verify all accounted for
                     (= (length data)
                        (+ int-count float-count non-num-count))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

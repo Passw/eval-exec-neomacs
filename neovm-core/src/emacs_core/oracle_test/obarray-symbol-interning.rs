@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // intern creates, intern-soft only looks up
@@ -38,7 +38,7 @@ fn oracle_prop_obarray_intern_vs_intern_soft() {
                             (null soft-after-2)
                             ;; symbol-name roundtrip
                             (symbol-name sym1))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -64,7 +64,7 @@ fn oracle_prop_obarray_intern_identity() {
                       (let ((a (intern "neovm--osi-identity-check-8342"))
                             (b (intern "neovm--osi-identity-check-8342")))
                         (eq a b))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ fn oracle_prop_obarray_make_symbol_vs_intern() {
                         (symbolp interned)
                         (symbolp uninterned-a)
                         (symbolp uninterned-b))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +124,7 @@ fn oracle_prop_obarray_symbol_name_roundtrip_special() {
                                   ;; Re-interning symbol-name gives back same symbol
                                   (eq (intern (symbol-name sym)) sym))))
                             names))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ fn oracle_prop_obarray_intern_soft_nil_for_absent() {
                           ;; The found symbols are eq to intern result
                           (eq (nth 0 after) (intern (nth 0 absent-names)))
                           (eq (nth 1 after) (intern (nth 1 absent-names)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -317,5 +317,5 @@ fn oracle_prop_obarray_symbol_enum_validation() {
                         ;; Range
                         (funcall enum-range 'red 'green)
                         (funcall enum-range 'yellow 'green))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

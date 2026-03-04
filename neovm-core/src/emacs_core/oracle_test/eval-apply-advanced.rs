@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // eval with quoted forms and various levels of quoting
@@ -30,7 +30,7 @@ fn oracle_prop_eval_apply_quoted_forms_deep() {
   (eval t)
   ;; eval of a self-evaluating vector
   (eval [1 2 3]))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ fn oracle_prop_eval_dynamically_constructed_code() {
                 results)))
 
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ fn oracle_prop_apply_variable_arg_lists() {
   (apply (lambda (&rest xs) (length xs)) '(a b c d e))
   ;; Nested apply
   (apply #'apply (list #'+ '(1 2 3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ fn oracle_prop_funcall_vs_apply_differences() {
    (funcall #'funcall #'+ 1 2)
    ;; apply chain
    (apply #'apply (list #'+ '(3 4)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +220,7 @@ fn oracle_prop_eval_meta_circular_step() {
                            (car test) (cadr test)))
                 tests))
     (fmakunbound 'neovm--test-eaa-myeval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +283,7 @@ fn oracle_prop_apply_function_composition() {
     (fmakunbound 'neovm--test-eaa-compose)
     (fmakunbound 'neovm--test-eaa-pipe)
     (fmakunbound 'neovm--test-eaa-juxt)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -337,7 +337,7 @@ fn oracle_prop_eval_dynamic_dispatch() {
          (funcall 'neovm--test-eaa-send p 'distance-to-origin)))
     (fmakunbound 'neovm--test-eaa-make-point)
     (fmakunbound 'neovm--test-eaa-send)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -372,5 +372,5 @@ fn oracle_prop_eval_apply_function_table() {
               (fn (cdr (assq op-name ops))))
          (list op-name (apply fn args))))
      commands)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

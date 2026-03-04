@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Longest common subsequence (LCS) via dynamic programming
@@ -73,7 +73,7 @@ fn oracle_prop_diff_lcs_dynamic_programming() {
        (funcall 'neovm--diff-lcs '(h e l l o w o r l d) '(h e l p w o r k)))
     (fmakunbound 'neovm--diff-lcs)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ fn oracle_prop_diff_edit_distance_with_ops() {
        (funcall 'neovm--diff-edit-distance '(a b) '()))
     (fmakunbound 'neovm--diff-edit-distance)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -301,7 +301,7 @@ fn oracle_prop_diff_hunk_generation() {
     (fmakunbound 'neovm--diff-lcs-indices)
     (fmakunbound 'neovm--diff-generate-hunks)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -393,7 +393,7 @@ fn oracle_prop_diff_patch_application() {
     (fmakunbound 'neovm--diff-compute-patch)
     (fmakunbound 'neovm--diff-apply-patch)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -543,7 +543,7 @@ fn oracle_prop_diff_three_way_merge() {
     (fmakunbound 'neovm--diff3-changes)
     (fmakunbound 'neovm--diff3-merge)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -651,7 +651,7 @@ fn oracle_prop_diff_unified_format() {
     (fmakunbound 'neovm--diff-line-lcs)
     (fmakunbound 'neovm--diff-unified)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -724,5 +724,5 @@ fn oracle_prop_diff_statistics() {
     (fmakunbound 'neovm--diff-stats-lcs-len)
     (fmakunbound 'neovm--diff-stats)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

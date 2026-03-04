@@ -2,7 +2,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_err_kind, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_char_table_parent_and_subtype_basics() {
@@ -17,7 +17,7 @@ fn oracle_prop_char_table_parent_and_subtype_basics() {
 fn oracle_prop_char_table_parent_fallback_lookup() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         "(let* ((p (make-char-table 'generic 'p)) (c (make-char-table 'generic nil))) (set-char-table-parent c p) (char-table-range c ?A))",
     );
 }

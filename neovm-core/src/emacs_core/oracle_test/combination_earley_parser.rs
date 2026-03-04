@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Core Earley parser: grammar, items, predict/scan/complete
@@ -186,7 +186,7 @@ fn oracle_prop_earley_parser_core() {
     (fmakunbound 'neovm--ep-complete)
     (fmakunbound 'neovm--ep-parse)
     (fmakunbound 'neovm--ep-accepted-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -319,7 +319,7 @@ fn oracle_prop_earley_parser_recursive_grammar() {
     (fmakunbound 'neovm--ep2-complete)
     (fmakunbound 'neovm--ep2-parse)
     (fmakunbound 'neovm--ep2-ok-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -456,7 +456,7 @@ fn oracle_prop_earley_parser_arithmetic() {
     (fmakunbound 'neovm--ep3-complete)
     (fmakunbound 'neovm--ep3-parse)
     (fmakunbound 'neovm--ep3-ok-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -580,7 +580,7 @@ fn oracle_prop_earley_parser_ambiguity() {
     (fmakunbound 'neovm--ep4-complete)
     (fmakunbound 'neovm--ep4-parse)
     (fmakunbound 'neovm--ep4-count-parses)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -726,7 +726,7 @@ fn oracle_prop_earley_parser_multi_rule() {
     (fmakunbound 'neovm--ep5-complete)
     (fmakunbound 'neovm--ep5-parse)
     (fmakunbound 'neovm--ep5-ok-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -848,5 +848,5 @@ fn oracle_prop_earley_parser_chart_stats() {
     (fmakunbound 'neovm--ep6-complete)
     (fmakunbound 'neovm--ep6-parse)
     (fmakunbound 'neovm--ep6-chart-stats)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

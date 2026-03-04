@@ -3,7 +3,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // event-convert-list with full modifier combinations
@@ -30,7 +30,7 @@ fn oracle_prop_event_convert_advanced_all_modifier_combos() {
       (event-convert-list '(control meta shift ?a))
       (event-convert-list '(control meta shift super ?a))
       (event-convert-list '(control meta shift super hyper ?a)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ fn oracle_prop_event_convert_advanced_mouse_events() {
       (event-convert-list '(control down-mouse-1))
       (event-convert-list '(double-mouse-1))
       (event-convert-list '(meta double-mouse-1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ fn oracle_prop_event_convert_advanced_key_description_sequences() {
       (key-description [tab])
       (key-description [return])
       (key-description [backspace]))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ fn oracle_prop_event_convert_advanced_single_key_description() {
       (single-key-description (event-convert-list '(meta control shift ?z)))
       (single-key-description (event-convert-list '(super ?q)))
       (single-key-description (event-convert-list '(hyper ?h))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ fn oracle_prop_event_convert_advanced_roundtrip_describe() {
       (key-description
        (vector (event-convert-list '(super ?l))
                (event-convert-list '(hyper ?r)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +193,7 @@ fn oracle_prop_event_convert_advanced_keymap_multi_key_binding() {
                     (key-description
                      (vector (event-convert-list '(control ?x))
                              (event-convert-list '(control ?f))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -224,5 +224,5 @@ fn oracle_prop_event_convert_advanced_modifier_bit_consistency() {
                     ;; Verify event-convert-list order independence
                     (= (event-convert-list '(control meta ?z))
                        (event-convert-list '(meta control ?z)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

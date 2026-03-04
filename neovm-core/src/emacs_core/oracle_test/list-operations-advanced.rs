@@ -9,7 +9,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // cons/car/cdr on dotted pairs vs proper lists
@@ -49,7 +49,7 @@ fn oracle_prop_cons_car_cdr_dotted_vs_proper() {
           (consp x)))
   ;; car/cdr of nil
   (list (car nil) (cdr nil) (car-safe 5) (cdr-safe 5)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +88,7 @@ fn oracle_prop_append_multi_args_with_nil() {
              (length orig) (length result))))
    ;; Nested lists in append
    (append '((a 1) (b 2)) '((c 3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ fn oracle_prop_nconc_vs_append_behavior() {
    ;; Append result
    app-result
    nconc-result))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ fn oracle_prop_member_memq_assoc_assq_differences() {
                     (y . ((c . 3) (d . 4))))))
      (list (cdr (assq 'a (cdr (assq 'x nested))))
            (cdr (assq 'd (cdr (assq 'y nested))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +206,7 @@ fn oracle_prop_sort_with_lambda_predicate() {
             (if (eq a-even b-even)
                 (< a b)
               a-even)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -238,7 +238,7 @@ fn oracle_prop_mapcar_mapconcat_mapc_pipeline() {
   (list squared big joined nums total
         ;; Verify roundtrip
         (equal nums big)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -307,7 +307,7 @@ fn oracle_prop_list_set_operations() {
     (fmakunbound 'neovm--set-union)
     (fmakunbound 'neovm--set-intersect)
     (fmakunbound 'neovm--set-diff)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -392,5 +392,5 @@ fn oracle_prop_alist_database() {
     (fmakunbound 'neovm--db-update-field)
     (fmakunbound 'neovm--db-delete)
     (fmakunbound 'neovm--db-query)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic max-char return value and type
@@ -28,7 +28,7 @@ fn oracle_prop_max_char_basic_value() {
   (unwind-protect
       (funcall 'neovm--test-analyze-max-char)
     (fmakunbound 'neovm--test-analyze-max-char)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -54,7 +54,7 @@ fn oracle_prop_max_char_unicode_argument() {
   (unwind-protect
       (funcall 'neovm--test-max-char-unicode)
     (fmakunbound 'neovm--test-max-char-unicode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ fn oracle_prop_max_char_characterp_boundary() {
   (unwind-protect
       (funcall 'neovm--test-char-boundary)
     (fmakunbound 'neovm--test-char-boundary)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ fn oracle_prop_max_char_loop_bounds() {
       (funcall 'neovm--test-boundary-analysis)
     (fmakunbound 'neovm--test-count-chars-in-range)
     (fmakunbound 'neovm--test-boundary-analysis)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -216,7 +216,7 @@ fn oracle_prop_max_char_unicode_range_classification() {
     (fmakunbound 'neovm--test-classify-char)
     (fmakunbound 'neovm--test-build-classification-table)
     (fmakunbound 'neovm--test-run-classification)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ fn oracle_prop_max_char_arithmetic_comparisons() {
   (unwind-protect
       (funcall 'neovm--test-max-char-math)
     (fmakunbound 'neovm--test-max-char-math)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -294,5 +294,5 @@ fn oracle_prop_max_char_char_table_integration() {
   (unwind-protect
       (funcall 'neovm--test-char-table-full-range)
     (fmakunbound 'neovm--test-char-table-full-range)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

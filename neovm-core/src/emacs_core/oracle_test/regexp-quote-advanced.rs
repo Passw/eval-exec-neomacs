@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // regexp-quote on every regex metacharacter
@@ -53,7 +53,7 @@ fn oracle_prop_regexp_quote_dynamic_patterns() {
               (list term found-pos)))
           search-terms))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ fn oracle_prop_manual_regexp_opt() {
                 texts))
     (fmakunbound 'neovm--rq-make-alt-pattern)))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ fn oracle_prop_looking_at_vs_looking_at_p() {
               (match-string 1)
               (match-string 2))))))))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ fn oracle_prop_re_search_backward_comprehensive() {
 
     (nreverse results)))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ fn oracle_prop_regex_syntax_highlighter() {
                "let x = 42; if x >= 10 && x != 0 { return x + 1; }")
     (fmakunbound 'neovm--rq-tokenize)))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -268,5 +268,5 @@ fn oracle_prop_regex_structured_data_extractor() {
                "# Database config\n[database]\nhost = localhost\nport = 5432\nname = mydb\n\n# Server config\n[server]\nport = 8080\nworkers = 4\ndebug = true\n\n[logging]\nlevel = info\nfile = /var/log/app.log")
     (fmakunbound 'neovm--rq-parse-config)))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

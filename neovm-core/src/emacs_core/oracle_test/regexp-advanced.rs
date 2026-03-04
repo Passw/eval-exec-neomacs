@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // string-match with START parameter
@@ -21,7 +21,7 @@ fn oracle_prop_regexp_string_match_start() {
                           (string-match "foo" s 9)
                           (string-match "foo" s 15)
                           (string-match "xyz" s 0)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -40,7 +40,7 @@ fn oracle_prop_regexp_string_match_groups_at_start() {
                                     results))
                         (setq pos (match-end 0)))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ fn oracle_prop_regexp_re_search_count() {
                       (list found (point)
                             ;; Position after 3rd "aaa"
                             (buffer-substring (- (point) 3) (point)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -72,7 +72,7 @@ fn oracle_prop_regexp_re_search_count_negative() {
                     (goto-char (point-max))
                     (let ((found (re-search-forward "xx" nil t -2)))
                       (list found (point))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ fn oracle_prop_regexp_replace_basic() {
                     (replace-regexp-in-string "foo" "bar" "foo baz foo")
                     (replace-regexp-in-string "[0-9]+" "N" "a1 b23 c456")
                     (replace-regexp-in-string "\\s-+" " " "a   b\t\tc"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -102,7 +102,7 @@ fn oracle_prop_regexp_replace_fixedcase() {
                     ;; With fixedcase=t: replacement used as-is
                     (replace-regexp-in-string "hello" "world"
                                               "Hello HELLO hello" t))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -120,7 +120,7 @@ fn oracle_prop_regexp_replace_literal() {
                     (replace-regexp-in-string
                      "[0-9]+" "\\1"
                      "a1b2c3" nil t))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -168,7 +168,7 @@ fn oracle_prop_regexp_shy_groups() {
                      "bar-42")
                     (list (match-string 0 "bar-42")
                           (match-string 1 "bar-42")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -183,7 +183,7 @@ fn oracle_prop_regexp_word_boundary() {
                               pos (match-end 0)))
                       (list (nreverse matches)
                             (length matches))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +208,7 @@ fn oracle_prop_regexp_url_parser() {
                                (match-string 3 url)
                                (match-string 4 url))))
                      urls))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -233,5 +233,5 @@ fn oracle_prop_regexp_text_transformer() {
                               "XMLHttpRequest"
                               "simpleWord"
                               "already_snake")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

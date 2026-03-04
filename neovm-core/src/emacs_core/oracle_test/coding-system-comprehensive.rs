@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // coding-system-p for various coding systems
@@ -37,7 +37,7 @@ fn oracle_prop_coding_system_comprehensive_predicate() {
   (coding-system-p t)
   (coding-system-p 42)
   (coding-system-p "utf-8"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ fn oracle_prop_coding_system_comprehensive_check_valid() {
   (check-coding-system 'undecided)
   ;; nil means no coding system, which is valid (returns nil)
   (check-coding-system nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -80,7 +80,7 @@ fn oracle_prop_coding_system_comprehensive_check_errors() {
       (check-coding-system "utf-8")
     (wrong-type-argument (list 'wrong-type-argument))
     (error (list 'other-error))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ fn oracle_prop_coding_system_comprehensive_base() {
   ;; undecided
   (coding-system-base 'undecided)
   (coding-system-base 'undecided-unix))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ fn oracle_prop_coding_system_comprehensive_eol_type() {
   (coding-system-eol-type 'no-conversion)
   ;; undecided
   (vectorp (coding-system-eol-type 'undecided)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ fn oracle_prop_coding_system_comprehensive_aliases() {
         (unless (coding-system-p a)
           (setq all-valid nil)))
       all-valid)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +206,7 @@ fn oracle_prop_coding_system_comprehensive_plist() {
     (if mnemonic t t))  ;; just verify it doesn't error
   ;; coding-system-get with unknown property returns nil
   (coding-system-get 'utf-8 :neovm-nonexistent-prop))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +233,7 @@ fn oracle_prop_coding_system_comprehensive_priority_list() {
   (not (null (memq 'utf-8 (coding-system-priority-list))))
   ;; Length should be reasonable (more than 1)
   (> (length (coding-system-priority-list)) 1))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -337,7 +337,7 @@ fn oracle_prop_coding_system_comprehensive_byte_counts() {
           (funcall 'neovm--csc-byte-info s 'utf-8)    ;; 1+2+3 = 6 bytes
           (length s))))                                  ;; 3 chars
     (fmakunbound 'neovm--csc-byte-info)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -385,7 +385,7 @@ fn oracle_prop_coding_system_comprehensive_metadata() {
        (eq (coding-system-base 'latin-1-unix)
            (coding-system-base 'latin-1-dos)))
     (fmakunbound 'neovm--csc-describe)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

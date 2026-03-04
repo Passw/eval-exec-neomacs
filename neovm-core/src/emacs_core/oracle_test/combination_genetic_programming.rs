@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Tree-based program representation and evaluation
@@ -106,7 +106,7 @@ fn oracle_prop_gp_tree_representation_and_eval() {
     (fmakunbound 'neovm--gp-depth)
     (fmakunbound 'neovm--gp-node-count)
     (fmakunbound 'neovm--gp-to-string)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ fn oracle_prop_gp_fitness_evaluation() {
                  (>= f-linear f-const)))))
     (fmakunbound 'neovm--gp2-eval)
     (fmakunbound 'neovm--gp2-fitness)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -275,7 +275,7 @@ fn oracle_prop_gp_crossover() {
     (fmakunbound 'neovm--gp3-replace-subtree)
     (fmakunbound 'neovm--gp3-node-count)
     (fmakunbound 'neovm--gp3-crossover)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -378,7 +378,7 @@ fn oracle_prop_gp_mutation() {
     (fmakunbound 'neovm--gp4-replace-subtree)
     (fmakunbound 'neovm--gp4-random-tree)
     (fmakunbound 'neovm--gp4-mutate)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -475,7 +475,7 @@ fn oracle_prop_gp_tournament_selection() {
     (fmakunbound 'neovm--gp5-eval)
     (fmakunbound 'neovm--gp5-fitness)
     (fmakunbound 'neovm--gp5-tournament)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -544,7 +544,7 @@ fn oracle_prop_gp_symbolic_regression_polynomial() {
             (funcall 'neovm--gp6-eval perfect '((x . 0)))))))
     (fmakunbound 'neovm--gp6-eval)
     (fmakunbound 'neovm--gp6-fitness)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -712,5 +712,5 @@ fn oracle_prop_gp_population_evolution() {
     (fmakunbound 'neovm--gp7-simple-mutate)
     (fmakunbound 'neovm--gp7-select)
     (fmakunbound 'neovm--gp7-evolve-gen)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // TCP state machine: full SYN -> SYN-ACK -> ACK -> DATA -> FIN sequence
@@ -146,7 +146,7 @@ fn oracle_prop_proto_tcp_state_machine() {
     (fmakunbound 'neovm--tcp-make)
     (fmakunbound 'neovm--tcp-trace)
     (fmakunbound 'neovm--tcp-transition)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -322,7 +322,7 @@ fn oracle_prop_proto_token_auth_flow() {
     (fmakunbound 'neovm--auth-login)
     (fmakunbound 'neovm--auth-validate)
     (fmakunbound 'neovm--auth-revoke)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -470,7 +470,7 @@ fn oracle_prop_proto_connection_pool() {
     (fmakunbound 'neovm--pool-create-conn)
     (fmakunbound 'neovm--pool-acquire)
     (fmakunbound 'neovm--pool-release)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -567,7 +567,7 @@ fn oracle_prop_proto_multiplexing() {
     (fmakunbound 'neovm--mux-open-stream)
     (fmakunbound 'neovm--mux-send-frame)
     (fmakunbound 'neovm--mux-get-stream-info)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

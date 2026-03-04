@@ -2,7 +2,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_string_match_p_basic() {
@@ -57,16 +57,16 @@ fn oracle_prop_string_match_p_does_not_modify_match_data() {
                       (string-match-p "bar" "xyzbar")
                       (let ((after (match-beginning 1)))
                         (list before after (= before after)))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
 fn oracle_prop_string_match_p_character_classes() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(string-match-p "[[:alpha:]]+" "hello")"#);
-    assert_oracle_parity(r#"(string-match-p "[[:digit:]]+" "abc123")"#);
-    assert_oracle_parity(r#"(string-match-p "[[:space:]]" "hello world")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-match-p "[[:alpha:]]+" "hello")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-match-p "[[:digit:]]+" "abc123")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-match-p "[[:space:]]" "hello world")"#);
 }
 
 #[test]
@@ -77,5 +77,5 @@ fn oracle_prop_string_match_p_in_conditional() {
     let form = r####"(mapcar (lambda (s)
                             (if (string-match-p "^test-" s) 'test 'other))
                           '("test-foo" "hello" "test-bar" "world"))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Core ring buffer: create, push, pop, peek, size, empty?, full?
@@ -118,7 +118,7 @@ fn oracle_prop_ring_buffer_core_operations() {
     (fmakunbound 'neovm--rb-pop)
     (fmakunbound 'neovm--rb-peek)
     (fmakunbound 'neovm--rb-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +193,7 @@ fn oracle_prop_ring_buffer_overflow_overwrite() {
     (fmakunbound 'neovm--rb-push)
     (fmakunbound 'neovm--rb-peek)
     (fmakunbound 'neovm--rb-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ fn oracle_prop_ring_buffer_capacity_one() {
     (fmakunbound 'neovm--rb-pop)
     (fmakunbound 'neovm--rb-peek)
     (fmakunbound 'neovm--rb-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -360,7 +360,7 @@ fn oracle_prop_ring_buffer_interleaved_push_pop() {
     (fmakunbound 'neovm--rb-push)
     (fmakunbound 'neovm--rb-pop)
     (fmakunbound 'neovm--rb-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -452,7 +452,7 @@ fn oracle_prop_ring_buffer_empty_pop_and_cycles() {
     (fmakunbound 'neovm--rb-push)
     (fmakunbound 'neovm--rb-pop)
     (fmakunbound 'neovm--rb-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -525,7 +525,7 @@ fn oracle_prop_ring_buffer_large_sequential() {
     (fmakunbound 'neovm--rb-push)
     (fmakunbound 'neovm--rb-pop)
     (fmakunbound 'neovm--rb-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -593,5 +593,5 @@ fn oracle_prop_ring_buffer_mixed_types() {
     (fmakunbound 'neovm--rb-push)
     (fmakunbound 'neovm--rb-pop)
     (fmakunbound 'neovm--rb-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

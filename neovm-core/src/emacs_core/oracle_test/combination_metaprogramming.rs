@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Code that generates code (defun generators)
@@ -228,7 +228,7 @@ fn oracle_prop_meta_state_machine_dsl() {
                          ;; Traffic light: two cycles
                          (funcall sm-run traffic
                                   '(next next next next next next))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -296,7 +296,7 @@ fn oracle_prop_meta_template_expansion() {
                      (funcall template-subst
                               '(list $known $unknown)
                               '(($known . 42)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -389,7 +389,7 @@ fn oracle_prop_meta_reflective_properties() {
                                                 :a 1 :b 2 :c 3)))
                              (funcall obj-map-values nums
                                       (lambda (v) (* v 2)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -499,7 +499,7 @@ fn oracle_prop_meta_code_walker() {
                                     (+ (cadr node) (caddr node))
                                   node))
                               '(list (+ 1 2) (+ 3 4) (+ x 5)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -575,5 +575,5 @@ fn oracle_prop_meta_method_dispatch() {
                                   (list
                                    (funcall send c1 'get)
                                    (funcall send c2 'get)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Mark-sweep garbage collector simulation
@@ -498,7 +498,7 @@ fn oracle_prop_combination_gc_sim_compaction() {
             ;; Verify C's refs updated: old (0) -> new (0)
             (cdr (aref compacted 2)))))
     (fmakunbound 'neovm--gc-compact)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

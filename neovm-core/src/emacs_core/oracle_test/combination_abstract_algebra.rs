@@ -3,7 +3,7 @@
 //! Lagrange's theorem verification, ring operations, polynomial rings.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Cyclic group Z/nZ: elements, operation, inverse, identity, order
@@ -62,7 +62,7 @@ fn oracle_prop_algebra_cyclic_group() {
     (fmakunbound 'neovm--alg-zn-inv)
     (fmakunbound 'neovm--alg-zn-identity)
     (fmakunbound 'neovm--alg-zn-order)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ fn oracle_prop_algebra_permutation_group_s3() {
     (fmakunbound 'neovm--alg-perm-inverse)
     (fmakunbound 'neovm--alg-perm-identity)
     (fmakunbound 'neovm--alg-perm-equal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -309,7 +309,7 @@ fn oracle_prop_algebra_ring_operations() {
     (fmakunbound 'neovm--alg-ring-add)
     (fmakunbound 'neovm--alg-ring-mul)
     (fmakunbound 'neovm--alg-ring-neg)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -416,7 +416,7 @@ fn oracle_prop_algebra_polynomial_ring() {
     (fmakunbound 'neovm--alg-poly-mul)
     (fmakunbound 'neovm--alg-poly-eval)
     (fmakunbound 'neovm--alg-poly-degree)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -470,7 +470,7 @@ fn oracle_prop_algebra_group_homomorphism() {
                       (length kernel)
                       (length image)))))))
     (fmakunbound 'neovm--alg-phi)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -544,5 +544,5 @@ fn oracle_prop_algebra_modular_exponentiation_euler() {
     (fmakunbound 'neovm--alg-mod-pow)
     (fmakunbound 'neovm--alg-gcd)
     (fmakunbound 'neovm--alg-euler-totient)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

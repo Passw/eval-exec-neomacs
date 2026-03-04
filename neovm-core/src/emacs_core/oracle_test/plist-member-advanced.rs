@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // plist-member returns the tail starting from the key
@@ -38,7 +38,7 @@ fn oracle_prop_plist_member_tail_returns() {
     ;; plist-member on single-pair plist
     (plist-member '(:x 42) :x)
     (plist-member '(:x 42) :y)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ fn oracle_prop_plist_get_various_keys() {
   (plist-get '(:present nil :other 1) :present)
   ;; plist-get on nil plist
   (plist-get nil :anything))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ fn oracle_prop_plist_nil_vs_missing() {
        (funcall has-key pl :exists-nil)
        (funcall has-key pl :exists-val)
        (funcall has-key pl :missing)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ fn oracle_prop_plist_put_create_and_update() {
     pl)
   ;; Put with symbol keys
   (plist-put '(a 1 b 2) 'a 100))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ fn oracle_prop_plist_nested_operations() {
     (fmakunbound 'neovm--plist-get-in)
     (fmakunbound 'neovm--plist-put-in)
     (fmakunbound 'neovm--plist-keys)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -398,5 +398,5 @@ fn oracle_prop_plist_merge_diff_operations() {
     (fmakunbound 'neovm--plist-diff)
     (fmakunbound 'neovm--plist-select)
     (fmakunbound 'neovm--plist-reject)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

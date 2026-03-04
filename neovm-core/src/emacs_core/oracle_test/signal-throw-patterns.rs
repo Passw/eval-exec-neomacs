@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // signal with different error symbols and data
@@ -54,7 +54,7 @@ fn oracle_prop_signal_various_error_symbols() {
   (condition-case err
       (signal 'wrong-type-argument '(integerp 3.14))
     (error (list 'parent-caught (car err) (cadr err)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ fn oracle_prop_throw_catch_across_functions() {
     (fmakunbound 'neovm--tc-inner)
     (fmakunbound 'neovm--tc-middle)
     (fmakunbound 'neovm--tc-outer)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ fn oracle_prop_nested_catch_inner_outer() {
   ;; No throw: catch returns body value
   (catch 'unused
     (+ 10 20 30)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ fn oracle_prop_throw_value_propagation() {
     (throw 'outer
            (catch 'inner
              (throw 'inner 'inception)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +262,7 @@ fn oracle_prop_nonlocal_exit_deep_recursion() {
          (funcall 'neovm--find-in-tree 'x 'y)))
     (fmakunbound 'neovm--tree-search)
     (fmakunbound 'neovm--find-in-tree)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -413,7 +413,7 @@ fn oracle_prop_catch_as_loop_control() {
             (throw 'found-row (list 'row row-idx 'sum row-sum 'data row))))
         (setq row-idx (1+ row-idx)))
       'no-row-found)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -473,5 +473,5 @@ fn oracle_prop_signal_condition_unwind_interaction() {
          (signal 'error '("will be caught"))
        (error
         (throw 'escape (list 'escaped-from-handler (cadr err))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

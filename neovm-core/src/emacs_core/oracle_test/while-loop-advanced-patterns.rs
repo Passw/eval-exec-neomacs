@@ -6,7 +6,7 @@
 //! binary search), and while with destructuring.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Nested while loops with accumulators building a multiplication table
@@ -25,7 +25,7 @@ fn oracle_prop_while_nested_accumulator_multiplication_table() {
       (setq table (cons (nreverse row) table)))
     (setq i (1+ i)))
   (nreverse table))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +55,7 @@ fn oracle_prop_while_nested_cross_accumulators() {
     (setq fibs (cdr fibs)))
   (list :grand-total grand-total
         :results (nreverse all-sums)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ fn oracle_prop_while_throw_catch_exit() {
         (setq rest (cdr rest))
         (setq idx (1+ idx)))
       (list :not-found t))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ fn oracle_prop_while_nested_catch_throw_break() {
         (setq rows (cdr rows))
         (setq ri (1+ ri)))))
   result)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ fn oracle_prop_while_collect_hash_table() {
                            result)))
       (setq keys (cdr keys)))
     (nreverse result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ fn oracle_prop_while_frequency_histogram() {
     (dolist (k sorted-keys)
       (setq result (cons (cons k (gethash k freq)) result)))
     (list :mode mode :max-count max-count :histogram (nreverse result))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +206,7 @@ fn oracle_prop_while_dynamic_binding_changes() {
         (list :final-depth neovm--test-dyn-depth
               :trace (nreverse results)))
     (makunbound 'neovm--test-dyn-depth)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +263,7 @@ fn oracle_prop_while_buffer_delete_and_track() {
           :positions (nreverse positions)
           :final-text (buffer-string)
           :final-size (buffer-size))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -293,7 +293,7 @@ fn oracle_prop_while_regexp_group_extraction() {
     (when current
       (setq entries (cons (nreverse current) entries)))
     (nreverse entries)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -325,7 +325,7 @@ fn oracle_prop_while_condition_case_recovery() {
   (list :successes successes
         :errors errors
         :log (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -384,7 +384,7 @@ fn oracle_prop_while_binary_search() {
       (setq results (cons (or found (list :found nil :target target :steps steps))
                           results))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -418,7 +418,7 @@ fn oracle_prop_while_euclidean_gcd() {
        (funcall 'neovm--test-gcd -48 18)
        (funcall 'neovm--test-gcd 48 -18))
     (fmakunbound 'neovm--test-gcd)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -459,7 +459,7 @@ fn oracle_prop_while_destructuring_iteration() {
         :avg-score (/ total-score count)
         :seniors (nreverse seniors)
         :honor-roll (nreverse honor-roll)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -485,7 +485,7 @@ fn oracle_prop_while_fibonacci_memo_table() {
       (setq result (cons (gethash j memo) result))
       (setq j (1+ j)))
     (nreverse result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -537,7 +537,7 @@ fn oracle_prop_while_state_machine() {
                     (setq rev (cdr rev))
                     (setq i (1+ i)))
                   (nreverse t3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -568,5 +568,5 @@ fn oracle_prop_while_insertion_sort() {
   (list :sorted (append vec nil)
         :comparisons comparisons
         :swaps swaps))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

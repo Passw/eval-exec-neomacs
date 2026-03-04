@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Matrix determinant: 2x2 and 3x3 with edge cases
@@ -153,7 +153,7 @@ fn oracle_prop_matrix_advanced_inverse_2x2() {
          matrices))
     (fmakunbound 'neovm--test-adv-inv2)
     (fmakunbound 'neovm--test-adv-mmul2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -311,7 +311,7 @@ fn oracle_prop_matrix_advanced_row_echelon() {
     (fmakunbound 'neovm--test-adv-mget)
     (fmakunbound 'neovm--test-adv-mset)
     (fmakunbound 'neovm--test-adv-ref)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -573,5 +573,5 @@ fn oracle_prop_matrix_advanced_eigenvalues_2x2() {
        (let ((info (funcall 'neovm--test-adv-eigen2 '((5 4) (1 2)))))
          (list (= (nth 1 info) 7) (= (nth 3 info) 6))))
     (fmakunbound 'neovm--test-adv-eigen2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

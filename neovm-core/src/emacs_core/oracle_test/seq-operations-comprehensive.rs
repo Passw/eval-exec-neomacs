@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // seq-take, seq-drop on lists, vectors, strings
@@ -48,7 +48,7 @@ fn oracle_prop_seq_take_drop_all_types() {
   ;; Complementary: (append (seq-take s n) (seq-drop s n)) = s
   (let ((s '(1 2 3 4 5)))
     (equal s (append (seq-take s 3) (seq-drop s 3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ fn oracle_prop_seq_reduce_accumulator_patterns() {
     (sort freqs (lambda (a b) (< (car a) (car b)))))
   ;; Reduce empty sequence returns initial value
   (seq-reduce #'+ nil 42))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ fn oracle_prop_seq_count_complex_predicates() {
   (seq-count #'identity '(t t t t))
   ;; Count where predicate always false
   (seq-count #'null '(1 2 3 4)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

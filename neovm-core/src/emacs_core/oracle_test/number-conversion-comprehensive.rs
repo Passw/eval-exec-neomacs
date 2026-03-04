@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 1. string-to-number with explicit base arguments (2, 8, 10, 16)
@@ -40,7 +40,7 @@ fn oracle_prop_numconv_string_to_number_bases() {
   (string-to-number "0" 16)
   (string-to-number "deadbeef" 16)
   (string-to-number "1a2b" 16))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ fn oracle_prop_numconv_float_to_int_conversions() {
    (mapcar #'floor vals)
    (mapcar #'ceiling vals)
    (mapcar #'round vals)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +124,7 @@ fn oracle_prop_numconv_string_to_number_edge_cases() {
   (string-to-number ".5")
   (string-to-number "1e10")
   (string-to-number "1.5e-3"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ fn oracle_prop_numconv_literal_parsing() {
   (+ #xff 1)
   (+ #o10 #b1010)
   (* #x10 #o10))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +237,7 @@ fn oracle_prop_numconv_mixed_arithmetic_coercion() {
   ;; Explicit truncation
   (truncate 7.9)
   (integerp (truncate 7.9)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +267,7 @@ fn oracle_prop_numconv_base_invalid_digits() {
   (string-to-number "-ff" 16)
   (string-to-number "-1010" 2)
   (string-to-number "-77" 8))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -337,7 +337,7 @@ fn oracle_prop_numconv_rounding_edge_values() {
   (ceiling 2.0001)
   (truncate -2.9999)
   (floor -2.0001))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -370,7 +370,7 @@ fn oracle_prop_numconv_type_predicates_after_conversion() {
   ;; number-to-string always returns string
   (stringp (number-to-string 42))
   (stringp (number-to-string 3.14)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

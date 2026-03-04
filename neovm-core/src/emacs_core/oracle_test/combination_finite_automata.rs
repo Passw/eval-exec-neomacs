@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // DFA for binary number divisibility by 3
@@ -82,7 +82,7 @@ fn oracle_prop_fa_dfa_div_by_3() {
     (fmakunbound 'neovm--fa-d3-run)
     (fmakunbound 'neovm--fa-d3-check)
     (makunbound 'neovm--fa-d3-trans)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ fn oracle_prop_fa_nfa_epsilon() {
     (fmakunbound 'neovm--fa-nfa-run)
     (makunbound 'neovm--fa-nfa-trans)
     (makunbound 'neovm--fa-nfa-eps)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -430,7 +430,7 @@ fn oracle_prop_fa_regex_to_nfa() {
     (fmakunbound 'neovm--fa-rx-move)
     (fmakunbound 'neovm--fa-rx-match)
     (makunbound 'neovm--fa-rx-next-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -511,7 +511,7 @@ fn oracle_prop_fa_moore_sequence_detector() {
     (fmakunbound 'neovm--fa-moore-run)
     (makunbound 'neovm--fa-moore-trans)
     (makunbound 'neovm--fa-moore-output)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -600,7 +600,7 @@ fn oracle_prop_fa_mealy_protocol() {
     (fmakunbound 'neovm--fa-mealy-run)
     (makunbound 'neovm--fa-mealy-trans)
     (makunbound 'neovm--fa-mealy-out)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -691,5 +691,5 @@ fn oracle_prop_fa_dpda_nested_structures() {
                    (open . "li") (open . "a") (close . "a") (close . "li")
                    (open . "li") (close . "li") (close . "ul"))))
     (fmakunbound 'neovm--fa-dpda-validate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

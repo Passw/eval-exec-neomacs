@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // encode-coding-string / decode-coding-string with multiple coding systems
@@ -81,7 +81,7 @@ fn oracle_prop_string_bytes_vs_length() {
   ;; Unibyte string: bytes = chars
   (let ((s (encode-coding-string "hello" 'utf-8)))
     (list (length s) (string-bytes s) (= (length s) (string-bytes s)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +118,7 @@ fn oracle_prop_multibyte_unibyte_predicates() {
   (unibyte-string-p 42)
   (multibyte-string-p nil)
   (unibyte-string-p nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +157,7 @@ fn oracle_prop_string_to_multibyte_unibyte() {
   (string-to-multibyte "")
   (string-to-unibyte "")
   (multibyte-string-p (string-to-multibyte "")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ fn oracle_prop_aref_unibyte_string_bytes() {
           (aref s 1)        ;; char code of 'c'
           (length s)
           (length enc))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ fn oracle_prop_concat_mixing_unibyte_multibyte() {
   (concat)
   (concat nil)
   (concat "a" nil "b"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +286,7 @@ fn oracle_prop_string_as_multibyte_unibyte() {
          (raw (string-as-unibyte s)))
     (list (unibyte-string-p raw)
           (length raw))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -322,7 +322,7 @@ fn oracle_prop_encode_decode_nocopy_param() {
          (dec (decode-coding-string enc 'utf-8 nil)))
     (list (string-equal "hello" dec)
           (multibyte-string-p dec))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -355,7 +355,7 @@ fn oracle_prop_encoding_pipeline_statistics() {
                                             (unibyte-string-p utf8))
                                       results))))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +395,7 @@ fn oracle_prop_cross_coding_system_comparison() {
   (let ((s "line1\nline2\n"))
     (string-equal (encode-coding-string s 'utf-8)
                   (encode-coding-string s 'utf-8-unix))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -437,7 +437,7 @@ fn oracle_prop_string_bytes_comprehensive() {
           (string-bytes (substring s 0 5))
           (string-bytes (substring s 5 6))
           (string-bytes (substring s 6)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -470,7 +470,7 @@ fn oracle_prop_encode_concat_decode_segments() {
                      (length full)
                      (unibyte-string-p combined)
                      (multibyte-string-p decoded)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -498,7 +498,7 @@ fn oracle_prop_make_string_multibyte_unibyte() {
   ;; make-string length 1
   (let ((s (make-string 1 ?\u4e16)))
     (list (length s) (string-bytes s) (aref s 0))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -523,7 +523,7 @@ fn oracle_prop_encoding_lookup_table() {
                                (setq row (append row (list (cons sys :error)))))))
                           (setq table (cons row table))))
                       (nreverse table)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -557,5 +557,5 @@ fn oracle_prop_substring_multibyte_semantics() {
      (string-bytes (substring s 2 3))   ;; CJK -> 3 bytes
      (string-bytes (substring s 3 4)))) ;; "B" -> 1 byte
 )"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

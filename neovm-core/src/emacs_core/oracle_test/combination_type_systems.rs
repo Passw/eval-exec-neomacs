@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
+use super::common::{assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Type predicates comprehensive (all type-of categories)
@@ -30,7 +30,7 @@ fn oracle_prop_type_predicates_comprehensive() {
            (keywordp v) (natnump v) (characterp v)
            (arrayp v) (hash-table-p v)))
    values))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ fn oracle_prop_type_dispatch_cond() {
         (funcall 'neovm--describe-type '(a . b))
         (funcall 'neovm--describe-type (make-hash-table)))
     (fmakunbound 'neovm--describe-type)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +155,7 @@ fn oracle_prop_tagged_union_simulation() {
     (fmakunbound 'neovm--make-list-val)
     (fmakunbound 'neovm--match-val)
     (fmakunbound 'neovm--val-type)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +219,7 @@ fn oracle_prop_polymorphic_dispatch_table() {
            ;; Missing method
            (funcall 'neovm--dispatch table (cons 'circle 5) 'perimeter))))
     (fmakunbound 'neovm--dispatch)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -354,5 +354,5 @@ fn oracle_prop_type_safe_container() {
     (fmakunbound 'neovm--typed-items)
     (fmakunbound 'neovm--typed-count)
     (fmakunbound 'neovm--typed-find)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

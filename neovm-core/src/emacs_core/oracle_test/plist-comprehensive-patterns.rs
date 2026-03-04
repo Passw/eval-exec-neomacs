@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // plist-get with various key types and missing keys
@@ -44,7 +44,7 @@ fn oracle_prop_plist_get_various_key_types() {
                      (plist-get '(:only 42) :other)
                      ;; plist-get with default nil for missing
                      (plist-get '(:a 1) :b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -94,7 +94,7 @@ fn oracle_prop_plist_put_new_and_update() {
                                  (q (plist-put q :x 3))
                                  (q (plist-put q :x 4)))
                             (list (plist-get q :x) (length q)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ fn oracle_prop_plist_member_tail_comprehensive() {
                              ;; present returns non-nil tail, missing returns nil
                              (if (plist-member pl2 :present) 'found 'not-found)
                              (if (plist-member pl2 :missing) 'found 'not-found)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +276,7 @@ fn oracle_prop_plist_as_kv_store() {
                        (let ((nums '(:a 5 :b 25 :c 10 :d 50 :e 30)))
                          (funcall kv-filter nums
                                   (lambda (_k v) (> v 20)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -330,7 +330,7 @@ fn oracle_prop_nested_plists() {
                          (list (plist-get creds :user)
                                (plist-get creds :pass)
                                (plist-member creds :user))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -399,7 +399,7 @@ fn oracle_prop_plist_iteration_patterns() {
                          (setq count (1+ count))
                          (setq rest (cddr rest)))
                        count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -492,7 +492,7 @@ fn oracle_prop_plist_merge_update_patterns() {
                        ;; Select subset of keys
                        (funcall plist-select '(:a 1 :b 2 :c 3 :d 4) '(:b :d))
                        (funcall plist-select '(:a 1 :b 2) '(:x :y)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -593,5 +593,5 @@ fn oracle_prop_plist_event_handler_system() {
                        (funcall handler-count d :hover)
                        (funcall handler-count d :keypress)
                        (funcall handler-count d :scroll))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

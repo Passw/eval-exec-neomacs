@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Register-based VM (vs stack-based)
@@ -107,7 +107,7 @@ fn oracle_prop_interp_adv_register_vm() {
                   (add 0 0 1)
                   (ret 0))))
     (fmakunbound 'neovm--test-regvm-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ fn oracle_prop_interp_adv_bytecode_compiler() {
     (fmakunbound 'neovm--test-bc-compile)
     (fmakunbound 'neovm--test-bc-emit)
     (fmakunbound 'neovm--test-bc-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -328,7 +328,7 @@ fn oracle_prop_interp_adv_type_checking() {
        (funcall 'neovm--test-typed-eval
                 '(add (mul 2 3) (add "bad" 1)) nil))
     (fmakunbound 'neovm--test-typed-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -447,7 +447,7 @@ fn oracle_prop_interp_adv_closures_env() {
                          (call (call compose dbl inc) 5)))
                 nil))
     (fmakunbound 'neovm--test-closure-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -543,7 +543,7 @@ fn oracle_prop_interp_adv_tail_call_detection() {
                      (call f3 (ref z)))
                 t))
     (fmakunbound 'neovm--test-tco-analyze)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -652,5 +652,5 @@ fn oracle_prop_interp_adv_continuations() {
                 '(+ 100 (abort 42)) nil))
     (fmakunbound 'neovm--test-cps-eval)
     (fmakunbound 'neovm--test-cps-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

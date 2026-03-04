@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Set union, intersection, difference using sorted lists
@@ -70,7 +70,7 @@ fn oracle_prop_setops_union_intersection_difference() {
     (fmakunbound 'neovm--test-set-union)
     (fmakunbound 'neovm--test-set-intersect)
     (fmakunbound 'neovm--test-set-diff)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ fn oracle_prop_setops_symmetric_difference() {
                            r)
                          #'<)))))
     (fmakunbound 'neovm--test-set-symdiff)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -182,7 +182,7 @@ fn oracle_prop_setops_power_set() {
           (length ps1)
           ps1))
     (fmakunbound 'neovm--test-power-set)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ fn oracle_prop_setops_subset_check() {
         (funcall 'neovm--test-proper-subsetp '(1 2 3) '(1 2 3)))
     (fmakunbound 'neovm--test-subsetp)
     (fmakunbound 'neovm--test-proper-subsetp)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -294,7 +294,7 @@ fn oracle_prop_setops_set_equality() {
             all-agree)))
     (fmakunbound 'neovm--test-set-equal)
     (fmakunbound 'neovm--test-set-equal-sym)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -371,7 +371,7 @@ fn oracle_prop_setops_multiset_bag_operations() {
     (fmakunbound 'neovm--test-bag-union)
     (fmakunbound 'neovm--test-bag-intersect)
     (fmakunbound 'neovm--test-bag-sum)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -429,7 +429,7 @@ fn oracle_prop_setops_jaccard_similarity() {
               (ab '(1 2 3 4 5)))
           (funcall 'neovm--test-jaccard a ab)))
     (fmakunbound 'neovm--test-jaccard)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -499,5 +499,5 @@ fn oracle_prop_setops_knn_jaccard() {
             (sort dists (lambda (a b) (< (cdr a) (cdr b)))))))
     (fmakunbound 'neovm--test-jaccard-dist)
     (fmakunbound 'neovm--test-knn)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

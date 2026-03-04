@@ -9,7 +9,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Character classes: [:alpha:] [:digit:] [:alnum:] [:space:] etc.
@@ -91,7 +91,7 @@ fn oracle_prop_regexp_shy_groups_vs_numbered() {
           (list (match-string 0 "bar")
                 (match-string 1 "bar")
                 (match-string 2 "bar")))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ fn oracle_prop_regexp_alternation_with_groups() {
         (string-match "\\(red\\|green\\|blue\\)" "the green one")
         (list (match-string 0 "the green one")
               (match-string 1 "the green one"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +224,7 @@ fn oracle_prop_regexp_repetition_operators() {
       ;; Repetition with groups
       (progn (string-match "\\(ab\\)\\{2,3\\}" "ababab")
              (list (match-string 0 "ababab") (match-string 1 "ababab"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -373,7 +373,7 @@ fn oracle_prop_regexp_match_data_lifecycle() {
       (progn
         (set-match-data nil)
         (match-data)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -464,7 +464,7 @@ fn oracle_prop_regexp_complex_patterns() {
                 (match-string 1 "Today is 2026-03-02 and tomorrow")
                 (match-string 2 "Today is 2026-03-02 and tomorrow")
                 (match-string 3 "Today is 2026-03-02 and tomorrow")))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -517,7 +517,7 @@ fn oracle_prop_regexp_buffer_search_comprehensive() {
                 (match-string 2)
                 (match-beginning 1)
                 (match-end 1)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -654,7 +654,7 @@ fn oracle_prop_regexp_case_fold_search() {
         (string-match "[a-z]+" "ABCDEF"))
       (let ((case-fold-search nil))
         (string-match "[a-z]+" "ABCDEF")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

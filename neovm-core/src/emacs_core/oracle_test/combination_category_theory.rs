@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Morphism composition and identity morphism
@@ -66,7 +66,7 @@ fn oracle_prop_category_theory_morphisms() {
     ;; Not commutative in general
     (not (= (funcall (funcall compose negate square) 3)
             (funcall (funcall compose square negate) 3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ fn oracle_prop_category_theory_functor() {
     ;; Composition of functors: list of maybes
     (let ((data '((just . 1) nil (just . 3) (just . 4) nil)))
       (mapcar (lambda (m) (funcall maybe-fmap double m)) data))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +206,7 @@ fn oracle_prop_category_theory_natural_transformation() {
         (funcall roundtrip '(1 2 3))    ;; (1)
         (funcall roundtrip nil)          ;; nil
         (funcall roundtrip '(99))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -304,7 +304,7 @@ fn oracle_prop_category_theory_maybe_monad() {
         ;; Access pattern for 'bob' who has nil data
         (funcall mbind (cons 'just (cdr (assq 'bob (cdr (assq 'users data)))))
           (lambda (val) (cons 'just val)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -550,5 +550,5 @@ fn oracle_prop_category_theory_kleisli() {
         (equal (funcall left "100") (funcall right "100"))
         (equal (funcall left "-5") (funcall right "-5"))
         (equal (funcall left "abc") (funcall right "abc"))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

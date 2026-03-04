@@ -6,7 +6,7 @@
 //! analysis for precondition inference.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Interval abstract domain: [lo, hi] with +/- infinity
@@ -73,7 +73,7 @@ fn oracle_prop_absint_adv_interval_domain() {
     ;; Idempotence
     (funcall 'neovm--iv-join '(2 . 7) '(2 . 7))
     (funcall 'neovm--iv-meet '(2 . 7) '(2 . 7))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ fn oracle_prop_absint_adv_interval_arithmetic() {
     (funcall 'neovm--iv-sub '(5 . 10) '(1 . 3))       ;; [2,9]
     (funcall 'neovm--iv-sub '(0 . 0) '(-5 . 5))       ;; [-5,5]
     (funcall 'neovm--iv-sub '(1 . 1) '(1 . 1))))"#; // [0,0]
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ fn oracle_prop_absint_adv_congruence_domain() {
     (funcall 'neovm--cong-add '(2 . 0) '(2 . 1))   ;; 2Z+1 (even + odd = odd)
     (funcall 'neovm--cong-add '(0 . 3) '(0 . 5))   ;; 0Z+8 ({8})
     (funcall 'neovm--cong-add 'bot '(2 . 0))))"#; // bot
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ fn oracle_prop_absint_adv_interval_widening() {
     (funcall 'neovm--iv-narrow '(0 . posinf) '(-5 . 50))       ;; [0, 50]
     (funcall 'neovm--iv-narrow '(0 . 5) '(1 . 3))              ;; [0, 5]
     (funcall 'neovm--iv-narrow 'bot '(1 . 5))))"#; // bot
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -353,7 +353,7 @@ fn oracle_prop_absint_adv_fixpoint_widening() {
       '(5 . 5)
       (lambda (x) (funcall 'neovm--fp-iadd x '(0 . 2)))
       20)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -446,7 +446,7 @@ fn oracle_prop_absint_adv_reduced_product() {
     (funcall 'neovm--rp-reduce '(non-neg . (5 . 10)))
     ;; bot + anything -> bot
     (funcall 'neovm--rp-reduce '(bot . (1 . 5)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -529,7 +529,7 @@ fn oracle_prop_absint_adv_backward_analysis() {
            (y-pre (funcall 'neovm--back-assign-add z-post 3))
            (x-pre (funcall 'neovm--back-assign-mul y-pre 2)))
       (list 'chain z-post y-pre x-pre))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -665,7 +665,7 @@ fn oracle_prop_absint_adv_alpha_gamma_sign() {
     (funcall 'neovm--check-gc 'neg '(-10 -1))
     (funcall 'neovm--check-gc 'non-neg '(0 1 42))
     (funcall 'neovm--check-gc 'top '(-5 0 5))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -719,7 +719,7 @@ fn oracle_prop_absint_adv_multi_var_program() {
       (list 'z-false z-false)
       (list 'w-false w-false)
       (list 'w-joined w-joined))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -780,5 +780,5 @@ fn oracle_prop_absint_adv_interval_multiplication() {
     ;; Infinite intervals
     (funcall 'neovm--iv-mul '(1 . posinf) '(2 . 3))
     (funcall 'neovm--iv-mul '(neginf . -1) '(1 . 2))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

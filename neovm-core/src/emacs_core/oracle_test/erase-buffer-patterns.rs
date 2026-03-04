@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // erase-buffer basic: empty, non-empty, already-empty buffer
@@ -68,7 +68,7 @@ fn oracle_prop_erase_buffer_basic_cases() {
                         (= (point) 1))
                   results))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +152,7 @@ fn oracle_prop_erase_buffer_vs_delete_region_equivalence() {
   (list erase-result
         delete-result
         (equal erase-result delete-result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +224,7 @@ fn oracle_prop_erase_buffer_recycling_pattern() {
                           (buffer-string))
                     all-results))))
     (nreverse all-results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

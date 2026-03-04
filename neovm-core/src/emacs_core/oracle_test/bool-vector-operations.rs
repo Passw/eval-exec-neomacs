@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-bool-vector and bool-vector-p predicate
@@ -29,7 +29,7 @@ fn oracle_prop_bool_vector_make_and_predicate() {
     (length bv-true)
     (length bv-false)
     (length bv-empty)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ fn oracle_prop_bool_vector_aref_aset() {
     (aset bv 3 nil)
     (let ((after-clear (list (aref bv 2) (aref bv 3) (aref bv 4))))
       (list (nreverse result) after-clear))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ fn oracle_prop_bool_vector_bitset_operations() {
     (fmakunbound 'neovm--test-bv-clear-bit)
     (fmakunbound 'neovm--test-bv-test-bit)
     (fmakunbound 'neovm--test-bv-popcount)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ fn oracle_prop_bool_vector_length_various() {
   (length (make-bool-vector 64 nil))
   (length (make-bool-vector 100 t))
   (length (make-bool-vector 255 nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ fn oracle_prop_bool_vector_init_values() {
                             pattern))
         (setq i (1+ i)))
       (list all-t all-nil (nreverse pattern)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ fn oracle_prop_bool_vector_sieve_of_eratosthenes() {
         (list primes-50 primes-2 primes-1 count-100
               (and has-2 t) (and has-47 t) no-49 no-50))
     (fmakunbound 'neovm--test-bv-sieve)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -333,5 +333,5 @@ fn oracle_prop_bool_vector_bit_manipulation() {
     (fmakunbound 'neovm--test-bv-hamming)
     (fmakunbound 'neovm--test-bv-reverse)
     (fmakunbound 'neovm--test-bv-gray-encode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // sort with all standard comparator types
@@ -42,7 +42,7 @@ fn oracle_prop_sort_comprehensive_all_comparators() {
               (and (= (length a) (length b))
                    (string< a b))))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ fn oracle_prop_sort_comprehensive_vector_sort() {
   ;; Verify vector sort returns a vector (using type-of or vectorp)
   (vectorp (sort [3 1 2] '<)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ fn oracle_prop_sort_comprehensive_key_parameter() {
   (sort (list -5 3 -8 1 -9 2 -7 4 -6)
         :key 'abs :lessp '<))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ fn oracle_prop_sort_comprehensive_string_sort() {
   ;; Verify string sort returns a string
   (stringp (sort "cba" '<)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +329,7 @@ fn oracle_prop_sort_comprehensive_nested_structures() {
                                  (> (nth 2 a) (nth 2 b))))))))
     (makunbound 'neovm--test-sort-records)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +395,7 @@ fn oracle_prop_sort_comprehensive_destructive_behavior() {
           ;; The result of sort IS the destructively modified list
           (eq sorted-orig original))))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -429,7 +429,7 @@ fn oracle_prop_sort_comprehensive_edge_cases() {
   ;; Mixed positive, negative, zero
   (sort (list 0 -1 1 -2 2 -3 3 0 0) '<))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -452,7 +452,7 @@ fn oracle_prop_sort_comprehensive_in_place() {
   (sort (list '(3 . "c") '(1 . "a") '(5 . "e") '(2 . "b") '(4 . "d"))
         :key 'car :lessp '< :reverse t))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -512,7 +512,7 @@ fn oracle_prop_sort_comprehensive_manual_merge_sort() {
     (fmakunbound 'neovm--test-msort-merge)
     (fmakunbound 'neovm--test-msort)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -552,5 +552,5 @@ fn oracle_prop_sort_comprehensive_frequency_sort() {
                 (setq result (cons x result))))
             (nreverse result)))))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

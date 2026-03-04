@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Accumulator patterns: multiple simultaneous accumulators
@@ -50,7 +50,7 @@ fn oracle_prop_while_loop_multi_accumulator() {
         'deposits deposit-count
         'withdrawals withdraw-count
         'large-txns (nreverse large-txns)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ fn oracle_prop_while_loop_catch_throw_exit() {
              (setq cells (cdr cells))))
          (setq rows (cdr rows)))
        'not-found))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ fn oracle_prop_while_loop_nested_combinations() {
       (setq i-list (cdr i-list))))
   (list 'count (length combos)
         'combos (nreverse combos)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ fn oracle_prop_while_loop_complex_conditions() {
                           (setq lst (cdr lst))
                           (setq i (1+ i)))
                         result))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -234,7 +234,7 @@ fn oracle_prop_while_loop_do_while_simulation() {
                 (when (= b 0) (setq continue nil))))
             (setq results (cons (list pair a steps) results))))))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +287,7 @@ fn oracle_prop_while_loop_foreach_with_index() {
         (setq averages (cons (/ (float sum) window-size) averages)))
       (setq idx (1+ idx)))
     (nreverse averages)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -352,7 +352,7 @@ fn oracle_prop_while_loop_infinite_with_catch_exit() {
        (funcall 'neovm--wlp-process-events
                 '(increment bogus decrement fizz quit)))
     (fmakunbound 'neovm--wlp-process-events)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -412,5 +412,5 @@ fn oracle_prop_while_loop_pagerank_iteration() {
     (list 'converged converged
           'iterations iterations
           'rankings result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Basic contract wrappers: precondition and postcondition
@@ -86,7 +86,7 @@ fn oracle_prop_contract_basic_pre_post() {
           (funcall bounded-add 800 500)
           (funcall bounded-add -600 -500)))
     (fmakunbound 'neovm--ct-make-contract)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +193,7 @@ fn oracle_prop_contract_invariant_sorted_list() {
             (funcall sorted-check-invariant s5)
             (funcall sorted-check-invariant s6)
             (funcall sorted-check-invariant s7)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -292,7 +292,7 @@ fn oracle_prop_contract_inheritance_composition() {
           (funcall safe-harmonic 10 10)
           (funcall safe-harmonic -1 5)))
     (fmakunbound 'neovm--ct-combine-contracts)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -393,7 +393,7 @@ fn oracle_prop_contract_checked_stack() {
       ;; Empty after all pops
       (funcall stack-size s6)
       (funcall stack-to-list s6))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -495,7 +495,7 @@ fn oracle_prop_contract_registry_system() {
     (fmakunbound 'neovm--ct-lookup)
     (fmakunbound 'neovm--ct-apply)
     (makunbound 'neovm--ct-registry)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -586,7 +586,7 @@ fn oracle_prop_contract_validated_record() {
       (funcall schema-validate-field person-schema 'age 25)
       (funcall schema-validate-field person-schema 'age 200)
       (funcall schema-validate-field person-schema 'unknown 42))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -659,5 +659,5 @@ fn oracle_prop_contract_pipeline_stages() {
       (funcall run-pipeline pipeline "600")
       ;; Two-stage pipeline only
       (funcall run-pipeline (list parse-stage double-stage) "25"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

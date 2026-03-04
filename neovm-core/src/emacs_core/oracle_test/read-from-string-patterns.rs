@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Reading all basic types: integers, floats, strings, symbols, keywords
@@ -90,7 +90,7 @@ fn oracle_prop_rfs_patterns_compound_types() {
   (car (read-from-string "(a [1 2] b)"))
   ;; Vector containing list
   (car (read-from-string "[(a b) (c d)]")))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@ fn oracle_prop_rfs_patterns_position_tracking() {
          (r3 (read-from-string s (cdr r2))))
     (list (car r1) (car r2) (car r3)
           (cdr r1) (cdr r2) (cdr r3))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ fn oracle_prop_rfs_patterns_quoted_forms() {
   (car (read-from-string "'(a . b)"))
   ;; Hash notation
   (car (read-from-string "#t")))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +233,7 @@ fn oracle_prop_rfs_patterns_sequential_tokenizer() {
     (fmakunbound 'neovm--rfs-tokenize)
     (fmakunbound 'neovm--rfs-token-values)
     (fmakunbound 'neovm--rfs-token-positions)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +317,7 @@ fn oracle_prop_rfs_patterns_config_parser() {
     (fmakunbound 'neovm--rfs-parse-config)
     (fmakunbound 'neovm--rfs-config-get)
     (fmakunbound 'neovm--rfs-config-merge)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -365,7 +365,7 @@ fn oracle_prop_rfs_patterns_error_handling() {
     (car (read-from-string "42"))
     (car (read-from-string "(a b c)"))
     (car (read-from-string "\"hello\""))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -453,5 +453,5 @@ fn oracle_prop_rfs_patterns_sexp_evaluator() {
     (fmakunbound 'neovm--rfs-seval)
     (fmakunbound 'neovm--rfs-eval-string)
     (fmakunbound 'neovm--rfs-eval-all)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

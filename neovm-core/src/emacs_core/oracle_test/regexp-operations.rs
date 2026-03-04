@@ -3,7 +3,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // regexp-quote
@@ -51,7 +51,7 @@ fn oracle_prop_regexp_quote_used_in_search() {
                     (string-match-p "foo.bar" "fooXbar")
                     (string-match-p (regexp-quote "foo.bar") "fooXbar")
                     (string-match-p (regexp-quote "foo.bar") "foo.bar"))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +84,7 @@ fn oracle_prop_replace_regexp_with_backreference() {
                     "\\([a-z]+\\)-\\([0-9]+\\)"
                     "\\2-\\1"
                     "foo-123 bar-456")"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn oracle_prop_replace_regexp_fixedcase() {
     // FIXEDCASE parameter (4th arg)
     let form = r####"(replace-regexp-in-string
                     "hello" "world" "Hello hello HELLO" t)"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -117,7 +117,7 @@ fn oracle_prop_replace_regexp_literal() {
     // LITERAL parameter (5th arg) — don't interpret \ in replacement
     let form = r####"(replace-regexp-in-string
                     "foo" "\\&bar" "foo" nil t)"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -153,7 +153,7 @@ fn oracle_prop_looking_at_basic() {
                     (insert "hello world")
                     (goto-char (point-min))
                     (looking-at "hello"))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -164,7 +164,7 @@ fn oracle_prop_looking_at_at_middle() {
                     (insert "hello world")
                     (goto-char 7)
                     (looking-at "world"))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -175,7 +175,7 @@ fn oracle_prop_looking_at_no_match() {
                     (insert "hello world")
                     (goto-char (point-min))
                     (looking-at "world"))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -189,7 +189,7 @@ fn oracle_prop_looking_at_sets_match_data() {
                     (list (match-string 0)
                           (match-string 1)
                           (match-string 2)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +220,7 @@ fn oracle_prop_replace_match_with_backreference() {
                     (re-search-forward "\\([a-z]+\\)-\\([0-9]+\\)")
                     (replace-match "\\2-\\1")
                     (buffer-string))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -234,7 +234,7 @@ fn oracle_prop_replace_match_fixedcase_and_literal() {
                     (re-search-forward "Hello")
                     (replace-match "goodbye" t)
                     (buffer-string))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -245,7 +245,7 @@ fn oracle_prop_replace_match_on_string() {
     let form = r####"(progn
                     (string-match "\\([a-z]+\\)" "hello world")
                     (replace-match "REPLACED" nil nil "hello world"))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +267,7 @@ fn oracle_prop_regexp_search_replace_pipeline() {
                       (goto-char (point-max))
                       (insert (format " [sum=$%d]" sum))
                       (buffer-string)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -282,5 +282,5 @@ fn oracle_prop_regexp_global_replace_in_buffer() {
                         (replace-match "dog")
                         (setq count (1+ count)))
                       (list (buffer-string) count)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

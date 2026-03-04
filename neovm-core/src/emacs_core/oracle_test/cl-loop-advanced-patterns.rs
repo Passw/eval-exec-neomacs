@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // thereis / never / always termination clauses
@@ -79,7 +79,7 @@ fn oracle_prop_cl_loop_adv_named_return_from() {
     (cl-loop named outer
              for row in '((1 2 3) (4 5 6) (7 8 9))
              collect (cl-loop for x in row sum (* x x)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +118,7 @@ fn oracle_prop_cl_loop_adv_concat_vconcat() {
     (cl-loop for x in '(1 2 3 4 5 6 7 8 9 10)
              when (= (% x 3) 0)
              vconcat (vector x))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ fn oracle_prop_cl_loop_adv_hash_iteration() {
             :total total
             :long-keys long-keys
             :doubled doubled))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -205,7 +205,7 @@ fn oracle_prop_cl_loop_adv_if_else_accumulation() {
              finally return (list :long long-words
                                   :total-len total-len
                                   :short short-count))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ fn oracle_prop_cl_loop_adv_initially_finally() {
                                   :longest longest
                                   :shortest shortest
                                   :word-count word-count))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +295,7 @@ fn oracle_prop_cl_loop_adv_append_nconc() {
     (cl-loop for k in '(a b c d e)
              for v from 1
              append (list (cons k v)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -331,7 +331,7 @@ fn oracle_prop_cl_loop_adv_for_on_tails() {
     (cl-loop for tail on '(1 1 2 3 3 3 4 5 5)
              when (and (cdr tail) (= (car tail) (cadr tail)))
              count t)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -370,7 +370,7 @@ fn oracle_prop_cl_loop_adv_for_across() {
              maximize x into mx
              minimize x into mn
              finally return (list :max mx :min mn :range (- mx mn)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -422,7 +422,7 @@ fn oracle_prop_cl_loop_adv_multi_clause_complex() {
                      ((and (eq state 'active) (= input 0)) 'idle)
                      (t state))
              collect (list input state))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -457,5 +457,5 @@ fn oracle_prop_cl_loop_adv_deep_destructuring() {
              for rank from 1
              when (>= score 90)
              collect (format "#%d %s (%d)" rank name score))))"##;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

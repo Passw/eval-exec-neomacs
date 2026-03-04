@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Skip word constituents (syntax class w)
@@ -47,7 +47,7 @@ fn oracle_prop_skip_syntax_adv_word_constituents() {
                                     (let ((t5 (buffer-substring p4 (point))))
                                       (list s1 t1 s2 s3 t3 s4 s5 t5
                                             p1 p2 p3 p4 p5)))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ fn oracle_prop_skip_syntax_adv_whitespace() {
                           ;; Should be at end
                           (list s1 p1 s2 p2 s3 p3
                                 (= (point) (point-max)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +154,7 @@ fn oracle_prop_skip_syntax_adv_mixed_classes() {
                                 (let ((t3 (buffer-substring start3 (point))))
                                   (list s1 t1 s2 s3 t3
                                         p1 p2 p3)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ fn oracle_prop_skip_syntax_adv_backward_positions() {
                                               (let ((t6 (buffer-substring (point) end6)))
                                                 (list s1 t1 s2 s3 t3 s4 s5 t5 s6 t6
                                                       p1 p2 p3 p4 p5 p6))))))))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ fn oracle_prop_skip_syntax_adv_return_values() {
                                           (> fwd-ws 0) (> fwd-w 0)
                                           (< bwd-ws 0) (< bwd-w 0)
                                           (= fwd-zero 0) (= bwd-zero 0)))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -373,5 +373,5 @@ fn oracle_prop_skip_syntax_adv_extract_words() {
                                  (sort repeated
                                        (lambda (a b) (string< (car a) (car b)))))))))
                       (makunbound 'neovm--test-syntax-words)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

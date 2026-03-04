@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // while with multiple exit conditions (and/or in test)
@@ -34,7 +34,7 @@ fn oracle_prop_while_pattern_multi_exit_conditions() {
                     (list count sum
                           (if remaining (car remaining) 'exhausted)
                           result))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ fn oracle_prop_while_pattern_collect_nreverse_sieve() {
                         (setq primes (cons i primes)))
                       (setq i (1+ i)))
                     (nreverse primes))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ fn oracle_prop_while_pattern_catch_throw_early_exit() {
                               (setq entries (cdr entries))))
                           (setq tables (cdr tables))))
                       'not-found))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ fn oracle_prop_while_pattern_nested_2d_matrix_multiply() {
                     ;; Convert to lists for comparison
                     (list (append (aref result 0) nil)
                           (append (aref result 1) nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ fn oracle_prop_while_pattern_accumulator_run_length_encode() {
                     (when current
                       (setq result (cons (cons count current) result)))
                     (nreverse result))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ fn oracle_prop_while_pattern_buffer_csv_parser() {
                             (gethash "A" grades 0)
                             (gethash "B" grades 0)
                             (gethash "C" grades 0))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,7 +290,7 @@ fn oracle_prop_while_pattern_merge_sorted_lists() {
     (fmakunbound 'neovm--test-merge)
     (fmakunbound 'neovm--test-split)
     (fmakunbound 'neovm--test-msort)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -347,5 +347,5 @@ fn oracle_prop_while_pattern_binary_search() {
           (funcall 'neovm--test-bisect-left sorted 100)))
     (fmakunbound 'neovm--test-bsearch)
     (fmakunbound 'neovm--test-bisect-left)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Word frequency counter with top-N extraction
@@ -48,7 +48,7 @@ fn oracle_prop_text_analysis_word_frequency() {
                       (setq h (cons (car entry) h))))
                   (sort h #'string<))))
     (list top5 total unique most-freq hapax)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ fn oracle_prop_text_analysis_ngrams() {
        (length bigram-freq)
        ;; Unique trigram count
        (length trigram-freq)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -371,5 +371,5 @@ fn oracle_prop_text_analysis_markov_chain() {
      unique-count
      expected-pairs
      (= total-trans expected-pairs))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

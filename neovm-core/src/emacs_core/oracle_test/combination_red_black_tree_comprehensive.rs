@@ -9,7 +9,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Full LLRB tree preamble with insert, delete, search, traversal, validation,
@@ -398,7 +398,7 @@ fn oracle_prop_rbtree3_insert_all_rotation_cases() {
                (funcall 'neovm--rb3-size desc))))
     {RB3_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -448,7 +448,7 @@ fn oracle_prop_rbtree3_delete_rebalancing() {
                  (funcall 'neovm--rb3-max t7)))))
     {RB3_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -481,7 +481,7 @@ fn oracle_prop_rbtree3_delete_all_nodes() {
                 (funcall 'neovm--rb3-size cur))))
     {RB3_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -522,7 +522,7 @@ fn oracle_prop_rbtree3_successor_predecessor() {
          (funcall 'neovm--rb3-predecessor tree 95)))
     {RB3_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -609,7 +609,7 @@ fn oracle_prop_rbtree3_bulk_insert_range() {
          (funcall 'neovm--rb3-inorder tree)))
     {RB3_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -640,7 +640,7 @@ fn oracle_prop_rbtree3_duplicate_insertion() {
              (funcall 'neovm--rb3-valid-p tree2)))))
     {RB3_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -681,7 +681,7 @@ fn oracle_prop_rbtree3_search_comprehensive() {
            all-found)))
     {RB3_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -714,7 +714,7 @@ fn oracle_prop_rbtree3_zigzag_insertion() {
                  (funcall 'neovm--rb3-inorder cur)))))
     {RB3_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -756,7 +756,7 @@ fn oracle_prop_rbtree3_mixed_operations() {
                     (funcall 'neovm--rb3-size tree))))))
     {RB3_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -793,5 +793,5 @@ fn oracle_prop_rbtree3_negative_keys() {
                  (funcall 'neovm--rb3-inorder cur)))))
     {RB3_CLEANUP}))"#
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }

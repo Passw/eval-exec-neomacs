@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // assoc with TESTFN parameter (custom comparison)
@@ -35,7 +35,7 @@ fn oracle_prop_assoc_with_testfn() {
                           (lambda (a b) (< (abs (- a b)) 0.1)))
                    ;; eq as testfn: like assq
                    (assoc 'b '((a . 1) (b . 2) (c . 3)) #'eq))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ fn oracle_prop_assq_vs_assoc_key_types() {
                      (let ((list-alist '(((1 2) . "pair1") ((3 4) . "pair2"))))
                        (list (assoc '(1 2) list-alist)
                              (assq '(1 2) list-alist)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ fn oracle_prop_rassoc_rassq_reverse_lookup() {
                      (let ((num-alist '((a . 1) (b . 2) (c . 3) (d . 2))))
                        (list (rassoc 2 num-alist)
                              (rassq 2 num-alist)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,7 +162,7 @@ fn oracle_prop_nested_alist_lookups() {
                        ;; Top-level config values
                        (funcall lookup '(config debug) db)
                        (funcall lookup '(config version) db))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ fn oracle_prop_alist_multimap() {
                          result-before
                          (funcall mm-get mm 'tag)
                          (funcall mm-get mm 'category)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -277,7 +277,7 @@ fn oracle_prop_alist_merge_strategies() {
                                            '((a . 1) (b . 2) (c . 3))
                                            '((b . 10) (c . 20) (d . 30))
                                            (lambda (old new) (+ old new))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -355,5 +355,5 @@ fn oracle_prop_alist_query_engine() {
                                                 (lambda (v) (> v 26)))
                                        'age 'asc)
                               '(name age))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

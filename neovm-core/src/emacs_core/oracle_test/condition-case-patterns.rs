@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Catching specific error symbols (wrong-type-argument, void-variable, etc.)
@@ -43,7 +43,7 @@ fn oracle_prop_ccpat_specific_error_symbols() {
       (funcall 'neovm--definitely-unbound-fn-xyz 1)
     (void-function
      (list 'void-fn (car err) (cadr err)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ fn oracle_prop_ccpat_multiple_handler_dispatch() {
    (funcall classify-error (lambda () (signal 'file-error '("not found"))))
    ;; No error case
    (funcall classify-error (lambda () 'all-good))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ fn oracle_prop_ccpat_nested_resignal() {
     (error
      (setq log (cons 'level-1 log))
      (list (nreverse log) (cadr outer-err) (caddr outer-err)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +135,7 @@ fn oracle_prop_ccpat_error_in_let_bindings() {
       (let ((x 10) (y 20))
         (+ x y))
     (error 'should-not-reach)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ fn oracle_prop_ccpat_with_unwind_protect_ordering() {
         (error
          (setq log (cons 'outer-handler log))))
       (list pattern1 pattern2 (nreverse log)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +224,7 @@ fn oracle_prop_ccpat_error_as_early_return() {
    (funcall process-items '(100 200 9999 1))
    (funcall process-items '())
    (funcall process-items '(500 500 1 500))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -279,7 +279,7 @@ fn oracle_prop_ccpat_transaction_rollback() {
             (gethash "balance-c" db)
             ;; A should also be unchanged (rollback undid the +100)
             (gethash "balance-a" db)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,5 +314,5 @@ fn oracle_prop_ccpat_condition_case_with_catch_throw() {
       (catch 'tag
         (/ 1 0))
     (arith-error 'arith-caught-outside-catch)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

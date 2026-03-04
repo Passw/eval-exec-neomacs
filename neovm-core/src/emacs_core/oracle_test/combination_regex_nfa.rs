@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // NFA state representation and basic construction
@@ -71,7 +71,7 @@ fn oracle_prop_regex_nfa_state_representation() {
         (fmakunbound 'neovm--nfa-state-trans) (fmakunbound 'neovm--nfa-make)
         (fmakunbound 'neovm--nfa-states) (fmakunbound 'neovm--nfa-start)
         (fmakunbound 'neovm--nfa-accept) (fmakunbound 'neovm--nfa-literal)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +191,7 @@ fn oracle_prop_regex_nfa_thompson_construction() {
         (fmakunbound 'neovm--nfa-add-trans) (fmakunbound 'neovm--nfa-lit)
         (fmakunbound 'neovm--nfa-concat) (fmakunbound 'neovm--nfa-union)
         (fmakunbound 'neovm--nfa-star)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -265,7 +265,7 @@ fn oracle_prop_regex_nfa_epsilon_closure() {
               (fmakunbound 'neovm--ec-id) (fmakunbound 'neovm--ec-st)
               (fmakunbound 'neovm--ec-mk) (fmakunbound 'neovm--ec-find)
               (fmakunbound 'neovm--ec-closure))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -431,7 +431,7 @@ fn oracle_prop_regex_nfa_simulation() {
         (fmakunbound 'neovm--sim-lit) (fmakunbound 'neovm--sim-dot)
         (fmakunbound 'neovm--sim-cat) (fmakunbound 'neovm--sim-alt)
         (fmakunbound 'neovm--sim-kleene)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -573,7 +573,7 @@ fn oracle_prop_regex_nfa_character_classes() {
         (fmakunbound 'neovm--cc-move) (fmakunbound 'neovm--cc-run)
         (fmakunbound 'neovm--cc-charclass) (fmakunbound 'neovm--cc-charrange)
         (fmakunbound 'neovm--cc-cat) (fmakunbound 'neovm--cc-lit)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -815,7 +815,7 @@ fn oracle_prop_regex_nfa_full_compiler() {
         (fmakunbound 'neovm--rc-star) (fmakunbound 'neovm--rc-plus)
         (fmakunbound 'neovm--rc-parse) (fmakunbound 'neovm--rc-parse-alt)
         (fmakunbound 'neovm--rc-parse-seq) (fmakunbound 'neovm--rc-parse-atom)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -1026,5 +1026,5 @@ fn oracle_prop_regex_nfa_complex_patterns() {
         (fmakunbound 'neovm--cx-star) (fmakunbound 'neovm--cx-plus)
         (fmakunbound 'neovm--cx-parse) (fmakunbound 'neovm--cx-parse-alt)
         (fmakunbound 'neovm--cx-parse-seq) (fmakunbound 'neovm--cx-parse-atom)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

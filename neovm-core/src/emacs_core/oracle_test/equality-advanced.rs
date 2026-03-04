@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // eq on all value types (identity comparison)
@@ -47,7 +47,7 @@ fn oracle_prop_eq_all_value_types() {
                      ;; Characters: same char is eq (fixnum)
                      (eq ch ?A)
                      (eq ?Z ?Z)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +84,7 @@ fn oracle_prop_eql_vs_eq_number_semantics() {
                      (eql (+ 1.0 2.0) (- 5.0 2.0))
                      ;; but NOT eq
                      (eq (+ 1.0 2.0) (- 5.0 2.0))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ fn oracle_prop_equal_deeply_nested_mixed() {
                    ;; Dotted pairs nested
                    (equal '((a . 1) (b . (c . 2)))
                           '((a . 1) (b . (c . 2)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ fn oracle_prop_string_equal_case_and_properties() {
                    (string-equal "a\nb" "a\tb")
                    ;; Unicode
                    (string-equal "\u00e9" "\u00e9"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +213,7 @@ fn oracle_prop_not_equal_numeric() {
                    ;; Computed values
                    (/= (+ 2 3) (* 1 5))
                    (/= (+ 2 3) (* 1 6)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ fn oracle_prop_equality_custom_structural() {
                        ;; Compare with built-in equal for reference
                        (equal rec1 rec2)
                        (equal nested1 nested2))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -342,5 +342,5 @@ fn oracle_prop_equality_bst_with_equal_keys() {
                        (funcall bst-search tree 42)
                        ;; In-order traversal
                        (funcall bst-to-sorted-list tree))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

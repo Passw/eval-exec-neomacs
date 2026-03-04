@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Buddy allocator: power-of-2 split and merge
@@ -129,7 +129,7 @@ fn oracle_prop_memalloc_buddy_allocator() {
     (fmakunbound 'neovm--buddy-alloc)
     (fmakunbound 'neovm--buddy-free)
     (makunbound 'neovm--buddy-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +237,7 @@ fn oracle_prop_memalloc_slab_allocator() {
     (fmakunbound 'neovm--slab-free)
     (fmakunbound 'neovm--slab-stats)
     (makunbound 'neovm--slab-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +329,7 @@ Returns (offset . new-arena) or (nil . arena) if full."
     (fmakunbound 'neovm--arena-reset)
     (fmakunbound 'neovm--arena-stats)
     (makunbound 'neovm--arena-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -424,7 +424,7 @@ fn oracle_prop_memalloc_free_list_strategies() {
     (fmakunbound 'neovm--fl-first-fit)
     (fmakunbound 'neovm--fl-best-fit)
     (makunbound 'neovm--fl-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -509,7 +509,7 @@ Returns fragmentation metrics."
          :extreme extreme))
     (fmakunbound 'neovm--frag-analyze)
     (makunbound 'neovm--frag-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -588,7 +588,7 @@ Returns sorted, merged list."
     (fmakunbound 'neovm--coal-coalesce)
     (fmakunbound 'neovm--coal-free-and-coalesce)
     (makunbound 'neovm--coal-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

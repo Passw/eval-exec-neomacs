@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-hash-table with :size, :test, :weakness params
@@ -32,7 +32,7 @@ fn oracle_prop_hash_table_creation_params() {
                     (hash-table-p h1)
                     (hash-table-p '(not a hash))
                     (hash-table-count h1)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ fn oracle_prop_hash_table_count_cycles() {
                     (list (nreverse counts)
                           (gethash 'new-key h)
                           (gethash 0 h))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ fn oracle_prop_maphash_cross_modification() {
                         (sort filt-pairs (lambda (a b)
                                            (string-lessp (symbol-name (car a))
                                                          (symbol-name (car b)))))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +172,7 @@ fn oracle_prop_hash_table_set_operations() {
                                            (puthash k t sym-diff)))
                                        set-b)
                               (funcall collect sym-diff))))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ fn oracle_prop_hash_table_memoization() {
           ;; Verify memoization populated
           (hash-table-count memo)))
     (fmakunbound 'neovm--test-catalan)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +254,7 @@ fn oracle_prop_copy_hash_table_deep_independence() {
                       (hash-table-count copy)
                       ;; Test preserved
                       (eq (hash-table-test orig) (hash-table-test copy)))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -294,7 +294,7 @@ fn oracle_prop_hash_table_eq_vs_equal_keys() {
                                  (gethash 42 h-eq))
                           (progn (puthash 42 'num-equal h-equal)
                                  (gethash 42 h-equal))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -373,5 +373,5 @@ fn oracle_prop_hash_table_trie() {
     (fmakunbound 'neovm--trie-insert)
     (fmakunbound 'neovm--trie-search)
     (fmakunbound 'neovm--trie-starts-with)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

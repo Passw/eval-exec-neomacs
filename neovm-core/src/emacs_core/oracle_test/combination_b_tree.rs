@@ -10,7 +10,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // B-tree core: node construction, search, and simple insert
@@ -93,7 +93,7 @@ fn oracle_prop_btree_search_basic() {
     (fmakunbound 'neovm--bt-children)
     (fmakunbound 'neovm--bt-leaf-p)
     (fmakunbound 'neovm--bt-search)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -259,7 +259,7 @@ fn oracle_prop_btree_insert_with_splitting() {
     (fmakunbound 'neovm--bt2-insert-impl)
     (fmakunbound 'neovm--bt2-insert)
     (fmakunbound 'neovm--bt2-inorder)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -382,7 +382,7 @@ fn oracle_prop_btree_inorder_traversal_sorted() {
     (fmakunbound 'neovm--bt3-ins-impl)
     (fmakunbound 'neovm--bt3-insert)
     (fmakunbound 'neovm--bt3-inorder)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -492,7 +492,7 @@ fn oracle_prop_btree_bulk_insert_sorted() {
     (fmakunbound 'neovm--bt4-insert)
     (fmakunbound 'neovm--bt4-inorder)
     (fmakunbound 'neovm--bt4-search)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -607,7 +607,7 @@ fn oracle_prop_btree_range_query() {
     (fmakunbound 'neovm--bt5-ins-impl)
     (fmakunbound 'neovm--bt5-insert)
     (fmakunbound 'neovm--bt5-range)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -728,5 +728,5 @@ fn oracle_prop_btree_height_and_structure() {
     (fmakunbound 'neovm--bt6-height)
     (fmakunbound 'neovm--bt6-count)
     (fmakunbound 'neovm--bt6-all-leaf-depths)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Church booleans: true, false, and, or, not, if
@@ -59,7 +59,7 @@ fn oracle_prop_church_booleans() {
                                 (funcall to-bool
                                          (funcall OR (funcall NOT p)
                                                   (funcall NOT q))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ fn oracle_prop_church_numerals_basic() {
                                   (funcall MULT
                                            (funcall PLUS TWO THREE)
                                            (funcall PLUS ONE ONE)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -319,7 +319,7 @@ fn oracle_prop_y_combinator_recursion() {
                          (funcall sum-list '(1 2 3 4 5))
                          (funcall sum-list nil)
                          (funcall sum-list '(10 20 30))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -489,5 +489,5 @@ fn oracle_prop_lambda_calculus_evaluator() {
                 '(add (add (lit 1) (lit 2)) (add (lit 3) (lit 4)))))
     (fmakunbound 'neovm--test-lc-subst)
     (fmakunbound 'neovm--test-lc-eval)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

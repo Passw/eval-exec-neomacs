@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // LRU cache with fixed capacity
@@ -86,7 +86,7 @@ fn oracle_prop_cache_lru_fixed_capacity() {
                           (car r2)   ;; nil (miss)
                           (car r3)   ;; value of "d" = 4
                           (funcall lru-stats c))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ fn oracle_prop_cache_lfu() {
                     (car r)   ;; nil: "c" was evicted
                     ;; "a" is still there
                     (car (funcall lfu-get c "a"))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +261,7 @@ fn oracle_prop_cache_ttl() {
                         (car r3)    ;; "val-medium" at t=7
                         keys-t15    ;; only "long" remains
                         ))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -379,7 +379,7 @@ fn oracle_prop_cache_write_through_vs_write_back() {
                    wb-store-x-after   ;; 100
                    wb-dirty-after     ;; nil
                    ))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -489,7 +489,7 @@ fn oracle_prop_cache_multi_level() {
                 (mapcar #'car (funcall level-entries l2))
                 (funcall level-stats l1)
                 (funcall level-stats l2)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -595,5 +595,5 @@ fn oracle_prop_cache_statistics() {
          :hit-rate (funcall sc-hit-rate c)
          :top-3 (funcall sc-top-keys c 3)
          :total-accesses (+ (nth 2 c) (nth 3 c)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

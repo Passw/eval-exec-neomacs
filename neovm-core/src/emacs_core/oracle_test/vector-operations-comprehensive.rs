@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-vector with various init values and aref/aset round-trip
@@ -33,7 +33,7 @@ fn oracle_prop_vector_ops_comp_make_vector_aref_aset_roundtrip() {
         (progn (aset v 6 nil) (aset v 7 3.14) (list (aref v 6) (aref v 7)))
         ;; Original values unchanged
         (aref v 0) (aref v 1) (aref v 2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ fn oracle_prop_vector_ops_comp_vector_constructor_and_vconcat_mixed() {
         (length cat1) (length cat4)
         ;; vconcat with empty inputs
         (vconcat) (vconcat []) (vconcat '() "" [])))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@ fn oracle_prop_vector_ops_comp_fillarray_comprehensive() {
        (fillarray v5 '(a b c))
        ;; All elements share the same list object
        (list v5 (eq (aref v5 0) (aref v5 1)) (eq (aref v5 1) (aref v5 2)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +154,7 @@ fn oracle_prop_vector_ops_comp_sort_vectors() {
   ;; Sort by absolute value using a wrapper
   (let ((v (vector -3 1 -5 2 -1 4)))
     (sort v (lambda (a b) (< (abs a) (abs b))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -348,7 +348,7 @@ fn oracle_prop_vector_ops_comp_equality_comparison() {
   (list (vectorp [1 2 3]) (vectorp '(1 2 3)) (vectorp "abc")
         (arrayp [1 2 3]) (arrayp "abc") (arrayp '(1 2))
         (sequencep [1]) (sequencep '(1)) (sequencep "a")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

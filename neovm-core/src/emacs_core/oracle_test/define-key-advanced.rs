@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // define-key with string key sequences (kbd-style)
@@ -43,7 +43,7 @@ fn oracle_prop_define_key_string_sequences() {
     (keymapp (lookup-key m (kbd "C-x 4")))
     ;; Verify the intermediate prefix for C-c
     (keymapp (lookup-key m (kbd "C-c")))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +135,7 @@ fn oracle_prop_define_key_lambda_bindings() {
     ;; Call the lambda to check it works
     (funcall (lookup-key m [?a]))
     (funcall (lookup-key m [?b]) 7)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +173,7 @@ fn oracle_prop_define_key_symbol_bindings() {
     ;; Verify the symbol is exactly what we set
     (lookup-key m [?a])
     (lookup-key m (kbd "C-x C-f"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ fn oracle_prop_define_key_prefix_nested_keymaps() {
     (keymapp (lookup-key root (kbd "C-c p q")))
     ;; Too-long returns integer
     (numberp (lookup-key root [?a ?b]))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ fn oracle_prop_define_key_modifier_keys() {
     ;; Unbound modifier combos
     (lookup-key m (kbd "C-b"))
     (lookup-key m (kbd "M-b"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

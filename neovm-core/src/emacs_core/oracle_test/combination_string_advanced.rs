@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // String interning and equality: eq vs equal on strings
@@ -31,7 +31,7 @@ fn oracle_prop_string_interning_eq_vs_equal() {
                           (let ((d (copy-sequence a)))
                             (list (equal a d)
                                   (eq a d)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ fn oracle_prop_string_multibyte_length_vs_bytes() {
                                     (>= (string-bytes s) (length s))
                                     (multibyte-string-p s)))
                             strings))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ fn oracle_prop_string_as_sequence_access() {
                          (dotimes (i (length s))
                            (aset rebuilt i (aref s i)))
                          (string= s rebuilt)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ fn oracle_prop_string_comparison_transitivity() {
                                                  (nth j sorted))
                                   (setq all-ok nil)))))
                           (list sorted transitive all-ok)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ fn oracle_prop_string_word_wrap() {
                              (when (> (length line) 15)
                                (setq all-ok nil)))
                            (list lines all-ok))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ fn oracle_prop_string_levenshtein_dp() {
                                        (builtin (string-distance a b)))
                                   (list a b manual builtin (= manual builtin))))
                               pairs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ fn oracle_prop_string_tokenizer() {
                      (funcall tokenize "42")
                      (funcall tokenize "1+2-3*4/5")
                      (funcall tokenize "  100  +  200  ")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ fn oracle_prop_string_char_histogram() {
                                 (dolist (p freq)
                                   (setq sum (+ sum (cdr p))))
                                 (= sum (length text)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -360,5 +360,5 @@ fn oracle_prop_string_base_conversion() {
                              '(0 1 2 3 4 8))
                      ;; Negative
                      (funcall int-to-base -42 10)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

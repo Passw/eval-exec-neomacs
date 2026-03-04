@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Pattern matcher
@@ -50,7 +50,7 @@ fn oracle_prop_interp_pattern_match() {
         (funcall 'neovm--test-pmatch '(or 1 2 3) 2)
         (funcall 'neovm--test-pmatch '(or 1 2 3) 5))
     (fmakunbound 'neovm--test-pmatch)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ fn oracle_prop_interp_rule_engine() {
                         (gethash 'slippery facts)
                         (gethash 'ice-risk facts)
                         (gethash 'sunny facts)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ fn oracle_prop_interp_fsm_with_actions() {
                           (funcall run-fsm "abc")
                           (funcall run-fsm "1.2.3")
                           (funcall run-fsm "")))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -217,7 +217,7 @@ fn oracle_prop_interp_arithmetic_evaluator() {
                     (+ (* a a) (* b b)))
                  nil))
     (fmakunbound 'neovm--test-arith-eval)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -257,7 +257,7 @@ fn oracle_prop_interp_event_system() {
                     (funcall emit 'click 'button-2)
                     (funcall emit 'keypress nil)
                     (nreverse log)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -299,5 +299,5 @@ fn oracle_prop_interp_visitor_pattern() {
                          (string-lessp (symbol-name (car a))
                                        (symbol-name (car b)))))))
     (fmakunbound 'neovm--test-visit)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

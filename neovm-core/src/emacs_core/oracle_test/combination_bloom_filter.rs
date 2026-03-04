@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::assert_oracle_parity_with_bootstrap;
 
 // ---------------------------------------------------------------------------
 // Bloom filter with multiple hash functions
@@ -112,7 +112,7 @@ fn oracle_prop_bloom_filter_basic() {
     (fmakunbound 'neovm--bf-add)
     (fmakunbound 'neovm--bf-might-contain)
     (fmakunbound 'neovm--bf-bit-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -207,7 +207,7 @@ fn oracle_prop_bloom_filter_false_positive_rate() {
     (fmakunbound 'neovm--bfp-hash)
     (fmakunbound 'neovm--bfp-add)
     (fmakunbound 'neovm--bfp-check)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ fn oracle_prop_bloom_filter_membership_semantics() {
     (fmakunbound 'neovm--bfm-add)
     (fmakunbound 'neovm--bfm-check)
     (fmakunbound 'neovm--bfm-verify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -420,7 +420,7 @@ fn oracle_prop_count_min_sketch() {
     (fmakunbound 'neovm--cms-hash)
     (fmakunbound 'neovm--cms-add)
     (fmakunbound 'neovm--cms-estimate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -546,7 +546,7 @@ fn oracle_prop_hyperloglog_cardinality() {
     (fmakunbound 'neovm--hll-leading-zeros)
     (fmakunbound 'neovm--hll-add)
     (fmakunbound 'neovm--hll-estimate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -652,5 +652,5 @@ fn oracle_prop_bloom_filter_set_operations() {
     (fmakunbound 'neovm--bfs-check)
     (fmakunbound 'neovm--bfs-union)
     (fmakunbound 'neovm--bfs-bit-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

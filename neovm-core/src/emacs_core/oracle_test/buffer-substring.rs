@@ -5,7 +5,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 use proptest::prelude::*;
 
 use super::common::{
-    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm,
+    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
 };
 
 #[test]
@@ -44,6 +44,6 @@ proptest! {
             r#"(progn (erase-buffer) (insert "abcdef") (buffer-substring {} {}))"#,
             start, end
         );
-        assert_oracle_parity(&form);
+        assert_oracle_parity_with_bootstrap(&form);
     }
 }

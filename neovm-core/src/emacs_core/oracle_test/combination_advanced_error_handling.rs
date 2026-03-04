@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Multiple condition-case handlers with re-signaling
@@ -57,7 +57,7 @@ fn oracle_prop_aeh_multiple_handlers_resignal() {
                               (list (nreverse results)
                                     (nreverse neovm--test-aeh-log)))))
                       (makunbound 'neovm--test-aeh-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ fn oracle_prop_aeh_error_wrapping_layers() {
                       (fmakunbound 'neovm--test-data-access)
                       (fmakunbound 'neovm--test-service)
                       (fmakunbound 'neovm--test-controller)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +169,7 @@ fn oracle_prop_aeh_retry_exponential_backoff() {
                       (fmakunbound 'neovm--test-with-retry)
                       (makunbound 'neovm--test-retry-log)
                       (makunbound 'neovm--test-retry-attempt)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +230,7 @@ fn oracle_prop_aeh_error_aggregation_batch() {
                                 (length successes)
                                 (length failures)))
                       (fmakunbound 'neovm--test-validate-record)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -402,7 +402,7 @@ fn oracle_prop_aeh_transaction_rollback() {
                       (fmakunbound 'neovm--test-txn-execute)
                       (makunbound 'neovm--test-txn-store)
                       (makunbound 'neovm--test-txn-journal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -455,5 +455,5 @@ fn oracle_prop_aeh_handler_priority_chain() {
                        (setq results
                              (cons (list 'propagated (cadr outer)) results))))
                     (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // seq-map, seq-filter, seq-reduce on lists, vectors, strings
@@ -117,7 +117,7 @@ fn oracle_prop_seq_count_length_elt() {
       (seq-elt [10 20 30 40] 3)
       (seq-elt "abcde" 0)
       (seq-elt "abcde" 4))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

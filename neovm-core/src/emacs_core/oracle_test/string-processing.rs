@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // split-string extended usage
@@ -15,17 +15,17 @@ fn oracle_prop_split_string_default_sep() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Default separator is split-string-default-separators
-    assert_oracle_parity(r#"(split-string "  hello   world  ")"#);
-    assert_oracle_parity(r#"(split-string "no-spaces")"#);
+    assert_oracle_parity_with_bootstrap(r#"(split-string "  hello   world  ")"#);
+    assert_oracle_parity_with_bootstrap(r#"(split-string "no-spaces")"#);
 }
 
 #[test]
 fn oracle_prop_split_string_custom_separator() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(split-string "a,b,c,d" ",")"#);
-    assert_oracle_parity(r#"(split-string "a::b::c" "::")"#);
-    assert_oracle_parity(r#"(split-string "a.b.c" "\\.")"#);
+    assert_oracle_parity_with_bootstrap(r#"(split-string "a,b,c,d" ",")"#);
+    assert_oracle_parity_with_bootstrap(r#"(split-string "a::b::c" "::")"#);
+    assert_oracle_parity_with_bootstrap(r#"(split-string "a.b.c" "\\.")"#);
 }
 
 #[test]
@@ -33,8 +33,8 @@ fn oracle_prop_split_string_omit_nulls() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // OMIT-NULLS parameter (3rd arg)
-    assert_oracle_parity(r#"(split-string ",a,,b,c," "," t)"#);
-    assert_oracle_parity(r#"(split-string ",a,,b,c," ",")"#);
+    assert_oracle_parity_with_bootstrap(r#"(split-string ",a,,b,c," "," t)"#);
+    assert_oracle_parity_with_bootstrap(r#"(split-string ",a,,b,c," ",")"#);
 }
 
 #[test]
@@ -42,7 +42,7 @@ fn oracle_prop_split_string_trim() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // TRIM parameter (4th arg) — regex to trim from each result
-    assert_oracle_parity(r#"(split-string "  a , b , c  " "," t "[ \t]+")"#);
+    assert_oracle_parity_with_bootstrap(r#"(split-string "  a , b , c  " "," t "[ \t]+")"#);
 }
 
 // ---------------------------------------------------------------------------
@@ -53,10 +53,10 @@ fn oracle_prop_split_string_trim() {
 fn oracle_prop_string_trim_patterns() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(string-trim "  hello  ")"#);
-    assert_oracle_parity(r#"(string-trim-left "  hello  ")"#);
-    assert_oracle_parity(r#"(string-trim-right "  hello  ")"#);
-    assert_oracle_parity(r#"(string-trim "\n\thello\n\t")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "  hello  ")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim-left "  hello  ")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim-right "  hello  ")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "\n\thello\n\t")"#);
 }
 
 #[test]
@@ -64,8 +64,8 @@ fn oracle_prop_string_trim_custom_chars() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Custom trim characters
-    assert_oracle_parity(r#"(string-trim "---hello---" "-+")"#);
-    assert_oracle_parity(r#"(string-trim "***hello***" "[*]+" "[*]+")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "---hello---" "-+")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "***hello***" "[*]+" "[*]+")"#);
 }
 
 // ---------------------------------------------------------------------------
@@ -76,14 +76,14 @@ fn oracle_prop_string_trim_custom_chars() {
 fn oracle_prop_string_prefix_suffix() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(string-prefix-p "hel" "hello")"#);
-    assert_oracle_parity(r#"(string-prefix-p "world" "hello")"#);
-    assert_oracle_parity(r#"(string-prefix-p "" "hello")"#);
-    assert_oracle_parity(r#"(string-prefix-p "hello" "hello")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-prefix-p "hel" "hello")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-prefix-p "world" "hello")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-prefix-p "" "hello")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-prefix-p "hello" "hello")"#);
 
-    assert_oracle_parity(r#"(string-suffix-p "llo" "hello")"#);
-    assert_oracle_parity(r#"(string-suffix-p "world" "hello")"#);
-    assert_oracle_parity(r#"(string-suffix-p "" "hello")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-suffix-p "llo" "hello")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-suffix-p "world" "hello")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-suffix-p "" "hello")"#);
 }
 
 #[test]
@@ -91,9 +91,9 @@ fn oracle_prop_string_prefix_ignore_case() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // IGNORE-CASE parameter (3rd arg)
-    assert_oracle_parity(r#"(string-prefix-p "HEL" "hello" t)"#);
-    assert_oracle_parity(r#"(string-prefix-p "HEL" "hello")"#);
-    assert_oracle_parity(r#"(string-suffix-p "LLO" "hello" t)"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-prefix-p "HEL" "hello" t)"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-prefix-p "HEL" "hello")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-suffix-p "LLO" "hello" t)"#);
 }
 
 // ---------------------------------------------------------------------------
@@ -104,9 +104,9 @@ fn oracle_prop_string_prefix_ignore_case() {
 fn oracle_prop_string_search_positions() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(string-search "world" "hello world")"#);
-    assert_oracle_parity(r#"(string-search "xyz" "hello world")"#);
-    assert_oracle_parity(r#"(string-search "o" "hello world")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-search "world" "hello world")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-search "xyz" "hello world")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-search "o" "hello world")"#);
 }
 
 #[test]
@@ -114,17 +114,17 @@ fn oracle_prop_string_search_start_pos() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // START-POS parameter
-    assert_oracle_parity(r#"(string-search "o" "hello world" 5)"#);
-    assert_oracle_parity(r#"(string-search "o" "hello world" 8)"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-search "o" "hello world" 5)"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-search "o" "hello world" 8)"#);
 }
 
 #[test]
 fn oracle_prop_string_replace_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(r#"(string-replace "world" "emacs" "hello world")"#);
-    assert_oracle_parity(r#"(string-replace "o" "0" "hello world")"#);
-    assert_oracle_parity(r#"(string-replace "xyz" "abc" "hello world")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-replace "world" "emacs" "hello world")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-replace "o" "0" "hello world")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-replace "xyz" "abc" "hello world")"#);
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ fn oracle_prop_string_csv_parser() {
                               (setq h (cdr h) values (cdr values)))
                             (setq result (cons (nreverse record) result)))))
                       (nreverse result)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -173,7 +173,7 @@ fn oracle_prop_string_path_manipulation() {
                         ;; Rebuild
                         (concat "/" (mapconcat #'identity
                                               (nreverse stack) "/")))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -198,7 +198,7 @@ fn oracle_prop_string_word_wrap() {
                       (when (> (length current-line) 0)
                         (setq lines (cons current-line lines)))
                       (nreverse lines)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -228,7 +228,7 @@ fn oracle_prop_string_camelcase_to_kebab() {
                           (funcall convert "camelCaseString")
                           (funcall convert "XMLParser")
                           (funcall convert "simple")))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]

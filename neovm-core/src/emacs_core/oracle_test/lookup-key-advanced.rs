@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // lookup-key with string key sequences
@@ -190,7 +190,7 @@ fn oracle_prop_lookup_key_integer_too_long() {
         (integerp r1) r1
         (integerp r2) r2
         (integerp r3) r3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -299,7 +299,7 @@ fn oracle_prop_lookup_key_sparse_vs_full() {
         (lookup-key sparse [?p])
         (lookup-key full [?p])
         (eq (lookup-key sparse [?p]) (lookup-key full [?p]))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

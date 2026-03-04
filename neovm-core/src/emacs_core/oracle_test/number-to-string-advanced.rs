@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // number-to-string: integers (positive, negative, zero, large, most-positive)
@@ -85,7 +85,7 @@ fn oracle_prop_nts_adv_string_to_number_bases() {
   (string-to-number "0" 2)
   (string-to-number "1" 2)
   (string-to-number "10000000" 2))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +118,7 @@ fn oracle_prop_nts_adv_string_to_number_whitespace_invalid() {
   (string-to-number "1G" 16)
   (string-to-number "29" 8)
   (string-to-number "12" 2))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -218,7 +218,7 @@ fn oracle_prop_nts_adv_base_converter() {
    (funcall base-to-int "-42" 10)
    ;; Zero
    (funcall int-to-base 0 16)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +261,7 @@ fn oracle_prop_nts_adv_thousands_separator() {
    (string= (funcall format-thousands 1234567 ?,) "1,234,567")
    (string= (funcall format-thousands 1000000000 ?,) "1,000,000,000")
    (string= (funcall format-thousands -42000 ?,) "-42,000")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

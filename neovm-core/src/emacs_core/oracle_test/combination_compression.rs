@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Run-length encoding and decoding
@@ -60,7 +60,7 @@ fn oracle_prop_compression_rle() {
                     test-strings))
         (fmakunbound 'neovm--test-rle-encode)
         (fmakunbound 'neovm--test-rle-decode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -272,7 +272,7 @@ fn oracle_prop_compression_base64_custom() {
                     inputs))
         (fmakunbound 'neovm--test-b64-encode)
         (fmakunbound 'neovm--test-b64-decode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -336,7 +336,7 @@ fn oracle_prop_compression_delta_encoding() {
                     sequences))
         (fmakunbound 'neovm--test-delta-encode)
         (fmakunbound 'neovm--test-delta-decode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -416,7 +416,7 @@ fn oracle_prop_compression_lz77_like() {
                     inputs))
         (fmakunbound 'neovm--test-lz77-encode)
         (fmakunbound 'neovm--test-lz77-decode)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -496,5 +496,5 @@ fn oracle_prop_compression_bwt() {
                     inputs))
         (fmakunbound 'neovm--test-bwt-forward)
         (fmakunbound 'neovm--test-bwt-inverse)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

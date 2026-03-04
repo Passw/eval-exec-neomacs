@@ -4,7 +4,7 @@
 //! UNION, INTERSECT, INSERT/UPDATE/DELETE, index-based lookup, multi-table queries.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // SELECT with WHERE, projection, and compound conditions
@@ -63,7 +63,7 @@ fn oracle_prop_db_relational_select_where_compound() {
             (unless (member d depts)
               (setq depts (cons d depts)))))
         (sort (nreverse depts) #'string<)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +129,7 @@ fn oracle_prop_db_relational_left_join() {
               (funcall left-join customers orders 'cust-id 'cust-id))
       ;; Alice appears twice (two orders)
       (length (funcall left-join customers orders 'cust-id 'cust-id)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,7 +162,7 @@ fn oracle_prop_db_relational_cross_join() {
           (length (funcall cross-join colors singles)))
         ;; Cross join with empty table
         (length (funcall cross-join colors nil))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -326,7 +326,7 @@ fn oracle_prop_db_relational_distinct_union_intersect() {
             (unless (member row except)
               (setq except (cons row except)))))
         (length except)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -415,7 +415,7 @@ fn oracle_prop_db_relational_insert_update_delete_constraints() {
         (car r5)
         (length t5)
         (mapcar (lambda (r) (cdr (assq 'name r))) t5)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -478,7 +478,7 @@ fn oracle_prop_db_relational_index_lookup() {
               (when (= (cdr (assq 'age r)) 35)
                 (setq result (cons (cdr (assq 'uname r)) result))))
             (nreverse result)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -558,7 +558,7 @@ fn oracle_prop_db_relational_multi_table_query() {
                            report))))
            dept-groups)
           (sort report (lambda (a b) (string< (car a) (car b)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -628,5 +628,5 @@ fn oracle_prop_db_relational_order_by_multi_key() {
                       (setq result (cons row result))
                       (setq i (1+ i))))
                   (nreverse result)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

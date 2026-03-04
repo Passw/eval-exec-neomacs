@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // bool-vector constructor and bool-vector-p
@@ -38,7 +38,7 @@ fn oracle_prop_bool_vector_comprehensive_constructor_and_predicate() {
     (aref bv1 0) (aref bv1 1) (aref bv1 2) (aref bv1 3) (aref bv1 4)
     ;; read back bv4
     (aref bv4 0) (aref bv4 7)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ fn oracle_prop_bool_vector_comprehensive_count_population() {
     (let ((before (bool-vector-count-population bv)))
       (aset bv 0 nil) (aset bv 5 nil) (aset bv 10 nil)
       (list before (bool-vector-count-population bv)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ fn oracle_prop_bool_vector_comprehensive_count_consecutive() {
     (bool-vector-count-consecutive (make-bool-vector 20 nil) nil 0)
     ;; Edge: count from end boundary
     (bool-vector-count-consecutive (make-bool-vector 10 t) t 9)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ fn oracle_prop_bool_vector_comprehensive_subsetp() {
         (b (bool-vector t t t nil t nil t t)))
     (list (bool-vector-subsetp a b)
           (bool-vector-subsetp b a))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ fn oracle_prop_bool_vector_comprehensive_not() {
     (bool-vector-count-population (bool-vector-not (make-bool-vector 16 nil)))
     ;; Not of empty
     (length (bool-vector-not (make-bool-vector 0 nil)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -187,7 +187,7 @@ fn oracle_prop_bool_vector_comprehensive_union() {
     ;; Self-union
     (let ((self-u (bool-vector-union a a)))
       (list (aref self-u 0) (aref self-u 1) (aref self-u 2)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +214,7 @@ fn oracle_prop_bool_vector_comprehensive_intersection() {
     ;; Self intersection = self
     (let ((self-i (bool-vector-intersection b b)))
       (bool-vector-count-population self-i))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +247,7 @@ fn oracle_prop_bool_vector_comprehensive_setdiff_xor() {
     ;; XOR is symmetric: pop(a XOR b) == pop(b XOR a)
     (= (bool-vector-count-population (bool-vector-exclusive-or a b))
        (bool-vector-count-population (bool-vector-exclusive-or b a)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -312,7 +312,7 @@ fn oracle_prop_bool_vector_comprehensive_bitset_set_operations() {
                    (funcall 'neovm--bvc-to-list or-nots)))))
     (fmakunbound 'neovm--bvc-make-set)
     (fmakunbound 'neovm--bvc-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -342,5 +342,5 @@ fn oracle_prop_bool_vector_comprehensive_in_place_destination() {
           (list union-pop inter-pop xor-pop not-pop
                 ;; Verify dest contents after not
                 (aref dest 0) (aref dest 1) (aref dest 2) (aref dest 3)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

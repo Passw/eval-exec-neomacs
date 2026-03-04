@@ -5,7 +5,7 @@
 //! string-trim variants with custom TRIM-CHARS, string-chop-newline.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // substring: exhaustive parameter combinations
@@ -16,44 +16,44 @@ fn oracle_prop_substring_comprehensive_params() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Basic: START only
-    assert_oracle_parity(r#"(substring "abcdefgh" 0)"#);
-    assert_oracle_parity(r#"(substring "abcdefgh" 3)"#);
-    assert_oracle_parity(r#"(substring "abcdefgh" 7)"#);
-    assert_oracle_parity(r#"(substring "abcdefgh" 8)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" 0)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" 3)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" 7)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" 8)"#);
 
     // START and END both positive
-    assert_oracle_parity(r#"(substring "abcdefgh" 0 0)"#);
-    assert_oracle_parity(r#"(substring "abcdefgh" 0 8)"#);
-    assert_oracle_parity(r#"(substring "abcdefgh" 2 5)"#);
-    assert_oracle_parity(r#"(substring "abcdefgh" 4 4)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" 0 0)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" 0 8)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" 2 5)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" 4 4)"#);
 
     // Negative START (counts from end)
-    assert_oracle_parity(r#"(substring "abcdefgh" -1)"#);
-    assert_oracle_parity(r#"(substring "abcdefgh" -8)"#);
-    assert_oracle_parity(r#"(substring "abcdefgh" -3)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" -1)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" -8)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" -3)"#);
 
     // Negative END
-    assert_oracle_parity(r#"(substring "abcdefgh" 0 -1)"#);
-    assert_oracle_parity(r#"(substring "abcdefgh" 0 -7)"#);
-    assert_oracle_parity(r#"(substring "abcdefgh" 2 -2)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" 0 -1)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" 0 -7)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" 2 -2)"#);
 
     // Both negative
-    assert_oracle_parity(r#"(substring "abcdefgh" -6 -2)"#);
-    assert_oracle_parity(r#"(substring "abcdefgh" -4 -1)"#);
-    assert_oracle_parity(r#"(substring "abcdefgh" -8 -0)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" -6 -2)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" -4 -1)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" -8 -0)"#);
 
     // Positive START, negative END
-    assert_oracle_parity(r#"(substring "abcdefgh" 1 -1)"#);
-    assert_oracle_parity(r#"(substring "abcdefgh" 3 -2)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" 1 -1)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "abcdefgh" 3 -2)"#);
 
     // Single character string
-    assert_oracle_parity(r#"(substring "x" 0)"#);
-    assert_oracle_parity(r#"(substring "x" 0 1)"#);
-    assert_oracle_parity(r#"(substring "x" -1)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "x" 0)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "x" 0 1)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "x" -1)"#);
 
     // Empty result
-    assert_oracle_parity(r#"(substring "hello" 3 3)"#);
-    assert_oracle_parity(r#"(substring "" 0)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "hello" 3 3)"#);
+    assert_oracle_parity_with_bootstrap(r#"(substring "" 0)"#);
 
     // Combined with let to test programmatic usage
     let form = r#"(let ((s "The quick brown fox jumps"))
@@ -61,7 +61,7 @@ fn oracle_prop_substring_comprehensive_params() {
                           (substring s -5)
                           (substring s 10 -5)
                           (substring s -15 -10)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,26 +73,26 @@ fn oracle_prop_concat_comprehensive_types() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Zero args
-    assert_oracle_parity(r#"(concat)"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat)"#);
 
     // Single arg of each type
-    assert_oracle_parity(r#"(concat "hello")"#);
-    assert_oracle_parity(r#"(concat '(104 101 108 108 111))"#);
-    assert_oracle_parity(r#"(concat [104 101 108 108 111])"#);
-    assert_oracle_parity(r#"(concat nil)"#);
-    assert_oracle_parity(r#"(concat "")"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat "hello")"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat '(104 101 108 108 111))"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat [104 101 108 108 111])"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat nil)"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat "")"#);
 
     // Two args, all type combinations
-    assert_oracle_parity(r#"(concat "hel" "lo")"#);
-    assert_oracle_parity(r#"(concat "hel" '(108 111))"#);
-    assert_oracle_parity(r#"(concat '(104 101) "llo")"#);
-    assert_oracle_parity(r#"(concat [104 101] [108 108 111])"#);
-    assert_oracle_parity(r#"(concat "abc" [100 101 102])"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat "hel" "lo")"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat "hel" '(108 111))"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat '(104 101) "llo")"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat [104 101] [108 108 111])"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat "abc" [100 101 102])"#);
 
     // Three+ args mixed
-    assert_oracle_parity(r#"(concat "a" '(98) [99] "d" nil "e")"#);
-    assert_oracle_parity(r#"(concat "" "" "" "" "")"#);
-    assert_oracle_parity(r#"(concat "x" nil nil nil "y")"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat "a" '(98) [99] "d" nil "e")"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat "" "" "" "" "")"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat "x" nil nil nil "y")"#);
 
     // Concat building up a string in a loop
     let form = r#"(let ((result "")
@@ -100,14 +100,14 @@ fn oracle_prop_concat_comprehensive_types() {
                     (dolist (w words)
                       (setq result (concat result (if (string= result "") "" " ") w)))
                     result)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // Many arguments via apply
     let form2 = r#"(apply #'concat (mapcar #'number-to-string '(1 2 3 4 5 6 7 8 9 0)))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // Concat with multibyte characters
-    assert_oracle_parity(r#"(concat '(955 945 956 946 948 945))"#);
+    assert_oracle_parity_with_bootstrap(r#"(concat '(955 945 956 946 948 945))"#);
 }
 
 // ---------------------------------------------------------------------------
@@ -381,7 +381,7 @@ fn oracle_prop_string_manipulation_pipeline() {
                            (no-special (replace-regexp-in-string "[^a-z0-9 ]" "" lowered))
                            (hyphenated (replace-regexp-in-string " +" "-" no-special)))
                       (list trimmed lowered no-special hyphenated)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // CSV parser: split lines, split fields, trim each
     let form2 = r#"(let ((csv "name, age, city\nAlice, 30, NYC\nBob, 25, LA"))
@@ -392,7 +392,7 @@ fn oracle_prop_string_manipulation_pipeline() {
                               (lambda (field) (string-trim field))
                               (split-string line "," nil)))
                           lines)))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // Word frequency counter using string operations
     let form3 = r#"(let* ((text "the cat sat on the mat the cat")
@@ -404,7 +404,7 @@ fn oracle_prop_string_manipulation_pipeline() {
                              (setcdr entry (1+ (cdr entry)))
                            (setq counts (cons (cons w 1) counts)))))
                      (sort counts (lambda (a b) (> (cdr a) (cdr b)))))"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 }
 
 // ---------------------------------------------------------------------------
@@ -416,17 +416,17 @@ fn oracle_prop_string_replace_vs_regexp_replace() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // string-replace is literal (not regex)
-    assert_oracle_parity(r#"(string-replace "." "!" "a.b.c")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-replace "." "!" "a.b.c")"#);
     // replace-regexp-in-string treats . as any char
-    assert_oracle_parity(r#"(replace-regexp-in-string "\\." "!" "a.b.c")"#);
+    assert_oracle_parity_with_bootstrap(r#"(replace-regexp-in-string "\\." "!" "a.b.c")"#);
 
     // Bracket differences
-    assert_oracle_parity(r#"(string-replace "[x]" "Y" "a[x]b[x]c")"#);
-    assert_oracle_parity(r#"(replace-regexp-in-string "\\[x\\]" "Y" "a[x]b[x]c")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-replace "[x]" "Y" "a[x]b[x]c")"#);
+    assert_oracle_parity_with_bootstrap(r#"(replace-regexp-in-string "\\[x\\]" "Y" "a[x]b[x]c")"#);
 
     // Backslash handling
-    assert_oracle_parity(r#"(string-replace "+" "plus" "1+2+3")"#);
-    assert_oracle_parity(r#"(replace-regexp-in-string "\\+" "plus" "1+2+3")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-replace "+" "plus" "1+2+3")"#);
+    assert_oracle_parity_with_bootstrap(r#"(replace-regexp-in-string "\\+" "plus" "1+2+3")"#);
 
     // Multi-step transformation
     let form = r#"(let ((s "Hello World 123 Foo"))
@@ -439,5 +439,5 @@ fn oracle_prop_string_replace_vs_regexp_replace() {
                       (replace-regexp-in-string "\\([A-Za-z]+\\)" "[\\1]" s)
                       ;; Regex with START offset
                       (replace-regexp-in-string "[A-Z]" "x" s nil nil nil nil 6)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

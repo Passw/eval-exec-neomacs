@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // `or` as default value pattern
@@ -27,7 +27,7 @@ fn oracle_prop_idiom_or_default_value() {
     ;; lang is missing from config, so default "en" is used
     ;; name and indent have values and are used as-is
     (list name theme indent lang)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -52,7 +52,7 @@ fn oracle_prop_idiom_and_short_circuit_guard() {
              (setq eligible
                    (cons (cdr (assq 'name info)) eligible)))))
     (nreverse eligible)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ fn oracle_prop_idiom_alist_crud() {
                         (mapcar #'car db))
                   log))
   (nreverse log))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ fn oracle_prop_idiom_plist_manipulation() {
             (plist-get cleaned :height)
             (plist-get cleaned :color)
             (plist-get cleaned :visible)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +195,7 @@ fn oracle_prop_idiom_buffer_local_simulation() {
      (list (funcall get-var "unknown.txt" 'indent-width)
            (funcall get-var "unknown.txt" 'tab-mode)
            (funcall get-var "unknown.txt" 'line-wrap)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +235,7 @@ fn oracle_prop_idiom_while_multiple_accumulators() {
         (list 'neg neg-sum neg-count)
         (list 'range min-val max-val)
         (list 'running (nreverse running))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -354,5 +354,5 @@ fn oracle_prop_idiom_full_pipeline() {
       (sort stats (lambda (a b)
                     (> (cdr (nth 2 a))
                        (cdr (nth 2 b))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

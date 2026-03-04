@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-keymap vs make-sparse-keymap differences
@@ -63,7 +63,7 @@ fn oracle_prop_define_key_various_sequences() {
                       (keymapp (lookup-key m (kbd "C-x")))
                       ;; Full sequence
                       (lookup-key m (kbd "C-x C-f"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ fn oracle_prop_lookup_key_return_types() {
                         (if (numberp result)
                             (list 'too-long result)
                           result))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ fn oracle_prop_keymap_parent_chain() {
                     (eq (keymap-parent child) parent)
                     (eq (keymap-parent parent) grandparent)
                     (keymap-parent grandparent)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ fn oracle_prop_copy_keymap_independence() {
                       ;; Both are keymaps
                       (keymapp orig)
                       (keymapp copy))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ fn oracle_prop_keymap_shadowing() {
                         ;; Parent unchanged
                         (lookup-key parent [?x])
                         (lookup-key parent [?y])))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -274,5 +274,5 @@ fn oracle_prop_keymapp_various_objects() {
                     (let ((m (make-sparse-keymap)))
                       (define-key m (kbd "C-x C-f") 'find-file)
                       (keymapp (lookup-key m (kbd "C-x")))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

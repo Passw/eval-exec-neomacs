@@ -2,7 +2,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_err_kind, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_charset_basics() {
@@ -35,5 +35,5 @@ fn oracle_prop_encode_char_unknown_charset_error() {
 fn oracle_prop_decode_char_out_of_range_error_shape() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(decode-char 'ucs -1)");
+    assert_oracle_parity_with_bootstrap("(decode-char 'ucs -1)");
 }

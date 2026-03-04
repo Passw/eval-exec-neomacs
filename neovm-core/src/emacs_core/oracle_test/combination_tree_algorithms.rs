@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Binary search tree: insert, lookup, delete, in-order traversal
@@ -135,7 +135,7 @@ fn oracle_prop_tree_bst_operations() {
     (fmakunbound 'neovm--test-bst-inorder)
     (fmakunbound 'neovm--test-bst-min)
     (fmakunbound 'neovm--test-bst-delete)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +237,7 @@ fn oracle_prop_tree_height_balance() {
     (fmakunbound 'neovm--test-tree-balanced-p)
     (fmakunbound 'neovm--test-tree-count)
     (fmakunbound 'neovm--test-tree-leaves)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -330,7 +330,7 @@ fn oracle_prop_tree_lca() {
     (fmakunbound 'neovm--test-tree-contains)
     (fmakunbound 'neovm--test-tree-lca)
     (fmakunbound 'neovm--test-tree-path)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -421,7 +421,7 @@ fn oracle_prop_tree_serialize_deserialize() {
     (fmakunbound 'neovm--test-tree-deserialize)
     (fmakunbound 'neovm--test-tree-inorder)
     (fmakunbound 'neovm--test-tree-preorder)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -536,7 +536,7 @@ fn oracle_prop_tree_map_fold() {
     (fmakunbound 'neovm--test-tree-filter)
     (fmakunbound 'neovm--test-tree-zip)
     (fmakunbound 'neovm--test-tree-flatten)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -683,7 +683,7 @@ fn oracle_prop_tree_trie_string_lookup() {
     (fmakunbound 'neovm--test-trie-autocomplete)
     (fmakunbound 'neovm--test-trie-delete)
     (fmakunbound 'neovm--test-trie-count-words)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -771,5 +771,5 @@ fn oracle_prop_tree_level_order_and_mirror() {
     (fmakunbound 'neovm--test-tree-mirror)
     (fmakunbound 'neovm--test-tree-inorder2)
     (fmakunbound 'neovm--test-tree-same-shape)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

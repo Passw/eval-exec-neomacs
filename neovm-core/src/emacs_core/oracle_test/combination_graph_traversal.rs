@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // BFS with alist adjacency lists and distance tracking
@@ -63,7 +63,7 @@ fn oracle_prop_graph_traversal_bfs_alist() {
                 (length (car result)))))  ;; should visit all 8 nodes
     (fmakunbound 'neovm--gt-neighbors)
     (fmakunbound 'neovm--gt-bfs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ fn oracle_prop_graph_traversal_dfs_iterative_stack() {
                 ;; Verify all nodes finished
                 (= (length (cadr result)) 6))))
     (fmakunbound 'neovm--gt-dfs-iterative)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ fn oracle_prop_graph_traversal_topological_sort_alist() {
     (fmakunbound 'neovm--gt-topo-sort)
     (fmakunbound 'neovm--gt-topo-visit)
     (fmakunbound 'neovm--gt-verify-topo)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -271,7 +271,7 @@ fn oracle_prop_graph_traversal_cycle_detection() {
         (nreverse results))
     (fmakunbound 'neovm--gt-detect-cycles)
     (fmakunbound 'neovm--gt-cycle-visit)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -356,7 +356,7 @@ fn oracle_prop_graph_traversal_shortest_path_bfs() {
     (fmakunbound 'neovm--gt-build-undirected)
     (fmakunbound 'neovm--gt-bfs-paths)
     (fmakunbound 'neovm--gt-reconstruct)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -436,7 +436,7 @@ fn oracle_prop_graph_traversal_connected_components() {
                 (list 'all-components
                       (mapcar (lambda (c) (cdr c)) components)))))
     (fmakunbound 'neovm--gt-find-cc)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -550,5 +550,5 @@ fn oracle_prop_graph_traversal_topology_properties() {
     (fmakunbound 'neovm--gt-degree-seq)
     (fmakunbound 'neovm--gt-bfs-max-dist)
     (fmakunbound 'neovm--gt-diameter)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
