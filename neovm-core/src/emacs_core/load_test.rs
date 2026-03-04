@@ -839,7 +839,7 @@ fn macroexpand_all_pcase_terminates() {
     eval.set_variable("load-path", Value::list(load_path_entries));
     eval.set_variable("dump-mode", Value::symbol("pbootstrap"));
     eval.set_variable("purify-flag", Value::Nil);
-    eval.set_variable("max-lisp-eval-depth", Value::Int(4200));
+    eval.set_variable("max-lisp-eval-depth", Value::Int(1600));
 
     let load_path = get_load_path(&eval.obarray());
     let load_and_report =
@@ -937,7 +937,7 @@ fn pcase_integer_literal_pattern() {
     eval.set_variable("load-path", Value::list(load_path_entries));
     eval.set_variable("dump-mode", Value::symbol("pbootstrap"));
     eval.set_variable("purify-flag", Value::Nil);
-    eval.set_variable("max-lisp-eval-depth", Value::Int(4200));
+    eval.set_variable("max-lisp-eval-depth", Value::Int(1600));
 
     let load_path = get_load_path(&eval.obarray());
     let load_and_report =

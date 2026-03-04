@@ -1301,7 +1301,7 @@ pub fn create_bootstrap_evaluator() -> Result<super::eval::Evaluator, EvalError>
     eval.set_variable("load-path", Value::list(load_path_entries));
     eval.set_variable("dump-mode", Value::symbol("pbootstrap"));
     eval.set_variable("purify-flag", Value::Nil);
-    eval.set_variable("max-lisp-eval-depth", Value::Int(4200));
+    eval.set_variable("max-lisp-eval-depth", Value::Int(1600));
     eval.set_variable("inhibit-load-charset-map", Value::True);
     // data-directory: directory of machine-independent data files (etc/)
     let etc_dir = project_root.join("etc");
