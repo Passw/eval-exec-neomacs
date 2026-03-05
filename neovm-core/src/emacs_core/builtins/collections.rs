@@ -503,7 +503,8 @@ pub(crate) fn builtin_puthash(args: Vec<Value>) -> EvalResult {
                 maybe_resize_hash_table_for_insert(ht, inserting_new_key);
                 ht.data.insert(key.clone(), args[1]);
                 if inserting_new_key {
-                    ht.key_snapshots.insert(key, args[0]);
+                    ht.key_snapshots.insert(key.clone(), args[0]);
+                    ht.insertion_order.push(key);
                 }
             });
             Ok(args[1])
@@ -525,6 +526,7 @@ pub(crate) fn builtin_remhash(args: Vec<Value>) -> EvalResult {
                 let ht = h.get_hash_table_mut(*ht_id);
                 ht.data.remove(&key);
                 ht.key_snapshots.remove(&key);
+                ht.insertion_order.retain(|k| k != &key);
             });
             Ok(Value::Nil)
         }
@@ -543,6 +545,7 @@ pub(crate) fn builtin_clrhash(args: Vec<Value>) -> EvalResult {
                 let ht = h.get_hash_table_mut(*ht_id);
                 ht.data.clear();
                 ht.key_snapshots.clear();
+                ht.insertion_order.clear();
             });
             Ok(Value::Nil)
         }

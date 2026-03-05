@@ -10,10 +10,12 @@ fn hash_table_keys_values_basics() {
         with_heap_mut(|h| {
             let raw = h.get_hash_table_mut(*ht);
             let test = raw.test.clone();
-            raw.data
-                .insert(Value::symbol("alpha").to_hash_key(&test), Value::Int(1));
-            raw.data
-                .insert(Value::symbol("beta").to_hash_key(&test), Value::Int(2));
+            let key_alpha = Value::symbol("alpha").to_hash_key(&test);
+            raw.data.insert(key_alpha.clone(), Value::Int(1));
+            raw.insertion_order.push(key_alpha);
+            let key_beta = Value::symbol("beta").to_hash_key(&test);
+            raw.data.insert(key_beta.clone(), Value::Int(2));
+            raw.insertion_order.push(key_beta);
         });
     } else {
         panic!("expected hash table");
@@ -445,14 +447,12 @@ fn internal_hash_table_buckets_report_hash_diagnostics() {
         with_heap_mut(|h| {
             let raw = h.get_hash_table_mut(*ht);
             let test = raw.test.clone();
-            raw.data.insert(
-                Value::string("a").to_hash_key(&test),
-                Value::symbol("value-a"),
-            );
-            raw.data.insert(
-                Value::string("b").to_hash_key(&test),
-                Value::symbol("value-b"),
-            );
+            let key_a = Value::string("a").to_hash_key(&test);
+            raw.data.insert(key_a.clone(), Value::symbol("value-a"));
+            raw.insertion_order.push(key_a);
+            let key_b = Value::string("b").to_hash_key(&test);
+            raw.data.insert(key_b.clone(), Value::symbol("value-b"));
+            raw.insertion_order.push(key_b);
         });
     } else {
         panic!("expected hash table");

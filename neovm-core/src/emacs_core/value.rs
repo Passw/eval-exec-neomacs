@@ -382,6 +382,9 @@ pub struct LispHashTable {
     /// Original key objects for diagnostics/iteration where pointer-identity
     /// keys cannot be reconstructed from `HashKey`.
     pub key_snapshots: HashMap<HashKey, Value>,
+    /// Insertion order for keys — used by `maphash` to iterate in the same
+    /// order as GNU Emacs (insertion order for freshly-created tables).
+    pub insertion_order: Vec<HashKey>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -540,6 +543,7 @@ impl LispHashTable {
             rehash_threshold,
             data: HashMap::with_capacity(size.max(0) as usize),
             key_snapshots: HashMap::with_capacity(size.max(0) as usize),
+            insertion_order: Vec::with_capacity(size.max(0) as usize),
         }
     }
 }

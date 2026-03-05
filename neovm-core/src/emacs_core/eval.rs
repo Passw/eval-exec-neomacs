@@ -2566,6 +2566,11 @@ impl Evaluator {
                         if ht.key_snapshots.remove(&HashKey::Ptr(old_ptr)).is_some() {
                             ht.key_snapshots.insert(HashKey::Ptr(new_ptr), *to);
                         }
+                        for k in &mut ht.insertion_order {
+                            if *k == HashKey::Ptr(old_ptr) {
+                                *k = HashKey::Ptr(new_ptr);
+                            }
+                        }
                     }
                 }
                 for item in ht.data.values_mut() {

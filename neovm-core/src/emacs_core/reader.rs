@@ -354,7 +354,8 @@ fn first_form_hash_table_literal_value(expr: &Expr) -> Option<Value> {
                     let inserting_new_key = !table.data.contains_key(&key);
                     table.data.insert(key.clone(), val_value);
                     if inserting_new_key {
-                        table.key_snapshots.insert(key, key_value);
+                        table.key_snapshots.insert(key.clone(), key_value);
+                        table.insertion_order.push(key);
                     }
                     idx += 2;
                 }

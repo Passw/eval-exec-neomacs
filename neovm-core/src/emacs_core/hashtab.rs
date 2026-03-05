@@ -419,10 +419,12 @@ fn internal_hash_table_nonempty_buckets(table: &LispHashTable) -> Vec<Vec<(Value
     let index_bits = bucket_count.trailing_zeros();
     let test = table.test.clone();
     let mut buckets: Vec<Vec<(Value, i64)>> = vec![Vec::new(); bucket_count];
-    for key in table.data.keys() {
-        let hash = internal_hash_table_diagnostic_hash(key, test.clone());
-        let index = knuth_hash_index(hash, index_bits);
-        buckets[index].push((hash_key_to_visible_value(table, key), hash as i64));
+    for key in &table.insertion_order {
+        if table.data.contains_key(key) {
+            let hash = internal_hash_table_diagnostic_hash(key, test.clone());
+            let index = knuth_hash_index(hash, index_bits);
+            buckets[index].push((hash_key_to_visible_value(table, key), hash as i64));
+        }
     }
     for bucket in &mut buckets {
         bucket.sort_by_key(|(key, hash)| (print_value(key), *hash));
@@ -551,8 +553,9 @@ pub(crate) fn builtin_hash_table_keys(args: Vec<Value>) -> EvalResult {
         Value::HashTable(ht) => {
             let table = with_heap(|h| h.get_hash_table(*ht).clone());
             let keys: Vec<Value> = table
-                .data
-                .keys()
+                .insertion_order
+                .iter()
+                .filter(|k| table.data.contains_key(k))
                 .map(|key| hash_key_to_visible_value(&table, key))
                 .collect();
             Ok(Value::list(keys))
@@ -571,7 +574,11 @@ pub(crate) fn builtin_hash_table_values(args: Vec<Value>) -> EvalResult {
     match &args[0] {
         Value::HashTable(ht) => {
             let table = with_heap(|h| h.get_hash_table(*ht).clone());
-            let values: Vec<Value> = table.data.values().cloned().collect();
+            let values: Vec<Value> = table
+                .insertion_order
+                .iter()
+                .filter_map(|k| table.data.get(k).cloned())
+                .collect();
             Ok(Value::list(values))
         }
         other => Err(signal(
@@ -694,9 +701,14 @@ pub(crate) fn builtin_maphash(eval: &mut super::eval::Evaluator, args: Vec<Value
         Value::HashTable(ht) => {
             let table = with_heap(|h| h.get_hash_table(*ht).clone());
             table
-                .data
+                .insertion_order
                 .iter()
-                .map(|(k, v)| (hash_key_to_visible_value(&table, k), *v))
+                .filter_map(|k| {
+                    table
+                        .data
+                        .get(k)
+                        .map(|v| (hash_key_to_visible_value(&table, k), *v))
+                })
                 .collect()
         }
         other => {

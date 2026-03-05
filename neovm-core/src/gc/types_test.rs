@@ -43,7 +43,9 @@ fn trace_values_hash_table() {
     let mut ht = LispHashTable::new(HashTableTest::Equal);
     // Insert a key/value pair via the data map directly
     use crate::emacs_core::value::HashKey;
-    ht.data.insert(HashKey::Int(1), Value::Int(42));
+    let key = HashKey::Int(1);
+    ht.data.insert(key.clone(), Value::Int(42));
+    ht.insertion_order.push(key);
     let obj = HeapObject::HashTable(ht);
     let traced = obj.trace_values();
     // At minimum the data value should be traced

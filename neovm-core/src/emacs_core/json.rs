@@ -906,7 +906,8 @@ impl<'a> JsonParser<'a> {
                         let inserting_new_key = !table.data.contains_key(&hash_key);
                         table.data.insert(hash_key.clone(), val);
                         if inserting_new_key {
-                            table.key_snapshots.insert(hash_key, key_val);
+                            table.key_snapshots.insert(hash_key.clone(), key_val);
+                            table.insertion_order.push(hash_key);
                         }
                     });
                 }

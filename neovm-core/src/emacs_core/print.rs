@@ -550,15 +550,17 @@ fn format_hash_table(id: crate::gc::types::ObjId) -> String {
     if !table.data.is_empty() {
         out.push_str(" data (");
         let mut first = true;
-        for (key, val) in &table.data {
-            if !first {
+        for key in &table.insertion_order {
+            if let Some(val) = table.data.get(key) {
+                if !first {
+                    out.push(' ');
+                }
+                let key_val = super::hashtab::hash_key_to_visible_value(&table, key);
+                out.push_str(&print_value(&key_val));
                 out.push(' ');
+                out.push_str(&print_value(val));
+                first = false;
             }
-            let key_val = super::hashtab::hash_key_to_visible_value(&table, key);
-            out.push_str(&print_value(&key_val));
-            out.push(' ');
-            out.push_str(&print_value(val));
-            first = false;
         }
         out.push(')');
     }
