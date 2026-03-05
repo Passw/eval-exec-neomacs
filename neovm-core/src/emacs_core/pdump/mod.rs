@@ -136,9 +136,12 @@ fn reconstruct_evaluator(state: DumpEvaluatorState) -> Result<Evaluator, DumpErr
     let mut interner = Box::new(load_interner(&state.interner));
     set_current_interner(&mut interner);
 
-    // 2. Reconstruct heap and set thread-local
+    // 2. Reconstruct heap (phase 1: all objects except hash table entries)
     let mut heap = Box::new(load_heap(&state.heap));
     set_current_heap(&mut heap);
+
+    // 2b. Phase 2: populate hash table entries (requires CURRENT_HEAP for HashKey::Str hashing)
+    load_heap_hash_tables(&mut heap, &state.heap);
 
     // 3. Reset thread-local caches (same as Evaluator::new())
     super::syntax::reset_syntax_thread_locals();
@@ -238,6 +241,46 @@ mod tests {
         let path = dir.path().join("bad.pdump");
         std::fs::write(&path, b"BADMAGIC").unwrap();
         assert!(matches!(load_from_dump(&path), Err(DumpError::BadMagic)));
+    }
+
+    #[test]
+    fn test_pdump_round_trip_bootstrap() {
+        // Bootstrap, dump, load, and verify eval works on loaded state
+        let eval = crate::emacs_core::load::create_bootstrap_evaluator()
+            .expect("bootstrap should succeed");
+
+        let dir = tempfile::tempdir().unwrap();
+        let dump_path = dir.path().join("bootstrap.pdump");
+
+        let dump_start = std::time::Instant::now();
+        dump_to_file(&eval, &dump_path).expect("dump should succeed");
+        let dump_time = dump_start.elapsed();
+        let file_size = std::fs::metadata(&dump_path).unwrap().len();
+        eprintln!("pdump: dump took {dump_time:.2?}, file size: {file_size} bytes ({:.1} MB)", file_size as f64 / 1048576.0);
+
+        // Drop original evaluator before loading to test standalone load
+        drop(eval);
+
+        let load_start = std::time::Instant::now();
+        let mut loaded = load_from_dump(&dump_path).expect("load should succeed");
+        let load_time = load_start.elapsed();
+        eprintln!("pdump: load took {load_time:.2?}");
+
+        // Verify the loaded evaluator can evaluate Elisp
+        let forms = crate::emacs_core::parser::parse_forms("(+ 1 2)").unwrap();
+        let result = loaded.eval_expr(&forms[0]).expect("eval should succeed");
+        assert_eq!(result, Value::Int(3));
+
+        // Verify features survived (bootstrap sets many features)
+        // Note: subr.el does NOT call (provide 'subr); use 'backquote instead
+        let forms = crate::emacs_core::parser::parse_forms("(featurep 'backquote)").unwrap();
+        let result = loaded.eval_expr(&forms[0]).expect("featurep should succeed");
+        assert_eq!(result, Value::True, "featurep 'backquote should be t");
+
+        // Verify a bootstrapped function works
+        let forms = crate::emacs_core::parser::parse_forms("(length '(a b c))").unwrap();
+        let result = loaded.eval_expr(&forms[0]).expect("eval should succeed");
+        assert_eq!(result, Value::Int(3));
     }
 
     #[test]

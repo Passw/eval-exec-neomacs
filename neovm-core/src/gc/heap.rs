@@ -688,6 +688,11 @@ impl LispHeap {
         &self.objects
     }
 
+    /// Mutable access to objects (for pdump hash table phase 2).
+    pub(crate) fn objects_mut(&mut self) -> &mut [HeapObject] {
+        &mut self.objects
+    }
+
     /// Access generation counters (for pdump serialization).
     pub(crate) fn generations(&self) -> &[u32] {
         &self.generations

@@ -1610,6 +1610,108 @@ pub fn create_bootstrap_evaluator() -> Result<super::eval::Evaluator, EvalError>
 
     Ok(eval)
 }
+
+/// Create a bootstrap evaluator, using a pdump cache file if available.
+///
+/// On first call, performs the full bootstrap and saves the result to a
+/// `.pdump` file next to the `lisp/` directory. On subsequent calls,
+/// loads from the dump file (~10-50ms vs 3-5s bootstrap).
+///
+/// The dump file is automatically invalidated when the pdump format
+/// version changes. Set `NEOVM_DISABLE_PDUMP=1` to force fresh bootstrap.
+pub fn create_bootstrap_evaluator_cached() -> Result<super::eval::Evaluator, EvalError> {
+    use super::pdump;
+
+    // Allow disabling pdump via env var
+    if std::env::var("NEOVM_DISABLE_PDUMP").unwrap_or_default() == "1" {
+        return create_bootstrap_evaluator();
+    }
+
+    let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest.parent().expect("project root");
+    let dump_path = project_root.join("target").join("neovm-bootstrap.pdump");
+
+    // Try loading from dump first
+    if dump_path.exists() {
+        let start = std::time::Instant::now();
+        match pdump::load_from_dump(&dump_path) {
+            Ok(mut eval) => {
+                tracing::info!(
+                    "pdump: loaded bootstrap state from {} ({:.2?})",
+                    dump_path.display(),
+                    start.elapsed()
+                );
+                // Re-set load-path since it contains absolute paths that may differ
+                let lisp_dir = project_root.join("lisp");
+                let subdirs = [
+                    "", "emacs-lisp", "progmodes", "language", "international",
+                    "textmodes", "vc", "leim",
+                ];
+                let mut load_path_entries = Vec::new();
+                for sub in &subdirs {
+                    let dir = if sub.is_empty() {
+                        lisp_dir.clone()
+                    } else {
+                        lisp_dir.join(sub)
+                    };
+                    if dir.is_dir() {
+                        load_path_entries.push(Value::string(dir.to_string_lossy().to_string()));
+                    }
+                }
+                eval.set_variable("load-path", Value::list(load_path_entries));
+
+                // Re-set directory paths
+                let etc_dir = project_root.join("etc");
+                eval.set_variable(
+                    "data-directory",
+                    Value::string(format!("{}/", etc_dir.to_string_lossy())),
+                );
+                eval.set_variable(
+                    "source-directory",
+                    Value::string(format!("{}/", project_root.to_string_lossy())),
+                );
+                eval.set_variable(
+                    "installation-directory",
+                    Value::string(format!("{}/", project_root.to_string_lossy())),
+                );
+
+                return Ok(eval);
+            }
+            Err(e) => {
+                tracing::warn!("pdump: load failed ({e}), falling back to full bootstrap");
+            }
+        }
+    }
+
+    // Full bootstrap
+    let start = std::time::Instant::now();
+    let eval = create_bootstrap_evaluator()?;
+    let bootstrap_time = start.elapsed();
+
+    // Save dump for next time
+    // Ensure target/ directory exists
+    let target_dir = project_root.join("target");
+    if !target_dir.exists() {
+        let _ = std::fs::create_dir_all(&target_dir);
+    }
+    let dump_start = std::time::Instant::now();
+    match pdump::dump_to_file(&eval, &dump_path) {
+        Ok(()) => {
+            tracing::info!(
+                "pdump: saved bootstrap state to {} ({:.2?}, bootstrap took {:.2?})",
+                dump_path.display(),
+                dump_start.elapsed(),
+                bootstrap_time,
+            );
+        }
+        Err(e) => {
+            tracing::warn!("pdump: failed to save ({e}), will bootstrap again next time");
+        }
+    }
+
+    Ok(eval)
+}
+
 #[cfg(test)]
 #[path = "load_test.rs"]
 mod tests;

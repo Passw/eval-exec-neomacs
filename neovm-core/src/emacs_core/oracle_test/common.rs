@@ -240,8 +240,9 @@ pub(crate) fn assert_oracle_parity_with_load(form: &str, load_files: &[&str]) {
 }
 
 /// Run a NeoVM evaluation using a fully bootstrapped evaluator.
+/// Uses pdump cache when available for faster startup.
 pub(crate) fn run_neovm_eval_with_bootstrap(form: &str) -> Result<String, String> {
-    let mut eval = crate::emacs_core::load::create_bootstrap_evaluator()
+    let mut eval = crate::emacs_core::load::create_bootstrap_evaluator_cached()
         .map_err(|e| format!("bootstrap failed: {e:?}"))?;
 
     let forms = parse_forms(form).map_err(|e| format!("parse error: {e}"))?;

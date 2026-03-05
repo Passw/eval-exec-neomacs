@@ -1311,7 +1311,10 @@ pub(crate) fn load_hash_table(ht: &DumpLispHashTable) -> LispHashTable {
 
 // --- Heap objects ---
 
-pub(crate) fn load_heap_object(obj: &DumpHeapObject) -> HeapObject {
+/// Load a heap object, but defer hash table population.
+/// Hash tables need CURRENT_HEAP set for HashKey::Str hashing,
+/// so we create empty placeholders first, then populate after heap is set.
+fn load_heap_object_phase1(obj: &DumpHeapObject) -> HeapObject {
     match obj {
         DumpHeapObject::Cons { car, cdr } => HeapObject::Cons {
             car: load_value(car),
@@ -1320,7 +1323,20 @@ pub(crate) fn load_heap_object(obj: &DumpHeapObject) -> HeapObject {
         DumpHeapObject::Vector(items) => {
             HeapObject::Vector(items.iter().map(load_value).collect())
         }
-        DumpHeapObject::HashTable(ht) => HeapObject::HashTable(load_hash_table(ht)),
+        DumpHeapObject::HashTable(ht) => {
+            // Create empty hash table with correct metadata; entries populated in phase 2
+            HeapObject::HashTable(LispHashTable {
+                test: load_hash_table_test(&ht.test),
+                test_name: ht.test_name.map(|s| load_sym_id(&s)),
+                size: ht.size,
+                weakness: ht.weakness.as_ref().map(load_hash_table_weakness),
+                rehash_size: ht.rehash_size,
+                rehash_threshold: ht.rehash_threshold,
+                data: HashMap::new(),
+                key_snapshots: HashMap::new(),
+                insertion_order: Vec::new(),
+            })
+        }
         DumpHeapObject::Str(s) => HeapObject::Str(s.clone()),
         DumpHeapObject::Lambda(d) => HeapObject::Lambda(load_lambda_data(d)),
         DumpHeapObject::Macro(d) => HeapObject::Macro(load_lambda_data(d)),
@@ -1331,9 +1347,37 @@ pub(crate) fn load_heap_object(obj: &DumpHeapObject) -> HeapObject {
 
 // --- Heap ---
 
+/// Load heap in two phases:
+/// Phase 1: Create all objects with empty hash tables (no heap access needed)
+/// Phase 2: After CURRENT_HEAP is set, populate hash table entries
+///          (HashKey::Str hashing requires heap access)
 pub(crate) fn load_heap(dh: &DumpLispHeap) -> LispHeap {
-    let objects: Vec<HeapObject> = dh.objects.iter().map(load_heap_object).collect();
+    let objects: Vec<HeapObject> = dh.objects.iter().map(load_heap_object_phase1).collect();
     LispHeap::from_dump(objects, dh.generations.clone(), dh.free_list.clone())
+}
+
+/// Phase 2: Populate hash table entries after CURRENT_HEAP is set.
+pub(crate) fn load_heap_hash_tables(heap: &mut LispHeap, dh: &DumpLispHeap) {
+    for (i, obj) in dh.objects.iter().enumerate() {
+        if let DumpHeapObject::HashTable(ht) = obj {
+            let data: HashMap<HashKey, Value> = ht
+                .entries
+                .iter()
+                .map(|(k, v)| (load_hash_key(k), load_value(v)))
+                .collect();
+            let key_snapshots: HashMap<HashKey, Value> = ht
+                .key_snapshots
+                .iter()
+                .map(|(k, v)| (load_hash_key(k), load_value(v)))
+                .collect();
+            let insertion_order: Vec<HashKey> = ht.insertion_order.iter().map(load_hash_key).collect();
+            if let HeapObject::HashTable(ref mut table) = heap.objects_mut()[i] {
+                table.data = data;
+                table.key_snapshots = key_snapshots;
+                table.insertion_order = insertion_order;
+            }
+        }
+    }
 }
 
 // --- Interner ---
