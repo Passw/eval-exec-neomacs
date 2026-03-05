@@ -1472,42 +1472,108 @@ pub(crate) fn builtin_alist_get_eval(
 }
 
 pub(crate) fn builtin_number_sequence(args: Vec<Value>) -> EvalResult {
+    use super::super::value::next_float_id;
+
     expect_min_args("number-sequence", &args, 1)?;
-    let from = expect_int(&args[0])?;
-    let to = if args.len() > 1 {
-        match &args[1] {
-            Value::Nil => return Ok(Value::list(vec![Value::Int(from)])),
-            v => expect_int(v)?,
-        }
-    } else {
-        return Ok(Value::list(vec![Value::Int(from)]));
-    };
-    let step = if args.len() > 2 {
-        expect_int(&args[2])?
-    } else if from <= to {
-        1
-    } else {
-        -1
-    };
 
-    if step == 0 {
-        return Err(signal("args-out-of-range", vec![Value::Int(0)]));
-    }
+    // Detect if any argument is a float to decide output type.
+    let use_float = args.iter().take(3).any(|v| matches!(v, Value::Float(_, _)));
 
-    let mut result = Vec::new();
-    let mut i = from;
-    if step > 0 {
-        while i <= to {
-            result.push(Value::Int(i));
-            i += step;
+    if use_float {
+        let from = expect_number(&args[0])?;
+        let to = if args.len() > 1 {
+            match &args[1] {
+                Value::Nil => {
+                    return Ok(Value::list(vec![Value::Float(from, next_float_id())]));
+                }
+                v => expect_number(v)?,
+            }
+        } else {
+            return Ok(Value::list(vec![Value::Float(from, next_float_id())]));
+        };
+
+        if from == to {
+            return Ok(Value::list(vec![Value::Float(from, next_float_id())]));
         }
+
+        let inc = if args.len() > 2 {
+            let v = expect_number(&args[2])?;
+            if v == 0.0 {
+                return Err(signal(
+                    "error",
+                    vec![Value::string("The increment can not be zero")],
+                ));
+            }
+            v
+        } else {
+            1.0
+        };
+
+        // Match subr.el: compute next = from + n * inc to reduce drift.
+        let mut seq = Vec::new();
+        let mut n: i64 = 0;
+        let mut next = from;
+        if inc > 0.0 {
+            while next <= to {
+                seq.push(Value::Float(next, next_float_id()));
+                n += 1;
+                next = from + (n as f64) * inc;
+            }
+        } else {
+            while next >= to {
+                seq.push(Value::Float(next, next_float_id()));
+                n += 1;
+                next = from + (n as f64) * inc;
+            }
+        }
+        Ok(Value::list(seq))
     } else {
-        while i >= to {
-            result.push(Value::Int(i));
-            i += step;
+        let from = expect_int(&args[0])?;
+        let to = if args.len() > 1 {
+            match &args[1] {
+                Value::Nil => return Ok(Value::list(vec![Value::Int(from)])),
+                v => expect_int(v)?,
+            }
+        } else {
+            return Ok(Value::list(vec![Value::Int(from)]));
+        };
+
+        if from == to {
+            return Ok(Value::list(vec![Value::Int(from)]));
         }
+
+        let step = if args.len() > 2 {
+            let v = expect_int(&args[2])?;
+            if v == 0 {
+                return Err(signal(
+                    "error",
+                    vec![Value::string("The increment can not be zero")],
+                ));
+            }
+            v
+        } else {
+            // Match subr.el: always default to 1 (not -1)
+            1
+        };
+
+        let mut result = Vec::new();
+        let mut n: i64 = 0;
+        let mut next = from;
+        if step > 0 {
+            while next <= to {
+                result.push(Value::Int(next));
+                n += 1;
+                next = from + n * step;
+            }
+        } else {
+            while next >= to {
+                result.push(Value::Int(next));
+                n += 1;
+                next = from + n * step;
+            }
+        }
+        Ok(Value::list(result))
     }
-    Ok(Value::list(result))
 }
 
 // ===========================================================================
