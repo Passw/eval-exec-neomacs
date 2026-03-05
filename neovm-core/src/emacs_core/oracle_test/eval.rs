@@ -224,9 +224,10 @@ proptest! {
     ) {
         return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
+        // Under lexical binding, (eval '(setq x ...)) sets the dynamic x,
+        // not the lexical x from the outer let.  The result is `initial`.
         let form = format!("(let ((x {})) (eval '(setq x {})) x)", initial, updated);
-        let expected = updated.to_string();
         let (oracle, neovm) = eval_oracle_and_neovm(&form);
-        assert_ok_eq(expected.as_str(), &oracle, &neovm);
+        assert_eq!(neovm, oracle, "neovm and oracle should match");
     }
 }
