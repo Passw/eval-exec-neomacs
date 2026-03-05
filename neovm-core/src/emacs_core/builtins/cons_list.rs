@@ -906,7 +906,8 @@ fn builtin_assoc_eval_inner(
                     if let Value::Cons(ref entry) = pair.car {
                         let entry_pair = read_cons(*entry);
                         let matches = if let Some(test_fn) = test_fn {
-                            eval.apply(*test_fn, vec![*key, entry_pair.car])?
+                            // GNU Emacs calls (TESTFN ALIST-KEY SEARCH-KEY)
+                            eval.apply(*test_fn, vec![entry_pair.car, *key])?
                                 .is_truthy()
                         } else {
                             equal_value(key, &entry_pair.car, 0)
