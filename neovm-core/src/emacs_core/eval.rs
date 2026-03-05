@@ -2722,6 +2722,7 @@ impl Evaluator {
     fn eval_backquote_list_template(&mut self, template: &Value, depth: usize) -> EvalResult {
         let mut expanded_items = Vec::new();
         let mut cursor = *template;
+        let mut dotted_tail: Option<Value> = None;
 
         while let Value::Cons(cell) = cursor {
             let pair = read_cons(cell);
@@ -2729,13 +2730,46 @@ impl Evaluator {
             cursor = pair.cdr;
             drop(pair);
 
+            // Check if cursor (the cdr) is a comma or comma-at marker.
+            // This handles dotted pairs like `(a . ,x)` where quote_to_value
+            // flattens the structure into (a , x).  After extracting car=a,
+            // cursor is (, x) which must be treated as a backquote
+            // substitution for the tail, not iterated as separate elements.
+            let tail_comma = Self::backquote_marker_arg(&cursor, ",");
+            let tail_comma_at = if tail_comma.is_none() {
+                Self::backquote_marker_arg(&cursor, ",@")
+            } else {
+                None
+            };
+
             match self.eval_backquote_element(&car, depth)? {
                 BackquoteElement::Item(value) => expanded_items.push(value),
                 BackquoteElement::Splice(mut values) => expanded_items.append(&mut values),
             }
+
+            if let Some(arg) = tail_comma {
+                dotted_tail = Some(if depth == 1 {
+                    self.eval_value(&arg)?
+                } else {
+                    let inner = self.eval_backquote_template(&arg, depth.saturating_sub(1))?;
+                    Value::list(vec![Value::symbol(","), inner])
+                });
+                break;
+            }
+            if let Some(arg) = tail_comma_at {
+                dotted_tail = Some(if depth == 1 {
+                    self.eval_value(&arg)?
+                } else {
+                    let inner = self.eval_backquote_template(&arg, depth.saturating_sub(1))?;
+                    Value::list(vec![Value::symbol(",@"), inner])
+                });
+                break;
+            }
         }
 
-        let mut tail = if cursor.is_nil() {
+        let mut tail = if let Some(dt) = dotted_tail {
+            dt
+        } else if cursor.is_nil() {
             Value::Nil
         } else {
             self.eval_backquote_template(&cursor, depth)?
