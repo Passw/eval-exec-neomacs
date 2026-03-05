@@ -366,8 +366,9 @@ impl Evaluator {
             .expect("startup seeding requires standard syntax table");
 
         // Set up standard global variables
-        obarray.set_symbol_value("most-positive-fixnum", Value::Int(i64::MAX));
-        obarray.set_symbol_value("most-negative-fixnum", Value::Int(i64::MIN));
+        // Match GNU Emacs: MOST_POSITIVE_FIXNUM = EMACS_INT_MAX >> INTTYPEBITS (>> 2)
+        obarray.set_symbol_value("most-positive-fixnum", Value::Int(i64::MAX >> 2));
+        obarray.set_symbol_value("most-negative-fixnum", Value::Int(-(i64::MAX >> 2) - 1));
         obarray.set_symbol_value("emacs-version", Value::string("29.1"));
         obarray.set_symbol_value("system-type", Value::symbol("gnu/linux"));
         obarray.set_symbol_value(

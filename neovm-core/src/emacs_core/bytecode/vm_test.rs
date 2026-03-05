@@ -7,8 +7,8 @@ fn vm_eval(src: &str) -> Result<Value, EvalError> {
     let mut compiler = Compiler::new(false);
     let mut obarray = Obarray::new();
     // Set up standard variables
-    obarray.set_symbol_value("most-positive-fixnum", Value::Int(i64::MAX));
-    obarray.set_symbol_value("most-negative-fixnum", Value::Int(i64::MIN));
+    obarray.set_symbol_value("most-positive-fixnum", Value::Int(i64::MAX >> 2));
+    obarray.set_symbol_value("most-negative-fixnum", Value::Int(-(i64::MAX >> 2) - 1));
 
     let mut dynamic: Vec<OrderedSymMap> = Vec::new();
     let mut lexenv: Value = Value::Nil;
