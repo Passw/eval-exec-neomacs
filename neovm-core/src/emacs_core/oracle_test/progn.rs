@@ -95,9 +95,12 @@ fn oracle_prop_progn_with_macro_expanding_to_progn() {
 fn oracle_prop_progn_multiple_funcall_sequencing() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
+    // With lexical binding, the lambda is created before `x` is bound in
+    // the `let`, so `x` is not captured — both GNU Emacs and NeoVM signal
+    // void-variable.
     let form = "(let ((x 0) (f (lambda () (setq x (1+ x)) x))) (progn (list (funcall f) (funcall f) (funcall f) x)))";
     let (oracle, neovm) = eval_oracle_and_neovm(form);
-    assert_ok_eq("(1 2 3 3)", &oracle, &neovm);
+    assert_eq!(neovm, oracle, "neovm and oracle should match");
 }
 
 #[test]

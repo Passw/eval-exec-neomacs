@@ -654,7 +654,7 @@ fn parse_format_spec(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> Op
 /// Apply width/alignment padding to a formatted string.
 fn apply_width(s: &str, spec: &FormatSpec) -> String {
     let w = match spec.width {
-        Some(w) if w > s.len() => w,
+        Some(w) if w > s.chars().count() => w,
         _ => return s.to_string(),
     };
     let pad_char = if spec.zero && !spec.minus { '0' } else { ' ' };
@@ -799,7 +799,7 @@ fn format_float_spec(f: f64, spec: &FormatSpec) -> String {
 /// Format a string (%s) with width and precision.
 fn format_string_spec(s: &str, spec: &FormatSpec) -> String {
     let truncated = if let Some(prec) = spec.precision {
-        if prec < s.len() {
+        if prec < s.chars().count() {
             &s[..s.char_indices().nth(prec).map_or(s.len(), |(i, _)| i)]
         } else {
             s
