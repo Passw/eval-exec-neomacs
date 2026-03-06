@@ -34,9 +34,9 @@ const CT_PARENT: usize = 2; // parent char-table or nil
 const CT_SUBTYPE: usize = 3; // sub-type symbol
 const CT_EXTRA_COUNT: usize = 4; // Value::Int — number of extra slots
 const CT_EXTRA_START: usize = 5; // first extra slot (if any)
-const CT_ALL_CHARS_SENTINEL: i64 = i64::MIN; // wildcard range set via RANGE=t
-const CT_BASE_FALLBACK_SENTINEL: i64 = i64::MIN + 1; // initial/default char fallback
 const CT_LOGICAL_LENGTH: i64 = 0x3F_FFFF;
+/// Maximum valid Unicode code point.
+const MAX_CHAR: i64 = 0x3F_FFFF;
 
 // Bool-vector fixed-layout indices:
 const BV_SIZE: usize = 1; // Value::Int — logical length
@@ -205,8 +205,6 @@ pub fn make_char_table_with_extra_slots(sub_type: Value, default: Value, n_extra
     for _ in 0..n_extras {
         vec.push(Value::Nil);
     }
-    vec.push(Value::Int(CT_BASE_FALLBACK_SENTINEL));
-    vec.push(default);
     Value::vector(vec)
 }
 
@@ -259,7 +257,7 @@ pub(crate) fn builtin_char_table_p(args: Vec<Value>) -> EvalResult {
 /// - a character (integer/char) -- set that single entry
 /// - a cons `(MIN . MAX)` -- set all characters MIN..=MAX
 /// - `nil` -- set the default value
-/// - `t` -- set all character entries (without changing the default slot)
+/// - `t` -- set the default value for all characters
 pub(crate) fn builtin_set_char_table_range(args: Vec<Value>) -> EvalResult {
     expect_args("set-char-table-range", &args, 3)?;
     let table = &args[0];
@@ -278,9 +276,9 @@ pub(crate) fn builtin_set_char_table_range(args: Vec<Value>) -> EvalResult {
         Value::Nil => {
             vec[CT_DEFAULT] = *value;
         }
-        // t -> set all characters (but keep default slot unchanged).
+        // t -> set the default value (same as nil in GNU Emacs).
         Value::True => {
-            ct_set_char(&mut vec, CT_ALL_CHARS_SENTINEL, *value);
+            vec[CT_DEFAULT] = *value;
         }
         // Single character
         Value::Int(_) | Value::Char(_) => {
@@ -357,22 +355,27 @@ fn ct_set_range(vec: &mut Vec<Value>, min: i64, max: i64, value: Value) {
 
 /// Look up a single character in the data pairs (no parent fallback).
 /// Exact character matches take priority over range matches.
+/// For multiple range matches, the LAST (most recently set) one wins,
+/// matching GNU Emacs behavior where later set-char-table-range overrides earlier.
 fn ct_get_char(vec: &[Value], ch: i64) -> Option<Value> {
     let start = ct_data_start(vec);
     let mut i = start;
+    let mut exact_match: Option<Value> = None;
     let mut range_match: Option<Value> = None;
     while i + 1 < vec.len() {
         match &vec[i] {
             Value::Int(existing) => {
                 if *existing == ch {
-                    return Some(vec[i + 1]); // exact match — immediate return
+                    // Take the last exact match (later overrides win).
+                    exact_match = Some(vec[i + 1]);
                 }
             }
             Value::Cons(cell) => {
                 // Range entry: key is (MIN . MAX)
                 let pair = read_cons(*cell);
                 if let (Value::Int(min), Value::Int(max)) = (&pair.car, &pair.cdr) {
-                    if ch >= *min && ch <= *max && range_match.is_none() {
+                    if ch >= *min && ch <= *max {
+                        // Take the last range match (later overrides win).
                         range_match = Some(vec[i + 1]);
                     }
                 }
@@ -381,7 +384,8 @@ fn ct_get_char(vec: &[Value], ch: i64) -> Option<Value> {
         }
         i += 2;
     }
-    range_match
+    // Exact match takes priority over range match.
+    exact_match.or(range_match)
 }
 
 /// `(char-table-range CHAR-TABLE RANGE)` -- look up a value.
@@ -399,7 +403,7 @@ pub(crate) fn builtin_char_table_range(args: Vec<Value>) -> EvalResult {
     }
 
     match range {
-        Value::Nil => {
+        Value::Nil | Value::True => {
             // Return the default value.
             let arc = match table {
                 Value::Vector(a) => a,
@@ -408,12 +412,6 @@ pub(crate) fn builtin_char_table_range(args: Vec<Value>) -> EvalResult {
             let vec = with_heap(|h| h.get_vector(*arc).clone());
             Ok(vec[CT_DEFAULT])
         }
-        Value::True => Err(signal(
-            "error",
-            vec![Value::string(
-                "Invalid RANGE argument to `char-table-range'",
-            )],
-        )),
         Value::Int(_) | Value::Char(_) => {
             let ch = expect_int(range)?;
             ct_lookup(table, ch)
@@ -432,8 +430,12 @@ pub(crate) fn builtin_char_table_range(args: Vec<Value>) -> EvalResult {
     }
 }
 
-/// Recursive char-table lookup: check own entries, then all-char wildcard,
-/// then char fallback/default, then parent chain.
+/// Recursive char-table lookup: check own entries, then default, then parent.
+///
+/// This matches GNU Emacs semantics:
+/// 1. Look up the character in the char-table's data pairs (exact match, then range match)
+/// 2. If not found, use the char-table's default value
+/// 3. If default is nil, recursively check the parent char-table
 pub(crate) fn ct_lookup(table: &Value, ch: i64) -> EvalResult {
     let arc = match table {
         Value::Vector(a) => a,
@@ -444,17 +446,9 @@ pub(crate) fn ct_lookup(table: &Value, ch: i64) -> EvalResult {
     if let Some(val) = ct_get_char(&vec, ch) {
         return Ok(val);
     }
-    if let Some(val) = ct_get_char(&vec, CT_ALL_CHARS_SENTINEL) {
-        return Ok(val);
-    }
-    if let Some(val) = ct_get_char(&vec, CT_BASE_FALLBACK_SENTINEL) {
-        if !val.is_nil() {
-            return Ok(val);
-        }
-    }
 
-    let parent = vec[CT_PARENT];
     let default = vec[CT_DEFAULT];
+    let parent = vec[CT_PARENT];
 
     if !default.is_nil() {
         Ok(default)
@@ -497,7 +491,12 @@ pub(crate) fn builtin_set_char_table_parent(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(map-char-table FUNCTION CHAR-TABLE)` -- call FUNCTION for each
-/// explicitly set entry.  FUNCTION receives `(CHAR VALUE)`.
+/// entry with a non-nil value.  FUNCTION receives `(KEY VALUE)` where
+/// KEY is either a character (integer) or a cons `(FROM . TO)` for ranges.
+///
+/// This resolves overlapping ranges: later (more specific) entries override
+/// earlier (broader) entries, and the result is reported as non-overlapping
+/// segments, matching GNU Emacs behavior.
 /// Returns nil.
 pub(crate) fn builtin_map_char_table(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("map-char-table", &args, 2)?;
@@ -509,30 +508,199 @@ pub(crate) fn builtin_map_char_table(eval: &mut Evaluator, args: Vec<Value>) -> 
         _ => return Err(wrong_type("char-table-p", table)),
     };
 
-    // Collect entries (key, value) from a snapshot, then iterate so the
-    // callback can modify the table.  Keys are either Int (single char)
-    // or Cons (range).
-    let entries: Vec<(Value, Value)> = {
-        let vec = with_heap(|h| h.get_vector(*arc).clone());
-        let start = ct_data_start(&vec);
-        let mut result = Vec::new();
-        let mut i = start;
-        while i + 1 < vec.len() {
-            match &vec[i] {
-                Value::Int(_) | Value::Cons(_) => {
-                    result.push((vec[i], vec[i + 1]));
-                }
-                _ => {}
-            }
-            i += 2;
-        }
-        result
-    };
+    let vec_snapshot = with_heap(|h| h.get_vector(*arc).clone());
+    let entries = ct_resolved_entries(&vec_snapshot);
 
     for (key, val) in entries {
         eval.apply(func, vec![key, val])?;
     }
     Ok(Value::Nil)
+}
+
+/// Resolve char-table data pairs into non-overlapping (key, value) entries.
+///
+/// Later entries in the data pairs take priority over earlier ones for
+/// overlapping characters. The result coalesces adjacent same-value entries
+/// into range cons cells, matching GNU Emacs `map-char-table` behavior.
+///
+/// Also includes the default value as a range entry covering all characters
+/// not otherwise mapped, if the default is non-nil.
+fn ct_resolved_entries(vec: &[Value]) -> Vec<(Value, Value)> {
+    let start = ct_data_start(&vec);
+    let default = vec[CT_DEFAULT];
+
+    // Collect all raw (key, value) pairs from the data section.
+    // We'll build a list of (char_code -> value) point mappings and
+    // (min, max, value) range mappings to resolve.
+    struct RawEntry {
+        kind: RawEntryKind,
+        order: usize, // insertion order, higher = later = higher priority
+    }
+    enum RawEntryKind {
+        Single(i64, Value),
+        Range(i64, i64, Value),
+    }
+
+    let mut raws = Vec::new();
+    let mut i = start;
+    let mut order = 0usize;
+    while i + 1 < vec.len() {
+        match &vec[i] {
+            Value::Int(ch) => {
+                raws.push(RawEntry {
+                    kind: RawEntryKind::Single(*ch, vec[i + 1]),
+                    order,
+                });
+            }
+            Value::Cons(cell) => {
+                let pair = read_cons(*cell);
+                if let (Value::Int(min), Value::Int(max)) = (&pair.car, &pair.cdr) {
+                    raws.push(RawEntry {
+                        kind: RawEntryKind::Range(*min, *max, vec[i + 1]),
+                        order,
+                    });
+                }
+            }
+            _ => {}
+        }
+        i += 2;
+        order += 1;
+    }
+
+    if raws.is_empty() && default.is_nil() {
+        return Vec::new();
+    }
+
+    // If there are no range entries and only single chars (common case),
+    // take the fast path.
+    let has_ranges = raws
+        .iter()
+        .any(|r| matches!(r.kind, RawEntryKind::Range(..)));
+
+    if !has_ranges && default.is_nil() {
+        // Simple case: just single-char entries, no overlaps possible with ranges.
+        // Later entries override earlier ones for the same char.
+        let mut map = std::collections::BTreeMap::new();
+        for raw in &raws {
+            if let RawEntryKind::Single(ch, val) = &raw.kind {
+                map.insert(*ch, *val);
+            }
+        }
+        return map
+            .into_iter()
+            .filter(|(_, v)| !v.is_nil())
+            .map(|(ch, val)| (Value::Int(ch), val))
+            .collect();
+    }
+
+    // General case: resolve all entries into a point map.
+    // Collect all character code points that are explicitly mentioned.
+    // For ranges, we need to enumerate boundary points.
+    //
+    // Strategy: Build sorted list of "events" (boundary points), then
+    // for each segment between events, determine the effective value.
+    // This avoids enumerating all 0..MAX_CHAR characters.
+
+    // Collect all boundary points.
+    let mut boundaries = std::collections::BTreeSet::new();
+    for raw in &raws {
+        match &raw.kind {
+            RawEntryKind::Single(ch, _) => {
+                boundaries.insert(*ch);
+                // Also insert ch-1 and ch+1 to split ranges around this point
+                if *ch > 0 {
+                    boundaries.insert(*ch - 1);
+                }
+                boundaries.insert(*ch + 1);
+            }
+            RawEntryKind::Range(min, max, _) => {
+                boundaries.insert(*min);
+                boundaries.insert(*max);
+                if *min > 0 {
+                    boundaries.insert(*min - 1);
+                }
+                boundaries.insert(*max + 1);
+            }
+        }
+    }
+
+    // For default value, add boundaries for the full range.
+    if !default.is_nil() {
+        boundaries.insert(0);
+        boundaries.insert(MAX_CHAR);
+    }
+
+    // For each boundary point, determine the effective value.
+    // The effective value is determined by the highest-order entry that covers the point.
+    let boundary_vec: Vec<i64> = boundaries.into_iter().filter(|b| *b >= 0 && *b <= MAX_CHAR).collect();
+
+    let mut point_values: Vec<(i64, Value)> = Vec::new();
+    for &pt in &boundary_vec {
+        // For each boundary point, find the highest-priority entry that covers it.
+        // Higher insertion order = higher priority. Default has lowest priority.
+        let mut best_order: Option<usize> = None;
+        let mut best_value = if !default.is_nil() {
+            default
+        } else {
+            Value::Nil
+        };
+
+        for raw in &raws {
+            let covers = match &raw.kind {
+                RawEntryKind::Single(ch, _) => *ch == pt,
+                RawEntryKind::Range(min, max, _) => pt >= *min && pt <= *max,
+            };
+            if covers {
+                if best_order.is_none() || raw.order > best_order.unwrap() {
+                    best_order = Some(raw.order);
+                    best_value = match &raw.kind {
+                        RawEntryKind::Single(_, v) => *v,
+                        RawEntryKind::Range(_, _, v) => *v,
+                    };
+                }
+            }
+        }
+
+        if !best_value.is_nil() {
+            point_values.push((pt, best_value));
+        }
+    }
+
+    if point_values.is_empty() {
+        return Vec::new();
+    }
+
+    // Coalesce adjacent same-value entries into ranges.
+    let mut result = Vec::new();
+    let mut run_start = point_values[0].0;
+    let mut run_end = point_values[0].0;
+    let mut run_val = point_values[0].1;
+
+    for &(pt, val) in &point_values[1..] {
+        if val == run_val && pt == run_end + 1 {
+            // Extend the current run.
+            run_end = pt;
+        } else {
+            // Emit the current run.
+            emit_run(&mut result, run_start, run_end, run_val);
+            run_start = pt;
+            run_end = pt;
+            run_val = val;
+        }
+    }
+    // Emit the final run.
+    emit_run(&mut result, run_start, run_end, run_val);
+
+    result
+}
+
+/// Emit a coalesced run as either a single character or a range cons.
+fn emit_run(result: &mut Vec<(Value, Value)>, start: i64, end: i64, val: Value) {
+    if start == end {
+        result.push((Value::Int(start), val));
+    } else {
+        result.push((Value::cons(Value::Int(start), Value::Int(end)), val));
+    }
 }
 
 /// `(char-table-extra-slot TABLE N)` -- get extra slot N (0-based).

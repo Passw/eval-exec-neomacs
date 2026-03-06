@@ -341,8 +341,6 @@ const CT_CHAR_TABLE_TAG: &str = "--char-table--";
 const CT_SUBTYPE: usize = 3;
 const CT_EXTRA_COUNT: usize = 4;
 const CT_EXTRA_START: usize = 5;
-const CT_BASE_FALLBACK_SENTINEL: i64 = i64::MIN + 1;
-
 const CURRENT_CASE_TABLE_PROPERTY: &str = "case-table";
 const STANDARD_CASE_TABLE_SYMBOL: &str = "neovm--standard-case-table-object";
 
@@ -354,7 +352,7 @@ fn build_char_table(
     data_pairs: &[(i64, Value)],
 ) -> Value {
     let extra_count = extra_slots.len();
-    let mut vec = Vec::with_capacity(CT_EXTRA_START + extra_count + 2 + data_pairs.len() * 2);
+    let mut vec = Vec::with_capacity(CT_EXTRA_START + extra_count + data_pairs.len() * 2);
     vec.push(Value::symbol(CT_CHAR_TABLE_TAG)); // tag
     vec.push(default); // CT_DEFAULT
     vec.push(Value::Nil); // CT_PARENT
@@ -363,8 +361,6 @@ fn build_char_table(
     for slot in extra_slots {
         vec.push(*slot);
     }
-    vec.push(Value::Int(CT_BASE_FALLBACK_SENTINEL)); // sentinel
-    vec.push(default); // fallback
     for &(ch, val) in data_pairs {
         vec.push(Value::Int(ch));
         vec.push(val);

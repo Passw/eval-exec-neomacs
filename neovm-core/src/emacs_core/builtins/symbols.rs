@@ -1924,6 +1924,33 @@ pub(crate) fn builtin_macrop_eval(
     super::subr_info::builtin_macrop(args)
 }
 
+/// Hash a string for custom obarray bucket index.
+fn obarray_hash(s: &str, len: usize) -> usize {
+    let hash = s.bytes().fold(0u64, |h, b| h.wrapping_mul(31).wrapping_add(b as u64));
+    hash as usize % len
+}
+
+/// Search a bucket chain (cons list) for a symbol with the given name.
+/// Returns the symbol Value if found.
+fn obarray_bucket_find(bucket: Value, name: &str) -> Option<Value> {
+    let mut current = bucket;
+    loop {
+        match current {
+            Value::Nil => return None,
+            Value::Cons(id) => {
+                let (car, cdr) = with_heap(|h| (h.cons_car(id), h.cons_cdr(id)));
+                if let Some(sym_name) = car.as_symbol_name() {
+                    if sym_name == name {
+                        return Some(car);
+                    }
+                }
+                current = cdr;
+            }
+            _ => return None,
+        }
+    }
+}
+
 pub(crate) fn builtin_intern_fn(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("intern", &args, 1)?;
     expect_max_args("intern", &args, 2)?;
@@ -1936,6 +1963,32 @@ pub(crate) fn builtin_intern_fn(eval: &mut super::eval::Evaluator, args: Vec<Val
         }
     }
     let name = expect_string(&args[0])?;
+
+    // Custom obarray path
+    if let Some(Value::Vector(vec_id)) = args.get(1).filter(|v| !v.is_nil()) {
+        let vec_id = *vec_id;
+        let vec_len = with_heap(|h| h.get_vector(vec_id).len());
+        if vec_len == 0 {
+            return Err(signal("args-out-of-range", vec![Value::Int(0)]));
+        }
+        let bucket_idx = obarray_hash(&name, vec_len);
+        let bucket = with_heap(|h| h.get_vector(vec_id)[bucket_idx]);
+
+        // Check if already interned
+        if let Some(sym) = obarray_bucket_find(bucket, &name) {
+            return Ok(sym);
+        }
+
+        // Not found: create symbol and prepend to bucket chain
+        let sym = Value::symbol(&name);
+        let new_bucket = Value::cons(sym, bucket);
+        with_heap_mut(|h| {
+            h.get_vector_mut(vec_id)[bucket_idx] = new_bucket;
+        });
+        return Ok(sym);
+    }
+
+    // Global obarray path
     eval.obarray_mut().intern(&name);
     Ok(Value::symbol(name))
 }
@@ -1954,6 +2007,33 @@ pub(crate) fn builtin_intern_soft(
             ));
         }
     }
+
+    // Custom obarray path
+    if let Some(Value::Vector(vec_id)) = args.get(1).filter(|v| !v.is_nil()) {
+        let vec_id = *vec_id;
+        let name = match &args[0] {
+            Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
+            Value::Symbol(id) => resolve_sym(*id).to_owned(),
+            Value::Nil => return Ok(Value::Nil),
+            Value::True => "t".to_owned(),
+            Value::Keyword(_) => return Ok(args[0]),
+            other => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("stringp"), *other],
+                ));
+            }
+        };
+        let vec_len = with_heap(|h| h.get_vector(vec_id).len());
+        if vec_len == 0 {
+            return Ok(Value::Nil);
+        }
+        let bucket_idx = obarray_hash(&name, vec_len);
+        let bucket = with_heap(|h| h.get_vector(vec_id)[bucket_idx]);
+        return Ok(obarray_bucket_find(bucket, &name).unwrap_or(Value::Nil));
+    }
+
+    // Global obarray path
     let name = match &args[0] {
         Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         Value::Nil => return Ok(Value::Nil),
@@ -2122,10 +2202,63 @@ pub(crate) fn builtin_vertical_motion(args: Vec<Value>) -> EvalResult {
     Ok(Value::Int(0))
 }
 
-pub(crate) fn builtin_rename_buffer(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_rename_buffer(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_range_args("rename-buffer", &args, 1, 2)?;
     let name = expect_strict_string(&args[0])?;
-    Ok(Value::string(name))
+
+    if name.is_empty() {
+        return Err(signal(
+            "error",
+            vec![Value::string(
+                "Empty string is invalid as a buffer name",
+            )],
+        ));
+    }
+
+    let current_id = match eval.buffers.current_buffer() {
+        Some(buf) => buf.id,
+        None => {
+            return Err(signal(
+                "error",
+                vec![Value::string("No current buffer")],
+            ));
+        }
+    };
+
+    let unique = args.get(1).copied().unwrap_or(Value::Nil);
+
+    let new_name = match eval.buffers.find_buffer_by_name(&name) {
+        Some(existing_id) if existing_id == current_id => {
+            // Already has this name, just return it
+            name
+        }
+        Some(_other_id) => {
+            // Name is taken by a different buffer
+            if unique.is_nil() {
+                return Err(signal(
+                    "error",
+                    vec![Value::string(format!(
+                        "Buffer name `{}' is in use",
+                        name
+                    ))],
+                ));
+            }
+            eval.buffers.generate_new_buffer_name(&name)
+        }
+        None => {
+            // Name is free
+            name
+        }
+    };
+
+    if let Some(buf) = eval.buffers.get_mut(current_id) {
+        buf.name = new_name.clone();
+    }
+
+    Ok(Value::string(new_name))
 }
 
 pub(crate) fn builtin_set_buffer_major_mode(args: Vec<Value>) -> EvalResult {
@@ -3139,8 +3272,9 @@ fn interactive_form_from_expr_body(body: &[super::expr::Expr]) -> Option<Value> 
         return None;
     }
     let mut interactive = vec![Value::symbol("interactive")];
-    if let Some(spec) = items.get(1).map(super::eval::quote_to_value) {
-        interactive.push(spec);
+    match items.get(1).map(super::eval::quote_to_value) {
+        Some(spec) => interactive.push(spec),
+        None => interactive.push(Value::Nil),
     }
     Some(Value::list(interactive))
 }
@@ -3155,7 +3289,7 @@ fn interactive_form_from_quoted_interactive_form(form: &Value) -> Result<Option<
     }
 
     match pair.cdr {
-        Value::Nil => Ok(Some(Value::list(vec![Value::symbol("interactive")]))),
+        Value::Nil => Ok(Some(Value::list(vec![Value::symbol("interactive"), Value::Nil]))),
         Value::Cons(arg_cell) => {
             let arg_pair = read_cons(arg_cell);
             Ok(Some(Value::list(vec![
@@ -3703,6 +3837,21 @@ pub(crate) fn builtin_keymap_get_keyelt(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_keymap_prompt(args: Vec<Value>) -> EvalResult {
     expect_args("keymap-prompt", &args, 1)?;
+    let map = args[0];
+    // A keymap is (keymap [PROMPT] . BINDINGS).
+    // If the arg is a cons whose car is the symbol `keymap`, check if cadr is a string.
+    if let Value::Cons(_) = map {
+        let car = map.cons_car();
+        if car.is_symbol_named("keymap") {
+            let cdr = map.cons_cdr();
+            if let Value::Cons(_) = cdr {
+                let cadr = cdr.cons_car();
+                if let Value::Str(_) = cadr {
+                    return Ok(cadr);
+                }
+            }
+        }
+    }
     Ok(Value::Nil)
 }
 

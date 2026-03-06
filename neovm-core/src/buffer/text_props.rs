@@ -155,14 +155,16 @@ impl TextPropertyTable {
     }
 
     /// Remove a single named property from the byte range `[start, end)`.
-    pub fn remove_property(&mut self, start: usize, end: usize, name: &str) {
+    /// Returns `true` if any property was actually removed, `false` otherwise.
+    pub fn remove_property(&mut self, start: usize, end: usize, name: &str) -> bool {
         if start >= end {
-            return;
+            return false;
         }
 
         self.split_at(start);
         self.split_at(end);
 
+        let mut removed = false;
         for interval in &mut self.intervals {
             if interval.start >= end {
                 break;
@@ -170,12 +172,15 @@ impl TextPropertyTable {
             if interval.end <= start {
                 continue;
             }
-            interval.properties.remove(name);
+            if interval.properties.remove(name).is_some() {
+                removed = true;
+            }
         }
 
         // Remove empty intervals and merge adjacent.
         self.cleanup();
         self.merge_adjacent();
+        removed
     }
 
     /// Remove all properties from the byte range `[start, end)`.

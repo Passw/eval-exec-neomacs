@@ -241,7 +241,9 @@ pub(super) fn builtin_lookup_key(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    expect_args("lookup-key", &args, 2)?;
+    expect_min_args("lookup-key", &args, 2)?;
+    expect_max_args("lookup-key", &args, 3)?;
+    // Optional 3rd arg ACCEPT-DEFAULTS is accepted but ignored.
     let keymap = expect_keymap(eval, &args[0])?;
     let events = expect_key_events(&args[1])?;
 

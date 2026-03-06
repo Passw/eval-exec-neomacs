@@ -1247,7 +1247,9 @@ pub(crate) fn builtin_string_trim_right(args: Vec<Value>) -> EvalResult {
 }
 
 pub(crate) fn builtin_make_string(args: Vec<Value>) -> EvalResult {
-    expect_args("make-string", &args, 2)?;
+    expect_min_args("make-string", &args, 2)?;
+    expect_max_args("make-string", &args, 3)?;
+    // Optional 3rd arg MULTIBYTE is accepted but ignored (we always use multibyte).
     let count_raw = expect_int(&args[0])?;
     if count_raw < 0 {
         return Err(signal(
@@ -1387,7 +1389,35 @@ pub(crate) fn builtin_string_to_list(args: Vec<Value>) -> EvalResult {
 }
 
 pub(crate) fn builtin_string_width(args: Vec<Value>) -> EvalResult {
-    expect_args("string-width", &args, 1)?;
+    expect_min_args("string-width", &args, 1)?;
+    expect_max_args("string-width", &args, 3)?;
     let s = expect_string(&args[0])?;
-    Ok(Value::Int(storage_string_display_width(&s) as i64))
+    if args.len() <= 1
+        || (args.len() == 2 && args[1] == Value::Nil)
+        || (args.len() <= 3
+            && (args.len() < 2 || args[1] == Value::Nil || args[1] == Value::Int(0))
+            && (args.len() < 3 || args[2] == Value::Nil))
+    {
+        // Fast path: full string width
+        return Ok(Value::Int(storage_string_display_width(&s) as i64));
+    }
+    // Substring range specified — decode units and sum width for [from, to)
+    let units = super::super::string_escape::decode_storage_units(&s);
+    let from = if args.len() > 1 && args[1] != Value::Nil {
+        expect_int(&args[1])? as usize
+    } else {
+        0
+    };
+    let to = if args.len() > 2 && args[2] != Value::Nil {
+        expect_int(&args[2])? as usize
+    } else {
+        units.len()
+    };
+    let width: usize = units
+        .iter()
+        .skip(from)
+        .take(to.saturating_sub(from))
+        .map(|(_, w)| w)
+        .sum();
+    Ok(Value::Int(width as i64))
 }

@@ -521,7 +521,7 @@ fn set_window_start_point_and_group_start_accept_marker_positions() {
     assert_eq!(out[5], "OK (t t t t t t t)");
     assert_eq!(
         out[6],
-        "OK ([:marker nil nil nil] (error \"Marker does not point anywhere\") [:marker nil nil nil])"
+        "OK ([:marker nil nil nil nil] (error \"Marker does not point anywhere\") [:marker nil nil nil nil])"
     );
     assert_eq!(
         out[7],

@@ -730,7 +730,34 @@ pub(crate) fn builtin_mapatoms(eval: &mut super::eval::Evaluator, args: Vec<Valu
     expect_max_args("mapatoms", &args, 2)?;
     validate_optional_obarray_arg(&args)?;
     let func = args[0];
-    // Collect symbol names to avoid borrowing obarray during eval
+
+    // Custom obarray path
+    if let Some(Value::Vector(vec_id)) = args.get(1).filter(|v| !v.is_nil()) {
+        let vec_id = *vec_id;
+        // Collect all symbols from all buckets
+        let all_slots = with_heap(|h| h.get_vector(vec_id).clone());
+        let mut symbols = Vec::new();
+        for slot in &all_slots {
+            let mut current = *slot;
+            loop {
+                match current {
+                    Value::Nil => break,
+                    Value::Cons(id) => {
+                        let (car, cdr) = with_heap(|h| (h.cons_car(id), h.cons_cdr(id)));
+                        symbols.push(car);
+                        current = cdr;
+                    }
+                    _ => break,
+                }
+            }
+        }
+        for sym in symbols {
+            eval.apply(func, vec![sym])?;
+        }
+        return Ok(Value::Nil);
+    }
+
+    // Global obarray path
     let symbols: Vec<String> = eval
         .obarray
         .all_symbols()
@@ -758,6 +785,54 @@ pub(crate) fn builtin_unintern(eval: &mut super::eval::Evaluator, args: Vec<Valu
             ));
         }
     };
+
+    // Custom obarray path
+    if let Some(Value::Vector(vec_id)) = args.get(1).filter(|v| !v.is_nil()) {
+        let vec_id = *vec_id;
+        let vec_len = with_heap(|h| h.get_vector(vec_id).len());
+        if vec_len == 0 {
+            return Ok(Value::Nil);
+        }
+        let bucket_idx = name.bytes().fold(0u64, |h, b| h.wrapping_mul(31).wrapping_add(b as u64)) as usize % vec_len;
+        let bucket = with_heap(|h| h.get_vector(vec_id)[bucket_idx]);
+
+        // Walk the bucket chain and rebuild without the matching symbol
+        let mut items = Vec::new();
+        let mut found = false;
+        let mut current = bucket;
+        loop {
+            match current {
+                Value::Nil => break,
+                Value::Cons(id) => {
+                    let (car, cdr) = with_heap(|h| (h.cons_car(id), h.cons_cdr(id)));
+                    if !found {
+                        if let Some(sym_name) = car.as_symbol_name() {
+                            if sym_name == name {
+                                found = true;
+                                current = cdr;
+                                continue;
+                            }
+                        }
+                    }
+                    items.push(car);
+                    current = cdr;
+                }
+                _ => break,
+            }
+        }
+
+        if found {
+            // Rebuild the bucket chain
+            let new_bucket = items.into_iter().rev().fold(Value::Nil, |acc, sym| Value::cons(sym, acc));
+            with_heap_mut(|h| {
+                h.get_vector_mut(vec_id)[bucket_idx] = new_bucket;
+            });
+            return Ok(Value::True);
+        }
+        return Ok(Value::Nil);
+    }
+
+    // Global obarray path
     let removed = eval.obarray.unintern(&name);
     Ok(if removed { Value::True } else { Value::Nil })
 }

@@ -68,8 +68,19 @@ impl<'a> Vm<'a> {
             watchers,
             catch_tags,
             depth: 0,
-            max_depth: 200,
+            max_depth: 1600,
         }
+    }
+
+    /// Set the current depth and max_depth (inherited from the Evaluator).
+    pub fn set_depth(&mut self, depth: usize, max_depth: usize) {
+        self.depth = depth;
+        self.max_depth = max_depth;
+    }
+
+    /// Get the current depth (to sync back to the Evaluator).
+    pub fn get_depth(&self) -> usize {
+        self.depth
     }
 
     /// Execute a bytecode function with given arguments.
@@ -1459,6 +1470,8 @@ impl<'a> Vm<'a> {
         eval.features = self.features.clone();
         eval.buffers = self.buffers.clone();
         eval.match_data = self.match_data.clone();
+        eval.depth = self.depth;
+        eval.max_depth = self.max_depth;
         std::mem::swap(self.watchers, &mut eval.watchers);
 
         let result = builtins::dispatch_builtin(&mut eval, name, args);
@@ -1470,6 +1483,7 @@ impl<'a> Vm<'a> {
         std::mem::swap(self.buffers, &mut eval.buffers);
         std::mem::swap(self.match_data, &mut eval.match_data);
         std::mem::swap(self.watchers, &mut eval.watchers);
+        self.depth = eval.depth;
 
         // Swap the heap data back to its original location so the parent
         // Evaluator's Box<LispHeap> is consistent when we return.  Any

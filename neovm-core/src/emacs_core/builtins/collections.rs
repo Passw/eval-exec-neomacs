@@ -613,7 +613,9 @@ pub(crate) fn builtin_string_to_char(args: Vec<Value>) -> EvalResult {
 // ===========================================================================
 
 pub(crate) fn builtin_plist_get(args: Vec<Value>) -> EvalResult {
-    expect_args("plist-get", &args, 2)?;
+    expect_min_args("plist-get", &args, 2)?;
+    expect_max_args("plist-get", &args, 3)?;
+    // Optional 3rd arg PREDICATE is accepted but ignored (we always use `eq`).
     let mut cursor = args[0];
     loop {
         match cursor {
@@ -642,7 +644,9 @@ pub(crate) fn builtin_plist_get(args: Vec<Value>) -> EvalResult {
 }
 
 pub(crate) fn builtin_plist_put(args: Vec<Value>) -> EvalResult {
-    expect_args("plist-put", &args, 3)?;
+    expect_min_args("plist-put", &args, 3)?;
+    expect_max_args("plist-put", &args, 4)?;
+    // Optional 4th arg PREDICATE is accepted but ignored (we always use `eq`).
     let plist = args[0];
     let key = args[1];
     let new_val = args[2];

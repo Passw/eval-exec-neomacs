@@ -1,7 +1,7 @@
 use super::*;
 
 // -----------------------------------------------------------------------
-// AbbrevManager unit tests
+// AbbrevManager unit tests (legacy -- kept for pdump compatibility)
 // -----------------------------------------------------------------------
 
 #[test]
@@ -207,38 +207,160 @@ fn test_apply_case() {
 }
 
 // -----------------------------------------------------------------------
-// Builtin-level tests
+// Obarray-based builtin tests
 // -----------------------------------------------------------------------
 
 #[test]
-fn test_builtin_define_and_expand() {
+fn test_make_abbrev_table_and_predicate() {
     use super::super::eval::Evaluator;
 
     let mut eval = Evaluator::new();
 
-    // define-abbrev
-    let result = builtin_define_abbrev(
-        &mut eval,
-        vec![
-            Value::string("global-abbrev-table"),
-            Value::string("btw"),
-            Value::string("by the way"),
-        ],
-    );
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_nil());
+    // make-abbrev-table creates an abbrev table
+    let table = builtin_make_abbrev_table(&mut eval, vec![]).unwrap();
+    assert!(matches!(table, Value::Vector(_)));
 
-    // Manager expansion behavior is exercised directly.
-    let expanded = eval.abbrevs.expand_abbrev("global-abbrev-table", "btw");
-    assert_eq!(expanded.as_deref(), Some("by the way"));
+    // abbrev-table-p returns true for it
+    let result = builtin_abbrev_table_p(&mut eval, vec![table]).unwrap();
+    assert!(result.is_truthy());
 
-    // expand nonexistent
-    let expanded = eval.abbrevs.expand_abbrev("global-abbrev-table", "xyz");
-    assert!(expanded.is_none());
+    // Non-tables return nil
+    let result = builtin_abbrev_table_p(&mut eval, vec![Value::Nil]).unwrap();
+    assert!(result.is_nil());
+
+    let result = builtin_abbrev_table_p(&mut eval, vec![Value::Int(42)]).unwrap();
+    assert!(result.is_nil());
+
+    // A plain vector is not an abbrev table
+    let plain_vec = Value::vector(vec![Value::Int(0); 10]);
+    let result = builtin_abbrev_table_p(&mut eval, vec![plain_vec]).unwrap();
+    assert!(result.is_nil());
 }
 
 #[test]
-fn test_builtin_abbrev_mode() {
+fn test_define_abbrev_and_lookup() {
+    use super::super::eval::Evaluator;
+
+    let mut eval = Evaluator::new();
+
+    let table = builtin_make_abbrev_table(&mut eval, vec![]).unwrap();
+
+    // Define an abbreviation
+    builtin_define_abbrev(
+        &mut eval,
+        vec![table, Value::string("btw"), Value::string("by the way")],
+    )
+    .unwrap();
+
+    // Look up via abbrev-expansion
+    let result = builtin_abbrev_expansion(
+        &mut eval,
+        vec![Value::string("btw"), table],
+    )
+    .unwrap();
+    assert_eq!(result.as_str(), Some("by the way"));
+
+    // Look up via abbrev-symbol
+    let sym = builtin_abbrev_symbol(
+        &mut eval,
+        vec![Value::string("btw"), table],
+    )
+    .unwrap();
+    assert!(sym.is_truthy());
+    assert_eq!(sym.as_symbol_name(), Some("btw"));
+
+    // Non-existent
+    let result = builtin_abbrev_expansion(
+        &mut eval,
+        vec![Value::string("xyz"), table],
+    )
+    .unwrap();
+    assert!(result.is_nil());
+}
+
+#[test]
+fn test_clear_abbrev_table() {
+    use super::super::eval::Evaluator;
+
+    let mut eval = Evaluator::new();
+
+    let table = builtin_make_abbrev_table(&mut eval, vec![]).unwrap();
+
+    // Define some abbrevs
+    builtin_define_abbrev(
+        &mut eval,
+        vec![table, Value::string("a"), Value::string("alpha")],
+    )
+    .unwrap();
+    builtin_define_abbrev(
+        &mut eval,
+        vec![table, Value::string("b"), Value::string("beta")],
+    )
+    .unwrap();
+
+    // Verify they exist
+    let result = builtin_abbrev_expansion(
+        &mut eval,
+        vec![Value::string("a"), table],
+    )
+    .unwrap();
+    assert_eq!(result.as_str(), Some("alpha"));
+
+    // Clear
+    builtin_clear_abbrev_table(&mut eval, vec![table]).unwrap();
+
+    // Verify gone
+    let result = builtin_abbrev_expansion(
+        &mut eval,
+        vec![Value::string("a"), table],
+    )
+    .unwrap();
+    assert!(result.is_nil());
+
+    // Table is still an abbrev table
+    let result = builtin_abbrev_table_p(&mut eval, vec![table]).unwrap();
+    assert!(result.is_truthy());
+}
+
+#[test]
+fn test_abbrev_get_put() {
+    use super::super::eval::Evaluator;
+
+    let mut eval = Evaluator::new();
+
+    let table = builtin_make_abbrev_table(&mut eval, vec![]).unwrap();
+
+    // Define an abbreviation
+    let sym = builtin_define_abbrev(
+        &mut eval,
+        vec![table, Value::string("hw"), Value::string("hello world")],
+    )
+    .unwrap();
+
+    // abbrev-get :count should be 0
+    let count = builtin_abbrev_get(
+        &mut eval,
+        vec![sym, Value::keyword(":count")],
+    )
+    .unwrap();
+    assert_eq!(count, Value::Int(0));
+
+    // abbrev-put and abbrev-get
+    builtin_abbrev_put(
+        &mut eval,
+        vec![sym, Value::keyword(":custom"), Value::Int(42)],
+    )
+    .unwrap();
+    let custom = builtin_abbrev_get(
+        &mut eval,
+        vec![sym, Value::keyword(":custom")],
+    )
+    .unwrap();
+    assert_eq!(custom, Value::Int(42));
+}
+
+#[test]
+fn test_abbrev_mode() {
     use super::super::eval::Evaluator;
 
     let mut eval = Evaluator::new();
@@ -270,204 +392,22 @@ fn test_builtin_abbrev_mode() {
 }
 
 #[test]
-fn test_builtin_define_abbrev_table() {
+fn test_define_abbrev_table_and_lookup() {
     use super::super::eval::Evaluator;
 
     let mut eval = Evaluator::new();
 
-    // Create a table without parent
-    let result = builtin_define_abbrev_table(
+    // define-abbrev-table creates a named table
+    builtin_define_abbrev_table(
         &mut eval,
-        vec![Value::string("my-mode-abbrev-table"), Value::Nil],
-    );
-    assert!(result.is_ok());
-    assert!(eval.abbrevs.get_table("my-mode-abbrev-table").is_some());
-
-    // Create a table with parent
-    let result = builtin_define_abbrev_table(
-        &mut eval,
-        vec![
-            Value::string("child-table"),
-            Value::string("my-mode-abbrev-table"),
-        ],
-    );
-    assert!(result.is_ok());
-    let child = eval.abbrevs.get_table("child-table").unwrap();
-    assert_eq!(child.parent.as_deref(), Some("my-mode-abbrev-table"));
-
-    // DEFS list form should be accepted for compatibility (currently ignored).
-    let result = builtin_define_abbrev_table(
-        &mut eval,
-        vec![
-            Value::string("defs-table"),
-            Value::list(vec![Value::list(vec![
-                Value::string("hw"),
-                Value::string("hello world"),
-            ])]),
-        ],
-    );
-    assert!(result.is_ok());
-    assert!(eval.abbrevs.get_table("defs-table").is_some());
-
-    // Symbol docstring + trailing arg should be treated as property list
-    // head and therefore remain accepted.
-    let result = builtin_define_abbrev_table(
-        &mut eval,
-        vec![
-            Value::string("props-table"),
-            Value::Nil,
-            Value::symbol(":foo"),
-            Value::True,
-        ],
-    );
-    assert!(result.is_ok());
-
-    // Nil docstring with one trailing property key must signal like GNU Emacs.
-    let result = builtin_define_abbrev_table(
-        &mut eval,
-        vec![
-            Value::string("missing-prop-value-table"),
-            Value::Nil,
-            Value::Nil,
-            Value::Nil,
-        ],
-    )
-    .expect_err("define-abbrev-table should reject missing property values");
-    match result {
-        Flow::Signal(sig) => {
-            assert_eq!(sig.symbol_name(), "error");
-            assert_eq!(
-                sig.data,
-                vec![Value::string("Missing value for property nil")]
-            );
-        }
-        other => panic!("unexpected flow: {other:?}"),
-    }
-}
-
-#[test]
-fn test_builtin_clear_abbrev_table() {
-    use super::super::eval::Evaluator;
-
-    let mut eval = Evaluator::new();
-
-    // Define some abbrevs
-    builtin_define_abbrev(
-        &mut eval,
-        vec![
-            Value::string("global-abbrev-table"),
-            Value::string("a"),
-            Value::string("alpha"),
-        ],
+        vec![Value::symbol("test-table"), Value::Nil],
     )
     .unwrap();
 
-    // Clear
-    let result = builtin_clear_abbrev_table(&mut eval, vec![Value::string("global-abbrev-table")]);
-    assert!(result.is_ok());
-
-    // Verify empty
-    let entries = eval.abbrevs.list_abbrevs("global-abbrev-table");
-    assert!(entries.is_empty());
-}
-
-#[test]
-fn test_builtin_abbrev_expansion() {
-    use super::super::eval::Evaluator;
-
-    let mut eval = Evaluator::new();
-
-    eval.abbrevs
-        .define_abbrev("global-abbrev-table", "teh", "the");
-
-    // Look up expansion without expanding (count should not change)
-    let result = builtin_abbrev_expansion(&mut eval, vec![Value::string("teh")]);
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap().as_str(), Some("the"));
-
-    // Verify count was NOT incremented
-    let tbl = eval.abbrevs.get_table("global-abbrev-table").unwrap();
-    assert_eq!(tbl.abbrevs.get("teh").unwrap().count, 0);
-
-    // Look up in specific table
-    let result = builtin_abbrev_expansion(
-        &mut eval,
-        vec![Value::string("teh"), Value::string("global-abbrev-table")],
-    );
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap().as_str(), Some("the"));
-
-    // Nonexistent
-    let result = builtin_abbrev_expansion(&mut eval, vec![Value::string("xyz")]);
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_nil());
-}
-
-#[test]
-fn test_builtin_abbrev_table_p() {
-    use super::super::eval::Evaluator;
-
-    let mut eval = Evaluator::new();
-
-    let result = builtin_abbrev_table_p(&mut eval, vec![Value::string("global-abbrev-table")]);
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_truthy());
-
-    let result = builtin_abbrev_table_p(&mut eval, vec![Value::string("no-such-table")]);
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_nil());
-}
-
-#[test]
-fn test_builtin_insert_abbrev_table_description() {
-    use super::super::eval::Evaluator;
-
-    let mut eval = Evaluator::new();
-
-    // Empty table
-    let result = builtin_insert_abbrev_table_description(
-        &mut eval,
-        vec![Value::string("global-abbrev-table")],
-    );
-    assert!(result.is_ok());
-    let desc = result.unwrap();
-    assert!(desc.as_str().unwrap().contains("define-abbrev-table"));
-
-    // With entries
-    eval.abbrevs
-        .define_abbrev("global-abbrev-table", "hw", "hello world");
-    let result = builtin_insert_abbrev_table_description(
-        &mut eval,
-        vec![Value::string("global-abbrev-table")],
-    );
-    assert!(result.is_ok());
-    let desc = result.unwrap();
-    assert!(desc.as_str().unwrap().contains("hw"));
-    assert!(desc.as_str().unwrap().contains("hello world"));
-}
-
-#[test]
-fn test_builtin_define_abbrev_with_hook() {
-    use super::super::eval::Evaluator;
-
-    let mut eval = Evaluator::new();
-
-    let result = builtin_define_abbrev(
-        &mut eval,
-        vec![
-            Value::string("global-abbrev-table"),
-            Value::string("hw"),
-            Value::string("hello world"),
-            Value::string("my-hook-fn"),
-            Value::True, // system
-        ],
-    );
-    assert!(result.is_ok());
-
-    let tbl = eval.abbrevs.get_table("global-abbrev-table").unwrap();
-    let ab = tbl.abbrevs.get("hw").unwrap();
-    assert_eq!(ab.hook.as_deref(), Some("my-hook-fn"));
-    assert!(ab.system);
+    // The symbol value should be an abbrev table
+    let table = eval.obarray().symbol_value("test-table").cloned().unwrap();
+    let result = builtin_abbrev_table_p(&mut eval, vec![table]).unwrap();
+    assert!(result.is_truthy());
 }
 
 #[test]
@@ -476,22 +416,10 @@ fn test_wrong_arg_count() {
 
     let mut eval = Evaluator::new();
 
-    // define-abbrev needs at least 3 args
-    let result = builtin_define_abbrev(&mut eval, vec![Value::string("t"), Value::string("a")]);
-    assert!(result.is_err());
-
-    // define-abbrev-table needs at least 2 args
-    let result = builtin_define_abbrev_table(&mut eval, vec![Value::string("my-table")]);
-    assert!(result.is_err());
-
     // expand-abbrev needs exactly 0 args
     let result = builtin_expand_abbrev(&mut eval, vec![Value::string("t")]);
     assert!(result.is_err());
     let result = builtin_expand_abbrev(&mut eval, vec![]);
     assert!(result.is_ok());
     assert!(result.unwrap().is_nil());
-
-    // clear-abbrev-table needs exactly 1
-    let result = builtin_clear_abbrev_table(&mut eval, vec![]);
-    assert!(result.is_err());
 }

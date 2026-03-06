@@ -219,35 +219,124 @@ pub fn translate_emacs_regex(pattern: &str) -> String {
                         out.push(next);
                         i += 1 + next_len;
                     }
-                    // Emacs syntax classes (\s-, \s , etc.) → simplified to \s
+                    // Emacs syntax classes (\s-, \sw, etc.)
+                    // Map to the closest Rust regex equivalents.
                     's' => {
                         i += 1 + next_len;
-                        // Consume the optional syntax-class character
+                        // Consume the syntax-class character and map appropriately
                         if i < len {
                             let (class_ch, class_len) =
                                 next_char_at(pattern, i).expect("byte index must be char boundary");
                             match class_ch {
-                                '-' | ' ' | '.' | '_' | 'w' => {
+                                '-' | ' ' => {
+                                    // \s- or \s  → whitespace
                                     i += class_len;
+                                    out.push_str("\\s");
                                 }
-                                _ => {}
+                                'w' => {
+                                    // \sw → word constituent
+                                    i += class_len;
+                                    out.push_str("\\w");
+                                }
+                                '_' => {
+                                    // \s_ → symbol constituent (word + underscore)
+                                    i += class_len;
+                                    out.push_str("[\\w_]");
+                                }
+                                '.' => {
+                                    // \s. → punctuation
+                                    i += class_len;
+                                    out.push_str("[[:punct:]]");
+                                }
+                                '(' => {
+                                    // \s( → open delimiter
+                                    i += class_len;
+                                    out.push_str("[\\[\\(\\{]");
+                                }
+                                ')' => {
+                                    // \s) → close delimiter
+                                    i += class_len;
+                                    out.push_str("[\\]\\)\\}]");
+                                }
+                                '"' => {
+                                    // \s" → string quote character
+                                    i += class_len;
+                                    out.push_str("[\"']");
+                                }
+                                '\'' | '<' | '>' | '!' | '|' | '/' => {
+                                    // Other syntax classes — approximate as whitespace
+                                    i += class_len;
+                                    out.push_str("\\s");
+                                }
+                                _ => {
+                                    // No valid syntax-class char follows; treat as bare \s
+                                    out.push_str("\\s");
+                                }
                             }
+                        } else {
+                            out.push_str("\\s");
                         }
-                        out.push_str("\\s");
                     }
                     'S' => {
                         i += 1 + next_len;
+                        // Consume the syntax-class character and map appropriately
                         if i < len {
                             let (class_ch, class_len) =
                                 next_char_at(pattern, i).expect("byte index must be char boundary");
                             match class_ch {
-                                '-' | ' ' | '.' | '_' | 'w' => {
+                                '-' | ' ' => {
+                                    // \S- or \S  → non-whitespace
                                     i += class_len;
+                                    out.push_str("\\S");
                                 }
-                                _ => {}
+                                'w' => {
+                                    // \Sw → non-word constituent
+                                    i += class_len;
+                                    out.push_str("\\W");
+                                }
+                                '_' => {
+                                    // \S_ → non-symbol constituent
+                                    i += class_len;
+                                    out.push_str("[^\\w_]");
+                                }
+                                '.' => {
+                                    // \S. → non-punctuation
+                                    i += class_len;
+                                    out.push_str("[^[:punct:]]");
+                                }
+                                '(' => {
+                                    // \S( → non-open-delimiter
+                                    i += class_len;
+                                    out.push_str("[^\\[\\(\\{]");
+                                }
+                                ')' => {
+                                    // \S) → non-close-delimiter
+                                    i += class_len;
+                                    out.push_str("[^\\]\\)\\}]");
+                                }
+                                '"' => {
+                                    // \S" → non-string-quote
+                                    i += class_len;
+                                    out.push_str("[^\"']");
+                                }
+                                '\'' | '<' | '>' | '!' | '|' | '/' => {
+                                    // Other syntax classes — approximate as non-whitespace
+                                    i += class_len;
+                                    out.push_str("\\S");
+                                }
+                                _ => {
+                                    // No valid syntax-class char follows; treat as bare \S
+                                    out.push_str("\\S");
+                                }
                             }
+                        } else {
+                            out.push_str("\\S");
                         }
-                        out.push_str("\\S");
+                    }
+                    // \= (match at point) → \A (match at start of search region)
+                    '=' => {
+                        out.push_str("\\A");
+                        i += 1 + next_len;
                     }
                     // Known escape sequences — pass through
                     'w' | 'W' | 'b' | 'B' | 'd' | 'D' | 'n' | 't' | 'r' | '`' | '\'' => {

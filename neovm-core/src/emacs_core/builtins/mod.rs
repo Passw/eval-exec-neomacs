@@ -980,6 +980,7 @@ pub(crate) fn dispatch_builtin(
         "buffer-file-name" => return Some(builtin_buffer_file_name(eval, args)),
         "buffer-base-buffer" => return Some(builtin_buffer_base_buffer(eval, args)),
         "buffer-last-name" => return Some(builtin_buffer_last_name(eval, args)),
+        "rename-buffer" => return Some(builtin_rename_buffer(eval, args)),
         "buffer-string" => return Some(builtin_buffer_string(eval, args)),
         "buffer-line-statistics" => return Some(builtin_buffer_line_statistics(eval, args)),
         "buffer-text-pixel-size" => return Some(builtin_buffer_text_pixel_size(eval, args)),
@@ -1567,6 +1568,9 @@ pub(crate) fn dispatch_builtin(
         "syntax-table" => return Some(super::syntax::builtin_syntax_table(eval, args)),
         "set-syntax-table" => return Some(super::syntax::builtin_set_syntax_table(eval, args)),
         "char-syntax" => return Some(super::syntax::builtin_char_syntax(eval, args)),
+        "matching-paren" => {
+            return Some(super::syntax::builtin_matching_paren_eval(eval, args));
+        }
         "syntax-after" => return Some(super::syntax::builtin_syntax_after(eval, args)),
         "forward-comment" => return Some(super::syntax::builtin_forward_comment(eval, args)),
         "backward-prefix-chars" => {
@@ -1649,6 +1653,12 @@ pub(crate) fn dispatch_builtin(
             ));
         }
         "abbrev-table-p" => return Some(super::abbrev::builtin_abbrev_table_p(eval, args)),
+        "make-abbrev-table" => return Some(super::abbrev::builtin_make_abbrev_table(eval, args)),
+        "abbrev-table-get" => return Some(super::abbrev::builtin_abbrev_table_get(eval, args)),
+        "abbrev-table-put" => return Some(super::abbrev::builtin_abbrev_table_put(eval, args)),
+        "abbrev-symbol" => return Some(super::abbrev::builtin_abbrev_symbol(eval, args)),
+        "abbrev-get" => return Some(super::abbrev::builtin_abbrev_get(eval, args)),
+        "abbrev-put" => return Some(super::abbrev::builtin_abbrev_put(eval, args)),
 
         // Text property operations (evaluator-dependent — buffer access)
         "put-text-property" => return Some(super::textprop::builtin_put_text_property(eval, args)),
@@ -2690,6 +2700,8 @@ pub(crate) fn dispatch_builtin(
 
         // Marker (evaluator-dependent)
         "set-marker" => return Some(super::marker::builtin_set_marker(eval, args)),
+        "marker-position" => return Some(super::marker::builtin_marker_position_eval(eval, args)),
+        "copy-marker" => return Some(super::marker::builtin_copy_marker_eval(eval, args)),
         "point-marker" => return Some(super::marker::builtin_point_marker(eval, args)),
         "point-min-marker" => return Some(super::marker::builtin_point_min_marker(eval, args)),
         "point-max-marker" => return Some(super::marker::builtin_point_max_marker(eval, args)),
@@ -3089,7 +3101,8 @@ pub(crate) fn dispatch_builtin(
         "gensym" => builtin_gensym(args),
         "string-to-syntax" => builtin_string_to_syntax(args),
         "syntax-class-to-char" => super::syntax::builtin_syntax_class_to_char(args),
-        "matching-paren" => super::syntax::builtin_matching_paren(args),
+        // matching-paren is now dispatched in dispatch_builtin (eval-dependent)
+        // "matching-paren" => handled in dispatch_builtin
         "make-syntax-table" => super::syntax::builtin_make_syntax_table(args),
         "copy-syntax-table" => super::syntax::builtin_copy_syntax_table(args),
         "syntax-table-p" => super::syntax::builtin_syntax_table_p(args),
@@ -3788,7 +3801,6 @@ pub(crate) fn dispatch_builtin(
         "redirect-debugging-output" => builtin_redirect_debugging_output(args),
         "redirect-frame-focus" => builtin_redirect_frame_focus(args),
         "remove-pos-from-symbol" => builtin_remove_pos_from_symbol(args),
-        "rename-buffer" => builtin_rename_buffer(args),
         "resize-mini-window-internal" => builtin_resize_mini_window_internal(args),
         "restore-buffer-modified-p" => builtin_restore_buffer_modified_p(args),
         "set--this-command-keys" => builtin_set_this_command_keys(args),
@@ -4032,11 +4044,9 @@ pub(crate) fn dispatch_builtin(
 
         // Marker (pure)
         "markerp" => super::marker::builtin_markerp(args),
-        "marker-position" => super::marker::builtin_marker_position(args),
         "marker-buffer" => super::marker::builtin_marker_buffer(args),
         "marker-insertion-type" => super::marker::builtin_marker_insertion_type(args),
         "set-marker-insertion-type" => super::marker::builtin_set_marker_insertion_type(args),
-        "copy-marker" => super::marker::builtin_copy_marker(args),
         "make-marker" => super::marker::builtin_make_marker(args),
 
         // Composite (pure)
@@ -4378,7 +4388,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "gensym" => builtin_gensym(args),
         "string-to-syntax" => builtin_string_to_syntax(args),
         "syntax-class-to-char" => super::syntax::builtin_syntax_class_to_char(args),
-        "matching-paren" => super::syntax::builtin_matching_paren(args),
+        // matching-paren is now dispatched in dispatch_builtin (eval-dependent)
+        // "matching-paren" => handled in dispatch_builtin
         "make-syntax-table" => super::syntax::builtin_make_syntax_table(args),
         "copy-syntax-table" => super::syntax::builtin_copy_syntax_table(args),
         "syntax-table-p" => super::syntax::builtin_syntax_table_p(args),
@@ -4707,7 +4718,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "redirect-debugging-output" => builtin_redirect_debugging_output(args),
         "redirect-frame-focus" => builtin_redirect_frame_focus(args),
         "remove-pos-from-symbol" => builtin_remove_pos_from_symbol(args),
-        "rename-buffer" => builtin_rename_buffer(args),
         "resize-mini-window-internal" => builtin_resize_mini_window_internal(args),
         "restore-buffer-modified-p" => builtin_restore_buffer_modified_p(args),
         "set--this-command-keys" => builtin_set_this_command_keys(args),

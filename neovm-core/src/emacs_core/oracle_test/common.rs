@@ -7,7 +7,7 @@ use std::io::Write;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
 
-use crate::emacs_core::{EvalError, Evaluator, Value, parse_forms, print_value};
+use crate::emacs_core::{EvalError, Evaluator, Value, parse_forms, print_value, print_value_with_buffers};
 
 /// Maximum virtual address space (in bytes) for each spawned oracle Emacs
 /// process.  This prevents runaway evaluations from consuming unbounded
@@ -204,18 +204,18 @@ pub(crate) fn run_neovm_eval_with_load(form: &str, load_files: &[&str]) -> Resul
         return Err("no form parsed".to_string());
     };
     let rendered = match eval.eval_expr(first) {
-        Ok(value) => format!("OK {}", print_value(&value)),
+        Ok(value) => format!("OK {}", print_value_with_buffers(&value, &eval.buffers)),
         Err(EvalError::Signal { symbol, data }) => {
             let mut values = Vec::with_capacity(data.len() + 1);
             values.push(Value::Symbol(symbol));
             values.extend(data);
-            format!("ERR {}", print_value(&Value::list(values)))
+            format!("ERR {}", print_value_with_buffers(&Value::list(values), &eval.buffers))
         }
         Err(EvalError::UncaughtThrow { tag, value }) => {
             format!(
                 "ERR (no-catch {} {})",
-                print_value(&tag),
-                print_value(&value),
+                print_value_with_buffers(&tag, &eval.buffers),
+                print_value_with_buffers(&value, &eval.buffers),
             )
         }
     };
@@ -268,18 +268,18 @@ pub(crate) fn run_neovm_eval_with_bootstrap(form: &str) -> Result<String, String
         return Err("no form parsed".to_string());
     };
     let rendered = match eval.eval_expr(first) {
-        Ok(value) => format!("OK {}", print_value(&value)),
+        Ok(value) => format!("OK {}", print_value_with_buffers(&value, &eval.buffers)),
         Err(EvalError::Signal { symbol, data }) => {
             let mut values = Vec::with_capacity(data.len() + 1);
             values.push(Value::Symbol(symbol));
             values.extend(data);
-            format!("ERR {}", print_value(&Value::list(values)))
+            format!("ERR {}", print_value_with_buffers(&Value::list(values), &eval.buffers))
         }
         Err(EvalError::UncaughtThrow { tag, value }) => {
             format!(
                 "ERR (no-catch {} {})",
-                print_value(&tag),
-                print_value(&value),
+                print_value_with_buffers(&tag, &eval.buffers),
+                print_value_with_buffers(&value, &eval.buffers),
             )
         }
     };

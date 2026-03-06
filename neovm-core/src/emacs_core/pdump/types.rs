@@ -386,6 +386,7 @@ pub enum DumpSyntaxClass {
     EndComment,
     InheritStandard,
     Generic,
+    StringFence,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

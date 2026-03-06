@@ -408,7 +408,19 @@ pub(crate) fn builtin_buffer_string(
         .buffers
         .current_buffer_mut()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-    Ok(Value::string(buf.buffer_string()))
+    let byte_start = buf.point_min();
+    let byte_end = buf.point_max();
+    let result = Value::string(buf.buffer_string());
+    // Copy buffer text properties to the result string
+    if !buf.text_props.is_empty() {
+        if let Value::Str(new_id) = &result {
+            let sliced = buf.text_props.slice(byte_start, byte_end);
+            if !sliced.is_empty() {
+                set_string_text_properties_table(*new_id, sliced);
+            }
+        }
+    }
+    Ok(result)
 }
 
 /// (buffer-substring START END) → string
@@ -439,7 +451,17 @@ pub(crate) fn builtin_buffer_substring(
     // Convert char positions to byte positions
     let byte_start = buf.text.char_to_byte(s);
     let byte_end = buf.text.char_to_byte(e);
-    Ok(Value::string(buf.buffer_substring(byte_start, byte_end)))
+    let result = Value::string(buf.buffer_substring(byte_start, byte_end));
+    // Copy buffer text properties to the result string
+    if !buf.text_props.is_empty() {
+        if let Value::Str(new_id) = &result {
+            let sliced = buf.text_props.slice(byte_start, byte_end);
+            if !sliced.is_empty() {
+                set_string_text_properties_table(*new_id, sliced);
+            }
+        }
+    }
+    Ok(result)
 }
 
 fn resolve_buffer_designator_allow_nil_current(
@@ -624,12 +646,75 @@ pub(crate) fn builtin_buffer_swap_text(
 
 /// `(insert-and-inherit &rest ARGS)` -> nil
 ///
-/// Text properties are not modelled separately yet, so this follows `insert`.
+/// Insert text and inherit text properties from the character immediately
+/// before the insertion point.  Properties listed in `rear-nonsticky` at
+/// that position are NOT inherited.
 pub(crate) fn builtin_insert_and_inherit(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    builtin_insert(eval, args)
+    use super::value::list_to_vec;
+
+    let text = super::editfns::collect_insert_text("insert-and-inherit", &args)?;
+    super::editfns::ensure_current_buffer_writable(eval)?;
+
+    if let Some(buf) = eval.buffers.current_buffer_mut() {
+        let old_pt = buf.pt;
+        buf.insert(&text);
+        let text_len = text.len();
+
+        if text_len > 0 && old_pt > 0 {
+            // Get all properties at the character just before the insertion point.
+            let props = buf.text_props.get_properties(old_pt - 1);
+
+            if !props.is_empty() {
+                // Check rear-nonsticky: if it's `t`, no properties are inherited.
+                // If it's a list, only properties NOT in the list are inherited.
+                let nonsticky = props.get("rear-nonsticky").copied();
+                let inherit_all = match nonsticky {
+                    None => true,
+                    Some(Value::Nil) => true,
+                    Some(val) if val.is_truthy() && list_to_vec(&val).is_none() => false, // `t` or non-list truthy
+                    _ => true, // it's a list, we'll filter per-property below
+                };
+
+                if inherit_all || nonsticky.is_some() {
+                    let nonsticky_names: Vec<String> = match nonsticky {
+                        Some(ref val) => {
+                            if let Some(items) = list_to_vec(val) {
+                                items
+                                    .iter()
+                                    .filter_map(|v| {
+                                        v.as_symbol_name().map(|s| s.to_string())
+                                    })
+                                    .collect()
+                            } else {
+                                Vec::new()
+                            }
+                        }
+                        None => Vec::new(),
+                    };
+
+                    for (name, value) in &props {
+                        // Skip rear-nonsticky itself.
+                        if name == "rear-nonsticky" {
+                            continue;
+                        }
+                        // If rear-nonsticky was `t`, skip everything.
+                        if !inherit_all {
+                            continue;
+                        }
+                        // If property is listed in rear-nonsticky list, skip it.
+                        if nonsticky_names.contains(name) {
+                            continue;
+                        }
+                        buf.text_props.put_property(old_pt, old_pt + text_len, name, *value);
+                    }
+                }
+            }
+        }
+    }
+    Ok(Value::Nil)
 }
 
 /// `(insert-before-markers-and-inherit &rest ARGS)` -> nil
@@ -1226,7 +1311,24 @@ pub(crate) fn builtin_insert(eval: &mut super::eval::Evaluator, args: Vec<Value>
         match arg {
             Value::Str(id) => {
                 let s = with_heap(|h| h.get_string(*id).clone());
+                let insert_pos = buf.pt;
                 buf.insert(&s);
+                // Transfer string text properties to buffer
+                if let Some(str_table) = get_string_text_properties_table(*id) {
+                    for iv in str_table.intervals() {
+                        if iv.properties.is_empty() {
+                            continue;
+                        }
+                        for (name, val) in &iv.properties {
+                            buf.text_props.put_property(
+                                iv.start + insert_pos,
+                                iv.end + insert_pos,
+                                name,
+                                *val,
+                            );
+                        }
+                    }
+                }
             }
             Value::Char(c) => {
                 let mut tmp = [0u8; 4];

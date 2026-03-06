@@ -70,6 +70,8 @@ pub enum SyntaxClass {
     InheritStandard,
     /// '!' — Generic comment delimiter
     Generic,
+    /// '|' — Generic string fence (pairs with itself, like `"` but independent)
+    StringFence,
 }
 
 impl SyntaxClass {
@@ -91,6 +93,7 @@ impl SyntaxClass {
             '>' => Some(SyntaxClass::EndComment),
             '@' => Some(SyntaxClass::InheritStandard),
             '!' => Some(SyntaxClass::Generic),
+            '|' => Some(SyntaxClass::StringFence),
             _ => None,
         }
     }
@@ -113,6 +116,7 @@ impl SyntaxClass {
             SyntaxClass::EndComment => '>',
             SyntaxClass::InheritStandard => '@',
             SyntaxClass::Generic => '!',
+            SyntaxClass::StringFence => '|',
         }
     }
 
@@ -135,6 +139,7 @@ impl SyntaxClass {
             SyntaxClass::EndComment => 12,
             SyntaxClass::InheritStandard => 13,
             SyntaxClass::Generic => 14,
+            SyntaxClass::StringFence => 15,
         }
     }
 
@@ -156,6 +161,7 @@ impl SyntaxClass {
             12 => Some(SyntaxClass::EndComment),
             13 => Some(SyntaxClass::InheritStandard),
             14 => Some(SyntaxClass::Generic),
+            15 => Some(SyntaxClass::StringFence),
             _ => None,
         }
     }
@@ -680,12 +686,18 @@ fn scan_sexp_forward(
                     SyntaxClass::Close => {
                         depth -= 1;
                     }
-                    SyntaxClass::StringDelim => {
+                    SyntaxClass::StringDelim | SyntaxClass::StringFence => {
                         // Skip over string contents
-                        let delim = c;
+                        let delim_class = s;
                         idx += 1;
-                        while idx < len && chars[idx] != delim {
-                            if matches!(table.char_syntax(chars[idx]), SyntaxClass::Escape) {
+                        while idx < len {
+                            let sc = table.char_syntax(chars[idx]);
+                            if sc == delim_class
+                                && (s == SyntaxClass::StringFence || chars[idx] == c)
+                            {
+                                break;
+                            }
+                            if matches!(sc, SyntaxClass::Escape) {
                                 idx += 1; // skip escaped char
                             }
                             idx += 1;
@@ -710,13 +722,19 @@ fn scan_sexp_forward(
         SyntaxClass::Close => {
             Err("Scan error: unbalanced parentheses (unexpected close)".to_string())
         }
-        SyntaxClass::StringDelim => {
+        SyntaxClass::StringDelim | SyntaxClass::StringFence => {
             // Scan to matching string delimiter.
-            let delim = ch;
+            // StringFence always pairs with itself (like `"` but independent).
+            let delim_class = syn;
             idx += 1;
-            while idx < len && chars[idx] != delim {
-                if matches!(table.char_syntax(chars[idx]), SyntaxClass::Escape) {
-                    idx += 1;
+            while idx < len {
+                let c = chars[idx];
+                let s = table.char_syntax(c);
+                if s == delim_class && (syn == SyntaxClass::StringFence || c == ch) {
+                    break;
+                }
+                if matches!(s, SyntaxClass::Escape) {
+                    idx += 1; // skip escaped char
                 }
                 idx += 1;
             }
@@ -806,12 +824,18 @@ fn scan_sexp_backward(chars: &[char], start: usize, table: &SyntaxTable) -> Resu
                     SyntaxClass::Open => {
                         depth -= 1;
                     }
-                    SyntaxClass::StringDelim => {
+                    SyntaxClass::StringDelim | SyntaxClass::StringFence => {
                         // Skip over string contents backward
-                        let delim = c;
+                        let delim_class = s;
                         if idx > 0 {
                             idx -= 1;
-                            while idx > 0 && chars[idx] != delim {
+                            while idx > 0 {
+                                let sc = table.char_syntax(chars[idx]);
+                                if sc == delim_class
+                                    && (s == SyntaxClass::StringFence || chars[idx] == c)
+                                {
+                                    break;
+                                }
                                 idx -= 1;
                             }
                             // idx now points at the opening delim
@@ -831,17 +855,24 @@ fn scan_sexp_backward(chars: &[char], start: usize, table: &SyntaxTable) -> Resu
         SyntaxClass::Open => {
             Err("Scan error: unbalanced parentheses (unexpected open)".to_string())
         }
-        SyntaxClass::StringDelim => {
+        SyntaxClass::StringDelim | SyntaxClass::StringFence => {
             // Scan backward to matching string delimiter.
-            let delim = ch;
+            let delim_class = syn;
             if idx == 0 {
                 return Err("Scan error: unterminated string".to_string());
             }
             idx -= 1;
-            while idx > 0 && chars[idx] != delim {
+            while idx > 0 {
+                let c = chars[idx];
+                let s = table.char_syntax(c);
+                if s == delim_class && (syn == SyntaxClass::StringFence || c == ch) {
+                    break;
+                }
                 idx -= 1;
             }
-            if chars[idx] != delim {
+            let c = chars[idx];
+            let s = table.char_syntax(c);
+            if !(s == delim_class && (syn == SyntaxClass::StringFence || c == ch)) {
                 return Err("Scan error: unterminated string".to_string());
             }
             Ok(idx)
@@ -1076,6 +1107,68 @@ pub(crate) fn builtin_syntax_class_to_char(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(matching-paren CHAR)` — return matching paren for bracket chars.
+///
+/// This is an evaluator-dependent version that uses the current buffer's
+/// syntax table. For backwards compatibility, also works as a pure function
+/// with standard bracket pairs.
+pub(crate) fn builtin_matching_paren_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() != 1 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("matching-paren"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+
+    let ch = match &args[0] {
+        Value::Int(n) => char::from_u32(*n as u32).ok_or_else(|| {
+            signal(
+                "wrong-type-argument",
+                vec![Value::symbol("characterp"), args[0]],
+            )
+        })?,
+        Value::Char(c) => *c,
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("characterp"), *other],
+            ));
+        }
+    };
+
+    // Look up in the current buffer's syntax table
+    if let Some(buf) = eval.buffers.current_buffer() {
+        let entry = buf.syntax_table.get_entry(ch);
+        if let Some(e) = entry {
+            if matches!(e.class, SyntaxClass::Open | SyntaxClass::Close) {
+                if let Some(m) = e.matching_char {
+                    return Ok(Value::Char(m));
+                }
+            }
+        }
+    }
+
+    // Fallback to standard hardcoded pairs
+    let out = match ch {
+        '(' => Some(')'),
+        ')' => Some('('),
+        '[' => Some(']'),
+        ']' => Some('['),
+        '{' => Some('}'),
+        '}' => Some('{'),
+        _ => None,
+    };
+    Ok(out.map_or(Value::Nil, Value::Char))
+}
+
+/// Pure (no-eval) version of `matching-paren` using standard hardcoded pairs.
+/// Kept for unit tests; dispatch uses `builtin_matching_paren_eval` instead.
+#[allow(dead_code)]
 pub(crate) fn builtin_matching_paren(args: Vec<Value>) -> EvalResult {
     if args.len() != 1 {
         return Err(signal(

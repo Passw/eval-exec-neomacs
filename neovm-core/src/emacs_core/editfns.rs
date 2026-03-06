@@ -95,7 +95,7 @@ fn buffer_read_only_active(eval: &super::eval::Evaluator, buf: &crate::buffer::B
         .is_some_and(|value| value.is_truthy())
 }
 
-fn ensure_current_buffer_writable(eval: &super::eval::Evaluator) -> Result<(), Flow> {
+pub(crate) fn ensure_current_buffer_writable(eval: &super::eval::Evaluator) -> Result<(), Flow> {
     if let Some(buf) = eval.buffers.current_buffer() {
         if buffer_read_only_active(eval, buf) {
             return Err(signal("buffer-read-only", vec![Value::string(&buf.name)]));
@@ -109,7 +109,7 @@ fn ensure_current_buffer_writable(eval: &super::eval::Evaluator) -> Result<(), F
 // ---------------------------------------------------------------------------
 
 /// Collect the insertable text from a mixed list of strings and characters.
-fn collect_insert_text(_name: &str, args: &[Value]) -> Result<String, Flow> {
+pub(crate) fn collect_insert_text(_name: &str, args: &[Value]) -> Result<String, Flow> {
     let mut text = String::new();
     for arg in args {
         match arg {
@@ -150,16 +150,33 @@ pub(crate) fn builtin_insert(eval: &mut super::eval::Evaluator, args: Vec<Value>
     Ok(Value::Nil)
 }
 
-/// `(insert-before-markers &rest ARGS)` — insert at point (markers advance).
-/// For now, identical to `insert`.
+/// `(insert-before-markers &rest ARGS)` — insert at point, advancing ALL
+/// markers at that position past the inserted text (regardless of their
+/// InsertionType).
 pub(crate) fn builtin_insert_before_markers(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    // In a full implementation, all markers at point would advance past the
-    // inserted text.  Our `Buffer::insert` already advances markers with
-    // InsertionType::After, so this is a reasonable approximation.
-    builtin_insert(eval, args)
+    let text = collect_insert_text("insert-before-markers", &args)?;
+    ensure_current_buffer_writable(eval)?;
+    if let Some(buf) = eval.buffers.current_buffer_mut() {
+        let byte_len = text.len();
+        if byte_len == 0 {
+            return Ok(Value::Nil);
+        }
+        let old_pt = buf.pt;
+        buf.insert(&text);
+        // `buf.insert` already advanced InsertionType::After markers.
+        // Now advance any InsertionType::Before markers that stayed at the
+        // old insertion point — this is what distinguishes
+        // insert-before-markers from plain insert.
+        for m in &mut buf.markers {
+            if m.byte_pos == old_pt {
+                m.byte_pos += byte_len;
+            }
+        }
+    }
+    Ok(Value::Nil)
 }
 
 /// `(delete-char N &optional KILLFLAG)` — delete N characters forward.

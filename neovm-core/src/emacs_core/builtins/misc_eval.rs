@@ -84,15 +84,57 @@ pub(crate) fn builtin_previous_property_change(
     expect_max_args("previous-property-change", &args, 3)?;
 
     let pos = expect_integer_or_marker(&args[0])?;
-    if let Some(Value::Str(_)) = args.get(1) {
-        if let Some(limit) = args.get(2) {
-            if !limit.is_nil() {
-                return Ok(Value::Int(expect_integer_or_marker(limit)?));
+
+    // --- String OBJECT ---
+    if let Some(Value::Str(str_id)) = args.get(1) {
+        let str_id = *str_id;
+        let s = with_heap(|h| h.get_string(str_id).clone());
+        let table = get_string_text_properties_table(str_id).unwrap_or_default();
+        let byte_pos = textprop::string_elisp_pos_to_byte(&s, pos);
+        let (byte_limit, limit_val) = match args.get(2) {
+            Some(v) if !v.is_nil() => {
+                let lim_int = expect_integer_or_marker(v)?;
+                (Some(textprop::string_elisp_pos_to_byte(&s, lim_int)), Some(lim_int))
+            }
+            _ => (None, None),
+        };
+
+        let ref_byte = if byte_pos > 0 { byte_pos - 1 } else { 0 };
+        let current_props = table.get_properties(ref_byte);
+        let mut cursor = byte_pos;
+
+        loop {
+            match table.previous_property_change(cursor) {
+                Some(prev) => {
+                    if let Some(lim) = byte_limit {
+                        if prev <= lim {
+                            return Ok(match limit_val {
+                                Some(lv) => Value::Int(lv),
+                                None => Value::Nil,
+                            });
+                        }
+                    }
+                    let check = if prev > 0 { prev - 1 } else { 0 };
+                    let new_props = table.get_properties(check);
+                    if new_props != current_props {
+                        return Ok(Value::Int(textprop::string_byte_to_elisp_pos(&s, prev)));
+                    }
+                    if prev == 0 {
+                        break;
+                    }
+                    cursor = if prev < cursor { prev } else { prev - 1 };
+                }
+                None => break,
             }
         }
-        return Ok(Value::Nil);
+
+        return Ok(match limit_val {
+            Some(lv) => Value::Int(lv),
+            None => Value::Nil,
+        });
     }
 
+    // --- Buffer OBJECT ---
     let buf_id = match args.get(1) {
         None | Some(Value::Nil) => eval
             .buffers
@@ -114,13 +156,12 @@ pub(crate) fn builtin_previous_property_change(
     let char_pos = if pos > 0 { (pos - 1) as usize } else { 0 };
     let byte_pos = buf.text.char_to_byte(char_pos.min(buf.text.char_count()));
 
-    let (byte_limit, limit_pos) = match args.get(2) {
+    let (byte_limit, limit_val) = match args.get(2) {
         Some(v) if !v.is_nil() => {
             let limit = expect_integer_or_marker(v)?;
             let limit_char = if limit > 0 { (limit - 1) as usize } else { 0 };
             let limit_byte = buf.text.char_to_byte(limit_char.min(buf.text.char_count()));
-            let limit_elisp = buf.text.byte_to_char(limit_byte) as i64 + 1;
-            (Some(limit_byte), Some(limit_elisp))
+            (Some(limit_byte), Some(limit))
         }
         _ => (None, None),
     };
@@ -132,9 +173,9 @@ pub(crate) fn builtin_previous_property_change(
     loop {
         match buf.text_props.previous_property_change(cursor) {
             Some(prev) => {
-                if let (Some(lim_byte), Some(limit_elisp)) = (byte_limit, limit_pos) {
-                    if prev < lim_byte {
-                        return Ok(Value::Int(limit_elisp));
+                if let (Some(lim_byte), Some(lv)) = (byte_limit, limit_val) {
+                    if prev <= lim_byte {
+                        return Ok(Value::Int(lv));
                     }
                 }
 
@@ -153,8 +194,8 @@ pub(crate) fn builtin_previous_property_change(
         }
     }
 
-    match limit_pos {
-        Some(limit_elisp) => Ok(Value::Int(limit_elisp)),
+    match limit_val {
+        Some(lv) => Ok(Value::Int(lv)),
         None => Ok(Value::Nil),
     }
 }

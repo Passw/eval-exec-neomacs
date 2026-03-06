@@ -37,6 +37,96 @@ fn format_lisp_propertized_string(s: &str, runs: &[StringTextPropertyRun]) -> St
     out
 }
 
+/// Print a `Value` as a Lisp string, with buffer-manager awareness for
+/// proper buffer name / killed-buffer rendering.
+pub fn print_value_with_buffers(value: &Value, buffers: &crate::buffer::BufferManager) -> String {
+    if let Some(handle) = print_special_handle(value) {
+        return handle;
+    }
+    match value {
+        Value::Buffer(id) => {
+            if let Some(buf) = buffers.get(*id) {
+                return format!("#<buffer {}>", buf.name);
+            }
+            if buffers.dead_buffer_last_name(*id).is_some() {
+                return "#<killed buffer>".to_string();
+            }
+            format!("#<buffer {}>", id.0)
+        }
+        Value::Cons(_) => {
+            // Recurse with buffer awareness
+            if let Some(shorthand) = print_list_shorthand_with_buffers(value, buffers) {
+                return shorthand;
+            }
+            let mut out = String::from("(");
+            print_cons_with_buffers(value, &mut out, buffers);
+            out.push(')');
+            out
+        }
+        Value::Vector(v) => {
+            if let Some(nbits) = super::chartable::bool_vector_length(value) {
+                return format_bool_vector(value, nbits as usize);
+            }
+            let items = with_heap(|h| h.get_vector(*v).clone());
+            let parts: Vec<String> = items.iter().map(|v| print_value_with_buffers(v, buffers)).collect();
+            format!("[{}]", parts.join(" "))
+        }
+        _ => print_value(value),
+    }
+}
+
+fn print_list_shorthand_with_buffers(value: &Value, buffers: &crate::buffer::BufferManager) -> Option<String> {
+    let items = list_to_vec(value)?;
+    if items.len() != 2 {
+        return None;
+    }
+    let head = match &items[0] {
+        Value::Symbol(id) => resolve_sym(*id),
+        _ => return None,
+    };
+    if head == "make-hash-table-from-literal" {
+        if let Some(payload) = quote_payload(&items[1]) {
+            return Some(format!("#s{}", print_value_with_buffers(&payload, buffers)));
+        }
+        return None;
+    }
+    let prefix = match head {
+        "quote" => "'",
+        "function" => "#'",
+        "`" => "`",
+        "," => ",",
+        ",@" => ",@",
+        _ => return None,
+    };
+    Some(format!("{prefix}{}", print_value_with_buffers(&items[1], buffers)))
+}
+
+fn print_cons_with_buffers(value: &Value, out: &mut String, buffers: &crate::buffer::BufferManager) {
+    let mut cursor = *value;
+    let mut first = true;
+    loop {
+        match cursor {
+            Value::Cons(cell) => {
+                if !first {
+                    out.push(' ');
+                }
+                let pair = read_cons(cell);
+                out.push_str(&print_value_with_buffers(&pair.car, buffers));
+                cursor = pair.cdr;
+                first = false;
+            }
+            Value::Nil => return,
+            other => {
+                if !first {
+                    out.push_str(" . ");
+                }
+                out.push_str(&print_value_with_buffers(&other, buffers));
+                return;
+            }
+        }
+    }
+}
+
 /// Print a `Value` as a Lisp string.
 pub fn print_value(value: &Value) -> String {
     if let Some(handle) = print_special_handle(value) {

@@ -318,6 +318,7 @@ fn replace_regexp_with_backref() {
 
 #[test]
 fn replace_regexp_with_start() {
+    // Emacs: START omits the first START chars from the result.
     let result = builtin_replace_regexp_in_string(vec![
         Value::string("[0-9]+"),
         Value::string("X"),
@@ -332,12 +333,15 @@ fn replace_regexp_with_start() {
 
 #[test]
 fn replace_regexp_with_start_no_subexp() {
+    // In Emacs, arg 6 is SUBEXP and arg 7 is START.
+    // To pass START without SUBEXP, use nil for SUBEXP.
     let result = builtin_replace_regexp_in_string(vec![
         Value::string("[0-9]+"),
         Value::string("X"),
         Value::string("111 222 333"),
         Value::Nil,    // fixedcase
         Value::Nil,    // literal
+        Value::Nil,    // subexp (default 0)
         Value::Int(4), // start
     ]);
     assert_str(result.unwrap(), "X X");

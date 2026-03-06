@@ -480,6 +480,13 @@ impl BufferManager {
         }
     }
 
+    /// Allocate a unique marker id without associating it with a buffer.
+    pub fn allocate_marker_id(&mut self) -> u64 {
+        let id = self.next_marker_id;
+        self.next_marker_id += 1;
+        id
+    }
+
     /// Create a marker in `buffer_id` at byte position `pos` with the given
     /// insertion type.  Returns the new marker's id.
     pub fn create_marker(

@@ -118,7 +118,7 @@ fn resolve_buffer_id(
 }
 
 /// Check if the OBJECT argument is a string.  Returns Some(ObjId) if so.
-fn is_string_object(object: Option<&Value>) -> Option<crate::gc::types::ObjId> {
+pub(crate) fn is_string_object(object: Option<&Value>) -> Option<crate::gc::types::ObjId> {
     match object {
         Some(Value::Str(id)) => Some(*id),
         _ => None,
@@ -126,19 +126,19 @@ fn is_string_object(object: Option<&Value>) -> Option<crate::gc::types::ObjId> {
 }
 
 /// Convert a 0-based Elisp string char position to a byte offset.
-fn string_elisp_pos_to_byte(s: &str, pos: i64) -> usize {
+pub(crate) fn string_elisp_pos_to_byte(s: &str, pos: i64) -> usize {
     let char_pos = if pos < 0 { 0usize } else { pos as usize };
     let clamped = char_pos.min(storage_char_len(s));
     storage_char_to_byte(s, clamped)
 }
 
 /// Convert a byte offset to a 0-based Elisp string char position.
-fn string_byte_to_elisp_pos(s: &str, byte_pos: usize) -> i64 {
+pub(crate) fn string_byte_to_elisp_pos(s: &str, byte_pos: usize) -> i64 {
     storage_byte_to_char(s, byte_pos) as i64
 }
 
 /// Write back a modified TextPropertyTable to string text properties.
-fn save_string_props(id: crate::gc::types::ObjId, table: TextPropertyTable) {
+pub(crate) fn save_string_props(id: crate::gc::types::ObjId, table: TextPropertyTable) {
     set_string_text_properties_table(id, table);
 }
 
@@ -386,11 +386,14 @@ pub(crate) fn builtin_remove_text_properties(
         let mut table = get_string_text_properties_table(str_id).unwrap_or_default();
         let byte_beg = string_elisp_pos_to_byte(&s, beg);
         let byte_end = string_elisp_pos_to_byte(&s, end);
+        let mut any_removed = false;
         for (name, _val) in pairs {
-            table.remove_property(byte_beg, byte_end, &name);
+            if table.remove_property(byte_beg, byte_end, &name) {
+                any_removed = true;
+            }
         }
         save_string_props(str_id, table);
-        return Ok(Value::True);
+        return Ok(if any_removed { Value::True } else { Value::Nil });
     }
 
     let buf_id = resolve_buffer_id(eval, args.get(3))?;
@@ -401,10 +404,13 @@ pub(crate) fn builtin_remove_text_properties(
 
     let byte_beg = elisp_pos_to_byte(buf, beg);
     let byte_end = elisp_pos_to_byte(buf, end);
+    let mut any_removed = false;
     for (name, _val) in pairs {
-        buf.text_props.remove_property(byte_beg, byte_end, &name);
+        if buf.text_props.remove_property(byte_beg, byte_end, &name) {
+            any_removed = true;
+        }
     }
-    Ok(Value::True)
+    Ok(if any_removed { Value::True } else { Value::Nil })
 }
 
 /// (set-text-properties BEG END PROPS &optional OBJECT)
@@ -552,10 +558,12 @@ pub(crate) fn builtin_next_single_property_change(
         let s = with_heap(|h| h.get_string(str_id).clone());
         let table = get_string_text_properties_table(str_id).unwrap_or_default();
         let byte_pos = string_elisp_pos_to_byte(&s, pos);
-        let limit = args.get(3);
-        let byte_limit = match limit {
-            Some(v) if !v.is_nil() => Some(string_elisp_pos_to_byte(&s, expect_int(v)?)),
-            _ => None,
+        let (byte_limit, limit_val) = match args.get(3) {
+            Some(v) if !v.is_nil() => {
+                let lim_int = expect_int(v)?;
+                (Some(string_elisp_pos_to_byte(&s, lim_int)), Some(lim_int))
+            }
+            _ => (None, None),
         };
         let current_val = table.get_property(byte_pos, &prop).cloned();
         let str_len = s.len();
@@ -564,8 +572,14 @@ pub(crate) fn builtin_next_single_property_change(
             match table.next_property_change(cursor) {
                 Some(next) => {
                     if let Some(lim) = byte_limit {
-                        if next > lim { return Ok(Value::Int(string_byte_to_elisp_pos(&s, lim))); }
+                        if next >= lim {
+                            return Ok(match limit_val {
+                                Some(lv) => Value::Int(lv),
+                                None => Value::Nil,
+                            });
+                        }
                     }
+                    if next >= str_len { break; }
                     let new_val = table.get_property(next, &prop).cloned();
                     let changed = match (&current_val, &new_val) {
                         (None, None) => false,
@@ -574,19 +588,17 @@ pub(crate) fn builtin_next_single_property_change(
                     };
                     if changed { return Ok(Value::Int(string_byte_to_elisp_pos(&s, next))); }
                     cursor = next;
-                    if cursor >= str_len { break; }
                 }
                 None => break,
             }
         }
-        return match byte_limit {
-            Some(lim) => Ok(Value::Int(string_byte_to_elisp_pos(&s, lim))),
-            None => Ok(Value::Nil),
-        };
+        return Ok(match limit_val {
+            Some(lv) => Value::Int(lv),
+            None => Value::Nil,
+        });
     }
 
     let buf_id = resolve_buffer_id(eval, args.get(2))?;
-    let limit = args.get(3);
 
     let buf = eval
         .buffers
@@ -594,23 +606,30 @@ pub(crate) fn builtin_next_single_property_change(
         .ok_or_else(|| signal("error", vec![Value::string("Buffer does not exist")]))?;
 
     let byte_pos = elisp_pos_to_byte(buf, pos);
-    let byte_limit = match limit {
-        Some(v) if !v.is_nil() => Some(elisp_pos_to_byte(buf, expect_int(v)?)),
-        _ => None,
+    let (byte_limit, limit_val) = match args.get(3) {
+        Some(v) if !v.is_nil() => {
+            let lim_int = expect_int(v)?;
+            (Some(elisp_pos_to_byte(buf, lim_int)), Some(lim_int))
+        }
+        _ => (None, None),
     };
 
     let current_val = buf.text_props.get_property(byte_pos, &prop).cloned();
-    let buf_len = buf.text.len();
+    let buf_end = buf.point_max();
     let mut cursor = byte_pos;
 
     loop {
         match buf.text_props.next_property_change(cursor) {
             Some(next) => {
                 if let Some(lim) = byte_limit {
-                    if next > lim {
-                        return Ok(Value::Int(byte_to_elisp_pos(buf, lim)));
+                    if next >= lim {
+                        return Ok(match limit_val {
+                            Some(lv) => Value::Int(lv),
+                            None => Value::Nil,
+                        });
                     }
                 }
+                if next >= buf_end { break; }
                 let new_val = buf.text_props.get_property(next, &prop).cloned();
                 let changed = match (&current_val, &new_val) {
                     (None, None) => false,
@@ -621,18 +640,15 @@ pub(crate) fn builtin_next_single_property_change(
                     return Ok(Value::Int(byte_to_elisp_pos(buf, next)));
                 }
                 cursor = next;
-                if cursor >= buf_len {
-                    break;
-                }
             }
             None => break,
         }
     }
 
-    match byte_limit {
-        Some(lim) => Ok(Value::Int(byte_to_elisp_pos(buf, lim))),
-        None => Ok(Value::Nil),
-    }
+    Ok(match limit_val {
+        Some(lv) => Value::Int(lv),
+        None => Value::Nil,
+    })
 }
 
 /// (previous-single-property-change POS PROP &optional OBJECT LIMIT)
@@ -649,10 +665,12 @@ pub(crate) fn builtin_previous_single_property_change(
         let s = with_heap(|h| h.get_string(str_id).clone());
         let table = get_string_text_properties_table(str_id).unwrap_or_default();
         let byte_pos = string_elisp_pos_to_byte(&s, pos);
-        let limit = args.get(3);
-        let byte_limit = match limit {
-            Some(v) if !v.is_nil() => Some(string_elisp_pos_to_byte(&s, expect_int(v)?)),
-            _ => None,
+        let (byte_limit, limit_val) = match args.get(3) {
+            Some(v) if !v.is_nil() => {
+                let lim_int = expect_int(v)?;
+                (Some(string_elisp_pos_to_byte(&s, lim_int)), Some(lim_int))
+            }
+            _ => (None, None),
         };
         let ref_byte = if byte_pos > 0 { byte_pos - 1 } else { 0 };
         let current_val = table.get_property(ref_byte, &prop).cloned();
@@ -661,7 +679,12 @@ pub(crate) fn builtin_previous_single_property_change(
             match table.previous_property_change(cursor) {
                 Some(prev) => {
                     if let Some(lim) = byte_limit {
-                        if prev < lim { return Ok(Value::Int(string_byte_to_elisp_pos(&s, lim))); }
+                        if prev <= lim {
+                            return Ok(match limit_val {
+                                Some(lv) => Value::Int(lv),
+                                None => Value::Nil,
+                            });
+                        }
                     }
                     let check = if prev > 0 { prev - 1 } else { 0 };
                     let new_val = table.get_property(check, &prop).cloned();
@@ -677,14 +700,13 @@ pub(crate) fn builtin_previous_single_property_change(
                 None => break,
             }
         }
-        return match byte_limit {
-            Some(lim) => Ok(Value::Int(string_byte_to_elisp_pos(&s, lim))),
-            None => Ok(Value::Nil),
-        };
+        return Ok(match limit_val {
+            Some(lv) => Value::Int(lv),
+            None => Value::Nil,
+        });
     }
 
     let buf_id = resolve_buffer_id(eval, args.get(2))?;
-    let limit = args.get(3);
 
     let buf = eval
         .buffers
@@ -692,9 +714,12 @@ pub(crate) fn builtin_previous_single_property_change(
         .ok_or_else(|| signal("error", vec![Value::string("Buffer does not exist")]))?;
 
     let byte_pos = elisp_pos_to_byte(buf, pos);
-    let byte_limit = match limit {
-        Some(v) if !v.is_nil() => Some(elisp_pos_to_byte(buf, expect_int(v)?)),
-        _ => None,
+    let (byte_limit, limit_val) = match args.get(3) {
+        Some(v) if !v.is_nil() => {
+            let lim_int = expect_int(v)?;
+            (Some(elisp_pos_to_byte(buf, lim_int)), Some(lim_int))
+        }
+        _ => (None, None),
     };
 
     let ref_byte = if byte_pos > 0 { byte_pos - 1 } else { 0 };
@@ -705,8 +730,11 @@ pub(crate) fn builtin_previous_single_property_change(
         match buf.text_props.previous_property_change(cursor) {
             Some(prev) => {
                 if let Some(lim) = byte_limit {
-                    if prev < lim {
-                        return Ok(Value::Int(byte_to_elisp_pos(buf, lim)));
+                    if prev <= lim {
+                        return Ok(match limit_val {
+                            Some(lv) => Value::Int(lv),
+                            None => Value::Nil,
+                        });
                     }
                 }
                 let check = if prev > 0 { prev - 1 } else { 0 };
@@ -728,10 +756,10 @@ pub(crate) fn builtin_previous_single_property_change(
         }
     }
 
-    match byte_limit {
-        Some(lim) => Ok(Value::Int(byte_to_elisp_pos(buf, lim))),
-        None => Ok(Value::Nil),
-    }
+    Ok(match limit_val {
+        Some(lv) => Value::Int(lv),
+        None => Value::Nil,
+    })
 }
 
 /// (next-property-change POS &optional OBJECT LIMIT)
@@ -747,27 +775,44 @@ pub(crate) fn builtin_next_property_change(
         let s = with_heap(|h| h.get_string(str_id).clone());
         let table = get_string_text_properties_table(str_id).unwrap_or_default();
         let byte_pos = string_elisp_pos_to_byte(&s, pos);
-        let limit = args.get(2);
-        let byte_limit = match limit {
-            Some(v) if !v.is_nil() => Some(string_elisp_pos_to_byte(&s, expect_int(v)?)),
-            _ => None,
+        let limit_arg = args.get(2);
+        // Keep original limit value for returning (don't clamp to string length)
+        let (byte_limit, limit_val) = match limit_arg {
+            Some(v) if !v.is_nil() => {
+                let lim_int = expect_int(v)?;
+                (Some(string_elisp_pos_to_byte(&s, lim_int)), Some(lim_int))
+            }
+            _ => (None, None),
         };
+        let str_byte_len = s.len();
         return match table.next_property_change(byte_pos) {
             Some(next) => {
                 if let Some(lim) = byte_limit {
-                    if next > lim { return Ok(Value::Int(string_byte_to_elisp_pos(&s, lim))); }
+                    if next >= lim {
+                        return Ok(match limit_val {
+                            Some(lv) => Value::Int(lv),
+                            None => Value::Nil,
+                        });
+                    }
+                }
+                // If the change is at or past the end of the string, treat as no change
+                if next >= str_byte_len {
+                    return Ok(match limit_val {
+                        Some(lv) => Value::Int(lv),
+                        None => Value::Nil,
+                    });
                 }
                 Ok(Value::Int(string_byte_to_elisp_pos(&s, next)))
             }
-            None => match byte_limit {
-                Some(lim) => Ok(Value::Int(string_byte_to_elisp_pos(&s, lim))),
-                None => Ok(Value::Nil),
-            },
+            None => Ok(match limit_val {
+                Some(lv) => Value::Int(lv),
+                None => Value::Nil,
+            }),
         };
     }
 
     let buf_id = resolve_buffer_id(eval, args.get(1))?;
-    let limit = args.get(2);
+    let limit_arg = args.get(2);
 
     let buf = eval
         .buffers
@@ -775,24 +820,39 @@ pub(crate) fn builtin_next_property_change(
         .ok_or_else(|| signal("error", vec![Value::string("Buffer does not exist")]))?;
 
     let byte_pos = elisp_pos_to_byte(buf, pos);
-    let byte_limit = match limit {
-        Some(v) if !v.is_nil() => Some(elisp_pos_to_byte(buf, expect_int(v)?)),
-        _ => None,
+    // Keep original limit value for returning
+    let (byte_limit, limit_val) = match limit_arg {
+        Some(v) if !v.is_nil() => {
+            let lim_int = expect_int(v)?;
+            (Some(elisp_pos_to_byte(buf, lim_int)), Some(lim_int))
+        }
+        _ => (None, None),
     };
+    let buf_end = buf.point_max();
 
     match buf.text_props.next_property_change(byte_pos) {
         Some(next) => {
             if let Some(lim) = byte_limit {
-                if next > lim {
-                    return Ok(Value::Int(byte_to_elisp_pos(buf, lim)));
+                if next >= lim {
+                    return Ok(match limit_val {
+                        Some(lv) => Value::Int(lv),
+                        None => Value::Nil,
+                    });
                 }
+            }
+            // If the change is at or past buffer end, treat as no change
+            if next >= buf_end {
+                return Ok(match limit_val {
+                    Some(lv) => Value::Int(lv),
+                    None => Value::Nil,
+                });
             }
             Ok(Value::Int(byte_to_elisp_pos(buf, next)))
         }
-        None => match byte_limit {
-            Some(lim) => Ok(Value::Int(byte_to_elisp_pos(buf, lim))),
-            None => Ok(Value::Nil),
-        },
+        None => Ok(match limit_val {
+            Some(lv) => Value::Int(lv),
+            None => Value::Nil,
+        }),
     }
 }
 

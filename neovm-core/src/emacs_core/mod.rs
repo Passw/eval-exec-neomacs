@@ -109,7 +109,7 @@ pub use eval::Evaluator;
 pub use expr::{Expr, ParseError, print_expr};
 pub use intern::SymId;
 pub use parser::parse_forms;
-pub use print::{print_value, print_value_bytes};
+pub use print::{print_value, print_value_bytes, print_value_with_buffers};
 pub use symbol::Obarray;
 pub use value::{LambdaData, LambdaParams, Value};
 

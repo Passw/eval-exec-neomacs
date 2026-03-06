@@ -135,44 +135,71 @@ fn count_newlines(text: &str, start: usize, end: usize) -> usize {
 /// Returns the byte position at the beginning of the destination line and the
 /// number of lines actually moved (may be fewer than requested at buffer edges).
 fn move_by_lines(text: &str, byte_pos: usize, n: i64) -> (usize, i64) {
+    move_by_lines_narrowed(text, byte_pos, n, 0, text.len())
+}
+
+/// Like `move_by_lines` but confined to the narrowed region `[begv, zv)`.
+fn move_by_lines_narrowed(text: &str, byte_pos: usize, n: i64, begv: usize, zv: usize) -> (usize, i64) {
+    let zv = zv.min(text.len());
     if n == 0 {
-        return (line_beginning_byte(text, byte_pos), 0);
+        return (line_beginning_byte_narrowed(text, byte_pos, begv), 0);
     }
-    let mut pos = byte_pos.min(text.len());
+    let mut pos = byte_pos.clamp(begv, zv);
     let mut moved: i64 = 0;
     if n > 0 {
         for _ in 0..n {
-            match text[pos..].find('\n') {
+            // Search for newline only within the narrowed region
+            match text[pos..zv].find('\n') {
                 Some(offset) => {
                     pos = pos + offset + 1;
                     moved += 1;
                 }
-                None => break,
+                None => {
+                    // No more newlines — move to end of narrowed region
+                    pos = zv;
+                    break;
+                }
             }
         }
     } else {
         // Move to start of current line first, if not already there.
-        let bol = line_beginning_byte(text, pos);
+        let bol = line_beginning_byte_narrowed(text, pos, begv);
         if bol < pos {
             pos = bol;
-            // This counts as moving backward one line for the purpose of
-            // backward navigation — but Emacs counts it differently.
-            // Actually, in Emacs `forward-line` with negative N first goes to
-            // BOL, and that counts as one of the N lines moved.
             moved -= 1;
         }
         let remaining = n - moved; // remaining is still negative
         for _ in 0..(-remaining) {
-            if pos == 0 {
+            if pos <= begv {
                 break;
             }
             // Move before the newline at pos-1
             pos -= 1;
-            pos = line_beginning_byte(text, pos);
+            pos = line_beginning_byte_narrowed(text, pos, begv);
             moved -= 1;
         }
     }
     (pos, moved)
+}
+
+/// Find the beginning of the line containing `byte_pos`, but not before `begv`.
+fn line_beginning_byte_narrowed(text: &str, byte_pos: usize, begv: usize) -> usize {
+    let pos = byte_pos.min(text.len());
+    let start = begv.min(pos);
+    match text[start..pos].rfind('\n') {
+        Some(offset) => start + offset + 1,
+        None => start,
+    }
+}
+
+/// Find the end of the line containing `byte_pos`, but not past `zv`.
+fn line_end_byte_narrowed(text: &str, byte_pos: usize, zv: usize) -> usize {
+    let pos = byte_pos.min(text.len());
+    let end = zv.min(text.len());
+    match text[pos..end].find('\n') {
+        Some(offset) => pos + offset,
+        None => end,
+    }
 }
 
 // ===========================================================================
@@ -230,13 +257,15 @@ pub(crate) fn builtin_line_beginning_position(
     };
     let buf = eval.buffers.current_buffer().ok_or_else(no_buffer)?;
     let text = buffer_text(buf);
+    let begv = buf.begv;
+    let zv = buf.zv;
     let mut pos = buf.pt;
     if n != 1 {
         let delta = n - 1;
-        let (new_pos, _) = move_by_lines(&text, pos, delta);
+        let (new_pos, _) = move_by_lines_narrowed(&text, pos, delta, begv, zv);
         pos = new_pos;
     }
-    let bol = line_beginning_byte(&text, pos);
+    let bol = line_beginning_byte_narrowed(&text, pos, begv);
     Ok(Value::Int(byte_to_char_pos(buf, bol)))
 }
 
@@ -252,31 +281,15 @@ pub(crate) fn builtin_line_end_position(
     };
     let buf = eval.buffers.current_buffer().ok_or_else(no_buffer)?;
     let text = buffer_text(buf);
-    let point = buf.pt.min(text.len());
-    let current_line = count_newlines(&text, 0, point) as i64 + 1;
-    let total_lines = count_newlines(&text, 0, text.len()) as i64 + 1;
-    let target_line = current_line + (n - 1);
-
-    if target_line < 1 {
-        return Ok(Value::Int(1));
+    let begv = buf.begv;
+    let zv = buf.zv;
+    let mut pos = buf.pt;
+    if n != 1 {
+        let delta = n - 1;
+        let (new_pos, _) = move_by_lines_narrowed(&text, pos, delta, begv, zv);
+        pos = new_pos;
     }
-    if target_line > total_lines {
-        return Ok(Value::Int(byte_to_char_pos(buf, text.len())));
-    }
-
-    let mut line_start = 0usize;
-    for _ in 1..(target_line as usize) {
-        match text[line_start..].find('\n') {
-            Some(offset) => {
-                line_start += offset + 1;
-            }
-            None => {
-                line_start = text.len();
-                break;
-            }
-        }
-    }
-    let eol = line_end_byte(&text, line_start);
+    let eol = line_end_byte_narrowed(&text, pos, zv);
     Ok(Value::Int(byte_to_char_pos(buf, eol)))
 }
 
@@ -339,7 +352,9 @@ pub(crate) fn builtin_forward_line(
     };
     let buf = eval.buffers.current_buffer_mut().ok_or_else(no_buffer)?;
     let text = buffer_text(buf);
-    let (new_pos, moved) = move_by_lines(&text, buf.pt, n);
+    let begv = buf.begv;
+    let zv = buf.zv;
+    let (new_pos, moved) = move_by_lines_narrowed(&text, buf.pt, n, begv, zv);
     buf.goto_char(new_pos);
     Ok(Value::Int(n - moved))
 }
@@ -425,13 +440,15 @@ pub(crate) fn builtin_beginning_of_line(
     };
     let buf = eval.buffers.current_buffer_mut().ok_or_else(no_buffer)?;
     let text = buffer_text(buf);
+    let begv = buf.begv;
+    let zv = buf.zv;
     let mut pos = buf.pt;
     if n != 1 {
         let delta = n - 1;
-        let (new_pos, _) = move_by_lines(&text, pos, delta);
+        let (new_pos, _) = move_by_lines_narrowed(&text, pos, delta, begv, zv);
         pos = new_pos;
     }
-    let bol = line_beginning_byte(&text, pos);
+    let bol = line_beginning_byte_narrowed(&text, pos, begv);
     buf.goto_char(bol);
     Ok(Value::Nil)
 }
@@ -448,13 +465,15 @@ pub(crate) fn builtin_end_of_line(
     };
     let buf = eval.buffers.current_buffer_mut().ok_or_else(no_buffer)?;
     let text = buffer_text(buf);
+    let begv = buf.begv;
+    let zv = buf.zv;
     let mut pos = buf.pt;
     if n != 1 {
         let delta = n - 1;
-        let (new_pos, _) = move_by_lines(&text, pos, delta);
+        let (new_pos, _) = move_by_lines_narrowed(&text, pos, delta, begv, zv);
         pos = new_pos;
     }
-    let eol = line_end_byte(&text, pos);
+    let eol = line_end_byte_narrowed(&text, pos, zv);
     buf.goto_char(eol);
     Ok(Value::Nil)
 }

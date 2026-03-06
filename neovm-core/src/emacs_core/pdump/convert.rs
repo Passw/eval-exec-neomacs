@@ -436,6 +436,7 @@ fn dump_syntax_class(c: &SyntaxClass) -> DumpSyntaxClass {
         SyntaxClass::EndComment => DumpSyntaxClass::EndComment,
         SyntaxClass::InheritStandard => DumpSyntaxClass::InheritStandard,
         SyntaxClass::Generic => DumpSyntaxClass::Generic,
+        SyntaxClass::StringFence => DumpSyntaxClass::StringFence,
     }
 }
 
@@ -1476,6 +1477,7 @@ fn load_syntax_class(c: &DumpSyntaxClass) -> SyntaxClass {
         DumpSyntaxClass::EndComment => SyntaxClass::EndComment,
         DumpSyntaxClass::InheritStandard => SyntaxClass::InheritStandard,
         DumpSyntaxClass::Generic => SyntaxClass::Generic,
+        DumpSyntaxClass::StringFence => SyntaxClass::StringFence,
     }
 }
 

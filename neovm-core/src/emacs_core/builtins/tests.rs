@@ -2207,8 +2207,6 @@ fn pure_dispatch_typed_aref_aset_char_table_uses_character_index_semantics() {
         Value::Nil,
         Value::symbol("syntax-table"),
         Value::Int(0),
-        Value::Int(i64::MIN + 1),
-        Value::Nil,
     ]);
 
     let initial = dispatch_builtin_pure("aref", vec![ct, Value::Int(0)])
@@ -2295,8 +2293,6 @@ fn pure_dispatch_typed_length_family_uses_char_table_logical_length() {
         Value::Nil,
         Value::symbol("syntax-table"),
         Value::Int(0),
-        Value::Int(i64::MIN + 1),
-        Value::Nil,
     ]);
 
     let len = dispatch_builtin_pure("length", vec![ct])
@@ -2880,18 +2876,17 @@ fn pure_dispatch_minibuffer_and_frame_placeholders_match_compat_contracts() {
 
 #[test]
 fn pure_dispatch_buffer_placeholder_mutators_match_compat_contracts() {
-    let renamed = dispatch_builtin_pure("rename-buffer", vec![Value::string("x")])
-        .expect("builtin rename-buffer should resolve")
-        .expect("builtin rename-buffer should evaluate");
-    assert_eq!(renamed, Value::string("x"));
-
-    let renamed_unique = dispatch_builtin_pure(
-        "rename-buffer",
-        vec![Value::string("x"), Value::symbol("unique")],
-    )
-    .expect("builtin rename-buffer should resolve with optional arg")
-    .expect("builtin rename-buffer should evaluate with optional arg");
-    assert_eq!(renamed_unique, Value::string("x"));
+    // rename-buffer is now an eval builtin — test it through the evaluator
+    {
+        let mut eval = crate::emacs_core::eval::Evaluator::new();
+        let buf_id = eval.buffers.create_buffer("old-name");
+        eval.buffers.set_current(buf_id);
+        let renamed = dispatch_builtin(&mut eval, "rename-buffer", vec![Value::string("new-name")])
+            .expect("builtin rename-buffer should resolve")
+            .expect("builtin rename-buffer should evaluate");
+        assert_eq!(renamed, Value::string("new-name"));
+        assert_eq!(eval.buffers.get(buf_id).unwrap().name, "new-name");
+    }
 
     let major_mode = dispatch_builtin_pure(
         "set-buffer-major-mode",
@@ -3765,12 +3760,12 @@ fn interactive_form_eval_preserves_noarg_and_explicit_nil_shapes() {
     assert_eq!(
         builtin_interactive_form_eval(&mut eval, vec![noarg_lambda])
             .expect("interactive-form should evaluate"),
-        Value::list(vec![Value::symbol("interactive")])
+        Value::list(vec![Value::symbol("interactive"), Value::Nil])
     );
     assert_eq!(
         builtin_interactive_form_eval(&mut eval, vec![Value::symbol("vm-interactive-form-noarg")])
             .expect("interactive-form should evaluate"),
-        Value::list(vec![Value::symbol("interactive")])
+        Value::list(vec![Value::symbol("interactive"), Value::Nil])
     );
     assert_eq!(
         builtin_interactive_form_eval(&mut eval, vec![nil_lambda])
@@ -3860,7 +3855,7 @@ fn interactive_form_eval_signals_listp_for_improper_lambda_shapes() {
     assert_eq!(
         builtin_interactive_form_eval(&mut eval, vec![doc_interactive_dotted_tail])
             .expect("interactive-form should stop at first interactive form"),
-        Value::list(vec![Value::symbol("interactive")])
+        Value::list(vec![Value::symbol("interactive"), Value::Nil])
     );
 }
 

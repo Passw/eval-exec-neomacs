@@ -77,7 +77,8 @@ fn set_default_via_range_nil() {
 }
 
 #[test]
-fn set_range_t_sets_all_chars_without_changing_default() {
+fn set_range_t_sets_default_value() {
+    // In GNU Emacs, (set-char-table-range ct t value) sets the default value.
     let ct = make_char_table_value(Value::symbol("test"), Value::Int(0));
     builtin_set_char_table_range(vec![ct, Value::True, Value::Int(5)]).unwrap();
 
@@ -86,11 +87,14 @@ fn set_range_t_sets_all_chars_without_changing_default() {
     let def = builtin_char_table_range(vec![ct, Value::Nil]).unwrap();
     assert!(matches!(a, Value::Int(5)));
     assert!(matches!(b, Value::Int(5)));
-    assert!(matches!(def, Value::Int(0)));
+    // Default IS changed when setting range t (matches GNU Emacs).
+    assert!(matches!(def, Value::Int(5)));
 }
 
 #[test]
-fn set_range_t_wildcard_allows_single_char_override() {
+fn set_range_t_allows_single_char_override() {
+    // (set-char-table-range ct t 5) sets default to 5.
+    // Then explicit char override for 'a' takes priority.
     let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
     builtin_set_char_table_range(vec![ct, Value::True, Value::Int(5)]).unwrap();
     builtin_set_char_table_range(vec![ct, Value::Int('a' as i64), Value::Int(9)]).unwrap();
@@ -100,7 +104,8 @@ fn set_range_t_wildcard_allows_single_char_override() {
     let def = builtin_char_table_range(vec![ct, Value::Nil]).unwrap();
     assert!(matches!(a, Value::Int(9)));
     assert!(matches!(b, Value::Int(5)));
-    assert!(def.is_nil());
+    // Default is now 5 (set via t).
+    assert!(matches!(def, Value::Int(5)));
 }
 
 #[test]

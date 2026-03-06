@@ -226,7 +226,8 @@ fn scan_storage_units(s: &str) -> Vec<(usize, usize, u32, usize, usize)> {
             }
         }
 
-        out.push((idx, next, code, 1, ch.len_utf8()));
+        let width = crate::encoding::char_width(ch);
+        out.push((idx, next, code, width, ch.len_utf8()));
         idx = next;
     }
 
@@ -262,7 +263,7 @@ pub(crate) fn bytes_to_unibyte_storage_string(bytes: &[u8]) -> String {
     out
 }
 
-fn decode_storage_units(s: &str) -> Vec<(u32, usize)> {
+pub(crate) fn decode_storage_units(s: &str) -> Vec<(u32, usize)> {
     scan_storage_units(s)
         .into_iter()
         .map(|(_, _, cp, width, _)| (cp, width))

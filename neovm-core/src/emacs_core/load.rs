@@ -1434,7 +1434,6 @@ pub fn create_bootstrap_evaluator() -> Result<super::eval::Evaluator, EvalError>
         "simple",
         "emacs-lisp/seq",
         "emacs-lisp/nadvice",
-        "emacs-lisp/cl-lib",
         "minibuffer",
         "frame",
         "startup",
