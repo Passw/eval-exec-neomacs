@@ -10,7 +10,7 @@ fn registry_contains_common_builtins() {
     assert!(is_dispatch_builtin_name("let"));
     assert!(is_dispatch_builtin_name("setq"));
     assert!(is_dispatch_builtin_name("unwind-protect"));
-    assert!(is_dispatch_builtin_name("read-key"));
+    // read-key is now Elisp (from subr.el)
     assert!(is_dispatch_builtin_name("read-char-exclusive"));
     assert!(is_dispatch_builtin_name("input-pending-p"));
     assert!(is_dispatch_builtin_name("discard-input"));

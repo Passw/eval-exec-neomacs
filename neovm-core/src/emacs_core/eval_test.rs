@@ -959,20 +959,6 @@ fn funcall_subr_object_ignores_symbol_function_rebinding() {
     );
 }
 
-#[test]
-fn named_autoload_function_cell_for_builtin_name_remains_callable() {
-    assert_eq!(
-        eval_one(
-            "(let ((orig (symbol-function 'safe-date-to-time)))
-               (unwind-protect
-                   (progn
-                     (fset 'safe-date-to-time '(autoload \"missing-file\" nil nil nil))
-                     (consp (safe-date-to-time \"1970-01-01 00:00:00 +0000\")))
-                 (fset 'safe-date-to-time orig)))"
-        ),
-        "OK t"
-    );
-}
 
 #[test]
 fn funcall_autoload_object_signals_wrong_type_argument_symbolp() {

@@ -95,7 +95,7 @@ pub(crate) fn is_evaluator_special_form_name(name: &str) -> bool {
             | "save-selected-window"
 
             | "save-restriction"
-            | "save-match-data"
+
             | "with-local-quit"
             | "with-temp-message"
             | "with-demoted-errors"
@@ -217,7 +217,6 @@ fn fallback_macro_spec(name: &str) -> Option<FallbackMacroSpec> {
         | "save-window-excursion"
         | "save-selected-window"
 
-        | "save-match-data"
         | "with-local-quit"
         | "declare"
         | "eval-when-compile"
@@ -325,7 +324,6 @@ fn subr_arity_value(name: &str) -> Value {
         "copy-category-table" => arity_cons(0, Some(1)),
         "copy-syntax-table" => arity_cons(0, Some(1)),
         "copy-file" => arity_cons(2, Some(6)),
-        "copy-to-register" => arity_cons(3, Some(5)),
         "make-directory-internal" => arity_cons(1, Some(1)),
         "make-temp-name" => arity_cons(1, Some(1)),
         "make-symbolic-link" | "rename-file" => arity_cons(2, Some(3)),
@@ -334,8 +332,6 @@ fn subr_arity_value(name: &str) -> Value {
         | "file-name-as-directory"
         | "file-name-directory"
         | "file-name-nondirectory"
-
-
 
         | "file-name-case-insensitive-p" => arity_cons(1, Some(1)),
         "file-name-all-completions" => arity_cons(2, Some(2)),
@@ -366,7 +362,6 @@ fn subr_arity_value(name: &str) -> Value {
         "goto-char" => arity_cons(1, Some(1)),
         "beginning-of-line"
         | "end-of-line"
-
 
         | "forward-char"
         | "backward-char"
@@ -410,7 +405,6 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(1, Some(1))
         }
         "get-byte" => arity_cons(0, Some(2)),
-        "get-register" => arity_cons(1, Some(1)),
         "get-buffer" | "get-file-buffer" => arity_cons(1, Some(1)),
         "get-buffer-create" | "generate-new-buffer-name" => {
             arity_cons(1, Some(2))
@@ -425,7 +419,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "charset-id-internal"
         | "charset-priority-list" => arity_cons(0, Some(1)),
         "char-category-set"
-        | "char-displayable-p"
+
         | "char-or-string-p"
         | "char-resolve-modifiers"
         | "char-syntax"
@@ -437,7 +431,6 @@ fn subr_arity_value(name: &str) -> Value {
         | "charsetp"
         | "closurep"
 
-        | "custom-variable-p"
         | "default-boundp"
         | "default-value"
         | "default-toplevel-value"
@@ -483,17 +476,14 @@ fn subr_arity_value(name: &str) -> Value {
         | "makunbound" => arity_cons(1, Some(1)),
         "make-symbol" | "symbol-name" | "symbol-plist" => arity_cons(1, Some(1)),
         "intern" | "intern-soft" | "indirect-function" | "unintern" => arity_cons(1, Some(2)),
-        "symbol-file" => arity_cons(1, Some(3)),
         "fset" | "set" | "get" | "set-marker-insertion-type" => arity_cons(2, Some(2)),
         "defalias" => arity_cons(2, Some(3)),
         "put" => arity_cons(3, Some(3)),
         "set-marker" => arity_cons(2, Some(3)),
         "increment-register"
-        | "number-to-register"
-        | "set-register"
+
         | "register-ccl-program"
         | "register-code-conversion-map" => arity_cons(2, Some(2)),
-        "insert-register" | "point-to-register" => arity_cons(1, Some(2)),
         "insert-byte" => arity_cons(2, Some(3)),
         "insert-char" => arity_cons(1, Some(3)),
         "hash-table-p"
@@ -529,16 +519,13 @@ fn subr_arity_value(name: &str) -> Value {
         "backward-sexp" => arity_cons(0, Some(2)),
         "backward-kill-word"
 
-
         | "capitalize"
         | "capitalize-word"
         | "downcase-word"
         | "kill-local-variable"
         => arity_cons(1, Some(1)),
         "terpri" => arity_cons(0, Some(2)),
-        "flush-lines" | "keep-lines" | "how-many" => arity_cons(1, Some(4)),
         "local-variable-p" => arity_cons(1, Some(2)),
-        "buffer-local-boundp" => arity_cons(2, Some(2)),
         "locale-info" => arity_cons(1, Some(1)),
         "max-char" => arity_cons(0, Some(1)),
         "memory-use-counts" | "make-marker" => arity_cons(0, Some(0)),
@@ -577,7 +564,6 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(1, Some(1))
         }
         "next-overlay-change" | "previous-overlay-change" => arity_cons(1, Some(1)),
-        "remove-overlays" => arity_cons(0, Some(4)),
         "prin1" | "prin1-to-string" => arity_cons(1, Some(3)),
         "princ" | "print" => arity_cons(1, Some(2)),
         "propertize" => arity_cons(1, None),
@@ -591,7 +577,6 @@ fn subr_arity_value(name: &str) -> Value {
         | "internal-make-lisp-face"
         | "internal-lisp-face-empty-p"
         | "internal-lisp-face-p" => arity_cons(1, Some(2)),
-        "face-list" => arity_cons(0, Some(0)),
         "font-put" => arity_cons(3, Some(3)),
         "internal-copy-lisp-face" => arity_cons(4, Some(4)),
         "internal-face-x-get-resource"
@@ -754,7 +739,6 @@ fn subr_arity_value(name: &str) -> Value {
         "re--describe-compiled" => arity_cons(1, Some(2)),
         "redisplay" => arity_cons(0, Some(1)),
         "rename-buffer" => arity_cons(1, Some(2)),
-        "replace-buffer-contents" => arity_cons(1, Some(3)),
         "set-buffer-major-mode" => arity_cons(1, Some(1)),
         "set-buffer-multibyte" => arity_cons(1, Some(1)),
         "setplist" => arity_cons(2, Some(2)),
@@ -769,10 +753,8 @@ fn subr_arity_value(name: &str) -> Value {
         "xw-color-values" => arity_cons(1, Some(2)),
         "xw-display-color-p" => arity_cons(0, Some(1)),
         "merge-face-attribute" => arity_cons(3, Some(3)),
-        "put-image" => arity_cons(2, Some(4)),
         "insert-image" => arity_cons(1, Some(5)),
         "lookup-image-map" => arity_cons(3, Some(3)),
-        "query-replace" | "query-replace-regexp" => arity_cons(2, Some(7)),
         "looking-at" | "posix-looking-at" => arity_cons(1, Some(2)),
         "match-beginning" | "match-end" => arity_cons(1, Some(1)),
         "match-data" => arity_cons(0, Some(3)),
@@ -793,60 +775,29 @@ fn subr_arity_value(name: &str) -> Value {
         | "syntax-table-p" => arity_cons(1, Some(1)),
         "string-collate-equalp" | "string-collate-lessp" => arity_cons(2, Some(4)),
         "make-string" => arity_cons(2, Some(3)),
-        "string-join" => arity_cons(1, Some(2)),
         "string-search" => arity_cons(2, Some(3)),
         "string-version-lessp" => arity_cons(2, Some(2)),
         "string-width" => arity_cons(1, Some(3)),
         // Startup helper wrappers / autoload-backed dispatch helpers.
         "autoloadp"
-        | "bounds-of-thing-at-point"
-        | "describe-function"
-        | "insert-rectangle"
+
         | "kbd-macro-query"
 
-        | "safe-date-to-time"
-        | "string-blank-p"
-        | "string-chop-newline"
-        | "string-clean-whitespace"
-
-        | "string-glyph-split"
-        | "string-pixel-width"
-
         | "upcase-char" => arity_cons(1, Some(1)),
-        "symbol-at-point" | "yank-rectangle" => arity_cons(0, Some(0)),
-        "word-at-point" => arity_cons(0, Some(1)),
-        "bookmark-delete" | "bookmark-jump" | "bookmark-rename" | "insert-kbd-macro" => {
+        "insert-kbd-macro" => {
             arity_cons(1, Some(2))
         }
-        "bookmark-load" => arity_cons(1, Some(4)),
-        "bookmark-save" => arity_cons(0, Some(3)),
-        "bookmark-set" => arity_cons(0, Some(2)),
         "clear-rectangle"
-        | "delete-extract-rectangle"
-        | "delete-rectangle"
-        | "kill-rectangle"
-        | "open-rectangle" => arity_cons(2, Some(3)),
-        "extract-rectangle" => arity_cons(2, Some(2)),
-        "describe-variable" => arity_cons(1, Some(3)),
-        "format-seconds" => arity_cons(2, Some(2)),
-        "format-spec" => arity_cons(2, Some(4)),
-        "replace-rectangle" | "string-rectangle" => arity_cons(3, Some(3)),
-        "thing-at-point" => arity_cons(1, Some(2)),
-        "seq-concatenate" | "seq-drop" | "seq-empty-p" | "seq-reverse" | "seq-take"
-        | "seq-uniq" => arity_cons(1, None),
+
+        => arity_cons(2, Some(3)),
+        "replace-rectangle" => arity_cons(3, Some(3)),
+        "seq-drop"
+        => arity_cons(1, None),
         "seq-count"
-        | "seq-do"
-        | "seq-every-p"
-        | "seq-into"
-        | "seq-some"
-        | "string-fill"
-        | "seq-contains-p" | "seq-position" | "seq-subseq" => {
+
+        => {
             arity_cons(2, Some(3))
         }
-        "seq-length" | "seq-max" | "seq-min" => arity_cons(1, Some(1)),
-        "seq-mapn" | "seq-sort" => arity_cons(2, None),
-        "seq-reduce" => arity_cons(3, Some(3)),
-        "string-limit" | "string-pad" => arity_cons(2, Some(4)),
         "sort" | "syntax-ppss-flush-cache" => arity_cons(1, None),
         "self-insert-command"
         | "single-key-description"
@@ -865,7 +816,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "upcase-word"
         | "use-global-map"
         | "use-local-map"
-        | "view-register" => arity_cons(1, Some(1)),
+        => arity_cons(1, Some(1)),
         "subr-arity" | "subr-name" | "subrp" => arity_cons(1, Some(1)),
         "signal" | "take" => arity_cons(2, Some(2)),
         "secure-hash" => arity_cons(2, Some(5)),
@@ -936,7 +887,7 @@ fn subr_arity_value(name: &str) -> Value {
         "widget-put" => arity_cons(3, Some(3)),
         "widget-apply" => arity_cons(2, None),
         "where-is-internal" => arity_cons(1, Some(5)),
-        "text-char-description" | "threadp" | "y-or-n-p" | "yes-or-no-p"  | "logcount" => {
+        "text-char-description" | "threadp" | "yes-or-no-p"  | "logcount" => {
             arity_cons(1, Some(1))
         }
         "syntax-ppss" => arity_cons(0, Some(1)),
@@ -955,13 +906,11 @@ fn subr_arity_value(name: &str) -> Value {
         | "re-search-backward"
         | "posix-search-forward"
         | "posix-search-backward"
-        | "word-search-forward"
-        | "word-search-backward" => arity_cons(1, Some(4)),
-        "add-timeout" => arity_cons(3, Some(4)),
+
+        => arity_cons(1, Some(4)),
         "add-variable-watcher" => arity_cons(2, Some(2)),
         "remove" | "remove-variable-watcher" | "narrow-to-region" => arity_cons(2, Some(2)),
-        "remove-images" => arity_cons(2, Some(3)),
-        "replace-regexp" | "replace-string" => arity_cons(2, Some(7)),
+        "replace-regexp" => arity_cons(2, Some(7)),
         "save-buffer"
         | "scroll-down"
 
@@ -970,12 +919,10 @@ fn subr_arity_value(name: &str) -> Value {
         "load-average" => arity_cons(0, Some(1)),
         "select-window" | "minor-mode-key-binding" => arity_cons(1, Some(2)),
         "select-frame" => arity_cons(1, Some(2)),
-        "select-frame-set-input-focus" => arity_cons(1, Some(2)),
         "selected-frame" => arity_cons(0, Some(0)),
         "set-charset-priority" => arity_cons(1, None),
         "write-char" => arity_cons(1, Some(2)),
         "write-region" => arity_cons(3, Some(7)),
-        "isearch-backward" | "isearch-forward" => arity_cons(0, Some(2)),
         // advice-add, advice-remove, advice-member-p: handled by nadvice.el
         "autoload" => arity_cons(2, Some(5)),
         "autoload-do-load" => arity_cons(1, Some(3)),
@@ -984,7 +931,6 @@ fn subr_arity_value(name: &str) -> Value {
         "documentation" => arity_cons(1, Some(2)),
         "documentation-stringp" => arity_cons(1, Some(1)),
         "documentation-property" => arity_cons(2, Some(3)),
-        "help-function-arglist" => arity_cons(1, Some(2)),
         "decode-coding-string" | "encode-coding-string" => arity_cons(2, Some(4)),
         "decode-time" => arity_cons(0, Some(3)),
         "detect-coding-region" => arity_cons(2, Some(3)),
@@ -993,23 +939,15 @@ fn subr_arity_value(name: &str) -> Value {
         "encode-time" => arity_cons(1, None),
         "format-time-string" => arity_cons(1, Some(3)),
         "format-mode-line" => arity_cons(1, Some(4)),
-        "indent-according-to-mode" | "indent-for-tab-command" => arity_cons(0, Some(1)),
-        "indent-line-to" => arity_cons(1, Some(1)),
-        "indent-region" => arity_cons(2, Some(3)),
-        "indent-rigidly" => arity_cons(3, Some(4)),
         "indent-to" | "move-to-column" => arity_cons(1, Some(2)),
-        "tab-to-tab-stop" => arity_cons(0, Some(0)),
         "backtrace--frames-from-thread" => arity_cons(1, Some(1)),
         "backtrace--locals" => arity_cons(1, Some(2)),
         "backtrace-debug" | "backtrace-eval" => arity_cons(2, Some(3)),
         "backtrace-frame--internal" => arity_cons(3, Some(3)),
-        "backtrace-frame" => arity_cons(1, Some(2)),
         "run-hook-with-args"
         | "run-hook-with-args-until-failure"
         | "run-hook-with-args-until-success" => arity_cons(1, None),
-        "run-hook-query-error-with-timeout" => arity_cons(1, Some(1)),
         "run-hook-wrapped" => arity_cons(2, None),
-        "run-mode-hooks" => arity_cons(0, None),
         "run-window-configuration-change-hook" | "run-window-scroll-functions" => {
             arity_cons(0, Some(1))
         }
@@ -1190,8 +1128,6 @@ fn subr_arity_value(name: &str) -> Value {
         "all-completions" => arity_cons(2, Some(4)),
         "read" => arity_cons(0, Some(1)),
         "read-char" | "read-char-exclusive" | "read-event" => arity_cons(0, Some(3)),
-        "read-key" => arity_cons(0, Some(2)),
-        "read-number" => arity_cons(1, Some(3)),
         "read-string" => arity_cons(1, Some(5)),
         "read-variable" | "read-command" => arity_cons(1, Some(2)),
         "read-from-string" => arity_cons(1, Some(3)),
@@ -1201,8 +1137,7 @@ fn subr_arity_value(name: &str) -> Value {
         "read-key-sequence" | "read-key-sequence-vector" => arity_cons(1, Some(6)),
         "read-non-nil-coding-system" => arity_cons(1, Some(1)),
         "json-insert" | "json-parse-string" | "json-serialize" => arity_cons(1, None),
-        "json-available-p" => arity_cons(0, Some(0)),
-        "key-valid-p" | "keymap-parent" | "keymapp" => {
+        "keymap-parent" | "keymapp" => {
             arity_cons(1, Some(1))
         }
         "accessible-keymaps" => arity_cons(1, Some(2)),
@@ -1244,7 +1179,6 @@ fn subr_arity_value(name: &str) -> Value {
         | "set-keyboard-coding-system-internal"
         | "set-match-data"
         | "set-text-conversion-style" => arity_cons(1, Some(2)),
-        "set-terminal-coding-system" => arity_cons(1, Some(3)),
         "set-terminal-coding-system-internal" => arity_cons(1, Some(2)),
         "set-safe-terminal-coding-system-internal" => arity_cons(1, Some(1)),
         "set-visited-file-modtime" | "verify-visited-file-modtime" => arity_cons(0, Some(1)),
@@ -1261,7 +1195,6 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(0, Some(0))
         }
         "user-full-name" | "user-login-name" => arity_cons(0, Some(1)),
-        "emacs-version" => arity_cons(0, Some(1)),
         "line-beginning-position"
         | "line-end-position"
         | "line-number-display-width"
@@ -1280,7 +1213,7 @@ fn subr_arity_value(name: &str) -> Value {
         "coordinates-in-window-p" => arity_cons(2, Some(2)),
         "move-to-window-line" | "move-point-visually" => arity_cons(1, Some(1)),
         "modify-frame-parameters" => arity_cons(2, Some(2)),
-        "make-frame" | "make-frame-visible" | "iconify-frame" => arity_cons(0, Some(1)),
+        "make-frame-visible" | "iconify-frame" => arity_cons(0, Some(1)),
         "get-unused-category" => arity_cons(0, Some(1)),
         "make-category-set"
         | "category-set-mnemonics"
@@ -1305,10 +1238,7 @@ fn subr_arity_value(name: &str) -> Value {
         "commandp" => arity_cons(1, Some(2)),
         "command-modes" => arity_cons(1, Some(1)),
         "command-remapping" => arity_cons(1, Some(3)),
-        "cancel-timer" | "timerp" | "timeout-event-p" => arity_cons(1, Some(1)),
-        "run-at-time" | "run-with-timer" | "run-with-idle-timer" => arity_cons(3, None),
-        "timer-activate" => arity_cons(1, Some(3)),
-        "sleep-for" | "sit-for" => arity_cons(1, Some(2)),
+        "sleep-for" => arity_cons(1, Some(2)),
         "current-cpu-time"
         | "current-idle-time"
         | "current-time"
@@ -1327,7 +1257,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "category-table-p"
         | "ccl-program-p"
         | "check-coding-system"
-        | "clear-abbrev-table"
+
         | "clear-string"
         | "module-function-p"
         | "number-or-marker-p"
@@ -1341,17 +1271,15 @@ fn subr_arity_value(name: &str) -> Value {
         | "coding-system-base"
         | "coding-system-eol-type"
         | "coding-system-p"
-        | "coding-system-type" => arity_cons(1, Some(1)),
+        => arity_cons(1, Some(1)),
         "coding-system-change-eol-conversion"
         | "coding-system-change-text-conversion"
-        | "coding-system-get" => arity_cons(2, Some(2)),
+        => arity_cons(2, Some(2)),
         "check-coding-systems-region" => arity_cons(3, Some(3)),
         "coding-system-plist" => arity_cons(1, Some(1)),
         "coding-system-put" => arity_cons(3, Some(3)),
-        "coding-system-list" | "coding-system-priority-list" => arity_cons(0, Some(1)),
-        "defined-colors" => arity_cons(0, Some(1)),
+        "coding-system-priority-list" => arity_cons(0, Some(1)),
         "color-distance" => arity_cons(2, Some(4)),
-        "color-defined-p" | "color-values" => arity_cons(1, Some(2)),
         "color-gray-p" => arity_cons(1, Some(2)),
         "color-supported-p" => arity_cons(1, Some(3)),
         "color-values-from-color-spec" => arity_cons(1, Some(1)),
@@ -1359,12 +1287,6 @@ fn subr_arity_value(name: &str) -> Value {
         "ccl-execute" => arity_cons(2, Some(2)),
         "ccl-execute-on-string" => arity_cons(3, Some(5)),
         "abbrev-mode" => arity_cons(0, Some(1)),
-        "abbrev-expansion" => arity_cons(1, Some(2)),
-        "abbrev-table-p" => arity_cons(1, Some(1)),
-        "define-abbrev" => arity_cons(3, None),
-        "define-abbrev-table" => arity_cons(2, None),
-        "expand-abbrev" => arity_cons(0, Some(0)),
-        "insert-abbrev-table-description" => arity_cons(1, Some(2)),
         "and"
         | "cond"
         | "inline"
@@ -1407,14 +1329,12 @@ fn subr_arity_value(name: &str) -> Value {
         "event-basic-type"
         | "event-convert-list"
 
-
         | "error-message-string" => arity_cons(1, Some(1)),
         "copysign" | "equal-including-properties" => arity_cons(2, Some(2)),
         "emacs-pid" => arity_cons(0, Some(0)),
         "eval" => arity_cons(1, Some(2)),
         "eval-buffer" => arity_cons(0, Some(5)),
         "eval-region" => arity_cons(2, Some(4)),
-        "help-key-description" => arity_cons(2, Some(2)),
         "recent-keys" => arity_cons(0, Some(1)),
         "input-pending-p" => arity_cons(0, Some(1)),
         "discard-input" => arity_cons(0, Some(0)),
@@ -1438,10 +1358,6 @@ fn subr_arity_value(name: &str) -> Value {
         | "minibuffer-contents-no-properties" => arity_cons(0, Some(0)),
         "read-passwd" => arity_cons(1, Some(3)),
         "regexp-quote" => arity_cons(1, Some(1)),
-        "gui-get-primary-selection" | "gui-selection-value" => arity_cons(0, Some(0)),
-        "gui-get-selection" => arity_cons(0, Some(2)),
-        "gui-select-text" => arity_cons(1, Some(1)),
-        "gui-set-selection" => arity_cons(2, Some(2)),
         "x-apply-session-resources" | "x-clipboard-yank" => arity_cons(0, Some(0)),
         "open-termscript"
         | "x-close-connection"
@@ -1478,14 +1394,12 @@ fn subr_arity_value(name: &str) -> Value {
         "clear-font-cache" => arity_cons(0, Some(0)),
         "clear-image-cache" => arity_cons(0, Some(2)),
         "image-cache-size" => arity_cons(0, Some(0)),
-        "create-image" => arity_cons(1, None),
         "find-font" => arity_cons(1, Some(2)),
         "font-family-list" => arity_cons(0, Some(1)),
         "image-flush" | "image-mask-p" | "image-metadata" => arity_cons(1, Some(2)),
         "imagep" => arity_cons(1, Some(1)),
-        "image-size" | "image-type" => arity_cons(1, Some(3)),
+        "image-size" => arity_cons(1, Some(3)),
         "image-transforms-p" => arity_cons(0, Some(1)),
-        "image-type-available-p" => arity_cons(1, Some(1)),
         "list-fonts" => arity_cons(1, Some(4)),
         "frame-parameter"
         | "set-window-point"
@@ -1506,10 +1420,7 @@ fn subr_arity_value(name: &str) -> Value {
         "window-text-pixel-size" => arity_cons(0, Some(7)),
         // Process primitives
         "accept-process-output" => arity_cons(0, Some(4)),
-        "backquote-delay-process" => arity_cons(2, Some(2)),
-        "backquote-process" => arity_cons(1, Some(2)),
         "call-process" => arity_cons(1, None),
-        "call-process-shell-command" => arity_cons(1, None),
         "call-process-region" => arity_cons(3, None),
         "continue-process" | "interrupt-process" | "kill-process" | "quit-process"
         | "stop-process" => arity_cons(0, Some(2)),
@@ -1522,8 +1433,6 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(2, Some(2))
         }
         "internal-default-signal-process" => arity_cons(2, Some(3)),
-        "isearch-process-search-char" => arity_cons(1, Some(2)),
-        "isearch-process-search-string" => arity_cons(2, Some(2)),
         "list-processes" => arity_cons(0, Some(2)),
         "list-processes--refresh" | "list-system-processes" => arity_cons(0, Some(0)),
         "make-process" => arity_cons(0, None),
@@ -1544,7 +1453,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "process-menu-visit-buffer"
         | "process-id"
         | "process-inherit-coding-system-flag"
-        | "process-live-p"
+
         | "process-mark"
         | "process-name"
         | "process-plist"
@@ -1558,17 +1467,13 @@ fn subr_arity_value(name: &str) -> Value {
         | "process-menu-delete-process"
         | "process-menu-mode" => arity_cons(0, Some(0)),
         "process-file"
-        | "process-file-shell-command"
-        | "process-lines"
-        | "process-lines-ignore-status" => arity_cons(1, None),
-        "process-lines-handling-status" => arity_cons(2, None),
+
+        => arity_cons(1, None),
         "process-running-child-p" | "process-send-eof" => arity_cons(0, Some(1)),
         "signal-process" => arity_cons(2, Some(3)),
         "signal-names" => arity_cons(0, Some(0)),
         "process-contact" => arity_cons(1, Some(3)),
         "process-list" => arity_cons(0, Some(0)),
-        "process-get" => arity_cons(2, Some(2)),
-        "process-put" => arity_cons(3, Some(3)),
         "process-send-region" => arity_cons(3, Some(3)),
         "process-send-string" => arity_cons(2, Some(2)),
         "process-tty-name" => arity_cons(1, Some(2)),
@@ -1583,42 +1488,14 @@ fn subr_arity_value(name: &str) -> Value {
         | "set-process-thread"
         | "set-process-sentinel" => arity_cons(2, Some(2)),
         "set-process-window-size" => arity_cons(3, Some(3)),
-        "set-buffer-process-coding-system" => arity_cons(2, Some(2)),
         "set-network-process-option" => arity_cons(3, Some(4)),
         "serial-process-configure" => arity_cons(0, None),
         "setenv" => arity_cons(1, Some(3)),
-        "start-process" => arity_cons(3, None),
-        "start-process-shell-command" | "start-file-process-shell-command" => {
-            arity_cons(3, Some(3))
-        }
         "syntax-propertize--in-process-p" => arity_cons(0, Some(0)),
         "tooltip-process-prompt-regexp" => arity_cons(1, Some(1)),
-        "window-adjust-process-window-size"
-
-        => arity_cons(2, Some(2)),
         "getenv" | "getenv-internal" => arity_cons(1, Some(2)),
         // Display/terminal query primitives
-        "display-images-p"
-        | "display-graphic-p"
-        | "display-color-p"
-        | "display-grayscale-p"
-        | "display-mouse-p"
-        | "display-popup-menus-p"
-        | "display-symbol-keys-p"
-        | "display-pixel-width"
-        | "display-pixel-height"
-        | "display-mm-width"
-        | "display-mm-height"
-        | "display-screens"
-        | "display-color-cells"
-        | "display-planes"
-        | "display-visual-class"
-        | "display-backing-store"
-        | "display-save-under"
-        | "display-selections-p"
-        | "display-monitor-attributes-list"
-        | "frame-monitor-attributes"
-        | "terminal-name"
+        "terminal-name"
         | "terminal-parameters"
         | "frame-terminal"
         | "tty-type"
@@ -1676,7 +1553,6 @@ fn subr_arity_value(name: &str) -> Value {
         | "window-cursor-type"
         | "window-display-table"
 
-
         | "window-frame"
         | "window-fringes"
 
@@ -1703,7 +1579,7 @@ fn subr_arity_value(name: &str) -> Value {
         "terminal-list"
         | "x-clear-preedit-text"
         | "x-display-list"
-        | "x-get-clipboard"
+
         | "x-hide-tip"
         | "x-mouse-absolute-pixel-position"
         | "redraw-display"
