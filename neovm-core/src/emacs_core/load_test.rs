@@ -914,8 +914,12 @@ fn auth_source_backend_exposes_type_slot() {
         .with_test_writer()
         .try_init();
 
-    let mut eval =
-        create_bootstrap_evaluator_with_features(&["neomacs"]).expect("bootstrap evaluator");
+    let mut eval = create_bootstrap_evaluator_cached_with_features(&["neomacs"])
+        .expect("bootstrap evaluator");
+    let runtime_load_path = crate::emacs_core::parser::parse_forms("(load \"subdirs\" nil t)")
+        .expect("parse runtime load-path expansion");
+    eval.eval_expr(&runtime_load_path[0])
+        .expect("load runtime subdirs.el");
     let require_error = eval
         .require_value(Value::symbol("auth-source"), None, None)
         .err()
@@ -957,6 +961,64 @@ fn auth_source_backend_exposes_type_slot() {
         "expected auth-source-backend slots to include `type`, got {:?}, require_error={require_error:?}",
         slot_names,
     );
+}
+
+fn expect_vector_ints(value: Value) -> Vec<i64> {
+    match value {
+        Value::Vector(v) => with_heap(|h| h.get_vector(v).clone())
+            .iter()
+            .map(|item| match item {
+                Value::Int(n) => *n,
+                other => panic!("expected int in vector, got {other:?}"),
+            })
+            .collect(),
+        other => panic!("expected vector, got {other:?}"),
+    }
+}
+
+#[test]
+fn cl_callf_updates_variable_place() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
+    let form = crate::emacs_core::parser::parse_forms(
+        "(let ((a '(3 2 1)))
+           (cl-callf (lambda (slots) (apply #'vector (nreverse slots))) a)
+           a)",
+    )
+    .expect("parse cl-callf variable probe");
+    let result = eval
+        .eval_expr(&form[0])
+        .expect("evaluate cl-callf variable probe");
+    assert_eq!(expect_vector_ints(result), vec![1, 2, 3]);
+}
+
+#[test]
+fn direct_setq_funcall_updates_variable_place() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
+    let form = crate::emacs_core::parser::parse_forms(
+        "(let ((a '(3 2 1)))
+           (setq a (funcall #'(lambda (slots) (apply #'vector (nreverse slots))) a))
+           a)",
+    )
+    .expect("parse direct funcall probe");
+    let result = eval
+        .eval_expr(&form[0])
+        .expect("evaluate direct funcall probe");
+    assert_eq!(expect_vector_ints(result), vec![1, 2, 3]);
+}
+
+#[test]
+fn cl_callf_updates_generalized_place() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
+    let form = crate::emacs_core::parser::parse_forms(
+        "(let ((box (list '(3 2 1))))
+           (cl-callf (lambda (slots) (apply #'vector (nreverse slots))) (car box))
+           (car box))",
+    )
+    .expect("parse cl-callf generalized place probe");
+    let result = eval
+        .eval_expr(&form[0])
+        .expect("evaluate cl-callf generalized place probe");
+    assert_eq!(expect_vector_ints(result), vec![1, 2, 3]);
 }
 
 /// Minimal test: load enough files to get macroexpand-all + pcase working,
