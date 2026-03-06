@@ -1029,7 +1029,17 @@ pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
             }
             Ok(Value::list(items))
         }
-        Value::Str(id) => Ok(Value::string(with_heap(|h| h.get_string(*id).clone()))),
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            let new_val = Value::string(&s);
+            // Copy text properties
+            if let Value::Str(new_id) = &new_val {
+                if let Some(table) = get_string_text_properties_table(*id) {
+                    set_string_text_properties_table(*new_id, table);
+                }
+            }
+            Ok(new_val)
+        }
         Value::Vector(v) => Ok(Value::vector(with_heap(|h| h.get_vector(*v).clone()))),
         Value::Record(v) => {
             let items = with_heap(|h| h.get_vector(*v).clone());

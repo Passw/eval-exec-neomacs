@@ -39,7 +39,7 @@ impl PropertyInterval {
         }
     }
 
-    fn with_properties(start: usize, end: usize, properties: HashMap<String, Value>) -> Self {
+    pub fn with_properties(start: usize, end: usize, properties: HashMap<String, Value>) -> Self {
         Self {
             start,
             end,
@@ -384,6 +384,55 @@ impl TextPropertyTable {
                 i += 1;
             }
         }
+    }
+
+    /// Expose intervals for iteration (GC tracing, printing, etc.).
+    pub fn intervals(&self) -> &[PropertyInterval] {
+        &self.intervals
+    }
+
+    /// Returns true if there are no intervals (no properties).
+    pub fn is_empty(&self) -> bool {
+        self.intervals.is_empty()
+    }
+
+    /// Extract a sub-range `[start, end)` of the property table,
+    /// shifting all positions to be 0-based relative to `start`.
+    pub fn slice(&self, start: usize, end: usize) -> TextPropertyTable {
+        if start >= end {
+            return TextPropertyTable::new();
+        }
+        let mut result = Vec::new();
+        for iv in &self.intervals {
+            if iv.end <= start || iv.start >= end {
+                continue;
+            }
+            let new_start = iv.start.max(start) - start;
+            let new_end = iv.end.min(end) - start;
+            if new_start < new_end && !iv.properties.is_empty() {
+                result.push(PropertyInterval::with_properties(
+                    new_start,
+                    new_end,
+                    iv.properties.clone(),
+                ));
+            }
+        }
+        TextPropertyTable { intervals: result }
+    }
+
+    /// Append another table's intervals shifted by `byte_offset`.
+    pub fn append_shifted(&mut self, other: &TextPropertyTable, byte_offset: usize) {
+        for iv in &other.intervals {
+            if iv.properties.is_empty() {
+                continue;
+            }
+            self.intervals.push(PropertyInterval::with_properties(
+                iv.start + byte_offset,
+                iv.end + byte_offset,
+                iv.properties.clone(),
+            ));
+        }
+        self.merge_adjacent();
     }
 
     // pdump accessors

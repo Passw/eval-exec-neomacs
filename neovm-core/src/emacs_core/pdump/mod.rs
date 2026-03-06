@@ -156,10 +156,10 @@ fn reconstruct_evaluator(state: DumpEvaluatorState) -> Result<Evaluator, DumpErr
     super::timefns::reset_timefns_thread_locals();
 
     // 4. Restore string text properties
-    let stp: Vec<(u64, Vec<value::StringTextPropertyRun>)> = state
+    let stp: Vec<(u64, crate::buffer::text_props::TextPropertyTable)> = state
         .string_text_props
         .iter()
-        .map(|(key, runs)| (*key, runs.iter().map(load_string_text_prop_run).collect::<Vec<_>>()))
+        .map(|(key, runs)| (*key, load_text_property_table(runs)))
         .collect();
     value::restore_string_text_props(stp);
 

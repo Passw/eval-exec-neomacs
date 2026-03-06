@@ -25,9 +25,13 @@ pub(crate) fn builtin_string_greaterp(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(a > b))
 }
 
-fn substring_impl(name: &str, args: &[Value]) -> EvalResult {
+fn substring_impl(name: &str, args: &[Value], preserve_props: bool) -> EvalResult {
     expect_min_args(name, args, 1)?;
     expect_max_args(name, args, 3)?;
+    let src_id = match &args[0] {
+        Value::Str(id) => Some(*id),
+        _ => None,
+    };
     let s = expect_string(&args[0])?;
     let len = storage_char_len(&s) as i64;
 
@@ -79,15 +83,32 @@ fn substring_impl(name: &str, args: &[Value]) -> EvalResult {
             ],
         )
     })?;
-    Ok(Value::string(result))
+    let new_val = Value::string(&result);
+
+    // Preserve text properties from source string
+    if preserve_props {
+        if let (Some(sid), Value::Str(new_id)) = (src_id, &new_val) {
+            if let Some(src_table) = get_string_text_properties_table(sid) {
+                use super::super::string_escape::storage_char_to_byte;
+                let byte_from = storage_char_to_byte(&s, from);
+                let byte_to = storage_char_to_byte(&s, to);
+                let sliced = src_table.slice(byte_from, byte_to);
+                if !sliced.is_empty() {
+                    set_string_text_properties_table(*new_id, sliced);
+                }
+            }
+        }
+    }
+
+    Ok(new_val)
 }
 
 pub(crate) fn builtin_substring(args: Vec<Value>) -> EvalResult {
-    substring_impl("substring", &args)
+    substring_impl("substring", &args, true)
 }
 
 pub(crate) fn builtin_substring_no_properties(args: Vec<Value>) -> EvalResult {
-    substring_impl("substring-no-properties", &args)
+    substring_impl("substring-no-properties", &args, false)
 }
 
 pub(crate) fn builtin_concat(args: Vec<Value>) -> EvalResult {
@@ -143,9 +164,16 @@ pub(crate) fn builtin_concat(args: Vec<Value>) -> EvalResult {
     }
 
     let mut result = String::new();
+    // Track string sources with their byte offsets for property preservation
+    let mut string_sources: Vec<(crate::gc::types::ObjId, usize)> = Vec::new();
+
     for arg in &args {
         match arg {
-            Value::Str(id) => result.push_str(&with_heap(|h| h.get_string(*id).clone())),
+            Value::Str(id) => {
+                let offset = result.len();
+                result.push_str(&with_heap(|h| h.get_string(*id).clone()));
+                string_sources.push((*id, offset));
+            }
             Value::Nil => {}
             Value::Cons(_) => {
                 let mut cursor = *arg;
@@ -180,7 +208,27 @@ pub(crate) fn builtin_concat(args: Vec<Value>) -> EvalResult {
             }
         }
     }
-    Ok(Value::string(result))
+
+    let new_val = Value::string(&result);
+
+    // Preserve text properties from string sources
+    if let Value::Str(new_id) = &new_val {
+        let mut combined_table = crate::buffer::text_props::TextPropertyTable::new();
+        let mut has_props = false;
+        for (src_id, offset) in &string_sources {
+            if let Some(src_table) = get_string_text_properties_table(*src_id) {
+                if !src_table.is_empty() {
+                    combined_table.append_shifted(&src_table, *offset);
+                    has_props = true;
+                }
+            }
+        }
+        if has_props {
+            set_string_text_properties_table(*new_id, combined_table);
+        }
+    }
+
+    Ok(new_val)
 }
 
 pub(crate) fn builtin_string_to_number(args: Vec<Value>) -> EvalResult {

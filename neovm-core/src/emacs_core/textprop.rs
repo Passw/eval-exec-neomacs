@@ -5,8 +5,10 @@
 
 use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
+use super::string_escape::{storage_char_to_byte, storage_byte_to_char, storage_char_len};
 use super::value::*;
 use crate::buffer::buffer::BufferId;
+use crate::buffer::text_props::TextPropertyTable;
 
 // ---------------------------------------------------------------------------
 // Helpers (local to this module)
@@ -115,6 +117,31 @@ fn resolve_buffer_id(
     }
 }
 
+/// Check if the OBJECT argument is a string.  Returns Some(ObjId) if so.
+fn is_string_object(object: Option<&Value>) -> Option<crate::gc::types::ObjId> {
+    match object {
+        Some(Value::Str(id)) => Some(*id),
+        _ => None,
+    }
+}
+
+/// Convert a 0-based Elisp string char position to a byte offset.
+fn string_elisp_pos_to_byte(s: &str, pos: i64) -> usize {
+    let char_pos = if pos < 0 { 0usize } else { pos as usize };
+    let clamped = char_pos.min(storage_char_len(s));
+    storage_char_to_byte(s, clamped)
+}
+
+/// Convert a byte offset to a 0-based Elisp string char position.
+fn string_byte_to_elisp_pos(s: &str, byte_pos: usize) -> i64 {
+    storage_byte_to_char(s, byte_pos) as i64
+}
+
+/// Write back a modified TextPropertyTable to string text properties.
+fn save_string_props(id: crate::gc::types::ObjId, table: TextPropertyTable) {
+    set_string_text_properties_table(id, table);
+}
+
 /// Iterate a plist (alternating key value key value ...) from a list or vec.
 /// Returns pairs of (property-name, value).
 fn plist_pairs(plist: &Value) -> Result<Vec<(String, Value)>, Flow> {
@@ -159,8 +186,18 @@ pub(crate) fn builtin_put_text_property(
     let end = expect_int(&args[1])?;
     let prop = expect_symbol_name(&args[2])?;
     let val = args[3];
-    let buf_id = resolve_buffer_id(eval, args.get(4))?;
 
+    if let Some(str_id) = is_string_object(args.get(4)) {
+        let s = with_heap(|h| h.get_string(str_id).clone());
+        let mut table = get_string_text_properties_table(str_id).unwrap_or_default();
+        let byte_beg = string_elisp_pos_to_byte(&s, beg);
+        let byte_end = string_elisp_pos_to_byte(&s, end);
+        table.put_property(byte_beg, byte_end, &prop, val);
+        save_string_props(str_id, table);
+        return Ok(Value::Nil);
+    }
+
+    let buf_id = resolve_buffer_id(eval, args.get(4))?;
     let buf = eval
         .buffers
         .get_mut(buf_id)
@@ -181,8 +218,19 @@ pub(crate) fn builtin_get_text_property(
     expect_max_args("get-text-property", &args, 3)?;
     let pos = expect_int(&args[0])?;
     let prop = expect_symbol_name(&args[1])?;
-    let buf_id = resolve_buffer_id(eval, args.get(2))?;
 
+    if let Some(str_id) = is_string_object(args.get(2)) {
+        let s = with_heap(|h| h.get_string(str_id).clone());
+        if let Some(table) = get_string_text_properties_table(str_id) {
+            let byte_pos = string_elisp_pos_to_byte(&s, pos);
+            if let Some(v) = table.get_property(byte_pos, &prop) {
+                return Ok(*v);
+            }
+        }
+        return Ok(Value::Nil);
+    }
+
+    let buf_id = resolve_buffer_id(eval, args.get(2))?;
     let buf = eval
         .buffers
         .get(buf_id)
@@ -199,14 +247,15 @@ pub(crate) fn builtin_get_text_property(
 }
 
 /// (get-char-property POS PROP &optional OBJECT)
-/// For now, same as get-text-property (ignores overlays).
+/// For strings, same as get-text-property (no overlays).
 pub(crate) fn builtin_get_char_property(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("get-char-property", &args, 2)?;
     expect_max_args("get-char-property", &args, 3)?;
-    // Delegate to get-text-property for now.
+    // For strings, delegate directly (no overlays).
+    // For buffers, also delegate (overlays not yet implemented here).
     builtin_get_text_property(eval, args)
 }
 
@@ -220,8 +269,20 @@ pub(crate) fn builtin_add_text_properties(
     let beg = expect_int(&args[0])?;
     let end = expect_int(&args[1])?;
     let pairs = plist_pairs(&args[2])?;
-    let buf_id = resolve_buffer_id(eval, args.get(3))?;
 
+    if let Some(str_id) = is_string_object(args.get(3)) {
+        let s = with_heap(|h| h.get_string(str_id).clone());
+        let mut table = get_string_text_properties_table(str_id).unwrap_or_default();
+        let byte_beg = string_elisp_pos_to_byte(&s, beg);
+        let byte_end = string_elisp_pos_to_byte(&s, end);
+        for (name, val) in pairs {
+            table.put_property(byte_beg, byte_end, &name, val);
+        }
+        save_string_props(str_id, table);
+        return Ok(Value::True);
+    }
+
+    let buf_id = resolve_buffer_id(eval, args.get(3))?;
     let buf = eval
         .buffers
         .get_mut(buf_id)
@@ -232,7 +293,6 @@ pub(crate) fn builtin_add_text_properties(
     for (name, val) in pairs {
         buf.text_props.put_property(byte_beg, byte_end, &name, val);
     }
-    // In Emacs, returns t if any property was actually changed; we simplify.
     Ok(Value::True)
 }
 
@@ -271,6 +331,19 @@ pub(crate) fn builtin_add_face_text_property(
     let append = args.get(3).is_some_and(Value::is_truthy);
 
     let object = args.get(4);
+
+    if let Some(str_id) = is_string_object(object) {
+        let s = with_heap(|h| h.get_string(str_id).clone());
+        let mut table = get_string_text_properties_table(str_id).unwrap_or_default();
+        let byte_beg = string_elisp_pos_to_byte(&s, beg);
+        let byte_end = string_elisp_pos_to_byte(&s, end);
+        let existing = table.get_property(byte_beg, "face").cloned();
+        let merged = merge_face_property(existing, new_face, append);
+        table.put_property(byte_beg, byte_end, "face", merged);
+        save_string_props(str_id, table);
+        return Ok(Value::Nil);
+    }
+
     let buf_id = match object {
         None | Some(Value::Nil) => eval
             .buffers
@@ -278,7 +351,6 @@ pub(crate) fn builtin_add_face_text_property(
             .map(|b| b.id)
             .ok_or_else(|| signal("error", vec![Value::string("No current buffer")])),
         Some(Value::Buffer(id)) => Ok(*id),
-        Some(Value::Str(_)) => return Ok(Value::Nil),
         Some(other) => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("buffer-or-string-p"), *other],
@@ -308,8 +380,20 @@ pub(crate) fn builtin_remove_text_properties(
     let beg = expect_int(&args[0])?;
     let end = expect_int(&args[1])?;
     let pairs = plist_pairs(&args[2])?;
-    let buf_id = resolve_buffer_id(eval, args.get(3))?;
 
+    if let Some(str_id) = is_string_object(args.get(3)) {
+        let s = with_heap(|h| h.get_string(str_id).clone());
+        let mut table = get_string_text_properties_table(str_id).unwrap_or_default();
+        let byte_beg = string_elisp_pos_to_byte(&s, beg);
+        let byte_end = string_elisp_pos_to_byte(&s, end);
+        for (name, _val) in pairs {
+            table.remove_property(byte_beg, byte_end, &name);
+        }
+        save_string_props(str_id, table);
+        return Ok(Value::True);
+    }
+
+    let buf_id = resolve_buffer_id(eval, args.get(3))?;
     let buf = eval
         .buffers
         .get_mut(buf_id)
@@ -332,9 +416,27 @@ pub(crate) fn builtin_set_text_properties(
     expect_max_args("set-text-properties", &args, 4)?;
     let beg = expect_int(&args[0])?;
     let end = expect_int(&args[1])?;
-    let pairs = plist_pairs(&args[2])?;
-    let buf_id = resolve_buffer_id(eval, args.get(3))?;
+    // set-text-properties accepts nil for PROPS (= remove all)
+    let pairs = if args[2].is_nil() {
+        Vec::new()
+    } else {
+        plist_pairs(&args[2])?
+    };
 
+    if let Some(str_id) = is_string_object(args.get(3)) {
+        let s = with_heap(|h| h.get_string(str_id).clone());
+        let mut table = get_string_text_properties_table(str_id).unwrap_or_default();
+        let byte_beg = string_elisp_pos_to_byte(&s, beg);
+        let byte_end = string_elisp_pos_to_byte(&s, end);
+        table.remove_all_properties(byte_beg, byte_end);
+        for (name, val) in pairs {
+            table.put_property(byte_beg, byte_end, &name, val);
+        }
+        save_string_props(str_id, table);
+        return Ok(Value::True);
+    }
+
+    let buf_id = resolve_buffer_id(eval, args.get(3))?;
     let buf = eval
         .buffers
         .get_mut(buf_id)
@@ -360,8 +462,25 @@ pub(crate) fn builtin_remove_list_of_text_properties(
     let end = expect_int(&args[1])?;
     let names = list_to_vec(&args[2])
         .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), args[2]]))?;
-    let buf_id = resolve_buffer_id(eval, args.get(3))?;
 
+    if let Some(str_id) = is_string_object(args.get(3)) {
+        let s = with_heap(|h| h.get_string(str_id).clone());
+        let mut table = get_string_text_properties_table(str_id).unwrap_or_default();
+        let byte_beg = string_elisp_pos_to_byte(&s, beg);
+        let byte_end = string_elisp_pos_to_byte(&s, end);
+        let mut changed = false;
+        for name_val in names {
+            let name = expect_symbol_name(&name_val)?;
+            if table.get_property(byte_beg, &name).is_some() {
+                changed = true;
+            }
+            table.remove_property(byte_beg, byte_end, &name);
+        }
+        save_string_props(str_id, table);
+        return Ok(if changed { Value::True } else { Value::Nil });
+    }
+
+    let buf_id = resolve_buffer_id(eval, args.get(3))?;
     let buf = eval
         .buffers
         .get_mut(buf_id)
@@ -397,8 +516,18 @@ pub(crate) fn builtin_text_properties_at(
     expect_min_args("text-properties-at", &args, 1)?;
     expect_max_args("text-properties-at", &args, 2)?;
     let pos = expect_int(&args[0])?;
-    let buf_id = resolve_buffer_id(eval, args.get(1))?;
 
+    if let Some(str_id) = is_string_object(args.get(1)) {
+        let s = with_heap(|h| h.get_string(str_id).clone());
+        if let Some(table) = get_string_text_properties_table(str_id) {
+            let byte_pos = string_elisp_pos_to_byte(&s, pos);
+            let props = table.get_properties(byte_pos);
+            return Ok(hashmap_to_plist(&props));
+        }
+        return Ok(Value::Nil);
+    }
+
+    let buf_id = resolve_buffer_id(eval, args.get(1))?;
     let buf = eval
         .buffers
         .get(buf_id)
@@ -418,6 +547,44 @@ pub(crate) fn builtin_next_single_property_change(
     expect_max_args("next-single-property-change", &args, 4)?;
     let pos = expect_int(&args[0])?;
     let prop = expect_symbol_name(&args[1])?;
+
+    if let Some(str_id) = is_string_object(args.get(2)) {
+        let s = with_heap(|h| h.get_string(str_id).clone());
+        let table = get_string_text_properties_table(str_id).unwrap_or_default();
+        let byte_pos = string_elisp_pos_to_byte(&s, pos);
+        let limit = args.get(3);
+        let byte_limit = match limit {
+            Some(v) if !v.is_nil() => Some(string_elisp_pos_to_byte(&s, expect_int(v)?)),
+            _ => None,
+        };
+        let current_val = table.get_property(byte_pos, &prop).cloned();
+        let str_len = s.len();
+        let mut cursor = byte_pos;
+        loop {
+            match table.next_property_change(cursor) {
+                Some(next) => {
+                    if let Some(lim) = byte_limit {
+                        if next > lim { return Ok(Value::Int(string_byte_to_elisp_pos(&s, lim))); }
+                    }
+                    let new_val = table.get_property(next, &prop).cloned();
+                    let changed = match (&current_val, &new_val) {
+                        (None, None) => false,
+                        (Some(a), Some(b)) => !equal_value(a, b, 0),
+                        _ => true,
+                    };
+                    if changed { return Ok(Value::Int(string_byte_to_elisp_pos(&s, next))); }
+                    cursor = next;
+                    if cursor >= str_len { break; }
+                }
+                None => break,
+            }
+        }
+        return match byte_limit {
+            Some(lim) => Ok(Value::Int(string_byte_to_elisp_pos(&s, lim))),
+            None => Ok(Value::Nil),
+        };
+    }
+
     let buf_id = resolve_buffer_id(eval, args.get(2))?;
     let limit = args.get(3);
 
@@ -432,7 +599,6 @@ pub(crate) fn builtin_next_single_property_change(
         _ => None,
     };
 
-    // Walk forward from byte_pos looking for where the specific property changes.
     let current_val = buf.text_props.get_property(byte_pos, &prop).cloned();
     let buf_len = buf.text.len();
     let mut cursor = byte_pos;
@@ -445,7 +611,6 @@ pub(crate) fn builtin_next_single_property_change(
                         return Ok(Value::Int(byte_to_elisp_pos(buf, lim)));
                     }
                 }
-                // Check if the specific property changed at `next`.
                 let new_val = buf.text_props.get_property(next, &prop).cloned();
                 let changed = match (&current_val, &new_val) {
                     (None, None) => false,
@@ -464,7 +629,6 @@ pub(crate) fn builtin_next_single_property_change(
         }
     }
 
-    // No change found — return LIMIT if given, else nil.
     match byte_limit {
         Some(lim) => Ok(Value::Int(byte_to_elisp_pos(buf, lim))),
         None => Ok(Value::Nil),
@@ -480,6 +644,45 @@ pub(crate) fn builtin_previous_single_property_change(
     expect_max_args("previous-single-property-change", &args, 4)?;
     let pos = expect_int(&args[0])?;
     let prop = expect_symbol_name(&args[1])?;
+
+    if let Some(str_id) = is_string_object(args.get(2)) {
+        let s = with_heap(|h| h.get_string(str_id).clone());
+        let table = get_string_text_properties_table(str_id).unwrap_or_default();
+        let byte_pos = string_elisp_pos_to_byte(&s, pos);
+        let limit = args.get(3);
+        let byte_limit = match limit {
+            Some(v) if !v.is_nil() => Some(string_elisp_pos_to_byte(&s, expect_int(v)?)),
+            _ => None,
+        };
+        let ref_byte = if byte_pos > 0 { byte_pos - 1 } else { 0 };
+        let current_val = table.get_property(ref_byte, &prop).cloned();
+        let mut cursor = byte_pos;
+        loop {
+            match table.previous_property_change(cursor) {
+                Some(prev) => {
+                    if let Some(lim) = byte_limit {
+                        if prev < lim { return Ok(Value::Int(string_byte_to_elisp_pos(&s, lim))); }
+                    }
+                    let check = if prev > 0 { prev - 1 } else { 0 };
+                    let new_val = table.get_property(check, &prop).cloned();
+                    let changed = match (&current_val, &new_val) {
+                        (None, None) => false,
+                        (Some(a), Some(b)) => !equal_value(a, b, 0),
+                        _ => true,
+                    };
+                    if changed { return Ok(Value::Int(string_byte_to_elisp_pos(&s, prev))); }
+                    if prev == 0 { break; }
+                    cursor = if prev < cursor { prev } else { prev - 1 };
+                }
+                None => break,
+            }
+        }
+        return match byte_limit {
+            Some(lim) => Ok(Value::Int(string_byte_to_elisp_pos(&s, lim))),
+            None => Ok(Value::Nil),
+        };
+    }
+
     let buf_id = resolve_buffer_id(eval, args.get(2))?;
     let limit = args.get(3);
 
@@ -494,7 +697,6 @@ pub(crate) fn builtin_previous_single_property_change(
         _ => None,
     };
 
-    // The value of the property just before pos (at pos-1 conceptually).
     let ref_byte = if byte_pos > 0 { byte_pos - 1 } else { 0 };
     let current_val = buf.text_props.get_property(ref_byte, &prop).cloned();
     let mut cursor = byte_pos;
@@ -540,6 +742,30 @@ pub(crate) fn builtin_next_property_change(
     expect_min_args("next-property-change", &args, 1)?;
     expect_max_args("next-property-change", &args, 3)?;
     let pos = expect_int(&args[0])?;
+
+    if let Some(str_id) = is_string_object(args.get(1)) {
+        let s = with_heap(|h| h.get_string(str_id).clone());
+        let table = get_string_text_properties_table(str_id).unwrap_or_default();
+        let byte_pos = string_elisp_pos_to_byte(&s, pos);
+        let limit = args.get(2);
+        let byte_limit = match limit {
+            Some(v) if !v.is_nil() => Some(string_elisp_pos_to_byte(&s, expect_int(v)?)),
+            _ => None,
+        };
+        return match table.next_property_change(byte_pos) {
+            Some(next) => {
+                if let Some(lim) = byte_limit {
+                    if next > lim { return Ok(Value::Int(string_byte_to_elisp_pos(&s, lim))); }
+                }
+                Ok(Value::Int(string_byte_to_elisp_pos(&s, next)))
+            }
+            None => match byte_limit {
+                Some(lim) => Ok(Value::Int(string_byte_to_elisp_pos(&s, lim))),
+                None => Ok(Value::Nil),
+            },
+        };
+    }
+
     let buf_id = resolve_buffer_id(eval, args.get(1))?;
     let limit = args.get(2);
 
@@ -581,8 +807,28 @@ pub(crate) fn builtin_text_property_any(
     let end = expect_int(&args[1])?;
     let prop = expect_symbol_name(&args[2])?;
     let val = &args[3];
-    let buf_id = resolve_buffer_id(eval, args.get(4))?;
 
+    if let Some(str_id) = is_string_object(args.get(4)) {
+        let s = with_heap(|h| h.get_string(str_id).clone());
+        let table = get_string_text_properties_table(str_id).unwrap_or_default();
+        let byte_beg = string_elisp_pos_to_byte(&s, beg);
+        let byte_end = string_elisp_pos_to_byte(&s, end);
+        let mut cursor = byte_beg;
+        while cursor < byte_end {
+            if let Some(found) = table.get_property(cursor, &prop) {
+                if equal_value(found, val, 0) {
+                    return Ok(Value::Int(string_byte_to_elisp_pos(&s, cursor)));
+                }
+            }
+            match table.next_property_change(cursor) {
+                Some(next) if next <= byte_end => cursor = next,
+                _ => break,
+            }
+        }
+        return Ok(Value::Nil);
+    }
+
+    let buf_id = resolve_buffer_id(eval, args.get(4))?;
     let buf = eval
         .buffers
         .get(buf_id)
@@ -591,7 +837,6 @@ pub(crate) fn builtin_text_property_any(
     let byte_beg = elisp_pos_to_byte(buf, beg);
     let byte_end = elisp_pos_to_byte(buf, end);
 
-    // Walk through the range looking for the property with the matching value.
     let mut cursor = byte_beg;
     while cursor < byte_end {
         if let Some(found) = buf.text_props.get_property(cursor, &prop) {
@@ -599,7 +844,6 @@ pub(crate) fn builtin_text_property_any(
                 return Ok(Value::Int(byte_to_elisp_pos(buf, cursor)));
             }
         }
-        // Advance to next property change.
         match buf.text_props.next_property_change(cursor) {
             Some(next) if next <= byte_end => {
                 cursor = next;
@@ -621,8 +865,28 @@ pub(crate) fn builtin_text_property_not_all(
     let end = expect_int(&args[1])?;
     let prop = expect_symbol_name(&args[2])?;
     let val = &args[3];
-    let buf_id = resolve_buffer_id(eval, args.get(4))?;
 
+    if let Some(str_id) = is_string_object(args.get(4)) {
+        let s = with_heap(|h| h.get_string(str_id).clone());
+        let table = get_string_text_properties_table(str_id).unwrap_or_default();
+        let byte_beg = string_elisp_pos_to_byte(&s, beg);
+        let byte_end = string_elisp_pos_to_byte(&s, end);
+        let mut cursor = byte_beg;
+        while cursor < byte_end {
+            let matches = match table.get_property(cursor, &prop) {
+                Some(found) => equal_value(found, val, 0),
+                None => val.is_nil(),
+            };
+            if !matches { return Ok(Value::Int(string_byte_to_elisp_pos(&s, cursor))); }
+            match table.next_property_change(cursor) {
+                Some(next) if next > cursor && next < byte_end => cursor = next,
+                _ => break,
+            }
+        }
+        return Ok(Value::Nil);
+    }
+
+    let buf_id = resolve_buffer_id(eval, args.get(4))?;
     let buf = eval
         .buffers
         .get(buf_id)
@@ -659,6 +923,13 @@ pub(crate) fn builtin_get_char_property_and_overlay(
     expect_max_args("get-char-property-and-overlay", &args, 3)?;
     let pos = expect_int(&args[0])?;
     let prop = expect_symbol_name(&args[1])?;
+
+    // For strings, no overlays — just return (text-prop-value . nil)
+    if is_string_object(args.get(2)).is_some() {
+        let value = builtin_get_text_property(eval, args)?;
+        return Ok(Value::cons(value, Value::Nil));
+    }
+
     let buf_id = resolve_buffer_id(eval, args.get(2))?;
 
     if let Some(buf) = eval.buffers.get(buf_id) {

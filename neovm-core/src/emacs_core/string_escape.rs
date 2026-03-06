@@ -298,6 +298,28 @@ pub(crate) fn storage_byte_len(s: &str) -> usize {
         .sum()
 }
 
+/// Convert a 0-based Emacs character index to a byte offset in NeoVM string storage.
+/// Clamps to the string length if the index is out of bounds.
+pub(crate) fn storage_char_to_byte(s: &str, char_idx: usize) -> usize {
+    let units = scan_storage_units(s);
+    if char_idx >= units.len() {
+        s.len()
+    } else {
+        units[char_idx].0
+    }
+}
+
+/// Convert a byte offset in NeoVM string storage to a 0-based Emacs character index.
+pub(crate) fn storage_byte_to_char(s: &str, byte_pos: usize) -> usize {
+    let units = scan_storage_units(s);
+    for (i, unit) in units.iter().enumerate() {
+        if byte_pos < unit.1 {
+            return i;
+        }
+    }
+    units.len()
+}
+
 /// Slice NeoVM string storage by logical Emacs character index.
 pub(crate) fn storage_substring(s: &str, from: usize, to: usize) -> Option<String> {
     if from > to {

@@ -7,6 +7,8 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::intern::{SymId, intern, resolve_sym};
+use crate::buffer::text_props::TextPropertyTable;
+use crate::gc::GcTrace;
 
 thread_local! {
     static FLOAT_ALLOC_ID: Cell<u32> = const { Cell::new(0) };
@@ -112,7 +114,7 @@ static STRING_CHARS_CONSED: AtomicU64 = AtomicU64::new(ZERO_COUNT);
 static INTERVALS_CONSED: AtomicU64 = AtomicU64::new(ZERO_COUNT);
 static STRINGS_CONSED: AtomicU64 = AtomicU64::new(ZERO_COUNT);
 thread_local! {
-    static STRING_TEXT_PROPS: RefCell<HashMap<usize, Vec<StringTextPropertyRun>>> =
+    static STRING_TEXT_PROPS: RefCell<HashMap<usize, TextPropertyTable>> =
         RefCell::new(HashMap::new());
 }
 
@@ -133,10 +135,8 @@ pub fn reset_string_text_properties() {
 /// Collect GC roots from string text property plists.
 pub fn collect_string_text_prop_gc_roots(roots: &mut Vec<Value>) {
     STRING_TEXT_PROPS.with(|slot| {
-        for runs in slot.borrow().values() {
-            for run in runs {
-                roots.push(run.plist);
-            }
+        for table in slot.borrow().values() {
+            table.trace_roots(roots);
         }
     });
 }
@@ -246,19 +246,64 @@ pub struct StringTextPropertyRun {
     pub plist: Value,
 }
 
-pub fn set_string_text_properties(id: ObjId, runs: Vec<StringTextPropertyRun>) {
+pub fn set_string_text_properties_table(id: ObjId, table: TextPropertyTable) {
     let key = obj_id_to_key(id);
     STRING_TEXT_PROPS.with(|slot| {
         let mut props = slot.borrow_mut();
-        if runs.is_empty() {
+        if table.is_empty() {
             props.remove(&key);
         } else {
-            props.insert(key, runs);
+            props.insert(key, table);
         }
     });
 }
 
+pub fn set_string_text_properties(id: ObjId, runs: Vec<StringTextPropertyRun>) {
+    let mut table = TextPropertyTable::new();
+    for run in &runs {
+        // Convert plist Value to individual properties
+        if let Some(items) = list_to_vec(&run.plist) {
+            for chunk in items.chunks(2) {
+                if chunk.len() == 2 {
+                    if let Some(name) = chunk[0].as_symbol_name() {
+                        table.put_property(run.start, run.end, name, chunk[1]);
+                    }
+                }
+            }
+        }
+    }
+    set_string_text_properties_table(id, table);
+}
+
 pub fn get_string_text_properties(id: ObjId) -> Option<Vec<StringTextPropertyRun>> {
+    let key = obj_id_to_key(id);
+    STRING_TEXT_PROPS.with(|slot| {
+        let table = slot.borrow();
+        let table = table.get(&key)?;
+        if table.is_empty() {
+            return None;
+        }
+        let mut runs = Vec::new();
+        for interval in table.intervals() {
+            if interval.properties.is_empty() {
+                continue;
+            }
+            let mut plist_items = Vec::new();
+            for (key, val) in &interval.properties {
+                plist_items.push(Value::symbol(key.clone()));
+                plist_items.push(*val);
+            }
+            runs.push(StringTextPropertyRun {
+                start: interval.start,
+                end: interval.end,
+                plist: Value::list(plist_items),
+            });
+        }
+        if runs.is_empty() { None } else { Some(runs) }
+    })
+}
+
+pub fn get_string_text_properties_table(id: ObjId) -> Option<TextPropertyTable> {
     let key = obj_id_to_key(id);
     STRING_TEXT_PROPS.with(|slot| slot.borrow().get(&key).cloned())
 }
@@ -268,23 +313,23 @@ fn obj_id_to_key(id: ObjId) -> usize {
 }
 
 /// Snapshot the string text properties table (for pdump serialization).
-/// Returns entries as (combined_key, runs) pairs.
-pub(crate) fn snapshot_string_text_props() -> Vec<(u64, Vec<StringTextPropertyRun>)> {
+/// Returns entries as (combined_key, table) pairs.
+pub(crate) fn snapshot_string_text_props() -> Vec<(u64, TextPropertyTable)> {
     STRING_TEXT_PROPS.with(|slot| {
         slot.borrow()
             .iter()
-            .map(|(&key, runs)| (key as u64, runs.clone()))
+            .map(|(&key, table)| (key as u64, table.clone()))
             .collect()
     })
 }
 
 /// Restore string text properties from a pdump snapshot.
-pub(crate) fn restore_string_text_props(entries: Vec<(u64, Vec<StringTextPropertyRun>)>) {
+pub(crate) fn restore_string_text_props(entries: Vec<(u64, TextPropertyTable)>) {
     STRING_TEXT_PROPS.with(|slot| {
         let mut props = slot.borrow_mut();
         props.clear();
-        for (key, runs) in entries {
-            props.insert(key as usize, runs);
+        for (key, table) in entries {
+            props.insert(key as usize, table);
         }
     });
 }

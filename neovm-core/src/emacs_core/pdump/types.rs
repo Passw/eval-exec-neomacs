@@ -862,5 +862,5 @@ pub struct DumpEvaluatorState {
     pub registers: DumpRegisterManager,
     pub bookmarks: DumpBookmarkManager,
     pub watchers: DumpVariableWatcherList,
-    pub string_text_props: Vec<(u64, Vec<DumpStringTextPropertyRun>)>,
+    pub string_text_props: Vec<(u64, Vec<DumpPropertyInterval>)>,
 }

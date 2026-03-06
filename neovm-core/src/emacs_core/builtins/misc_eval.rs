@@ -846,8 +846,42 @@ pub(crate) fn builtin_propertize(args: Vec<Value>) -> EvalResult {
         ));
     }
 
-    // NeoVM does not attach text properties to string values yet.
-    Ok(Value::string(s))
+    // Create a copy of the string
+    let new_str = Value::string(&s);
+    let new_id = match &new_str {
+        Value::Str(id) => *id,
+        _ => unreachable!(),
+    };
+
+    // Copy existing text properties from source string
+    if let Value::Str(src_id) = &args[0] {
+        if let Some(src_table) = get_string_text_properties_table(*src_id) {
+            set_string_text_properties_table(new_id, src_table);
+        }
+    }
+
+    // Parse and apply plist properties
+    if args.len() > 1 {
+        let byte_len = s.len();
+        let mut table = get_string_text_properties_table(new_id)
+            .unwrap_or_else(|| crate::buffer::text_props::TextPropertyTable::new());
+        let pairs = &args[1..];
+        for chunk in pairs.chunks(2) {
+            if chunk.len() == 2 {
+                if let Some(name) = chunk[0].as_symbol_name() {
+                    table.put_property(0, byte_len, name, chunk[1]);
+                } else if let Some(name) = match &chunk[0] {
+                    Value::Keyword(id) => Some(resolve_sym(*id).to_owned()),
+                    _ => None,
+                } {
+                    table.put_property(0, byte_len, &name, chunk[1]);
+                }
+            }
+        }
+        set_string_text_properties_table(new_id, table);
+    }
+
+    Ok(new_str)
 }
 
 fn gensym_prefix_string(value: &Value) -> String {

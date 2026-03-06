@@ -1017,6 +1017,27 @@ pub(crate) fn dump_string_text_prop_run(r: &StringTextPropertyRun) -> DumpString
     }
 }
 
+/// Convert a TextPropertyTable to a list of DumpPropertyInterval entries (for string props).
+/// Does NOT allocate heap objects — serializes property values directly.
+fn dump_string_text_property_table(table: &TextPropertyTable) -> Vec<DumpPropertyInterval> {
+    let mut intervals = Vec::new();
+    for iv in table.dump_intervals() {
+        if iv.properties.is_empty() {
+            continue;
+        }
+        let properties: Vec<(String, DumpValue)> = iv.properties
+            .iter()
+            .map(|(key, val)| (key.clone(), dump_value(val)))
+            .collect();
+        intervals.push(DumpPropertyInterval {
+            start: iv.start,
+            end: iv.end,
+            properties,
+        });
+    }
+    intervals
+}
+
 // --- Top-level dump ---
 
 pub(crate) fn dump_evaluator(eval: &Evaluator) -> DumpEvaluatorState {
@@ -1047,7 +1068,7 @@ pub(crate) fn dump_evaluator(eval: &Evaluator) -> DumpEvaluatorState {
         watchers: dump_watcher_list(&eval.watchers),
         string_text_props: string_text_props
             .into_iter()
-            .map(|(key, runs)| (key, runs.iter().map(dump_string_text_prop_run).collect()))
+            .map(|(key, table)| (key, dump_string_text_property_table(&table)))
             .collect(),
     }
 }
@@ -2010,4 +2031,16 @@ pub(crate) fn load_string_text_prop_run(r: &DumpStringTextPropertyRun) -> String
         end: r.end,
         plist: load_value(&r.plist),
     }
+}
+
+/// Convert a list of DumpPropertyInterval entries back to a TextPropertyTable.
+pub(crate) fn load_text_property_table(intervals: &[DumpPropertyInterval]) -> TextPropertyTable {
+    let mut table = TextPropertyTable::new();
+    for iv in intervals {
+        for (name, dump_val) in &iv.properties {
+            let val = load_value(dump_val);
+            table.put_property(iv.start, iv.end, name, val);
+        }
+    }
+    table
 }
