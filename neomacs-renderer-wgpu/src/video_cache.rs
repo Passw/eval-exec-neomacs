@@ -707,7 +707,7 @@ impl VideoCache {
     fn try_export_va_surface(
         buffer: &gst::BufferRef,
         memory: &gst::Memory,
-        info: &gst_video::VideoInfo,
+        _info: &gst_video::VideoInfo,
     ) -> Option<DmaBufInfo> {
         use crate::va_dmabuf_export::{get_va_display_from_memory, try_export_va_dmabuf};
 
