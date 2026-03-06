@@ -634,7 +634,6 @@ fn subr_arity_navigation_case_primitives_match_oracle() {
     assert_subr_arity("capitalize", 1, Some(1));
     assert_subr_arity("capitalize-word", 1, Some(1));
     assert_subr_arity("capitalize-region", 2, Some(3));
-    assert_subr_arity("count-lines", 2, Some(3));
 }
 
 #[test]

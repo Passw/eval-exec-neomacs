@@ -161,39 +161,6 @@ fn test_line_number_at_pos_default() {
 }
 
 #[test]
-fn test_count_lines() {
-    let mut ev = eval_with_text("abc\ndef\nghi\n");
-    let n = eval_int(&mut ev, "(count-lines 1 13)");
-    assert_eq!(n, 3);
-}
-
-#[test]
-fn test_count_lines_same_line() {
-    let mut ev = eval_with_text("abcdef");
-    let n = eval_int(&mut ev, "(count-lines 1 4)");
-    // GNU Emacs: newline count + 1 when region is non-empty and end
-    // is not at the start of a line.
-    assert_eq!(n, 1);
-}
-
-#[test]
-fn test_count_lines_accepts_optional_third_arg() {
-    let mut ev = eval_with_text("abc\ndef\nghi\n");
-    let n = eval_int(&mut ev, "(count-lines 1 13 t)");
-    assert_eq!(n, 3);
-}
-
-#[test]
-fn test_count_lines_rejects_too_many_args() {
-    let mut ev = eval_with_text("abc\ndef");
-    let err = eval_str(
-        &mut ev,
-        "(condition-case err (count-lines 1 2 nil nil) (error (car err)))",
-    );
-    assert_eq!(err.as_symbol_name(), Some("wrong-number-of-arguments"));
-}
-
-#[test]
 fn test_forward_line() {
     let mut ev = eval_with_text("abc\ndef\nghi");
     let remainder = eval_int(&mut ev, "(forward-line 1)");

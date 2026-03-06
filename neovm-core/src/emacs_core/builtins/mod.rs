@@ -1751,7 +1751,6 @@ pub(crate) fn dispatch_builtin(
         "line-number-at-pos" => {
             return Some(super::navigation::builtin_line_number_at_pos(eval, args));
         }
-        "count-lines" => return Some(super::navigation::builtin_count_lines(eval, args)),
         "forward-line" => return Some(super::navigation::builtin_forward_line(eval, args)),
         "next-line" => return Some(super::navigation::builtin_next_line(eval, args)),
         "previous-line" => return Some(super::navigation::builtin_previous_line(eval, args)),

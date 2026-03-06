@@ -85,7 +85,6 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     "copy-sequence",
     "copy-syntax-table",
     "cos",
-    "count-lines",
     "current-buffer",
     "current-column",
     "decode-char",

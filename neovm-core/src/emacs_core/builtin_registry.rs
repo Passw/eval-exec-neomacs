@@ -296,7 +296,6 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "copy-to-register",
     "copysign",
     "count-matches",
-    "count-lines",
     "create-image",
     "current-active-maps",
     "current-bidi-paragraph-direction",

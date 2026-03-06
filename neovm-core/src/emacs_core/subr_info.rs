@@ -1477,7 +1477,6 @@ fn subr_arity_value(name: &str) -> Value {
         | "eventp"
         | "error-message-string" => arity_cons(1, Some(1)),
         "copysign" | "equal-including-properties" => arity_cons(2, Some(2)),
-        "count-lines" => arity_cons(2, Some(3)),
         "emacs-pid" => arity_cons(0, Some(0)),
         "eval" => arity_cons(1, Some(2)),
         "eval-buffer" => arity_cons(0, Some(5)),
