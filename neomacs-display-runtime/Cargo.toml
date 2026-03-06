@@ -65,8 +65,8 @@ parking_lot = { workspace = true, optional = true }
 portable-pty = { workspace = true, optional = true }
 
 [build-dependencies]
-bindgen.workspace = true
-pkg-config.workspace = true
+bindgen = { workspace = true, optional = true }
+pkg-config = { workspace = true, optional = true }
 
 [features]
 # Default: all features enabled
@@ -92,7 +92,11 @@ video = [
     "neomacs-renderer-wgpu/video",
 ]
 # WPE WebKit integration
-wpe-webkit = ["neomacs-renderer-wgpu/wpe-webkit"]
+wpe-webkit = [
+    "neomacs-renderer-wgpu/wpe-webkit",
+    "dep:bindgen",
+    "dep:pkg-config",
+]
 # GPU-accelerated terminal emulator
 neo-term = [
     "alacritty_terminal",
