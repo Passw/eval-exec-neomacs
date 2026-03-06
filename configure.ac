@@ -575,9 +575,9 @@ OPTION_DEFAULT_OFF([pgtk], [use GTK to support window systems other than X])
 OPTION_DEFAULT_OFF([neomacs], [use Neomacs GPU-accelerated display engine with winit/wgpu])
 AC_ARG_WITH([neovm-core-backend],
   [AS_HELP_STRING([--with-neovm-core-backend=BACKEND],
-     [select NeoVM core backend: rust (default) or emacs-c])],
+     [select NeoVM core backend: emacs-c (default) or rust])],
   [with_neovm_core_backend=$withval],
-  [with_neovm_core_backend=rust])
+  [with_neovm_core_backend=emacs-c])
 
 OPTION_DEFAULT_ON([gpm],[don't use -lgpm for mouse support on a GNU/Linux console])
 OPTION_DEFAULT_IFAVAILABLE([dbus],[compile with D-Bus support])
@@ -2708,7 +2708,7 @@ if test "${with_neomacs}" = "yes"; then
 fi
 
 case "${with_neovm_core_backend}" in
-  yes) with_neovm_core_backend=rust ;;
+  yes) with_neovm_core_backend=emacs-c ;;
   no) with_neovm_core_backend=emacs-c ;;
   emacs-c|rust) ;;
   *) AC_MSG_ERROR([bad value ${with_neovm_core_backend} for --with-neovm-core-backend (expected emacs-c or rust)]) ;;

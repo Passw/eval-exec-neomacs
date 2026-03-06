@@ -515,8 +515,8 @@ cargo build --release -p neomacs-bin
 
 Use `--with-neovm-core-backend=` to select which core backend gets compiled:
 
-- `rust` (default): Rust runtime path used by the Rust-only workflow.
-- `emacs-c`: legacy fallback for C core integration work.
+- `emacs-c` (default): legacy fallback for C core integration work.
+- `rust`: Rust runtime path used by the Rust-only workflow.
 
 ---
 
