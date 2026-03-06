@@ -107,7 +107,15 @@ pub(crate) fn run_oracle_eval(form: &str) -> Result<String, String> {
     let mem_limit = oracle_mem_limit_bytes();
     let mut cmd = Command::new(&oracle_bin);
     cmd.env("NEOVM_ORACLE_FORM_FILE", form_path.as_os_str())
-        .args(["--batch", "-Q", "--eval", program]);
+        .env("EMACSNATIVELOADPATH", "/dev/null")
+        .args([
+            "--batch",
+            "-Q",
+            "--eval",
+            "(setq native-comp-jit-compilation nil inhibit-automatic-native-compilation t native-comp-enable-subr-trampolines nil)",
+            "--eval",
+            program,
+        ]);
 
     // Safety: `pre_exec` runs between fork and exec in the child process.
     // We only call `setrlimit` which is async-signal-safe.
