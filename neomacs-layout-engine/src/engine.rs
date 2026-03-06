@@ -3792,51 +3792,6 @@ impl LayoutEngine {
                 "mode-line-inactive"
             };
             let ml_face = face_resolver.resolve_named_face(ml_face_name);
-            let ml_bg = Color::from_pixel(ml_face.bg);
-            let ml_fg = Color::from_pixel(ml_face.fg);
-
-            // Query mode-line face metrics
-            let ml_char_w = if let Some(ref mut svc) = self.font_metrics {
-                let m = svc.font_metrics(
-                    &ml_face.font_family,
-                    ml_face.font_weight,
-                    ml_face.italic,
-                    ml_face.font_size,
-                );
-                m.char_width
-            } else {
-                char_w
-            };
-
-            // Mode-line background
-            frame_glyphs.add_stretch(
-                params.bounds.x,
-                ml_y,
-                params.bounds.width,
-                params.mode_line_height,
-                ml_bg,
-                0,
-                false,
-            );
-
-            // Set mode-line face for text
-            frame_glyphs.set_face_with_font(
-                current_face_id,
-                ml_fg,
-                Some(ml_bg),
-                &ml_face.font_family,
-                ml_face.font_weight,
-                ml_face.italic,
-                ml_face.font_size,
-                0,
-                None,
-                0,
-                None,
-                0,
-                None,
-                false,
-            );
-            current_face_id += 1;
 
             // Try to evaluate (format-mode-line mode-line-format)
             let mode_text = {
@@ -3854,65 +3809,27 @@ impl LayoutEngine {
                 }
             };
 
-            // Render mode-line text
-            let mut mx = params.bounds.x + 2.0;
-            for ch in mode_text.chars() {
-                if mx + ml_char_w > params.bounds.x + params.bounds.width {
-                    break;
-                }
-                frame_glyphs.add_char(ch, mx, ml_y, ml_char_w, char_h, font_ascent, false);
-                mx += ml_char_w;
-            }
+            self.render_rust_status_line_plain(
+                params.bounds.x,
+                ml_y,
+                params.bounds.width,
+                params.mode_line_height,
+                params.window_id,
+                char_w,
+                font_ascent,
+                current_face_id,
+                &ml_face,
+                mode_text,
+                frame_glyphs,
+                StatusLineKind::ModeLine,
+            );
+            current_face_id += 1;
         }
 
         // Header-line: evaluate format-mode-line with header-line-format
         if params.header_line_height > 0.0 {
             let hl_y = params.text_bounds.y;
             let hl_face = face_resolver.resolve_named_face("header-line");
-            let hl_bg = Color::from_pixel(hl_face.bg);
-            let hl_fg = Color::from_pixel(hl_face.fg);
-
-            let hl_char_w = if let Some(ref mut svc) = self.font_metrics {
-                let m = svc.font_metrics(
-                    &hl_face.font_family,
-                    hl_face.font_weight,
-                    hl_face.italic,
-                    hl_face.font_size,
-                );
-                m.char_width
-            } else {
-                char_w
-            };
-
-            // Header-line background
-            frame_glyphs.add_stretch(
-                params.bounds.x,
-                hl_y,
-                params.bounds.width,
-                params.header_line_height,
-                hl_bg,
-                0,
-                false,
-            );
-
-            // Set header-line face for text
-            frame_glyphs.set_face_with_font(
-                current_face_id,
-                hl_fg,
-                Some(hl_bg),
-                &hl_face.font_family,
-                hl_face.font_weight,
-                hl_face.italic,
-                hl_face.font_size,
-                0,
-                None,
-                0,
-                None,
-                0,
-                None,
-                false,
-            );
-            current_face_id += 1;
 
             // Try to evaluate (format-mode-line header-line-format)
             let header_text = {
@@ -3930,15 +3847,21 @@ impl LayoutEngine {
                 }
             };
 
-            // Render header-line text
-            let mut hx = params.bounds.x + 2.0;
-            for ch in header_text.chars() {
-                if hx + hl_char_w > params.bounds.x + params.bounds.width {
-                    break;
-                }
-                frame_glyphs.add_char(ch, hx, hl_y, hl_char_w, char_h, font_ascent, false);
-                hx += hl_char_w;
-            }
+            self.render_rust_status_line_plain(
+                params.bounds.x,
+                hl_y,
+                params.bounds.width,
+                params.header_line_height,
+                params.window_id,
+                char_w,
+                font_ascent,
+                current_face_id,
+                &hl_face,
+                header_text,
+                frame_glyphs,
+                StatusLineKind::HeaderLine,
+            );
+            current_face_id += 1;
         }
 
         // Tab-line: evaluate format-mode-line with tab-line-format
@@ -3946,49 +3869,6 @@ impl LayoutEngine {
             // Tab-line is above header-line (at the very top of the window)
             let tl_y = params.bounds.y;
             let tl_face = face_resolver.resolve_named_face("tab-line");
-            let tl_bg = Color::from_pixel(tl_face.bg);
-            let tl_fg = Color::from_pixel(tl_face.fg);
-
-            let tl_char_w = if let Some(ref mut svc) = self.font_metrics {
-                let m = svc.font_metrics(
-                    &tl_face.font_family,
-                    tl_face.font_weight,
-                    tl_face.italic,
-                    tl_face.font_size,
-                );
-                m.char_width
-            } else {
-                char_w
-            };
-
-            // Tab-line background
-            frame_glyphs.add_stretch(
-                params.bounds.x,
-                tl_y,
-                params.bounds.width,
-                params.tab_line_height,
-                tl_bg,
-                0,
-                false,
-            );
-
-            // Set tab-line face for text
-            frame_glyphs.set_face_with_font(
-                current_face_id,
-                tl_fg,
-                Some(tl_bg),
-                &tl_face.font_family,
-                tl_face.font_weight,
-                tl_face.italic,
-                tl_face.font_size,
-                0,
-                None,
-                0,
-                None,
-                0,
-                None,
-                false,
-            );
 
             // Try to evaluate (format-mode-line tab-line-format)
             let tab_text = {
@@ -4006,15 +3886,20 @@ impl LayoutEngine {
                 }
             };
 
-            // Render tab-line text
-            let mut tx = params.bounds.x + 2.0;
-            for ch in tab_text.chars() {
-                if tx + tl_char_w > params.bounds.x + params.bounds.width {
-                    break;
-                }
-                frame_glyphs.add_char(ch, tx, tl_y, tl_char_w, char_h, font_ascent, false);
-                tx += tl_char_w;
-            }
+            self.render_rust_status_line_plain(
+                params.bounds.x,
+                tl_y,
+                params.bounds.width,
+                params.tab_line_height,
+                params.window_id,
+                char_w,
+                font_ascent,
+                current_face_id,
+                &tl_face,
+                tab_text,
+                frame_glyphs,
+                StatusLineKind::TabLine,
+            );
         }
 
         // Record last hit-test row (end of visible text)
@@ -4298,6 +4183,61 @@ impl LayoutEngine {
         }
     }
 
+    /// Apply a backend-neutral status-line face to the glyph buffer.
+    pub(crate) unsafe fn apply_status_line_face(
+        &self,
+        face: &StatusLineFace,
+        frame: Option<EmacsFrame>,
+        frame_glyphs: &mut FrameGlyphBuffer,
+    ) {
+        frame_glyphs.set_face_with_font(
+            face.face_id,
+            face.foreground,
+            Some(face.background),
+            &face.font_family,
+            face.font_weight,
+            face.italic,
+            face.font_size,
+            face.underline_style,
+            face.underline_color,
+            if face.strike_through { 1 } else { 0 },
+            face.strike_through_color,
+            if face.overline { 1 } else { 0 },
+            face.overline_color,
+            face.overstrike,
+        );
+        frame_glyphs.faces.insert(face.face_id, face.render_face());
+
+        if face.stipple > 0 && !frame_glyphs.stipple_patterns.contains_key(&face.stipple) {
+            let Some(frame) = frame else {
+                return;
+            };
+            let mut bits_buf = [0u8; 1024];
+            let mut w: c_int = 0;
+            let mut h: c_int = 0;
+            let rc = neomacs_layout_get_stipple_bitmap(
+                frame as *mut c_void,
+                face.stipple,
+                bits_buf.as_mut_ptr(),
+                bits_buf.len() as c_int,
+                &mut w,
+                &mut h,
+            );
+            if rc == 0 && w > 0 && h > 0 {
+                let bytes_per_row = ((w + 7) / 8) as usize;
+                let nbytes = bytes_per_row * h as usize;
+                frame_glyphs.stipple_patterns.insert(
+                    face.stipple,
+                    StipplePattern {
+                        width: w as u32,
+                        height: h as u32,
+                        bits: bits_buf[..nbytes].to_vec(),
+                    },
+                );
+            }
+        }
+    }
+
     /// Add a stretch glyph, automatically using stipple if the given face has one.
     pub(crate) fn add_stretch_for_face(
         face: &FaceDataFFI,
@@ -4325,6 +4265,83 @@ impl LayoutEngine {
             );
         } else {
             frame_glyphs.add_stretch(x, y, width, height, bg, face_id, is_overlay);
+        }
+    }
+
+    /// Add a stretch glyph for a backend-neutral status-line face.
+    pub(crate) fn add_stretch_for_status_line_face(
+        face: &StatusLineFace,
+        frame_glyphs: &mut FrameGlyphBuffer,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        bg: Color,
+        face_id: u32,
+        is_overlay: bool,
+    ) {
+        if face.stipple > 0 {
+            frame_glyphs.add_stretch_stipple(
+                x,
+                y,
+                width,
+                height,
+                bg,
+                face.foreground,
+                face_id,
+                is_overlay,
+                face.stipple,
+            );
+        } else {
+            frame_glyphs.add_stretch(x, y, width, height, bg, face_id, is_overlay);
+        }
+    }
+
+    /// Resolve the character width used by the Rust-native status-line path.
+    pub(crate) fn status_line_char_width(
+        &mut self,
+        face: &StatusLineFace,
+        fallback_char_width: f32,
+    ) -> f32 {
+        if face.font_char_width > 0.0 {
+            return face.font_char_width;
+        }
+        if let Some(ref mut svc) = self.font_metrics {
+            let metrics = svc.font_metrics(
+                &face.font_family,
+                face.font_weight,
+                face.italic,
+                face.font_size,
+            );
+            return metrics.char_width;
+        }
+        fallback_char_width
+    }
+
+    /// Measure the advance of a status-line glyph using the backend requested by the spec.
+    pub(crate) unsafe fn status_line_advance(
+        &mut self,
+        advance_mode: &StatusLineAdvanceMode,
+        face: &StatusLineFace,
+        fallback_char_width: f32,
+        ch: char,
+    ) -> f32 {
+        match advance_mode {
+            StatusLineAdvanceMode::Fixed => fallback_char_width,
+            StatusLineAdvanceMode::Measured { window } => char_advance(
+                &mut self.ascii_width_cache,
+                &mut self.font_metrics,
+                ch,
+                if is_wide_char(ch) { 2 } else { 1 },
+                fallback_char_width,
+                face.face_id,
+                face.font_size.round() as i32,
+                face.font_char_width,
+                *window,
+                &face.font_family,
+                face.font_weight,
+                face.italic,
+            ),
         }
     }
 
@@ -8891,7 +8908,6 @@ mod tests {
                 width,
                 height,
                 ascent,
-                is_overlay,
                 ..
             } => {
                 assert_eq!(*ch, 'a');
@@ -8901,7 +8917,6 @@ mod tests {
                 assert_eq!(*width, 8.0);
                 assert_eq!(*height, 16.0);
                 assert_eq!(*ascent, 12.0);
-                assert_eq!(*is_overlay, false);
             }
             _ => panic!("Expected Char glyph"),
         }
@@ -8925,7 +8940,6 @@ mod tests {
                 x,
                 y,
                 width,
-                is_overlay,
                 ..
             } => {
                 assert_eq!(*ch, 'x');
@@ -8933,7 +8947,6 @@ mod tests {
                 assert_eq!(*x, 100.0);
                 assert_eq!(*y, 200.0);
                 assert_eq!(*width, 9.0);
-                assert_eq!(*is_overlay, true);
             }
             _ => panic!("Expected Char glyph"),
         }
@@ -9010,7 +9023,6 @@ mod tests {
                 width,
                 height,
                 ascent,
-                is_overlay,
                 ..
             } => {
                 assert_eq!(*ch, '-'); // base char
@@ -9020,7 +9032,6 @@ mod tests {
                 assert_eq!(*width, 10.0); // total_advance = 6.0 + 4.0
                 assert_eq!(*height, 16.0);
                 assert_eq!(*ascent, 12.0);
-                assert_eq!(*is_overlay, false);
             }
             _ => panic!("Expected Char glyph"),
         }

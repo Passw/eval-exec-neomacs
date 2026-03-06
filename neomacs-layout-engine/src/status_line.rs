@@ -5,18 +5,230 @@
 
 use super::emacs_ffi::*;
 use super::engine::LayoutEngine;
+use super::neovm_bridge::ResolvedFace;
 use super::unicode::decode_utf8;
+use neomacs_display_protocol::face::{BoxType, Face, FaceAttributes, UnderlineStyle};
 use neomacs_display_protocol::frame_glyphs::{FrameGlyphBuffer, GlyphRowRole};
 use neomacs_display_protocol::types::{Color, Rect};
+use std::ffi::CStr;
 
 /// Which kind of status line to render.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StatusLineKind {
     ModeLine,
     HeaderLine,
     TabLine,
 }
 
+impl StatusLineKind {
+    fn row_role(self) -> GlyphRowRole {
+        match self {
+            Self::ModeLine => GlyphRowRole::ModeLine,
+            Self::HeaderLine => GlyphRowRole::HeaderLine,
+            Self::TabLine => GlyphRowRole::TabLine,
+        }
+    }
+}
+
+/// Shared render-facing face spec for all status-line backends.
+#[derive(Debug, Clone)]
+pub(crate) struct StatusLineFace {
+    pub(crate) face_id: u32,
+    pub(crate) foreground: Color,
+    pub(crate) background: Color,
+    pub(crate) font_family: String,
+    pub(crate) font_file_path: Option<String>,
+    pub(crate) font_weight: u16,
+    pub(crate) italic: bool,
+    pub(crate) font_size: f32,
+    pub(crate) underline_style: u8,
+    pub(crate) underline_color: Option<Color>,
+    pub(crate) strike_through: bool,
+    pub(crate) strike_through_color: Option<Color>,
+    pub(crate) overline: bool,
+    pub(crate) overline_color: Option<Color>,
+    pub(crate) overstrike: bool,
+    pub(crate) box_type: BoxType,
+    pub(crate) box_color: Option<Color>,
+    pub(crate) box_line_width: i32,
+    pub(crate) box_corner_radius: i32,
+    pub(crate) box_border_style: u32,
+    pub(crate) box_border_speed: f32,
+    pub(crate) box_color2: Option<Color>,
+    pub(crate) box_h_line_width: i32,
+    pub(crate) font_char_width: f32,
+    pub(crate) font_ascent: f32,
+    pub(crate) font_descent: i32,
+    pub(crate) underline_position: i32,
+    pub(crate) underline_thickness: i32,
+    pub(crate) stipple: i32,
+}
+
+impl StatusLineFace {
+    unsafe fn from_ffi(face: &FaceDataFFI) -> Self {
+        let font_family = if !face.font_family.is_null() {
+            unsafe { CStr::from_ptr(face.font_family) }
+                .to_str()
+                .unwrap_or("monospace")
+                .to_string()
+        } else {
+            "monospace".to_string()
+        };
+        let font_file_path = if !face.font_file_path.is_null() {
+            unsafe { CStr::from_ptr(face.font_file_path) }
+                .to_str()
+                .ok()
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+        } else {
+            None
+        };
+        let underline_style = face.underline_style.max(0) as u8;
+        let strike_through = face.strike_through > 0;
+        let overline = face.overline > 0;
+        let box_type = if face.box_type == 1 {
+            BoxType::Line
+        } else {
+            BoxType::None
+        };
+        Self {
+            face_id: face.face_id,
+            foreground: Color::from_pixel(face.fg),
+            background: Color::from_pixel(face.bg),
+            font_family,
+            font_file_path,
+            font_weight: face.font_weight.max(0) as u16,
+            italic: face.italic != 0,
+            font_size: face.font_size.max(0) as f32,
+            underline_style,
+            underline_color: (underline_style > 0).then(|| Color::from_pixel(face.underline_color)),
+            strike_through,
+            strike_through_color: strike_through
+                .then(|| Color::from_pixel(face.strike_through_color)),
+            overline,
+            overline_color: overline.then(|| Color::from_pixel(face.overline_color)),
+            overstrike: face.overstrike != 0,
+            box_type,
+            box_color: (face.box_type > 0).then(|| Color::from_pixel(face.box_color)),
+            box_line_width: face.box_line_width,
+            box_corner_radius: face.box_corner_radius,
+            box_border_style: face.box_border_style.max(0) as u32,
+            box_border_speed: face.box_border_speed as f32 / 100.0,
+            box_color2: (face.box_color2 != 0).then(|| Color::from_pixel(face.box_color2)),
+            box_h_line_width: face.box_h_line_width,
+            font_char_width: face.font_char_width,
+            font_ascent: face.font_ascent,
+            font_descent: face.font_descent,
+            underline_position: face.underline_position.max(1),
+            underline_thickness: face.underline_thickness.max(1),
+            stipple: face.stipple,
+        }
+    }
+
+    pub(crate) fn from_resolved(face_id: u32, face: &ResolvedFace) -> Self {
+        Self {
+            face_id,
+            foreground: Color::from_pixel(face.fg),
+            background: Color::from_pixel(face.bg),
+            font_family: if face.font_family.is_empty() {
+                "monospace".to_string()
+            } else {
+                face.font_family.clone()
+            },
+            font_file_path: None,
+            font_weight: face.font_weight,
+            italic: face.italic,
+            font_size: face.font_size,
+            underline_style: face.underline_style,
+            underline_color: (face.underline_style > 0)
+                .then(|| Color::from_pixel(face.underline_color)),
+            strike_through: face.strike_through,
+            strike_through_color: face
+                .strike_through
+                .then(|| Color::from_pixel(face.strike_through_color)),
+            overline: face.overline,
+            overline_color: face
+                .overline
+                .then(|| Color::from_pixel(face.overline_color)),
+            overstrike: face.overstrike,
+            box_type: if face.box_type != 0 {
+                BoxType::Line
+            } else {
+                BoxType::None
+            },
+            box_color: (face.box_type != 0 && face.box_color != 0)
+                .then(|| Color::from_pixel(face.box_color)),
+            box_line_width: face.box_line_width,
+            box_corner_radius: 0,
+            box_border_style: 0,
+            box_border_speed: 1.0,
+            box_color2: None,
+            box_h_line_width: face.box_line_width,
+            font_char_width: face.font_char_width,
+            font_ascent: face.font_ascent,
+            font_descent: 0,
+            underline_position: 1,
+            underline_thickness: 1,
+            stipple: 0,
+        }
+    }
+
+    pub(crate) fn render_face(&self) -> Face {
+        let mut attrs = FaceAttributes::empty();
+        if self.font_weight >= 700 {
+            attrs |= FaceAttributes::BOLD;
+        }
+        if self.italic {
+            attrs |= FaceAttributes::ITALIC;
+        }
+        if self.underline_style > 0 {
+            attrs |= FaceAttributes::UNDERLINE;
+        }
+        if self.strike_through {
+            attrs |= FaceAttributes::STRIKE_THROUGH;
+        }
+        if self.overline {
+            attrs |= FaceAttributes::OVERLINE;
+        }
+        if !matches!(self.box_type, BoxType::None) {
+            attrs |= FaceAttributes::BOX;
+        }
+        Face {
+            id: self.face_id,
+            foreground: self.foreground,
+            background: self.background,
+            underline_color: self.underline_color,
+            overline_color: self.overline_color,
+            strike_through_color: self.strike_through_color,
+            box_color: self.box_color,
+            font_family: self.font_family.clone(),
+            font_size: self.font_size,
+            font_weight: self.font_weight,
+            attributes: attrs,
+            underline_style: underline_style_from_code(self.underline_style),
+            box_type: self.box_type,
+            box_line_width: self.box_line_width,
+            box_corner_radius: self.box_corner_radius,
+            box_border_style: self.box_border_style,
+            box_border_speed: self.box_border_speed,
+            box_color2: self.box_color2,
+            font_file_path: self.font_file_path.clone(),
+            font_ascent: self.font_ascent as i32,
+            font_descent: self.font_descent,
+            underline_position: self.underline_position.max(1),
+            underline_thickness: self.underline_thickness.max(1),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum StatusLineAdvanceMode {
+    Fixed,
+    Measured { window: EmacsWindow },
+}
+
 /// A face run within an overlay/display string: byte offset + fg/bg colors.
+#[derive(Debug, Clone)]
 pub(crate) struct OverlayFaceRun {
     pub byte_offset: u16,
     pub fg: u32,
@@ -56,6 +268,7 @@ pub(crate) fn parse_overlay_face_runs(
 }
 
 /// An align-to entry within an overlay string: byte offset + target pixel position.
+#[derive(Debug, Clone)]
 pub(crate) struct OverlayAlignEntry {
     pub byte_offset: u16,
     pub align_to_px: f32,
@@ -161,6 +374,7 @@ pub(crate) fn apply_overlay_face_run(
 /// A display property record extracted from a mode-line string.
 /// Each record is 16 bytes: u16 byte_offset, u16 covers_bytes,
 /// u32 gpu_id, u16 width, u16 height, u16 ascent, u16 pad.
+#[derive(Debug, Clone)]
 struct DisplayPropRecord {
     byte_offset: u16,
     covers_bytes: u16,
@@ -194,7 +408,377 @@ fn parse_display_props(buf: &[u8], start: usize, count: usize) -> Vec<DisplayPro
     props
 }
 
+fn parse_status_line_align_entries(
+    buf: &[u8],
+    start: usize,
+    count: usize,
+) -> Vec<OverlayAlignEntry> {
+    let mut entries = Vec::with_capacity(count);
+    for i in 0..count {
+        let off = start + i * 6;
+        if off + 6 <= buf.len() {
+            let byte_offset = u16::from_ne_bytes([buf[off], buf[off + 1]]);
+            let align_to_px =
+                f32::from_ne_bytes([buf[off + 2], buf[off + 3], buf[off + 4], buf[off + 5]]);
+            entries.push(OverlayAlignEntry {
+                byte_offset,
+                align_to_px,
+            });
+        }
+    }
+    entries
+}
+
+#[derive(Debug, Clone)]
+struct StatusLineSpec {
+    kind: StatusLineKind,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    window_id: i64,
+    char_width: f32,
+    ascent: f32,
+    face: StatusLineFace,
+    text: Vec<u8>,
+    face_runs: Vec<OverlayFaceRun>,
+    display_props: Vec<DisplayPropRecord>,
+    align_entries: Vec<OverlayAlignEntry>,
+    advance_mode: StatusLineAdvanceMode,
+}
+
+impl StatusLineSpec {
+    fn plain(
+        kind: StatusLineKind,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        window_id: i64,
+        char_width: f32,
+        ascent: f32,
+        face: StatusLineFace,
+        text: String,
+    ) -> Self {
+        Self {
+            kind,
+            x,
+            y,
+            width,
+            height,
+            window_id,
+            char_width,
+            ascent,
+            face,
+            text: text.into_bytes(),
+            face_runs: Vec::new(),
+            display_props: Vec::new(),
+            align_entries: Vec::new(),
+            advance_mode: StatusLineAdvanceMode::Fixed,
+        }
+    }
+}
+
+fn underline_style_from_code(code: u8) -> UnderlineStyle {
+    match code {
+        1 => UnderlineStyle::Line,
+        2 => UnderlineStyle::Wave,
+        3 => UnderlineStyle::Double,
+        4 => UnderlineStyle::Dotted,
+        5 => UnderlineStyle::Dashed,
+        _ => UnderlineStyle::None,
+    }
+}
+
 impl LayoutEngine {
+    fn build_ffi_status_line_spec(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        window_id: i64,
+        char_w: f32,
+        ascent: f32,
+        wp: &WindowParamsFFI,
+        kind: StatusLineKind,
+    ) -> StatusLineSpec {
+        let mut line_face = FaceDataFFI::default();
+        let buf_size = 4096usize;
+        let mut line_buf = vec![0u8; buf_size];
+
+        let bytes = unsafe {
+            match kind {
+                StatusLineKind::TabLine => neomacs_layout_tab_line_text(
+                    wp.window_ptr,
+                    std::ptr::null_mut(),
+                    line_buf.as_mut_ptr(),
+                    buf_size as i64,
+                    &mut line_face,
+                ),
+                StatusLineKind::HeaderLine => neomacs_layout_header_line_text(
+                    wp.window_ptr,
+                    std::ptr::null_mut(),
+                    line_buf.as_mut_ptr(),
+                    buf_size as i64,
+                    &mut line_face,
+                ),
+                StatusLineKind::ModeLine => neomacs_layout_mode_line_text(
+                    wp.window_ptr,
+                    std::ptr::null_mut(),
+                    line_buf.as_mut_ptr(),
+                    buf_size as i64,
+                    &mut line_face,
+                ),
+            }
+        };
+
+        let text_len = if bytes > 0 {
+            (bytes & 0xFFFFFFFF) as usize
+        } else {
+            0
+        };
+        let nruns = if bytes > 0 {
+            ((bytes >> 32) & 0xFFFF) as usize
+        } else {
+            0
+        };
+        let ndisplay = if bytes > 0 {
+            ((bytes >> 48) & 0xFF) as usize
+        } else {
+            0
+        };
+        let naligns = if bytes > 0 {
+            ((bytes >> 56) & 0xFF) as usize
+        } else {
+            0
+        };
+        let display_start = text_len + nruns * 10;
+        let align_start = display_start + ndisplay * 16;
+
+        StatusLineSpec {
+            kind,
+            x,
+            y,
+            width,
+            height,
+            window_id,
+            char_width: char_w,
+            ascent,
+            face: unsafe { StatusLineFace::from_ffi(&line_face) },
+            text: line_buf[..text_len.min(line_buf.len())].to_vec(),
+            face_runs: parse_overlay_face_runs(&line_buf, text_len, nruns as i32),
+            display_props: parse_display_props(&line_buf, display_start, ndisplay),
+            align_entries: parse_status_line_align_entries(&line_buf, align_start, naligns),
+            advance_mode: StatusLineAdvanceMode::Measured {
+                window: wp.window_ptr,
+            },
+        }
+    }
+
+    fn render_status_line_spec(
+        &mut self,
+        spec: &StatusLineSpec,
+        frame: Option<EmacsFrame>,
+        frame_glyphs: &mut FrameGlyphBuffer,
+    ) {
+        let row_role = spec.kind.row_role();
+        frame_glyphs.set_draw_context(
+            spec.window_id,
+            row_role,
+            Some(Rect::new(spec.x, spec.y, spec.width, spec.height)),
+        );
+
+        unsafe {
+            self.apply_status_line_face(&spec.face, frame, frame_glyphs);
+        }
+
+        let bg = spec.face.background;
+        let default_fg = spec.face.foreground;
+        let inset = if spec.face.box_h_line_width > 0 {
+            spec.face.box_h_line_width as f32
+        } else {
+            0.0
+        };
+        let text_y = spec.y + inset;
+        let ascent = if spec.face.font_ascent > 0.0 {
+            spec.face.font_ascent
+        } else {
+            spec.ascent
+        };
+
+        Self::add_stretch_for_status_line_face(
+            &spec.face,
+            frame_glyphs,
+            spec.x,
+            spec.y,
+            spec.width,
+            spec.height,
+            bg,
+            spec.face.face_id,
+            true,
+        );
+
+        if spec.text.is_empty() {
+            return;
+        }
+
+        let mut sl_x_offset = 0.0f32;
+        let mut byte_idx = 0usize;
+        let mut current_run = 0usize;
+        let mut dp_idx = 0usize;
+        let mut align_idx = 0usize;
+
+        while byte_idx < spec.text.len() && sl_x_offset < spec.width {
+            if align_idx < spec.align_entries.len()
+                && byte_idx == spec.align_entries[align_idx].byte_offset as usize
+            {
+                let target_x = spec.align_entries[align_idx].align_to_px;
+                if target_x > sl_x_offset {
+                    let stretch_w = target_x - sl_x_offset;
+                    Self::add_stretch_for_status_line_face(
+                        &spec.face,
+                        frame_glyphs,
+                        spec.x + sl_x_offset,
+                        spec.y,
+                        stretch_w,
+                        spec.height,
+                        bg,
+                        spec.face.face_id,
+                        true,
+                    );
+                    sl_x_offset = target_x;
+                }
+                align_idx += 1;
+                let (_ch, ch_len) = decode_utf8(&spec.text[byte_idx..]);
+                byte_idx += ch_len;
+                continue;
+            }
+
+            if dp_idx < spec.display_props.len() {
+                let dp = &spec.display_props[dp_idx];
+                if byte_idx == dp.byte_offset as usize {
+                    if dp.gpu_id != 0 && dp.width > 0 && dp.height > 0 {
+                        let img_w = dp.width as f32;
+                        let img_h = dp.height as f32;
+                        let gx = spec.x + sl_x_offset;
+                        let gy = if img_h <= spec.height {
+                            let img_ascent_px = if dp.ascent == 0xFFFF {
+                                (img_h + ascent - (spec.height - ascent) + 1.0) / 2.0
+                            } else {
+                                img_h * (dp.ascent as f32 / 100.0)
+                            };
+                            text_y + ascent - img_ascent_px
+                        } else {
+                            text_y
+                        };
+
+                        frame_glyphs.add_image(dp.gpu_id, gx, gy, img_w, img_h);
+                        sl_x_offset += img_w;
+                    }
+                    byte_idx = (dp.byte_offset + dp.covers_bytes) as usize;
+                    dp_idx += 1;
+                    continue;
+                }
+            }
+
+            if current_run < spec.face_runs.len() {
+                while current_run + 1 < spec.face_runs.len()
+                    && byte_idx >= spec.face_runs[current_run + 1].byte_offset as usize
+                {
+                    current_run += 1;
+                }
+                if byte_idx >= spec.face_runs[current_run].byte_offset as usize {
+                    let run = &spec.face_runs[current_run];
+                    if run.fg != 0 || run.bg != 0 {
+                        frame_glyphs.set_face(
+                            spec.face.face_id,
+                            Color::from_pixel(run.fg),
+                            Some(Color::from_pixel(run.bg)),
+                            spec.face.font_weight,
+                            spec.face.italic,
+                            spec.face.underline_style,
+                            spec.face.underline_color,
+                            if spec.face.strike_through { 1 } else { 0 },
+                            spec.face.strike_through_color,
+                            if spec.face.overline { 1 } else { 0 },
+                            spec.face.overline_color,
+                        );
+                    }
+                }
+            }
+
+            let (ch, ch_len) = decode_utf8(&spec.text[byte_idx..]);
+            byte_idx += ch_len;
+
+            if ch == '\n' || ch == '\r' {
+                continue;
+            }
+
+            let advance = unsafe {
+                self.status_line_advance(&spec.advance_mode, &spec.face, spec.char_width, ch)
+            };
+
+            let gx = spec.x + sl_x_offset;
+            frame_glyphs.add_char(ch, gx, text_y, advance, spec.height, ascent, true);
+            sl_x_offset += advance;
+        }
+
+        frame_glyphs.set_face_with_font(
+            spec.face.face_id,
+            default_fg,
+            Some(bg),
+            &spec.face.font_family,
+            spec.face.font_weight,
+            spec.face.italic,
+            spec.face.font_size,
+            spec.face.underline_style,
+            spec.face.underline_color,
+            if spec.face.strike_through { 1 } else { 0 },
+            spec.face.strike_through_color,
+            if spec.face.overline { 1 } else { 0 },
+            spec.face.overline_color,
+            spec.face.overstrike,
+        );
+
+        if sl_x_offset < spec.width {
+            Self::add_stretch_for_status_line_face(
+                &spec.face,
+                frame_glyphs,
+                spec.x + sl_x_offset,
+                spec.y,
+                spec.width - sl_x_offset,
+                spec.height,
+                bg,
+                spec.face.face_id,
+                true,
+            );
+        }
+    }
+
+    pub(crate) fn render_rust_status_line_plain(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        window_id: i64,
+        char_w: f32,
+        ascent: f32,
+        face_id: u32,
+        face: &ResolvedFace,
+        text: String,
+        frame_glyphs: &mut FrameGlyphBuffer,
+        kind: StatusLineKind,
+    ) {
+        let face = StatusLineFace::from_resolved(face_id, face);
+        let char_width = self.status_line_char_width(&face, char_w);
+        let spec = StatusLineSpec::plain(
+            kind, x, y, width, height, window_id, char_width, ascent, face, text,
+        );
+        self.render_status_line_spec(&spec, None, frame_glyphs);
+    }
+
     /// Render a status line (mode-line, header-line, or tab-line).
     pub(crate) unsafe fn render_status_line(
         &mut self,
@@ -210,352 +794,9 @@ impl LayoutEngine {
         frame_glyphs: &mut FrameGlyphBuffer,
         kind: StatusLineKind,
     ) {
-        let row_role = match kind {
-            StatusLineKind::ModeLine => GlyphRowRole::ModeLine,
-            StatusLineKind::HeaderLine => GlyphRowRole::HeaderLine,
-            StatusLineKind::TabLine => GlyphRowRole::TabLine,
-        };
-        frame_glyphs.set_draw_context(window_id, row_role, Some(Rect::new(x, y, width, height)));
-
-        let mut line_face = FaceDataFFI::default();
-        let buf_size = 4096usize;
-        let mut line_buf = vec![0u8; buf_size];
-
-        let bytes = match kind {
-            StatusLineKind::TabLine => neomacs_layout_tab_line_text(
-                wp.window_ptr,
-                std::ptr::null_mut(),
-                line_buf.as_mut_ptr(),
-                buf_size as i64,
-                &mut line_face,
-            ),
-            StatusLineKind::HeaderLine => neomacs_layout_header_line_text(
-                wp.window_ptr,
-                std::ptr::null_mut(),
-                line_buf.as_mut_ptr(),
-                buf_size as i64,
-                &mut line_face,
-            ),
-            StatusLineKind::ModeLine => neomacs_layout_mode_line_text(
-                wp.window_ptr,
-                std::ptr::null_mut(),
-                line_buf.as_mut_ptr(),
-                buf_size as i64,
-                &mut line_face,
-            ),
-        };
-
-        // Apply face
-        self.apply_face(&line_face, frame, frame_glyphs);
-        let bg = Color::from_pixel(line_face.bg);
-        let default_fg = Color::from_pixel(line_face.fg);
-
-        // Use the mode-line face's own font metrics instead of the window's
-        // text-scaled values.  text-scale-adjust changes the window's default
-        // face size but the mode-line face renders at its own (unscaled) size.
-        let char_w = if line_face.font_char_width > 0.0 {
-            line_face.font_char_width
-        } else {
-            char_w
-        };
-        let ascent = if line_face.font_ascent > 0.0 {
-            line_face.font_ascent
-        } else {
-            ascent
-        };
-
-        // Vertical text inset within the mode line area.
-        // When box_h_line_width > 0, estimate_mode_line_height() added
-        // 2 * box_h_line_width to the area height for top/bottom borders.
-        // Text starts after the top border line.
-        // When box_h_line_width <= 0 (drawn within, or no box), the mode
-        // line area is exactly font height — no inset, text fills the area.
-        let inset = if line_face.box_h_line_width > 0 {
-            line_face.box_h_line_width as f32
-        } else {
-            0.0
-        };
-        let text_y = y + inset;
-
-        // Draw background
-        Self::add_stretch_for_face(
-            &line_face,
-            frame_glyphs,
-            x,
-            y,
-            width,
-            height,
-            bg,
-            line_face.face_id,
-            true,
-        );
-
-        if bytes <= 0 {
-            return;
-        }
-
-        // Extract text length, face run count, display prop count, and align
-        // count from packed return value:
-        //   bits  0-31 = text_len
-        //   bits 32-47 = nruns (face runs)
-        //   bits 48-55 = ndisplay (image display props)
-        //   bits 56-63 = naligns (align-to entries)
-        let text_len = (bytes & 0xFFFFFFFF) as usize;
-        let nruns = ((bytes >> 32) & 0xFFFF) as usize;
-        let ndisplay = ((bytes >> 48) & 0xFF) as usize;
-        let naligns = ((bytes >> 56) & 0xFF) as usize;
-
-        let text = &line_buf[..text_len];
-
-        // Parse face runs: each run is 10 bytes (u16 byte_offset, u32 fg, u32 bg)
-        // stored after text data
-        struct FaceRun {
-            byte_offset: u16,
-            fg: u32,
-            bg: u32,
-        }
-        let mut face_runs: Vec<FaceRun> = Vec::with_capacity(nruns);
-        if nruns > 0 {
-            let runs_start = text_len;
-            for i in 0..nruns {
-                let off = runs_start + i * 10;
-                if off + 10 <= line_buf.len() {
-                    let byte_offset = u16::from_ne_bytes([line_buf[off], line_buf[off + 1]]);
-                    let fg = u32::from_ne_bytes([
-                        line_buf[off + 2],
-                        line_buf[off + 3],
-                        line_buf[off + 4],
-                        line_buf[off + 5],
-                    ]);
-                    let bg_val = u32::from_ne_bytes([
-                        line_buf[off + 6],
-                        line_buf[off + 7],
-                        line_buf[off + 8],
-                        line_buf[off + 9],
-                    ]);
-                    face_runs.push(FaceRun {
-                        byte_offset,
-                        fg,
-                        bg: bg_val,
-                    });
-                }
-            }
-        }
-
-        // Parse display property records (images) after face runs.
-        // Each record is 16 bytes, stored after the face run area.
-        let display_start = text_len + nruns * 10;
-        let display_props = parse_display_props(&line_buf, display_start, ndisplay);
-
-        // Parse align-to entries after display props.
-        // Each entry is 6 bytes: u16 byte_offset + f32 align_to_px.
-        let align_start = display_start + ndisplay * 16;
-        let align_entries = if naligns > 0 {
-            let mut entries = Vec::with_capacity(naligns);
-            for i in 0..naligns {
-                let off = align_start + i * 6;
-                if off + 6 <= line_buf.len() {
-                    let byte_offset = u16::from_ne_bytes([line_buf[off], line_buf[off + 1]]);
-                    let align_to_px = f32::from_ne_bytes([
-                        line_buf[off + 2],
-                        line_buf[off + 3],
-                        line_buf[off + 4],
-                        line_buf[off + 5],
-                    ]);
-                    entries.push(OverlayAlignEntry {
-                        byte_offset,
-                        align_to_px,
-                    });
-                }
-            }
-            entries
-        } else {
-            Vec::new()
-        };
-
-        // Use the mode-line face for character width queries
-        let face_id = line_face.face_id;
-        let window = wp.window_ptr;
-
-        // Render text with face runs, display properties, and align-to entries
-        let mut sl_x_offset: f32 = 0.0;
-        let mut byte_idx = 0usize;
-        let mut current_run = 0usize;
-        let mut dp_idx = 0usize; // current display prop index
-        let mut align_idx = 0usize; // current align-to entry index
-
-        while byte_idx < text.len() && sl_x_offset < width {
-            // Check if an align-to entry matches this byte position.
-            // If so, jump x offset to the target column and skip the char.
-            if align_idx < align_entries.len()
-                && byte_idx == align_entries[align_idx].byte_offset as usize
-            {
-                let target_x = align_entries[align_idx].align_to_px;
-                if target_x > sl_x_offset {
-                    let stretch_w = target_x - sl_x_offset;
-                    Self::add_stretch_for_face(
-                        &line_face,
-                        frame_glyphs,
-                        x + sl_x_offset,
-                        y,
-                        stretch_w,
-                        height,
-                        bg,
-                        line_face.face_id,
-                        true,
-                    );
-                    sl_x_offset = target_x;
-                }
-                align_idx += 1;
-                // Skip the character that has the display property
-                let (_ch, ch_len) = decode_utf8(&text[byte_idx..]);
-                byte_idx += ch_len;
-                continue;
-            }
-
-            // Check if a display property (image) covers this byte position.
-            // If so, render the image and skip the covered bytes.
-            if dp_idx < display_props.len() {
-                let dp = &display_props[dp_idx];
-                if byte_idx == dp.byte_offset as usize {
-                    if dp.gpu_id != 0 && dp.width > 0 && dp.height > 0 {
-                        let img_w = dp.width as f32;
-                        let img_h = dp.height as f32;
-                        let gx = x + sl_x_offset;
-
-                        // Vertical alignment: use ascent-based positioning
-                        let gy = if img_h <= height {
-                            let img_ascent_px = if dp.ascent == 0xFFFF {
-                                // Centered
-                                (img_h + ascent - (height - ascent) + 1.0) / 2.0
-                            } else {
-                                // Percentage
-                                img_h * (dp.ascent as f32 / 100.0)
-                            };
-                            text_y + ascent - img_ascent_px
-                        } else {
-                            text_y
-                        };
-
-                        frame_glyphs.add_image(dp.gpu_id, gx, gy, img_w, img_h);
-                        sl_x_offset += img_w;
-                    }
-                    // Skip covered bytes
-                    byte_idx = (dp.byte_offset + dp.covers_bytes) as usize;
-                    dp_idx += 1;
-                    continue;
-                }
-            }
-
-            // Check if we need to switch face for this byte position
-            if current_run < face_runs.len() {
-                if byte_idx >= face_runs[current_run].byte_offset as usize {
-                    // Check if next run starts here or we're in current run
-                    if current_run + 1 < face_runs.len()
-                        && byte_idx >= face_runs[current_run + 1].byte_offset as usize
-                    {
-                        current_run += 1;
-                    }
-                    let run = &face_runs[current_run];
-                    if run.fg != 0 || run.bg != 0 {
-                        let run_fg = Color::from_pixel(run.fg);
-                        let run_bg = Color::from_pixel(run.bg);
-                        frame_glyphs.set_face(
-                            line_face.face_id,
-                            run_fg,
-                            Some(run_bg),
-                            400,
-                            false,
-                            0,
-                            None,
-                            0,
-                            None,
-                            0,
-                            None,
-                        );
-                    }
-                }
-            }
-
-            let (ch, ch_len) = decode_utf8(&text[byte_idx..]);
-            byte_idx += ch_len;
-
-            if ch == '\n' || ch == '\r' {
-                continue;
-            }
-
-            // Use actual glyph width from the font instead of fixed char_w.
-            // This handles variable-width characters (icons, CJK) correctly.
-            let advance = {
-                let cp = ch as u32;
-                if cp < 128 {
-                    // ASCII: use cached width via text_extents()
-                    let cache_key = (face_id, line_face.font_size);
-                    if !self.ascii_width_cache.contains_key(&cache_key) {
-                        let mut widths = [0.0f32; 128];
-                        neomacs_layout_fill_ascii_widths(
-                            window,
-                            face_id as std::os::raw::c_int,
-                            widths.as_mut_ptr(),
-                        );
-                        for w in widths.iter_mut() {
-                            if *w < 0.0 {
-                                *w = char_w;
-                            }
-                        }
-                        self.ascii_width_cache.insert(cache_key, widths);
-                    }
-                    self.ascii_width_cache[&cache_key][cp as usize]
-                } else {
-                    // Non-ASCII: query individually
-                    let w = neomacs_layout_char_width(
-                        window,
-                        cp as std::os::raw::c_int,
-                        face_id as std::os::raw::c_int,
-                    );
-                    if w > 0.0 { w } else { char_w }
-                }
-            };
-
-            let gx = x + sl_x_offset;
-            frame_glyphs.add_char(ch, gx, text_y, advance, height, ascent, true);
-            sl_x_offset += advance;
-        }
-
-        // Restore default mode-line face
-        frame_glyphs.set_face(
-            line_face.face_id,
-            default_fg,
-            Some(bg),
-            400,
-            false,
-            0,
-            None,
-            0,
-            None,
-            0,
-            None,
-        );
-
-        // Fill remaining with background
-        if sl_x_offset < width {
-            let gx = x + sl_x_offset;
-            let remaining = width - sl_x_offset;
-            Self::add_stretch_for_face(
-                &line_face,
-                frame_glyphs,
-                gx,
-                y,
-                remaining,
-                height,
-                bg,
-                line_face.face_id,
-                true,
-            );
-        }
-
-        // Box borders are rendered by the renderer's box span detection
-        // (supports both sharp and SDF rounded corners).
+        let spec = self
+            .build_ffi_status_line_spec(x, y, width, height, window_id, char_w, ascent, wp, kind);
+        self.render_status_line_spec(&spec, Some(frame), frame_glyphs);
     }
 }
 
@@ -1067,7 +1308,6 @@ mod tests {
 
     #[test]
     fn parse_many_runs() {
-        let text = b"";
         let text_len = 0;
         let n = 100;
 
@@ -1160,5 +1400,75 @@ mod tests {
         // Already at last run, byte_idx well past it
         let cr = apply_overlay_face_run(&runs, 100, 1, &mut fgb);
         assert_eq!(cr, 1);
+    }
+
+    #[test]
+    fn render_rust_status_line_plain_sets_mode_line_draw_context() {
+        let mut engine = LayoutEngine::new();
+        let mut fgb = FrameGlyphBuffer::with_size(320.0, 200.0);
+        let mut face = ResolvedFace::default();
+        face.bg = 0x00C0C0C0;
+        face.font_family = "monospace".to_string();
+        face.font_size = 14.0;
+        face.font_char_width = 8.0;
+        face.font_ascent = 12.0;
+
+        let clip_rect = Rect::new(10.0, 150.0, 200.0, 16.0);
+        engine.render_rust_status_line_plain(
+            clip_rect.x,
+            clip_rect.y,
+            clip_rect.width,
+            clip_rect.height,
+            42,
+            8.0,
+            12.0,
+            7,
+            &face,
+            " *scratch* ".to_string(),
+            &mut fgb,
+            StatusLineKind::ModeLine,
+        );
+
+        assert!(!fgb.glyphs.is_empty());
+
+        let mut saw_mode_line_stretch = false;
+        let mut saw_mode_line_char = false;
+        for glyph in &fgb.glyphs {
+            match glyph {
+                FrameGlyph::Stretch {
+                    window_id,
+                    row_role,
+                    clip_rect: glyph_clip,
+                    face_id,
+                    ..
+                } => {
+                    assert_eq!(*window_id, 42);
+                    assert_eq!(*row_role, GlyphRowRole::ModeLine);
+                    assert_eq!(*glyph_clip, Some(clip_rect));
+                    assert_eq!(*face_id, 7);
+                    saw_mode_line_stretch = true;
+                }
+                FrameGlyph::Char {
+                    window_id,
+                    row_role,
+                    clip_rect: glyph_clip,
+                    face_id,
+                    ..
+                } => {
+                    assert_eq!(*window_id, 42);
+                    assert_eq!(*row_role, GlyphRowRole::ModeLine);
+                    assert_eq!(*glyph_clip, Some(clip_rect));
+                    assert_eq!(*face_id, 7);
+                    saw_mode_line_char = true;
+                }
+                _ => {}
+            }
+        }
+
+        assert!(
+            saw_mode_line_stretch,
+            "status-line background stretch missing"
+        );
+        assert!(saw_mode_line_char, "status-line text glyphs missing");
     }
 }

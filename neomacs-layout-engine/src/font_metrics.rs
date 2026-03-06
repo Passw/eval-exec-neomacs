@@ -807,7 +807,13 @@ mod tests {
         let mut buffer = Buffer::new(font_system, metrics);
         buffer.set_size(font_system, Some(font_size * 8.0), Some(font_size * 3.0));
         let text = String::from(ch);
-        buffer.set_text(font_system, &text, attrs, cosmic_text::Shaping::Advanced);
+        buffer.set_text(
+            font_system,
+            &text,
+            &attrs,
+            cosmic_text::Shaping::Advanced,
+            None,
+        );
         buffer.shape_until_scroll(font_system, false);
         for run in buffer.layout_runs() {
             for glyph in run.glyphs.iter() {
@@ -1054,7 +1060,7 @@ mod tests {
             // Small buffer (font_size * 4.0) — as in FontMetricsService
             let mut buf_small = Buffer::new(&mut fs, metrics);
             buf_small.set_size(&mut fs, Some(font_size * 4.0), Some(font_size * 2.0));
-            buf_small.set_text(&mut fs, &text, attrs, cosmic_text::Shaping::Advanced);
+            buf_small.set_text(&mut fs, &text, &attrs, cosmic_text::Shaping::Advanced, None);
             buf_small.shape_until_scroll(&mut fs, false);
             let w_small = buf_small
                 .layout_runs()
@@ -1066,7 +1072,7 @@ mod tests {
             // Large buffer (font_size * 8.0) — as in rasterize_text()
             let mut buf_large = Buffer::new(&mut fs, metrics);
             buf_large.set_size(&mut fs, Some(font_size * 8.0), Some(font_size * 3.0));
-            buf_large.set_text(&mut fs, &text, attrs, cosmic_text::Shaping::Advanced);
+            buf_large.set_text(&mut fs, &text, &attrs, cosmic_text::Shaping::Advanced, None);
             buf_large.shape_until_scroll(&mut fs, false);
             let w_large = buf_large
                 .layout_runs()

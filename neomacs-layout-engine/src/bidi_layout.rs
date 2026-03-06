@@ -257,6 +257,7 @@ pub fn reorder_row_bidi(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use neomacs_display_protocol::frame_glyphs::{CursorStyle, GlyphRowRole};
     use neomacs_display_protocol::types::Color;
 
     /// Helper to create a minimal Char glyph for testing.
@@ -264,6 +265,9 @@ mod tests {
         let y = 0.0;
         let ascent = 12.0;
         FrameGlyph::Char {
+            window_id: 0,
+            row_role: GlyphRowRole::Text,
+            clip_rect: None,
             char: ch,
             composed: None,
             x,
@@ -285,7 +289,6 @@ mod tests {
             overline: 0,
             overline_color: None,
             overstrike: false,
-            is_overlay: false,
         }
     }
 
@@ -418,13 +421,15 @@ mod tests {
         // Add a stretch glyph between chars
         buf.glyphs.push(make_char_glyph('H', 0.0, 8.0));
         buf.glyphs.push(FrameGlyph::Stretch {
+            window_id: 0,
+            row_role: GlyphRowRole::Text,
+            clip_rect: None,
             x: 8.0,
             y: 0.0,
             width: 16.0,
             height: 16.0,
             bg: Color::new(0.0, 0.0, 0.0, 1.0),
             face_id: 0,
-            is_overlay: false,
             stipple_id: 0,
             stipple_fg: None,
         });
@@ -943,13 +948,15 @@ mod tests {
         let mut buf = FrameGlyphBuffer::default();
         buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0)); // Alef
         buf.glyphs.push(FrameGlyph::Stretch {
+            window_id: 0,
+            row_role: GlyphRowRole::Text,
+            clip_rect: None,
             x: 8.0,
             y: 0.0,
             width: 4.0,
             height: 16.0,
             bg: Color::new(0.0, 0.0, 0.0, 1.0),
             face_id: 0,
-            is_overlay: false,
             stipple_id: 0,
             stipple_fg: None,
         });
@@ -976,24 +983,28 @@ mod tests {
     fn test_only_stretch_glyphs_no_panic() {
         let mut buf = FrameGlyphBuffer::default();
         buf.glyphs.push(FrameGlyph::Stretch {
+            window_id: 0,
+            row_role: GlyphRowRole::Text,
+            clip_rect: None,
             x: 0.0,
             y: 0.0,
             width: 100.0,
             height: 16.0,
             bg: Color::new(0.0, 0.0, 0.0, 1.0),
             face_id: 0,
-            is_overlay: false,
             stipple_id: 0,
             stipple_fg: None,
         });
         buf.glyphs.push(FrameGlyph::Stretch {
+            window_id: 0,
+            row_role: GlyphRowRole::Text,
+            clip_rect: None,
             x: 100.0,
             y: 0.0,
             width: 100.0,
             height: 16.0,
             bg: Color::new(0.0, 0.0, 0.0, 1.0),
             face_id: 0,
-            is_overlay: false,
             stipple_id: 0,
             stipple_fg: None,
         });
