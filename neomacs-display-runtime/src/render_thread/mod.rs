@@ -3,6 +3,7 @@
 //! Owns winit event loop, wgpu, GLib/WebKit. Runs at native VSync.
 
 mod app_handler;
+mod asset_commands;
 mod bootstrap;
 pub(crate) mod child_frames;
 mod command_processing;
@@ -18,10 +19,13 @@ mod pointer_events;
 mod render_pass;
 mod state;
 mod surface_readback;
+mod terminal_commands;
 #[cfg(test)]
 mod tests;
 mod thread_handle;
 mod transitions;
+mod ui_commands;
+mod window_commands;
 mod window_events;
 
 pub(crate) use bootstrap::run_render_loop;
