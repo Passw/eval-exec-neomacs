@@ -1,4 +1,18 @@
-use super::*;
+use super::{RenderApp, SharedImageDimensions, SharedMonitorInfo, surface_readback};
+use crate::thread_comm::{InputEvent, RenderComms};
+use neomacs_renderer_wgpu::{WgpuGlyphAtlas, WgpuRenderer};
+use std::sync::Arc;
+use winit::event_loop::{ControlFlow, EventLoop};
+#[cfg(target_os = "linux")]
+use winit::platform::wayland::EventLoopBuilderExtWayland;
+#[cfg(target_os = "linux")]
+use winit::platform::x11::EventLoopBuilderExtX11;
+use winit::window::Window;
+
+#[cfg(feature = "wpe-webkit")]
+use crate::backend::wpe::WpeBackend;
+#[cfg(all(feature = "wpe-webkit", wpe_platform_available))]
+use crate::backend::wpe::sys::platform as plat;
 
 impl RenderApp {
     /// Initialize wgpu with the window

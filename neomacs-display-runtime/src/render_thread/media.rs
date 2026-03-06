@@ -1,4 +1,13 @@
-use super::*;
+use super::RenderApp;
+use crate::core::frame_glyphs::{FrameGlyph, GlyphRowRole};
+use crate::thread_comm::InputEvent;
+
+#[cfg(all(feature = "wpe-webkit", wpe_platform_available))]
+use crate::backend::wpe::sys::platform as plat;
+#[cfg(feature = "wpe-webkit")]
+use crate::render_thread::state::WebKitImportPolicy;
+#[cfg(all(feature = "wpe-webkit", target_os = "linux"))]
+use neomacs_renderer_wgpu::WgpuRenderer;
 
 impl RenderApp {
     #[cfg(all(feature = "wpe-webkit", wpe_platform_available))]

@@ -1,4 +1,7 @@
-use super::*;
+use super::{ImeCursorArea, RenderApp};
+use crate::core::frame_glyphs::FrameGlyph;
+use crate::render_thread::cursor::CursorTarget;
+use winit::dpi::{PhysicalPosition, PhysicalSize};
 
 impl RenderApp {
     /// Compute physical IME cursor rectangle for the current cursor target.
@@ -38,8 +41,8 @@ impl RenderApp {
         }
 
         window.set_ime_cursor_area(
-            winit::dpi::PhysicalPosition::new(area.x as f64, area.y as f64),
-            winit::dpi::PhysicalSize::new(area.width as f64, area.height as f64),
+            PhysicalPosition::new(area.x as f64, area.y as f64),
+            PhysicalSize::new(area.width as f64, area.height as f64),
         );
         self.last_ime_cursor_area = Some(area);
     }
@@ -55,7 +58,7 @@ impl RenderApp {
             .map(|f| {
                 f.glyphs
                     .iter()
-                    .any(|g| matches!(g, crate::core::frame_glyphs::FrameGlyph::Cursor { .. }))
+                    .any(|g| matches!(g, FrameGlyph::Cursor { .. }))
             })
             .unwrap_or(false);
         if !has_cursor {

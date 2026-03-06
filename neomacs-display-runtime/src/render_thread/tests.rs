@@ -1,4 +1,4 @@
-use super::*;
+use super::RenderApp;
 use crate::thread_comm::ThreadComms;
 use winit::keyboard::{Key, NamedKey};
 
