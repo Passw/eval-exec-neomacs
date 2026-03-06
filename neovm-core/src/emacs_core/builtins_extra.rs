@@ -12,6 +12,8 @@
 use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::{Value, read_cons, with_heap};
+#[cfg(unix)]
+use std::ffi::CStr;
 use std::fs;
 
 // ---------------------------------------------------------------------------
@@ -789,6 +791,69 @@ pub(crate) fn builtin_system_name(args: Vec<Value>) -> EvalResult {
     expect_args("system-name", &args, 0)?;
     let name = std::env::var("HOSTNAME").unwrap_or_else(|_| "localhost".to_string());
     Ok(Value::string(name))
+}
+
+pub(crate) fn operating_system_release_value() -> Value {
+    operating_system_release()
+        .map(Value::string)
+        .unwrap_or(Value::Nil)
+}
+
+pub(crate) fn system_configuration_value() -> Value {
+    Value::string(
+        option_env!("TARGET")
+            .map(str::to_owned)
+            .unwrap_or_else(fallback_system_configuration),
+    )
+}
+
+pub(crate) fn system_configuration_options_value() -> Value {
+    Value::string("")
+}
+
+pub(crate) fn system_configuration_features_value() -> Value {
+    let mut features = vec!["PDUMPER".to_string(), "THREADS".to_string()];
+    features.sort_unstable();
+    features.dedup();
+    Value::string(features.join(" "))
+}
+
+fn fallback_system_configuration() -> String {
+    let arch = std::env::consts::ARCH;
+    let os = match std::env::consts::OS {
+        "linux" => "unknown-linux-gnu",
+        "macos" => "apple-darwin",
+        "windows" => "pc-windows-msvc",
+        other => other,
+    };
+    format!("{arch}-{os}")
+}
+
+fn operating_system_release() -> Option<String> {
+    #[cfg(unix)]
+    {
+        let mut utsname = std::mem::MaybeUninit::<libc::utsname>::uninit();
+        // SAFETY: uname writes a fully initialized utsname struct on success.
+        let release = unsafe {
+            if libc::uname(utsname.as_mut_ptr()) != 0 {
+                return None;
+            }
+            let utsname = utsname.assume_init();
+            CStr::from_ptr(utsname.release.as_ptr())
+                .to_string_lossy()
+                .trim()
+                .to_string()
+        };
+        if release.is_empty() {
+            None
+        } else {
+            Some(release)
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        None
+    }
 }
 
 /// `(emacs-version)` -> string.

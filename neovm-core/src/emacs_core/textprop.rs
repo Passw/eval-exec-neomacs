@@ -84,6 +84,19 @@ fn expect_symbol_name(value: &Value) -> Result<String, Flow> {
     }
 }
 
+pub fn register_bootstrap_vars(obarray: &mut crate::emacs_core::symbol::Obarray) {
+    obarray.set_symbol_value("default-text-properties", Value::Nil);
+    obarray.set_symbol_value("char-property-alias-alist", Value::Nil);
+    obarray.set_symbol_value("inhibit-point-motion-hooks", Value::True);
+    obarray.set_symbol_value(
+        "text-property-default-nonsticky",
+        Value::list(vec![
+            Value::cons(Value::symbol("syntax-table"), Value::True),
+            Value::cons(Value::symbol("display"), Value::True),
+        ]),
+    );
+}
+
 /// Convert a 1-based Elisp char position to a 0-based byte position,
 /// clamping within the buffer.
 fn elisp_pos_to_byte(buf: &crate::buffer::buffer::Buffer, pos: i64) -> usize {

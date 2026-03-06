@@ -5,7 +5,7 @@ use super::eval::{quote_to_value, value_to_expr};
 use super::expr::Expr;
 use super::expr::print_expr;
 use super::intern::intern;
-use super::value::Value;
+use super::value::{HashTableTest, Value};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
@@ -1263,7 +1263,139 @@ pub fn register_bootstrap_vars(obarray: &mut super::symbol::Obarray) {
 
 /// Create an Evaluator with the full Emacs bootstrap loaded (like GNU
 /// Emacs's dumped state).  Mirrors the loadup.el boot sequence.
+fn normalized_bootstrap_features(extra_features: &[&str]) -> Vec<String> {
+    let mut features = extra_features
+        .iter()
+        .map(|feature| (*feature).to_string())
+        .filter(|feature| !feature.is_empty())
+        .collect::<Vec<_>>();
+    features.sort_unstable();
+    features.dedup();
+    features
+}
+
+const BOOTSTRAP_IMAGE_SCHEMA_VERSION: u32 = 2;
+
+fn bootstrap_dump_path(project_root: &Path, extra_features: &[&str]) -> PathBuf {
+    let features = normalized_bootstrap_features(extra_features);
+    let suffix = if features.is_empty() {
+        String::new()
+    } else {
+        format!("-{}", features.join("-"))
+    };
+    project_root.join("target").join(format!(
+        "neovm-bootstrap-v{BOOTSTRAP_IMAGE_SCHEMA_VERSION}{suffix}.pdump"
+    ))
+}
+
+fn ensure_startup_compat_variables(eval: &mut super::eval::Evaluator, project_root: &Path) {
+    let etc_dir = format!("{}/", project_root.join("etc").to_string_lossy());
+    let source_dir = format!("{}/", project_root.to_string_lossy());
+    let temporary_file_directory = std::env::temp_dir().to_string_lossy().to_string();
+    let path_separator = if cfg!(windows) { ";" } else { ":" };
+    let process_environment = Value::list(
+        std::env::vars()
+            .map(|(name, value)| Value::string(format!("{name}={value}")))
+            .collect::<Vec<_>>(),
+    );
+    let system_name = super::builtins_extra::builtin_system_name(vec![])
+        .unwrap_or_else(|_| Value::string("localhost"));
+    let user_full_name = super::builtins_extra::builtin_user_full_name(vec![])
+        .unwrap_or_else(|_| Value::string("unknown"));
+    let user_login_name = super::builtins_extra::builtin_user_login_name(vec![])
+        .unwrap_or_else(|_| Value::string("unknown"));
+    let user_real_login_name = super::builtins_extra::builtin_user_real_login_name(vec![])
+        .unwrap_or_else(|_| Value::string("unknown"));
+    let system_configuration = super::builtins_extra::system_configuration_value();
+    let system_configuration_options = super::builtins_extra::system_configuration_options_value();
+    let system_configuration_features =
+        super::builtins_extra::system_configuration_features_value();
+    let operating_system_release = super::builtins_extra::operating_system_release_value();
+    let defaults = [
+        ("data-directory", Value::string(etc_dir.clone())),
+        ("doc-directory", Value::string(etc_dir)),
+        ("source-directory", Value::string(source_dir.clone())),
+        ("installation-directory", Value::string(source_dir)),
+        ("exec-directory", Value::Nil),
+        ("configure-info-directory", Value::Nil),
+        ("charset-map-path", Value::Nil),
+        ("initial-environment", process_environment.clone()),
+        ("process-environment", process_environment),
+        ("path-separator", Value::string(path_separator)),
+        ("file-name-coding-system", Value::Nil),
+        ("default-file-name-coding-system", Value::Nil),
+        ("set-auto-coding-function", Value::Nil),
+        ("after-insert-file-functions", Value::Nil),
+        ("write-region-annotate-functions", Value::Nil),
+        ("write-region-post-annotation-function", Value::Nil),
+        ("write-region-annotations-so-far", Value::Nil),
+        ("inhibit-file-name-handlers", Value::Nil),
+        ("inhibit-file-name-operation", Value::Nil),
+        (
+            "temporary-file-directory",
+            Value::string(temporary_file_directory),
+        ),
+        ("create-lockfiles", Value::True),
+        ("auto-save-list-file-name", Value::Nil),
+        ("auto-save-list-file-prefix", Value::Nil),
+        ("auto-save-visited-file-name", Value::Nil),
+        ("auto-save-include-big-deletions", Value::Nil),
+        ("shared-game-score-directory", Value::Nil),
+        ("invocation-name", Value::Nil),
+        ("invocation-directory", Value::Nil),
+        ("system-messages-locale", Value::Nil),
+        ("system-time-locale", Value::Nil),
+        ("before-init-time", Value::Nil),
+        ("after-init-time", Value::Nil),
+        ("system-configuration", system_configuration),
+        ("system-configuration-options", system_configuration_options),
+        (
+            "system-configuration-features",
+            system_configuration_features,
+        ),
+        ("system-name", system_name),
+        ("user-full-name", user_full_name),
+        ("user-login-name", user_login_name),
+        ("user-real-login-name", user_real_login_name),
+        ("operating-system-release", operating_system_release),
+        ("delayed-warnings-list", Value::Nil),
+        ("default-text-properties", Value::Nil),
+        ("char-property-alias-alist", Value::Nil),
+        ("inhibit-point-motion-hooks", Value::True),
+        (
+            "text-property-default-nonsticky",
+            Value::list(vec![
+                Value::cons(Value::symbol("syntax-table"), Value::True),
+                Value::cons(Value::symbol("display"), Value::True),
+            ]),
+        ),
+        ("face-filters-always-match", Value::Nil),
+        (
+            "face--new-frame-defaults",
+            Value::hash_table(HashTableTest::Eq),
+        ),
+        ("face-default-stipple", Value::string("gray3")),
+        ("scalable-fonts-allowed", Value::Nil),
+        ("face-ignored-fonts", Value::Nil),
+        ("face-remapping-alist", Value::Nil),
+        ("face-font-rescale-alist", Value::Nil),
+        ("face-near-same-color-threshold", Value::Int(30_000)),
+        ("face-font-lax-matched-attributes", Value::True),
+    ];
+    for (name, value) in defaults {
+        if eval.obarray().symbol_value(name).is_none() {
+            eval.set_variable(name, value);
+        }
+    }
+}
+
 pub fn create_bootstrap_evaluator() -> Result<super::eval::Evaluator, EvalError> {
+    create_bootstrap_evaluator_with_features(&[])
+}
+
+pub fn create_bootstrap_evaluator_with_features(
+    extra_features: &[&str],
+) -> Result<super::eval::Evaluator, EvalError> {
     // Discover the project root (contains lisp/ directory).
     let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let project_root = manifest.parent().expect("project root");
@@ -1275,6 +1407,9 @@ pub fn create_bootstrap_evaluator() -> Result<super::eval::Evaluator, EvalError>
     );
 
     let mut eval = super::eval::Evaluator::new();
+    for feature in normalized_bootstrap_features(extra_features) {
+        let _ = eval.provide_value(Value::symbol(&feature), None);
+    }
 
     // Set up load-path with lisp/ and its subdirectories.
     let subdirs = [
@@ -1619,16 +1754,24 @@ pub fn create_bootstrap_evaluator() -> Result<super::eval::Evaluator, EvalError>
 /// The dump file is automatically invalidated when the pdump format
 /// version changes. Set `NEOVM_DISABLE_PDUMP=1` to force fresh bootstrap.
 pub fn create_bootstrap_evaluator_cached() -> Result<super::eval::Evaluator, EvalError> {
-    use super::pdump;
+    create_bootstrap_evaluator_cached_with_features(&[])
+}
 
-    // Allow disabling pdump via env var
-    if std::env::var("NEOVM_DISABLE_PDUMP").unwrap_or_default() == "1" {
-        return create_bootstrap_evaluator();
-    }
+pub fn create_bootstrap_evaluator_cached_with_features(
+    extra_features: &[&str],
+) -> Result<super::eval::Evaluator, EvalError> {
+    use super::pdump;
 
     let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let project_root = manifest.parent().expect("project root");
-    let dump_path = project_root.join("target").join("neovm-bootstrap.pdump");
+
+    // Allow disabling pdump via env var
+    if std::env::var("NEOVM_DISABLE_PDUMP").unwrap_or_default() == "1" {
+        let mut eval = create_bootstrap_evaluator_with_features(extra_features)?;
+        ensure_startup_compat_variables(&mut eval, project_root);
+        return Ok(eval);
+    }
+    let dump_path = bootstrap_dump_path(project_root, extra_features);
 
     // Try loading from dump first
     if dump_path.exists() {
@@ -1640,6 +1783,7 @@ pub fn create_bootstrap_evaluator_cached() -> Result<super::eval::Evaluator, Eva
                     dump_path.display(),
                     start.elapsed()
                 );
+                ensure_startup_compat_variables(&mut eval, project_root);
                 // Re-set load-path since it contains absolute paths that may differ
                 let lisp_dir = project_root.join("lisp");
                 let subdirs = [
@@ -1684,7 +1828,8 @@ pub fn create_bootstrap_evaluator_cached() -> Result<super::eval::Evaluator, Eva
 
     // Full bootstrap
     let start = std::time::Instant::now();
-    let eval = create_bootstrap_evaluator()?;
+    let mut eval = create_bootstrap_evaluator_with_features(extra_features)?;
+    ensure_startup_compat_variables(&mut eval, project_root);
     let bootstrap_time = start.elapsed();
 
     // Save dump for next time

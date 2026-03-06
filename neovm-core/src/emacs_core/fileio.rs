@@ -3552,14 +3552,30 @@ pub(crate) fn builtin_find_file_noselect(
 // ===========================================================================
 
 pub fn register_bootstrap_vars(obarray: &mut crate::emacs_core::symbol::Obarray) {
+    let temporary_file_directory = std::env::temp_dir().to_string_lossy().to_string();
+    obarray.set_symbol_value("file-name-coding-system", Value::Nil);
+    obarray.set_symbol_value("default-file-name-coding-system", Value::Nil);
     obarray.set_symbol_value("file-name-handler-alist", Value::Nil);
+    obarray.set_symbol_value("set-auto-coding-function", Value::Nil);
+    obarray.set_symbol_value("after-insert-file-functions", Value::Nil);
+    obarray.set_symbol_value("write-region-annotate-functions", Value::Nil);
+    obarray.set_symbol_value("write-region-post-annotation-function", Value::Nil);
+    obarray.set_symbol_value("write-region-annotations-so-far", Value::Nil);
+    obarray.set_symbol_value("inhibit-file-name-handlers", Value::Nil);
+    obarray.set_symbol_value("inhibit-file-name-operation", Value::Nil);
     obarray.set_symbol_value("directory-abbrev-alist", Value::Nil);
+    obarray.set_symbol_value("auto-save-list-file-name", Value::Nil);
     obarray.set_symbol_value("auto-save-list-file-prefix", Value::Nil);
     obarray.set_symbol_value("auto-save-visited-file-name", Value::Nil);
     obarray.set_symbol_value("auto-save-include-big-deletions", Value::Nil);
     obarray.set_symbol_value("write-region-inhibit-fsync", Value::Nil);
     obarray.set_symbol_value("delete-by-moving-to-trash", Value::Nil);
     obarray.set_symbol_value("auto-save-file-name-transforms", Value::Nil);
+    obarray.set_symbol_value(
+        "temporary-file-directory",
+        Value::string(temporary_file_directory),
+    );
+    obarray.set_symbol_value("create-lockfiles", Value::True);
     // files.el: defvar for vc-hooks.el and locate-dominating-file
     obarray.set_symbol_value(
         "locate-dominating-stop-dir-regexp",

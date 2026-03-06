@@ -283,6 +283,12 @@ fn user_info() {
     assert!(builtin_user_real_login_name(vec![]).unwrap().is_string());
     assert!(builtin_user_full_name(vec![]).unwrap().is_string());
     assert!(builtin_system_name(vec![]).unwrap().is_string());
+    assert!(system_configuration_value().is_string());
+    assert!(system_configuration_options_value().is_string());
+    assert!(system_configuration_features_value().is_string());
+    assert!(
+        operating_system_release_value().is_nil() || operating_system_release_value().is_string()
+    );
     assert!(builtin_emacs_version(vec![]).unwrap().is_string());
 }
 

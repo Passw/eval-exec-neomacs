@@ -1,8 +1,9 @@
 use super::*;
 use crate::emacs_core::expr::Expr;
 use crate::emacs_core::intern::{intern, resolve_sym};
-use crate::emacs_core::value::Value;
+use crate::emacs_core::value::{HashTableTest, Value, with_heap};
 use std::fs;
+use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 struct CacheWriteFailGuard;
@@ -261,6 +262,91 @@ fn load_file_records_load_history() {
     );
 
     let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn ensure_startup_compat_variables_backfills_xfaces_bootstrap_state() {
+    let mut eval = super::super::eval::Evaluator::new();
+    for name in [
+        "face-filters-always-match",
+        "face--new-frame-defaults",
+        "face-default-stipple",
+        "scalable-fonts-allowed",
+        "face-ignored-fonts",
+        "face-remapping-alist",
+        "face-font-rescale-alist",
+        "face-near-same-color-threshold",
+        "face-font-lax-matched-attributes",
+        "system-configuration",
+        "system-configuration-options",
+        "system-configuration-features",
+        "operating-system-release",
+        "delayed-warnings-list",
+    ] {
+        eval.obarray_mut().makunbound(name);
+    }
+
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest.parent().expect("project root");
+    ensure_startup_compat_variables(&mut eval, project_root);
+
+    assert_eq!(
+        eval.obarray().symbol_value("face-default-stipple").copied(),
+        Some(Value::string("gray3"))
+    );
+    assert_eq!(
+        eval.obarray()
+            .symbol_value("face-near-same-color-threshold")
+            .copied(),
+        Some(Value::Int(30_000))
+    );
+    assert_eq!(
+        eval.obarray()
+            .symbol_value("face-font-lax-matched-attributes")
+            .copied(),
+        Some(Value::True)
+    );
+    assert!(
+        eval.obarray()
+            .symbol_value("system-configuration")
+            .is_some_and(Value::is_string),
+        "system-configuration should be backfilled to a string"
+    );
+    assert!(
+        eval.obarray()
+            .symbol_value("system-configuration-options")
+            .is_some_and(Value::is_string),
+        "system-configuration-options should be backfilled to a string"
+    );
+    assert!(
+        eval.obarray()
+            .symbol_value("system-configuration-features")
+            .is_some_and(Value::is_string),
+        "system-configuration-features should be backfilled to a string"
+    );
+    assert!(
+        eval.obarray()
+            .symbol_value("operating-system-release")
+            .is_some_and(|value| value.is_nil() || value.is_string()),
+        "operating-system-release should be backfilled to nil or a string"
+    );
+    assert_eq!(
+        eval.obarray()
+            .symbol_value("delayed-warnings-list")
+            .copied(),
+        Some(Value::Nil)
+    );
+
+    let table = eval
+        .obarray()
+        .symbol_value("face--new-frame-defaults")
+        .copied()
+        .expect("face hash table backfilled");
+    let Value::HashTable(id) = table else {
+        panic!("face--new-frame-defaults must be a hash table");
+    };
+    let test = with_heap(|heap| heap.get_hash_table(id).test.clone());
+    assert_eq!(test, HashTableTest::Eq);
 }
 
 #[test]
@@ -800,6 +886,21 @@ fn neovm_loadup_bootstrap() {
     assert!(
         integer_pred.is_some_and(|v| !v.is_nil()),
         "expected integer cl-deftype-satisfies property to be non-nil, got {integer_pred:?}"
+    );
+
+    let compat_probe = crate::emacs_core::parser::parse_forms(
+        "(list (coding-system-p 'iso-8859-15) (stringp system-configuration-features))",
+    )
+    .expect("parse startup compatibility probe");
+    let compat_result = eval
+        .eval_expr(&compat_probe[0])
+        .expect("evaluate startup compatibility probe");
+    let compat_items =
+        crate::emacs_core::value::list_to_vec(&compat_result).expect("compat probe result list");
+    assert_eq!(
+        compat_items,
+        vec![Value::True, Value::True],
+        "expected iso-8859-15 and system-configuration-features to be available, got {compat_result}"
     );
 }
 

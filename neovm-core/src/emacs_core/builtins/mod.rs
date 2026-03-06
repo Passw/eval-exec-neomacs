@@ -108,6 +108,7 @@ pub(super) fn expect_fixnum(value: &Value) -> Result<i64, Flow> {
 pub(super) fn expect_char_table_index(value: &Value) -> Result<i64, Flow> {
     let idx = expect_fixnum(value)?;
     if !(0..=0x3F_FFFF).contains(&idx) {
+        maybe_trace_characterp_nil(value, "expect_char_table_index");
         return Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("characterp"), *value],
@@ -120,10 +121,13 @@ pub(super) fn expect_char_equal_code(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) if (0..=KEY_CHAR_CODE_MASK).contains(n) => Ok(*n),
         Value::Char(c) => Ok(*c as i64),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("characterp"), *other],
-        )),
+        other => {
+            maybe_trace_characterp_nil(other, "expect_char_equal_code");
+            Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("characterp"), *other],
+            ))
+        }
     }
 }
 
@@ -131,11 +135,27 @@ pub(super) fn expect_character_code(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Char(c) => Ok(*c as i64),
         Value::Int(n) if (0..=0x3FFFFF).contains(n) => Ok(*n),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("characterp"), *other],
-        )),
+        other => {
+            maybe_trace_characterp_nil(other, "expect_character_code");
+            Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("characterp"), *other],
+            ))
+        }
     }
+}
+
+fn maybe_trace_characterp_nil(value: &Value, source: &str) {
+    if !matches!(value, Value::Nil) {
+        return;
+    }
+    if std::env::var("NEOVM_TRACE_CHARACTERP_NIL").unwrap_or_default() != "1" {
+        return;
+    }
+    eprintln!(
+        "NEOVM_TRACE_CHARACTERP_NIL source={source}\n{}",
+        std::backtrace::Backtrace::force_capture()
+    );
 }
 
 pub(super) fn char_equal_folded(code: i64) -> Option<String> {
@@ -2303,6 +2323,16 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ));
         }
+        "x-open-connection" => {
+            return Some(super::display::builtin_x_open_connection_eval(eval, args));
+        }
+        "x-apply-session-resources" => {
+            return Some(super::display::builtin_x_apply_session_resources_eval(
+                eval, args,
+            ));
+        }
+        "x-get-resource" => return Some(super::display::builtin_x_get_resource_eval(eval, args)),
+        "x-list-fonts" => return Some(super::display::builtin_x_list_fonts_eval(eval, args)),
         "window-system" => return Some(super::display::builtin_window_system_eval(eval, args)),
         "frame-edges" => return Some(super::display::builtin_frame_edges_eval(eval, args)),
         "display-mm-width" => {

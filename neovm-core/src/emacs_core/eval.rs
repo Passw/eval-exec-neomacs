@@ -407,6 +407,41 @@ impl Evaluator {
         obarray.set_symbol_value("command-line-functions", Value::Nil);
         obarray.set_symbol_value("command-line-processed", Value::True);
         obarray.set_symbol_value("command-switch-alist", Value::Nil);
+        obarray.set_symbol_value("invocation-name", Value::Nil);
+        obarray.set_symbol_value("invocation-directory", Value::Nil);
+        obarray.set_symbol_value("installation-directory", Value::Nil);
+        obarray.set_symbol_value("configure-info-directory", Value::Nil);
+        obarray.set_symbol_value("charset-map-path", Value::Nil);
+        obarray.set_symbol_value("doc-directory", Value::Nil);
+        obarray.set_symbol_value("process-environment", Value::Nil);
+        obarray.set_symbol_value("initial-environment", Value::Nil);
+        obarray.set_symbol_value("path-separator", Value::string(":"));
+        obarray.set_symbol_value("shared-game-score-directory", Value::Nil);
+        obarray.set_symbol_value("system-messages-locale", Value::Nil);
+        obarray.set_symbol_value("system-time-locale", Value::Nil);
+        obarray.set_symbol_value("before-init-time", Value::Nil);
+        obarray.set_symbol_value("after-init-time", Value::Nil);
+        obarray.set_symbol_value(
+            "system-configuration",
+            super::builtins_extra::system_configuration_value(),
+        );
+        obarray.set_symbol_value(
+            "system-configuration-options",
+            super::builtins_extra::system_configuration_options_value(),
+        );
+        obarray.set_symbol_value(
+            "system-configuration-features",
+            super::builtins_extra::system_configuration_features_value(),
+        );
+        obarray.set_symbol_value("system-name", Value::string("localhost"));
+        obarray.set_symbol_value("user-full-name", Value::string("unknown"));
+        obarray.set_symbol_value("user-login-name", Value::string("unknown"));
+        obarray.set_symbol_value("user-real-login-name", Value::string("unknown"));
+        obarray.set_symbol_value(
+            "operating-system-release",
+            super::builtins_extra::operating_system_release_value(),
+        );
+        obarray.set_symbol_value("delayed-warnings-list", Value::Nil);
         obarray.set_symbol_value(
             "command-line-ns-option-alist",
             Value::list(vec![Value::list(vec![
@@ -979,7 +1014,6 @@ impl Evaluator {
         obarray.set_symbol_value("inhibit-load-charset-map", Value::Nil);
 
         // Terminal/display variables (C-level DEFVAR in official Emacs)
-        obarray.set_symbol_value("tty-defined-color-alist", Value::Nil);
         obarray.set_symbol_value("standard-display-table", Value::Nil);
         obarray.set_symbol_value(
             "image-load-path",
@@ -1010,6 +1044,8 @@ impl Evaluator {
         super::composite::register_bootstrap_vars(&mut obarray);
         super::coding::register_bootstrap_vars(&mut obarray);
         super::xdisp::register_bootstrap_vars(&mut obarray);
+        super::textprop::register_bootstrap_vars(&mut obarray);
+        super::xfaces::register_bootstrap_vars(&mut obarray);
         super::frame_vars::register_bootstrap_vars(&mut obarray);
         super::buffer_vars::register_bootstrap_vars(&mut obarray);
 

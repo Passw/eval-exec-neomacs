@@ -3487,7 +3487,18 @@ pub(crate) fn builtin_internal_track_mouse(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_internal_char_font(args: Vec<Value>) -> EvalResult {
     expect_range_args("internal-char-font", &args, 1, 2)?;
-    let _ = expect_character_code(&args[0])?;
+    let position = &args[0];
+    let ch = args.get(1).copied().unwrap_or(Value::Nil);
+
+    if position.is_nil() {
+        let _ = expect_character_code(&ch)?;
+        return Ok(Value::Nil);
+    }
+
+    let _ = expect_integer_or_marker(position)?;
+    if !ch.is_nil() {
+        let _ = expect_character_code(&ch)?;
+    }
     Ok(Value::Nil)
 }
 

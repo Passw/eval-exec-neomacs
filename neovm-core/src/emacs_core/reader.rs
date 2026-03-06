@@ -1112,9 +1112,10 @@ pub(crate) fn builtin_set_input_interrupt_mode(
 
 /// `(set-input-meta-mode META)`
 ///
-/// Batch-compatible behavior: accepts one argument and returns nil.
+/// Batch-compatible behavior: accepts GNU-compatible optional TERMINAL and returns nil.
 pub(crate) fn builtin_set_input_meta_mode(args: Vec<Value>) -> EvalResult {
-    expect_args("set-input-meta-mode", &args, 1)?;
+    expect_min_args("set-input-meta-mode", &args, 1)?;
+    expect_max_args("set-input-meta-mode", &args, 2)?;
     Ok(Value::Nil)
 }
 

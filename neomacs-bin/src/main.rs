@@ -9,7 +9,7 @@
 //! No C code is involved.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 
@@ -26,6 +26,9 @@ use neomacs_display_runtime::thread_comm::ThreadComms;
 use neovm_core::buffer::BufferId;
 use neovm_core::emacs_core::Evaluator;
 use neovm_core::emacs_core::Value;
+use neovm_core::emacs_core::error::EvalError;
+use neovm_core::emacs_core::intern::resolve_sym;
+use neovm_core::emacs_core::print_value_with_eval;
 use neovm_core::window::{SplitDirection, Window, WindowId};
 
 // Modifier bitmask constants (must match neomacs_display.h / thread_comm.rs)
@@ -247,8 +250,9 @@ fn main() {
     );
 
     // 1. Initialize the evaluator from the canonical core bootstrap.
-    let mut evaluator = neovm_core::emacs_core::load::create_bootstrap_evaluator_cached()
-        .expect("core bootstrap should succeed");
+    let mut evaluator =
+        neovm_core::emacs_core::load::create_bootstrap_evaluator_cached_with_features(&["neomacs"])
+            .expect("core bootstrap should succeed");
     evaluator.setup_thread_locals();
     // Release-mode stack frames are smaller than debug-mode, so we can
     // safely raise the eval recursion limit above the test-safe default.
@@ -256,59 +260,22 @@ fn main() {
     evaluator.set_variable("dump-mode", Value::Nil);
     tracing::info!("Evaluator initialized");
 
-    // 2. Parse command-line arguments
-    let args = parse_args();
-
-    // 3. Bootstrap: create *scratch*, *Messages*, *Minibuf-0* buffers
+    // 2. Bootstrap the host-side initial frame/buffers.
     let width: u32 = 960;
     let height: u32 = 640;
     let bootstrap = bootstrap_buffers(&mut evaluator, width, height);
     let scratch_id = bootstrap.scratch_id;
+    let frame_id = evaluator
+        .frame_manager()
+        .selected_frame()
+        .expect("No selected frame after bootstrap")
+        .id;
+    configure_gnu_startup_state(&mut evaluator, frame_id);
+    maybe_install_startup_phase_trace(&mut evaluator);
+    run_gnu_startup(&mut evaluator);
+    tracing::info!("GNU startup complete: *scratch* buffer={:?}", scratch_id);
 
-    // Set a useful mode-line-format with %-constructs
-    // %* = modified indicator, %b = buffer name, %l = line, %c = column
-    evaluator.set_variable(
-        "mode-line-format",
-        Value::string(" %*%+ %b   L%l C%c   %f "),
-    );
-
-    tracing::info!("Bootstrap complete: *scratch* buffer={:?}", scratch_id);
-
-    // 4. Load Elisp files specified on the command line
-    for load_item in &args.load {
-        match load_item {
-            LoadItem::File(path) => {
-                tracing::info!("Loading Elisp file: {}", path.display());
-                evaluator.setup_thread_locals();
-                match neovm_core::emacs_core::load::load_file(&mut evaluator, path) {
-                    Ok(_) => tracing::info!("  Loaded: {}", path.display()),
-                    Err(e) => tracing::error!("  Error loading {}: {:?}", path.display(), e),
-                }
-            }
-            LoadItem::Eval(expr) => {
-                tracing::info!("Evaluating: {}", expr);
-                evaluator.setup_thread_locals();
-                match neovm_core::emacs_core::parse_forms(expr) {
-                    Ok(forms) => {
-                        for form in &forms {
-                            match evaluator.eval_expr(form) {
-                                Ok(val) => tracing::info!("  => {:?}", val),
-                                Err(e) => tracing::error!("  Error: {:?}", e),
-                            }
-                        }
-                    }
-                    Err(e) => tracing::error!("  Parse error: {}", e),
-                }
-            }
-        }
-    }
-
-    // Open files specified on the command line
-    for file_path in &args.files {
-        open_file(&mut evaluator, file_path, scratch_id);
-    }
-
-    // Add undo boundary after bootstrap so initial content isn't undoable
+    // Add undo boundary after startup so initial content isn't undoable
     if let Some(buf) = evaluator.buffer_manager_mut().current_buffer_mut() {
         buf.undo_list.boundary();
     }
@@ -336,12 +303,6 @@ fn main() {
     tracing::info!("Render thread spawned ({}x{})", width, height);
 
     // 6. Run initial layout and send first frame
-    let frame_id = evaluator
-        .frame_manager()
-        .selected_frame()
-        .expect("No selected frame after bootstrap")
-        .id;
-
     let mut frame_glyphs = FrameGlyphBuffer::with_size(width as f32, height as f32);
     run_layout(&mut evaluator, frame_id, &mut frame_glyphs);
     log_frame_glyph_summary("initial", &frame_glyphs);
@@ -633,6 +594,10 @@ fn bootstrap_buffers(eval: &mut Evaluator, width: u32, height: u32) -> Bootstrap
 
     // Set window positions (0-based for neovm-core)
     if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
+        frame
+            .parameters
+            .insert("window-system".to_string(), Value::symbol("neomacs"));
+        frame.title = "Neomacs".to_string();
         if let Window::Leaf {
             window_start,
             point,
@@ -677,6 +642,110 @@ fn bootstrap_buffers(eval: &mut Evaluator, width: u32, height: u32) -> Bootstrap
         scratch_id,
         minibuf_id: mini_id,
     }
+}
+
+fn configure_gnu_startup_state(eval: &mut Evaluator, frame_id: neovm_core::window::FrameId) {
+    let argv = std::env::args().map(Value::string).collect::<Vec<_>>();
+    let invocation_directory = std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(|parent| parent.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("/"));
+    let invocation_name = std::env::current_exe()
+        .ok()
+        .and_then(|path| {
+            path.file_name()
+                .map(|name| name.to_string_lossy().to_string())
+        })
+        .unwrap_or_else(|| "neomacs".to_string());
+    let invocation_directory = ensure_dir_string(&invocation_directory);
+
+    eval.set_variable("command-line-args", Value::list(argv));
+    eval.set_variable("command-line-args-left", Value::Nil);
+    eval.set_variable("command-line-processed", Value::Nil);
+    eval.set_variable("noninteractive", Value::Nil);
+    eval.set_variable("window-system", Value::symbol("neomacs"));
+    eval.set_variable("initial-window-system", Value::symbol("neomacs"));
+    eval.set_variable("invocation-name", Value::string(invocation_name));
+    eval.set_variable("invocation-directory", Value::string(invocation_directory));
+    eval.set_variable("frame-initial-frame", Value::Frame(frame_id.0));
+    eval.set_variable("default-minibuffer-frame", Value::Frame(frame_id.0));
+}
+
+fn run_gnu_startup(eval: &mut Evaluator) {
+    eval.setup_thread_locals();
+    let top_level = eval.obarray().symbol_value("top-level").cloned();
+    tracing::info!("top-level variable before startup: {:?}", top_level);
+    let forms =
+        neovm_core::emacs_core::parse_forms("(eval top-level)").expect("top-level form parses");
+    let result = match eval.eval_expr(&forms[0]) {
+        Ok(value) => value,
+        Err(EvalError::Signal { symbol, data }) => {
+            let decoded = data
+                .iter()
+                .map(|value| print_value_with_eval(eval, value))
+                .collect::<Vec<_>>();
+            let traced_phase = eval
+                .obarray()
+                .symbol_value("neomacs--startup-last-phase")
+                .cloned()
+                .map(|value| print_value_with_eval(eval, &value));
+            panic!(
+                "GNU-compatible top-level startup failed with {} {:?} (last phase: {:?})",
+                resolve_sym(symbol),
+                decoded,
+                traced_phase
+            );
+        }
+        Err(other) => panic!("GNU-compatible top-level startup should succeed: {other:?}"),
+    };
+    tracing::info!("top-level startup returned: {:?}", result);
+}
+
+fn maybe_install_startup_phase_trace(eval: &mut Evaluator) {
+    if std::env::var("NEOMACS_TRACE_STARTUP_PHASES").unwrap_or_default() != "1" {
+        return;
+    }
+    let source = r#"
+        (progn
+          (defvar neomacs--startup-last-phase nil)
+          (defun neomacs--startup-trace-around (name orig &rest args)
+            (setq neomacs--startup-last-phase name)
+            (apply orig args))
+          (dolist (fn '(set-locale-environment
+                        command-line
+                        frame-initialize
+                        display-graphic-p
+                        tab-bar-height
+                        tool-bar-height
+                        tab-bar-mode
+                        tool-bar-mode
+                        frame-parameters
+                        frame-parameter
+                        modify-frame-parameters
+                        make-frame
+                        frame-set-background-mode
+                        startup--setup-quote-display
+                        frame-notice-user-settings
+                        tty-run-terminal-initialization
+                        face-set-after-frame-default))
+            (when (fboundp fn)
+              (advice-add fn :around
+                          (apply-partially #'neomacs--startup-trace-around fn)))))
+    "#;
+    let forms =
+        neovm_core::emacs_core::parse_forms(source).expect("startup trace helper should parse");
+    for form in &forms {
+        eval.eval_expr(form)
+            .expect("startup trace helper should install");
+    }
+}
+
+fn ensure_dir_string(path: &Path) -> String {
+    let mut dir = path.to_string_lossy().to_string();
+    if !dir.ends_with('/') {
+        dir.push('/');
+    }
+    dir
 }
 
 /// Run the layout engine on the current frame state.
@@ -5245,73 +5314,6 @@ fn fontify_buffer(eval: &mut Evaluator) {
 
         i += 1;
     }
-}
-
-// ===== CLI argument parsing =====
-
-/// Items to load at startup.
-enum LoadItem {
-    /// Load an Elisp file.
-    File(PathBuf),
-    /// Evaluate an Elisp expression.
-    Eval(String),
-}
-
-/// Parsed command-line arguments.
-struct Args {
-    /// Elisp files/expressions to load (in order).
-    load: Vec<LoadItem>,
-    /// Files to open in buffers.
-    files: Vec<PathBuf>,
-}
-
-/// Parse command-line arguments.
-///
-/// Supported flags:
-///   --load FILE / -l FILE   Load an Elisp file
-///   --eval EXPR / -e EXPR   Evaluate an Elisp expression
-///   FILE                    Open a file in a buffer
-fn parse_args() -> Args {
-    let mut args = Args {
-        load: Vec::new(),
-        files: Vec::new(),
-    };
-
-    let mut iter = std::env::args().skip(1); // skip program name
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--load" | "-l" => {
-                if let Some(path) = iter.next() {
-                    args.load.push(LoadItem::File(PathBuf::from(path)));
-                } else {
-                    tracing::error!("{} requires a file path argument", arg);
-                }
-            }
-            "--eval" | "-e" => {
-                if let Some(expr) = iter.next() {
-                    args.load.push(LoadItem::Eval(expr));
-                } else {
-                    tracing::error!("{} requires an expression argument", arg);
-                }
-            }
-            "--" => {
-                // Everything after -- is a file to open
-                for remaining in iter.by_ref() {
-                    args.files.push(PathBuf::from(remaining));
-                }
-                break;
-            }
-            _ if arg.starts_with('-') => {
-                tracing::warn!("Unknown option: {}", arg);
-            }
-            _ => {
-                // Positional argument: file to open
-                args.files.push(PathBuf::from(arg));
-            }
-        }
-    }
-
-    args
 }
 
 /// Open a file into a new buffer and switch to it.

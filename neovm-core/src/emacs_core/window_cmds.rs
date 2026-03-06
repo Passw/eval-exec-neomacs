@@ -3974,7 +3974,14 @@ pub(crate) fn builtin_framep(eval: &mut super::eval::Evaluator, args: Vec<Value>
         Value::Int(n) => *n as u64,
         _ => return Ok(Value::Nil),
     };
-    Ok(Value::bool(eval.frames.get(FrameId(id)).is_some()))
+    let Some(frame) = eval.frames.get(FrameId(id)) else {
+        return Ok(Value::Nil);
+    };
+    Ok(frame
+        .parameters
+        .get("window-system")
+        .copied()
+        .unwrap_or(Value::True))
 }
 
 /// `(frame-live-p OBJ)` -> t if OBJ is a live frame object or frame id.

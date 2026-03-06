@@ -578,6 +578,42 @@ fn x_open_connection_requires_string_display_arg() {
 }
 
 #[test]
+fn x_open_connection_eval_accepts_neomacs_host_startup() {
+    let mut eval = crate::emacs_core::Evaluator::new();
+    eval.set_variable("initial-window-system", Value::symbol("neomacs"));
+    assert!(
+        builtin_x_open_connection_eval(&mut eval, vec![Value::Nil])
+            .unwrap()
+            .is_nil()
+    );
+}
+
+#[test]
+fn neomacs_window_system_resource_queries_return_nil() {
+    let mut eval = crate::emacs_core::Evaluator::new();
+    eval.set_variable("initial-window-system", Value::symbol("neomacs"));
+
+    assert!(
+        builtin_x_apply_session_resources_eval(&mut eval, vec![])
+            .unwrap()
+            .is_nil()
+    );
+    assert!(
+        builtin_x_get_resource_eval(
+            &mut eval,
+            vec![Value::string("geometry"), Value::string("Geometry")]
+        )
+        .unwrap()
+        .is_nil()
+    );
+    assert!(
+        builtin_x_list_fonts_eval(&mut eval, vec![Value::string("*")])
+            .unwrap()
+            .is_nil()
+    );
+}
+
+#[test]
 fn x_open_connection_arity_errors() {
     let x_open_none = builtin_x_open_connection(vec![]);
     let x_open_four = builtin_x_open_connection(vec![

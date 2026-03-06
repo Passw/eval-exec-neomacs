@@ -80,6 +80,39 @@ fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> 
     eval.obarray.symbol_value(name).cloned()
 }
 
+fn frame_window_system_symbol(
+    eval: &mut super::eval::Evaluator,
+    frame: Option<&Value>,
+) -> Result<Option<Value>, Flow> {
+    let frame_id = if let Some(frame) = frame {
+        if !frame.is_nil() && !live_frame_designator_p(eval, frame) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("framep"), *frame],
+            ));
+        }
+        if frame.is_nil() {
+            eval.frames.selected_frame().map(|selected| selected.id)
+        } else {
+            match frame {
+                Value::Frame(id) => Some(FrameId(*id)),
+                Value::Int(n) => Some(FrameId(*n as u64)),
+                _ => None,
+            }
+        }
+    } else {
+        eval.frames.selected_frame().map(|frame| frame.id)
+    };
+
+    let Some(frame_id) = frame_id else {
+        return Ok(None);
+    };
+    Ok(eval
+        .frames
+        .get(frame_id)
+        .and_then(|frame| frame.parameters.get("window-system").copied()))
+}
+
 fn preserve_emacs_downcase_payload(code: i64) -> bool {
     matches!(
         code,
@@ -302,6 +335,12 @@ fn window_system_not_initialized_error() -> Flow {
             "Window system is not in use or not initialized",
         )],
     )
+}
+
+fn neomacs_window_system_active(eval: &super::eval::Evaluator) -> bool {
+    let host_window_system = dynamic_or_global_symbol_value(eval, "initial-window-system")
+        .or_else(|| dynamic_or_global_symbol_value(eval, "window-system"));
+    host_window_system == Some(Value::symbol("neomacs"))
 }
 
 fn expect_optional_window_system_frame_arg(value: &Value) -> Result<(), Flow> {
@@ -644,7 +683,9 @@ pub(crate) fn builtin_display_graphic_p_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_optional_display_designator_eval(eval, "display-graphic-p", &args)?;
-    Ok(Value::Nil)
+    Ok(Value::bool(
+        frame_window_system_symbol(eval, args.first())?.is_some_and(|value| value.is_symbol()),
+    ))
 }
 
 /// Evaluator-aware variant of `display-color-p`.
@@ -792,15 +833,10 @@ pub(crate) fn builtin_window_system_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_max_args("window-system", &args, 1)?;
-    if let Some(frame) = args.first() {
-        if !frame.is_nil() && !live_frame_designator_p(eval, frame) {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("framep"), *frame],
-            ));
-        }
+    if let Some(window_system) = frame_window_system_symbol(eval, args.first())? {
+        return Ok(window_system);
     }
-    Ok(Value::Nil)
+    Ok(dynamic_or_global_symbol_value(eval, "window-system").unwrap_or(Value::Nil))
 }
 
 /// (frame-edges &optional FRAME TYPE) -> `(0 0 80 25)` in batch-style vm context.
@@ -1388,9 +1424,31 @@ pub(crate) fn builtin_x_get_resource(args: Vec<Value>) -> EvalResult {
     Err(window_system_not_initialized_error())
 }
 
+pub(crate) fn builtin_x_get_resource_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("x-get-resource", &args, 2, 4)?;
+    if neomacs_window_system_active(eval) {
+        return Ok(Value::Nil);
+    }
+    Err(window_system_not_initialized_error())
+}
+
 /// (x-apply-session-resources) -> error in batch/no-X context.
 pub(crate) fn builtin_x_apply_session_resources(args: Vec<Value>) -> EvalResult {
     expect_args("x-apply-session-resources", &args, 0)?;
+    Err(window_system_not_initialized_error())
+}
+
+pub(crate) fn builtin_x_apply_session_resources_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("x-apply-session-resources", &args, 0)?;
+    if neomacs_window_system_active(eval) {
+        return Ok(Value::Nil);
+    }
     Err(window_system_not_initialized_error())
 }
 
@@ -1441,6 +1499,17 @@ pub(crate) fn builtin_x_clipboard_yank_eval(
 /// (x-list-fonts PATTERN &optional FACE FRAME MAXIMUM WIDTH) -> error in batch/no-X context.
 pub(crate) fn builtin_x_list_fonts(args: Vec<Value>) -> EvalResult {
     expect_range_args("x-list-fonts", &args, 1, 5)?;
+    Err(window_system_not_initialized_error())
+}
+
+pub(crate) fn builtin_x_list_fonts_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("x-list-fonts", &args, 1, 5)?;
+    if neomacs_window_system_active(eval) {
+        return Ok(Value::Nil);
+    }
     Err(window_system_not_initialized_error())
 }
 
@@ -1626,6 +1695,12 @@ pub(crate) fn builtin_x_display_grayscale_p_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    expect_max_args("x-display-grayscale-p", &args, 1)?;
+    if let Some(display) = args.first() {
+        if live_frame_designator_p(eval, display) && neomacs_window_system_active(eval) {
+            return Ok(Value::Nil);
+        }
+    }
     x_optional_display_query_error_eval(eval, "x-display-grayscale-p", args)
 }
 
@@ -1800,6 +1875,10 @@ pub(crate) fn builtin_x_display_set_last_user_time_eval(
 pub(crate) fn builtin_x_open_connection(args: Vec<Value>) -> EvalResult {
     expect_range_args("x-open-connection", &args, 1, 3)?;
     match &args[0] {
+        Value::Nil => Err(signal(
+            "error",
+            vec![Value::string("Display nil can’t be opened")],
+        )),
         Value::Str(id) => {
             let display = with_heap(|h| h.get_string(*id).clone());
             Err(signal(
@@ -1812,6 +1891,19 @@ pub(crate) fn builtin_x_open_connection(args: Vec<Value>) -> EvalResult {
             vec![Value::symbol("stringp"), *other],
         )),
     }
+}
+
+pub(crate) fn builtin_x_open_connection_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("x-open-connection", &args, 1, 3)?;
+    let host_window_system = dynamic_or_global_symbol_value(eval, "initial-window-system")
+        .or_else(|| dynamic_or_global_symbol_value(eval, "window-system"));
+    if host_window_system == Some(Value::symbol("neomacs")) {
+        return Ok(Value::Nil);
+    }
+    builtin_x_open_connection(args)
 }
 
 /// (x-close-connection DISPLAY) -> nil

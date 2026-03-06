@@ -2151,6 +2151,20 @@ fn framep_true() {
 }
 
 #[test]
+fn framep_returns_window_system_symbol_for_gui_frames() {
+    let mut ev = Evaluator::new();
+    let frame_id = super::ensure_selected_frame_id(&mut ev);
+    ev.frames
+        .get_mut(frame_id)
+        .expect("selected frame")
+        .parameters
+        .insert("window-system".to_string(), Value::symbol("neomacs"));
+
+    let result = super::builtin_framep(&mut ev, vec![Value::Frame(frame_id.0)]).unwrap();
+    assert_eq!(result, Value::symbol("neomacs"));
+}
+
+#[test]
 fn framep_false() {
     let r = eval_one_with_frame("(framep 999999)");
     assert_eq!(r, "OK nil");

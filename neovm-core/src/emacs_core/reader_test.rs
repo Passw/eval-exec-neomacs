@@ -1122,8 +1122,19 @@ fn set_input_meta_mode_accepts_one_arg_and_returns_nil() {
 }
 
 #[test]
+fn set_input_meta_mode_accepts_optional_terminal_arg() {
+    let result = builtin_set_input_meta_mode(vec![Value::symbol("encoded"), Value::Nil]).unwrap();
+    assert!(result.is_nil());
+}
+
+#[test]
 fn set_input_meta_mode_rejects_wrong_arity() {
     let result = builtin_set_input_meta_mode(vec![]);
+    assert!(matches!(
+        result,
+        Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
+    ));
+    let result = builtin_set_input_meta_mode(vec![Value::Nil, Value::Nil, Value::Nil]);
     assert!(matches!(
         result,
         Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
