@@ -873,6 +873,7 @@ pub struct DumpEvaluatorState {
     pub interactive: DumpInteractiveRegistry,
     pub kill_ring: DumpKillRing,
     pub rectangle: DumpRectangleState,
+    pub standard_syntax_table: DumpValue,
     pub current_local_map: DumpValue,
     pub kmacro: DumpKmacroManager,
     pub registers: DumpRegisterManager,

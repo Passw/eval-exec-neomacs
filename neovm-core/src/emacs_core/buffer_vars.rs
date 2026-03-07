@@ -28,6 +28,7 @@ pub fn register_bootstrap_vars(obarray: &mut crate::emacs_core::symbol::Obarray)
     obarray.set_symbol_value("find-file-not-found-functions", Value::Nil);
     obarray.set_symbol_value("major-mode", Value::symbol("fundamental-mode"));
     obarray.set_symbol_value("mode-name", Value::string("Fundamental"));
+    obarray.set_symbol_value("local-abbrev-table", Value::Nil);
     obarray.set_symbol_value("fill-column", Value::Int(70));
     obarray.set_symbol_value("left-margin", Value::Int(0));
     // tab-width is set by init_indent_vars() with special=true

@@ -251,6 +251,44 @@ fn define_derived_mode_registers_interactive() {
     assert!(ev.interactive.is_interactive("ireg-mode"));
 }
 
+#[test]
+fn define_derived_mode_installs_inherited_syntax_table() {
+    let mut ev = Evaluator::new();
+    let results = eval_all_with(
+        &mut ev,
+        r#"(defvar vm-parent-mode-syntax-table
+             (let ((st (make-syntax-table)))
+               (modify-syntax-entry ?\n ">" st)
+               (modify-syntax-entry ?\; "<" st)
+               st))
+           (define-derived-mode vm-parent-mode nil "Parent")
+           (define-derived-mode vm-child-mode vm-parent-mode "Child")
+           (vm-child-mode)
+           (list (eq major-mode 'vm-child-mode)
+                 (eq (char-table-parent vm-child-mode-syntax-table)
+                     vm-parent-mode-syntax-table)
+                 (char-syntax ?\n)
+                 (char-syntax ?\;))"#,
+    );
+    assert_eq!(results[4], "OK (t t 62 60)");
+}
+
+#[test]
+fn define_derived_mode_installs_child_keymap_with_parent_inheritance() {
+    let mut ev = Evaluator::new();
+    let results = eval_all_with(
+        &mut ev,
+        r#"(defvar vm-parent-map (make-sparse-keymap))
+           (define-derived-mode vm-parent-map-mode nil "Parent")
+           (define-derived-mode vm-child-map-mode vm-parent-map-mode "Child")
+           (vm-child-map-mode)
+           (list (eq (current-local-map) vm-child-map-mode-map)
+                 (eq (keymap-parent vm-child-map-mode-map)
+                     vm-parent-map-mode-map))"#,
+    );
+    assert_eq!(results[4], "OK (t t)");
+}
+
 // -------------------------------------------------------------------
 // define-generic-mode special form
 // -------------------------------------------------------------------

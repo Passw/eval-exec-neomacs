@@ -180,6 +180,12 @@ pub struct Evaluator {
     pub(crate) timers: TimerManager,
     /// Variable watcher list — callbacks on variable changes.
     pub(crate) watchers: VariableWatcherList,
+    /// Canonical Lisp object returned by `standard-syntax-table`.
+    ///
+    /// GNU Emacs stores this in `Vstandard_syntax_table`; NeoVM keeps the
+    /// authoritative identity here and mirrors it into thread-local state for
+    /// no-evaluator syntax builtins.
+    pub(crate) standard_syntax_table: Value,
     /// Current buffer-local keymap (set by `use-local-map`).
     pub(crate) current_local_map: Value,
     /// Register manager — quick storage and retrieval of text, positions, etc.
@@ -1593,6 +1599,9 @@ impl Evaluator {
 
         let mut custom = CustomManager::new();
         custom.make_variable_buffer_local("buffer-read-only");
+        custom.make_variable_buffer_local("major-mode");
+        custom.make_variable_buffer_local("mode-name");
+        custom.make_variable_buffer_local("local-abbrev-table");
 
         let mut ev = Self {
             interner,
@@ -1608,6 +1617,7 @@ impl Evaluator {
             processes: ProcessManager::new(),
             timers: TimerManager::new(),
             watchers: VariableWatcherList::new(),
+            standard_syntax_table,
             current_local_map: Value::Nil,
             registers: RegisterManager::new(),
             bookmarks: BookmarkManager::new(),
@@ -1648,6 +1658,7 @@ impl Evaluator {
         // Re-point anyway to be explicit about thread-local state.
         set_current_interner(&mut ev.interner);
         set_current_heap(&mut ev.heap);
+        super::syntax::restore_standard_syntax_table_object(ev.standard_syntax_table);
         ev
     }
 
@@ -1679,6 +1690,7 @@ impl Evaluator {
         interactive: InteractiveRegistry,
         kill_ring: KillRing,
         rectangle: RectangleState,
+        standard_syntax_table: Value,
         current_local_map: Value,
         kmacro: KmacroManager,
         registers: RegisterManager,
@@ -1699,6 +1711,7 @@ impl Evaluator {
             processes: ProcessManager::new(),
             timers: TimerManager::new(),
             watchers,
+            standard_syntax_table,
             current_local_map,
             registers,
             bookmarks,
@@ -1738,6 +1751,7 @@ impl Evaluator {
         // Re-point thread-local pointers to the evaluator's owned boxes.
         set_current_interner(&mut ev.interner);
         set_current_heap(&mut ev.heap);
+        super::syntax::restore_standard_syntax_table_object(ev.standard_syntax_table);
         ev
     }
 
@@ -1826,6 +1840,7 @@ impl Evaluator {
     pub fn setup_thread_locals(&mut self) {
         set_current_interner(&mut self.interner);
         set_current_heap(&mut self.heap);
+        super::syntax::restore_standard_syntax_table_object(self.standard_syntax_table);
     }
 
     /// Perform a full mark-and-sweep garbage collection.

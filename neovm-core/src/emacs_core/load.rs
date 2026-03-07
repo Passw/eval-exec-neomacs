@@ -1285,7 +1285,11 @@ fn normalized_bootstrap_features(extra_features: &[&str]) -> Vec<String> {
     features
 }
 
-const BOOTSTRAP_IMAGE_SCHEMA_VERSION: u32 = 2;
+// Bump when bootstrap image semantics change in ways an older dump cannot
+// represent correctly.  The March 2026 startup fixes require regenerating
+// cached bootstrap images because derived-mode lambdas and startup buffer
+// state changed semantically.
+const BOOTSTRAP_IMAGE_SCHEMA_VERSION: u32 = 4;
 const BOOTSTRAP_CACHE_SEED: &str = match option_env!("NEOVM_BOOTSTRAP_CACHE_SEED") {
     Some(seed) => seed,
     None => "dev",
@@ -1417,6 +1421,42 @@ pub(crate) fn bootstrap_load_path_entries(lisp_dir: &Path) -> Vec<Value> {
         }
     }
     load_path_entries
+}
+
+fn eval_startup_forms(eval: &mut super::eval::Evaluator, forms_src: &str) -> Result<(), EvalError> {
+    let forms =
+        crate::emacs_core::parser::parse_forms(forms_src).map_err(|e| EvalError::Signal {
+            symbol: intern("error"),
+            data: vec![Value::string(format!("startup parse error: {e}"))],
+        })?;
+    for result in eval.eval_forms(&forms) {
+        result?;
+    }
+    Ok(())
+}
+
+/// Apply the runtime startup state that GNU Emacs has after the dumped image
+/// is loaded and `normal-top-level` begins to run.
+///
+/// The dumped bootstrap image intentionally stops before normal interactive
+/// startup.  Runtime callers that compare against `emacs --batch -Q` still
+/// need the early startup buffer initialization, especially the `*scratch*`
+/// major mode transition from `fundamental-mode` to `initial-major-mode`
+/// (`lisp-interaction-mode` by default).  NeoVM currently cannot rely on the
+/// dumped scratch buffer's cached syntax table being synchronized with its
+/// `major-mode`, so we force the initial major-mode setup here instead of
+/// reproducing GNU Emacs's narrower `major-mode == fundamental-mode` guard.
+pub fn apply_runtime_startup_state(eval: &mut super::eval::Evaluator) -> Result<(), EvalError> {
+    eval_startup_forms(
+        eval,
+        r#"
+          (if (get-buffer "*scratch*")
+              (progn
+                (set-buffer "*scratch*")
+                (with-current-buffer "*scratch*"
+                  (funcall initial-major-mode))))
+        "#,
+    )
 }
 
 pub(crate) const BOOTSTRAP_LOAD_SEQUENCE: &[&str] = &[

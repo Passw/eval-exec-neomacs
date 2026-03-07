@@ -122,6 +122,12 @@ fn string_to_syntax_comment_style_b() {
 }
 
 #[test]
+fn string_to_syntax_comment_style_c() {
+    let entry = string_to_syntax(". c").unwrap();
+    assert!(entry.flags.contains(SyntaxFlags::COMMENT_STYLE_C));
+}
+
+#[test]
 fn string_to_syntax_prefix_flag() {
     let entry = string_to_syntax(". p").unwrap();
     assert_eq!(entry.class, SyntaxClass::Punctuation);
@@ -184,8 +190,11 @@ fn standard_table_escape() {
 #[test]
 fn standard_table_punctuation() {
     let table = SyntaxTable::new_standard();
+    assert_eq!(table.char_syntax('\u{0001}'), SyntaxClass::Punctuation);
+    assert_eq!(table.char_syntax('\u{007f}'), SyntaxClass::Punctuation);
     assert_eq!(table.char_syntax(';'), SyntaxClass::Punctuation);
     assert_eq!(table.char_syntax('?'), SyntaxClass::Punctuation);
+    assert_eq!(table.char_syntax('.'), SyntaxClass::Punctuation);
 }
 
 #[test]
@@ -233,10 +242,10 @@ fn copy_syntax_table_is_independent() {
 }
 
 #[test]
-fn unknown_char_defaults_to_symbol() {
+fn non_ascii_defaults_to_word() {
     let table = SyntaxTable::new_standard();
     // A random Unicode character not in the table.
-    assert_eq!(table.char_syntax('\u{1F600}'), SyntaxClass::Symbol);
+    assert_eq!(table.char_syntax('\u{1F600}'), SyntaxClass::Word);
 }
 
 // -----------------------------------------------------------------------
@@ -659,6 +668,16 @@ fn syntax_table_and_standard_default_to_same_object() {
 fn set_syntax_table_updates_current_buffer_only() {
     let mut eval = crate::emacs_core::eval::Evaluator::new();
     let custom = builtin_make_syntax_table(vec![]).unwrap();
+    builtin_modify_syntax_entry(
+        &mut eval,
+        vec![Value::Int(';' as i64), Value::string("<"), custom],
+    )
+    .unwrap();
+    builtin_modify_syntax_entry(
+        &mut eval,
+        vec![Value::Int('\n' as i64), Value::string(">"), custom],
+    )
+    .unwrap();
     let current_id = eval.buffers.current_buffer().expect("current buffer").id;
     let other_id = eval.buffers.create_buffer("*syntax-other*");
 
@@ -677,6 +696,14 @@ fn set_syntax_table_updates_current_buffer_only() {
     eval.buffers.set_current(current_id);
     let restored = builtin_syntax_table(&mut eval, vec![]).unwrap();
     assert_eq!(restored, custom);
+    assert_eq!(
+        builtin_char_syntax(&mut eval, vec![Value::Int(';' as i64)]).unwrap(),
+        Value::Char('<')
+    );
+    assert_eq!(
+        builtin_char_syntax(&mut eval, vec![Value::Int('\n' as i64)]).unwrap(),
+        Value::Char('>')
+    );
 }
 
 #[test]
@@ -781,7 +808,7 @@ fn backward_prefix_chars_validates_arity() {
 }
 
 #[test]
-fn modify_syntax_entry_at_descriptor_yields_whitespace() {
+fn modify_syntax_entry_at_descriptor_inherits_parent_or_default() {
     let mut eval = crate::emacs_core::eval::Evaluator::new();
     builtin_modify_syntax_entry(&mut eval, vec![Value::Int('x' as i64), Value::string("@")])
         .unwrap();

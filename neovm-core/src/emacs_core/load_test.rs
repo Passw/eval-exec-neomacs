@@ -1007,6 +1007,106 @@ fn direct_setq_funcall_updates_variable_place() {
 }
 
 #[test]
+fn runtime_startup_state_matches_char_syntax_comprehensive_form() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+
+    let form = crate::emacs_core::parser::parse_forms(
+        r#"
+(list
+ ;; Standard syntax table entries
+ (char-syntax ?a)
+ (char-syntax ?Z)
+ (char-syntax ?0)
+ (char-syntax ?9)
+ (char-syntax ?_)
+ (char-syntax ?\ )
+ (char-syntax ?\t)
+ (char-syntax ?\n)
+ (char-syntax ?\()
+ (char-syntax ?\))
+ (char-syntax ?\[)
+ (char-syntax ?\])
+ (char-syntax ?{)
+ (char-syntax ?})
+ (char-syntax ?.)
+ (char-syntax ?,)
+ (char-syntax ?;)
+ (char-syntax ?\")
+ (char-syntax ?+)
+ (char-syntax ?-)
+ (char-syntax ?*)
+ (char-syntax ?/)
+ (char-syntax ?')
+   (with-syntax-table (copy-syntax-table)
+     (modify-syntax-entry ?_ "w")
+     (modify-syntax-entry ?- "w")
+     (list (char-syntax ?_)
+           (char-syntax ?-)
+           (char-syntax ?a)
+           (char-syntax ?\())))
+"#,
+    )
+    .expect("parse char syntax comprehensive probe");
+    let result = eval
+        .eval_expr(&form[0])
+        .expect("evaluate char syntax comprehensive probe");
+    assert_eq!(
+        crate::emacs_core::print::print_value_with_buffers(&result, &eval.buffers),
+        "(119 119 119 119 95 32 32 62 40 41 40 41 95 95 95 39 60 34 95 95 95 95 39 (119 119 119 40))"
+    );
+}
+
+#[test]
+fn oracle_bootstrap_helper_matches_char_syntax_comprehensive_form() {
+    let rendered = crate::emacs_core::oracle_test::common::run_neovm_eval_with_bootstrap(
+        r#"
+(list
+ ;; Standard syntax table entries
+ (char-syntax ?a)       ;; ?w (word)
+ (char-syntax ?Z)       ;; ?w
+ (char-syntax ?0)       ;; ?w
+ (char-syntax ?9)       ;; ?w
+ (char-syntax ?_)       ;; ?_ (symbol) in standard table
+ (char-syntax ?\ )      ;; ?\  (whitespace)
+ (char-syntax ?\t)      ;; ?\  (whitespace)
+ (char-syntax ?\n)      ;; ?\  (whitespace or comment-end)
+ (char-syntax ?\()      ;; ?\( (open paren)
+ (char-syntax ?\))      ;; ?\) (close paren)
+ (char-syntax ?\[)      ;; ?\( (open paren in standard)
+ (char-syntax ?\])      ;; ?\) (close paren in standard)
+ (char-syntax ?{)
+ (char-syntax ?})
+ (char-syntax ?.)       ;; ?. (punctuation)
+ (char-syntax ?,)       ;; ?. (punctuation)
+ (char-syntax ?;)
+ (char-syntax ?\")      ;; ?\" (string delimiter)
+ (char-syntax ?+)       ;; ?. (punctuation)
+ (char-syntax ?-)       ;; ?. (punctuation)
+ (char-syntax ?*)
+ (char-syntax ?/)
+ (char-syntax ?')       ;; ?' (expression prefix) or ?w
+ ;; With a custom syntax table
+ (with-syntax-table (copy-syntax-table)
+   ;; Make _ a word constituent
+   (modify-syntax-entry ?_ "w")
+   ;; Make - a word constituent
+   (modify-syntax-entry ?- "w")
+   (list (char-syntax ?_)
+         (char-syntax ?-)
+         ;; Other entries unchanged
+         (char-syntax ?a)
+         (char-syntax ?\())))
+"#,
+    )
+    .expect("oracle bootstrap helper should evaluate form");
+    assert_eq!(
+        rendered,
+        "OK (119 119 119 119 95 32 32 62 40 41 40 41 95 95 95 39 60 34 95 95 95 95 39 (119 119 119 40))"
+    );
+}
+
+#[test]
 fn cl_callf_updates_generalized_place() {
     let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
     let form = crate::emacs_core::parser::parse_forms(

@@ -469,6 +469,30 @@ pub(crate) fn builtin_char_table_parent(args: Vec<Value>) -> EvalResult {
     Ok(vec[CT_PARENT])
 }
 
+/// Return the sparse local `(key . value)` entries stored directly in a char-table.
+///
+/// Keys are either character codes (`Value::Int`) or range conses `(FROM . TO)`.
+/// Parent/default fallback is intentionally not applied here; callers that need
+/// effective values should use `ct_lookup`.
+pub(crate) fn char_table_local_entries(table: &Value) -> Result<Vec<(Value, Value)>, Flow> {
+    let arc = match table {
+        Value::Vector(a) if is_char_table(table) => a,
+        _ => return Err(wrong_type("char-table-p", table)),
+    };
+    let vec = with_heap(|h| h.get_vector(*arc).clone());
+    let start = ct_data_start(&vec);
+    let mut out = Vec::new();
+    let mut i = start;
+    while i + 1 < vec.len() {
+        match vec[i] {
+            Value::Int(_) | Value::Cons(_) => out.push((vec[i], vec[i + 1])),
+            _ => {}
+        }
+        i += 2;
+    }
+    Ok(out)
+}
+
 /// `(set-char-table-parent CHAR-TABLE PARENT)` -- set the parent table.
 pub(crate) fn builtin_set_char_table_parent(args: Vec<Value>) -> EvalResult {
     expect_args("set-char-table-parent", &args, 2)?;

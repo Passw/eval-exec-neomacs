@@ -22,6 +22,7 @@ use super::intern::{intern, resolve_sym};
 use super::keymap::{
     KeyEvent, format_key_event, format_key_sequence, is_list_keymap, key_event_to_emacs_event,
     list_keymap_for_each_binding, list_keymap_lookup_one, list_keymap_lookup_seq, make_list_keymap,
+    make_sparse_list_keymap,
 };
 use super::mode::{MajorMode, MinorMode};
 use super::value::*;
@@ -2475,6 +2476,29 @@ pub(crate) fn sf_define_minor_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalR
 /// :syntax-table :abbrev-table
 ///
 /// Creates a major mode that derives from PARENT.
+#[derive(Clone, Debug)]
+enum DerivedModeVarSpec {
+    None,
+    Existing(String),
+    Declared(String),
+}
+
+impl DerivedModeVarSpec {
+    fn runtime_name(&self) -> Option<&str> {
+        match self {
+            Self::None => None,
+            Self::Existing(name) | Self::Declared(name) => Some(name),
+        }
+    }
+
+    fn declared_name(&self) -> Option<&str> {
+        match self {
+            Self::Declared(name) => Some(name),
+            Self::None | Self::Existing(_) => None,
+        }
+    }
+}
+
 pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.len() < 3 {
         return Err(signal(
@@ -2490,10 +2514,17 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
         return Err(signal("wrong-type-argument", vec![]));
     };
     let mode_name = resolve_sym(*mode_name_id);
+    let sym = |name: &str| Expr::Symbol(intern(name));
+    let quote_sym = |name: &str| {
+        Expr::List(vec![
+            Expr::Symbol(intern("quote")),
+            Expr::Symbol(intern(name)),
+        ])
+    };
 
     // Parent can be nil or a symbol
     let parent = match &tail[1] {
-        Expr::Symbol(id) if resolve_sym(*id) == "nil" => None,
+        Expr::Symbol(id) if matches!(resolve_sym(*id), "nil" | "fundamental-mode") => None,
         Expr::Symbol(id) => Some(resolve_sym(*id).to_owned()),
         _ => None,
     };
@@ -2511,8 +2542,10 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
     };
 
     // Parse optional keyword args and body
-    let mut syntax_table_name: Option<String> = None;
-    let mut abbrev_table_name: Option<String> = None;
+    let mut syntax_spec = DerivedModeVarSpec::Declared(format!("{mode_name}-syntax-table"));
+    let mut abbrev_spec = DerivedModeVarSpec::Declared(format!("{mode_name}-abbrev-table"));
+    let mut run_interactively = true;
+    let mut after_hook: Option<Expr> = None;
     let mut body_start = 3;
 
     // Skip docstring if present
@@ -2527,15 +2560,31 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
     while i + 1 < tail.len() {
         match &tail[i] {
             Expr::Keyword(id) if resolve_sym(*id) == ":syntax-table" => {
-                if let Expr::Symbol(sid) = &tail[i + 1] {
-                    syntax_table_name = Some(resolve_sym(*sid).to_owned());
-                }
+                syntax_spec = match &tail[i + 1] {
+                    Expr::Symbol(sid) if resolve_sym(*sid) == "nil" => DerivedModeVarSpec::None,
+                    Expr::Symbol(sid) => DerivedModeVarSpec::Existing(resolve_sym(*sid).to_owned()),
+                    _ => DerivedModeVarSpec::None,
+                };
                 i += 2;
             }
             Expr::Keyword(id) if resolve_sym(*id) == ":abbrev-table" => {
-                if let Expr::Symbol(sid) = &tail[i + 1] {
-                    abbrev_table_name = Some(resolve_sym(*sid).to_owned());
-                }
+                abbrev_spec = match &tail[i + 1] {
+                    Expr::Symbol(sid) if resolve_sym(*sid) == "nil" => DerivedModeVarSpec::None,
+                    Expr::Symbol(sid) => DerivedModeVarSpec::Existing(resolve_sym(*sid).to_owned()),
+                    _ => DerivedModeVarSpec::None,
+                };
+                i += 2;
+            }
+            Expr::Keyword(id) if resolve_sym(*id) == ":interactive" => {
+                run_interactively =
+                    !matches!(&tail[i + 1], Expr::Symbol(sid) if resolve_sym(*sid) == "nil");
+                i += 2;
+            }
+            Expr::Keyword(id) if resolve_sym(*id) == ":after-hook" => {
+                after_hook = Some(tail[i + 1].clone());
+                i += 2;
+            }
+            Expr::Keyword(id) if resolve_sym(*id) == ":group" => {
                 i += 2;
             }
             _ => break,
@@ -2548,6 +2597,32 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
     let hook_name = format!("{}-hook", mode_name);
     let keymap_name = format!("{}-map", mode_name);
 
+    eval.obarray.set_symbol_value(&hook_name, Value::Nil);
+    eval.obarray.make_special(&hook_name);
+
+    if !eval.obarray.boundp(&keymap_name) {
+        eval.obarray
+            .set_symbol_value(&keymap_name, make_sparse_list_keymap());
+    }
+    if let Some(name) = syntax_spec.declared_name() {
+        if !eval.obarray.boundp(name) {
+            let table = super::syntax::builtin_make_syntax_table(vec![])?;
+            eval.obarray.set_symbol_value(name, table);
+        }
+    }
+    if let Some(name) = abbrev_spec.declared_name() {
+        if !eval.obarray.boundp(name) {
+            super::abbrev::builtin_define_abbrev_table(
+                eval,
+                vec![Value::symbol(name), Value::Nil],
+            )?;
+        }
+    }
+    if let Some(ref parent_name) = parent {
+        eval.obarray
+            .put_property(mode_name, "derived-mode-parent", Value::symbol(parent_name));
+    }
+
     // 1. Register the major mode
     let mode = MajorMode {
         name: mode_name.to_owned(),
@@ -2555,63 +2630,138 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
         parent: parent.clone(),
         mode_hook: hook_name.clone(),
         keymap_name: Some(keymap_name.clone()),
-        syntax_table_name: syntax_table_name.clone(),
-        abbrev_table_name: abbrev_table_name.clone(),
+        syntax_table_name: syntax_spec.runtime_name().map(str::to_string),
+        abbrev_table_name: abbrev_spec.runtime_name().map(str::to_string),
         font_lock: None,
         body: None,
     };
     eval.modes.register_major_mode(mode);
 
-    // 2. Create the hook variable
-    eval.obarray.set_symbol_value(&hook_name, Value::Nil);
-    eval.obarray.make_special(&hook_name);
+    // 2. Register as interactive command
+    if run_interactively {
+        eval.interactive
+            .register_interactive(mode_name, InteractiveSpec::no_args());
+    }
 
-    // 3. Register as interactive command
-    eval.interactive
-        .register_interactive(mode_name, InteractiveSpec::no_args());
-
-    // 4. Create mode function that:
-    //    - Calls parent mode first (if any)
-    //    - Runs body
-    //    - Sets major-mode variable
-    //    - Runs mode hook
+    // 3. Create mode function that mirrors GNU Emacs's generated
+    // `define-derived-mode` form closely enough for startup/runtime parity.
     let mut func_body: Vec<Expr> = Vec::new();
 
-    // Call parent mode if it exists
+    // Run the parent (or reset locals for a root mode) first.
     if let Some(ref par) = parent {
-        func_body.push(Expr::List(vec![Expr::Symbol(intern(par))]));
+        func_body.push(Expr::List(vec![sym(par)]));
+    } else {
+        func_body.push(Expr::List(vec![sym("kill-all-local-variables")]));
     }
 
     // (setq major-mode 'MODE)
     func_body.push(Expr::List(vec![
-        Expr::Symbol(intern("setq")),
-        Expr::Symbol(intern("major-mode")),
-        Expr::List(vec![
-            Expr::Symbol(intern("quote")),
-            Expr::Symbol(*mode_name_id),
-        ]),
+        sym("setq"),
+        sym("major-mode"),
+        quote_sym(mode_name),
     ]));
 
     // (setq mode-name PRETTY-NAME)
     func_body.push(Expr::List(vec![
-        Expr::Symbol(intern("setq")),
-        Expr::Symbol(intern("mode-name")),
+        sym("setq"),
+        sym("mode-name"),
         Expr::Str(pretty_name),
     ]));
+
+    if parent.is_some() {
+        func_body.push(Expr::List(vec![
+            sym("if"),
+            Expr::List(vec![sym("keymap-parent"), sym(&keymap_name)]),
+            Expr::Symbol(intern("nil")),
+            Expr::List(vec![
+                sym("set-keymap-parent"),
+                sym(&keymap_name),
+                Expr::List(vec![sym("current-local-map")]),
+            ]),
+        ]));
+
+        if let Some(name) = syntax_spec.declared_name() {
+            func_body.push(Expr::List(vec![
+                sym("let"),
+                Expr::List(vec![Expr::List(vec![
+                    sym("parent"),
+                    Expr::List(vec![sym("char-table-parent"), sym(name)]),
+                ])]),
+                Expr::List(vec![
+                    sym("if"),
+                    Expr::List(vec![
+                        sym("and"),
+                        sym("parent"),
+                        Expr::List(vec![
+                            sym("not"),
+                            Expr::List(vec![
+                                sym("eq"),
+                                sym("parent"),
+                                Expr::List(vec![sym("standard-syntax-table")]),
+                            ]),
+                        ]),
+                    ]),
+                    Expr::Symbol(intern("nil")),
+                    Expr::List(vec![
+                        sym("set-char-table-parent"),
+                        sym(name),
+                        Expr::List(vec![sym("syntax-table")]),
+                    ]),
+                ]),
+            ]));
+        }
+
+        if let Some(name) = abbrev_spec.declared_name() {
+            func_body.push(Expr::List(vec![
+                sym("if"),
+                Expr::List(vec![
+                    sym("or"),
+                    Expr::List(vec![
+                        sym("abbrev-table-get"),
+                        sym(name),
+                        Expr::Keyword(intern(":parents")),
+                    ]),
+                    Expr::List(vec![sym("eq"), sym(name), sym("local-abbrev-table")]),
+                ]),
+                Expr::Symbol(intern("nil")),
+                Expr::List(vec![
+                    sym("abbrev-table-put"),
+                    sym(name),
+                    Expr::Keyword(intern(":parents")),
+                    Expr::List(vec![sym("list"), sym("local-abbrev-table")]),
+                ]),
+            ]));
+        }
+    }
+
+    func_body.push(Expr::List(vec![sym("use-local-map"), sym(&keymap_name)]));
+
+    if let Some(name) = syntax_spec.runtime_name() {
+        func_body.push(Expr::List(vec![sym("set-syntax-table"), sym(name)]));
+    }
+
+    if let Some(name) = abbrev_spec.runtime_name() {
+        func_body.push(Expr::List(vec![
+            sym("setq"),
+            sym("local-abbrev-table"),
+            sym(name),
+        ]));
+    }
 
     // Body forms
     for form in body_forms {
         func_body.push(form.clone());
     }
 
-    // (run-hooks 'MODE-hook)
+    // (run-mode-hooks 'MODE-hook)
     func_body.push(Expr::List(vec![
-        Expr::Symbol(intern("run-hooks")),
-        Expr::List(vec![
-            Expr::Symbol(intern("quote")),
-            Expr::Symbol(intern(&hook_name)),
-        ]),
+        sym("run-mode-hooks"),
+        quote_sym(&hook_name),
     ]));
+
+    if let Some(form) = after_hook {
+        func_body.push(form);
+    }
 
     let lambda = Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![]),
@@ -2623,7 +2773,7 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
 
     eval.obarray.set_symbol_function(mode_name, lambda);
 
-    // Set up major-mode and mode-name as special variables
+    // Set up major-mode/mode-name as special buffer-oriented variables.
     if !eval.obarray.boundp("major-mode") {
         eval.obarray
             .set_symbol_value("major-mode", Value::symbol("fundamental-mode"));
@@ -2634,6 +2784,12 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
             .set_symbol_value("mode-name", Value::string("Fundamental"));
     }
     eval.obarray.make_special("mode-name");
+
+    if !eval.obarray.boundp("local-abbrev-table") {
+        eval.obarray
+            .set_symbol_value("local-abbrev-table", Value::Nil);
+    }
+    eval.obarray.make_special("local-abbrev-table");
 
     Ok(Value::symbol(mode_name))
 }

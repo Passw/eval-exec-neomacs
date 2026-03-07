@@ -21,6 +21,21 @@ pub fn reset_syntax_thread_locals() {
     STANDARD_SYNTAX_TABLE_OBJECT.with(|slot| *slot.borrow_mut() = None);
 }
 
+/// Restore the canonical standard syntax-table object for the current thread.
+///
+/// GNU Emacs keeps the standard syntax table as a single canonical Lisp object.
+/// NeoVM exposes it through a thread-local cache because `standard-syntax-table`
+/// is currently a no-evaluator builtin; callers that reconstruct or move an
+/// `Evaluator` between threads must restore that identity explicitly.
+pub(crate) fn restore_standard_syntax_table_object(table: Value) {
+    STANDARD_SYNTAX_TABLE_OBJECT.with(|slot| *slot.borrow_mut() = Some(table));
+}
+
+/// Snapshot the current thread's canonical standard syntax-table object.
+pub(crate) fn snapshot_standard_syntax_table_object() -> Option<Value> {
+    STANDARD_SYNTAX_TABLE_OBJECT.with(|slot| *slot.borrow())
+}
+
 /// Collect GC roots from the cached syntax table.
 pub fn collect_syntax_gc_roots(roots: &mut Vec<Value>) {
     STANDARD_SYNTAX_TABLE_OBJECT.with(|slot| {
@@ -192,6 +207,8 @@ impl SyntaxFlags {
     pub const COMMENT_STYLE_B: SyntaxFlags = SyntaxFlags(0b0010_0000);
     /// 'n' — nestable comment
     pub const COMMENT_NESTABLE: SyntaxFlags = SyntaxFlags(0b0100_0000);
+    /// 'c' — belongs to alternative "c" comment style
+    pub const COMMENT_STYLE_C: SyntaxFlags = SyntaxFlags(0b1000_0000);
 
     /// Construct from raw bits.
     pub const fn new(bits: u8) -> Self {
@@ -298,6 +315,7 @@ pub fn string_to_syntax(s: &str) -> Result<SyntaxEntry, String> {
             'p' => flags |= SyntaxFlags::PREFIX,
             'b' => flags |= SyntaxFlags::COMMENT_STYLE_B,
             'n' => flags |= SyntaxFlags::COMMENT_NESTABLE,
+            'c' => flags |= SyntaxFlags::COMMENT_STYLE_C,
             ' ' => {} // whitespace in flag area is ignored
             _ => {}   // Emacs silently ignores unknown flags
         }
@@ -346,12 +364,21 @@ impl SyntaxTable {
     pub fn new_standard() -> Self {
         let mut entries = HashMap::new();
 
-        // Whitespace
-        for ch in [' ', '\t', '\n', '\r', '\x0c'] {
+        // Control characters are punctuation by default, except a few
+        // whitespace characters explicitly reset below.
+        for cp in 0u32..=(' ' as u32 - 1) {
+            if let Some(ch) = char::from_u32(cp) {
+                entries.insert(ch, SyntaxEntry::simple(SyntaxClass::Punctuation));
+            }
+        }
+        entries.insert('\u{007f}', SyntaxEntry::simple(SyntaxClass::Punctuation));
+
+        // Whitespace.
+        for ch in [' ', '\t', '\n', '\r', '\u{000c}'] {
             entries.insert(ch, SyntaxEntry::simple(SyntaxClass::Whitespace));
         }
 
-        // Word constituents: a-z, A-Z, 0-9
+        // Word constituents: a-z, A-Z, 0-9, '$', '%'.
         for ch in 'a'..='z' {
             entries.insert(ch, SyntaxEntry::simple(SyntaxClass::Word));
         }
@@ -361,10 +388,10 @@ impl SyntaxTable {
         for ch in '0'..='9' {
             entries.insert(ch, SyntaxEntry::simple(SyntaxClass::Word));
         }
-        // Emacs default treats '%' as a word constituent.
+        entries.insert('$', SyntaxEntry::simple(SyntaxClass::Word));
         entries.insert('%', SyntaxEntry::simple(SyntaxClass::Word));
 
-        // Parentheses (with matching chars)
+        // Parentheses (with matching chars).
         entries.insert('(', SyntaxEntry::with_match(SyntaxClass::Open, ')'));
         entries.insert(')', SyntaxEntry::with_match(SyntaxClass::Close, '('));
         entries.insert('[', SyntaxEntry::with_match(SyntaxClass::Open, ']'));
@@ -378,23 +405,15 @@ impl SyntaxTable {
         // Escape
         entries.insert('\\', SyntaxEntry::simple(SyntaxClass::Escape));
 
-        // Symbol constituents (common Emacs defaults for Lisp)
-        for ch in ['_', '-', '&', '*', '+', '/', '<', '=', '>', '|', '.'] {
+        // Symbol constituents.
+        for ch in ['_', '-', '+', '*', '/', '&', '|', '<', '>', '='] {
             entries.insert(ch, SyntaxEntry::simple(SyntaxClass::Symbol));
         }
 
-        // Punctuation: everything else in printable ASCII that we haven't
-        // covered.  In Emacs the standard table marks most punctuation as
-        // punctuation; we enumerate the important ones.
-        for ch in ['!', '#', ',', ':', ';', '?', '@', '^', '~'] {
+        // Punctuation.
+        for ch in ['.', ',', ';', ':', '?', '!', '#', '@', '~', '^', '\'', '`'] {
             entries.insert(ch, SyntaxEntry::simple(SyntaxClass::Punctuation));
         }
-
-        // Quote/backtick are punctuation by default in Emacs standard syntax.
-        entries.insert('\'', SyntaxEntry::simple(SyntaxClass::Punctuation));
-        entries.insert('`', SyntaxEntry::simple(SyntaxClass::Punctuation));
-        // Dollar defaults to word syntax in Emacs standard syntax table.
-        entries.insert('$', SyntaxEntry::simple(SyntaxClass::Word));
 
         Self {
             entries,
@@ -424,13 +443,15 @@ impl SyntaxTable {
             .or_else(|| self.parent.as_ref().and_then(|p| p.get_entry(ch)))
     }
 
-    /// Return the syntax class for `ch`, defaulting to `Symbol` for
-    /// characters not present in the table (matching Emacs behavior for
-    /// multi-byte characters).
+    /// Return the syntax class for `ch`.
     pub fn char_syntax(&self, ch: char) -> SyntaxClass {
-        self.get_entry(ch)
-            .map(|e| e.class)
-            .unwrap_or(SyntaxClass::Symbol)
+        self.get_entry(ch).map(|e| e.class).unwrap_or_else(|| {
+            if u32::from(ch) >= 0x80 {
+                SyntaxClass::Word
+            } else {
+                SyntaxClass::Whitespace
+            }
+        })
     }
 
     // -- Mutation -------------------------------------------------------------
@@ -1002,7 +1023,17 @@ pub(crate) fn builtin_copy_syntax_table(args: Vec<Value>) -> EvalResult {
     };
 
     match source {
-        Value::Vector(v) => Ok(Value::vector(with_heap(|h| h.get_vector(v).clone()))),
+        Value::Vector(v) => {
+            let copy = Value::vector(with_heap(|h| h.get_vector(v).clone()));
+            super::chartable::builtin_set_char_table_range(vec![copy, Value::Nil, Value::Nil])?;
+            if super::chartable::builtin_char_table_parent(vec![copy])?.is_nil() {
+                super::chartable::builtin_set_char_table_parent(vec![
+                    copy,
+                    ensure_standard_syntax_table_object()?,
+                ])?;
+            }
+            Ok(copy)
+        }
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("syntax-table-p"), other],
@@ -1015,17 +1046,34 @@ fn ensure_standard_syntax_table_object() -> EvalResult {
         if let Some(table) = slot.borrow().as_ref() {
             return Ok(*table);
         }
+        let whitespace = syntax_entry_to_value(&SyntaxEntry::simple(SyntaxClass::Whitespace));
+        let punctuation = syntax_entry_to_value(&SyntaxEntry::simple(SyntaxClass::Punctuation));
+        let word = syntax_entry_to_value(&SyntaxEntry::simple(SyntaxClass::Word));
         let table =
-            super::chartable::make_char_table_value(Value::symbol("syntax-table"), Value::Nil);
+            super::chartable::make_char_table_value(Value::symbol("syntax-table"), whitespace);
+
+        for cp in 0..=(' ' as i64 - 1) {
+            super::chartable::builtin_set_char_table_range(vec![
+                table,
+                Value::Int(cp),
+                punctuation,
+            ])?;
+        }
+        super::chartable::builtin_set_char_table_range(vec![table, Value::Int(0x7f), punctuation])?;
+
         let standard = SyntaxTable::new_standard();
         for (ch, entry) in &standard.entries {
-            let entry_value = syntax_entry_to_value(entry);
             super::chartable::builtin_set_char_table_range(vec![
                 table,
                 Value::Int(*ch as i64),
-                entry_value,
+                syntax_entry_to_value(entry),
             ])?;
         }
+        super::chartable::builtin_set_char_table_range(vec![
+            table,
+            Value::cons(Value::Int(0x80), Value::Int(0x3F_FFFF)),
+            word,
+        ])?;
         *slot.borrow_mut() = Some(table);
         Ok(table)
     })
@@ -1060,6 +1108,115 @@ fn set_current_buffer_syntax_table_object(
     buf.properties
         .insert(SYNTAX_TABLE_OBJECT_PROPERTY.to_string(), table);
     Ok(())
+}
+
+fn syntax_entry_from_chartable_entry(entry: &Value) -> Option<SyntaxEntry> {
+    match entry {
+        Value::Nil => None,
+        Value::Cons(cell) => {
+            let pair = read_cons(*cell);
+            let code = match pair.car {
+                Value::Int(code) => code,
+                _ => return None,
+            };
+            let class = SyntaxClass::from_code(code)?;
+            let matching_char = match pair.cdr {
+                Value::Int(n) => char::from_u32(n as u32),
+                Value::Char(c) => Some(c),
+                Value::Nil => None,
+                _ => None,
+            };
+            Some(SyntaxEntry {
+                class,
+                matching_char,
+                flags: SyntaxFlags::new(((code >> 16) & 0xFF) as u8),
+            })
+        }
+        Value::Int(code) => Some(SyntaxEntry {
+            class: SyntaxClass::from_code(*code)?,
+            matching_char: None,
+            flags: SyntaxFlags::new(((*code >> 16) & 0xFF) as u8),
+        }),
+        _ => None,
+    }
+}
+
+fn apply_compiled_syntax_entry(
+    syntax_table: &mut SyntaxTable,
+    key: Value,
+    entry: Option<&SyntaxEntry>,
+) -> Result<(), Flow> {
+    match key {
+        Value::Int(n) => {
+            if let Some(ch) = char::from_u32(n as u32) {
+                if let Some(entry) = entry {
+                    syntax_table.modify_syntax_entry(ch, entry.clone());
+                } else {
+                    syntax_table.entries.remove(&ch);
+                }
+            }
+        }
+        Value::Char(ch) => {
+            if let Some(entry) = entry {
+                syntax_table.modify_syntax_entry(ch, entry.clone());
+            } else {
+                syntax_table.entries.remove(&ch);
+            }
+        }
+        Value::Cons(cell) => {
+            let pair = read_cons(cell);
+            let (start, end) = match (pair.car, pair.cdr) {
+                (Value::Int(start), Value::Int(end)) => (start, end),
+                _ => return Ok(()),
+            };
+            if start > end {
+                return Ok(());
+            }
+            if start >= 0x80
+                && end == 0x3F_FFFF
+                && matches!(entry, Some(e) if e.class == SyntaxClass::Word && e.matching_char.is_none())
+            {
+                return Ok(());
+            }
+            for cp in start..=end {
+                if let Some(ch) = char::from_u32(cp as u32) {
+                    if let Some(entry) = entry {
+                        syntax_table.modify_syntax_entry(ch, entry.clone());
+                    } else {
+                        syntax_table.entries.remove(&ch);
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn syntax_table_from_chartable(table: Value) -> Result<SyntaxTable, Flow> {
+    if builtin_syntax_table_p(vec![table])?.is_nil() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("syntax-table-p"), table],
+        ));
+    }
+
+    let parent = super::chartable::builtin_char_table_parent(vec![table])?;
+    let mut compiled = SyntaxTable {
+        entries: HashMap::new(),
+        parent: if parent.is_nil() {
+            None
+        } else {
+            Some(Box::new(syntax_table_from_chartable(parent)?))
+        },
+    };
+
+    for (key, value) in super::chartable::char_table_local_entries(&table)? {
+        let entry = syntax_entry_from_chartable_entry(&value);
+        apply_compiled_syntax_entry(&mut compiled, key, entry.as_ref())?;
+    }
+
+    Ok(compiled)
 }
 
 /// `(syntax-class-to-char CLASS)` — map syntax class code to descriptor char.
@@ -1295,39 +1452,18 @@ pub(crate) fn builtin_set_syntax_table(
     }
     let table = args[0];
     set_current_buffer_syntax_table_object(eval, table)?;
+    let compiled = syntax_table_from_chartable(table)?;
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    buf.syntax_table = compiled;
     Ok(table)
 }
 
 // ===========================================================================
 // Builtin functions (evaluator-dependent — operate on current buffer)
 // ===========================================================================
-
-/// Extract a character from a Value, returning `Ok(None)` for
-/// non-Unicode internal Emacs codes (above U+10FFFF but within 0x3FFFFF).
-fn syntax_extract_char_opt(value: &Value) -> Result<Option<char>, Flow> {
-    match value {
-        Value::Char(c) => Ok(Some(*c)),
-        Value::Int(n) => {
-            if let Some(c) = char::from_u32(*n as u32) {
-                Ok(Some(c))
-            } else if (0..=0x3FFFFF).contains(n) {
-                Ok(None) // internal Emacs code above Unicode range
-            } else {
-                Err(signal(
-                    "error",
-                    vec![Value::string(format!(
-                        "modify-syntax-entry: Invalid character code: {}",
-                        n
-                    ))],
-                ))
-            }
-        }
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("characterp"), *other],
-        )),
-    }
-}
 
 /// `(modify-syntax-entry CHAR NEWENTRY &optional SYNTAX-TABLE)`
 pub(crate) fn builtin_modify_syntax_entry(
@@ -1352,7 +1488,7 @@ pub(crate) fn builtin_modify_syntax_entry(
             ));
         }
     };
-    let mut entry =
+    let entry =
         string_to_syntax(&descriptor).map_err(|msg| signal("error", vec![Value::string(&msg)]))?;
     let target_table = if let Some(table) = args.get(2) {
         if builtin_syntax_table_p(vec![*table])?.is_nil() {
@@ -1376,89 +1512,16 @@ pub(crate) fn builtin_modify_syntax_entry(
     };
     super::chartable::builtin_set_char_table_range(vec![target_table, args[0], chartable_entry])?;
 
-    // Keep internal buffer syntax behavior aligned with the active table.
-    if matches!(entry.class, SyntaxClass::InheritStandard) {
-        // Emacs effectively treats "@" modifier entries as inherited/default
-        // whitespace semantics in baseline syntax tables.
-        entry = SyntaxEntry::simple(SyntaxClass::Whitespace);
-    }
-
     if !update_current_buffer_table {
         return Ok(Value::Nil);
     }
-
-    // First argument: single character OR range (FROM . TO).
-    match &args[0] {
-        Value::Cons(cell) => {
-            // Range: (FROM . TO)
-            let pair = read_cons(*cell);
-            let from = syntax_extract_char_opt(&pair.car)?;
-            let to = syntax_extract_char_opt(&pair.cdr)?;
-            drop(pair);
-            if let (Some(f), Some(t)) = (from, to) {
-                let buf = eval
-                    .buffers
-                    .current_buffer_mut()
-                    .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-                for cp in (f as u32)..=(t as u32) {
-                    if let Some(ch) = char::from_u32(cp) {
-                        buf.syntax_table.modify_syntax_entry(ch, entry.clone());
-                    }
-                }
-            }
-            // else: range endpoints are non-Unicode internal codes; skip
-        }
-        _ => {
-            let ch = match &args[0] {
-                Value::Char(c) => *c,
-                Value::Int(n) => {
-                    if let Some(c) = char::from_u32(*n as u32) {
-                        c
-                    } else if (0..=0x3FFFFF).contains(n) {
-                        // Internal Emacs char code above Unicode range
-                        return Ok(Value::Nil);
-                    } else {
-                        return Err(signal(
-                            "error",
-                            vec![Value::string(format!("Invalid character code: {}", n))],
-                        ));
-                    }
-                }
-                other => {
-                    return Err(signal(
-                        "wrong-type-argument",
-                        vec![Value::symbol("characterp"), *other],
-                    ));
-                }
-            };
-            let buf = eval
-                .buffers
-                .current_buffer_mut()
-                .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-            buf.syntax_table.modify_syntax_entry(ch, entry);
-        }
-    }
+    let compiled = syntax_table_from_chartable(target_table)?;
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    buf.syntax_table = compiled;
     Ok(Value::Nil)
-}
-
-/// Extract the syntax class from a char-table entry value.
-///
-/// In GNU Emacs the syntax table is a char-table whose entries are cons
-/// cells `(CODE . MATCHING-CHAR)` where the low bits of CODE encode the
-/// syntax class.  `nil` entries mean "inherit from standard table".
-fn syntax_class_from_chartable_entry(entry: &Value) -> Option<SyntaxClass> {
-    match entry {
-        Value::Cons(cell) => {
-            let pair = read_cons(*cell);
-            if let Value::Int(code) = pair.car {
-                SyntaxClass::from_code(code)
-            } else {
-                None
-            }
-        }
-        Value::Int(code) => SyntaxClass::from_code(*code),
-        _ => None,
-    }
 }
 
 /// `(char-syntax CHAR)` — return the syntax class designator char.

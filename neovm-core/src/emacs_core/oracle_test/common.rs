@@ -283,6 +283,8 @@ pub(crate) fn assert_oracle_parity_with_load(form: &str, load_files: &[&str]) {
 pub(crate) fn run_neovm_eval_with_bootstrap(form: &str) -> Result<String, String> {
     let mut eval = crate::emacs_core::load::create_bootstrap_evaluator_cached()
         .map_err(|e| format!("bootstrap failed: {e:?}"))?;
+    crate::emacs_core::load::apply_runtime_startup_state(&mut eval)
+        .map_err(|e| format!("startup state failed: {e:?}"))?;
 
     let forms = parse_forms(form).map_err(|e| format!("parse error: {e}"))?;
     let Some(first) = forms.first() else {

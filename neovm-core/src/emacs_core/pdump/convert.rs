@@ -1174,6 +1174,7 @@ pub(crate) fn dump_evaluator(eval: &Evaluator) -> DumpEvaluatorState {
         interactive: dump_interactive_registry(&eval.interactive),
         kill_ring: dump_kill_ring(&eval.kill_ring),
         rectangle: dump_rectangle(&eval.rectangle),
+        standard_syntax_table: dump_value(&eval.standard_syntax_table),
         current_local_map: dump_value(&eval.current_local_map),
         kmacro: dump_kmacro(&eval.kmacro),
         registers: dump_register_manager(&eval.registers),

@@ -204,6 +204,7 @@ fn reconstruct_evaluator(state: DumpEvaluatorState) -> Result<Evaluator, DumpErr
         load_interactive_registry(&state.interactive),
         load_kill_ring(&state.kill_ring),
         load_rectangle(&state.rectangle),
+        load_value(&state.standard_syntax_table),
         load_value(&state.current_local_map),
         load_kmacro(&state.kmacro),
         load_register_manager(&state.registers),
@@ -316,6 +317,90 @@ mod tests {
         .unwrap();
         let result = loaded.eval_expr(&forms[0]).expect("eval should succeed");
         assert_eq!(result, Value::Int(49));
+    }
+
+    #[test]
+    fn test_pdump_round_trip_preserves_runtime_derived_mode_syntax() {
+        let mut eval = crate::emacs_core::load::create_bootstrap_evaluator()
+            .expect("bootstrap should succeed");
+        crate::emacs_core::load::apply_runtime_startup_state(&mut eval)
+            .expect("runtime startup should succeed");
+
+        let probe = crate::emacs_core::parser::parse_forms(
+            r#"(list
+                 (boundp 'lisp-data-mode-syntax-table)
+                 (boundp 'emacs-lisp-mode-syntax-table)
+                 (boundp 'lisp-interaction-mode-syntax-table)
+                 (functionp (symbol-function 'lisp-interaction-mode))
+                 (eq (char-table-parent emacs-lisp-mode-syntax-table)
+                     lisp-data-mode-syntax-table)
+                 (eq (char-table-parent lisp-interaction-mode-syntax-table)
+                     emacs-lisp-mode-syntax-table)
+                 (char-syntax ?\n)
+                 (char-syntax ?\;)
+                 (char-syntax ?{)
+                 (char-syntax ?'))"#,
+        )
+        .unwrap();
+        let full_result = eval
+            .eval_expr(&probe[0])
+            .expect("full bootstrap probe should run");
+        assert_eq!(
+            crate::emacs_core::print_value_with_buffers(&full_result, &eval.buffers),
+            "(t t t t t t 62 60 95 39)"
+        );
+
+        let dir = tempfile::tempdir().unwrap();
+        let dump_path = dir.path().join("derived-mode-syntax.pdump");
+        dump_to_file(&eval, &dump_path).expect("dump should succeed");
+        drop(eval);
+
+        let mut loaded = load_from_dump(&dump_path).expect("load should succeed");
+        crate::emacs_core::load::apply_runtime_startup_state(&mut loaded)
+            .expect("runtime startup after load should succeed");
+
+        let loaded_result = loaded
+            .eval_expr(&probe[0])
+            .expect("loaded bootstrap probe should run");
+        assert_eq!(
+            crate::emacs_core::print_value_with_buffers(&loaded_result, &loaded.buffers),
+            "(t t t t t t 62 60 95 39)"
+        );
+    }
+
+    #[test]
+    fn test_pdump_round_trip_preserves_pre_runtime_standard_syntax_identity() {
+        let eval = crate::emacs_core::load::create_bootstrap_evaluator()
+            .expect("bootstrap should succeed");
+
+        let dir = tempfile::tempdir().unwrap();
+        let dump_path = dir.path().join("bootstrap-pre-runtime-syntax.pdump");
+        dump_to_file(&eval, &dump_path).expect("dump should succeed");
+        drop(eval);
+
+        let mut loaded = load_from_dump(&dump_path).expect("load should succeed");
+        crate::emacs_core::load::apply_runtime_startup_state(&mut loaded)
+            .expect("runtime startup after load should succeed");
+
+        let probe = crate::emacs_core::parser::parse_forms(
+            r#"(list
+                 (eq (char-table-parent emacs-lisp-mode-syntax-table)
+                     lisp-data-mode-syntax-table)
+                 (eq (char-table-parent lisp-interaction-mode-syntax-table)
+                     emacs-lisp-mode-syntax-table)
+                 (char-syntax ?\n)
+                 (char-syntax ?\;)
+                 (char-syntax ?{)
+                 (char-syntax ?'))"#,
+        )
+        .unwrap();
+        let result = loaded
+            .eval_expr(&probe[0])
+            .expect("loaded pre-runtime probe should run");
+        assert_eq!(
+            crate::emacs_core::print_value_with_buffers(&result, &loaded.buffers),
+            "(t t 62 60 95 39)"
+        );
     }
 
     #[test]
