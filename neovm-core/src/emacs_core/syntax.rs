@@ -379,14 +379,14 @@ impl SyntaxTable {
         entries.insert('\\', SyntaxEntry::simple(SyntaxClass::Escape));
 
         // Symbol constituents (common Emacs defaults for Lisp)
-        for ch in ['_', '-', '&', '*', '+', '/', '<', '=', '>', '|'] {
+        for ch in ['_', '-', '&', '*', '+', '/', '<', '=', '>', '|', '.'] {
             entries.insert(ch, SyntaxEntry::simple(SyntaxClass::Symbol));
         }
 
         // Punctuation: everything else in printable ASCII that we haven't
         // covered.  In Emacs the standard table marks most punctuation as
         // punctuation; we enumerate the important ones.
-        for ch in ['!', '#', ',', '.', ':', ';', '?', '@', '^', '~'] {
+        for ch in ['!', '#', ',', ':', ';', '?', '@', '^', '~'] {
             entries.insert(ch, SyntaxEntry::simple(SyntaxClass::Punctuation));
         }
 

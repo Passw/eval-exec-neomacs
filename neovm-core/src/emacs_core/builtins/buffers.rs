@@ -455,11 +455,16 @@ pub(crate) fn builtin_buffer_substring(
     // Convert char positions to byte positions
     let byte_start = buf.text.char_to_byte(s);
     let byte_end = buf.text.char_to_byte(e);
-    let result = Value::string(buf.buffer_substring(byte_start, byte_end));
+    let (byte_lo, byte_hi) = if byte_start <= byte_end {
+        (byte_start, byte_end)
+    } else {
+        (byte_end, byte_start)
+    };
+    let result = Value::string(buf.buffer_substring(byte_lo, byte_hi));
     // Copy buffer text properties to the result string
     if !buf.text_props.is_empty() {
         if let Value::Str(new_id) = &result {
-            let sliced = buf.text_props.slice(byte_start, byte_end);
+            let sliced = buf.text_props.slice(byte_lo, byte_hi);
             if !sliced.is_empty() {
                 set_string_text_properties_table(*new_id, sliced);
             }

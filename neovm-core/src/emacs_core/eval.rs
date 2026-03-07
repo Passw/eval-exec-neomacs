@@ -1573,6 +1573,7 @@ impl Evaluator {
             "print-length",
             "print-level",
             "standard-output",
+            "case-fold-search",
             "buffer-read-only",
             "unread-command-events",
         ] {
@@ -2295,12 +2296,13 @@ impl Evaluator {
         rewrite_builtin_wrong_arity: bool,
     ) -> EvalResult {
         if super::builtins::is_canonical_symbol_id(sym_id) {
-            return self.apply_named_callable(
-                resolve_sym(sym_id),
-                args,
-                value_from_symbol_id(sym_id),
-                rewrite_builtin_wrong_arity,
-            );
+            let name = resolve_sym(sym_id);
+            let invalid_fn = if super::subr_info::is_special_form(name) {
+                Value::Subr(sym_id)
+            } else {
+                value_from_symbol_id(sym_id)
+            };
+            return self.apply_named_callable(name, args, invalid_fn, rewrite_builtin_wrong_arity);
         }
 
         if self.obarray.is_function_unbound_id(sym_id) {
@@ -3855,7 +3857,7 @@ impl Evaluator {
     fn validate_throw(&self, flow: Flow) -> Flow {
         match flow {
             Flow::Throw { ref tag, ref value } => {
-                if self.catch_tags.iter().rev().any(|t| eq_value(t, tag)) {
+                if !tag.is_nil() && self.catch_tags.iter().rev().any(|t| eq_value(t, tag)) {
                     flow
                 } else {
                     signal("no-catch", vec![*tag, *value])
@@ -3905,7 +3907,7 @@ impl Evaluator {
         // Mirror GNU Emacs Fthrow: check for a matching catch first.
         // If found → Flow::Throw (bypasses condition-case, caught by catch).
         // If not → signal no-catch immediately (condition-case can catch this).
-        if self.catch_tags.iter().rev().any(|t| eq_value(t, &tag)) {
+        if !tag.is_nil() && self.catch_tags.iter().rev().any(|t| eq_value(t, &tag)) {
             Err(Flow::Throw { tag, value })
         } else {
             Err(signal("no-catch", vec![tag, value]))

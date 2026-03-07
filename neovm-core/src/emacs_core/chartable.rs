@@ -353,21 +353,19 @@ fn ct_set_range(vec: &mut Vec<Value>, min: i64, max: i64, value: Value) {
     vec.push(value);
 }
 
-/// Look up a single character in the data pairs (no parent fallback).
-/// Exact character matches take priority over range matches.
-/// For multiple range matches, the LAST (most recently set) one wins,
-/// matching GNU Emacs behavior where later set-char-table-range overrides earlier.
+/// Look up a single character in the data pairs (no parent/default fallback).
+/// The last assignment that covers the character wins, matching GNU Emacs
+/// `set-char-table-range` overwrite semantics for both single-char and range
+/// entries.
 fn ct_get_char(vec: &[Value], ch: i64) -> Option<Value> {
     let start = ct_data_start(vec);
     let mut i = start;
-    let mut exact_match: Option<Value> = None;
-    let mut range_match: Option<Value> = None;
+    let mut match_value: Option<Value> = None;
     while i + 1 < vec.len() {
         match &vec[i] {
             Value::Int(existing) => {
                 if *existing == ch {
-                    // Take the last exact match (later overrides win).
-                    exact_match = Some(vec[i + 1]);
+                    match_value = Some(vec[i + 1]);
                 }
             }
             Value::Cons(cell) => {
@@ -375,8 +373,7 @@ fn ct_get_char(vec: &[Value], ch: i64) -> Option<Value> {
                 let pair = read_cons(*cell);
                 if let (Value::Int(min), Value::Int(max)) = (&pair.car, &pair.cdr) {
                     if ch >= *min && ch <= *max {
-                        // Take the last range match (later overrides win).
-                        range_match = Some(vec[i + 1]);
+                        match_value = Some(vec[i + 1]);
                     }
                 }
             }
@@ -384,8 +381,7 @@ fn ct_get_char(vec: &[Value], ch: i64) -> Option<Value> {
         }
         i += 2;
     }
-    // Exact match takes priority over range match.
-    exact_match.or(range_match)
+    match_value
 }
 
 /// `(char-table-range CHAR-TABLE RANGE)` -- look up a value.
@@ -433,8 +429,8 @@ pub(crate) fn builtin_char_table_range(args: Vec<Value>) -> EvalResult {
 /// Recursive char-table lookup: check own entries, then default, then parent.
 ///
 /// This matches GNU Emacs semantics:
-/// 1. Look up the character in the char-table's data pairs (exact match, then range match)
-/// 2. If not found, use the char-table's default value
+/// 1. Look up the character in the char-table's data pairs
+/// 2. If the local entry is nil or absent, use the char-table's default value
 /// 3. If default is nil, recursively check the parent char-table
 pub(crate) fn ct_lookup(table: &Value, ch: i64) -> EvalResult {
     let arc = match table {
@@ -444,7 +440,9 @@ pub(crate) fn ct_lookup(table: &Value, ch: i64) -> EvalResult {
     let vec = with_heap(|h| h.get_vector(*arc).clone());
 
     if let Some(val) = ct_get_char(&vec, ch) {
-        return Ok(val);
+        if !val.is_nil() {
+            return Ok(val);
+        }
     }
 
     let default = vec[CT_DEFAULT];
@@ -503,13 +501,12 @@ pub(crate) fn builtin_map_char_table(eval: &mut Evaluator, args: Vec<Value>) -> 
     let func = args[0];
     let table = &args[1];
 
-    let arc = match table {
-        Value::Vector(a) if is_char_table(table) => a,
+    match table {
+        Value::Vector(_) if is_char_table(table) => {}
         _ => return Err(wrong_type("char-table-p", table)),
-    };
+    }
 
-    let vec_snapshot = with_heap(|h| h.get_vector(*arc).clone());
-    let entries = ct_resolved_entries(&vec_snapshot);
+    let entries = ct_resolved_entries(table);
 
     for (key, val) in entries {
         eval.apply(func, vec![key, val])?;
@@ -517,184 +514,180 @@ pub(crate) fn builtin_map_char_table(eval: &mut Evaluator, args: Vec<Value>) -> 
     Ok(Value::Nil)
 }
 
-/// Resolve char-table data pairs into non-overlapping (key, value) entries.
+/// Resolve a char-table into non-overlapping effective `(key, value)` entries.
 ///
-/// Later entries in the data pairs take priority over earlier ones for
-/// overlapping characters. The result coalesces adjacent same-value entries
-/// into range cons cells, matching GNU Emacs `map-char-table` behavior.
-///
-/// Also includes the default value as a range entry covering all characters
-/// not otherwise mapped, if the default is non-nil.
-fn ct_resolved_entries(vec: &[Value]) -> Vec<(Value, Value)> {
-    let start = ct_data_start(&vec);
+/// This mirrors GNU Emacs `map-char-table` semantics:
+/// - later local assignments override earlier ones regardless of whether they
+///   are single-char or range writes
+/// - an explicit local `nil` means "inherit", not "mask the parent"
+/// - the table default fills uncovered regions before parent inheritance
+/// - parent/default/local ranges are coalesced into maximal same-value runs
+fn ct_resolved_entries(table: &Value) -> Vec<(Value, Value)> {
+    let Value::Vector(arc) = table else {
+        return Vec::new();
+    };
+    let vec = with_heap(|h| h.get_vector(*arc).clone());
+    let raws = ct_collect_raw_entries(&vec);
     let default = vec[CT_DEFAULT];
+    let parent_entries = match vec[CT_PARENT] {
+        parent if is_char_table(&parent) => ct_resolved_entries(&parent),
+        _ => Vec::new(),
+    };
 
-    // Collect all raw (key, value) pairs from the data section.
-    // We'll build a list of (char_code -> value) point mappings and
-    // (min, max, value) range mappings to resolve.
-    struct RawEntry {
-        kind: RawEntryKind,
-        order: usize, // insertion order, higher = later = higher priority
-    }
-    enum RawEntryKind {
-        Single(i64, Value),
-        Range(i64, i64, Value),
+    if raws.is_empty() && default.is_nil() && parent_entries.is_empty() {
+        return Vec::new();
     }
 
+    let mut boundaries = std::collections::BTreeSet::new();
+    for raw in &raws {
+        boundaries.insert(raw.start);
+        boundaries.insert(raw.end.saturating_add(1));
+    }
+    for (key, _) in &parent_entries {
+        let (start, end) = resolved_key_bounds(key);
+        boundaries.insert(start);
+        boundaries.insert(end.saturating_add(1));
+    }
+    if !default.is_nil() {
+        boundaries.insert(0);
+        boundaries.insert(MAX_CHAR.saturating_add(1));
+    }
+
+    let boundary_vec = boundaries
+        .into_iter()
+        .filter(|b| *b >= 0 && *b <= MAX_CHAR.saturating_add(1))
+        .collect::<Vec<_>>();
+
+    let mut result = Vec::new();
+    let mut run_start: Option<i64> = None;
+    let mut run_end = 0i64;
+    let mut run_value = Value::Nil;
+
+    for window in boundary_vec.windows(2) {
+        let start = window[0];
+        let end_exclusive = window[1];
+        if start > MAX_CHAR || end_exclusive <= start {
+            continue;
+        }
+        let interval_end = end_exclusive.saturating_sub(1).min(MAX_CHAR);
+        let value = ct_effective_value_at(&raws, default, &parent_entries, start);
+        if value.is_nil() {
+            if let Some(existing_start) = run_start.take() {
+                emit_run(&mut result, existing_start, run_end, run_value);
+            }
+            continue;
+        }
+
+        match run_start {
+            Some(existing_start) if run_value == value && start == run_end.saturating_add(1) => {
+                let _ = existing_start;
+                run_end = interval_end;
+            }
+            Some(existing_start) => {
+                emit_run(&mut result, existing_start, run_end, run_value);
+                run_start = Some(start);
+                run_end = interval_end;
+                run_value = value;
+            }
+            None => {
+                run_start = Some(start);
+                run_end = interval_end;
+                run_value = value;
+            }
+        }
+    }
+
+    if let Some(existing_start) = run_start {
+        emit_run(&mut result, existing_start, run_end, run_value);
+    }
+
+    result
+}
+
+#[derive(Clone, Copy)]
+struct RawEntry {
+    start: i64,
+    end: i64,
+    value: Value,
+}
+
+fn ct_collect_raw_entries(vec: &[Value]) -> Vec<RawEntry> {
+    let start = ct_data_start(vec);
     let mut raws = Vec::new();
     let mut i = start;
-    let mut order = 0usize;
     while i + 1 < vec.len() {
         match &vec[i] {
-            Value::Int(ch) => {
-                raws.push(RawEntry {
-                    kind: RawEntryKind::Single(*ch, vec[i + 1]),
-                    order,
-                });
-            }
+            Value::Int(ch) => raws.push(RawEntry {
+                start: *ch,
+                end: *ch,
+                value: vec[i + 1],
+            }),
             Value::Cons(cell) => {
                 let pair = read_cons(*cell);
                 if let (Value::Int(min), Value::Int(max)) = (&pair.car, &pair.cdr) {
                     raws.push(RawEntry {
-                        kind: RawEntryKind::Range(*min, *max, vec[i + 1]),
-                        order,
+                        start: *min,
+                        end: *max,
+                        value: vec[i + 1],
                     });
                 }
             }
             _ => {}
         }
         i += 2;
-        order += 1;
     }
+    raws
+}
 
-    if raws.is_empty() && default.is_nil() {
-        return Vec::new();
-    }
-
-    // If there are no range entries and only single chars (common case),
-    // take the fast path.
-    let has_ranges = raws
-        .iter()
-        .any(|r| matches!(r.kind, RawEntryKind::Range(..)));
-
-    if !has_ranges && default.is_nil() {
-        // Simple case: just single-char entries, no overlaps possible with ranges.
-        // Later entries override earlier ones for the same char.
-        let mut map = std::collections::BTreeMap::new();
-        for raw in &raws {
-            if let RawEntryKind::Single(ch, val) = &raw.kind {
-                map.insert(*ch, *val);
-            }
-        }
-        return map
-            .into_iter()
-            .filter(|(_, v)| !v.is_nil())
-            .map(|(ch, val)| (Value::Int(ch), val))
-            .collect();
-    }
-
-    // General case: resolve all entries into a point map.
-    // Collect all character code points that are explicitly mentioned.
-    // For ranges, we need to enumerate boundary points.
-    //
-    // Strategy: Build sorted list of "events" (boundary points), then
-    // for each segment between events, determine the effective value.
-    // This avoids enumerating all 0..MAX_CHAR characters.
-
-    // Collect all boundary points.
-    let mut boundaries = std::collections::BTreeSet::new();
-    for raw in &raws {
-        match &raw.kind {
-            RawEntryKind::Single(ch, _) => {
-                boundaries.insert(*ch);
-                // Also insert ch-1 and ch+1 to split ranges around this point
-                if *ch > 0 {
-                    boundaries.insert(*ch - 1);
-                }
-                boundaries.insert(*ch + 1);
-            }
-            RawEntryKind::Range(min, max, _) => {
-                boundaries.insert(*min);
-                boundaries.insert(*max);
-                if *min > 0 {
-                    boundaries.insert(*min - 1);
-                }
-                boundaries.insert(*max + 1);
-            }
+fn ct_local_value_at(raws: &[RawEntry], ch: i64) -> Option<Value> {
+    let mut value = None;
+    for raw in raws {
+        if ch >= raw.start && ch <= raw.end {
+            value = Some(raw.value);
         }
     }
+    value
+}
 
-    // For default value, add boundaries for the full range.
+fn ct_effective_value_at(
+    raws: &[RawEntry],
+    default: Value,
+    parent_entries: &[(Value, Value)],
+    ch: i64,
+) -> Value {
+    if let Some(local) = ct_local_value_at(raws, ch) {
+        if !local.is_nil() {
+            return local;
+        }
+    }
     if !default.is_nil() {
-        boundaries.insert(0);
-        boundaries.insert(MAX_CHAR);
+        return default;
     }
+    resolved_entries_value_at(parent_entries, ch).unwrap_or(Value::Nil)
+}
 
-    // For each boundary point, determine the effective value.
-    // The effective value is determined by the highest-order entry that covers the point.
-    let boundary_vec: Vec<i64> = boundaries
-        .into_iter()
-        .filter(|b| *b >= 0 && *b <= MAX_CHAR)
-        .collect();
+fn resolved_entries_value_at(entries: &[(Value, Value)], ch: i64) -> Option<Value> {
+    for (key, value) in entries {
+        let (start, end) = resolved_key_bounds(key);
+        if ch >= start && ch <= end {
+            return Some(*value);
+        }
+    }
+    None
+}
 
-    let mut point_values: Vec<(i64, Value)> = Vec::new();
-    for &pt in &boundary_vec {
-        // For each boundary point, find the highest-priority entry that covers it.
-        // Higher insertion order = higher priority. Default has lowest priority.
-        let mut best_order: Option<usize> = None;
-        let mut best_value = if !default.is_nil() {
-            default
-        } else {
-            Value::Nil
-        };
-
-        for raw in &raws {
-            let covers = match &raw.kind {
-                RawEntryKind::Single(ch, _) => *ch == pt,
-                RawEntryKind::Range(min, max, _) => pt >= *min && pt <= *max,
-            };
-            if covers {
-                if best_order.is_none() || raw.order > best_order.unwrap() {
-                    best_order = Some(raw.order);
-                    best_value = match &raw.kind {
-                        RawEntryKind::Single(_, v) => *v,
-                        RawEntryKind::Range(_, _, v) => *v,
-                    };
-                }
+fn resolved_key_bounds(key: &Value) -> (i64, i64) {
+    match key {
+        Value::Int(ch) => (*ch, *ch),
+        Value::Cons(cell) => {
+            let pair = read_cons(*cell);
+            match (&pair.car, &pair.cdr) {
+                (Value::Int(start), Value::Int(end)) => (*start, *end),
+                _ => (0, -1),
             }
         }
-
-        if !best_value.is_nil() {
-            point_values.push((pt, best_value));
-        }
+        _ => (0, -1),
     }
-
-    if point_values.is_empty() {
-        return Vec::new();
-    }
-
-    // Coalesce adjacent same-value entries into ranges.
-    let mut result = Vec::new();
-    let mut run_start = point_values[0].0;
-    let mut run_end = point_values[0].0;
-    let mut run_val = point_values[0].1;
-
-    for &(pt, val) in &point_values[1..] {
-        if val == run_val && pt == run_end + 1 {
-            // Extend the current run.
-            run_end = pt;
-        } else {
-            // Emit the current run.
-            emit_run(&mut result, run_start, run_end, run_val);
-            run_start = pt;
-            run_end = pt;
-            run_val = val;
-        }
-    }
-    // Emit the final run.
-    emit_run(&mut result, run_start, run_end, run_val);
-
-    result
 }
 
 /// Emit a coalesced run as either a single character or a range cons.

@@ -875,7 +875,7 @@ impl<'a> Vm<'a> {
                     // catch_tags (catches established by the interpreter above us).
                     // If found → Flow::Throw (will be caught by sf_catch).
                     // If not → signal no-catch immediately (GNU Emacs semantics).
-                    if self.catch_tags.iter().rev().any(|t| eq_value(t, &tag)) {
+                    if !tag.is_nil() && self.catch_tags.iter().rev().any(|t| eq_value(t, &tag)) {
                         return Err(Flow::Throw { tag, value: val });
                     }
                     return Err(signal("no-catch", vec![tag, val]));
@@ -1412,7 +1412,7 @@ impl<'a> Vm<'a> {
                 let tag = args[0];
                 let value = args[1];
                 // Check evaluator catch_tags for a matching catch.
-                if self.catch_tags.iter().rev().any(|t| eq_value(t, &tag)) {
+                if !tag.is_nil() && self.catch_tags.iter().rev().any(|t| eq_value(t, &tag)) {
                     return Err(Flow::Throw { tag, value });
                 }
                 return Err(signal("no-catch", vec![tag, value]));
@@ -1531,7 +1531,7 @@ fn resolve_throw_target(
             } => {
                 // Remove from evaluator catch_tags registry (this catch is being unwound).
                 catch_tags.pop();
-                if eq_value(&catch_tag, tag) {
+                if !tag.is_nil() && eq_value(&catch_tag, tag) {
                     return Some(ThrowResolution { target, cleanups });
                 }
             }

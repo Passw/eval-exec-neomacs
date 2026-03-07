@@ -202,6 +202,70 @@ fn char_table_overwrite_entry() {
 }
 
 #[test]
+fn later_range_overrides_earlier_single_entry() {
+    let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
+    builtin_set_char_table_range(vec![ct, Value::Int('M' as i64), Value::symbol("single")])
+        .unwrap();
+    builtin_set_char_table_range(vec![
+        ct,
+        Value::cons(Value::Int('A' as i64), Value::Int('Z' as i64)),
+        Value::symbol("range"),
+    ])
+    .unwrap();
+
+    let val = builtin_char_table_range(vec![ct, Value::Int('M' as i64)]).unwrap();
+    assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) == "range"));
+}
+
+#[test]
+fn explicit_nil_entry_inherits_from_parent() {
+    let parent = make_char_table_value(Value::symbol("test"), Value::Nil);
+    builtin_set_char_table_range(vec![
+        parent,
+        Value::Int('a' as i64),
+        Value::symbol("parent-a"),
+    ])
+    .unwrap();
+
+    let child = make_char_table_value(Value::symbol("test"), Value::Nil);
+    builtin_set_char_table_parent(vec![child, parent]).unwrap();
+    builtin_set_char_table_range(vec![child, Value::Int('a' as i64), Value::Nil]).unwrap();
+
+    let val = builtin_char_table_range(vec![child, Value::Int('a' as i64)]).unwrap();
+    assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) == "parent-a"));
+}
+
+#[test]
+fn map_char_table_coalesces_ranges_after_single_override() {
+    let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
+    builtin_set_char_table_range(vec![
+        ct,
+        Value::cons(Value::Int('A' as i64), Value::Int('Z' as i64)),
+        Value::symbol("upper"),
+    ])
+    .unwrap();
+    builtin_set_char_table_range(vec![ct, Value::Int('M' as i64), Value::symbol("middle")])
+        .unwrap();
+
+    let entries = ct_resolved_entries(&ct);
+    assert_eq!(entries.len(), 3);
+    assert_eq!(
+        entries,
+        vec![
+            (
+                Value::cons(Value::Int('A' as i64), Value::Int('L' as i64)),
+                Value::symbol("upper"),
+            ),
+            (Value::Int('M' as i64), Value::symbol("middle")),
+            (
+                Value::cons(Value::Int('N' as i64), Value::Int('Z' as i64)),
+                Value::symbol("upper"),
+            ),
+        ]
+    );
+}
+
+#[test]
 fn char_table_p_on_plain_vector() {
     // A plain vector should not be detected as a char-table.
     let v = Value::vector(vec![Value::Int(1), Value::Int(2)]);

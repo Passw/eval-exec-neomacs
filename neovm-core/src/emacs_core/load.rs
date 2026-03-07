@@ -1275,6 +1275,10 @@ fn normalized_bootstrap_features(extra_features: &[&str]) -> Vec<String> {
 }
 
 const BOOTSTRAP_IMAGE_SCHEMA_VERSION: u32 = 2;
+const BOOTSTRAP_CACHE_SEED: &str = match option_env!("NEOVM_BOOTSTRAP_CACHE_SEED") {
+    Some(seed) => seed,
+    None => "dev",
+};
 
 fn bootstrap_dump_path(project_root: &Path, extra_features: &[&str]) -> PathBuf {
     let features = normalized_bootstrap_features(extra_features);
@@ -1284,7 +1288,7 @@ fn bootstrap_dump_path(project_root: &Path, extra_features: &[&str]) -> PathBuf 
         format!("-{}", features.join("-"))
     };
     project_root.join("target").join(format!(
-        "neovm-bootstrap-v{BOOTSTRAP_IMAGE_SCHEMA_VERSION}{suffix}.pdump"
+        "neovm-bootstrap-v{BOOTSTRAP_IMAGE_SCHEMA_VERSION}-{BOOTSTRAP_CACHE_SEED}{suffix}.pdump"
     ))
 }
 
