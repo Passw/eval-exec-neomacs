@@ -97,6 +97,17 @@ fn print_string() {
 }
 
 #[test]
+fn print_empty_char_table_uses_gnu_vector_shape() {
+    let table = crate::emacs_core::chartable::make_char_table_with_extra_slots(
+        Value::symbol("syntax-table"),
+        Value::Nil,
+        0,
+    );
+    let rendered = print_value(&table);
+    assert!(rendered.starts_with("#^[nil nil syntax-table"));
+}
+
+#[test]
 fn print_propertized_string_literal_shape() {
     let value = Value::string_with_text_properties(
         " ",

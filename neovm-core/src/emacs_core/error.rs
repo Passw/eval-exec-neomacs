@@ -354,6 +354,11 @@ fn format_vector_bytes_with_eval(
     value: &Value,
     options: PrintOptions,
 ) -> Vec<u8> {
+    if super::chartable::bool_vector_length(value).is_some()
+        || super::chartable::char_table_external_slots(value).is_some()
+    {
+        return super::print::print_value_bytes_with_options(value, options);
+    }
     let mut out = Vec::new();
     out.push(b'[');
     let Value::Vector(items) = value else {

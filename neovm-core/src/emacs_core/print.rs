@@ -1,6 +1,6 @@
 //! Value printing (Lisp representation).
 
-use super::chartable::bool_vector_length;
+use super::chartable::{bool_vector_length, char_table_external_slots};
 use super::expr::{self, Expr};
 use super::intern::{lookup_interned, resolve_sym};
 use super::string_escape::{format_lisp_string, format_lisp_string_bytes};
@@ -83,6 +83,13 @@ pub fn print_value_with_buffers_and_options(
         Value::Vector(v) => {
             if let Some(nbits) = super::chartable::bool_vector_length(value) {
                 return format_bool_vector(value, nbits as usize);
+            }
+            if let Some(slots) = char_table_external_slots(value) {
+                let parts: Vec<String> = slots
+                    .iter()
+                    .map(|v| print_value_with_buffers_and_options(v, buffers, options))
+                    .collect();
+                return format!("#^[{}]", parts.join(" "));
             }
             let items = with_heap(|h| h.get_vector(*v).clone());
             let parts: Vec<String> = items
@@ -204,6 +211,13 @@ pub fn print_value_with_options(value: &Value, options: PrintOptions) -> String 
             if let Some(nbits) = bool_vector_length(value) {
                 return format_bool_vector(value, nbits as usize);
             }
+            if let Some(slots) = char_table_external_slots(value) {
+                let parts: Vec<String> = slots
+                    .iter()
+                    .map(|item| print_value_with_options(item, options))
+                    .collect();
+                return format!("#^[{}]", parts.join(" "));
+            }
             let items = with_heap(|h| h.get_vector(*v).clone());
             let parts: Vec<String> = items
                 .iter()
@@ -322,6 +336,17 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>, options: PrintOpti
         Value::Vector(v) => {
             if let Some(nbits) = bool_vector_length(value) {
                 append_bool_vector_bytes(value, nbits as usize, out);
+                return;
+            }
+            if let Some(slots) = char_table_external_slots(value) {
+                out.extend_from_slice(b"#^[");
+                for (idx, item) in slots.iter().enumerate() {
+                    if idx > 0 {
+                        out.push(b' ');
+                    }
+                    append_print_value_bytes(item, out, options);
+                }
+                out.push(b']');
                 return;
             }
             out.push(b'[');

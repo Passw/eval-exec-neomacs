@@ -78,7 +78,8 @@ fn set_default_via_range_nil() {
 
 #[test]
 fn set_range_t_sets_default_value() {
-    // In GNU Emacs, (set-char-table-range ct t value) sets the default value.
+    // In GNU Emacs, (set-char-table-range ct t value) sets all character
+    // entries, but leaves the default slot untouched.
     let ct = make_char_table_value(Value::symbol("test"), Value::Int(0));
     builtin_set_char_table_range(vec![ct, Value::True, Value::Int(5)]).unwrap();
 
@@ -87,15 +88,14 @@ fn set_range_t_sets_default_value() {
     let def = builtin_char_table_range(vec![ct, Value::Nil]).unwrap();
     assert!(matches!(a, Value::Int(5)));
     assert!(matches!(b, Value::Int(5)));
-    // Default IS changed when setting range t (matches GNU Emacs).
-    assert!(matches!(def, Value::Int(5)));
+    assert!(matches!(def, Value::Int(0)));
 }
 
 #[test]
 fn set_range_t_allows_single_char_override() {
-    // (set-char-table-range ct t 5) sets default to 5.
-    // Then explicit char override for 'a' takes priority.
-    let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
+    // (set-char-table-range ct t 5) sets all characters to 5 without touching
+    // the default slot. Later single-char overrides take precedence.
+    let ct = make_char_table_value(Value::symbol("test"), Value::Int(0));
     builtin_set_char_table_range(vec![ct, Value::True, Value::Int(5)]).unwrap();
     builtin_set_char_table_range(vec![ct, Value::Int('a' as i64), Value::Int(9)]).unwrap();
 
@@ -104,8 +104,27 @@ fn set_range_t_allows_single_char_override() {
     let def = builtin_char_table_range(vec![ct, Value::Nil]).unwrap();
     assert!(matches!(a, Value::Int(9)));
     assert!(matches!(b, Value::Int(5)));
-    // Default is now 5 (set via t).
-    assert!(matches!(def, Value::Int(5)));
+    assert!(matches!(def, Value::Int(0)));
+}
+
+#[test]
+fn later_t_write_overrides_prior_specific_entries() {
+    let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
+    builtin_set_char_table_range(vec![ct, Value::Int('a' as i64), Value::Int(9)]).unwrap();
+    builtin_set_char_table_range(vec![
+        ct,
+        Value::cons(Value::Int('0' as i64), Value::Int('9' as i64)),
+        Value::Int(7),
+    ])
+    .unwrap();
+    builtin_set_char_table_range(vec![ct, Value::True, Value::Int(5)]).unwrap();
+
+    let a = builtin_char_table_range(vec![ct, Value::Int('a' as i64)]).unwrap();
+    let five = builtin_char_table_range(vec![ct, Value::Int('5' as i64)]).unwrap();
+    let def = builtin_char_table_range(vec![ct, Value::Nil]).unwrap();
+    assert!(matches!(a, Value::Int(5)));
+    assert!(matches!(five, Value::Int(5)));
+    assert!(def.is_nil());
 }
 
 #[test]
@@ -233,6 +252,16 @@ fn explicit_nil_entry_inherits_from_parent() {
 
     let val = builtin_char_table_range(vec![child, Value::Int('a' as i64)]).unwrap();
     assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) == "parent-a"));
+}
+
+#[test]
+fn set_char_table_parent_rejects_cycles() {
+    let parent = make_char_table_value(Value::symbol("test"), Value::Nil);
+    let child = make_char_table_value(Value::symbol("test"), Value::Nil);
+    builtin_set_char_table_parent(vec![child, parent]).unwrap();
+
+    let result = builtin_set_char_table_parent(vec![parent, child]);
+    assert!(result.is_err());
 }
 
 #[test]

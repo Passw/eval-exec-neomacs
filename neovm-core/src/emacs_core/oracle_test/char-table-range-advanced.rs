@@ -356,6 +356,6 @@ fn oracle_prop_char_table_range_adv_parent_fallthrough() {
        fall-a fall-Z fall-5 fall-bang fall-space
        over-a over-f fall-g fall-z
        over-X fall-Y fall-7
-       p-a p-f)))"#;
+       p-a p-f))))"#;
     assert_oracle_parity_with_bootstrap(form);
 }

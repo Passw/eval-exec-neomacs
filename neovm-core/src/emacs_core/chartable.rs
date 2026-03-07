@@ -257,7 +257,7 @@ pub(crate) fn builtin_char_table_p(args: Vec<Value>) -> EvalResult {
 /// - a character (integer/char) -- set that single entry
 /// - a cons `(MIN . MAX)` -- set all characters MIN..=MAX
 /// - `nil` -- set the default value
-/// - `t` -- set the default value for all characters
+/// - `t` -- set all character entries while leaving the default slot alone
 pub(crate) fn builtin_set_char_table_range(args: Vec<Value>) -> EvalResult {
     expect_args("set-char-table-range", &args, 3)?;
     let table = &args[0];
@@ -276,9 +276,9 @@ pub(crate) fn builtin_set_char_table_range(args: Vec<Value>) -> EvalResult {
         Value::Nil => {
             vec[CT_DEFAULT] = *value;
         }
-        // t -> set the default value (same as nil in GNU Emacs).
+        // t -> set all characters, but not the default slot.
         Value::True => {
-            vec[CT_DEFAULT] = *value;
+            ct_set_range(&mut vec, 0, MAX_CHAR, *value);
         }
         // Single character
         Value::Int(_) | Value::Char(_) => {
@@ -314,19 +314,6 @@ pub(crate) fn builtin_set_char_table_range(args: Vec<Value>) -> EvalResult {
 
 /// Set a single character entry in the char-table's data pairs.
 fn ct_set_char(vec: &mut Vec<Value>, ch: i64, value: Value) {
-    let start = ct_data_start(vec);
-    // Search for an existing entry.
-    let mut i = start;
-    while i + 1 < vec.len() {
-        if let Value::Int(existing) = &vec[i] {
-            if *existing == ch {
-                vec[i + 1] = value;
-                return;
-            }
-        }
-        i += 2;
-    }
-    // Not found — append a new pair.
     vec.push(Value::Int(ch));
     vec.push(value);
 }
@@ -334,21 +321,6 @@ fn ct_set_char(vec: &mut Vec<Value>, ch: i64, value: Value) {
 /// Set a range entry in the char-table's data pairs.
 /// The range is stored as a `Cons(min . max)` key.
 fn ct_set_range(vec: &mut Vec<Value>, min: i64, max: i64, value: Value) {
-    let start = ct_data_start(vec);
-    // Search for an existing range entry with the same bounds.
-    let mut i = start;
-    while i + 1 < vec.len() {
-        if let Value::Cons(cell) = &vec[i] {
-            let pair = read_cons(*cell);
-            if matches!((&pair.car, &pair.cdr), (Value::Int(m1), Value::Int(m2)) if *m1 == min && *m2 == max)
-            {
-                vec[i + 1] = value;
-                return;
-            }
-        }
-        i += 2;
-    }
-    // Not found — append a new range entry.
     vec.push(Value::cons(Value::Int(min), Value::Int(max)));
     vec.push(value);
 }
@@ -399,7 +371,7 @@ pub(crate) fn builtin_char_table_range(args: Vec<Value>) -> EvalResult {
     }
 
     match range {
-        Value::Nil | Value::True => {
+        Value::Nil => {
             // Return the default value.
             let arc = match table {
                 Value::Vector(a) => a,
@@ -413,15 +385,17 @@ pub(crate) fn builtin_char_table_range(args: Vec<Value>) -> EvalResult {
             ct_lookup(table, ch)
         }
         Value::Cons(cell) => {
-            // Cons range (FROM . TO): In official Emacs, this returns the
-            // value for FROM (the first character in the range).
             let pair = read_cons(*cell);
             let from = expect_int(&pair.car)?;
-            ct_lookup(table, from)
+            let _to = expect_int(&pair.cdr)?;
+            let (value, _run_from, _run_to) = ct_lookup_and_range(table, from)?;
+            Ok(value)
         }
         _ => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("char-table-range"), *range],
+            "error",
+            vec![Value::string(
+                "Invalid RANGE argument to `char-table-range'",
+            )],
         )),
     }
 }
@@ -455,6 +429,18 @@ pub(crate) fn ct_lookup(table: &Value, ch: i64) -> EvalResult {
     } else {
         Ok(Value::Nil)
     }
+}
+
+fn ct_lookup_and_range(table: &Value, ch: i64) -> Result<(Value, i64, i64), Flow> {
+    if !is_char_table(table) {
+        return Err(wrong_type("char-table-p", table));
+    }
+    for run in ct_effective_runs(table) {
+        if ch >= run.start && ch <= run.end {
+            return Ok((run.value, run.start, run.end));
+        }
+    }
+    Ok((Value::Nil, 0, MAX_CHAR))
 }
 
 /// `(char-table-parent CHAR-TABLE)` -- return the parent table (or nil).
@@ -498,17 +484,37 @@ pub(crate) fn builtin_set_char_table_parent(args: Vec<Value>) -> EvalResult {
     expect_args("set-char-table-parent", &args, 2)?;
     let table = &args[0];
     let parent = &args[1];
+    let table_arc = match table {
+        Value::Vector(a) if is_char_table(table) => *a,
+        _ => return Err(wrong_type("char-table-p", table)),
+    };
 
     // parent must be nil or a char-table.
     if !parent.is_nil() && !is_char_table(parent) {
         return Err(wrong_type("char-table-p", parent));
     }
 
-    let arc = match table {
-        Value::Vector(a) if is_char_table(table) => a,
-        _ => return Err(wrong_type("char-table-p", table)),
-    };
-    with_heap_mut(|h| h.vector_set(*arc, CT_PARENT, *parent));
+    if !parent.is_nil() {
+        let mut cursor = *parent;
+        while is_char_table(&cursor) {
+            let cursor_arc = match cursor {
+                Value::Vector(a) => a,
+                _ => unreachable!(),
+            };
+            if cursor_arc == table_arc {
+                return Err(signal(
+                    "error",
+                    vec![Value::string(
+                        "Attempt to make a chartable be its own parent",
+                    )],
+                ));
+            }
+            let vec = with_heap(|h| h.get_vector(cursor_arc).clone());
+            cursor = vec[CT_PARENT];
+        }
+    }
+
+    with_heap_mut(|h| h.vector_set(table_arc, CT_PARENT, *parent));
     Ok(*parent)
 }
 
@@ -516,9 +522,9 @@ pub(crate) fn builtin_set_char_table_parent(args: Vec<Value>) -> EvalResult {
 /// entry with a non-nil value.  FUNCTION receives `(KEY VALUE)` where
 /// KEY is either a character (integer) or a cons `(FROM . TO)` for ranges.
 ///
-/// This resolves overlapping ranges: later (more specific) entries override
-/// earlier (broader) entries, and the result is reported as non-overlapping
-/// segments, matching GNU Emacs behavior.
+/// GNU Emacs passes a shared mutable cons cell for range keys; if Lisp code
+/// retains those keys, later internal mutations are observable.  Mirror that
+/// behavior instead of materializing fresh range objects.
 /// Returns nil.
 pub(crate) fn builtin_map_char_table(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("map-char-table", &args, 2)?;
@@ -530,106 +536,41 @@ pub(crate) fn builtin_map_char_table(eval: &mut Evaluator, args: Vec<Value>) -> 
         _ => return Err(wrong_type("char-table-p", table)),
     }
 
-    let entries = ct_resolved_entries(table);
-
-    for (key, val) in entries {
-        eval.apply(func, vec![key, val])?;
+    let shared_range = Value::cons(Value::Int(0), Value::Int(MAX_CHAR));
+    for run in ct_effective_runs(table) {
+        shared_range.set_car(Value::Int(run.start));
+        shared_range.set_cdr(Value::Int(run.end));
+        if run.value.is_nil() {
+            continue;
+        }
+        let key = if run.start == run.end {
+            Value::Int(run.start)
+        } else {
+            shared_range
+        };
+        eval.apply(func, vec![key, run.value])?;
     }
     Ok(Value::Nil)
 }
 
-/// Resolve a char-table into non-overlapping effective `(key, value)` entries.
-///
-/// This mirrors GNU Emacs `map-char-table` semantics:
-/// - later local assignments override earlier ones regardless of whether they
-///   are single-char or range writes
-/// - an explicit local `nil` means "inherit", not "mask the parent"
-/// - the table default fills uncovered regions before parent inheritance
-/// - parent/default/local ranges are coalesced into maximal same-value runs
+/// Resolve a char-table into non-overlapping effective runs, including nil.
 fn ct_resolved_entries(table: &Value) -> Vec<(Value, Value)> {
-    let Value::Vector(arc) = table else {
-        return Vec::new();
-    };
-    let vec = with_heap(|h| h.get_vector(*arc).clone());
-    let raws = ct_collect_raw_entries(&vec);
-    let default = vec[CT_DEFAULT];
-    let parent_entries = match vec[CT_PARENT] {
-        parent if is_char_table(&parent) => ct_resolved_entries(&parent),
-        _ => Vec::new(),
-    };
-
-    if raws.is_empty() && default.is_nil() && parent_entries.is_empty() {
-        return Vec::new();
-    }
-
-    let mut boundaries = std::collections::BTreeSet::new();
-    for raw in &raws {
-        boundaries.insert(raw.start);
-        boundaries.insert(raw.end.saturating_add(1));
-    }
-    for (key, _) in &parent_entries {
-        let (start, end) = resolved_key_bounds(key);
-        boundaries.insert(start);
-        boundaries.insert(end.saturating_add(1));
-    }
-    if !default.is_nil() {
-        boundaries.insert(0);
-        boundaries.insert(MAX_CHAR.saturating_add(1));
-    }
-
-    let boundary_vec = boundaries
+    ct_effective_runs(table)
         .into_iter()
-        .filter(|b| *b >= 0 && *b <= MAX_CHAR.saturating_add(1))
-        .collect::<Vec<_>>();
-
-    let mut result = Vec::new();
-    let mut run_start: Option<i64> = None;
-    let mut run_end = 0i64;
-    let mut run_value = Value::Nil;
-
-    for window in boundary_vec.windows(2) {
-        let start = window[0];
-        let end_exclusive = window[1];
-        if start > MAX_CHAR || end_exclusive <= start {
-            continue;
-        }
-        let interval_end = end_exclusive.saturating_sub(1).min(MAX_CHAR);
-        let value = ct_effective_value_at(&raws, default, &parent_entries, start);
-        if value.is_nil() {
-            if let Some(existing_start) = run_start.take() {
-                emit_run(&mut result, existing_start, run_end, run_value);
-            }
-            continue;
-        }
-
-        match run_start {
-            Some(existing_start) if run_value == value && start == run_end.saturating_add(1) => {
-                let _ = existing_start;
-                run_end = interval_end;
-            }
-            Some(existing_start) => {
-                emit_run(&mut result, existing_start, run_end, run_value);
-                run_start = Some(start);
-                run_end = interval_end;
-                run_value = value;
-            }
-            None => {
-                run_start = Some(start);
-                run_end = interval_end;
-                run_value = value;
-            }
-        }
-    }
-
-    if let Some(existing_start) = run_start {
-        emit_run(&mut result, existing_start, run_end, run_value);
-    }
-
-    result
+        .filter(|run| !run.value.is_nil())
+        .map(|run| (run_key(run.start, run.end), run.value))
+        .collect()
 }
 
 #[derive(Clone, Copy)]
 struct RawEntry {
+    start: i64,
+    end: i64,
+    value: Value,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct EffectiveRun {
     start: i64,
     end: i64,
     value: Value,
@@ -676,7 +617,7 @@ fn ct_local_value_at(raws: &[RawEntry], ch: i64) -> Option<Value> {
 fn ct_effective_value_at(
     raws: &[RawEntry],
     default: Value,
-    parent_entries: &[(Value, Value)],
+    parent_runs: &[EffectiveRun],
     ch: i64,
 ) -> Value {
     if let Some(local) = ct_local_value_at(raws, ch) {
@@ -687,40 +628,129 @@ fn ct_effective_value_at(
     if !default.is_nil() {
         return default;
     }
-    resolved_entries_value_at(parent_entries, ch).unwrap_or(Value::Nil)
+    effective_runs_value_at(parent_runs, ch).unwrap_or(Value::Nil)
 }
 
-fn resolved_entries_value_at(entries: &[(Value, Value)], ch: i64) -> Option<Value> {
-    for (key, value) in entries {
-        let (start, end) = resolved_key_bounds(key);
-        if ch >= start && ch <= end {
-            return Some(*value);
+fn effective_runs_value_at(entries: &[EffectiveRun], ch: i64) -> Option<Value> {
+    for run in entries {
+        if ch >= run.start && ch <= run.end {
+            return Some(run.value);
         }
     }
     None
 }
 
-fn resolved_key_bounds(key: &Value) -> (i64, i64) {
-    match key {
-        Value::Int(ch) => (*ch, *ch),
-        Value::Cons(cell) => {
-            let pair = read_cons(*cell);
-            match (&pair.car, &pair.cdr) {
-                (Value::Int(start), Value::Int(end)) => (*start, *end),
-                _ => (0, -1),
-            }
+fn ct_effective_runs(table: &Value) -> Vec<EffectiveRun> {
+    let Value::Vector(arc) = table else {
+        return vec![EffectiveRun {
+            start: 0,
+            end: MAX_CHAR,
+            value: Value::Nil,
+        }];
+    };
+    let vec = with_heap(|h| h.get_vector(*arc).clone());
+    let raws = ct_collect_raw_entries(&vec);
+    let default = vec[CT_DEFAULT];
+    let parent_runs = match vec[CT_PARENT] {
+        parent if is_char_table(&parent) => ct_effective_runs(&parent),
+        _ => vec![EffectiveRun {
+            start: 0,
+            end: MAX_CHAR,
+            value: Value::Nil,
+        }],
+    };
+
+    let mut boundaries = std::collections::BTreeSet::new();
+    boundaries.insert(0);
+    boundaries.insert(MAX_CHAR.saturating_add(1));
+    for raw in &raws {
+        boundaries.insert(raw.start);
+        boundaries.insert(raw.end.saturating_add(1).min(MAX_CHAR.saturating_add(1)));
+    }
+    for run in &parent_runs {
+        boundaries.insert(run.start);
+        boundaries.insert(run.end.saturating_add(1).min(MAX_CHAR.saturating_add(1)));
+    }
+
+    let boundary_vec = boundaries.into_iter().collect::<Vec<_>>();
+    let mut runs: Vec<EffectiveRun> = Vec::new();
+
+    for window in boundary_vec.windows(2) {
+        let start = window[0];
+        let end_exclusive = window[1];
+        if start > MAX_CHAR || end_exclusive <= start {
+            continue;
         }
-        _ => (0, -1),
+        let end = end_exclusive.saturating_sub(1).min(MAX_CHAR);
+        let value = ct_effective_value_at(&raws, default, &parent_runs, start);
+        match runs.last_mut() {
+            Some(last) if last.value == value && start == last.end.saturating_add(1) => {
+                last.end = end;
+            }
+            _ => runs.push(EffectiveRun { start, end, value }),
+        }
+    }
+
+    if runs.is_empty() {
+        vec![EffectiveRun {
+            start: 0,
+            end: MAX_CHAR,
+            value: Value::Nil,
+        }]
+    } else {
+        runs
     }
 }
 
-/// Emit a coalesced run as either a single character or a range cons.
-fn emit_run(result: &mut Vec<(Value, Value)>, start: i64, end: i64, val: Value) {
+fn run_key(start: i64, end: i64) -> Value {
     if start == end {
-        result.push((Value::Int(start), val));
+        Value::Int(start)
     } else {
-        result.push((Value::cons(Value::Int(start), Value::Int(end)), val));
+        Value::cons(Value::Int(start), Value::Int(end))
     }
+}
+
+const GNU_CHAR_TABLE_CONTENT_BLOCKS: i64 = 64;
+const GNU_CHAR_TABLE_BLOCK_CHARS: i64 = 1 << 16;
+
+fn uniform_run_value(runs: &[EffectiveRun], start: i64, end: i64) -> Option<Value> {
+    runs.iter()
+        .find(|run| start >= run.start && end <= run.end)
+        .map(|run| run.value)
+}
+
+pub(crate) fn char_table_external_slots(table: &Value) -> Option<Vec<Value>> {
+    if !is_char_table(table) {
+        return None;
+    }
+
+    let Value::Vector(arc) = table else {
+        return None;
+    };
+    let vec = with_heap(|h| h.get_vector(*arc).clone());
+    let runs = ct_effective_runs(table);
+    let extra_count = match vec[CT_EXTRA_COUNT] {
+        Value::Int(n) if n >= 0 => n as usize,
+        _ => 0,
+    };
+
+    let mut slots = Vec::with_capacity(4 + GNU_CHAR_TABLE_CONTENT_BLOCKS as usize + extra_count);
+    slots.push(vec[CT_DEFAULT]);
+    slots.push(vec[CT_PARENT]);
+    slots.push(vec[CT_SUBTYPE]);
+    slots.push(uniform_run_value(&runs, 0, 127).unwrap_or(Value::Nil));
+
+    for idx in 0..GNU_CHAR_TABLE_CONTENT_BLOCKS {
+        let start = idx * GNU_CHAR_TABLE_BLOCK_CHARS;
+        let end = (start + GNU_CHAR_TABLE_BLOCK_CHARS - 1).min(MAX_CHAR);
+        slots.push(uniform_run_value(&runs, start, end).unwrap_or(Value::Nil));
+    }
+
+    for extra_idx in 0..extra_count {
+        slots.push(vec[CT_EXTRA_START + extra_idx]);
+    }
+
+    Some(slots)
 }
 
 /// `(char-table-extra-slot TABLE N)` -- get extra slot N (0-based).
@@ -740,10 +770,7 @@ pub(crate) fn builtin_char_table_extra_slot(args: Vec<Value>) -> EvalResult {
     };
 
     if n < 0 || n >= extra_count {
-        return Err(signal(
-            "args-out-of-range",
-            vec![args[1], Value::Int(extra_count)],
-        ));
+        return Err(signal("args-out-of-range", vec![args[0], args[1]]));
     }
 
     Ok(v[CT_EXTRA_START + n as usize])
@@ -767,10 +794,7 @@ pub(crate) fn builtin_set_char_table_extra_slot(args: Vec<Value>) -> EvalResult 
     };
 
     if n < 0 || n >= extra_count {
-        return Err(signal(
-            "args-out-of-range",
-            vec![args[1], Value::Int(extra_count)],
-        ));
+        return Err(signal("args-out-of-range", vec![args[0], args[1]]));
     }
 
     v[CT_EXTRA_START + n as usize] = *value;
