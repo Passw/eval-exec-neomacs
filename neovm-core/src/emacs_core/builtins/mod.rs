@@ -341,7 +341,7 @@ pub(crate) use strings::*;
 pub(crate) use types::*;
 
 mod buffers;
-mod higher_order;
+pub(crate) mod higher_order;
 mod hooks;
 pub(crate) mod keymaps;
 mod misc_eval;
@@ -4300,7 +4300,6 @@ pub(crate) fn dispatch_builtin(
 pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<EvalResult> {
     match name {
         "functionp"
-        | "format"
         | "format-message"
         | "error"
         | "copy-file"
@@ -4411,6 +4410,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "identity" => builtin_identity(args),
         "purecopy" => builtin_purecopy(args),
         "current-message" => builtin_current_message(args),
+        "format" => super::builtins::strings::builtin_format(args),
         "ngettext" => builtin_ngettext(args),
         "file-size-human-readable" => builtin_file_size_human_readable(args),
         "file-size-human-readable-iec" => builtin_file_size_human_readable_iec(args),
@@ -4418,6 +4418,18 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "prefix-numeric-value" => builtin_prefix_numeric_value(args),
         "propertize" => builtin_propertize(args),
         "gensym" => builtin_gensym(args),
+        "documentation-stringp" => super::builtins::misc_pure::builtin_documentation_stringp(args),
+        "bare-symbol" => super::builtins_extra::builtin_bare_symbol(args),
+        "capitalize" => super::casefiddle::builtin_capitalize(args),
+        "charsetp" => super::charset::builtin_charsetp(args),
+        "charset-plist" => super::charset::builtin_charset_plist(args),
+        "define-charset-internal" => super::charset::builtin_define_charset_internal(args),
+        "define-charset-alias" => super::charset::builtin_define_charset_alias(args),
+        "internal-lisp-face-p" => super::font::builtin_internal_lisp_face_p(args),
+        "internal-make-lisp-face" => super::font::builtin_internal_make_lisp_face(args),
+        "internal-set-lisp-face-attribute" => {
+            super::font::builtin_internal_set_lisp_face_attribute(args)
+        }
         "string-to-syntax" => builtin_string_to_syntax(args),
         "syntax-class-to-char" => super::syntax::builtin_syntax_class_to_char(args),
         // matching-paren is now dispatched in dispatch_builtin (eval-dependent)

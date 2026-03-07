@@ -206,7 +206,7 @@ fn decode_buffer_op_point() {
 #[test]
 fn parse_arglist_descriptor_no_rest() {
     // 2 mandatory, 3 total → 1 optional
-    let params = parse_arglist_descriptor((2 << 8) | 3);
+    let params = parse_arglist_descriptor(2 | (3 << 8));
     assert_eq!(params.required.len(), 2);
     assert_eq!(params.optional.len(), 1);
     assert!(params.rest.is_none());
@@ -214,10 +214,19 @@ fn parse_arglist_descriptor_no_rest() {
 
 #[test]
 fn parse_arglist_descriptor_with_rest() {
-    // 1 mandatory + &rest
-    let params = parse_arglist_descriptor(128 | 1);
+    // 1 mandatory + &rest, with 1 non-rest slot total.
+    let params = parse_arglist_descriptor(1 | (1 << 8) | 128);
     assert_eq!(params.required.len(), 1);
     assert_eq!(params.optional.len(), 0);
+    assert!(params.rest.is_some());
+}
+
+#[test]
+fn parse_arglist_descriptor_with_optional_and_rest_slot() {
+    // GNU lexical bytecode can carry both optional args and a hidden rest slot.
+    let params = parse_arglist_descriptor(3 | (4 << 8) | 128);
+    assert_eq!(params.required.len(), 3);
+    assert_eq!(params.optional.len(), 1);
     assert!(params.rest.is_some());
 }
 
@@ -250,7 +259,7 @@ fn parse_arglist_value_from_list() {
 
 #[test]
 fn parse_arglist_value_int() {
-    let params = parse_arglist_value(&Value::Int((1 << 8) | 2));
+    let params = parse_arglist_value(&Value::Int(1 | (2 << 8)));
     assert_eq!(params.required.len(), 1);
     assert_eq!(params.optional.len(), 1);
     assert!(params.rest.is_none());

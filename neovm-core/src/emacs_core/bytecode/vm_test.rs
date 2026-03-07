@@ -768,3 +768,70 @@ fn vm_dolist() {
         "OK (c b a)"
     );
 }
+
+#[test]
+fn vm_gnu_arg_descriptor_preserves_optional_and_rest_slots() {
+    let func = ByteCodeFunction {
+        ops: vec![
+            Op::StackRef(4),
+            Op::StackRef(4),
+            Op::StackRef(4),
+            Op::StackRef(4),
+            Op::StackRef(4),
+            Op::List(5),
+            Op::Return,
+        ],
+        constants: vec![],
+        max_stack: 10,
+        params: crate::emacs_core::bytecode::decode::parse_arglist_descriptor(3 | (4 << 8) | 128),
+        env: None,
+        gnu_byte_offset_map: None,
+        docstring: None,
+        doc_form: None,
+    };
+
+    let mut obarray = Obarray::new();
+    crate::emacs_core::errors::init_standard_errors(&mut obarray);
+    let mut dynamic: Vec<OrderedSymMap> = Vec::new();
+    let mut lexenv: Value = Value::Nil;
+    let mut features: Vec<SymId> = Vec::new();
+    let mut custom = CustomManager::new();
+    let mut buffers = crate::buffer::BufferManager::new();
+    let mut frames = FrameManager::new();
+    let mut coding_systems = CodingSystemManager::new();
+    let mut match_data: Option<MatchData> = None;
+    let mut watchers = VariableWatcherList::new();
+    let mut catch_tags: Vec<Value> = Vec::new();
+
+    let mut vm = Vm::new(
+        &mut obarray,
+        &mut dynamic,
+        &mut lexenv,
+        &mut features,
+        &mut custom,
+        &mut buffers,
+        &mut frames,
+        &mut coding_systems,
+        &mut match_data,
+        &mut watchers,
+        &mut catch_tags,
+    );
+
+    let result = vm
+        .execute(
+            &func,
+            vec![Value::Int(1), Value::Int(2), Value::Int(3), Value::Int(4)],
+        )
+        .expect("vm should preserve GNU descriptor slot layout");
+
+    assert_eq!(
+        result,
+        Value::list(vec![
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(3),
+            Value::Int(4),
+            Value::Nil,
+        ])
+    );
+}

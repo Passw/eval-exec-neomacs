@@ -628,40 +628,33 @@ use crate::emacs_core::value::LambdaParams;
 /// Parse a GNU integer arglist descriptor into `LambdaParams`.
 ///
 /// GNU encoding:
-/// - No `&rest`: `(mandatory << 8) | total_non_rest_args`
-///   - optional = total - mandatory
-/// - With `&rest`: `128 | mandatory_count`
+/// - bits 0..6: mandatory argument count
+/// - bit 7: `&rest` slot present
+/// - bits 8..14: total non-`&rest` argument count (mandatory + optional)
+///
+/// For lexical bytecode compiled by GNU Emacs, the rest bit describes stack
+/// layout, not just source-level `&rest`.  CL-generated constructors can use a
+/// hidden extra slot even when the original source arglist only shows
+/// `&optional`, so the runtime frame must follow the descriptor exactly.
 pub fn parse_arglist_descriptor(descriptor: i64) -> LambdaParams {
-    if descriptor & 128 != 0 {
-        // Has &rest
-        let mandatory = (descriptor & 127) as usize;
-        let mut required = Vec::with_capacity(mandatory);
-        for i in 0..mandatory {
-            required.push(intern(&format!("arg{}", i)));
-        }
-        LambdaParams {
-            required,
-            optional: Vec::new(),
-            rest: Some(intern("rest")),
-        }
-    } else {
-        let mandatory = ((descriptor >> 8) & 127) as usize;
-        let total = (descriptor & 127) as usize;
-        let optional_count = total.saturating_sub(mandatory);
+    let mandatory = (descriptor & 127) as usize;
+    let has_rest = (descriptor & 128) != 0;
+    let nonrest = (descriptor >> 8) as usize;
+    let optional_count = nonrest.saturating_sub(mandatory);
 
-        let mut required = Vec::with_capacity(mandatory);
-        for i in 0..mandatory {
-            required.push(intern(&format!("arg{}", i)));
-        }
-        let mut optional = Vec::with_capacity(optional_count);
-        for i in 0..optional_count {
-            optional.push(intern(&format!("opt{}", i)));
-        }
-        LambdaParams {
-            required,
-            optional,
-            rest: None,
-        }
+    let mut required = Vec::with_capacity(mandatory);
+    for i in 0..mandatory {
+        required.push(intern(&format!("arg{}", i)));
+    }
+    let mut optional = Vec::with_capacity(optional_count);
+    for i in 0..optional_count {
+        optional.push(intern(&format!("opt{}", i)));
+    }
+
+    LambdaParams {
+        required,
+        optional,
+        rest: has_rest.then(|| intern("rest")),
     }
 }
 

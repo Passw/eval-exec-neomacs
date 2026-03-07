@@ -337,14 +337,14 @@ pub(crate) fn builtin_indirect_variable_eval(
     Ok(value_from_symbol_id(resolved))
 }
 
-pub(crate) fn builtin_fboundp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_args("fboundp", &args, 1)?;
+pub(crate) fn builtin_fboundp_in_obarray(obarray: &Obarray, args: &[Value]) -> EvalResult {
+    expect_args("fboundp", args, 1)?;
     let symbol = expect_symbol_id(&args[0])?;
     let name = resolve_sym(symbol);
-    if eval.obarray().is_function_unbound_id(symbol) {
+    if obarray.is_function_unbound_id(symbol) {
         return Ok(Value::Nil);
     }
-    if let Some(function) = eval.obarray().symbol_function_id(symbol) {
+    if let Some(function) = obarray.symbol_function_id(symbol) {
         let result = !function.is_nil();
         return Ok(Value::bool(result));
     }
@@ -358,6 +358,10 @@ pub(crate) fn builtin_fboundp(eval: &mut super::eval::Evaluator, args: Vec<Value
         || super::builtin_registry::is_dispatch_builtin_name(name)
         || name.parse::<PureBuiltinId>().is_ok();
     Ok(Value::bool(result))
+}
+
+pub(crate) fn builtin_fboundp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    builtin_fboundp_in_obarray(eval.obarray(), &args)
 }
 
 pub(crate) fn builtin_symbol_value(

@@ -80,7 +80,7 @@ pub(crate) fn builtin_funcall_with_delayed_message(
 // Higher-order
 // ===========================================================================
 
-fn for_each_sequence_element<F>(seq: &Value, mut f: F) -> Result<(), Flow>
+pub(crate) fn for_each_sequence_element<F>(seq: &Value, mut f: F) -> Result<(), Flow>
 where
     F: FnMut(Value) -> Result<(), Flow>,
 {

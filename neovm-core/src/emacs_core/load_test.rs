@@ -1129,6 +1129,29 @@ fn compiled_bootstrap_cl_preload_stubs_work_after_faces() {
 }
 
 #[test]
+fn compiled_cl_preloaded_loads_after_faces() {
+    let mut eval = partial_bootstrap_eval_until("emacs-lisp/cl-preloaded", true);
+    let load_path = get_load_path(&eval.obarray());
+    let path = bootstrap_fixture_path(&load_path, "emacs-lisp/cl-preloaded", true)
+        .expect("compiled cl-preloaded fixture path");
+
+    load_file(&mut eval, &path).unwrap_or_else(|err| {
+        panic!(
+            "failed loading emacs-lisp/cl-preloaded from {}: {}",
+            path.display(),
+            format_eval_error(&eval, &err)
+        )
+    });
+
+    let probe = crate::emacs_core::parser::parse_forms("(fboundp 'built-in-class--make)")
+        .expect("parse built-in-class probe");
+    let result = eval
+        .eval_expr(&probe[0])
+        .expect("evaluate built-in-class constructor probe");
+    assert_eq!(result, Value::True);
+}
+
+#[test]
 fn auth_source_backend_exposes_type_slot() {
     let _ = tracing_subscriber::fmt()
         .with_env_filter(

@@ -16,7 +16,7 @@ use crate::emacs_core::regex::MatchData;
 use crate::emacs_core::string_escape::{storage_char_len, storage_substring};
 use crate::emacs_core::symbol::Obarray;
 use crate::emacs_core::value::*;
-use crate::window::FrameManager;
+use crate::window::{FrameId, FrameManager, Window};
 
 /// Handler frame for catch/condition-case/unwind-protect.
 #[derive(Clone, Debug)]
@@ -1329,6 +1329,183 @@ impl<'a> Vm<'a> {
         Ok(())
     }
 
+    fn ensure_selected_frame_id(&mut self) -> FrameId {
+        if let Some(fid) = self.frames.selected_frame().map(|frame| frame.id) {
+            return fid;
+        }
+
+        let buf_id = self
+            .buffers
+            .current_buffer()
+            .map(|buffer| buffer.id)
+            .unwrap_or_else(|| self.buffers.create_buffer("*scratch*"));
+        let fid = self.frames.create_frame("F1", 640, 384, buf_id);
+        let minibuffer_buf_id = self
+            .buffers
+            .find_buffer_by_name(" *Minibuf-0*")
+            .unwrap_or_else(|| self.buffers.create_buffer(" *Minibuf-0*"));
+        if let Some(frame) = self.frames.get_mut(fid) {
+            frame.parameters.insert("width".to_string(), Value::Int(80));
+            frame
+                .parameters
+                .insert("height".to_string(), Value::Int(25));
+            if let Some(Window::Leaf {
+                window_start,
+                point,
+                ..
+            }) = frame.find_window_mut(frame.selected_window)
+            {
+                *window_start = 1;
+                *point = 1;
+            }
+            if let Some(minibuffer_leaf) = frame.minibuffer_leaf.as_mut() {
+                minibuffer_leaf.set_buffer(minibuffer_buf_id);
+            }
+        }
+        fid
+    }
+
+    fn resolve_frame_id(&mut self, arg: Option<&Value>, predicate: &str) -> Result<FrameId, Flow> {
+        match arg {
+            None | Some(Value::Nil) => Ok(self.ensure_selected_frame_id()),
+            Some(Value::Int(n)) => {
+                let fid = FrameId(*n as u64);
+                if self.frames.get(fid).is_some() {
+                    Ok(fid)
+                } else {
+                    Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol(predicate), Value::Int(*n)],
+                    ))
+                }
+            }
+            Some(Value::Frame(id)) => {
+                let fid = FrameId(*id);
+                if self.frames.get(fid).is_some() {
+                    Ok(fid)
+                } else {
+                    Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol(predicate), Value::Frame(*id)],
+                    ))
+                }
+            }
+            Some(other) => Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol(predicate), *other],
+            )),
+        }
+    }
+
+    fn ensure_global_keymap(&mut self) -> Value {
+        if let Some(value) = self.obarray.symbol_value("global-map").copied() {
+            if crate::emacs_core::keymap::is_list_keymap(&value) {
+                return value;
+            }
+        }
+        let keymap = crate::emacs_core::keymap::make_list_keymap();
+        self.obarray.set_symbol_value("global-map", keymap);
+        keymap
+    }
+
+    fn builtin_mapcar_fast(&mut self, args: &[Value]) -> EvalResult {
+        builtins::expect_args("mapcar", args, 2)?;
+        let func = args[0];
+        let sequence = args[1];
+        let saved_roots = self.gc_roots.len();
+        self.gc_roots.push(func);
+        self.gc_roots.push(sequence);
+
+        let mut results = Vec::new();
+        let map_result = crate::emacs_core::builtins::higher_order::for_each_sequence_element(
+            &sequence,
+            |item| {
+                let value =
+                    self.with_extra_roots(&[item], |vm| vm.call_function(func, vec![item]))?;
+                results.push(value);
+                self.gc_roots.push(value);
+                Ok(())
+            },
+        );
+
+        let out = match map_result {
+            Ok(()) => self.with_extra_roots(&results, |_| Ok(Value::list(results.clone()))),
+            Err(flow) => Err(flow),
+        };
+        self.gc_roots.truncate(saved_roots);
+        out
+    }
+
+    fn builtin_frame_list_fast(&mut self, args: &[Value]) -> EvalResult {
+        builtins::expect_args("frame-list", args, 0)?;
+        let _ = self.ensure_selected_frame_id();
+        let frames = self
+            .frames
+            .frame_list()
+            .into_iter()
+            .map(|frame_id| Value::Frame(frame_id.0))
+            .collect();
+        Ok(Value::list(frames))
+    }
+
+    fn builtin_framep_fast(&mut self, args: &[Value]) -> EvalResult {
+        builtins::expect_args("framep", args, 1)?;
+        let id = match args[0] {
+            Value::Frame(id) => id,
+            Value::Int(n) => n as u64,
+            _ => return Ok(Value::Nil),
+        };
+        let Some(frame) = self.frames.get(FrameId(id)) else {
+            return Ok(Value::Nil);
+        };
+        Ok(frame
+            .parameters
+            .get("window-system")
+            .copied()
+            .unwrap_or(Value::True))
+    }
+
+    fn builtin_frame_parameter_fast(&mut self, args: &[Value]) -> EvalResult {
+        builtins::expect_args("frame-parameter", args, 2)?;
+        let fid = self.resolve_frame_id(args.first(), "framep")?;
+        let param_name = match args[1] {
+            Value::Symbol(id) => resolve_sym(id).to_owned(),
+            _ => return Ok(Value::Nil),
+        };
+        let frame = self
+            .frames
+            .get(fid)
+            .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+        match param_name.as_str() {
+            "name" => Ok(Value::string(frame.name.clone())),
+            "title" => Ok(Value::string(frame.title.clone())),
+            "width" => Ok(frame
+                .parameters
+                .get("width")
+                .cloned()
+                .unwrap_or(Value::Int(frame.columns() as i64))),
+            "height" => Ok(frame
+                .parameters
+                .get("height")
+                .cloned()
+                .unwrap_or(Value::Int(frame.lines() as i64))),
+            "visibility" => Ok(if frame.visible {
+                Value::True
+            } else {
+                Value::Nil
+            }),
+            _ => Ok(frame
+                .parameters
+                .get(&param_name)
+                .cloned()
+                .unwrap_or(Value::Nil)),
+        }
+    }
+
+    fn builtin_fboundp_fast(&self, args: &[Value]) -> EvalResult {
+        crate::emacs_core::builtins::symbols::builtin_fboundp_in_obarray(self.obarray, args)
+    }
+
     fn bind_params(
         &self,
         params: &LambdaParams,
@@ -1669,6 +1846,10 @@ impl<'a> Vm<'a> {
                 builtins::expect_max_args("make-sparse-keymap", args, 1)
                     .map(|_| crate::emacs_core::keymap::make_sparse_list_keymap()),
             ),
+            "current-global-map" => Some(
+                builtins::expect_args("current-global-map", args, 0)
+                    .map(|_| self.ensure_global_keymap()),
+            ),
             "define-key" => Some((|| -> EvalResult {
                 builtins::expect_min_args("define-key", args, 3)?;
                 builtins::expect_max_args("define-key", args, 4)?;
@@ -1708,7 +1889,8 @@ impl<'a> Vm<'a> {
                     .cloned()
                     .unwrap_or(Value::Nil))
             })()),
-            "put" => Some((|| -> EvalResult {
+            "put" => {
+                Some((|| -> EvalResult {
                 builtins::expect_args("put", args, 3)?;
                 let sym = crate::emacs_core::builtins::symbols::expect_symbol_id(&args[0])?;
                 let prop = crate::emacs_core::builtins::symbols::expect_symbol_id(&args[1])?;
@@ -1732,7 +1914,8 @@ impl<'a> Vm<'a> {
                 }
                 self.obarray.put_property_id(sym, prop, value);
                 Ok(value)
-            })()),
+                })())
+            }
             "default-toplevel-value" => Some(
                 crate::emacs_core::builtins::symbols::builtin_default_toplevel_value_in_obarray(
                     self.obarray,
@@ -1834,6 +2017,23 @@ impl<'a> Vm<'a> {
                 self.obarray.intern(&name);
                 Ok(Value::symbol(name))
             })()),
+            "mapcar" => Some(self.builtin_mapcar_fast(args)),
+            "fboundp" => Some(self.builtin_fboundp_fast(args)),
+            "frame-list" => Some(self.builtin_frame_list_fast(args)),
+            "framep" => Some(self.builtin_framep_fast(args)),
+            "frame-parameter" => Some(self.builtin_frame_parameter_fast(args)),
+            "define-coding-system-internal" => Some(
+                crate::emacs_core::coding::builtin_define_coding_system_internal(
+                    self.coding_systems,
+                    args.to_vec(),
+                ),
+            ),
+            "define-coding-system-alias" => Some(
+                crate::emacs_core::coding::builtin_define_coding_system_alias(
+                    self.coding_systems,
+                    args.to_vec(),
+                ),
+            ),
             "string-match" => Some({
                 let case_fold = self
                     .lookup_var("case-fold-search")
