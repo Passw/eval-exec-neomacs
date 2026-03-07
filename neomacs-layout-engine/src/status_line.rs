@@ -18,6 +18,7 @@ pub(crate) enum StatusLineKind {
     ModeLine,
     HeaderLine,
     TabLine,
+    TabBar,
 }
 
 impl StatusLineKind {
@@ -26,6 +27,7 @@ impl StatusLineKind {
             Self::ModeLine => GlyphRowRole::ModeLine,
             Self::HeaderLine => GlyphRowRole::HeaderLine,
             Self::TabLine => GlyphRowRole::TabLine,
+            Self::TabBar => GlyphRowRole::TabBar,
         }
     }
 }
@@ -430,7 +432,7 @@ fn parse_status_line_align_entries(
 }
 
 #[derive(Debug, Clone)]
-struct StatusLineSpec {
+pub(crate) struct StatusLineSpec {
     kind: StatusLineKind,
     x: f32,
     y: f32,
@@ -530,6 +532,10 @@ impl LayoutEngine {
                     buf_size as i64,
                     &mut line_face,
                 ),
+                StatusLineKind::TabBar => {
+                    // TabBar uses build_ffi_tab_bar_spec() instead, never reaches here.
+                    unreachable!("TabBar should use build_ffi_tab_bar_spec()")
+                }
             }
         };
 
@@ -576,7 +582,7 @@ impl LayoutEngine {
         }
     }
 
-    fn render_status_line_spec(
+    pub(crate) fn render_status_line_spec(
         &mut self,
         spec: &StatusLineSpec,
         frame: Option<EmacsFrame>,
@@ -779,6 +785,61 @@ impl LayoutEngine {
         self.render_status_line_spec(&spec, None, frame_glyphs);
     }
 
+    /// Build a StatusLineSpec for the frame-level tab-bar.
+    /// Similar to build_ffi_status_line_spec but takes a frame instead of window params.
+    pub(crate) fn build_ffi_tab_bar_spec(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        window_id: i64,
+        char_w: f32,
+        ascent: f32,
+        frame: EmacsFrame,
+    ) -> Option<StatusLineSpec> {
+        let mut line_face = FaceDataFFI::default();
+        let buf_size = 4096usize;
+        let mut line_buf = vec![0u8; buf_size];
+
+        let bytes = unsafe {
+            neomacs_layout_tab_bar_text(
+                frame,
+                line_buf.as_mut_ptr(),
+                buf_size as i64,
+                &mut line_face,
+            )
+        };
+
+        if bytes <= 0 {
+            return None;
+        }
+
+        let text_len = (bytes & 0xFFFFFFFF) as usize;
+        let nruns = ((bytes >> 32) & 0xFFFF) as usize;
+        let ndisplay = ((bytes >> 48) & 0xFF) as usize;
+        let naligns = ((bytes >> 56) & 0xFF) as usize;
+        let display_start = text_len + nruns * 10;
+        let align_start = display_start + ndisplay * 16;
+
+        Some(StatusLineSpec {
+            kind: StatusLineKind::TabBar,
+            x,
+            y,
+            width,
+            height,
+            window_id,
+            char_width: char_w,
+            ascent,
+            face: unsafe { StatusLineFace::from_ffi(&line_face) },
+            text: line_buf[..text_len.min(line_buf.len())].to_vec(),
+            face_runs: parse_overlay_face_runs(&line_buf, text_len, nruns as i32),
+            display_props: parse_display_props(&line_buf, display_start, ndisplay),
+            align_entries: parse_status_line_align_entries(&line_buf, align_start, naligns),
+            advance_mode: StatusLineAdvanceMode::Fixed,
+        })
+    }
+
     /// Render a status line (mode-line, header-line, or tab-line).
     pub(crate) unsafe fn render_status_line(
         &mut self,
@@ -823,11 +884,12 @@ mod tests {
 
     #[test]
     fn status_line_kind_variants_exist() {
-        // Ensure all three variants can be constructed (compile-time check
+        // Ensure all four variants can be constructed (compile-time check
         // made explicit).
         let _ml = StatusLineKind::ModeLine;
         let _hl = StatusLineKind::HeaderLine;
         let _tl = StatusLineKind::TabLine;
+        let _tb = StatusLineKind::TabBar;
     }
 
     #[test]
@@ -838,11 +900,13 @@ mod tests {
                 StatusLineKind::ModeLine => 0,
                 StatusLineKind::HeaderLine => 1,
                 StatusLineKind::TabLine => 2,
+                StatusLineKind::TabBar => 3,
             }
         };
         assert_eq!(check(&StatusLineKind::ModeLine), 0);
         assert_eq!(check(&StatusLineKind::HeaderLine), 1);
         assert_eq!(check(&StatusLineKind::TabLine), 2);
+        assert_eq!(check(&StatusLineKind::TabBar), 3);
     }
 
     // ---------------------------------------------------------------

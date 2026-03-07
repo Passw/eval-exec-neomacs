@@ -1531,32 +1531,21 @@ pub unsafe extern "C" fn neomacs_display_tab_bar_add_item(
 }
 
 /// Finish collecting tab bar items and send to render thread.
+/// Face/active_bg no longer needed — rendering is handled by the layout engine.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn neomacs_display_tab_bar_end(
     _handle: *mut NeomacsDisplay,
-    active_bg_color: u32,
-    face_data: *const neomacs_display_protocol::face::FaceDataFFI,
+    _active_bg_color: u32,
+    _face_data: *const neomacs_display_protocol::face::FaceDataFFI,
 ) {
     let items = TABBAR_ITEMS.with(|items| std::mem::take(&mut *items.borrow_mut()));
     let height = TABBAR_HEIGHT.with(|h| *h.borrow());
 
-    let face = if !face_data.is_null() {
-        unsafe { &*face_data }.to_face()
-    } else {
-        neomacs_display_protocol::face::Face::default()
-    };
-
-    let active_bg_r = ((active_bg_color >> 16) & 0xFF) as f32 / 255.0;
-    let active_bg_g = ((active_bg_color >> 8) & 0xFF) as f32 / 255.0;
-    let active_bg_b = (active_bg_color & 0xFF) as f32 / 255.0;
-
     if let Some(ref state) = THREADED_STATE {
-        let _ = state.emacs_comms.cmd_tx.try_send(RenderCommand::SetTabBar {
-            items,
-            height,
-            face,
-            active_bg: (active_bg_r, active_bg_g, active_bg_b),
-        });
+        let _ = state
+            .emacs_comms
+            .cmd_tx
+            .try_send(RenderCommand::SetTabBar { items, height });
     }
 }
 

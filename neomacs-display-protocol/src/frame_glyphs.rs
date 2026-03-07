@@ -61,12 +61,17 @@ pub enum GlyphRowRole {
     ModeLine,
     /// Minibuffer/echo text row.
     Minibuffer,
+    /// Frame-level tab-bar row.
+    TabBar,
 }
 
 impl GlyphRowRole {
     /// True for UI chrome rows that should render above regular text rows.
     pub fn is_chrome(self) -> bool {
-        matches!(self, Self::TabLine | Self::HeaderLine | Self::ModeLine)
+        matches!(
+            self,
+            Self::TabLine | Self::HeaderLine | Self::ModeLine | Self::TabBar
+        )
     }
 }
 

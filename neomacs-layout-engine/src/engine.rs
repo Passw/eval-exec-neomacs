@@ -927,6 +927,12 @@ impl LayoutEngine {
             }
         }
 
+        // Render frame-level tab-bar (tab-bar-mode) via the status-line pipeline.
+        let tab_bar_height = neomacs_layout_tab_bar_height(frame);
+        if tab_bar_height > 0.0 {
+            self.render_frame_tab_bar(frame, frame_params, frame_glyphs, tab_bar_height);
+        }
+
         // Get number of windows (direct Rust struct access, no FFI call)
         let window_count = super::emacs_types::frame_window_count(frame as *const std::ffi::c_void);
         tracing::debug!(
@@ -4343,6 +4349,38 @@ impl LayoutEngine {
                 face.font_weight,
                 face.italic,
             ),
+        }
+    }
+
+    /// Render the frame-level tab-bar via the status-line pipeline.
+    unsafe fn render_frame_tab_bar(
+        &mut self,
+        frame: EmacsFrame,
+        frame_params: &FrameParams,
+        frame_glyphs: &mut FrameGlyphBuffer,
+        tab_bar_height: f32,
+    ) {
+        // Tab-bar is positioned at y=0 (topmost, no menu bar in Neomacs).
+        let x = 0.0;
+        let y = 0.0;
+        let width = frame_params.width;
+        // Use the tab-bar window pointer as a synthetic window_id for draw context.
+        let window_id = frame as i64;
+
+        let char_w = frame_params.char_width;
+        let ascent = frame_params.char_height * 0.8; // approximate ascent
+
+        if let Some(spec) = self.build_ffi_tab_bar_spec(
+            x,
+            y,
+            width,
+            tab_bar_height,
+            window_id,
+            char_w,
+            ascent,
+            frame,
+        ) {
+            self.render_status_line_spec(&spec, Some(frame), frame_glyphs);
         }
     }
 

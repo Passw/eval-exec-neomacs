@@ -352,17 +352,10 @@ impl RenderApp {
                 self.frame_dirty = true;
                 Ok(())
             }
-            RenderCommand::SetTabBar {
-                items,
-                height,
-                face,
-                active_bg,
-            } => {
+            RenderCommand::SetTabBar { items, height } => {
                 tracing::debug!("SetTabBar: {} items, height={}", items.len(), height);
                 self.tab_bar_items = items;
                 self.tab_bar_height = height;
-                self.tab_bar_face = face;
-                self.tab_bar_active_bg = active_bg;
                 self.frame_dirty = true;
                 Ok(())
             }

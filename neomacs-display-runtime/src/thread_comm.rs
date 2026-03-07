@@ -519,12 +519,10 @@ pub enum RenderCommand {
         bg_g: f32,
         bg_b: f32,
     },
-    /// Set tab bar items (sent each frame when items change)
+    /// Set tab bar items for click hit-testing (rendering now via layout engine)
     SetTabBar {
         items: Vec<TabBarItem>,
         height: f32,
-        face: neomacs_display_protocol::face::Face,
-        active_bg: (f32, f32, f32),
     },
 }
 

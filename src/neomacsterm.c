@@ -2446,66 +2446,24 @@ static int extract_string_align_entries (Lisp_Object, struct window *,
      bits 32-47: number of face runs
      bits 48-55: number of display property records
      bits 56-63: number of align-to entries  */
+
+/* Extract face runs, display properties (images), and align-to entries
+   from a propertized string RESULT.  The text bytes must already have been
+   copied into OUT_BUF[0..TEXT_LEN).  Additional records are appended after
+   the text bytes.  W is used for face resolution, F for image loading.
+   REMAPPED_FACE_ID is the base face for merging via face_at_string_position.
+   IMAGE_FACE_ID is used for lookup_image.
+   BASE_FG/BASE_BG are the resolved base colors (with defaulted_p applied).
+   Returns packed int64 with text_len, nruns, ndisplay, naligns.  */
 static int64_t
-neomacs_layout_status_line_text_1 (struct window *w, struct frame *f,
-                                   uint8_t *out_buf, int64_t out_buf_len,
-                                   void *face_out, int face_id,
-                                   Lisp_Object format)
+extract_propertized_string_data (struct window *w, struct frame *f,
+                                 Lisp_Object result,
+                                 int remapped_face_id, int image_face_id,
+                                 unsigned long base_fg, unsigned long base_bg,
+                                 uint8_t *out_buf, int64_t out_buf_len,
+                                 ptrdiff_t text_len)
 {
-  if (!w || !out_buf || out_buf_len <= 0)
-    return -1;
-
-  if (NILP (format))
-    return 0;
-
-  if (!BUFFERP (w->contents))
-    return -1;
-
-  /* Switch to window's buffer BEFORE face lookup so that
-     face-remapping-alist (used by solaire-mode to remap mode-line,
-     header-line, etc.) is respected.  */
-  struct buffer *buf = XBUFFER (w->contents);
-  struct buffer *old = current_buffer;
-  set_buffer_internal_1 (buf);
-
-  /* Fill base face data with remapped face. */
-  int remapped_face_id = lookup_basic_face (w, f, face_id);
-  struct face *base_face = FACE_FROM_ID_OR_NULL (f, remapped_face_id);
-  if (!base_face)
-    base_face = FACE_FROM_ID_OR_NULL (f, face_id);
-  if (face_out && base_face)
-    fill_face_data (f, base_face, (struct FaceDataFFI *) face_out);
-
-  /* Call (format-mode-line FORMAT nil WINDOW BUFFER).
-     Pass nil as FACE so that per-segment face properties from
-     :propertize specs are preserved in the output string.
-     The base status-line face is applied later via
-     face_at_string_position with face_id as base.  */
-  Lisp_Object window_obj;
-  XSETWINDOW (window_obj, w);
-  Lisp_Object result = Fformat_mode_line (format, Qnil,
-                                           window_obj, w->contents);
-
-  set_buffer_internal_1 (old);
-
-  if (!STRINGP (result))
-    return -1;
-
-  ptrdiff_t len = SBYTES (result);
-  if (len > out_buf_len)
-    len = out_buf_len;
-
-  memcpy (out_buf, SDATA (result), len);
-
-  /* Resolve the base face's actual fg/bg for defaulted_p substitution.
-     When a sub-face has background_defaulted_p, we substitute the base
-     status-line face's background (not the frame background).  */
-  unsigned long base_fg = base_face ? base_face->foreground : 0;
-  unsigned long base_bg = base_face ? base_face->background : 0;
-  if (base_face && base_face->foreground_defaulted_p)
-    base_fg = FRAME_FOREGROUND_PIXEL (f);
-  if (base_face && base_face->background_defaulted_p)
-    base_bg = FRAME_BACKGROUND_PIXEL (f);
+  ptrdiff_t len = text_len;
 
   /* Extract face runs from the propertized string.
      Walk character positions and detect face changes.
@@ -2631,7 +2589,7 @@ neomacs_layout_status_line_text_1 (struct window *w, struct frame *f,
                   && EQ (XCAR (dprop), Qimage)
                   && valid_image_p (dprop))
                 {
-                  ptrdiff_t img_id = lookup_image (f, dprop, face_id);
+                  ptrdiff_t img_id = lookup_image (f, dprop, image_face_id);
                   if (img_id >= 0)
                     {
                       struct image *img = IMAGE_FROM_ID (f, img_id);
@@ -2696,6 +2654,72 @@ neomacs_layout_status_line_text_1 (struct window *w, struct frame *f,
     }
 
   return (int64_t) len;
+}
+
+static int64_t
+neomacs_layout_status_line_text_1 (struct window *w, struct frame *f,
+                                   uint8_t *out_buf, int64_t out_buf_len,
+                                   void *face_out, int face_id,
+                                   Lisp_Object format)
+{
+  if (!w || !out_buf || out_buf_len <= 0)
+    return -1;
+
+  if (NILP (format))
+    return 0;
+
+  if (!BUFFERP (w->contents))
+    return -1;
+
+  /* Switch to window's buffer BEFORE face lookup so that
+     face-remapping-alist (used by solaire-mode to remap mode-line,
+     header-line, etc.) is respected.  */
+  struct buffer *buf = XBUFFER (w->contents);
+  struct buffer *old = current_buffer;
+  set_buffer_internal_1 (buf);
+
+  /* Fill base face data with remapped face. */
+  int remapped_face_id = lookup_basic_face (w, f, face_id);
+  struct face *base_face = FACE_FROM_ID_OR_NULL (f, remapped_face_id);
+  if (!base_face)
+    base_face = FACE_FROM_ID_OR_NULL (f, face_id);
+  if (face_out && base_face)
+    fill_face_data (f, base_face, (struct FaceDataFFI *) face_out);
+
+  /* Call (format-mode-line FORMAT nil WINDOW BUFFER).
+     Pass nil as FACE so that per-segment face properties from
+     :propertize specs are preserved in the output string.
+     The base status-line face is applied later via
+     face_at_string_position with face_id as base.  */
+  Lisp_Object window_obj;
+  XSETWINDOW (window_obj, w);
+  Lisp_Object result = Fformat_mode_line (format, Qnil,
+                                           window_obj, w->contents);
+
+  set_buffer_internal_1 (old);
+
+  if (!STRINGP (result))
+    return -1;
+
+  ptrdiff_t len = SBYTES (result);
+  if (len > out_buf_len)
+    len = out_buf_len;
+
+  memcpy (out_buf, SDATA (result), len);
+
+  /* Resolve the base face's actual fg/bg for defaulted_p substitution.
+     When a sub-face has background_defaulted_p, we substitute the base
+     status-line face's background (not the frame background).  */
+  unsigned long base_fg = base_face ? base_face->foreground : 0;
+  unsigned long base_bg = base_face ? base_face->background : 0;
+  if (base_face && base_face->foreground_defaulted_p)
+    base_fg = FRAME_FOREGROUND_PIXEL (f);
+  if (base_face && base_face->background_defaulted_p)
+    base_bg = FRAME_BACKGROUND_PIXEL (f);
+
+  return extract_propertized_string_data (w, f, result, remapped_face_id,
+                                           face_id, base_fg, base_bg,
+                                           out_buf, out_buf_len, len);
 }
 
 /* Get mode-line text for a window.  Thin wrapper around common core. */
@@ -2764,6 +2788,86 @@ neomacs_layout_tab_line_text (void *window_ptr, void *frame_ptr,
   return neomacs_layout_status_line_text_1 (w, f, out_buf, out_buf_len,
                                              face_out, TAB_LINE_FACE_ID,
                                              format);
+}
+
+/* Get tab-bar text for a frame as a propertized string with face runs.
+   The frame-level tab-bar (tab-bar-mode) is distinct from the per-window
+   tab-line.  We concatenate TAB_BAR_ITEM_CAPTION strings (which carry
+   text properties like `face`, `display`, `mouse-face`) and extract
+   face runs, display props, and align-to entries via the shared helper.
+   Returns packed int64 (same format as status line text functions).  */
+int64_t
+neomacs_layout_tab_bar_text (void *frame_ptr, uint8_t *out_buf,
+                              int64_t out_buf_len, void *face_out)
+{
+  struct frame *f = (struct frame *) frame_ptr;
+  if (!f || !out_buf || out_buf_len <= 0)
+    return -1;
+
+  if (FRAME_TAB_BAR_LINES (f) <= 0 || NILP (f->tab_bar_items))
+    return 0;
+
+  int nitems = f->n_tab_bar_items;
+  Lisp_Object items_vec = f->tab_bar_items;
+  if (!VECTORP (items_vec) || nitems <= 0)
+    return 0;
+
+  /* Use tab-bar window for face resolution.  */
+  struct window *w = WINDOWP (f->tab_bar_window)
+    ? XWINDOW (f->tab_bar_window)
+    : XWINDOW (f->selected_window);
+
+  /* Look up tab-bar base face.  */
+  int face_id = TAB_BAR_FACE_ID;
+  int remapped_face_id = lookup_basic_face (w, f, face_id);
+  struct face *base_face = FACE_FROM_ID_OR_NULL (f, remapped_face_id);
+  if (!base_face)
+    base_face = FACE_FROM_ID_OR_NULL (f, face_id);
+  if (face_out && base_face)
+    fill_face_data (f, base_face, (struct FaceDataFFI *) face_out);
+
+  /* Concatenate all TAB_BAR_ITEM_CAPTION strings (preserving text
+     properties: face, display, mouse-face).  */
+  int nslots = TAB_BAR_ITEM_NSLOTS;
+  Lisp_Object result = empty_unibyte_string;
+  for (int i = 0; i < nitems; i++)
+    {
+      int base = i * nslots;
+      Lisp_Object caption = AREF (items_vec, base + TAB_BAR_ITEM_CAPTION);
+      if (STRINGP (caption) && SCHARS (caption) > 0)
+        result = concat2 (result, caption);
+    }
+
+  if (!STRINGP (result) || SCHARS (result) == 0)
+    return 0;
+
+  ptrdiff_t len = SBYTES (result);
+  if (len > out_buf_len)
+    len = out_buf_len;
+
+  memcpy (out_buf, SDATA (result), len);
+
+  /* Resolve base face colors for defaulted_p substitution.  */
+  unsigned long base_fg = base_face ? base_face->foreground : 0;
+  unsigned long base_bg = base_face ? base_face->background : 0;
+  if (base_face && base_face->foreground_defaulted_p)
+    base_fg = FRAME_FOREGROUND_PIXEL (f);
+  if (base_face && base_face->background_defaulted_p)
+    base_bg = FRAME_BACKGROUND_PIXEL (f);
+
+  return extract_propertized_string_data (w, f, result, remapped_face_id,
+                                           face_id, base_fg, base_bg,
+                                           out_buf, out_buf_len, len);
+}
+
+/* Get tab-bar pixel height for a frame.  Returns 0 if tab-bar is disabled.  */
+float
+neomacs_layout_tab_bar_height (void *frame_ptr)
+{
+  struct frame *f = (struct frame *) frame_ptr;
+  if (!f || FRAME_TAB_BAR_LINES (f) <= 0)
+    return 0.0f;
+  return (float) FRAME_TAB_BAR_HEIGHT (f);
 }
 
 /* FFI struct for line number configuration.
@@ -5033,7 +5137,8 @@ neomacs_send_tool_bar_items (struct frame *f)
   neomacs_display_tool_bar_end (dpyinfo->display_handle, fg_rgb, bg_rgb);
 }
 
-/* Send tab bar items to the GPU tab bar overlay.  */
+/* Send tab bar items for click hit-testing.
+   Rendering is now handled by the layout engine via neomacs_layout_tab_bar_text().  */
 static void
 neomacs_send_tab_bar_items (struct frame *f)
 {
@@ -5057,24 +5162,7 @@ neomacs_send_tab_bar_items (struct frame *f)
   if (!VECTORP (items_vec) || nitems <= 0)
     return;
 
-  /* Get tab-bar face and fill face data struct.  */
-  struct face *tb_face = FACE_FROM_ID_OR_NULL (f, TAB_BAR_FACE_ID);
-  struct FaceDataFFI face_data = {0};
-  if (tb_face)
-    fill_face_data (f, tb_face, &face_data);
-
-  /* Active tab gets a brighter background.  Blend fg into bg at 15%.  */
-  unsigned long fg_pixel = tb_face ? tb_face->foreground : FRAME_FOREGROUND_PIXEL (f);
-  unsigned long bg_pixel = tb_face ? tb_face->background : FRAME_BACKGROUND_PIXEL (f);
-  uint32_t active_r = (RED_FROM_ULONG (bg_pixel) * 85
-                       + RED_FROM_ULONG (fg_pixel) * 15) / 100;
-  uint32_t active_g = (GREEN_FROM_ULONG (bg_pixel) * 85
-                       + GREEN_FROM_ULONG (fg_pixel) * 15) / 100;
-  uint32_t active_b = (BLUE_FROM_ULONG (bg_pixel) * 85
-                       + BLUE_FROM_ULONG (fg_pixel) * 15) / 100;
-  uint32_t active_bg_rgb = (active_r << 16) | (active_g << 8) | active_b;
-
-  float height = (float) FRAME_LINE_HEIGHT (f) + 4.0f;
+  float height = (float) FRAME_TAB_BAR_HEIGHT (f);
   neomacs_display_tab_bar_begin (dpyinfo->display_handle, nitems, height);
 
   for (int i = 0; i < nitems; i++)
@@ -5098,8 +5186,7 @@ neomacs_send_tab_bar_items (struct frame *f)
                                           0 /* is_separator */);
     }
 
-  neomacs_display_tab_bar_end (dpyinfo->display_handle, active_bg_rgb,
-                                 &face_data);
+  neomacs_display_tab_bar_end (dpyinfo->display_handle, 0, NULL);
 }
 
 /* Called at the end of updating a frame */

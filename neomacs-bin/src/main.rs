@@ -173,6 +173,7 @@ fn log_frame_glyph_summary(phase: &str, frame_glyphs: &FrameGlyphBuffer) {
                     }
                 }
                 GlyphRowRole::Minibuffer => minibuffer += 1,
+                GlyphRowRole::TabBar => tab += 1,
             }
             if row_role.is_chrome() && has_clip {
                 chrome_with_clip += 1;

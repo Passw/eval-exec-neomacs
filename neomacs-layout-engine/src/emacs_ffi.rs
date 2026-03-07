@@ -168,6 +168,20 @@ unsafe extern "C" {
         face_out: *mut FaceDataFFI,
     ) -> i64;
 
+    /// Get tab-bar text for a frame as propertized UTF-8 with face runs.
+    /// Returns packed int64 (same format as status line text functions),
+    /// or 0 if tab-bar is disabled, or -1 on error.
+    /// Also fills face_out with the tab-bar base face.
+    pub fn neomacs_layout_tab_bar_text(
+        frame: EmacsFrame,
+        out_buf: *mut u8,
+        out_buf_len: i64,
+        face_out: *mut FaceDataFFI,
+    ) -> i64;
+
+    /// Get tab-bar pixel height for a frame.  Returns 0 if disabled.
+    pub fn neomacs_layout_tab_bar_height(frame: EmacsFrame) -> f32;
+
     // ========================================================================
     // Line numbers
     // ========================================================================

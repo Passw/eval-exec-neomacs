@@ -283,26 +283,8 @@ impl RenderApp {
             }
         }
 
-        // Render tab bar overlay (between menu bar and toolbar)
-        if self.tab_bar_height > 0.0 && !self.tab_bar_items.is_empty() {
-            if let (Some(renderer), Some(glyph_atlas)) = (&self.renderer, &mut self.glyph_atlas) {
-                let tab_bar_y = self.menu_bar_height;
-                renderer.render_tab_bar(
-                    &surface_view,
-                    &self.tab_bar_items,
-                    self.tab_bar_height,
-                    tab_bar_y,
-                    &self.tab_bar_face,
-                    self.tab_bar_active_bg,
-                    self.tab_bar_hovered,
-                    self.tab_bar_pressed,
-                    glyph_atlas,
-                    self.scale_factor as f32,
-                    self.width as f32,
-                    self.height as f32,
-                );
-            }
-        }
+        // Tab bar is now rendered via the layout engine's status-line pipeline
+        // (GlyphRowRole::TabBar) — no separate overlay needed.
 
         // Render toolbar overlay
         if self.toolbar_height > 0.0 && !self.toolbar_items.is_empty() {
