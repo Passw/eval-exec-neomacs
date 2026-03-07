@@ -2658,6 +2658,113 @@ fn gc_stress_closures() {
 }
 
 #[test]
+fn gc_stress_lambda_argument_closure_survives_binding_installation() {
+    let mut ev = Evaluator::new();
+    ev.set_lexical_binding(true);
+    ev.gc_stress = true;
+    ev.heap.set_gc_threshold(1);
+    let forms = parse_forms(
+        r#"(let ((payload (list 1 2 3)))
+             ((lambda (orig)
+                (funcall orig))
+              (lambda () payload)))"#,
+    )
+    .expect("parse");
+    let result = format_eval_result(&ev.eval_expr(&forms[0]));
+    assert_eq!(result, "OK (1 2 3)");
+}
+
+#[test]
+fn gc_stress_direct_lambda_head_roots_fresh_closure_during_arg_eval() {
+    let mut ev = Evaluator::new();
+    ev.set_lexical_binding(true);
+    ev.gc_stress = true;
+    ev.heap.set_gc_threshold(1);
+    let forms = parse_forms(
+        r#"((lambda (f value)
+              (funcall f value))
+            (lambda (x) x)
+            (prog1 (list 1 2 3)
+              (list 4 5 6)
+              (list 7 8 9)))"#,
+    )
+    .expect("parse");
+    let result = format_eval_result(&ev.eval_expr(&forms[0]));
+    assert_eq!(result, "OK (1 2 3)");
+}
+
+#[test]
+fn gc_stress_builtin_apply_roots_closure_function_argument() {
+    let mut ev = Evaluator::new();
+    ev.set_lexical_binding(true);
+    ev.gc_stress = true;
+    ev.heap.set_gc_threshold(1);
+    let forms = parse_forms(
+        r#"(let ((payload (list 7 8 9)))
+             (let ((f (lambda () payload)))
+               (apply f nil)))"#,
+    )
+    .expect("parse");
+    let result = format_eval_result(&ev.eval_expr(&forms[0]));
+    assert_eq!(result, "OK (7 8 9)");
+}
+
+#[test]
+fn gc_stress_let_star_lexical_binding_roots_evaluated_values() {
+    let mut ev = Evaluator::new();
+    ev.set_lexical_binding(true);
+    ev.gc_stress = true;
+    ev.heap.set_gc_threshold(1);
+    let forms = parse_forms(
+        r#"(let ((build (lambda () (list 4 5 6))))
+             (let* ((x (funcall build))
+                    (y x))
+               y))"#,
+    )
+    .expect("parse");
+    let result = format_eval_result(&ev.eval_expr(&forms[0]));
+    assert_eq!(result, "OK (4 5 6)");
+}
+
+#[test]
+fn gc_stress_prog1_roots_first_value() {
+    let r = eval_stress("(prog1 (list 1 2 3) (list 4 5 6) (list 7 8 9))");
+    assert_eq!(r[0], "OK (1 2 3)");
+}
+
+#[test]
+fn gc_stress_aref_on_closure_survives_closure_vector_conversion() {
+    let mut ev = Evaluator::new();
+    ev.set_lexical_binding(true);
+    ev.gc_stress = true;
+    ev.heap.set_gc_threshold(1);
+    let forms = parse_forms(
+        r#"(let ((payload (list 1 2 3)))
+             (let ((closure (lambda () payload)))
+               (not (null (aref closure 2)))))"#,
+    )
+    .expect("parse");
+    let result = format_eval_result(&ev.eval_expr(&forms[0]));
+    assert_eq!(result, "OK t");
+}
+
+#[test]
+fn gc_stress_cdr_on_lambda_survives_cons_list_conversion() {
+    let mut ev = Evaluator::new();
+    ev.set_lexical_binding(true);
+    ev.gc_stress = true;
+    ev.heap.set_gc_threshold(1);
+    let forms = parse_forms(
+        r#"(let ((payload (list 1 2 3)))
+             (let ((closure (lambda () payload)))
+               (not (null (car (cdr closure))))))"#,
+    )
+    .expect("parse");
+    let result = format_eval_result(&ev.eval_expr(&forms[0]));
+    assert_eq!(result, "OK t");
+}
+
+#[test]
 fn gc_stress_recursive_function() {
     let r = eval_stress(
         "(defun my-length (lst)

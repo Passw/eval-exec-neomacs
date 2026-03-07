@@ -1,5 +1,6 @@
 //! Evaluator — special forms, function application, and dispatch.
 
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -124,6 +125,10 @@ fn value_from_symbol_id(sym_id: SymId) -> Value {
 /// Limit for stored recent input events to match GNU Emacs: 300 entries.
 pub(crate) const RECENT_INPUT_EVENT_LIMIT: usize = 300;
 
+thread_local! {
+    static SCRATCH_GC_ROOTS: RefCell<Vec<Value>> = const { RefCell::new(Vec::new()) };
+}
+
 /// Collect GC roots from all thread-local statics that hold Values.
 ///
 /// Thread-local statics are invisible to the normal GC root scan (which
@@ -138,6 +143,19 @@ fn collect_thread_local_gc_roots(roots: &mut Vec<Value>) {
     super::terminal::pure::collect_terminal_gc_roots(roots);
     super::font::collect_font_gc_roots(roots);
     super::ccl::collect_ccl_gc_roots(roots);
+    SCRATCH_GC_ROOTS.with(|scratch| roots.extend(scratch.borrow().iter().copied()));
+}
+
+pub(crate) fn save_scratch_gc_roots() -> usize {
+    SCRATCH_GC_ROOTS.with(|scratch| scratch.borrow().len())
+}
+
+pub(crate) fn push_scratch_gc_root(value: Value) {
+    SCRATCH_GC_ROOTS.with(|scratch| scratch.borrow_mut().push(value));
+}
+
+pub(crate) fn restore_scratch_gc_roots(saved_len: usize) {
+    SCRATCH_GC_ROOTS.with(|scratch| scratch.borrow_mut().truncate(saved_len));
 }
 
 /// The Elisp evaluator.
@@ -490,7 +508,8 @@ impl Evaluator {
         obarray.set_symbol_value("load-path", Value::Nil);
         obarray.set_symbol_value("load-history", Value::Nil);
         // In official Emacs, load-suffixes is (".elc" ".el"), but neomacs
-        // only supports .el.
+        // only supports .el by default today. Compiled-first lookup remains a
+        // separate compatibility target until .elc bootstrap/runtime is ready.
         obarray.set_symbol_value("load-suffixes", Value::list(vec![Value::string(".el")]));
         // load-file-rep-suffixes: suffixes for alternate representations of
         // the same file (e.g., compressed ".gz").  Default is just ("").
@@ -2634,9 +2653,11 @@ impl Evaluator {
             if let Some(Expr::Symbol(id)) = lambda_form.first() {
                 if resolve_sym(*id) == "lambda" {
                     let func = self.eval_lambda(&lambda_form[1..])?;
+                    self.push_temp_root(func);
                     let (args, args_saved) = self.eval_args(tail)?;
                     let result = self.apply(func, args);
                     self.restore_temp_roots(args_saved);
+                    self.temp_roots.pop();
                     return result;
                 }
             }
@@ -2645,9 +2666,11 @@ impl Evaluator {
         // Head is an opaque callable value (Lambda, ByteCode, Subr, etc.)
         // embedded in code via value_to_expr (e.g., from eval/macro expansion).
         if let Expr::OpaqueValue(func) = head {
+            self.push_temp_root(*func);
             let (args, args_saved) = self.eval_args(tail)?;
             let result = self.apply(*func, args);
             self.restore_temp_roots(args_saved);
+            self.temp_roots.pop();
             return result;
         }
 
@@ -3122,7 +3145,7 @@ impl Evaluator {
                         }
                         let old_value = self.visible_variable_value_or_nil(name);
                         if use_lexical && !self.obarray.is_special(name) {
-                            self.lexenv = lexenv_prepend(self.lexenv, *id, Value::Nil);
+                            self.bind_lexical_value_rooted(*id, Value::Nil);
                         } else if let Some(frame) = self.dynamic.last_mut() {
                             frame.insert(*id, Value::Nil);
                         }
@@ -3147,7 +3170,7 @@ impl Evaluator {
                         }
                         let old_value = self.visible_variable_value_or_nil(name);
                         if use_lexical && !self.obarray.is_special(name) {
-                            self.lexenv = lexenv_prepend(self.lexenv, *id, value);
+                            self.bind_lexical_value_rooted(*id, value);
                         } else if let Some(frame) = self.dynamic.last_mut() {
                             frame.insert(*id, value);
                         }
@@ -3387,9 +3410,15 @@ impl Evaluator {
             ));
         }
         let first = self.eval(&tail[0])?;
+        let saved_roots = self.save_temp_roots();
+        self.push_temp_root(first);
         for form in &tail[1..] {
-            self.eval(form)?;
+            if let Err(err) = self.eval(form) {
+                self.restore_temp_roots(saved_roots);
+                return Err(err);
+            }
         }
+        self.restore_temp_roots(saved_roots);
         Ok(first)
     }
 
@@ -4694,14 +4723,21 @@ impl Evaluator {
 
     /// Apply a function value to evaluated arguments.
     pub(crate) fn apply(&mut self, function: Value, args: Vec<Value>) -> EvalResult {
+        let saved_roots = self.save_temp_roots();
+        self.push_temp_root(function);
+        for &arg in &args {
+            self.push_temp_root(arg);
+        }
         // Deep interpreted expansion (notably loadup's eager macroexpansion of
         // macroexp.el itself) can recurse through many apply/apply_lambda
         // frames between successive eval() calls. Grow the stack at the
         // function-application boundary so those paths don't exhaust the
         // native thread stack long before max-lisp-eval-depth is reached.
-        stacker::maybe_grow(256 * 1024, 2 * 1024 * 1024, || {
+        let result = stacker::maybe_grow(256 * 1024, 2 * 1024 * 1024, || {
             self.apply_inner(function, args)
-        })
+        });
+        self.restore_temp_roots(saved_roots);
+        result
     }
 
     fn apply_inner(&mut self, function: Value, args: Vec<Value>) -> EvalResult {
@@ -5021,32 +5057,37 @@ impl Evaluator {
             }
         }
 
+        let saved_arg_roots = self.save_temp_roots();
+        for &arg in &args {
+            self.push_temp_root(arg);
+        }
+
         // If closure has a captured lexenv, restore it and prepend param bindings.
         // The old lexenv is saved on a GC-scanned stack so it survives
         // garbage collection during the function body evaluation.
         let has_lexenv = lambda.env.is_some();
         if let Some(env) = lambda.env {
             let old = std::mem::replace(&mut self.lexenv, env);
+            self.saved_lexenvs.push(old);
             // Prepend param bindings onto the captured env
             let mut arg_idx = 0;
             for param in &params.required {
-                self.lexenv = lexenv_prepend(self.lexenv, *param, args[arg_idx]);
+                self.bind_lexical_value_rooted(*param, args[arg_idx]);
                 arg_idx += 1;
             }
             for param in &params.optional {
                 if arg_idx < args.len() {
-                    self.lexenv = lexenv_prepend(self.lexenv, *param, args[arg_idx]);
+                    self.bind_lexical_value_rooted(*param, args[arg_idx]);
                     arg_idx += 1;
                 } else {
-                    self.lexenv = lexenv_prepend(self.lexenv, *param, Value::Nil);
+                    self.bind_lexical_value_rooted(*param, Value::Nil);
                 }
             }
             if let Some(ref rest_name) = params.rest {
                 let rest_args: Vec<Value> = args[arg_idx..].to_vec();
-                self.lexenv = lexenv_prepend(self.lexenv, *rest_name, Value::list(rest_args));
+                let rest_value = Value::list(rest_args);
+                self.bind_lexical_value_rooted(*rest_name, rest_value);
             }
-            // Save old lexenv on GC-scanned stack
-            self.saved_lexenvs.push(old);
         } else {
             // Dynamic binding (no captured lexenv)
             let mut frame = OrderedSymMap::new();
@@ -5077,6 +5118,8 @@ impl Evaluator {
             None
         };
 
+        self.restore_temp_roots(saved_arg_roots);
+
         // Macros are sometimes invoked directly via apply_lambda during
         // expansion, bypassing apply(). Keep the same stack-growth guard here.
         let result =
@@ -5092,6 +5135,14 @@ impl Evaluator {
             self.dynamic.pop();
         }
         result
+    }
+
+    #[inline]
+    fn bind_lexical_value_rooted(&mut self, sym: SymId, value: Value) {
+        let saved_roots = self.save_temp_roots();
+        self.push_temp_root(value);
+        self.lexenv = lexenv_prepend(self.lexenv, sym, value);
+        self.restore_temp_roots(saved_roots);
     }
 
     // -----------------------------------------------------------------------

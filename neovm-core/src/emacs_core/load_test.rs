@@ -1007,6 +1007,200 @@ fn direct_setq_funcall_updates_variable_place() {
 }
 
 #[test]
+fn pdump_roundtrip_preserves_advice_remove_member_lifecycle() {
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest.parent().expect("project root");
+
+    let mut eval = create_bootstrap_evaluator().expect("bootstrap evaluator");
+    ensure_startup_compat_variables(&mut eval, project_root);
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let dump_path = dir.path().join("advice-lifecycle.pdump");
+    crate::emacs_core::pdump::dump_to_file(&eval, &dump_path).expect("dump should succeed");
+    drop(eval);
+
+    let mut loaded =
+        crate::emacs_core::pdump::load_from_dump(&dump_path).expect("load should succeed");
+    ensure_startup_compat_variables(&mut loaded, project_root);
+    apply_runtime_startup_state(&mut loaded).expect("runtime startup after load");
+
+    let steps = [
+        (
+            "setup-target",
+            "(fset 'neovm--adv-tgt3 (lambda (x) x))",
+            None,
+        ),
+        (
+            "setup-before",
+            "(fset 'neovm--adv-fn3a (lambda (&rest _) nil))",
+            None,
+        ),
+        (
+            "setup-after",
+            "(fset 'neovm--adv-fn3b (lambda (&rest _) nil))",
+            None,
+        ),
+        (
+            "member-initial",
+            "(not (null (advice-member-p 'neovm--adv-fn3a 'neovm--adv-tgt3)))",
+            Some("nil"),
+        ),
+        (
+            "add-before",
+            "(advice-add 'neovm--adv-tgt3 :before 'neovm--adv-fn3a)",
+            None,
+        ),
+        (
+            "add-after",
+            "(advice-add 'neovm--adv-tgt3 :after 'neovm--adv-fn3b)",
+            None,
+        ),
+        (
+            "member-before-present",
+            "(not (null (advice-member-p 'neovm--adv-fn3a 'neovm--adv-tgt3)))",
+            Some("t"),
+        ),
+        (
+            "member-after-present",
+            "(not (null (advice-member-p 'neovm--adv-fn3b 'neovm--adv-tgt3)))",
+            Some("t"),
+        ),
+        (
+            "remove-before",
+            "(advice-remove 'neovm--adv-tgt3 'neovm--adv-fn3a)",
+            None,
+        ),
+        (
+            "member-before-absent",
+            "(not (null (advice-member-p 'neovm--adv-fn3a 'neovm--adv-tgt3)))",
+            Some("nil"),
+        ),
+        (
+            "member-after-still-present",
+            "(not (null (advice-member-p 'neovm--adv-fn3b 'neovm--adv-tgt3)))",
+            Some("t"),
+        ),
+        (
+            "remove-after",
+            "(advice-remove 'neovm--adv-tgt3 'neovm--adv-fn3b)",
+            None,
+        ),
+        (
+            "member-after-absent",
+            "(not (null (advice-member-p 'neovm--adv-fn3b 'neovm--adv-tgt3)))",
+            Some("nil"),
+        ),
+    ];
+
+    for (label, form, expected) in steps {
+        eprintln!("pdump advice lifecycle step: {label}");
+        let parsed = crate::emacs_core::parser::parse_forms(form).expect("parse step");
+        let value = loaded.eval_expr(&parsed[0]).expect("evaluate step");
+        if let Some(expected) = expected {
+            let rendered =
+                crate::emacs_core::print::print_value_with_buffers(&value, &loaded.buffers);
+            assert_eq!(rendered, expected, "unexpected result at step {label}");
+        }
+    }
+}
+
+#[test]
+fn pdump_roundtrip_evaluates_full_advice_remove_member_form() {
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest.parent().expect("project root");
+
+    let mut eval = create_bootstrap_evaluator().expect("bootstrap evaluator");
+    ensure_startup_compat_variables(&mut eval, project_root);
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let dump_path = dir.path().join("advice-lifecycle-full.pdump");
+    crate::emacs_core::pdump::dump_to_file(&eval, &dump_path).expect("dump should succeed");
+    drop(eval);
+
+    let mut loaded =
+        crate::emacs_core::pdump::load_from_dump(&dump_path).expect("load should succeed");
+    ensure_startup_compat_variables(&mut loaded, project_root);
+    apply_runtime_startup_state(&mut loaded).expect("runtime startup after load");
+
+    let form = crate::emacs_core::parser::parse_forms(
+        r#"(progn
+      (fset 'neovm--adv-tgt3 (lambda (x) x))
+      (fset 'neovm--adv-fn3a (lambda (&rest _) nil))
+      (fset 'neovm--adv-fn3b (lambda (&rest _) nil))
+      (unwind-protect
+          (let (results)
+            (setq results (cons (not (null (advice-member-p 'neovm--adv-fn3a 'neovm--adv-tgt3))) results))
+            (advice-add 'neovm--adv-tgt3 :before 'neovm--adv-fn3a)
+            (advice-add 'neovm--adv-tgt3 :after 'neovm--adv-fn3b)
+            (setq results (cons (not (null (advice-member-p 'neovm--adv-fn3a 'neovm--adv-tgt3))) results))
+            (setq results (cons (not (null (advice-member-p 'neovm--adv-fn3b 'neovm--adv-tgt3))) results))
+            (advice-remove 'neovm--adv-tgt3 'neovm--adv-fn3a)
+            (setq results (cons (not (null (advice-member-p 'neovm--adv-fn3a 'neovm--adv-tgt3))) results))
+            (setq results (cons (not (null (advice-member-p 'neovm--adv-fn3b 'neovm--adv-tgt3))) results))
+            (advice-remove 'neovm--adv-tgt3 'neovm--adv-fn3b)
+            (setq results (cons (not (null (advice-member-p 'neovm--adv-fn3b 'neovm--adv-tgt3))) results))
+            (nreverse results))
+        (fmakunbound 'neovm--adv-tgt3)
+        (fmakunbound 'neovm--adv-fn3a)
+        (fmakunbound 'neovm--adv-fn3b)))"#,
+    )
+    .expect("parse form");
+
+    let value = loaded.eval_expr(&form[0]).expect("evaluate full form");
+    let rendered = crate::emacs_core::print::print_value_with_buffers(&value, &loaded.buffers);
+    assert_eq!(rendered, "(nil t t nil t nil)");
+}
+
+#[test]
+fn cached_bootstrap_reload_evaluates_full_advice_remove_member_form() {
+    let form_source = r#"(progn
+      (fset 'neovm--adv-tgt3 (lambda (x) x))
+      (fset 'neovm--adv-fn3a (lambda (&rest _) nil))
+      (fset 'neovm--adv-fn3b (lambda (&rest _) nil))
+      (unwind-protect
+          (let (results)
+            (setq results (cons (not (null (advice-member-p 'neovm--adv-fn3a 'neovm--adv-tgt3))) results))
+            (advice-add 'neovm--adv-tgt3 :before 'neovm--adv-fn3a)
+            (advice-add 'neovm--adv-tgt3 :after 'neovm--adv-fn3b)
+            (setq results (cons (not (null (advice-member-p 'neovm--adv-fn3a 'neovm--adv-tgt3))) results))
+            (setq results (cons (not (null (advice-member-p 'neovm--adv-fn3b 'neovm--adv-tgt3))) results))
+            (advice-remove 'neovm--adv-tgt3 'neovm--adv-fn3a)
+            (setq results (cons (not (null (advice-member-p 'neovm--adv-fn3a 'neovm--adv-tgt3))) results))
+            (setq results (cons (not (null (advice-member-p 'neovm--adv-fn3b 'neovm--adv-tgt3))) results))
+            (advice-remove 'neovm--adv-tgt3 'neovm--adv-fn3b)
+            (setq results (cons (not (null (advice-member-p 'neovm--adv-fn3b 'neovm--adv-tgt3))) results))
+            (nreverse results))
+        (fmakunbound 'neovm--adv-tgt3)
+        (fmakunbound 'neovm--adv-fn3a)
+        (fmakunbound 'neovm--adv-fn3b)))"#;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let dump_path = dir.path().join("cached-advice-lifecycle.pdump");
+
+    let mut fresh =
+        create_bootstrap_evaluator_cached_at_path(&[], &dump_path).expect("fresh cached bootstrap");
+    apply_runtime_startup_state(&mut fresh).expect("fresh runtime startup");
+    let fresh_form = crate::emacs_core::parser::parse_forms(form_source).expect("parse fresh form");
+    let fresh_value = fresh.eval_expr(&fresh_form[0]).expect("fresh form eval");
+    assert_eq!(
+        crate::emacs_core::print::print_value_with_buffers(&fresh_value, &fresh.buffers),
+        "(nil t t nil t nil)"
+    );
+    drop(fresh);
+
+    let mut loaded = create_bootstrap_evaluator_cached_at_path(&[], &dump_path)
+        .expect("loaded cached bootstrap");
+    apply_runtime_startup_state(&mut loaded).expect("loaded runtime startup");
+    let loaded_form =
+        crate::emacs_core::parser::parse_forms(form_source).expect("parse loaded form");
+    let loaded_value = loaded.eval_expr(&loaded_form[0]).expect("loaded form eval");
+    assert_eq!(
+        crate::emacs_core::print::print_value_with_buffers(&loaded_value, &loaded.buffers),
+        "(nil t t nil t nil)"
+    );
+}
+
+#[test]
 fn runtime_startup_state_matches_char_syntax_comprehensive_form() {
     let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
     apply_runtime_startup_state(&mut eval).expect("runtime startup state");

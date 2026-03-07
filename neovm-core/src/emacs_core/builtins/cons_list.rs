@@ -24,7 +24,8 @@ pub(crate) fn builtin_cons(args: Vec<Value>) -> EvalResult {
 /// Convert a Lambda (or Macro) value to a cons-list representation matching
 /// the official Emacs format.
 pub(crate) fn lambda_to_cons_list(value: &Value) -> Option<Value> {
-    let data = value.get_lambda_data()?;
+    let data = value.get_lambda_data()?.clone();
+    let saved_roots = crate::emacs_core::eval::save_scratch_gc_roots();
     let mut elements = Vec::new();
 
     if let Some(env_val) = data.env {
@@ -38,25 +39,32 @@ pub(crate) fn lambda_to_cons_list(value: &Value) -> Option<Value> {
         elements.push(Value::symbol("lambda"));
     }
 
-    elements.push(lambda_params_to_value(&data.params));
+    let params_value = lambda_params_to_value(&data.params);
+    crate::emacs_core::eval::push_scratch_gc_root(params_value);
+    elements.push(params_value);
 
     if let Some(ref doc) = data.docstring {
-        elements.push(Value::string(doc.clone()));
+        let doc_value = Value::string(doc.clone());
+        crate::emacs_core::eval::push_scratch_gc_root(doc_value);
+        elements.push(doc_value);
     }
 
     // Include (:documentation TYPE) form for oclosures
     if let Some(doc_form) = data.doc_form {
-        elements.push(Value::list(vec![
-            Value::keyword(":documentation"),
-            doc_form,
-        ]));
+        let doc_entry = Value::list(vec![Value::keyword(":documentation"), doc_form]);
+        crate::emacs_core::eval::push_scratch_gc_root(doc_entry);
+        elements.push(doc_entry);
     }
 
     for expr in data.body.iter() {
-        elements.push(crate::emacs_core::eval::quote_to_value(expr));
+        let quoted = crate::emacs_core::eval::quote_to_value(expr);
+        crate::emacs_core::eval::push_scratch_gc_root(quoted);
+        elements.push(quoted);
     }
 
-    Some(Value::list(elements))
+    let result = Value::list(elements);
+    crate::emacs_core::eval::restore_scratch_gc_roots(saved_roots);
+    Some(result)
 }
 
 /// Convert a Lambda value to the official Emacs closure vector layout:
@@ -64,19 +72,26 @@ pub(crate) fn lambda_to_cons_list(value: &Value) -> Option<Value> {
 /// This is used by `aref` on closures for oclosure slot access.
 pub(crate) fn lambda_to_closure_vector(value: &Value) -> Vec<Value> {
     let data = match value.get_lambda_data() {
-        Some(d) => d,
+        Some(d) => d.clone(),
         None => return Vec::new(),
     };
+    let saved_roots = crate::emacs_core::eval::save_scratch_gc_roots();
 
     let args = lambda_params_to_value(&data.params);
+    crate::emacs_core::eval::push_scratch_gc_root(args);
 
     // Body: list of body forms
     let body_forms: Vec<Value> = data
         .body
         .iter()
-        .map(|expr| crate::emacs_core::eval::quote_to_value(expr))
+        .map(|expr| {
+            let quoted = crate::emacs_core::eval::quote_to_value(expr);
+            crate::emacs_core::eval::push_scratch_gc_root(quoted);
+            quoted
+        })
         .collect();
     let body = Value::list(body_forms);
+    crate::emacs_core::eval::push_scratch_gc_root(body);
 
     // Env — already stored as a flat cons alist matching GNU Emacs's
     // Vinternal_interpreter_environment.
@@ -97,7 +112,9 @@ pub(crate) fn lambda_to_closure_vector(value: &Value) -> Vec<Value> {
     };
 
     // Layout: [ARGS, BODY, ENV, nil, SLOT4]
-    vec![args, body, env, Value::Nil, slot4]
+    let result = vec![args, body, env, Value::Nil, slot4];
+    crate::emacs_core::eval::restore_scratch_gc_roots(saved_roots);
+    result
 }
 
 /// Convert a ByteCode value to the GNU Emacs closure vector layout:
@@ -105,11 +122,13 @@ pub(crate) fn lambda_to_closure_vector(value: &Value) -> Vec<Value> {
 /// This is used by `aref` on bytecode closures for oclosure slot access.
 pub(crate) fn bytecode_to_closure_vector(value: &Value) -> Vec<Value> {
     let bc = match value.get_bytecode_data() {
-        Some(d) => d,
+        Some(d) => d.clone(),
         None => return Vec::new(),
     };
+    let saved_roots = crate::emacs_core::eval::save_scratch_gc_roots();
 
     let args = lambda_params_to_value(&bc.params);
+    crate::emacs_core::eval::push_scratch_gc_root(args);
 
     // Slot 1: bytecode string — NeoVM uses decoded IR, not raw bytes
     let code = Value::Nil;
@@ -120,6 +139,7 @@ pub(crate) fn bytecode_to_closure_vector(value: &Value) -> Vec<Value> {
     } else {
         Value::vector(bc.constants.clone())
     };
+    crate::emacs_core::eval::push_scratch_gc_root(env);
 
     // Slot 3: max stack depth
     let depth = Value::Int(bc.max_stack as i64);
@@ -134,7 +154,9 @@ pub(crate) fn bytecode_to_closure_vector(value: &Value) -> Vec<Value> {
             .unwrap_or(Value::Nil)
     };
 
-    vec![args, code, env, depth, slot4]
+    let result = vec![args, code, env, depth, slot4];
+    crate::emacs_core::eval::restore_scratch_gc_roots(saved_roots);
+    result
 }
 
 /// Convert LambdaParams to a Lisp list (a b &optional c &rest d).

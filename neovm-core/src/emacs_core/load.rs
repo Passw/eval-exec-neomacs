@@ -1408,6 +1408,30 @@ fn ensure_startup_compat_variables(eval: &mut super::eval::Evaluator, project_ro
     }
 }
 
+fn finalize_cached_bootstrap_eval(eval: &mut super::eval::Evaluator, project_root: &Path) {
+    ensure_startup_compat_variables(eval, project_root);
+
+    let lisp_dir = project_root.join("lisp");
+    eval.set_variable(
+        "load-path",
+        Value::list(bootstrap_load_path_entries(&lisp_dir)),
+    );
+
+    let etc_dir = project_root.join("etc");
+    eval.set_variable(
+        "data-directory",
+        Value::string(format!("{}/", etc_dir.to_string_lossy())),
+    );
+    eval.set_variable(
+        "source-directory",
+        Value::string(format!("{}/", project_root.to_string_lossy())),
+    );
+    eval.set_variable(
+        "installation-directory",
+        Value::string(format!("{}/", project_root.to_string_lossy())),
+    );
+}
+
 pub(crate) fn bootstrap_load_path_entries(lisp_dir: &Path) -> Vec<Value> {
     let mut load_path_entries = Vec::new();
     for sub in BOOTSTRAP_LOAD_PATH_SUBDIRS {
@@ -1810,6 +1834,16 @@ pub fn create_bootstrap_evaluator_cached() -> Result<super::eval::Evaluator, Eva
 pub fn create_bootstrap_evaluator_cached_with_features(
     extra_features: &[&str],
 ) -> Result<super::eval::Evaluator, EvalError> {
+    let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest.parent().expect("project root");
+    let dump_path = bootstrap_dump_path(project_root, extra_features);
+    create_bootstrap_evaluator_cached_at_path(extra_features, &dump_path)
+}
+
+fn create_bootstrap_evaluator_cached_at_path(
+    extra_features: &[&str],
+    dump_path: &Path,
+) -> Result<super::eval::Evaluator, EvalError> {
     use super::pdump;
 
     let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1821,40 +1855,18 @@ pub fn create_bootstrap_evaluator_cached_with_features(
         ensure_startup_compat_variables(&mut eval, project_root);
         return Ok(eval);
     }
-    let dump_path = bootstrap_dump_path(project_root, extra_features);
 
     // Try loading from dump first
     if dump_path.exists() {
         let start = std::time::Instant::now();
-        match pdump::load_from_dump(&dump_path) {
+        match pdump::load_from_dump(dump_path) {
             Ok(mut eval) => {
                 tracing::info!(
                     "pdump: loaded bootstrap state from {} ({:.2?})",
                     dump_path.display(),
                     start.elapsed()
                 );
-                ensure_startup_compat_variables(&mut eval, project_root);
-                // Re-set load-path since it contains absolute paths that may differ
-                let lisp_dir = project_root.join("lisp");
-                eval.set_variable(
-                    "load-path",
-                    Value::list(bootstrap_load_path_entries(&lisp_dir)),
-                );
-
-                // Re-set directory paths
-                let etc_dir = project_root.join("etc");
-                eval.set_variable(
-                    "data-directory",
-                    Value::string(format!("{}/", etc_dir.to_string_lossy())),
-                );
-                eval.set_variable(
-                    "source-directory",
-                    Value::string(format!("{}/", project_root.to_string_lossy())),
-                );
-                eval.set_variable(
-                    "installation-directory",
-                    Value::string(format!("{}/", project_root.to_string_lossy())),
-                );
+                finalize_cached_bootstrap_eval(&mut eval, project_root);
 
                 return Ok(eval);
             }
@@ -1870,14 +1882,14 @@ pub fn create_bootstrap_evaluator_cached_with_features(
     ensure_startup_compat_variables(&mut eval, project_root);
     let bootstrap_time = start.elapsed();
 
-    // Save dump for next time
-    // Ensure target/ directory exists
-    let target_dir = project_root.join("target");
-    if !target_dir.exists() {
-        let _ = std::fs::create_dir_all(&target_dir);
+    // Save dump for next time.
+    if let Some(parent) = dump_path.parent()
+        && !parent.exists()
+    {
+        let _ = std::fs::create_dir_all(parent);
     }
     let dump_start = std::time::Instant::now();
-    match pdump::dump_to_file(&eval, &dump_path) {
+    match pdump::dump_to_file(&eval, dump_path) {
         Ok(()) => {
             tracing::info!(
                 "pdump: saved bootstrap state to {} ({:.2?}, bootstrap took {:.2?})",
@@ -1885,6 +1897,21 @@ pub fn create_bootstrap_evaluator_cached_with_features(
                 dump_start.elapsed(),
                 bootstrap_time,
             );
+            drop(eval);
+            let reload_start = std::time::Instant::now();
+            let mut loaded = pdump::load_from_dump(dump_path).map_err(|e| EvalError::Signal {
+                symbol: intern("error"),
+                data: vec![Value::string(format!(
+                    "pdump: failed to reload freshly written bootstrap image: {e}"
+                ))],
+            })?;
+            finalize_cached_bootstrap_eval(&mut loaded, project_root);
+            tracing::info!(
+                "pdump: reloaded freshly written bootstrap state from {} ({:.2?})",
+                dump_path.display(),
+                reload_start.elapsed()
+            );
+            return Ok(loaded);
         }
         Err(e) => {
             tracing::warn!("pdump: failed to save ({e}), will bootstrap again next time");
