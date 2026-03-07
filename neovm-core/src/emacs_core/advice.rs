@@ -110,8 +110,12 @@ impl VariableWatcherList {
     }
 
     // pdump accessors
-    pub(crate) fn dump_watchers(&self) -> &HashMap<String, Vec<VariableWatcher>> { &self.watchers }
-    pub(crate) fn from_dump(watchers: HashMap<String, Vec<VariableWatcher>>) -> Self { Self { watchers } }
+    pub(crate) fn dump_watchers(&self) -> &HashMap<String, Vec<VariableWatcher>> {
+        &self.watchers
+    }
+    pub(crate) fn from_dump(watchers: HashMap<String, Vec<VariableWatcher>>) -> Self {
+        Self { watchers }
+    }
 }
 
 fn watcher_callback_matches(registered: &Value, candidate: &Value) -> bool {

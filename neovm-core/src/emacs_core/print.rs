@@ -68,14 +68,20 @@ pub fn print_value_with_buffers(value: &Value, buffers: &crate::buffer::BufferMa
                 return format_bool_vector(value, nbits as usize);
             }
             let items = with_heap(|h| h.get_vector(*v).clone());
-            let parts: Vec<String> = items.iter().map(|v| print_value_with_buffers(v, buffers)).collect();
+            let parts: Vec<String> = items
+                .iter()
+                .map(|v| print_value_with_buffers(v, buffers))
+                .collect();
             format!("[{}]", parts.join(" "))
         }
         _ => print_value(value),
     }
 }
 
-fn print_list_shorthand_with_buffers(value: &Value, buffers: &crate::buffer::BufferManager) -> Option<String> {
+fn print_list_shorthand_with_buffers(
+    value: &Value,
+    buffers: &crate::buffer::BufferManager,
+) -> Option<String> {
     let items = list_to_vec(value)?;
     if items.len() != 2 {
         return None;
@@ -98,10 +104,17 @@ fn print_list_shorthand_with_buffers(value: &Value, buffers: &crate::buffer::Buf
         ",@" => ",@",
         _ => return None,
     };
-    Some(format!("{prefix}{}", print_value_with_buffers(&items[1], buffers)))
+    Some(format!(
+        "{prefix}{}",
+        print_value_with_buffers(&items[1], buffers)
+    ))
 }
 
-fn print_cons_with_buffers(value: &Value, out: &mut String, buffers: &crate::buffer::BufferManager) {
+fn print_cons_with_buffers(
+    value: &Value,
+    out: &mut String,
+    buffers: &crate::buffer::BufferManager,
+) {
     let mut cursor = *value;
     let mut first = true;
     loop {

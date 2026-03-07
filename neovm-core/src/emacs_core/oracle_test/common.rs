@@ -7,7 +7,9 @@ use std::io::Write;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
 
-use crate::emacs_core::{EvalError, Evaluator, Value, parse_forms, print_value, print_value_with_buffers};
+use crate::emacs_core::{
+    EvalError, Evaluator, Value, parse_forms, print_value, print_value_with_buffers,
+};
 
 /// Maximum virtual address space (in bytes) for each spawned oracle Emacs
 /// process.  This prevents runaway evaluations from consuming unbounded
@@ -209,7 +211,10 @@ pub(crate) fn run_neovm_eval_with_load(form: &str, load_files: &[&str]) -> Resul
             let mut values = Vec::with_capacity(data.len() + 1);
             values.push(Value::Symbol(symbol));
             values.extend(data);
-            format!("ERR {}", print_value_with_buffers(&Value::list(values), &eval.buffers))
+            format!(
+                "ERR {}",
+                print_value_with_buffers(&Value::list(values), &eval.buffers)
+            )
         }
         Err(EvalError::UncaughtThrow { tag, value }) => {
             format!(
@@ -273,7 +278,10 @@ pub(crate) fn run_neovm_eval_with_bootstrap(form: &str) -> Result<String, String
             let mut values = Vec::with_capacity(data.len() + 1);
             values.push(Value::Symbol(symbol));
             values.extend(data);
-            format!("ERR {}", print_value_with_buffers(&Value::list(values), &eval.buffers))
+            format!(
+                "ERR {}",
+                print_value_with_buffers(&Value::list(values), &eval.buffers)
+            )
         }
         Err(EvalError::UncaughtThrow { tag, value }) => {
             format!(

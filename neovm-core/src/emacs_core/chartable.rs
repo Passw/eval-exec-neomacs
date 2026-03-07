@@ -632,7 +632,10 @@ fn ct_resolved_entries(vec: &[Value]) -> Vec<(Value, Value)> {
 
     // For each boundary point, determine the effective value.
     // The effective value is determined by the highest-order entry that covers the point.
-    let boundary_vec: Vec<i64> = boundaries.into_iter().filter(|b| *b >= 0 && *b <= MAX_CHAR).collect();
+    let boundary_vec: Vec<i64> = boundaries
+        .into_iter()
+        .filter(|b| *b >= 0 && *b <= MAX_CHAR)
+        .collect();
 
     let mut point_values: Vec<(i64, Value)> = Vec::new();
     for &pt in &boundary_vec {

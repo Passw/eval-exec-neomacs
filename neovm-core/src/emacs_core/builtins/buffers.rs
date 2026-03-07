@@ -684,9 +684,7 @@ pub(crate) fn builtin_insert_and_inherit(
                             if let Some(items) = list_to_vec(val) {
                                 items
                                     .iter()
-                                    .filter_map(|v| {
-                                        v.as_symbol_name().map(|s| s.to_string())
-                                    })
+                                    .filter_map(|v| v.as_symbol_name().map(|s| s.to_string()))
                                     .collect()
                             } else {
                                 Vec::new()
@@ -708,7 +706,8 @@ pub(crate) fn builtin_insert_and_inherit(
                         if nonsticky_names.contains(name) {
                             continue;
                         }
-                        buf.text_props.put_property(old_pt, old_pt + text_len, name, *value);
+                        buf.text_props
+                            .put_property(old_pt, old_pt + text_len, name, *value);
                     }
                 }
             }

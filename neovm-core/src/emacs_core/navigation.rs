@@ -139,7 +139,13 @@ fn move_by_lines(text: &str, byte_pos: usize, n: i64) -> (usize, i64) {
 }
 
 /// Like `move_by_lines` but confined to the narrowed region `[begv, zv)`.
-fn move_by_lines_narrowed(text: &str, byte_pos: usize, n: i64, begv: usize, zv: usize) -> (usize, i64) {
+fn move_by_lines_narrowed(
+    text: &str,
+    byte_pos: usize,
+    n: i64,
+    begv: usize,
+    zv: usize,
+) -> (usize, i64) {
     let zv = zv.min(text.len());
     if n == 0 {
         return (line_beginning_byte_narrowed(text, byte_pos, begv), 0);

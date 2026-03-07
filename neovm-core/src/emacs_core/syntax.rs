@@ -441,9 +441,16 @@ impl SyntaxTable {
     }
 
     // pdump accessors
-    pub(crate) fn dump_entries(&self) -> &HashMap<char, SyntaxEntry> { &self.entries }
-    pub(crate) fn dump_parent(&self) -> &Option<Box<SyntaxTable>> { &self.parent }
-    pub(crate) fn from_dump(entries: HashMap<char, SyntaxEntry>, parent: Option<Box<SyntaxTable>>) -> Self {
+    pub(crate) fn dump_entries(&self) -> &HashMap<char, SyntaxEntry> {
+        &self.entries
+    }
+    pub(crate) fn dump_parent(&self) -> &Option<Box<SyntaxTable>> {
+        &self.parent
+    }
+    pub(crate) fn from_dump(
+        entries: HashMap<char, SyntaxEntry>,
+        parent: Option<Box<SyntaxTable>>,
+    ) -> Self {
         Self { entries, parent }
     }
 }

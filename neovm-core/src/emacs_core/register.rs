@@ -142,8 +142,12 @@ impl RegisterManager {
     }
 
     // pdump accessors
-    pub(crate) fn dump_registers(&self) -> &HashMap<char, RegisterContent> { &self.registers }
-    pub(crate) fn from_dump(registers: HashMap<char, RegisterContent>) -> Self { Self { registers } }
+    pub(crate) fn dump_registers(&self) -> &HashMap<char, RegisterContent> {
+        &self.registers
+    }
+    pub(crate) fn from_dump(registers: HashMap<char, RegisterContent>) -> Self {
+        Self { registers }
+    }
 }
 
 impl GcTrace for RegisterManager {

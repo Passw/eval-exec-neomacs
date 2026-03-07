@@ -247,10 +247,18 @@ impl BookmarkManager {
     }
 
     // pdump accessors
-    pub(crate) fn dump_bookmarks(&self) -> &HashMap<String, Bookmark> { &self.bookmarks }
-    pub(crate) fn dump_recent(&self) -> &[String] { &self.recent }
+    pub(crate) fn dump_bookmarks(&self) -> &HashMap<String, Bookmark> {
+        &self.bookmarks
+    }
+    pub(crate) fn dump_recent(&self) -> &[String] {
+        &self.recent
+    }
     pub(crate) fn from_dump(bookmarks: HashMap<String, Bookmark>, recent: Vec<String>) -> Self {
-        Self { bookmarks, recent, modified: false }
+        Self {
+            bookmarks,
+            recent,
+            modified: false,
+        }
     }
 }
 

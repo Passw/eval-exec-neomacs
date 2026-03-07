@@ -253,28 +253,16 @@ fn test_define_abbrev_and_lookup() {
     .unwrap();
 
     // Look up via abbrev-expansion
-    let result = builtin_abbrev_expansion(
-        &mut eval,
-        vec![Value::string("btw"), table],
-    )
-    .unwrap();
+    let result = builtin_abbrev_expansion(&mut eval, vec![Value::string("btw"), table]).unwrap();
     assert_eq!(result.as_str(), Some("by the way"));
 
     // Look up via abbrev-symbol
-    let sym = builtin_abbrev_symbol(
-        &mut eval,
-        vec![Value::string("btw"), table],
-    )
-    .unwrap();
+    let sym = builtin_abbrev_symbol(&mut eval, vec![Value::string("btw"), table]).unwrap();
     assert!(sym.is_truthy());
     assert_eq!(sym.as_symbol_name(), Some("btw"));
 
     // Non-existent
-    let result = builtin_abbrev_expansion(
-        &mut eval,
-        vec![Value::string("xyz"), table],
-    )
-    .unwrap();
+    let result = builtin_abbrev_expansion(&mut eval, vec![Value::string("xyz"), table]).unwrap();
     assert!(result.is_nil());
 }
 
@@ -299,22 +287,14 @@ fn test_clear_abbrev_table() {
     .unwrap();
 
     // Verify they exist
-    let result = builtin_abbrev_expansion(
-        &mut eval,
-        vec![Value::string("a"), table],
-    )
-    .unwrap();
+    let result = builtin_abbrev_expansion(&mut eval, vec![Value::string("a"), table]).unwrap();
     assert_eq!(result.as_str(), Some("alpha"));
 
     // Clear
     builtin_clear_abbrev_table(&mut eval, vec![table]).unwrap();
 
     // Verify gone
-    let result = builtin_abbrev_expansion(
-        &mut eval,
-        vec![Value::string("a"), table],
-    )
-    .unwrap();
+    let result = builtin_abbrev_expansion(&mut eval, vec![Value::string("a"), table]).unwrap();
     assert!(result.is_nil());
 
     // Table is still an abbrev table
@@ -338,11 +318,7 @@ fn test_abbrev_get_put() {
     .unwrap();
 
     // abbrev-get :count should be 0
-    let count = builtin_abbrev_get(
-        &mut eval,
-        vec![sym, Value::keyword(":count")],
-    )
-    .unwrap();
+    let count = builtin_abbrev_get(&mut eval, vec![sym, Value::keyword(":count")]).unwrap();
     assert_eq!(count, Value::Int(0));
 
     // abbrev-put and abbrev-get
@@ -351,11 +327,7 @@ fn test_abbrev_get_put() {
         vec![sym, Value::keyword(":custom"), Value::Int(42)],
     )
     .unwrap();
-    let custom = builtin_abbrev_get(
-        &mut eval,
-        vec![sym, Value::keyword(":custom")],
-    )
-    .unwrap();
+    let custom = builtin_abbrev_get(&mut eval, vec![sym, Value::keyword(":custom")]).unwrap();
     assert_eq!(custom, Value::Int(42));
 }
 
@@ -398,11 +370,7 @@ fn test_define_abbrev_table_and_lookup() {
     let mut eval = Evaluator::new();
 
     // define-abbrev-table creates a named table
-    builtin_define_abbrev_table(
-        &mut eval,
-        vec![Value::symbol("test-table"), Value::Nil],
-    )
-    .unwrap();
+    builtin_define_abbrev_table(&mut eval, vec![Value::symbol("test-table"), Value::Nil]).unwrap();
 
     // The symbol value should be an abbrev table
     let table = eval.obarray().symbol_value("test-table").cloned().unwrap();

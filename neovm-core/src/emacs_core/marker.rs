@@ -390,9 +390,10 @@ pub(crate) fn builtin_copy_marker_eval(
                 if let Some(ref bname) = buffer_name {
                     if let Some(buf_id) = eval.buffers.find_buffer_by_name(bname) {
                         if let Some(buf) = eval.buffers.get(buf_id) {
-                            buf.markers.iter().find(|m| m.id == mid).map(|m| {
-                                buf.text.byte_to_char(m.byte_pos) as i64 + 1
-                            })
+                            buf.markers
+                                .iter()
+                                .find(|m| m.id == mid)
+                                .map(|m| buf.text.byte_to_char(m.byte_pos) as i64 + 1)
                         } else {
                             None
                         }
@@ -421,9 +422,7 @@ pub(crate) fn builtin_copy_marker_eval(
             register_marker_in_buffer(eval, &marker, &buffer_name, Some(*n));
             Ok(marker)
         }
-        Value::Nil => {
-            Ok(make_marker_value(None, None, insertion_type))
-        }
+        Value::Nil => Ok(make_marker_value(None, None, insertion_type)),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("integer-or-marker-p"), *other],

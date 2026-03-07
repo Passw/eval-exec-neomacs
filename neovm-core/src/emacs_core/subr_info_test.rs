@@ -150,8 +150,7 @@ fn subr_arity_condition_notify_optional_all() {
 }
 
 #[test]
-fn subr_arity_event_apply_modifier_is_four() {
-}
+fn subr_arity_event_apply_modifier_is_four() {}
 
 #[test]
 fn subr_arity_thread_primitives_match_oracle() {
@@ -1345,8 +1344,7 @@ fn subr_arity_predicate_core_primitives_match_oracle() {
 }
 
 #[test]
-fn subr_arity_abbrev_primitives_match_oracle() {
-}
+fn subr_arity_abbrev_primitives_match_oracle() {}
 
 #[test]
 fn subr_arity_cxr_family_match_oracle() {

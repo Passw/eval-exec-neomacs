@@ -709,7 +709,10 @@ impl LispHeap {
         generations: Vec<u32>,
         free_list: Vec<u32>,
     ) -> Self {
-        let allocated_count = objects.iter().filter(|o| !matches!(o, HeapObject::Free)).count();
+        let allocated_count = objects
+            .iter()
+            .filter(|o| !matches!(o, HeapObject::Free))
+            .count();
         let marks = vec![false; objects.len()];
         Self {
             objects,

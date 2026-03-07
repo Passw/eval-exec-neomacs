@@ -1787,8 +1787,14 @@ pub fn create_bootstrap_evaluator_cached_with_features(
                 // Re-set load-path since it contains absolute paths that may differ
                 let lisp_dir = project_root.join("lisp");
                 let subdirs = [
-                    "", "emacs-lisp", "progmodes", "language", "international",
-                    "textmodes", "vc", "leim",
+                    "",
+                    "emacs-lisp",
+                    "progmodes",
+                    "language",
+                    "international",
+                    "textmodes",
+                    "vc",
+                    "leim",
                 ];
                 let mut load_path_entries = Vec::new();
                 for sub in &subdirs {

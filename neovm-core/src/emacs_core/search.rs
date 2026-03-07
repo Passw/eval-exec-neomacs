@@ -504,10 +504,7 @@ pub(crate) fn builtin_replace_regexp_in_string(args: Vec<Value>) -> EvalResult {
 }
 
 /// Parse SUBEXP and START args (positions 5 and 6) for replace-regexp-in-string.
-fn parse_replace_regexp_subexp_start(
-    args: &[Value],
-    s: &str,
-) -> Result<(i64, usize), Flow> {
+fn parse_replace_regexp_subexp_start(args: &[Value], s: &str) -> Result<(i64, usize), Flow> {
     // args[5] = SUBEXP (optional), args[6] = START (optional)
     let subexp = match args.get(5) {
         Some(Value::Nil) | None => 0i64,

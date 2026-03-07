@@ -436,8 +436,10 @@ fn commandp_rejects_overflow_arity() {
 fn commandp_resolves_aliases_and_symbol_designators() {
     let mut ev = Evaluator::new();
     // Register forward-char as an interactive command for testing.
-    ev.interactive.register_interactive("forward-char", InteractiveSpec::new("p"));
-    ev.obarray.set_symbol_function("t", Value::symbol("forward-char"));
+    ev.interactive
+        .register_interactive("forward-char", InteractiveSpec::new("p"));
+    ev.obarray
+        .set_symbol_function("t", Value::symbol("forward-char"));
     ev.obarray
         .set_symbol_function(":vm-command-alias-keyword", Value::symbol("forward-char"));
     ev.obarray

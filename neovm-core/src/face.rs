@@ -776,8 +776,12 @@ impl FaceTable {
     }
 
     // pdump accessors
-    pub(crate) fn dump_faces(&self) -> &HashMap<String, Face> { &self.faces }
-    pub(crate) fn from_dump(faces: HashMap<String, Face>) -> Self { Self { faces } }
+    pub(crate) fn dump_faces(&self) -> &HashMap<String, Face> {
+        &self.faces
+    }
+    pub(crate) fn from_dump(faces: HashMap<String, Face>) -> Self {
+        Self { faces }
+    }
 }
 
 impl Default for FaceTable {

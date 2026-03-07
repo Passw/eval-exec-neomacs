@@ -14,10 +14,10 @@
 
 use std::collections::HashMap;
 
-use crate::gc::types::ObjId;
 use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::{Value, list_to_vec, with_heap, with_heap_mut};
+use crate::gc::types::ObjId;
 
 // ---------------------------------------------------------------------------
 // AbbrevManager -- kept for backward compat (eval.rs, pdump)
@@ -427,7 +427,8 @@ pub(crate) fn builtin_make_abbrev_table(
 
     // Intern the "0" symbol and set abbrev-table property
     obarray_intern(vec_id, "0");
-    eval.obarray_mut().put_property("0", "abbrev-table", Value::True);
+    eval.obarray_mut()
+        .put_property("0", "abbrev-table", Value::True);
 
     // Process optional property list
     if let Some(props_val) = args.first() {
@@ -682,8 +683,7 @@ pub(crate) fn builtin_clear_abbrev_table(
             } else {
                 // Non-system: set expansion to nil, hook to nil, count to 0
                 eval.obarray_mut().set_symbol_value(sym_name, Value::Nil);
-                eval.obarray_mut()
-                    .set_symbol_function(sym_name, Value::Nil);
+                eval.obarray_mut().set_symbol_function(sym_name, Value::Nil);
                 eval.obarray_mut()
                     .put_property(sym_name, ":count", Value::Int(0));
             }
@@ -811,11 +811,7 @@ pub(crate) fn builtin_abbrev_put(
 }
 
 /// Helper: get a property from the "0" symbol of an obarray.
-fn get_table_property(
-    eval: &super::eval::Evaluator,
-    _vec_id: ObjId,
-    prop: &str,
-) -> Option<Value> {
+fn get_table_property(eval: &super::eval::Evaluator, _vec_id: ObjId, prop: &str) -> Option<Value> {
     eval.obarray().get_property("0", prop).cloned()
 }
 
@@ -1038,7 +1034,13 @@ pub(crate) fn builtin_insert_abbrev_table_description(
             let count = eval
                 .obarray()
                 .get_property(sym_name, ":count")
-                .and_then(|v| if let Value::Int(n) = v { Some(*n) } else { None })
+                .and_then(|v| {
+                    if let Value::Int(n) = v {
+                        Some(*n)
+                    } else {
+                        None
+                    }
+                })
                 .unwrap_or(0);
             let hook_fn = eval
                 .obarray()

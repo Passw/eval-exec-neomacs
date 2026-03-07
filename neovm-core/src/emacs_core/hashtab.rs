@@ -793,7 +793,10 @@ pub(crate) fn builtin_unintern(eval: &mut super::eval::Evaluator, args: Vec<Valu
         if vec_len == 0 {
             return Ok(Value::Nil);
         }
-        let bucket_idx = name.bytes().fold(0u64, |h, b| h.wrapping_mul(31).wrapping_add(b as u64)) as usize % vec_len;
+        let bucket_idx =
+            name.bytes()
+                .fold(0u64, |h, b| h.wrapping_mul(31).wrapping_add(b as u64)) as usize
+                % vec_len;
         let bucket = with_heap(|h| h.get_vector(vec_id)[bucket_idx]);
 
         // Walk the bucket chain and rebuild without the matching symbol
@@ -823,7 +826,10 @@ pub(crate) fn builtin_unintern(eval: &mut super::eval::Evaluator, args: Vec<Valu
 
         if found {
             // Rebuild the bucket chain
-            let new_bucket = items.into_iter().rev().fold(Value::Nil, |acc, sym| Value::cons(sym, acc));
+            let new_bucket = items
+                .into_iter()
+                .rev()
+                .fold(Value::Nil, |acc, sym| Value::cons(sym, acc));
             with_heap_mut(|h| {
                 h.get_vector_mut(vec_id)[bucket_idx] = new_bucket;
             });

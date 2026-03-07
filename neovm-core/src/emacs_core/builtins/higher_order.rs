@@ -1,5 +1,4 @@
 use super::*;
-
 pub(crate) fn builtin_apply(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     if args.is_empty() {
         return Err(signal(

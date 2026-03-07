@@ -94,7 +94,10 @@ pub(crate) fn builtin_previous_property_change(
         let (byte_limit, limit_val) = match args.get(2) {
             Some(v) if !v.is_nil() => {
                 let lim_int = expect_integer_or_marker(v)?;
-                (Some(textprop::string_elisp_pos_to_byte(&s, lim_int)), Some(lim_int))
+                (
+                    Some(textprop::string_elisp_pos_to_byte(&s, lim_int)),
+                    Some(lim_int),
+                )
             }
             _ => (None, None),
         };

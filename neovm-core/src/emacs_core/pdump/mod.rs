@@ -23,8 +23,8 @@ use sha2::{Digest, Sha256};
 use self::convert::*;
 use self::types::DumpEvaluatorState;
 use crate::emacs_core::eval::Evaluator;
-use crate::emacs_core::value::{self, set_current_heap};
 use crate::emacs_core::intern::{self, set_current_interner};
+use crate::emacs_core::value::{self, set_current_heap};
 
 const MAGIC: &[u8; 8] = b"NEOPDUMP";
 const FORMAT_VERSION: u32 = 1;
@@ -65,8 +65,8 @@ impl From<std::io::Error> for DumpError {
 pub fn dump_to_file(eval: &Evaluator, path: &Path) -> Result<(), DumpError> {
     let state = dump_evaluator(eval);
 
-    let payload = bincode::serialize(&state)
-        .map_err(|e| DumpError::SerializationError(e.to_string()))?;
+    let payload =
+        bincode::serialize(&state).map_err(|e| DumpError::SerializationError(e.to_string()))?;
 
     let mut hasher = Sha256::new();
     hasher.update(&payload);
@@ -170,13 +170,20 @@ fn reconstruct_evaluator(state: DumpEvaluatorState) -> Result<Evaluator, DumpErr
         .iter()
         .map(|m| {
             crate::emacs_core::value::OrderedSymMap::from_entries(
-                m.entries.iter().map(|(k, v)| (load_sym_id(k), load_value(v))).collect(),
+                m.entries
+                    .iter()
+                    .map(|(k, v)| (load_sym_id(k), load_value(v)))
+                    .collect(),
             )
         })
         .collect();
     let lexenv = load_value(&state.lexenv);
     let features: Vec<_> = state.features.iter().map(|id| intern::SymId(*id)).collect();
-    let require_stack: Vec<_> = state.require_stack.iter().map(|id| intern::SymId(*id)).collect();
+    let require_stack: Vec<_> = state
+        .require_stack
+        .iter()
+        .map(|id| intern::SymId(*id))
+        .collect();
 
     let eval = Evaluator::from_dump(
         interner,
@@ -218,7 +225,8 @@ mod tests {
         let mut eval = Evaluator::new();
 
         // Set a symbol value to verify round-trip
-        eval.obarray.set_symbol_value("test-pdump-var", Value::Int(42));
+        eval.obarray
+            .set_symbol_value("test-pdump-var", Value::Int(42));
 
         // Dump to temp file
         let dir = tempfile::tempdir().unwrap();
@@ -256,7 +264,10 @@ mod tests {
         dump_to_file(&eval, &dump_path).expect("dump should succeed");
         let dump_time = dump_start.elapsed();
         let file_size = std::fs::metadata(&dump_path).unwrap().len();
-        eprintln!("pdump: dump took {dump_time:.2?}, file size: {file_size} bytes ({:.1} MB)", file_size as f64 / 1048576.0);
+        eprintln!(
+            "pdump: dump took {dump_time:.2?}, file size: {file_size} bytes ({:.1} MB)",
+            file_size as f64 / 1048576.0
+        );
 
         // Drop original evaluator before loading to test standalone load
         drop(eval);
@@ -274,7 +285,9 @@ mod tests {
         // Verify features survived (bootstrap sets many features)
         // Note: subr.el does NOT call (provide 'subr); use 'backquote instead
         let forms = crate::emacs_core::parser::parse_forms("(featurep 'backquote)").unwrap();
-        let result = loaded.eval_expr(&forms[0]).expect("featurep should succeed");
+        let result = loaded
+            .eval_expr(&forms[0])
+            .expect("featurep should succeed");
         assert_eq!(result, Value::True, "featurep 'backquote should be t");
 
         // Verify a bootstrapped function works
@@ -283,21 +296,24 @@ mod tests {
         assert_eq!(result, Value::Int(3));
 
         // Verify string operations (tests heap String objects)
-        let forms = crate::emacs_core::parser::parse_forms("(concat \"hello\" \" \" \"world\")").unwrap();
+        let forms =
+            crate::emacs_core::parser::parse_forms("(concat \"hello\" \" \" \"world\")").unwrap();
         let result = loaded.eval_expr(&forms[0]).expect("eval should succeed");
         assert_eq!(crate::emacs_core::print_value(&result), "\"hello world\"");
 
         // Verify hash table access (tests hash table round-trip)
         let forms = crate::emacs_core::parser::parse_forms(
-            "(let ((h (make-hash-table :test 'equal))) (puthash \"key\" 42 h) (gethash \"key\" h))"
-        ).unwrap();
+            "(let ((h (make-hash-table :test 'equal))) (puthash \"key\" 42 h) (gethash \"key\" h))",
+        )
+        .unwrap();
         let result = loaded.eval_expr(&forms[0]).expect("eval should succeed");
         assert_eq!(result, Value::Int(42));
 
         // Verify defun works (tests lambda/macro round-trip)
         let forms = crate::emacs_core::parser::parse_forms(
-            "(progn (defun pdump-test-fn (x) (* x x)) (pdump-test-fn 7))"
-        ).unwrap();
+            "(progn (defun pdump-test-fn (x) (* x x)) (pdump-test-fn 7))",
+        )
+        .unwrap();
         let result = loaded.eval_expr(&forms[0]).expect("eval should succeed");
         assert_eq!(result, Value::Int(49));
     }

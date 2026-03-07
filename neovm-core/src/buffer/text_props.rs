@@ -441,8 +441,12 @@ impl TextPropertyTable {
     }
 
     // pdump accessors
-    pub(crate) fn dump_intervals(&self) -> &[PropertyInterval] { &self.intervals }
-    pub(crate) fn from_dump(intervals: Vec<PropertyInterval>) -> Self { Self { intervals } }
+    pub(crate) fn dump_intervals(&self) -> &[PropertyInterval] {
+        &self.intervals
+    }
+    pub(crate) fn from_dump(intervals: Vec<PropertyInterval>) -> Self {
+        Self { intervals }
+    }
 }
 
 impl Default for TextPropertyTable {

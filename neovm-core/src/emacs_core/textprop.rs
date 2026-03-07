@@ -5,7 +5,7 @@
 
 use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
-use super::string_escape::{storage_char_to_byte, storage_byte_to_char, storage_char_len};
+use super::string_escape::{storage_byte_to_char, storage_char_len, storage_char_to_byte};
 use super::value::*;
 use crate::buffer::buffer::BufferId;
 use crate::buffer::text_props::TextPropertyTable;
@@ -592,14 +592,18 @@ pub(crate) fn builtin_next_single_property_change(
                             });
                         }
                     }
-                    if next >= str_len { break; }
+                    if next >= str_len {
+                        break;
+                    }
                     let new_val = table.get_property(next, &prop).cloned();
                     let changed = match (&current_val, &new_val) {
                         (None, None) => false,
                         (Some(a), Some(b)) => !equal_value(a, b, 0),
                         _ => true,
                     };
-                    if changed { return Ok(Value::Int(string_byte_to_elisp_pos(&s, next))); }
+                    if changed {
+                        return Ok(Value::Int(string_byte_to_elisp_pos(&s, next)));
+                    }
                     cursor = next;
                 }
                 None => break,
@@ -642,7 +646,9 @@ pub(crate) fn builtin_next_single_property_change(
                         });
                     }
                 }
-                if next >= buf_end { break; }
+                if next >= buf_end {
+                    break;
+                }
                 let new_val = buf.text_props.get_property(next, &prop).cloned();
                 let changed = match (&current_val, &new_val) {
                     (None, None) => false,
@@ -706,8 +712,12 @@ pub(crate) fn builtin_previous_single_property_change(
                         (Some(a), Some(b)) => !equal_value(a, b, 0),
                         _ => true,
                     };
-                    if changed { return Ok(Value::Int(string_byte_to_elisp_pos(&s, prev))); }
-                    if prev == 0 { break; }
+                    if changed {
+                        return Ok(Value::Int(string_byte_to_elisp_pos(&s, prev)));
+                    }
+                    if prev == 0 {
+                        break;
+                    }
                     cursor = if prev < cursor { prev } else { prev - 1 };
                 }
                 None => break,
@@ -950,7 +960,9 @@ pub(crate) fn builtin_text_property_not_all(
                 Some(found) => equal_value(found, val, 0),
                 None => val.is_nil(),
             };
-            if !matches { return Ok(Value::Int(string_byte_to_elisp_pos(&s, cursor))); }
+            if !matches {
+                return Ok(Value::Int(string_byte_to_elisp_pos(&s, cursor)));
+            }
             match table.next_property_change(cursor) {
                 Some(next) if next > cursor && next < byte_end => cursor = next,
                 _ => break,

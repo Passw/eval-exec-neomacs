@@ -7191,7 +7191,6 @@ fn macrop_eval_resolves_keyword_designators() {
     builtin_fset(&mut eval, vec![keyword, orig_keyword]).expect("restore keyword function cell");
 }
 
-
 #[test]
 fn macroexpand_runtime_environment_overrides_and_shadows_global_macros() {
     let mut eval = crate::emacs_core::eval::Evaluator::new();

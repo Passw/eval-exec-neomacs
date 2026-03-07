@@ -489,7 +489,11 @@ impl GapBuffer {
     /// Reconstruct from text bytes (for pdump load).
     pub(crate) fn from_dump(text: Vec<u8>) -> Self {
         let len = text.len();
-        Self { buf: text, gap_start: len, gap_end: len }
+        Self {
+            buf: text,
+            gap_start: len,
+            gap_end: len,
+        }
     }
 }
 

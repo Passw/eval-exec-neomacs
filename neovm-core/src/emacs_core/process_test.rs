@@ -1178,7 +1178,6 @@ fn process_coding_tty_and_kill_buffer_query_runtime_surface() {
     assert_eq!(results[11], "OK wrong-number-of-arguments");
 }
 
-
 #[test]
 fn process_list_network_serial_runtime_surface() {
     let results = eval_all(
