@@ -244,12 +244,12 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
     let mut key_fn = Value::Nil;
     let mut lessp_fn = Value::Nil;
     let mut reverse = false;
-    let mut _in_place = false;
+    let mut in_place = false;
 
     if args.len() == 2 && !args[1].is_keyword() {
         // Old-style (sort SEQ PRED) — predicate is the comparison function
         lessp_fn = args[1];
-        _in_place = true;
+        in_place = true;
     } else if args.len() > 2 && !args[1].is_keyword() {
         return Err(signal(
             "error",
@@ -282,7 +282,7 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
                     ":in-place" => {
                         i += 1;
                         if i < args.len() {
-                            _in_place = args[i].is_truthy();
+                            in_place = args[i].is_truthy();
                         }
                     }
                     _ => {}
@@ -292,41 +292,12 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
         }
     }
 
-    // Default predicate: value< (numbers use <, strings use string<)
-    let use_default_lessp = lessp_fn.is_nil();
-
-    // Helper: compare two values using key_fn and pred/default
-    let compare = |eval: &mut super::eval::Evaluator, a: Value, b: Value| -> Result<bool, Flow> {
-        let ka = if key_fn.is_nil() {
-            a
-        } else {
-            eval.apply(key_fn, vec![a])?
-        };
-        let kb = if key_fn.is_nil() {
-            b
-        } else {
-            eval.apply(key_fn, vec![b])?
-        };
-        let result = if use_default_lessp {
-            // Default value<: numbers use <, strings use string<
-            match (&ka, &kb) {
-                (Value::Int(a), Value::Int(b)) => *a < *b,
-                (Value::Float(a, _), Value::Float(b, _)) => *a < *b,
-                (Value::Int(a), Value::Float(b, _)) => (*a as f64) < *b,
-                (Value::Float(a, _), Value::Int(b)) => *a < (*b as f64),
-                (Value::Str(a), Value::Str(b)) => {
-                    let sa = with_heap(|h| h.get_string(*a).clone());
-                    let sb = with_heap(|h| h.get_string(*b).clone());
-                    sa < sb
-                }
-                (Value::Symbol(a), Value::Symbol(b)) => resolve_sym(*a) < resolve_sym(*b),
-                _ => false,
-            }
-        } else {
-            eval.apply(lessp_fn, vec![ka, kb])?.is_truthy()
-        };
-        Ok(if reverse { !result } else { result })
-    };
+    if matches!(key_fn.as_symbol_name(), Some("identity")) {
+        key_fn = Value::Nil;
+    }
+    if matches!(lessp_fn.as_symbol_name(), Some("value<")) {
+        lessp_fn = Value::Nil;
+    }
 
     match &args[0] {
         Value::Nil => Ok(Value::Nil),
@@ -351,72 +322,141 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
                 }
             }
 
-            let saved = eval.save_temp_roots();
-            eval.push_temp_root(lessp_fn);
-            eval.push_temp_root(key_fn);
-            eval.push_temp_root(args[0]);
-            for v in &values {
-                eval.push_temp_root(*v);
-            }
-
-            // Stable insertion sort
-            for i in 1..values.len() {
-                let mut j = i;
-                while j > 0 {
-                    match compare(eval, values[j], values[j - 1]) {
-                        Ok(true) => {
-                            values.swap(j, j - 1);
-                            j -= 1;
-                        }
-                        Ok(false) => break,
-                        Err(err) => {
-                            eval.restore_temp_roots(saved);
-                            return Err(err);
-                        }
-                    }
+            let mut sorted_values =
+                stable_sort_values(eval, &args[0], &values, key_fn, lessp_fn, reverse)?;
+            if in_place {
+                for (cell, value) in cons_cells.iter().zip(sorted_values.into_iter()) {
+                    with_heap_mut(|h| h.set_car(*cell, value));
                 }
+                Ok(args[0])
+            } else {
+                Ok(Value::list(std::mem::take(&mut sorted_values)))
             }
-
-            eval.restore_temp_roots(saved);
-            for (cell, value) in cons_cells.iter().zip(values.into_iter()) {
-                with_heap_mut(|h| h.set_car(*cell, value));
-            }
-            Ok(args[0])
         }
         Value::Vector(v) | Value::Record(v) => {
-            let mut values = with_heap(|h| h.get_vector(*v).clone());
+            let values = with_heap(|h| h.get_vector(*v).clone());
+            let sorted_values =
+                stable_sort_values(eval, &args[0], &values, key_fn, lessp_fn, reverse)?;
 
-            let saved = eval.save_temp_roots();
-            eval.push_temp_root(lessp_fn);
-            eval.push_temp_root(key_fn);
-            eval.push_temp_root(args[0]);
-            for val in &values {
-                eval.push_temp_root(*val);
-            }
-
-            for i in 1..values.len() {
-                let mut j = i;
-                while j > 0 {
-                    match compare(eval, values[j], values[j - 1]) {
-                        Ok(true) => {
-                            values.swap(j, j - 1);
-                            j -= 1;
-                        }
-                        Ok(false) => break,
-                        Err(err) => {
-                            eval.restore_temp_roots(saved);
-                            return Err(err);
-                        }
+            if in_place {
+                with_heap_mut(|h| *h.get_vector_mut(*v) = sorted_values);
+                Ok(args[0])
+            } else {
+                match args[0] {
+                    Value::Vector(_) => Ok(Value::vector(sorted_values)),
+                    Value::Record(_) => {
+                        let id = with_heap_mut(|h| h.alloc_vector(sorted_values));
+                        Ok(Value::Record(id))
                     }
+                    _ => unreachable!(),
                 }
             }
-            eval.restore_temp_roots(saved);
-            with_heap_mut(|h| *h.get_vector_mut(*v) = values);
-            Ok(args[0])
         }
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("list-or-vector-p"), *other],
         )),
     }
+}
+
+#[derive(Clone, Copy)]
+struct SortItem {
+    value: Value,
+    key: Value,
+}
+
+fn stable_sort_values(
+    eval: &mut super::eval::Evaluator,
+    sequence_root: &Value,
+    values: &[Value],
+    key_fn: Value,
+    lessp_fn: Value,
+    reverse: bool,
+) -> Result<Vec<Value>, Flow> {
+    use std::cmp::Ordering;
+
+    if values.len() < 2 {
+        return Ok(values.to_vec());
+    }
+
+    let mut items: Vec<SortItem> = values
+        .iter()
+        .copied()
+        .map(|value| SortItem {
+            value,
+            key: Value::Nil,
+        })
+        .collect();
+
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(*sequence_root);
+    eval.push_temp_root(lessp_fn);
+    eval.push_temp_root(key_fn);
+    for item in &items {
+        eval.push_temp_root(item.value);
+    }
+
+    let result = (|| -> Result<Vec<Value>, Flow> {
+        if !key_fn.is_nil() {
+            for item in &mut items {
+                let key = eval.apply(key_fn, vec![item.value])?;
+                eval.push_temp_root(key);
+                item.key = key;
+            }
+        } else {
+            for item in &mut items {
+                item.key = item.value;
+            }
+        }
+
+        if reverse {
+            items.reverse();
+        }
+
+        let mut sort_error: Option<Flow> = None;
+        items.sort_by(|left, right| {
+            if sort_error.is_some() {
+                return Ordering::Equal;
+            }
+            match compare_sort_items(eval, left, right, lessp_fn) {
+                Ok(ordering) => ordering,
+                Err(err) => {
+                    sort_error = Some(err);
+                    Ordering::Equal
+                }
+            }
+        });
+
+        if reverse {
+            items.reverse();
+        }
+
+        if let Some(err) = sort_error {
+            return Err(err);
+        }
+        Ok(items.into_iter().map(|item| item.value).collect())
+    })();
+
+    eval.restore_temp_roots(saved);
+    result
+}
+
+fn compare_sort_items(
+    eval: &mut super::eval::Evaluator,
+    left: &SortItem,
+    right: &SortItem,
+    lessp_fn: Value,
+) -> Result<std::cmp::Ordering, Flow> {
+    if lessp_fn.is_nil() {
+        return super::symbols::compare_value_lt(&left.key, &right.key)
+            .map_err(|(lhs, rhs)| signal("type-mismatch", vec![lhs, rhs]));
+    }
+
+    if eval.apply(lessp_fn, vec![left.key, right.key])?.is_truthy() {
+        return Ok(std::cmp::Ordering::Less);
+    }
+    if eval.apply(lessp_fn, vec![right.key, left.key])?.is_truthy() {
+        return Ok(std::cmp::Ordering::Greater);
+    }
+    Ok(std::cmp::Ordering::Equal)
 }

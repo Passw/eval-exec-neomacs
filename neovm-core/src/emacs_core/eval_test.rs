@@ -475,6 +475,30 @@ fn vector_literals_are_self_evaluating_constants() {
 }
 
 #[test]
+fn sort_keyword_form_returns_stable_copy_by_default() {
+    assert_eq!(
+        eval_one(
+            "(let* ((xs '((1 . a) (1 . b) (0 . c)))
+                    (ys (sort xs :key #'car)))
+               (list xs ys (eq xs ys)))"
+        ),
+        "OK (((1 . a) (1 . b) (0 . c)) ((0 . c) (1 . a) (1 . b)) nil)"
+    );
+}
+
+#[test]
+fn sort_legacy_form_remains_in_place() {
+    assert_eq!(
+        eval_one(
+            "(let* ((xs '((1 . a) (0 . b)))
+                    (ys (sort xs (lambda (a b) (< (car a) (car b))))))
+               (list xs ys (eq xs ys)))"
+        ),
+        "OK (((0 . b) (1 . a)) ((0 . b) (1 . a)) t)"
+    );
+}
+
+#[test]
 fn format_function() {
     assert_eq!(
         eval_one(r#"(format "hello %s, %d" "world" 42)"#),

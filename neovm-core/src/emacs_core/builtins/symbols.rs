@@ -3137,7 +3137,10 @@ pub(crate) fn builtin_variable_binding_locus(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-fn compare_value_lt(lhs: &Value, rhs: &Value) -> Result<std::cmp::Ordering, (Value, Value)> {
+pub(crate) fn compare_value_lt(
+    lhs: &Value,
+    rhs: &Value,
+) -> Result<std::cmp::Ordering, (Value, Value)> {
     if let (Some(left), Some(right)) = (as_number_for_value_lt(lhs), as_number_for_value_lt(rhs)) {
         return Ok(left
             .partial_cmp(&right)
