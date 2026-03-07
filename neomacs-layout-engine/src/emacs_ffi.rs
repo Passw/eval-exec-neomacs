@@ -8,7 +8,6 @@
 //! The pointers are valid for the duration of the layout computation.
 
 use std::ffi::{c_int, c_void};
-use std::os::raw::c_char;
 
 /// Opaque pointer to an Emacs frame (struct frame *)
 pub type EmacsFrame = *mut std::ffi::c_void;
@@ -538,78 +537,6 @@ impl Default for WindowParamsFFI {
     }
 }
 
-/// FFI-safe face data struct.
-#[repr(C)]
-#[derive(Debug, Clone, Default)]
-pub struct FaceDataFFI {
-    /// Face ID
-    pub face_id: u32,
-    /// Foreground color (sRGB pixel: 0x00RRGGBB)
-    pub fg: u32,
-    /// Background color (sRGB pixel: 0x00RRGGBB)
-    pub bg: u32,
-    /// Font family name (null-terminated C string, valid for duration of layout)
-    pub font_family: *const c_char,
-    /// Font weight (CSS scale: 400=normal, 700=bold)
-    pub font_weight: c_int,
-    /// Italic flag
-    pub italic: c_int,
-    /// Font pixel size
-    pub font_size: c_int,
-    /// Underline style (0=none, 1=single, 2=wave, 3=double, 4=dotted, 5=dashed)
-    pub underline_style: c_int,
-    /// Underline color (sRGB pixel)
-    pub underline_color: u32,
-    /// Strike-through (0=none, 1=enabled)
-    pub strike_through: c_int,
-    /// Strike-through color
-    pub strike_through_color: u32,
-    /// Overline (0=none, 1=enabled)
-    pub overline: c_int,
-    /// Overline color
-    pub overline_color: u32,
-    /// Box type (0=none, 1=line)
-    pub box_type: c_int,
-    /// Box color
-    pub box_color: u32,
-    /// Box line width
-    pub box_line_width: c_int,
-    /// Box corner radius (0 = sharp corners)
-    pub box_corner_radius: c_int,
-    /// Fancy border style (0=solid, 1=rainbow, 2=animated-rainbow, 3=gradient,
-    /// 4=glow, 5=neon, 6=dashed, 7=comet, 8=iridescent, 9=fire, 10=heartbeat)
-    pub box_border_style: c_int,
-    /// Animation speed multiplier (100 = 1.0x)
-    pub box_border_speed: c_int,
-    /// Secondary box color (sRGB pixel: 0x00RRGGBB)
-    pub box_color2: u32,
-    /// Signed box horizontal (top/bottom) line width.
-    /// >0: box adds height (borders drawn outside text area).
-    /// <0: box drawn within text area (no extra height).
-    /// Used for mode-line text vertical inset.
-    pub box_h_line_width: c_int,
-    /// Extend: face bg extends to end of visual line (0=no, 1=yes)
-    pub extend: c_int,
-    /// Per-face font character width (0.0 = use window default)
-    pub font_char_width: f32,
-    /// Per-face font ascent (0.0 = use window default)
-    pub font_ascent: f32,
-    /// Per-face space width (for tab stop calculations with proportional fonts)
-    pub font_space_width: f32,
-    /// Whether the face's font is monospace (1=monospace, 0=proportional)
-    pub font_is_monospace: c_int,
-    /// Stipple bitmap ID (0 = none, positive = 1-based bitmap index)
-    pub stipple: c_int,
-    /// Overstrike flag (1 = simulate bold by drawing twice at x and x+1)
-    /// Set by Emacs when bold variant is unavailable for the font.
-    pub overstrike: c_int,
-    /// Font descent in pixels (FONT_DESCENT)
-    pub font_descent: c_int,
-    /// Underline position below baseline (font->underline_position, >=1)
-    pub underline_position: c_int,
-    /// Underline thickness in pixels (font->underline_thickness, >=1)
-    pub underline_thickness: c_int,
-    /// Absolute path to resolved font file (from Fontconfig), or NULL.
-    /// Used to pre-load the exact font file into the Rust renderer's fontdb.
-    pub font_file_path: *const c_char,
-}
+// FaceDataFFI is defined in neomacs-display-protocol and re-exported here
+// for backward compatibility with all existing users in this crate.
+pub use neomacs_display_protocol::face::FaceDataFFI;

@@ -2685,8 +2685,7 @@ void neomacs_display_tab_bar_add_item(struct NeomacsDisplay *handle,
  * Finish collecting tab bar items and send to render thread.
  */
 void neomacs_display_tab_bar_end(struct NeomacsDisplay *handle,
-                                   uint32_t fg_color,
-                                   uint32_t bg_color,
-                                   uint32_t active_bg_color);
+                                   uint32_t active_bg_color,
+                                   const struct FaceDataFFI *face_data);
 
 #endif  /* NEOMACS_DISPLAY_H */

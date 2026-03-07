@@ -523,15 +523,8 @@ pub enum RenderCommand {
     SetTabBar {
         items: Vec<TabBarItem>,
         height: f32,
-        fg_r: f32,
-        fg_g: f32,
-        fg_b: f32,
-        bg_r: f32,
-        bg_g: f32,
-        bg_b: f32,
-        active_bg_r: f32,
-        active_bg_g: f32,
-        active_bg_b: f32,
+        face: neomacs_display_protocol::face::Face,
+        active_bg: (f32, f32, f32),
     },
 }
 

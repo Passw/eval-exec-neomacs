@@ -7,6 +7,7 @@ use super::WgpuRenderer;
 use cosmic_text::SubpixelBin;
 use neomacs_display_protocol::frame_glyphs::FrameGlyphBuffer;
 use neomacs_display_protocol::types::Color;
+use neomacs_display_protocol::face::{BoxType, Face, FaceAttributes, UnderlineStyle};
 use neomacs_display_protocol::{MenuBarItem, TabBarItem, ToolBarItem};
 use std::collections::HashMap;
 use wgpu::util::DeviceExt;
@@ -2140,8 +2141,7 @@ impl WgpuRenderer {
         items: &[TabBarItem],
         tab_bar_height: f32,
         tab_bar_y: f32,
-        fg: (f32, f32, f32),
-        bg: (f32, f32, f32),
+        face: &Face,
         active_bg: (f32, f32, f32),
         hovered: Option<u32>,
         _pressed: Option<u32>,
@@ -2160,14 +2160,39 @@ impl WgpuRenderer {
         self.queue
             .write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
 
-        let bg_color = Color::new(bg.0, bg.1, bg.2, 1.0).srgb_to_linear();
+        // Extract colors from face
+        let fg = (face.foreground.r, face.foreground.g, face.foreground.b);
+        let bg_color = face.background.srgb_to_linear();
         let active_bg_color =
             Color::new(active_bg.0, active_bg.1, active_bg.2, 1.0).srgb_to_linear();
+
         let padding_x = 8.0_f32;
         let tab_padding = 12.0_f32;
-        let font_size = glyph_atlas.default_font_size();
-        let char_width = glyph_atlas.default_char_width();
-        let font_size_bits = 0.0_f32.to_bits();
+
+        // Use face font size if available, otherwise default
+        let font_size = if face.font_size > 0.0 {
+            face.font_size
+        } else {
+            glyph_atlas.default_font_size()
+        };
+        let font_size_bits = font_size.to_bits();
+        let face_id = face.id;
+
+        // Measure char width from the face's font via glyph atlas
+        let probe_key = GlyphKey {
+            charcode: 'M' as u32,
+            face_id,
+            font_size_bits,
+            x_bin: SubpixelBin::Zero,
+            y_bin: SubpixelBin::Zero,
+        };
+        let char_width = glyph_atlas
+            .get_or_create(&self.device, &self.queue, &probe_key, Some(face))
+            .map(|info| info.advance_width / self.scale_factor)
+            .unwrap_or_else(|| glyph_atlas.default_char_width());
+
+        let overstrike = face.attributes.contains(FaceAttributes::BOLD)
+            && face.font_weight < 700;
 
         // --- Pass 1: Background bar + tab highlights ---
         let mut rect_verts: Vec<RectVertex> = Vec::new();
@@ -2226,6 +2251,118 @@ impl WgpuRenderer {
             &border_color,
         );
 
+        // --- Box decoration around each tab ---
+        if face.box_type != BoxType::None && face.box_line_width > 0 {
+            let box_w = face.box_line_width as f32;
+            let box_color = face
+                .box_color
+                .unwrap_or(face.foreground)
+                .srgb_to_linear();
+            let mut bx = padding_x;
+            for item in items {
+                if item.is_separator {
+                    bx += 12.0;
+                    continue;
+                }
+                let tw = item.label.len() as f32 * char_width + tab_padding * 2.0;
+                // Top
+                self.add_rect(&mut rect_verts, bx, tab_bar_y, tw, box_w, &box_color);
+                // Bottom
+                self.add_rect(
+                    &mut rect_verts,
+                    bx,
+                    tab_bar_y + tab_bar_height - box_w,
+                    tw,
+                    box_w,
+                    &box_color,
+                );
+                // Left
+                self.add_rect(
+                    &mut rect_verts,
+                    bx,
+                    tab_bar_y,
+                    box_w,
+                    tab_bar_height,
+                    &box_color,
+                );
+                // Right
+                self.add_rect(
+                    &mut rect_verts,
+                    bx + tw - box_w,
+                    tab_bar_y,
+                    box_w,
+                    tab_bar_height,
+                    &box_color,
+                );
+                bx += tw + 2.0;
+            }
+        }
+
+        // --- Overline decoration ---
+        if face.attributes.contains(FaceAttributes::OVERLINE) {
+            let overline_color = face
+                .overline_color
+                .unwrap_or(face.foreground)
+                .srgb_to_linear();
+            self.add_rect(
+                &mut rect_verts,
+                0.0,
+                tab_bar_y,
+                logical_w,
+                1.0,
+                &overline_color,
+            );
+        }
+
+        // --- Underline / strike-through decorations per tab label ---
+        let text_y = tab_bar_y + (tab_bar_height - font_size) / 2.0;
+        {
+            let mut dx = padding_x;
+            for item in items {
+                if item.is_separator {
+                    dx += 12.0;
+                    continue;
+                }
+                let tw = item.label.len() as f32 * char_width + tab_padding * 2.0;
+                let label_start = dx + tab_padding;
+                let label_width = item.label.len() as f32 * char_width;
+
+                // Underline
+                if face.underline_style != UnderlineStyle::None {
+                    let ul_color = face.get_underline_color().srgb_to_linear();
+                    let ul_thickness = face.underline_thickness.max(1) as f32;
+                    let ul_y = text_y + font_size + face.underline_position.max(1) as f32;
+                    self.add_rect(
+                        &mut rect_verts,
+                        label_start,
+                        ul_y,
+                        label_width,
+                        ul_thickness,
+                        &ul_color,
+                    );
+                }
+
+                // Strike-through
+                if face.attributes.contains(FaceAttributes::STRIKE_THROUGH) {
+                    let st_color = face
+                        .strike_through_color
+                        .unwrap_or(face.foreground)
+                        .srgb_to_linear();
+                    let st_y = text_y + font_size * 0.5;
+                    self.add_rect(
+                        &mut rect_verts,
+                        label_start,
+                        st_y,
+                        label_width,
+                        1.0,
+                        &st_color,
+                    );
+                }
+
+                dx += tw + 2.0;
+            }
+        }
+
         if !rect_verts.is_empty() {
             let buffer = self
                 .device
@@ -2266,12 +2403,11 @@ impl WgpuRenderer {
 
         // --- Pass 2: Text labels via glyph atlas ---
         let text_color = {
-            let c = Color::new(fg.0, fg.1, fg.2, 1.0).srgb_to_linear();
+            let c = face.foreground.srgb_to_linear();
             [c.r, c.g, c.b, c.a]
         };
 
         let mut overlay_glyphs: Vec<(GlyphKey, f32, f32, [f32; 4])> = Vec::new();
-        let text_y = tab_bar_y + (tab_bar_height - font_size) / 2.0;
 
         let mut tab_x = padding_x;
         for item in items {
@@ -2283,13 +2419,18 @@ impl WgpuRenderer {
             for (ci, ch) in item.label.chars().enumerate() {
                 let key = GlyphKey {
                     charcode: ch as u32,
-                    face_id: 0,
+                    face_id,
                     font_size_bits,
                     x_bin: SubpixelBin::Zero,
                     y_bin: SubpixelBin::Zero,
                 };
-                glyph_atlas.get_or_create(&self.device, &self.queue, &key, None);
-                overlay_glyphs.push((key, label_x + (ci as f32) * char_width, text_y, text_color));
+                glyph_atlas.get_or_create(&self.device, &self.queue, &key, Some(face));
+                let x = label_x + (ci as f32) * char_width;
+                // Overstrike: render glyph again at x+1 to simulate bold
+                if overstrike {
+                    overlay_glyphs.push((key.clone(), x + 1.0, text_y, text_color));
+                }
+                overlay_glyphs.push((key, x, text_y, text_color));
             }
             let tab_width = item.label.len() as f32 * char_width + tab_padding * 2.0;
             tab_x += tab_width + 2.0;

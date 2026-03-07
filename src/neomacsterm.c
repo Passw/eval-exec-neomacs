@@ -5046,7 +5046,7 @@ neomacs_send_tab_bar_items (struct frame *f)
     {
       /* Send empty tab bar to hide it.  */
       neomacs_display_tab_bar_begin (dpyinfo->display_handle, 0, 0.0f);
-      neomacs_display_tab_bar_end (dpyinfo->display_handle, 0, 0, 0);
+      neomacs_display_tab_bar_end (dpyinfo->display_handle, 0, NULL);
       return;
     }
 
@@ -5057,18 +5057,15 @@ neomacs_send_tab_bar_items (struct frame *f)
   if (!VECTORP (items_vec) || nitems <= 0)
     return;
 
-  /* Get tab-bar face colors.  */
+  /* Get tab-bar face and fill face data struct.  */
   struct face *tb_face = FACE_FROM_ID_OR_NULL (f, TAB_BAR_FACE_ID);
-  unsigned long fg_pixel = tb_face ? tb_face->foreground : FRAME_FOREGROUND_PIXEL (f);
-  unsigned long bg_pixel = tb_face ? tb_face->background : FRAME_BACKGROUND_PIXEL (f);
-  uint32_t fg_rgb = ((RED_FROM_ULONG (fg_pixel) << 16)
-                     | (GREEN_FROM_ULONG (fg_pixel) << 8)
-                     | BLUE_FROM_ULONG (fg_pixel));
-  uint32_t bg_rgb = ((RED_FROM_ULONG (bg_pixel) << 16)
-                     | (GREEN_FROM_ULONG (bg_pixel) << 8)
-                     | BLUE_FROM_ULONG (bg_pixel));
+  struct FaceDataFFI face_data = {0};
+  if (tb_face)
+    fill_face_data (f, tb_face, &face_data);
 
   /* Active tab gets a brighter background.  Blend fg into bg at 15%.  */
+  unsigned long fg_pixel = tb_face ? tb_face->foreground : FRAME_FOREGROUND_PIXEL (f);
+  unsigned long bg_pixel = tb_face ? tb_face->background : FRAME_BACKGROUND_PIXEL (f);
   uint32_t active_r = (RED_FROM_ULONG (bg_pixel) * 85
                        + RED_FROM_ULONG (fg_pixel) * 15) / 100;
   uint32_t active_g = (GREEN_FROM_ULONG (bg_pixel) * 85
@@ -5101,8 +5098,8 @@ neomacs_send_tab_bar_items (struct frame *f)
                                           0 /* is_separator */);
     }
 
-  neomacs_display_tab_bar_end (dpyinfo->display_handle, fg_rgb, bg_rgb,
-                                 active_bg_rgb);
+  neomacs_display_tab_bar_end (dpyinfo->display_handle, active_bg_rgb,
+                                 &face_data);
 }
 
 /* Called at the end of updating a frame */

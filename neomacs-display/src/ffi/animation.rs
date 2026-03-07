@@ -1534,19 +1534,18 @@ pub unsafe extern "C" fn neomacs_display_tab_bar_add_item(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn neomacs_display_tab_bar_end(
     _handle: *mut NeomacsDisplay,
-    fg_color: u32,
-    bg_color: u32,
     active_bg_color: u32,
+    face_data: *const neomacs_display_protocol::face::FaceDataFFI,
 ) {
     let items = TABBAR_ITEMS.with(|items| std::mem::take(&mut *items.borrow_mut()));
     let height = TABBAR_HEIGHT.with(|h| *h.borrow());
 
-    let fg_r = ((fg_color >> 16) & 0xFF) as f32 / 255.0;
-    let fg_g = ((fg_color >> 8) & 0xFF) as f32 / 255.0;
-    let fg_b = (fg_color & 0xFF) as f32 / 255.0;
-    let bg_r = ((bg_color >> 16) & 0xFF) as f32 / 255.0;
-    let bg_g = ((bg_color >> 8) & 0xFF) as f32 / 255.0;
-    let bg_b = (bg_color & 0xFF) as f32 / 255.0;
+    let face = if !face_data.is_null() {
+        unsafe { &*face_data }.to_face()
+    } else {
+        neomacs_display_protocol::face::Face::default()
+    };
+
     let active_bg_r = ((active_bg_color >> 16) & 0xFF) as f32 / 255.0;
     let active_bg_g = ((active_bg_color >> 8) & 0xFF) as f32 / 255.0;
     let active_bg_b = (active_bg_color & 0xFF) as f32 / 255.0;
@@ -1555,15 +1554,8 @@ pub unsafe extern "C" fn neomacs_display_tab_bar_end(
         let _ = state.emacs_comms.cmd_tx.try_send(RenderCommand::SetTabBar {
             items,
             height,
-            fg_r,
-            fg_g,
-            fg_b,
-            bg_r,
-            bg_g,
-            bg_b,
-            active_bg_r,
-            active_bg_g,
-            active_bg_b,
+            face,
+            active_bg: (active_bg_r, active_bg_g, active_bg_b),
         });
     }
 }
