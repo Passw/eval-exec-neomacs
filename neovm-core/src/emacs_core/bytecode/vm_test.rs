@@ -358,6 +358,19 @@ fn vm_define_coding_system_alias_survives_eval_builtin_bridge() {
 }
 
 #[test]
+fn vm_roots_bytecode_constants_across_gc_during_eval_builtin_dispatch() {
+    assert_eq!(
+        vm_eval_str(
+            "(let ((map (make-sparse-keymap)))
+               (garbage-collect)
+               (define-key map [97] 'ignore)
+               (lookup-key map [97]))"
+        ),
+        "OK ignore"
+    );
+}
+
+#[test]
 fn vm_throw_restores_saved_stack_before_resuming_catch() {
     let func = ByteCodeFunction {
         ops: vec![

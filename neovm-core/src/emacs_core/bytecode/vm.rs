@@ -54,6 +54,9 @@ pub struct Vm<'a> {
     /// Active catch tags from the evaluator — shared with interpreter
     /// so throws can check for matching catches across eval/VM boundaries.
     catch_tags: &'a mut Vec<Value>,
+    /// Values that must remain GC-visible while the VM crosses into evaluator
+    /// code that may trigger collection.
+    gc_roots: Vec<Value>,
     depth: usize,
     max_depth: usize,
 }
@@ -80,6 +83,7 @@ impl<'a> Vm<'a> {
             match_data,
             watchers,
             catch_tags,
+            gc_roots: Vec::new(),
             depth: 0,
             max_depth: 1600,
         }
@@ -94,6 +98,74 @@ impl<'a> Vm<'a> {
     /// Get the current depth (to sync back to the Evaluator).
     pub fn get_depth(&self) -> usize {
         self.depth
+    }
+
+    fn with_frame_roots<T>(
+        &mut self,
+        func: &ByteCodeFunction,
+        stack: &[Value],
+        handlers: &[Handler],
+        unbind_roots: &[Value],
+        extra: &[Value],
+        f: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let saved_len = self.gc_roots.len();
+        self.gc_roots.extend(func.constants.iter().copied());
+        self.gc_roots.extend(stack.iter().copied());
+        Self::collect_handler_roots(handlers, &mut self.gc_roots);
+        self.gc_roots.extend(unbind_roots.iter().copied());
+        self.gc_roots.extend(extra.iter().copied());
+        let result = f(self);
+        self.gc_roots.truncate(saved_len);
+        result
+    }
+
+    fn with_extra_roots<T>(&mut self, extra: &[Value], f: impl FnOnce(&mut Self) -> T) -> T {
+        let saved_len = self.gc_roots.len();
+        self.gc_roots.extend(extra.iter().copied());
+        let result = f(self);
+        self.gc_roots.truncate(saved_len);
+        result
+    }
+
+    fn collect_handler_roots(handlers: &[Handler], out: &mut Vec<Value>) {
+        for handler in handlers {
+            match handler {
+                Handler::Catch { tag, .. } => out.push(*tag),
+                Handler::ConditionCase { conditions, .. } => out.push(*conditions),
+                Handler::UnwindProtect { .. } => {}
+                Handler::UnwindProtectFn { cleanup } => out.push(*cleanup),
+            }
+        }
+    }
+
+    fn collect_unbind_roots(unbind_watch: &[(String, Value)]) -> Vec<Value> {
+        unbind_watch.iter().map(|(_, value)| *value).collect()
+    }
+
+    fn collect_flow_roots(flow: &Flow, out: &mut Vec<Value>) {
+        match flow {
+            Flow::Signal(sig) => {
+                out.push(Value::Symbol(sig.symbol));
+                out.extend(sig.data.iter().copied());
+                if let Some(raw) = sig.raw_data {
+                    out.push(raw);
+                }
+            }
+            Flow::Throw { tag, value } => {
+                out.push(*tag);
+                out.push(*value);
+            }
+        }
+    }
+
+    fn result_roots(result: &EvalResult) -> Vec<Value> {
+        let mut roots = Vec::new();
+        match result {
+            Ok(value) => roots.push(*value),
+            Err(flow) => Self::collect_flow_roots(flow, &mut roots),
+        }
+        roots
     }
 
     /// Execute a bytecode function with given arguments.
@@ -253,7 +325,16 @@ impl<'a> Vm<'a> {
         if let Some(old) = saved_lexenv {
             *self.lexenv = old;
         }
-        let cleanup = self.cleanup_varbind_unwind(&mut bind_count, &mut unbind_watch);
+        let cleanup_roots = Self::result_roots(&result);
+        let unbind_roots = Self::collect_unbind_roots(&unbind_watch);
+        let cleanup = self.with_frame_roots(
+            func,
+            &stack,
+            &handlers,
+            &unbind_roots,
+            &cleanup_roots,
+            |vm| vm.cleanup_varbind_unwind(&mut bind_count, &mut unbind_watch),
+        );
         merge_result_with_cleanup(result, cleanup)
     }
 
@@ -344,7 +425,16 @@ impl<'a> Vm<'a> {
                 Op::VarSet(idx) => {
                     let name = sym_name(constants, *idx);
                     let val = stack.pop().unwrap_or(Value::Nil);
-                    vm_try!(self.assign_var(&name, val));
+                    let unbind_roots = Self::collect_unbind_roots(unbind_watch);
+                    let extra = [val];
+                    vm_try!(self.with_frame_roots(
+                        func,
+                        stack,
+                        handlers,
+                        &unbind_roots,
+                        &extra,
+                        |vm| vm.assign_var(&name, val),
+                    ));
                 }
                 Op::VarBind(idx) => {
                     let name = sym_name(constants, *idx);
@@ -354,11 +444,28 @@ impl<'a> Vm<'a> {
                     frame.insert(intern(&name), val);
                     self.dynamic.push(frame);
                     unbind_watch.push((name.clone(), old_value));
-                    vm_try!(self.run_variable_watchers(&name, &val, &Value::Nil, "let"));
+                    let unbind_roots = Self::collect_unbind_roots(unbind_watch);
+                    let extra = [val];
+                    vm_try!(self.with_frame_roots(
+                        func,
+                        stack,
+                        handlers,
+                        &unbind_roots,
+                        &extra,
+                        |vm| vm.run_variable_watchers(&name, &val, &Value::Nil, "let"),
+                    ));
                     *bind_count += 1;
                 }
                 Op::Unbind(n) => {
-                    vm_try!(self.cleanup_varbind_unwind_n(*n as usize, bind_count, unbind_watch));
+                    let unbind_roots = Self::collect_unbind_roots(unbind_watch);
+                    vm_try!(self.with_frame_roots(
+                        func,
+                        stack,
+                        handlers,
+                        &unbind_roots,
+                        &[],
+                        |vm| vm.cleanup_varbind_unwind_n(*n as usize, bind_count, unbind_watch),
+                    ));
                 }
 
                 // -- Function calls --
@@ -369,7 +476,18 @@ impl<'a> Vm<'a> {
                     let func_val = stack.pop().unwrap_or(Value::Nil);
                     let writeback_names = self.writeback_callable_names(&func_val);
                     let writeback_args = args.clone();
-                    let result = vm_try!(self.call_function(func_val, args));
+                    let unbind_roots = Self::collect_unbind_roots(unbind_watch);
+                    let mut call_roots = Vec::with_capacity(args.len() + 1);
+                    call_roots.push(func_val);
+                    call_roots.extend(args.iter().copied());
+                    let result = vm_try!(self.with_frame_roots(
+                        func,
+                        stack,
+                        handlers,
+                        &unbind_roots,
+                        &call_roots,
+                        |vm| vm.call_function(func_val, args),
+                    ));
                     if let Some((called_name, alias_target)) = writeback_names.as_ref() {
                         self.maybe_writeback_mutating_first_arg(
                             called_name,
@@ -385,7 +503,16 @@ impl<'a> Vm<'a> {
                     let n = *n as usize;
                     if n == 0 {
                         let func_val = stack.pop().unwrap_or(Value::Nil);
-                        let result = vm_try!(self.call_function(func_val, vec![]));
+                        let unbind_roots = Self::collect_unbind_roots(unbind_watch);
+                        let call_roots = [func_val];
+                        let result = vm_try!(self.with_frame_roots(
+                            func,
+                            stack,
+                            handlers,
+                            &unbind_roots,
+                            &call_roots,
+                            |vm| vm.call_function(func_val, vec![]),
+                        ));
                         stack.push(result);
                     } else {
                         let args_start = stack.len().saturating_sub(n);
@@ -398,7 +525,18 @@ impl<'a> Vm<'a> {
                         }
                         let writeback_names = self.writeback_callable_names(&func_val);
                         let writeback_args = args.clone();
-                        let result = vm_try!(self.call_function(func_val, args));
+                        let unbind_roots = Self::collect_unbind_roots(unbind_watch);
+                        let mut call_roots = Vec::with_capacity(args.len() + 1);
+                        call_roots.push(func_val);
+                        call_roots.extend(args.iter().copied());
+                        let result = vm_try!(self.with_frame_roots(
+                            func,
+                            stack,
+                            handlers,
+                            &unbind_roots,
+                            &call_roots,
+                            |vm| vm.call_function(func_val, args),
+                        ));
                         if let Some((called_name, alias_target)) = writeback_names.as_ref() {
                             self.maybe_writeback_mutating_first_arg(
                                 called_name,
@@ -1174,7 +1312,11 @@ impl<'a> Vm<'a> {
             self.watchers
                 .notify_watchers(name, new_value, old_value, operation, &Value::Nil);
         for (callback, args) in calls {
-            let _ = self.call_function(callback, args)?;
+            let mut callback_roots = Vec::with_capacity(args.len() + 1);
+            callback_roots.push(callback);
+            callback_roots.extend(args.iter().copied());
+            let _ =
+                self.with_extra_roots(&callback_roots, |vm| vm.call_function(callback, args))?;
         }
         Ok(())
     }
@@ -1306,14 +1448,24 @@ impl<'a> Vm<'a> {
             &mut bind_count,
             &mut unbind_watch,
         );
-        let cleanup = self.cleanup_varbind_unwind(&mut bind_count, &mut unbind_watch);
+        let cleanup_roots = Self::result_roots(&result);
+        let unbind_roots = Self::collect_unbind_roots(&unbind_watch);
+        let cleanup = self.with_frame_roots(
+            func,
+            &stack,
+            &handlers,
+            &unbind_roots,
+            &cleanup_roots,
+            |vm| vm.cleanup_varbind_unwind(&mut bind_count, &mut unbind_watch),
+        );
         merge_result_with_cleanup(result, cleanup)
     }
 
     /// Run cleanup functions collected during non-local resolution.
     fn run_unwind_cleanups(&mut self, cleanups: &[Value]) -> Result<(), Flow> {
         for cleanup in cleanups {
-            self.call_function(*cleanup, vec![])?;
+            let cleanup_root = [*cleanup];
+            self.with_extra_roots(&cleanup_root, |vm| vm.call_function(*cleanup, vec![]))?;
         }
         Ok(())
     }
@@ -1329,7 +1481,12 @@ impl<'a> Vm<'a> {
         match flow {
             Flow::Throw { tag, value } => {
                 if let Some(res) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
-                    if let Err(cleanup_flow) = self.run_unwind_cleanups(&res.cleanups) {
+                    let extra = [tag, value];
+                    if let Err(cleanup_flow) =
+                        self.with_frame_roots(_func, stack, handlers, &[], &extra, |vm| {
+                            vm.run_unwind_cleanups(&res.cleanups)
+                        })
+                    {
                         return self.resume_nonlocal(_func, stack, pc, handlers, cleanup_flow);
                     }
                     stack.truncate(res.stack_len);
@@ -1351,7 +1508,13 @@ impl<'a> Vm<'a> {
                 if let Some(res) =
                     resolve_signal_target(handlers, &mut self.catch_tags, self.obarray, &sig)
                 {
-                    if let Err(cleanup_flow) = self.run_unwind_cleanups(&res.cleanups) {
+                    let mut signal_roots = Vec::new();
+                    Self::collect_flow_roots(&Flow::Signal(sig.clone()), &mut signal_roots);
+                    if let Err(cleanup_flow) =
+                        self.with_frame_roots(_func, stack, handlers, &[], &signal_roots, |vm| {
+                            vm.run_unwind_cleanups(&res.cleanups)
+                        })
+                    {
                         return self.resume_nonlocal(_func, stack, pc, handlers, cleanup_flow);
                     }
                     stack.truncate(res.stack_len);
@@ -1530,6 +1693,13 @@ impl<'a> Vm<'a> {
         eval.max_depth = self.max_depth;
         std::mem::swap(self.coding_systems, &mut eval.coding_systems);
         std::mem::swap(self.watchers, &mut eval.watchers);
+        let saved_temp_roots = eval.save_temp_roots();
+        for root in &self.gc_roots {
+            eval.push_temp_root(*root);
+        }
+        for arg in &args {
+            eval.push_temp_root(*arg);
+        }
 
         let result = builtins::dispatch_builtin(&mut eval, name, args);
 
@@ -1541,6 +1711,7 @@ impl<'a> Vm<'a> {
         std::mem::swap(self.match_data, &mut eval.match_data);
         std::mem::swap(self.coding_systems, &mut eval.coding_systems);
         std::mem::swap(self.watchers, &mut eval.watchers);
+        eval.restore_temp_roots(saved_temp_roots);
         self.depth = eval.depth;
 
         // Swap the heap data back to its original location so the parent
