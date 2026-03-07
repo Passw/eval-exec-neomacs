@@ -5,7 +5,7 @@ use super::super::vertex::{GlyphVertex, RectVertex, RoundedRectVertex, Uniforms}
 use super::ModeLineFadeEntry;
 use super::WgpuRenderer;
 use cosmic_text::SubpixelBin;
-use neomacs_display_protocol::face::{BoxType, Face, FaceAttributes};
+use neomacs_display_protocol::face::{BoxType, Face, FaceAttributes, UnderlineStyle};
 use neomacs_display_protocol::frame_glyphs::{
     CursorStyle, FrameGlyph, FrameGlyphBuffer, GlyphRowRole,
 };
@@ -1963,6 +1963,172 @@ impl WgpuRenderer {
                                 let st_color = strike_through_color.as_ref().unwrap_or(fg);
                                 // Position at ~1/3 of ascent above baseline (standard typographic position)
                                 let st_y = baseline_y - *ascent / 3.0;
+                                self.add_rect(
+                                    &mut decoration_vertices,
+                                    *x,
+                                    st_y,
+                                    *width,
+                                    ul_thick.max(1.0),
+                                    st_color,
+                                );
+                            }
+                        }
+                    }
+
+                    // Also draw decorations for Stretch glyphs (e.g. align-to
+                    // gaps in mode-line).  Look up the face by face_id to get
+                    // underline/overline/strike-through attributes.
+                    for glyph in &frame_glyphs.glyphs {
+                        if let FrameGlyph::Stretch {
+                            x,
+                            y,
+                            width,
+                            face_id,
+                            row_role,
+                            ..
+                        } = glyph
+                        {
+                            if row_role.is_chrome() != want_overlay {
+                                continue;
+                            }
+                            let face = match frame_glyphs.faces.get(face_id) {
+                                Some(f) => f,
+                                None => continue,
+                            };
+                            let has_underline =
+                                face.attributes.contains(FaceAttributes::UNDERLINE);
+                            let has_overline =
+                                face.attributes.contains(FaceAttributes::OVERLINE);
+                            let has_strike =
+                                face.attributes.contains(FaceAttributes::STRIKE_THROUGH);
+                            if !has_underline && !has_overline && !has_strike {
+                                continue;
+                            }
+
+                            let y_offset = if has_line_anims {
+                                self.line_y_offset(*x, *y)
+                            } else {
+                                0.0
+                            };
+                            let ya = *y + y_offset;
+                            let font_ascent = face.font_ascent as f32;
+                            let baseline_y = ya + font_ascent;
+                            let ul_pos = face.underline_position as f32;
+                            let ul_thick = face.underline_thickness as f32;
+                            let fg = &face.foreground;
+
+                            // --- Underline ---
+                            if has_underline {
+                                let ul_color =
+                                    face.underline_color.as_ref().unwrap_or(fg);
+                                let ul_y = baseline_y + ul_pos;
+                                let line_thickness = ul_thick.max(1.0);
+
+                                match face.underline_style {
+                                    UnderlineStyle::Line => {
+                                        self.add_rect(
+                                            &mut decoration_vertices,
+                                            *x,
+                                            ul_y,
+                                            *width,
+                                            line_thickness,
+                                            ul_color,
+                                        );
+                                    }
+                                    UnderlineStyle::Wave => {
+                                        let amplitude: f32 = 2.0;
+                                        let wavelength: f32 = 8.0;
+                                        let seg_w: f32 = 1.0;
+                                        let mut cx = *x;
+                                        while cx < *x + *width {
+                                            let sw = seg_w.min(*x + *width - cx);
+                                            let phase = (cx - *x)
+                                                * std::f32::consts::TAU
+                                                / wavelength;
+                                            let offset = phase.sin() * amplitude;
+                                            self.add_rect(
+                                                &mut decoration_vertices,
+                                                cx,
+                                                ul_y + offset,
+                                                sw,
+                                                line_thickness,
+                                                ul_color,
+                                            );
+                                            cx += seg_w;
+                                        }
+                                    }
+                                    UnderlineStyle::Double => {
+                                        self.add_rect(
+                                            &mut decoration_vertices,
+                                            *x,
+                                            ul_y,
+                                            *width,
+                                            line_thickness,
+                                            ul_color,
+                                        );
+                                        self.add_rect(
+                                            &mut decoration_vertices,
+                                            *x,
+                                            ul_y + line_thickness + 1.0,
+                                            *width,
+                                            line_thickness,
+                                            ul_color,
+                                        );
+                                    }
+                                    UnderlineStyle::Dotted => {
+                                        let mut cx = *x;
+                                        while cx < *x + *width {
+                                            let dw =
+                                                line_thickness.min(*x + *width - cx);
+                                            self.add_rect(
+                                                &mut decoration_vertices,
+                                                cx,
+                                                ul_y,
+                                                dw,
+                                                line_thickness,
+                                                ul_color,
+                                            );
+                                            cx += line_thickness + 2.0;
+                                        }
+                                    }
+                                    UnderlineStyle::Dashed => {
+                                        let mut cx = *x;
+                                        while cx < *x + *width {
+                                            let dw = 4.0_f32.min(*x + *width - cx);
+                                            self.add_rect(
+                                                &mut decoration_vertices,
+                                                cx,
+                                                ul_y,
+                                                dw,
+                                                line_thickness,
+                                                ul_color,
+                                            );
+                                            cx += 7.0;
+                                        }
+                                    }
+                                    UnderlineStyle::None => {}
+                                }
+                            }
+
+                            // --- Overline ---
+                            if has_overline {
+                                let ol_color =
+                                    face.overline_color.as_ref().unwrap_or(fg);
+                                self.add_rect(
+                                    &mut decoration_vertices,
+                                    *x,
+                                    ya,
+                                    *width,
+                                    ul_thick.max(1.0),
+                                    ol_color,
+                                );
+                            }
+
+                            // --- Strike-through ---
+                            if has_strike {
+                                let st_color =
+                                    face.strike_through_color.as_ref().unwrap_or(fg);
+                                let st_y = baseline_y - font_ascent / 3.0;
                                 self.add_rect(
                                     &mut decoration_vertices,
                                     *x,
