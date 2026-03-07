@@ -162,6 +162,12 @@ pub(crate) fn run_oracle_eval_with_bootstrap(form: &str) -> Result<String, Strin
     run_oracle_eval(form)
 }
 
+/// Run a NeoVM evaluation in a bare-core evaluator.
+///
+/// This intentionally does **not** load the bootstrapped runtime image.
+/// Use it for core-language parity only.  Features that GNU Emacs exposes
+/// from dumped startup state (for example `backquote`) must use
+/// `run_neovm_eval_with_bootstrap`.
 pub(crate) fn run_neovm_eval(form: &str) -> Result<String, String> {
     run_neovm_eval_with_load(form, &[])
 }
@@ -239,6 +245,10 @@ pub(crate) fn run_neovm_eval_with_load(form: &str, load_files: &[&str]) -> Resul
     Ok(rendered)
 }
 
+/// Compare GNU Emacs runtime against NeoVM bare-core evaluation.
+///
+/// Prefer `eval_oracle_and_neovm_with_bootstrap` when the form depends on
+/// dumped runtime features rather than raw evaluator semantics.
 pub(crate) fn eval_oracle_and_neovm(form: &str) -> (String, String) {
     // Keep oracle tests deterministic.  Running GNU Emacs and NeoVM in
     // parallel inside one test process exposes unrelated shared-state and
