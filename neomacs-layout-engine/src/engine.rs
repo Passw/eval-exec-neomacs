@@ -1759,8 +1759,7 @@ impl LayoutEngine {
         // (after fringe).
         if has_margins {
             if params.left_margin_width > 0.0 {
-                let margin_x =
-                    text_x - params.left_fringe_width - params.left_margin_width;
+                let margin_x = text_x - params.left_fringe_width - params.left_margin_width;
                 frame_glyphs.add_stretch(
                     margin_x,
                     text_y,
@@ -5039,8 +5038,7 @@ impl LayoutEngine {
                     // Default layout (fringes inside margins):
                     // | LEFT_MARGIN | LEFT_FRINGE | TEXT_AREA |
                     if left_image_gpu_id != 0 && params.left_margin_width > 0.0 {
-                        let margin_x =
-                            text_x - left_fringe_width - params.left_margin_width;
+                        let margin_x = text_x - left_fringe_width - params.left_margin_width;
                         let gy = row_y[row as usize];
                         frame_glyphs.add_image(
                             left_image_gpu_id as u32,
@@ -5050,8 +5048,7 @@ impl LayoutEngine {
                             left_image_h as f32,
                         );
                     } else if left_len > 0 && params.left_margin_width > 0.0 {
-                        let margin_x =
-                            text_x - left_fringe_width - params.left_margin_width;
+                        let margin_x = text_x - left_fringe_width - params.left_margin_width;
                         let gy = row_y[row as usize];
                         let margin_cols = (params.left_margin_width / char_w).floor() as i32;
 

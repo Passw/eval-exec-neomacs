@@ -1995,10 +1995,8 @@ impl WgpuRenderer {
                                 Some(f) => f,
                                 None => continue,
                             };
-                            let has_underline =
-                                face.attributes.contains(FaceAttributes::UNDERLINE);
-                            let has_overline =
-                                face.attributes.contains(FaceAttributes::OVERLINE);
+                            let has_underline = face.attributes.contains(FaceAttributes::UNDERLINE);
+                            let has_overline = face.attributes.contains(FaceAttributes::OVERLINE);
                             let has_strike =
                                 face.attributes.contains(FaceAttributes::STRIKE_THROUGH);
                             if !has_underline && !has_overline && !has_strike {
@@ -2019,8 +2017,7 @@ impl WgpuRenderer {
 
                             // --- Underline ---
                             if has_underline {
-                                let ul_color =
-                                    face.underline_color.as_ref().unwrap_or(fg);
+                                let ul_color = face.underline_color.as_ref().unwrap_or(fg);
                                 let ul_y = baseline_y + ul_pos;
                                 let line_thickness = ul_thick.max(1.0);
 
@@ -2042,9 +2039,8 @@ impl WgpuRenderer {
                                         let mut cx = *x;
                                         while cx < *x + *width {
                                             let sw = seg_w.min(*x + *width - cx);
-                                            let phase = (cx - *x)
-                                                * std::f32::consts::TAU
-                                                / wavelength;
+                                            let phase =
+                                                (cx - *x) * std::f32::consts::TAU / wavelength;
                                             let offset = phase.sin() * amplitude;
                                             self.add_rect(
                                                 &mut decoration_vertices,
@@ -2078,8 +2074,7 @@ impl WgpuRenderer {
                                     UnderlineStyle::Dotted => {
                                         let mut cx = *x;
                                         while cx < *x + *width {
-                                            let dw =
-                                                line_thickness.min(*x + *width - cx);
+                                            let dw = line_thickness.min(*x + *width - cx);
                                             self.add_rect(
                                                 &mut decoration_vertices,
                                                 cx,
@@ -2112,8 +2107,7 @@ impl WgpuRenderer {
 
                             // --- Overline ---
                             if has_overline {
-                                let ol_color =
-                                    face.overline_color.as_ref().unwrap_or(fg);
+                                let ol_color = face.overline_color.as_ref().unwrap_or(fg);
                                 self.add_rect(
                                     &mut decoration_vertices,
                                     *x,
@@ -2126,8 +2120,7 @@ impl WgpuRenderer {
 
                             // --- Strike-through ---
                             if has_strike {
-                                let st_color =
-                                    face.strike_through_color.as_ref().unwrap_or(fg);
+                                let st_color = face.strike_through_color.as_ref().unwrap_or(fg);
                                 let st_y = baseline_y - font_ascent / 3.0;
                                 self.add_rect(
                                     &mut decoration_vertices,
