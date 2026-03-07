@@ -12,6 +12,9 @@
 use super::error::{EvalResult, Flow, signal};
 use super::intern::{intern, resolve_sym};
 use super::value::*;
+use std::fs::File;
+use std::io::{ErrorKind, Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
 
 // ---------------------------------------------------------------------------
 // Argument helpers
@@ -224,12 +227,174 @@ fn eval_documentation_property_value(
         return Ok(Value::string(text));
     }
 
+    if let Some((file, position)) = compiled_doc_ref(&value) {
+        return load_compiled_doc_string(eval, &file, position);
+    }
+
     // Integer doc offsets require DOC-file lookup; return nil when unresolved.
     if matches!(value, Value::Int(_)) {
         return Ok(Value::Nil);
     }
 
     eval.eval_value(&value)
+}
+
+fn compiled_doc_ref(value: &Value) -> Option<(String, i64)> {
+    let Value::Cons(cell) = value else {
+        return None;
+    };
+    let pair = read_cons(*cell);
+    Some((pair.car.as_str_owned()?, pair.cdr.as_int()?))
+}
+
+fn resolve_compiled_doc_path(eval: &super::eval::Evaluator, file: &str) -> PathBuf {
+    let path = Path::new(file);
+    if path.is_absolute() {
+        return path.to_path_buf();
+    }
+
+    let lisp_dir = eval
+        .obarray
+        .symbol_value("lisp-directory")
+        .and_then(Value::as_str_owned);
+    if let Some(dir) = lisp_dir {
+        return Path::new(&dir).join(path);
+    }
+
+    path.to_path_buf()
+}
+
+fn compiled_doc_prefix_is_valid(prefix: &[u8]) -> bool {
+    if prefix.is_empty() {
+        return false;
+    }
+
+    let mut test = 1_usize;
+    if prefix[prefix.len() - test] == 0x1f {
+        return true;
+    }
+    if prefix[prefix.len() - test] != b' ' {
+        return false;
+    }
+    test += 1;
+    while prefix.len() >= test && prefix[prefix.len() - test].is_ascii_digit() {
+        test += 1;
+    }
+    if prefix.len() < test || prefix[prefix.len() - test] != b'@' {
+        return false;
+    }
+    test += 1;
+    prefix.len() >= test && prefix[prefix.len() - test] == b'#'
+}
+
+fn decode_compiled_doc_bytes(bytes: &[u8]) -> EvalResult {
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut pos = 0_usize;
+    while pos < bytes.len() {
+        if bytes[pos] != 0x01 {
+            out.push(bytes[pos]);
+            pos += 1;
+            continue;
+        }
+
+        pos += 1;
+        let Some(&escaped) = bytes.get(pos) else {
+            return Err(signal(
+                "error",
+                vec![Value::string(
+                    "Invalid data in documentation file -- dangling ^A escape",
+                )],
+            ));
+        };
+        match escaped {
+            0x01 => out.push(0x01),
+            b'0' => out.push(0x00),
+            b'_' => out.push(0x1f),
+            other => {
+                return Err(signal(
+                    "error",
+                    vec![Value::string(format!(
+                        "Invalid data in documentation file -- ^A followed by code {:03o}",
+                        other
+                    ))],
+                ));
+            }
+        }
+        pos += 1;
+    }
+
+    Ok(Value::string(super::load::decode_emacs_utf8(&out)))
+}
+
+fn load_compiled_doc_string(
+    eval: &super::eval::Evaluator,
+    file: &str,
+    position: i64,
+) -> EvalResult {
+    let position = position.unsigned_abs();
+    let resolved = resolve_compiled_doc_path(eval, file);
+    let mut handle = match File::open(&resolved) {
+        Ok(file_handle) => file_handle,
+        Err(err) if matches!(err.kind(), ErrorKind::NotFound | ErrorKind::NotADirectory) => {
+            return Ok(Value::string(format!(
+                "Cannot open doc string file \"{file}\"\n"
+            )));
+        }
+        Err(err) => {
+            return Err(signal(
+                "file-error",
+                vec![
+                    Value::string("Read error on documentation file"),
+                    Value::string(format!("{}: {}", resolved.display(), err)),
+                ],
+            ));
+        }
+    };
+
+    let prefix_len = usize::try_from(position.min(1024)).unwrap_or(1024);
+    let start = position.saturating_sub(prefix_len as u64);
+    handle.seek(SeekFrom::Start(start)).map_err(|_| {
+        signal(
+            "error",
+            vec![Value::string(format!(
+                "Position {position} out of range in doc string file \"{file}\""
+            ))],
+        )
+    })?;
+
+    let offset = prefix_len;
+    let mut buffer = Vec::with_capacity(prefix_len + 8192);
+    let mut chunk = [0_u8; 8192];
+    let end_index = loop {
+        let read = handle.read(&mut chunk).map_err(|err| {
+            signal(
+                "file-error",
+                vec![
+                    Value::string("Read error on documentation file"),
+                    Value::string(format!("{}: {}", resolved.display(), err)),
+                ],
+            )
+        })?;
+        if read == 0 {
+            break None;
+        }
+        buffer.extend_from_slice(&chunk[..read]);
+        if buffer.len() > offset
+            && let Some(pos) = buffer[offset..].iter().position(|&byte| byte == 0x1f)
+        {
+            break Some(offset + pos);
+        }
+    };
+
+    let Some(end_index) = end_index else {
+        return Ok(Value::Nil);
+    };
+
+    if offset == 0 || buffer.len() < offset || !compiled_doc_prefix_is_valid(&buffer[..offset]) {
+        return Ok(Value::Nil);
+    }
+
+    decode_compiled_doc_bytes(&buffer[offset..end_index])
 }
 
 fn startup_variable_doc_offset_symbol(sym: &str, prop: &str, value: &Value) -> bool {

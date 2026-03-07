@@ -640,9 +640,11 @@ impl<'a> Parser<'a> {
             }
             '$' => {
                 // #$ — expands to the current load file name during read.
-                // We model it as the special variable symbol and let eval resolve it.
+                // Preserve it as a dedicated reader object so quote/bytecode
+                // construction can substitute the runtime file name instead of
+                // collapsing it to the plain symbol `load-file-name`.
                 self.bump();
-                Ok(Expr::Symbol(intern("load-file-name")))
+                Ok(Expr::ReaderLoadFileName)
             }
             '#' => {
                 // ## — symbol with empty name.

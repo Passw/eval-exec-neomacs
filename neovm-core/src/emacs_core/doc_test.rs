@@ -1,4 +1,5 @@
 use super::*;
+use crate::emacs_core::builtins::builtin_documentation_stringp;
 
 // =======================================================================
 // substitute-command-keys
@@ -1808,6 +1809,50 @@ fn documentation_property_eval_integer_property_returns_nil() {
     )
     .unwrap();
     assert!(result.is_nil());
+}
+
+#[test]
+fn documentation_stringp_accepts_compiled_file_refs() {
+    let doc_ref = Value::cons(Value::string("/tmp/docref.elc"), Value::Int(17));
+    let result = builtin_documentation_stringp(vec![doc_ref]).unwrap();
+    assert!(result.is_truthy());
+}
+
+#[test]
+fn documentation_property_eval_reads_compiled_doc_ref() {
+    let unique = format!(
+        "neovm-docref-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("time should be after epoch")
+            .as_nanos()
+    );
+    let path = std::env::temp_dir().join(format!("{unique}.elc"));
+    std::fs::write(&path, b"#@11 compiled doc\x1f").expect("write doc fixture");
+
+    let mut evaluator = super::super::eval::Evaluator::new();
+    evaluator.obarray.put_property(
+        "doc-sym",
+        "variable-documentation",
+        Value::cons(
+            Value::string(path.to_string_lossy().into_owned()),
+            Value::Int(5),
+        ),
+    );
+
+    let result = builtin_documentation_property_eval(
+        &mut evaluator,
+        vec![
+            Value::symbol("doc-sym"),
+            Value::symbol("variable-documentation"),
+        ],
+    )
+    .unwrap();
+
+    assert_eq!(result.as_str(), Some("compiled doc"));
+
+    let _ = std::fs::remove_file(path);
 }
 
 #[test]

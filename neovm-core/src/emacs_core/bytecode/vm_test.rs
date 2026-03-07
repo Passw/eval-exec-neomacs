@@ -3,6 +3,7 @@ use crate::emacs_core::bytecode::compiler::Compiler;
 use crate::emacs_core::coding::CodingSystemManager;
 use crate::emacs_core::parse_forms;
 use crate::emacs_core::value::HashTableTest;
+use crate::window::FrameManager;
 
 fn vm_eval(src: &str) -> Result<Value, EvalError> {
     let forms = parse_forms(src).expect("parse");
@@ -17,6 +18,7 @@ fn vm_eval(src: &str) -> Result<Value, EvalError> {
     let mut lexenv: Value = Value::Nil;
     let mut features: Vec<SymId> = Vec::new();
     let mut buffers = crate::buffer::BufferManager::new();
+    let mut frames = FrameManager::new();
     let mut coding_systems = CodingSystemManager::new();
     let mut match_data: Option<MatchData> = None;
     let mut watchers = VariableWatcherList::new();
@@ -31,6 +33,7 @@ fn vm_eval(src: &str) -> Result<Value, EvalError> {
             &mut lexenv,
             &mut features,
             &mut buffers,
+            &mut frames,
             &mut coding_systems,
             &mut match_data,
             &mut watchers,
@@ -276,6 +279,7 @@ fn vm_switch_branches_using_hash_table_jump_table() {
     let mut lexenv: Value = Value::Nil;
     let mut features: Vec<SymId> = Vec::new();
     let mut buffers = crate::buffer::BufferManager::new();
+    let mut frames = FrameManager::new();
     let mut coding_systems = CodingSystemManager::new();
     let mut match_data: Option<MatchData> = None;
     let mut watchers = VariableWatcherList::new();
@@ -287,6 +291,7 @@ fn vm_switch_branches_using_hash_table_jump_table() {
         &mut lexenv,
         &mut features,
         &mut buffers,
+        &mut frames,
         &mut coding_systems,
         &mut match_data,
         &mut watchers,
@@ -398,6 +403,7 @@ fn vm_throw_restores_saved_stack_before_resuming_catch() {
     let mut lexenv: Value = Value::Nil;
     let mut features: Vec<SymId> = Vec::new();
     let mut buffers = crate::buffer::BufferManager::new();
+    let mut frames = FrameManager::new();
     let mut coding_systems = CodingSystemManager::new();
     let mut match_data: Option<MatchData> = None;
     let mut watchers = VariableWatcherList::new();
@@ -409,6 +415,7 @@ fn vm_throw_restores_saved_stack_before_resuming_catch() {
         &mut lexenv,
         &mut features,
         &mut buffers,
+        &mut frames,
         &mut coding_systems,
         &mut match_data,
         &mut watchers,
@@ -417,6 +424,14 @@ fn vm_throw_restores_saved_stack_before_resuming_catch() {
 
     let result = vm.execute(&func, vec![]).expect("vm catch should execute");
     assert_eq!(result, Value::list(vec![Value::Int(42), Value::Int(99)]));
+}
+
+#[test]
+fn vm_eval_bridge_preserves_frames_across_eval_dependent_builtins() {
+    assert_eq!(
+        vm_eval_str("(frame-parameter (selected-frame) 'width)"),
+        "OK 80"
+    );
 }
 
 #[test]

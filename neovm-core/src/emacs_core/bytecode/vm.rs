@@ -15,6 +15,7 @@ use crate::emacs_core::regex::MatchData;
 use crate::emacs_core::string_escape::{storage_char_len, storage_substring};
 use crate::emacs_core::symbol::Obarray;
 use crate::emacs_core::value::*;
+use crate::window::FrameManager;
 
 /// Handler frame for catch/condition-case/unwind-protect.
 #[derive(Clone, Debug)]
@@ -48,6 +49,7 @@ pub struct Vm<'a> {
     #[allow(dead_code)]
     features: &'a mut Vec<SymId>,
     buffers: &'a mut BufferManager,
+    frames: &'a mut FrameManager,
     coding_systems: &'a mut CodingSystemManager,
     match_data: &'a mut Option<MatchData>,
     watchers: &'a mut VariableWatcherList,
@@ -68,6 +70,7 @@ impl<'a> Vm<'a> {
         lexenv: &'a mut Value,
         features: &'a mut Vec<SymId>,
         buffers: &'a mut BufferManager,
+        frames: &'a mut FrameManager,
         coding_systems: &'a mut CodingSystemManager,
         match_data: &'a mut Option<MatchData>,
         watchers: &'a mut VariableWatcherList,
@@ -79,6 +82,7 @@ impl<'a> Vm<'a> {
             lexenv,
             features,
             buffers,
+            frames,
             coding_systems,
             match_data,
             watchers,
@@ -1688,6 +1692,7 @@ impl<'a> Vm<'a> {
         eval.lexenv = *self.lexenv;
         eval.features = self.features.clone();
         eval.buffers = self.buffers.clone();
+        std::mem::swap(self.frames, &mut eval.frames);
         eval.match_data = self.match_data.clone();
         eval.depth = self.depth;
         eval.max_depth = self.max_depth;
@@ -1708,6 +1713,7 @@ impl<'a> Vm<'a> {
         std::mem::swap(self.lexenv, &mut eval.lexenv);
         std::mem::swap(self.features, &mut eval.features);
         std::mem::swap(self.buffers, &mut eval.buffers);
+        std::mem::swap(self.frames, &mut eval.frames);
         std::mem::swap(self.match_data, &mut eval.match_data);
         std::mem::swap(self.coding_systems, &mut eval.coding_systems);
         std::mem::swap(self.watchers, &mut eval.watchers);

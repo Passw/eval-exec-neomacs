@@ -199,6 +199,7 @@ pub enum DumpExpr {
     Int(i64),
     Float(f64),
     Symbol(DumpSymId),
+    ReaderLoadFileName,
     Keyword(DumpSymId),
     Str(String),
     Char(char),

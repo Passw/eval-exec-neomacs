@@ -67,6 +67,7 @@ fn expr_fingerprint(expr: &Expr, hasher: &mut impl std::hash::Hasher, depth: usi
         Expr::Char(c) => c.hash(hasher),
         Expr::Float(f) => f.to_bits().hash(hasher),
         Expr::Str(s) => s.hash(hasher),
+        Expr::ReaderLoadFileName => {}
         Expr::Bool(b) => b.hash(hasher),
         Expr::List(items) | Expr::Vector(items) => {
             items.len().hash(hasher);
@@ -2191,6 +2192,11 @@ impl Evaluator {
         match expr {
             Expr::Int(v) => Ok(Value::Int(*v)),
             Expr::Float(v) => Ok(Value::Float(*v, next_float_id())),
+            Expr::ReaderLoadFileName => Ok(self
+                .obarray
+                .symbol_value("load-file-name")
+                .cloned()
+                .unwrap_or(Value::Nil)),
             Expr::Str(s) => Ok(Value::string(s.clone())),
             Expr::Char(c) => Ok(Value::Char(*c)),
             Expr::Keyword(id) => Ok(Value::Keyword(*id)),
@@ -2872,14 +2878,14 @@ impl Evaluator {
         })
     }
 
-    fn sf_quote(&self, tail: &[Expr]) -> EvalResult {
+    fn sf_quote(&mut self, tail: &[Expr]) -> EvalResult {
         if tail.len() != 1 {
             return Err(signal(
                 "wrong-number-of-arguments",
                 vec![Value::symbol("quote"), Value::Int(tail.len() as i64)],
             ));
         }
-        Ok(quote_to_value(&tail[0]))
+        Ok(self.quote_to_runtime_value(&tail[0]))
     }
 
     fn sf_function(&mut self, tail: &[Expr]) -> EvalResult {
@@ -2897,9 +2903,9 @@ impl Evaluator {
                         return self.eval_lambda(&items[1..]);
                     }
                 }
-                Ok(quote_to_value(&tail[0]))
+                Ok(self.quote_to_runtime_value(&tail[0]))
             }
-            _ => Ok(quote_to_value(&tail[0])),
+            _ => Ok(self.quote_to_runtime_value(&tail[0])),
         }
     }
 
@@ -3866,7 +3872,43 @@ impl Evaluator {
                 }
                 Ok(Value::vector(values))
             }
-            _ => Ok(quote_to_value(expr)),
+            _ => Ok(self.quote_to_runtime_value(expr)),
+        }
+    }
+
+    pub(crate) fn quote_to_runtime_value(&mut self, expr: &Expr) -> Value {
+        match expr {
+            Expr::ReaderLoadFileName => self
+                .obarray
+                .symbol_value("load-file-name")
+                .cloned()
+                .unwrap_or(Value::Nil),
+            Expr::List(items) => {
+                let quoted = items
+                    .iter()
+                    .map(|item| self.quote_to_runtime_value(item))
+                    .collect::<Vec<_>>();
+                Value::list(quoted)
+            }
+            Expr::DottedList(items, last) => {
+                let head_vals: Vec<Value> = items
+                    .iter()
+                    .map(|item| self.quote_to_runtime_value(item))
+                    .collect();
+                let tail_val = self.quote_to_runtime_value(last);
+                head_vals
+                    .into_iter()
+                    .rev()
+                    .fold(tail_val, |acc, item| Value::cons(item, acc))
+            }
+            Expr::Vector(items) => {
+                let vals = items
+                    .iter()
+                    .map(|item| self.quote_to_runtime_value(item))
+                    .collect();
+                Value::vector(vals)
+            }
+            _ => quote_to_value(expr),
         }
     }
 
@@ -3985,6 +4027,7 @@ impl Evaluator {
             &mut self.lexenv,
             &mut self.features,
             &mut self.buffers,
+            &mut self.frames,
             &mut self.coding_systems,
             &mut self.match_data,
             &mut self.watchers,
@@ -4658,6 +4701,7 @@ impl Evaluator {
                     &mut self.lexenv,
                     &mut self.features,
                     &mut self.buffers,
+                    &mut self.frames,
                     &mut self.coding_systems,
                     &mut self.match_data,
                     &mut self.watchers,
@@ -5260,7 +5304,7 @@ impl Evaluator {
         Ok(value)
     }
 
-    /// Cached version of `quote_to_value` keyed on `Expr` pointer identity.
+    /// Cached version of quote construction keyed on `Expr` pointer identity.
     ///
     /// When the same `&Expr` node is converted multiple times (e.g. pcase case
     /// patterns from a shared `Rc<Vec<Expr>>` lambda body), returns the same
@@ -5268,6 +5312,9 @@ impl Evaluator {
     /// (`List`, `DottedList`, `Vector`, `Str`) benefit from caching; scalars
     /// like `Int`, `Symbol`, `Char` already have identity-free representations.
     fn cached_quote_to_value(&mut self, expr: &Expr) -> Value {
+        if expr.depends_on_reader_runtime_state() {
+            return self.quote_to_runtime_value(expr);
+        }
         let key = expr as *const Expr;
         if let Some(&cached) = self.literal_cache.get(&key) {
             return cached;
@@ -5299,7 +5346,7 @@ impl Evaluator {
                     .collect();
                 Value::vector(vals)
             }
-            _ => quote_to_value(expr),
+            _ => self.quote_to_runtime_value(expr),
         };
         self.literal_cache.insert(key, value);
         value
@@ -5336,6 +5383,7 @@ fn free_vars_in_lambda(params: &LambdaParams, body: &[Expr]) -> HashSet<SymId> {
 /// `bound` tracks variables that are locally bound (not free).
 fn collect_free_vars(expr: &Expr, bound: &HashSet<SymId>, free: &mut HashSet<SymId>) {
     match expr {
+        Expr::ReaderLoadFileName => {}
         Expr::Symbol(id) => {
             let name = resolve_sym(*id);
             // Skip nil, t, and keyword-like symbols — they're not variable references.
@@ -5506,6 +5554,7 @@ fn collect_free_vars_backquote(
         // Backquote templates are data by default. Only active unquotes
         // contribute free-variable references to the surrounding closure.
         Expr::Symbol(_)
+        | Expr::ReaderLoadFileName
         | Expr::Keyword(_)
         | Expr::Int(_)
         | Expr::Float(_)
@@ -5721,6 +5770,7 @@ pub fn quote_to_value(expr: &Expr) -> Value {
     match expr {
         Expr::Int(v) => Value::Int(*v),
         Expr::Float(v) => Value::Float(*v, next_float_id()),
+        Expr::ReaderLoadFileName => Value::symbol("load-file-name"),
         Expr::Str(s) => Value::string(s.clone()),
         Expr::Char(c) => Value::Char(*c),
         Expr::Keyword(id) => Value::Keyword(*id),

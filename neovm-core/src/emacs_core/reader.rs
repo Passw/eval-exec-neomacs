@@ -215,29 +215,22 @@ pub(crate) fn builtin_read_from_string(
         ));
     }
 
-    let value = if first_form_is_reader_hash_dollar(&forms[0], consumed) {
-        eval.obarray()
-            .symbol_value("load-file-name")
-            .cloned()
-            .unwrap_or(Value::Nil)
-    } else if let Some(bytecode) = first_form_byte_code_literal_value(&forms[0]) {
+    let value = if let Some(bytecode) = first_form_byte_code_literal_value(eval, &forms[0]) {
         bytecode
-    } else if let Some(hash_table) = first_form_hash_table_literal_value(&forms[0]) {
+    } else if let Some(hash_table) = first_form_hash_table_literal_value(eval, &forms[0]) {
         hash_table
     } else {
-        super::eval::quote_to_value(&forms[0])
+        eval.quote_to_runtime_value(&forms[0])
     };
     let absolute_end = start + end_pos;
 
     Ok(Value::cons(value, Value::Int(absolute_end as i64)))
 }
 
-fn first_form_is_reader_hash_dollar(expr: &Expr, consumed: &str) -> bool {
-    matches!(expr, Expr::Symbol(id) if resolve_sym(*id) == "load-file-name")
-        && consumed_represents_hash_dollar(consumed)
-}
-
-fn first_form_byte_code_literal_value(expr: &Expr) -> Option<Value> {
+fn first_form_byte_code_literal_value(
+    eval: &mut super::eval::Evaluator,
+    expr: &Expr,
+) -> Option<Value> {
     let Expr::List(items) = expr else {
         return None;
     };
@@ -253,11 +246,17 @@ fn first_form_byte_code_literal_value(expr: &Expr) -> Option<Value> {
     let Expr::Vector(values) = &items[1] else {
         return None;
     };
-    let values = values.iter().map(super::eval::quote_to_value).collect();
+    let values = values
+        .iter()
+        .map(|value| eval.quote_to_runtime_value(value))
+        .collect();
     Some(Value::vector(values))
 }
 
-fn first_form_hash_table_literal_value(expr: &Expr) -> Option<Value> {
+fn first_form_hash_table_literal_value(
+    eval: &mut super::eval::Evaluator,
+    expr: &Expr,
+) -> Option<Value> {
     let Expr::List(items) = expr else {
         return None;
     };
@@ -300,7 +299,7 @@ fn first_form_hash_table_literal_value(expr: &Expr) -> Option<Value> {
             i += 1;
             continue;
         };
-        let value = super::eval::quote_to_value(&spec[i + 1]);
+        let value = eval.quote_to_runtime_value(&spec[i + 1]);
         match resolve_sym(*key_id) {
             "size" => {
                 size = value.as_int()?;
@@ -348,8 +347,8 @@ fn first_form_hash_table_literal_value(expr: &Expr) -> Option<Value> {
             if let Some(Expr::List(data_items)) = data_expr {
                 let mut idx = 0_usize;
                 while idx + 1 < data_items.len() {
-                    let key_value = super::eval::quote_to_value(&data_items[idx]);
-                    let val_value = super::eval::quote_to_value(&data_items[idx + 1]);
+                    let key_value = eval.quote_to_runtime_value(&data_items[idx]);
+                    let val_value = eval.quote_to_runtime_value(&data_items[idx + 1]);
                     let key = key_value.to_hash_key(&table.test);
                     let inserting_new_key = !table.data.contains_key(&key);
                     table.data.insert(key.clone(), val_value);
@@ -363,41 +362,6 @@ fn first_form_hash_table_literal_value(expr: &Expr) -> Option<Value> {
         });
     }
     Some(table_value)
-}
-
-fn consumed_represents_hash_dollar(input: &str) -> bool {
-    let bytes = input.as_bytes();
-    let mut pos = skip_ws_comments(input, 0);
-    loop {
-        if pos + 1 >= bytes.len() {
-            return false;
-        }
-        if bytes[pos] == b'#' && bytes[pos + 1] == b'@' {
-            pos += 2;
-            let digits_start = pos;
-            while pos < bytes.len() && bytes[pos].is_ascii_digit() {
-                pos += 1;
-            }
-            if pos == digits_start {
-                return false;
-            }
-            let len = std::str::from_utf8(&bytes[digits_start..pos])
-                .ok()
-                .and_then(|s| s.parse::<usize>().ok());
-            let Some(len) = len else {
-                return false;
-            };
-            let Some(after_data) = pos.checked_add(len) else {
-                return false;
-            };
-            if after_data > bytes.len() {
-                return false;
-            }
-            pos = skip_ws_comments(input, after_data);
-            continue;
-        }
-        return bytes[pos] == b'#' && bytes[pos + 1] == b'$';
-    }
 }
 
 fn starts_with_hash_skip_dispatch(input: &str) -> bool {
@@ -813,12 +777,13 @@ pub(crate) fn builtin_read(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
                     vec![Value::string("End of file during parsing")],
                 ));
             }
-            let value = if let Some(bytecode) = first_form_byte_code_literal_value(&forms[0]) {
+            let value = if let Some(bytecode) = first_form_byte_code_literal_value(eval, &forms[0])
+            {
                 bytecode
-            } else if let Some(hash_table) = first_form_hash_table_literal_value(&forms[0]) {
+            } else if let Some(hash_table) = first_form_hash_table_literal_value(eval, &forms[0]) {
                 hash_table
             } else {
-                super::eval::quote_to_value(&forms[0])
+                eval.quote_to_runtime_value(&forms[0])
             };
             // Advance point past the read form
             let end_offset = compute_read_end_position(substring);

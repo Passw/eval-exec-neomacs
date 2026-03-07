@@ -176,10 +176,16 @@ pub(crate) fn builtin_daemon_initialized(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_documentation_stringp(args: Vec<Value>) -> EvalResult {
     expect_args("documentation-stringp", &args, 1)?;
-    Ok(Value::bool(matches!(
-        args[0],
-        Value::Str(_) | Value::Int(_)
-    )))
+    let is_compiled_ref = match args[0] {
+        Value::Cons(cell) => {
+            let pair = read_cons(cell);
+            pair.car.as_str().is_some() && pair.cdr.as_int().is_some()
+        }
+        _ => false,
+    };
+    Ok(Value::bool(
+        matches!(args[0], Value::Str(_) | Value::Int(_)) || is_compiled_ref,
+    ))
 }
 
 pub(crate) fn builtin_flush_standard_output(args: Vec<Value>) -> EvalResult {

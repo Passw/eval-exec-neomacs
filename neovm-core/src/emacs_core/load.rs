@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 /// with `?\x<HEX>` escape syntax that the parser already supports.
 /// All other extended byte sequences (outside `?` context) are replaced
 /// with U+FFFD, matching lossy UTF-8 behaviour.
-fn decode_emacs_utf8(bytes: &[u8]) -> String {
+pub(crate) fn decode_emacs_utf8(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
@@ -1010,7 +1010,7 @@ fn load_file_body(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Valu
             let start = std::time::Instant::now();
             let (h0, m0) = (eval.macro_cache_hits, eval.macro_cache_misses);
             let eval_result = if let Some(mexp_fn) = macroexpand_fn {
-                let form_value = quote_to_value(form);
+                let form_value = eval.quote_to_runtime_value(form);
                 eager_expand_eval_and_collect(eval, form_value, mexp_fn, &mut expanded_collector)
             } else {
                 eval.eval_expr(form)
@@ -1097,7 +1097,7 @@ fn load_file_body(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Valu
 /// The parser already handles `.elc`-specific reader syntax:
 /// - `#[...]` → `(byte-code-literal VECTOR)` for compiled function objects
 /// - `#@N<bytes>` → reader skip for inline docstring data blocks
-/// - `#$` → `load-file-name` symbol reference
+/// - `#$` → reader object resolved against the current `load-file-name`
 fn load_elc_file_body(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value, EvalError> {
     let raw_bytes = std::fs::read(path).map_err(|e| EvalError::Signal {
         symbol: intern("file-error"),

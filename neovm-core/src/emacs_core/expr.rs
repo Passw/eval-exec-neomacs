@@ -14,6 +14,8 @@ pub enum Expr {
     Int(i64),
     Float(f64),
     Symbol(SymId),
+    /// Reader pseudo-object `#$` — current load file name captured at read time.
+    ReaderLoadFileName,
     Keyword(SymId),
     Str(String),
     Char(char),
@@ -31,11 +33,30 @@ pub enum Expr {
 }
 
 impl Expr {
+    /// Check if this Expr tree depends on reader-time runtime state.
+    ///
+    /// `#$` is the current example: it must capture `load-file-name` at read
+    /// time, so caching a quoted Value across different loads would be wrong.
+    pub fn depends_on_reader_runtime_state(&self) -> bool {
+        match self {
+            Expr::ReaderLoadFileName => true,
+            Expr::List(items) | Expr::Vector(items) => {
+                items.iter().any(|e| e.depends_on_reader_runtime_state())
+            }
+            Expr::DottedList(items, last) => {
+                items.iter().any(|e| e.depends_on_reader_runtime_state())
+                    || last.depends_on_reader_runtime_state()
+            }
+            _ => false,
+        }
+    }
+
     /// Check if this Expr tree contains any `OpaqueValue` nodes.
     /// Forms containing opaque values cannot be serialized to cache.
     pub fn contains_opaque_value(&self) -> bool {
         match self {
             Expr::OpaqueValue(_) => true,
+            Expr::ReaderLoadFileName => false,
             Expr::List(items) | Expr::Vector(items) => {
                 items.iter().any(|e| e.contains_opaque_value())
             }
@@ -51,6 +72,7 @@ impl Expr {
     pub fn collect_opaque_values(&self, out: &mut Vec<super::value::Value>) {
         match self {
             Expr::OpaqueValue(v) => out.push(*v),
+            Expr::ReaderLoadFileName => {}
             Expr::List(items) | Expr::Vector(items) => {
                 for e in items {
                     e.collect_opaque_values(out);
@@ -87,6 +109,7 @@ pub fn print_expr(expr: &Expr) -> String {
         Expr::Int(v) => v.to_string(),
         Expr::Float(v) => format_float(*v),
         Expr::Symbol(id) => format_symbol_name(resolve_sym(*id)),
+        Expr::ReaderLoadFileName => "#$".to_string(),
         Expr::Keyword(id) => resolve_sym(*id).to_owned(),
         Expr::Str(s) => format_lisp_string(s),
         Expr::Char(c) => format_char_literal(*c),

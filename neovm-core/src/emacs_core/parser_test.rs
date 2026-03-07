@@ -351,7 +351,7 @@ fn parse_bytecode_literal_vector_uses_byte_code_literal_form() {
     let Expr::DottedList(cons_items, cdr) = &values[4] else {
         panic!("expected source-loc dotted pair");
     };
-    assert_eq!(cons_items, &vec![Expr::Symbol(intern("load-file-name"))]);
+    assert_eq!(cons_items, &vec![Expr::ReaderLoadFileName]);
     assert_eq!(**cdr, Expr::Int(83));
 }
 
@@ -415,5 +415,5 @@ fn parse_hash_skip_without_length_reports_end_of_input() {
 #[test]
 fn parse_hash_dollar_maps_to_load_file_name_symbol() {
     let forms = parse_forms("#$").unwrap();
-    assert_eq!(forms, vec![Expr::Symbol(intern("load-file-name"))]);
+    assert_eq!(forms, vec![Expr::ReaderLoadFileName]);
 }

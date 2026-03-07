@@ -195,6 +195,11 @@ impl Compiler {
                     self.compile_symbol_ref(func, resolve_sym(*id));
                 }
             }
+            Expr::ReaderLoadFileName => {
+                if for_value {
+                    self.compile_symbol_ref(func, "load-file-name");
+                }
+            }
             Expr::Vector(items) => {
                 if for_value {
                     // Compile each element, then wrap as vector constant
@@ -1837,6 +1842,7 @@ fn literal_to_value(expr: &Expr) -> Value {
     match expr {
         Expr::Int(n) => Value::Int(*n),
         Expr::Float(f) => Value::Float(*f, next_float_id()),
+        Expr::ReaderLoadFileName => Value::symbol("load-file-name"),
         Expr::Str(s) => Value::string(s.clone()),
         Expr::Char(c) => Value::Char(*c),
         Expr::Keyword(id) => Value::Keyword(*id),

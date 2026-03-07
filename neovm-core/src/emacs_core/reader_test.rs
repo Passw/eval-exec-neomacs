@@ -1991,3 +1991,23 @@ fn read_from_string_hash_bracket_preserves_vector() {
         other => panic!("Expected cons from read-from-string, got {other:?}"),
     }
 }
+
+#[test]
+fn read_from_string_hash_dollar_inside_dotted_pair_uses_load_file_name() {
+    let mut ev = Evaluator::new();
+    ev.set_variable("load-file-name", Value::string("/tmp/reader-dotted.elc"));
+    let result = builtin_read_from_string(&mut ev, vec![Value::string("(#$ . 83)")]).unwrap();
+
+    match result {
+        Value::Cons(cell) => {
+            let pair = read_cons(cell);
+            let Value::Cons(data_cell) = pair.car else {
+                panic!("expected dotted pair");
+            };
+            let data = read_cons(data_cell);
+            assert_eq!(data.car.as_str(), Some("/tmp/reader-dotted.elc"));
+            assert_eq!(data.cdr.as_int(), Some(83));
+        }
+        other => panic!("Expected cons from read-from-string, got {other:?}"),
+    }
+}
