@@ -1124,6 +1124,149 @@ fn macroexpand_all_pcase_terminates() {
     tracing::debug!("All macroexpand-all pcase tests completed");
 }
 
+#[test]
+fn macroexp_eager_reload_preserves_symbol_identity() {
+    let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest.parent().expect("root");
+    let lisp_dir = project_root.join("lisp");
+    assert!(lisp_dir.is_dir());
+
+    let mut eval = crate::emacs_core::eval::Evaluator::new();
+    let subdirs = ["", "emacs-lisp"];
+    let mut load_path_entries = Vec::new();
+    for sub in &subdirs {
+        let dir = if sub.is_empty() {
+            lisp_dir.clone()
+        } else {
+            lisp_dir.join(sub)
+        };
+        if dir.is_dir() {
+            load_path_entries.push(Value::string(dir.to_string_lossy().to_string()));
+        }
+    }
+    eval.set_variable("load-path", Value::list(load_path_entries));
+    eval.set_variable("dump-mode", Value::symbol("pbootstrap"));
+    eval.set_variable("purify-flag", Value::Nil);
+    eval.set_variable(
+        "macroexp--pending-eager-loads",
+        Value::list(vec![Value::symbol("skip")]),
+    );
+
+    let load_path = get_load_path(&eval.obarray());
+    let load = |eval: &mut crate::emacs_core::eval::Evaluator, name: &str| {
+        let path = find_file_in_load_path(name, &load_path).expect(name);
+        load_file(eval, &path).unwrap_or_else(|e| panic!("failed to load {name}: {e:?}"));
+    };
+
+    for name in &[
+        "emacs-lisp/debug-early",
+        "emacs-lisp/byte-run",
+        "emacs-lisp/backquote",
+        "subr",
+    ] {
+        load(&mut eval, name);
+    }
+
+    let bootstrap_prefix = [
+        "keymap",
+        "version",
+        "widget",
+        "custom",
+        "emacs-lisp/map-ynp",
+        "international/mule",
+        "international/mule-conf",
+        "env",
+        "format",
+        "bindings",
+        "window",
+        "files",
+    ];
+    let prefix_count = std::env::var("NEOVM_MACROEXP_PREFIX_COUNT")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(0)
+        .min(bootstrap_prefix.len());
+    for name in &bootstrap_prefix[..prefix_count] {
+        load(&mut eval, name);
+    }
+
+    for name in &["emacs-lisp/macroexp", "emacs-lisp/pcase"] {
+        load(&mut eval, name);
+    }
+
+    let probe = crate::emacs_core::parser::parse_forms(
+        r#"(let* ((s-if (make-symbol "if"))
+                  (s-message (make-symbol "message"))
+                  (s-when (make-symbol "when"))
+                  (s-cadr (make-symbol "cadr"))
+                  (form (list s-cadr 'y)))
+             (list (special-form-p s-if)
+                   (functionp s-message)
+                   (macrop s-when)
+                   (equal (macroexpand form) form)))"#,
+    )
+    .expect("parse symbol identity probe");
+    let probe_result = eval
+        .eval_expr(&probe[0])
+        .expect("evaluate symbol identity probe");
+    let values =
+        crate::emacs_core::value::list_to_vec(&probe_result).expect("probe should return list");
+    assert_eq!(
+        values,
+        vec![Value::Nil, Value::Nil, Value::Nil, Value::True]
+    );
+
+    eval.set_variable("macroexp--pending-eager-loads", Value::Nil);
+    load(&mut eval, "emacs-lisp/macroexp");
+}
+
+#[test]
+fn function_get_only_exposes_cxxr_compiler_macro_on_cxxr_symbols() {
+    let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest.parent().expect("root");
+    let lisp_dir = project_root.join("lisp");
+    assert!(lisp_dir.is_dir());
+
+    let mut eval = crate::emacs_core::eval::Evaluator::new();
+    let mut load_path_entries = Vec::new();
+    for sub in ["", "emacs-lisp"] {
+        let dir = if sub.is_empty() {
+            lisp_dir.clone()
+        } else {
+            lisp_dir.join(sub)
+        };
+        if dir.is_dir() {
+            load_path_entries.push(Value::string(dir.to_string_lossy().to_string()));
+        }
+    }
+    eval.set_variable("load-path", Value::list(load_path_entries));
+
+    let load_path = get_load_path(&eval.obarray());
+    for name in &[
+        "emacs-lisp/debug-early",
+        "emacs-lisp/byte-run",
+        "emacs-lisp/backquote",
+        "subr",
+    ] {
+        let path = find_file_in_load_path(name, &load_path).expect(name);
+        load_file(&mut eval, &path).unwrap_or_else(|e| panic!("failed to load {name}: {e:?}"));
+    }
+
+    let probe = crate::emacs_core::parser::parse_forms(
+        r#"(list (if (function-get 'car 'compiler-macro) t nil)
+                 (if (function-get 'cdr 'compiler-macro) t nil)
+                 (if (function-get 'cadr 'compiler-macro) t nil))"#,
+    )
+    .expect("parse function-get probe");
+    let result = eval
+        .eval_expr(&probe[0])
+        .expect("evaluate function-get probe");
+    assert_eq!(
+        crate::emacs_core::value::list_to_vec(&result).expect("probe should return list"),
+        vec![Value::Nil, Value::Nil, Value::True]
+    );
+}
+
 /// Test pcase with integer literal patterns — reproduces the
 /// "Unknown pattern '32'" error from rx.el line 1284.
 #[test]

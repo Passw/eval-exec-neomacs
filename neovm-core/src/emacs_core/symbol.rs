@@ -8,7 +8,7 @@
 //! - A property list (plist)
 //! - A `special` flag (for dynamic binding in lexical scope)
 
-use super::intern::{SymId, intern, resolve_sym};
+use super::intern::{SymId, intern, lookup_interned, resolve_sym};
 use super::value::Value;
 use crate::gc::GcTrace;
 use std::collections::{HashMap, HashSet};
@@ -50,6 +50,7 @@ impl SymbolData {
 #[derive(Clone, Debug)]
 pub struct Obarray {
     symbols: HashMap<SymId, SymbolData>,
+    global_members: HashSet<SymId>,
     function_unbound: HashSet<SymId>,
     function_epoch: u64,
 }
@@ -61,9 +62,36 @@ impl Default for Obarray {
 }
 
 impl Obarray {
+    fn is_canonical_symbol_id(id: SymId) -> bool {
+        lookup_interned(resolve_sym(id)).is_some_and(|canonical| canonical == id)
+    }
+
+    fn ensure_global_member_if_canonical(&mut self, id: SymId) {
+        if Self::is_canonical_symbol_id(id) {
+            self.global_members.insert(id);
+        }
+    }
+
+    fn value_from_symbol_id(id: SymId) -> Value {
+        let name = resolve_sym(id);
+        if Self::is_canonical_symbol_id(id) {
+            if name == "nil" {
+                return Value::Nil;
+            }
+            if name == "t" {
+                return Value::True;
+            }
+            if name.starts_with(':') {
+                return Value::Keyword(id);
+            }
+        }
+        Value::Symbol(id)
+    }
+
     pub fn new() -> Self {
         let mut ob = Self {
             symbols: HashMap::new(),
+            global_members: HashSet::new(),
             function_unbound: HashSet::new(),
             function_epoch: 0,
         };
@@ -75,6 +103,7 @@ impl Obarray {
         t_sym.constant = true;
         t_sym.special = true;
         ob.symbols.insert(t_id, t_sym);
+        ob.global_members.insert(t_id);
 
         let nil_id = intern("nil");
         let mut nil_sym = SymbolData::new(nil_id);
@@ -82,6 +111,7 @@ impl Obarray {
         nil_sym.constant = true;
         nil_sym.special = true;
         ob.symbols.insert(nil_id, nil_sym);
+        ob.global_members.insert(nil_id);
 
         ob
     }
@@ -90,70 +120,127 @@ impl Obarray {
     /// Returns the symbol name (which is the key for identity).
     pub fn intern(&mut self, name: &str) -> String {
         let id = intern(name);
-        if !self.symbols.contains_key(&id) {
-            self.symbols.insert(id, SymbolData::new(id));
-        }
+        self.ensure_symbol_id(id);
+        self.global_members.insert(id);
         name.to_string()
     }
 
     /// Look up a symbol without creating it. Returns None if not interned.
     pub fn intern_soft(&self, name: &str) -> Option<&SymbolData> {
-        self.symbols.get(&intern(name))
+        let id = lookup_interned(name)?;
+        self.global_members
+            .contains(&id)
+            .then(|| self.symbols.get(&id))
+            .flatten()
     }
 
     /// Get symbol data (mutable). Interns the symbol if needed.
     pub fn get_or_intern(&mut self, name: &str) -> &mut SymbolData {
         let id = intern(name);
-        if !self.symbols.contains_key(&id) {
-            self.symbols.insert(id, SymbolData::new(id));
-        }
-        self.symbols.get_mut(&id).unwrap()
+        self.global_members.insert(id);
+        self.ensure_symbol_id(id)
     }
 
     /// Get symbol data (immutable).
     pub fn get(&self, name: &str) -> Option<&SymbolData> {
-        self.symbols.get(&intern(name))
+        let id = lookup_interned(name)?;
+        self.global_members
+            .contains(&id)
+            .then(|| self.symbols.get(&id))
+            .flatten()
     }
 
     /// Get symbol data (mutable).
     pub fn get_mut(&mut self, name: &str) -> Option<&mut SymbolData> {
-        self.symbols.get_mut(&intern(name))
+        let id = lookup_interned(name)?;
+        self.global_members
+            .contains(&id)
+            .then(|| self.symbols.get_mut(&id))
+            .flatten()
+    }
+
+    /// Ensure symbol storage exists for an arbitrary symbol id.
+    pub fn ensure_symbol_id(&mut self, id: SymId) -> &mut SymbolData {
+        self.symbols
+            .entry(id)
+            .or_insert_with(|| SymbolData::new(id))
+    }
+
+    /// Get symbol data by identity.
+    pub fn get_by_id(&self, id: SymId) -> Option<&SymbolData> {
+        self.symbols.get(&id)
+    }
+
+    /// Get mutable symbol data by identity.
+    pub fn get_mut_by_id(&mut self, id: SymId) -> Option<&mut SymbolData> {
+        self.symbols.get_mut(&id)
     }
 
     /// Get the value cell of a symbol.
     pub fn symbol_value(&self, name: &str) -> Option<&Value> {
-        self.symbols
-            .get(&intern(name))
-            .and_then(|s| s.value.as_ref())
+        self.symbol_value_id(intern(name))
+    }
+
+    /// Get the value cell of a symbol by identity.
+    pub fn symbol_value_id(&self, id: SymId) -> Option<&Value> {
+        self.symbols.get(&id).and_then(|s| s.value.as_ref())
     }
 
     /// Set the value cell of a symbol. Interns if needed.
     pub fn set_symbol_value(&mut self, name: &str, value: Value) {
-        let sym = self.get_or_intern(name);
+        let id = intern(name);
+        self.global_members.insert(id);
+        let sym = self.ensure_symbol_id(id);
+        sym.value = Some(value);
+    }
+
+    /// Set the value cell of a symbol by identity.
+    pub fn set_symbol_value_id(&mut self, id: SymId, value: Value) {
+        self.ensure_global_member_if_canonical(id);
+        let sym = self.ensure_symbol_id(id);
         sym.value = Some(value);
     }
 
     /// Get the function cell of a symbol.
     pub fn symbol_function(&self, name: &str) -> Option<&Value> {
-        if self.function_unbound.contains(&intern(name)) {
+        self.symbol_function_id(intern(name))
+    }
+
+    /// Get the function cell of a symbol by identity.
+    pub fn symbol_function_id(&self, id: SymId) -> Option<&Value> {
+        if self.function_unbound.contains(&id) {
             return None;
         }
-        self.symbols
-            .get(&intern(name))
-            .and_then(|s| s.function.as_ref())
+        self.symbols.get(&id).and_then(|s| s.function.as_ref())
     }
 
     /// Set the function cell of a symbol (fset). Interns if needed.
     pub fn set_symbol_function(&mut self, name: &str, function: Value) {
-        let sym = self.get_or_intern(name);
+        let id = intern(name);
+        self.global_members.insert(id);
+        let sym = self.ensure_symbol_id(id);
         sym.function = Some(function);
-        self.function_unbound.remove(&intern(name));
+        self.function_unbound.remove(&id);
+        self.function_epoch = self.function_epoch.wrapping_add(1);
+    }
+
+    /// Set the function cell of a symbol by identity.
+    pub fn set_symbol_function_id(&mut self, id: SymId, function: Value) {
+        self.ensure_global_member_if_canonical(id);
+        let sym = self.ensure_symbol_id(id);
+        sym.function = Some(function);
+        self.function_unbound.remove(&id);
         self.function_epoch = self.function_epoch.wrapping_add(1);
     }
 
     /// Remove the function cell (fmakunbound).
     pub fn fmakunbound(&mut self, name: &str) {
-        let id = intern(name);
+        self.fmakunbound_id(intern(name));
+    }
+
+    /// Remove the function cell by identity.
+    pub fn fmakunbound_id(&mut self, id: SymId) {
+        self.ensure_global_member_if_canonical(id);
         let mut changed = self.function_unbound.insert(id);
         if let Some(sym) = self.symbols.get_mut(&id) {
             changed |= sym.function.take().is_some();
@@ -166,7 +253,11 @@ impl Obarray {
     /// Remove function cell without marking as explicitly unbound.
     /// Used for init-time masking of lazily-materialized builtins.
     pub fn clear_function_silent(&mut self, name: &str) {
-        let id = intern(name);
+        self.clear_function_silent_id(intern(name));
+    }
+
+    /// Remove function cell without marking as explicitly unbound, by identity.
+    pub fn clear_function_silent_id(&mut self, id: SymId) {
         if let Some(sym) = self.symbols.get_mut(&id) {
             if sym.function.take().is_some() {
                 self.function_epoch = self.function_epoch.wrapping_add(1);
@@ -176,7 +267,13 @@ impl Obarray {
 
     /// Remove the value cell (makunbound).
     pub fn makunbound(&mut self, name: &str) {
-        if let Some(sym) = self.symbols.get_mut(&intern(name)) {
+        self.makunbound_id(intern(name));
+    }
+
+    /// Remove the value cell by identity.
+    pub fn makunbound_id(&mut self, id: SymId) {
+        self.ensure_global_member_if_canonical(id);
+        if let Some(sym) = self.symbols.get_mut(&id) {
             if !sym.constant {
                 sym.value = None;
             }
@@ -185,14 +282,21 @@ impl Obarray {
 
     /// Check if a symbol is bound (has a value cell).
     pub fn boundp(&self, name: &str) -> bool {
-        self.symbols
-            .get(&intern(name))
-            .is_some_and(|s| s.value.is_some())
+        self.boundp_id(intern(name))
+    }
+
+    /// Check if a symbol is bound by identity.
+    pub fn boundp_id(&self, id: SymId) -> bool {
+        self.symbols.get(&id).is_some_and(|s| s.value.is_some())
     }
 
     /// Check if a symbol has a function cell.
     pub fn fboundp(&self, name: &str) -> bool {
-        let id = intern(name);
+        self.fboundp_id(intern(name))
+    }
+
+    /// Check if a symbol has a function cell by identity.
+    pub fn fboundp_id(&self, id: SymId) -> bool {
         if self.function_unbound.contains(&id) {
             return false;
         }
@@ -204,24 +308,41 @@ impl Obarray {
 
     /// Get a property from the symbol's plist.
     pub fn get_property(&self, name: &str, prop: &str) -> Option<&Value> {
-        self.symbols
-            .get(&intern(name))
-            .and_then(|s| s.plist.get(&intern(prop)))
+        self.get_property_id(intern(name), intern(prop))
+    }
+
+    /// Get a property from the symbol's plist by identity.
+    pub fn get_property_id(&self, symbol: SymId, prop: SymId) -> Option<&Value> {
+        self.symbols.get(&symbol).and_then(|s| s.plist.get(&prop))
     }
 
     /// Set a property on the symbol's plist.
     pub fn put_property(&mut self, name: &str, prop: &str, value: Value) {
-        let sym = self.get_or_intern(name);
+        let symbol = intern(name);
+        self.global_members.insert(symbol);
+        let sym = self.ensure_symbol_id(symbol);
         sym.plist.insert(intern(prop), value);
+    }
+
+    /// Set a property on the symbol's plist by identity.
+    pub fn put_property_id(&mut self, symbol: SymId, prop: SymId, value: Value) {
+        self.ensure_global_member_if_canonical(symbol);
+        let sym = self.ensure_symbol_id(symbol);
+        sym.plist.insert(prop, value);
     }
 
     /// Get the symbol's full plist as a flat list.
     pub fn symbol_plist(&self, name: &str) -> Value {
-        match self.symbols.get(&intern(name)) {
+        self.symbol_plist_id(intern(name))
+    }
+
+    /// Get the symbol's full plist as a flat list by identity.
+    pub fn symbol_plist_id(&self, id: SymId) -> Value {
+        match self.symbols.get(&id) {
             Some(sym) if !sym.plist.is_empty() => {
                 let mut items = Vec::new();
                 for (k, v) in &sym.plist {
-                    items.push(Value::symbol(resolve_sym(*k)));
+                    items.push(Self::value_from_symbol_id(*k));
                     items.push(*v);
                 }
                 Value::list(items)
@@ -232,17 +353,36 @@ impl Obarray {
 
     /// Mark a symbol as special (dynamically bound).
     pub fn make_special(&mut self, name: &str) {
-        self.get_or_intern(name).special = true;
+        let id = intern(name);
+        self.global_members.insert(id);
+        self.ensure_symbol_id(id).special = true;
+    }
+
+    /// Mark a symbol as special by identity.
+    pub fn make_special_id(&mut self, id: SymId) {
+        self.ensure_global_member_if_canonical(id);
+        self.ensure_symbol_id(id).special = true;
     }
 
     /// Check if a symbol is special.
     pub fn is_special(&self, name: &str) -> bool {
-        self.symbols.get(&intern(name)).is_some_and(|s| s.special)
+        self.is_special_id(intern(name))
+    }
+
+    /// Check if a symbol is special by identity.
+    pub fn is_special_id(&self, id: SymId) -> bool {
+        self.symbols.get(&id).is_some_and(|s| s.special)
     }
 
     /// Check if a symbol is a constant.
     pub fn is_constant(&self, name: &str) -> bool {
-        name.starts_with(':') || self.symbols.get(&intern(name)).is_some_and(|s| s.constant)
+        self.is_constant_id(intern(name))
+    }
+
+    /// Check if a symbol is a constant by identity.
+    pub fn is_constant_id(&self, id: SymId) -> bool {
+        (Self::is_canonical_symbol_id(id) && resolve_sym(id).starts_with(':'))
+            || self.symbols.get(&id).is_some_and(|s| s.constant)
     }
 
     /// Follow function indirection (defalias chains).
@@ -267,24 +407,26 @@ impl Obarray {
 
     /// Number of interned symbols.
     pub fn len(&self) -> usize {
-        self.symbols.len()
+        self.global_members.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.symbols.is_empty()
+        self.global_members.is_empty()
     }
 
     /// All interned symbol names.
     pub fn all_symbols(&self) -> Vec<&str> {
-        self.symbols.keys().map(|id| resolve_sym(*id)).collect()
+        self.global_members
+            .iter()
+            .map(|id| resolve_sym(*id))
+            .collect()
     }
 
     /// Remove a symbol from the obarray.  Returns `true` if it was present.
     pub fn unintern(&mut self, name: &str) -> bool {
         let id = intern(name);
-        let removed_symbol = self.symbols.remove(&id).is_some();
-        let removed_unbound = self.function_unbound.remove(&id);
-        if removed_symbol || removed_unbound {
+        let removed_symbol = self.global_members.remove(&id);
+        if removed_symbol {
             self.function_epoch = self.function_epoch.wrapping_add(1);
         }
         removed_symbol
@@ -297,7 +439,12 @@ impl Obarray {
 
     /// True when `fmakunbound` explicitly masked this symbol's fallback function definition.
     pub fn is_function_unbound(&self, name: &str) -> bool {
-        self.function_unbound.contains(&intern(name))
+        self.is_function_unbound_id(intern(name))
+    }
+
+    /// True when `fmakunbound` explicitly masked this symbol's fallback function definition.
+    pub fn is_function_unbound_id(&self, id: SymId) -> bool {
+        self.function_unbound.contains(&id)
     }
 
     // -----------------------------------------------------------------------
@@ -309,6 +456,11 @@ impl Obarray {
         self.symbols.iter()
     }
 
+    /// Access the set of ids interned in the global obarray.
+    pub(crate) fn global_members(&self) -> &HashSet<SymId> {
+        &self.global_members
+    }
+
     /// Access the set of fmakunbound'd symbol ids (for pdump serialization).
     pub(crate) fn function_unbound_set(&self) -> &HashSet<SymId> {
         &self.function_unbound
@@ -317,11 +469,13 @@ impl Obarray {
     /// Reconstruct an Obarray from pdump data.
     pub(crate) fn from_dump(
         symbols: HashMap<SymId, SymbolData>,
+        global_members: HashSet<SymId>,
         function_unbound: HashSet<SymId>,
         function_epoch: u64,
     ) -> Self {
         Self {
             symbols,
+            global_members,
             function_unbound,
             function_epoch,
         }

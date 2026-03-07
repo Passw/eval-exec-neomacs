@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 use super::error::{EvalResult, Flow, signal};
-use super::intern::resolve_sym;
+use super::intern::{intern, resolve_sym};
 use super::value::*;
 use crate::gc::GcTrace;
 
@@ -489,17 +489,27 @@ pub(crate) fn builtin_default_value(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("default-value", &args, 1)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    let resolved = super::builtins::resolve_variable_alias_name(eval, name)?;
-    match eval.obarray.symbol_value(&resolved) {
+    let symbol = match args[0] {
+        Value::Nil => intern("nil"),
+        Value::True => intern("t"),
+        Value::Symbol(id) | Value::Keyword(id) => id,
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("symbolp"), args[0]],
+            ));
+        }
+    };
+    let resolved = super::builtins::resolve_variable_alias_id(eval, symbol)?;
+    let resolved_name = resolve_sym(resolved);
+    match eval.obarray.symbol_value_id(resolved) {
         Some(v) => Ok(*v),
-        None if resolved.starts_with(':') => Ok(Value::symbol(resolved)),
-        None => Err(signal("void-variable", vec![Value::symbol(name)])),
+        None if super::builtins::is_canonical_symbol_id(resolved)
+            && resolved_name.starts_with(':') =>
+        {
+            Ok(Value::Keyword(resolved))
+        }
+        None => Err(signal("void-variable", vec![args[0]])),
     }
 }
 
@@ -509,21 +519,27 @@ pub(crate) fn builtin_set_default(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("set-default", &args, 2)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    let resolved = super::builtins::resolve_variable_alias_name(eval, name)?;
-    if eval.obarray().is_constant(&resolved) {
-        return Err(signal("setting-constant", vec![Value::symbol(name)]));
+    let symbol = match args[0] {
+        Value::Nil => intern("nil"),
+        Value::True => intern("t"),
+        Value::Symbol(id) | Value::Keyword(id) => id,
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("symbolp"), args[0]],
+            ));
+        }
+    };
+    let resolved = super::builtins::resolve_variable_alias_id(eval, symbol)?;
+    let resolved_name = resolve_sym(resolved);
+    if eval.obarray().is_constant_id(resolved) {
+        return Err(signal("setting-constant", vec![args[0]]));
     }
     let value = args[1];
-    eval.obarray.set_symbol_value(&resolved, value);
-    eval.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
-    if resolved != name {
-        eval.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
+    eval.obarray.set_symbol_value_id(resolved, value);
+    eval.run_variable_watchers(resolved_name, &value, &Value::Nil, "set")?;
+    if resolved != symbol {
+        eval.run_variable_watchers(resolved_name, &value, &Value::Nil, "set")?;
     }
     Ok(value)
 }

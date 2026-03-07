@@ -131,6 +131,34 @@ fn intern_keyword_matches_reader_keyword_for_eq_and_memq() {
 }
 
 #[test]
+fn setq_keeps_canonical_symbols_in_obarray() {
+    assert_eq!(
+        eval_one(
+            r#"(let ((s 'vm-ghost))
+                 (setq vm-ghost 1)
+                 (list (if (intern-soft "vm-ghost") t nil)
+                       (let (seen)
+                         (mapatoms (lambda (x) (when (eq x s) (setq seen t))))
+                         seen)
+                       (symbol-value s)))"#
+        ),
+        "OK (t t 1)"
+    );
+}
+
+#[test]
+fn uninterned_nil_function_is_not_treated_as_canonical_nil() {
+    assert_eq!(
+        eval_one(
+            r#"(let ((s (make-symbol "nil")))
+                 (fset s (lambda () 'ok))
+                 (list (special-form-p s) (funcall s)))"#
+        ),
+        "OK (nil ok)"
+    );
+}
+
+#[test]
 fn comparisons() {
     assert_eq!(eval_one("(< 1 2)"), "OK t");
     assert_eq!(eval_one("(> 1 2)"), "OK nil");
@@ -958,7 +986,6 @@ fn funcall_subr_object_ignores_symbol_function_rebinding() {
         "OK (1 1)"
     );
 }
-
 
 #[test]
 fn funcall_autoload_object_signals_wrong_type_argument_symbolp() {

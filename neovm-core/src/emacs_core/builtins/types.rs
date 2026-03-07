@@ -190,8 +190,28 @@ pub(crate) fn builtin_functionp_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("functionp", &args, 1)?;
-    let is_function = if let Some(name) = args[0].as_symbol_name() {
-        if let Some(function) = resolve_indirect_symbol(eval, name) {
+    let is_function = if let Some(symbol) = match &args[0] {
+        Value::Nil => Some(intern("nil")),
+        Value::True => Some(intern("t")),
+        Value::Symbol(id) | Value::Keyword(id) => Some(*id),
+        _ => None,
+    } {
+        if super::is_canonical_symbol_id(symbol) {
+            if let Some(function) =
+                startup_virtual_autoload_function_cell(eval, resolve_sym(symbol))
+            {
+                if let Some(autoload_type) = autoload_type_of(&function) {
+                    return Ok(Value::bool(matches!(
+                        autoload_type,
+                        super::autoload::AutoloadType::Function
+                    )));
+                }
+                return Ok(Value::bool(is_runtime_function_object(&function)));
+            }
+        }
+
+        if let Some(function) = resolve_indirect_symbol_by_id(eval, symbol).map(|(_, value)| value)
+        {
             if let Some(autoload_type) = autoload_type_of(&function) {
                 matches!(autoload_type, super::autoload::AutoloadType::Function)
             } else {

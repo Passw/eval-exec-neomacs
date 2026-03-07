@@ -276,6 +276,17 @@ fn keyword_defaults_and_symbol_values_self_evaluate() {
 }
 
 #[test]
+fn uninterned_keyword_defaults_do_not_self_evaluate() {
+    let results = eval_all(
+        r#"(let ((s (make-symbol ":vm-k")))
+             (list (condition-case e (eval s nil) (error (car e)))
+                   (condition-case e (symbol-value s) (error (car e)))
+                   (condition-case e (default-value s) (error (car e)))))"#,
+    );
+    assert_eq!(results[0], "OK (void-variable void-variable void-variable)");
+}
+
+#[test]
 fn set_default_sets_global() {
     let results = eval_all(r#"(set-default 'my-var 99) (default-value 'my-var)"#);
     assert_eq!(results[1], "OK 99");

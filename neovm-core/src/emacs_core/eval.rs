@@ -16,7 +16,9 @@ use super::doc::{STARTUP_VARIABLE_DOC_STRING_PROPERTIES, STARTUP_VARIABLE_DOC_ST
 use super::error::*;
 use super::expr::Expr;
 use super::interactive::InteractiveRegistry;
-use super::intern::{StringInterner, SymId, intern, resolve_sym, set_current_interner};
+use super::intern::{
+    StringInterner, SymId, intern, lookup_interned, resolve_sym, set_current_interner,
+};
 use super::keymap::{list_keymap_set_parent, make_list_keymap, make_sparse_list_keymap};
 use super::kill_ring::KillRing;
 use super::kmacro::KmacroManager;
@@ -106,6 +108,22 @@ struct NamedCallCache {
     symbol: SymId,
     function_epoch: u64,
     target: NamedCallTarget,
+}
+
+fn value_from_symbol_id(sym_id: SymId) -> Value {
+    let name = resolve_sym(sym_id);
+    if lookup_interned(name).is_some_and(|canonical| canonical == sym_id) {
+        if name == "nil" {
+            return Value::Nil;
+        }
+        if name == "t" {
+            return Value::True;
+        }
+        if name.starts_with(':') {
+            return Value::Keyword(sym_id);
+        }
+    }
+    Value::Symbol(sym_id)
 }
 
 /// Limit for stored recent input events to match GNU Emacs: 300 entries.
@@ -2197,29 +2215,31 @@ impl Evaluator {
     /// Fassq on Vinternal_interpreter_environment).
     fn eval_symbol_by_id(&self, sym_id: SymId) -> EvalResult {
         let symbol = resolve_sym(sym_id);
-        if symbol == "nil" {
+        let symbol_is_canonical =
+            lookup_interned(symbol).is_some_and(|canonical| canonical == sym_id);
+        if symbol_is_canonical && symbol == "nil" {
             return Ok(Value::Nil);
         }
-        if symbol == "t" {
+        if symbol_is_canonical && symbol == "t" {
             return Ok(Value::True);
         }
         // Keywords evaluate to themselves
-        if symbol.starts_with(':') {
-            return Ok(Value::Keyword(intern(symbol)));
+        if symbol_is_canonical && symbol.starts_with(':') {
+            return Ok(Value::Keyword(sym_id));
         }
 
-        let resolved = super::builtins::resolve_variable_alias_name(self, symbol)?;
+        let resolved = super::builtins::resolve_variable_alias_id(self, sym_id)?;
+        let resolved_name = resolve_sym(resolved);
 
         // If lexical binding is on and symbol is NOT special, check lexenv first.
         // Use the original sym_id for lookup — this preserves uninterned symbol
         // identity (an uninterned #:body won't match the interned `body`).
-        if self.lexical_binding() && !self.obarray.is_special(symbol) {
+        if self.lexical_binding() && !self.obarray.is_special_id(sym_id) {
             if let Some(value) = lexenv_lookup(self.lexenv, sym_id) {
                 return Ok(value);
             }
-            if resolved != symbol && !self.obarray.is_special(&resolved) {
-                let resolved_id = intern(&resolved);
-                if let Some(value) = lexenv_lookup(self.lexenv, resolved_id) {
+            if resolved != sym_id && !self.obarray.is_special_id(resolved) {
+                if let Some(value) = lexenv_lookup(self.lexenv, resolved) {
                     return Ok(value);
                 }
             }
@@ -2230,41 +2250,73 @@ impl Evaluator {
             if let Some(value) = frame.get(&sym_id) {
                 return Ok(*value);
             }
-            if resolved != symbol {
-                let resolved_id = intern(&resolved);
-                if let Some(value) = frame.get(&resolved_id) {
+            if resolved != sym_id {
+                if let Some(value) = frame.get(&resolved) {
                     return Ok(*value);
                 }
             }
         }
 
-        if resolved == "nil" {
+        let resolved_is_canonical =
+            lookup_interned(resolved_name).is_some_and(|canonical| canonical == resolved);
+        if resolved_is_canonical && resolved_name == "nil" {
             return Ok(Value::Nil);
         }
-        if resolved == "t" {
+        if resolved_is_canonical && resolved_name == "t" {
             return Ok(Value::True);
         }
-        if resolved.starts_with(':') {
-            return Ok(Value::Keyword(intern(&resolved)));
+        if resolved_is_canonical && resolved_name.starts_with(':') {
+            return Ok(Value::Keyword(resolved));
         }
 
         // Buffer-local binding on current buffer.
         if let Some(buf) = self.buffers.current_buffer() {
-            if let Some(value) = buf.get_buffer_local(&resolved) {
+            if let Some(value) = buf.get_buffer_local(resolved_name) {
                 return Ok(*value);
             }
         }
 
         // Obarray value cell
-        if let Some(value) = self.obarray.symbol_value(&resolved) {
+        if let Some(value) = self.obarray.symbol_value_id(resolved) {
             return Ok(*value);
         }
 
-        Err(signal("void-variable", vec![Value::symbol(symbol)]))
+        Err(signal("void-variable", vec![value_from_symbol_id(sym_id)]))
     }
 
     fn eval_symbol(&self, symbol: &str) -> EvalResult {
         self.eval_symbol_by_id(intern(symbol))
+    }
+
+    fn apply_symbol_callable(
+        &mut self,
+        sym_id: SymId,
+        args: Vec<Value>,
+        rewrite_builtin_wrong_arity: bool,
+    ) -> EvalResult {
+        if super::builtins::is_canonical_symbol_id(sym_id) {
+            return self.apply_named_callable(
+                resolve_sym(sym_id),
+                args,
+                value_from_symbol_id(sym_id),
+                rewrite_builtin_wrong_arity,
+            );
+        }
+
+        if self.obarray.is_function_unbound_id(sym_id) {
+            return Err(signal("void-function", vec![Value::Symbol(sym_id)]));
+        }
+
+        let Some(function) = self.obarray.symbol_function_id(sym_id).cloned() else {
+            return Err(signal("void-function", vec![Value::Symbol(sym_id)]));
+        };
+
+        match self.apply(function, args) {
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "invalid-function" => {
+                Err(signal("invalid-function", vec![Value::Symbol(sym_id)]))
+            }
+            other => other,
+        }
     }
 
     /// Evaluate a slice of expressions into a Vec, rooting intermediate results
@@ -4161,20 +4213,24 @@ impl Evaluator {
     }
 
     pub(crate) fn defalias_value(&mut self, sym: Value, def: Value) -> EvalResult {
-        let name = sym
-            .as_symbol_name()
-            .map(str::to_string)
-            .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("symbolp"), sym]))?;
-        if name == "nil" {
+        let symbol = match sym {
+            Value::Nil => intern("nil"),
+            Value::True => intern("t"),
+            Value::Symbol(id) | Value::Keyword(id) => id,
+            _ => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("symbolp"), sym],
+                ));
+            }
+        };
+        if symbol == intern("nil") {
             return Err(signal("setting-constant", vec![Value::symbol("nil")]));
         }
-        if builtins::would_create_function_alias_cycle(self, &name, &def) {
-            return Err(signal(
-                "cyclic-function-indirection",
-                vec![Value::symbol(name.clone())],
-            ));
+        if builtins::would_create_function_alias_cycle(self, symbol, &def) {
+            return Err(signal("cyclic-function-indirection", vec![sym]));
         }
-        self.obarray.set_symbol_function(&name, def);
+        self.obarray.set_symbol_function_id(symbol, def);
         Ok(sym)
     }
 
@@ -4714,6 +4770,17 @@ impl Evaluator {
 
     /// Apply a function value to evaluated arguments.
     pub(crate) fn apply(&mut self, function: Value, args: Vec<Value>) -> EvalResult {
+        // Deep interpreted expansion (notably loadup's eager macroexpansion of
+        // macroexp.el itself) can recurse through many apply/apply_lambda
+        // frames between successive eval() calls. Grow the stack at the
+        // function-application boundary so those paths don't exhaust the
+        // native thread stack long before max-lisp-eval-depth is reached.
+        stacker::maybe_grow(256 * 1024, 2 * 1024 * 1024, || {
+            self.apply_inner(function, args)
+        })
+    }
+
+    fn apply_inner(&mut self, function: Value, args: Vec<Value>) -> EvalResult {
         match function {
             Value::ByteCode(bc) => {
                 self.refresh_features_from_variable();
@@ -4746,13 +4813,9 @@ impl Evaluator {
                 self.apply_lambda(&lambda_data, args, func_val)
             }
             Value::Subr(id) => self.apply_subr_object(resolve_sym(id), args, true),
-            Value::Symbol(id) => {
-                self.apply_named_callable(resolve_sym(id), args, Value::Subr(id), true)
-            }
-            Value::True => self.apply_named_callable("t", args, Value::Subr(intern("t")), true),
-            Value::Keyword(id) => {
-                self.apply_named_callable(resolve_sym(id), args, Value::Subr(id), true)
-            }
+            Value::Symbol(id) => self.apply_symbol_callable(id, args, true),
+            Value::True => self.apply_symbol_callable(intern("t"), args, true),
+            Value::Keyword(id) => self.apply_symbol_callable(id, args, true),
             Value::Nil => Err(signal("void-function", vec![Value::symbol("nil")])),
             function @ Value::Cons(_) => {
                 if super::autoload::is_autoload_value(&function) {
@@ -5088,7 +5151,10 @@ impl Evaluator {
             None
         };
 
-        let result = self.sf_progn(&lambda.body);
+        // Macros are sometimes invoked directly via apply_lambda during
+        // expansion, bypassing apply(). Keep the same stack-growth guard here.
+        let result =
+            stacker::maybe_grow(256 * 1024, 2 * 1024 * 1024, || self.sf_progn(&lambda.body));
 
         if let Some(old_mode) = saved_lexical_mode {
             self.set_lexical_binding(old_mode);
@@ -5183,7 +5249,7 @@ impl Evaluator {
     pub(crate) fn assign_by_id(&mut self, sym_id: SymId, value: Value) {
         let name = resolve_sym(sym_id);
         // If lexical binding and not special, check lexenv first
-        if self.lexical_binding() && !self.obarray.is_special(name) {
+        if self.lexical_binding() && !self.obarray.is_special_id(sym_id) {
             if let Some(cell_id) = lexenv_assq(self.lexenv, sym_id) {
                 lexenv_set(cell_id, value);
                 return;
@@ -5215,7 +5281,7 @@ impl Evaluator {
         }
 
         // Fall through to obarray value cell
-        self.obarray.set_symbol_value(name, value);
+        self.obarray.set_symbol_value_id(sym_id, value);
     }
 
     pub(crate) fn assign(&mut self, name: &str, value: Value) {
@@ -5411,11 +5477,7 @@ fn collect_free_vars(expr: &Expr, bound: &HashSet<SymId>, free: &mut HashSet<Sym
                                 if !inner.is_empty() {
                                     if let Expr::Symbol(s) = &inner[0] {
                                         if resolve_sym(*s) == "lambda" {
-                                            collect_free_vars_lambda_form(
-                                                &inner[1..],
-                                                bound,
-                                                free,
-                                            );
+                                            collect_free_vars_lambda_form(&inner[1..], bound, free);
                                             return;
                                         }
                                     }

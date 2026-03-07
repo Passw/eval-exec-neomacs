@@ -275,6 +275,7 @@ pub struct DumpSymbolData {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DumpObarray {
     pub symbols: Vec<(u32, DumpSymbolData)>,
+    pub global_members: Vec<u32>,
     pub function_unbound: Vec<u32>,
     pub function_epoch: u64,
 }
@@ -404,14 +405,22 @@ pub struct DumpSyntaxTable {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum DumpUndoRecord {
-    Insert { pos: usize, len: usize },
-    Delete { pos: usize, text: String },
+    Insert {
+        pos: usize,
+        len: usize,
+    },
+    Delete {
+        pos: usize,
+        text: String,
+    },
     PropertyChange {
         pos: usize,
         len: usize,
         old_props: Vec<(String, DumpValue)>,
     },
-    CursorMove { pos: usize },
+    CursorMove {
+        pos: usize,
+    },
     Boundary,
 }
 

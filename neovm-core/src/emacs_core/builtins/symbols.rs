@@ -1,4 +1,5 @@
 use super::*;
+use crate::emacs_core::intern::lookup_interned;
 
 // ===========================================================================
 // Symbol operations (need evaluator for obarray access)
@@ -11,48 +12,92 @@ fn is_internal_symbol_plist_property(property: &str) -> bool {
     property == VARIABLE_ALIAS_PROPERTY || property == RAW_SYMBOL_PLIST_PROPERTY
 }
 
-pub(crate) fn resolve_variable_alias_name(
+fn symbol_id(value: &Value) -> Option<SymId> {
+    match value {
+        Value::Nil => Some(intern("nil")),
+        Value::True => Some(intern("t")),
+        Value::Symbol(id) | Value::Keyword(id) => Some(*id),
+        _ => None,
+    }
+}
+
+fn value_from_symbol_id(id: SymId) -> Value {
+    let name = resolve_sym(id);
+    if lookup_interned(name).is_some_and(|canonical| canonical == id) {
+        if name == "nil" {
+            return Value::Nil;
+        }
+        if name == "t" {
+            return Value::True;
+        }
+        if name.starts_with(':') {
+            return Value::Keyword(id);
+        }
+    }
+    Value::Symbol(id)
+}
+
+fn expect_symbol_id(value: &Value) -> Result<SymId, Flow> {
+    symbol_id(value).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), *value],
+        )
+    })
+}
+
+pub(crate) fn is_canonical_symbol_id(id: SymId) -> bool {
+    lookup_interned(resolve_sym(id)).is_some_and(|canonical| canonical == id)
+}
+
+pub(crate) fn resolve_variable_alias_id(
     eval: &super::eval::Evaluator,
-    name: &str,
-) -> Result<String, Flow> {
-    let mut current = name.to_string();
+    symbol: SymId,
+) -> Result<SymId, Flow> {
+    let mut current = symbol;
     let mut seen = HashSet::new();
 
     loop {
-        if !seen.insert(current.clone()) {
+        if !seen.insert(current) {
             return Err(signal(
                 "cyclic-variable-indirection",
-                vec![Value::symbol(name)],
+                vec![Value::Symbol(symbol)],
             ));
         }
         let next = eval
             .obarray()
-            .get_property(&current, VARIABLE_ALIAS_PROPERTY)
-            .and_then(|value| value.as_symbol_name())
-            .map(|value| value.to_string());
+            .get_property_id(current, intern(VARIABLE_ALIAS_PROPERTY))
+            .and_then(symbol_id);
         match next {
-            Some(next_name) => current = next_name,
+            Some(next_id) => current = next_id,
             None => return Ok(current),
         }
     }
 }
 
+pub(crate) fn resolve_variable_alias_name(
+    eval: &super::eval::Evaluator,
+    name: &str,
+) -> Result<String, Flow> {
+    Ok(resolve_sym(resolve_variable_alias_id(eval, intern(name))?).to_string())
+}
+
 fn would_create_variable_alias_cycle(eval: &super::eval::Evaluator, new: &str, old: &str) -> bool {
-    let mut current = old.to_string();
+    let mut current = intern(old);
+    let new = intern(new);
     let mut seen = HashSet::new();
 
     loop {
         if current == new {
             return true;
         }
-        if !seen.insert(current.clone()) {
+        if !seen.insert(current) {
             return true;
         }
         let next = eval
             .obarray()
-            .get_property(&current, VARIABLE_ALIAS_PROPERTY)
-            .and_then(|value| value.as_symbol_name())
-            .map(|value| value.to_string());
+            .get_property_id(current, intern(VARIABLE_ALIAS_PROPERTY))
+            .and_then(symbol_id);
         match next {
             Some(next_name) => current = next_name,
             None => return false,
@@ -60,14 +105,14 @@ fn would_create_variable_alias_cycle(eval: &super::eval::Evaluator, new: &str, o
     }
 }
 
-fn symbol_raw_plist_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
+fn symbol_raw_plist_value(eval: &super::eval::Evaluator, symbol: SymId) -> Option<Value> {
     eval.obarray()
-        .get_property(name, RAW_SYMBOL_PLIST_PROPERTY)
+        .get_property_id(symbol, intern(RAW_SYMBOL_PLIST_PROPERTY))
         .cloned()
 }
 
-fn set_symbol_raw_plist(eval: &mut super::eval::Evaluator, name: &str, plist: Value) {
-    let sym = eval.obarray_mut().get_or_intern(name);
+fn set_symbol_raw_plist(eval: &mut super::eval::Evaluator, symbol: SymId, plist: Value) {
+    let sym = eval.obarray_mut().ensure_symbol_id(symbol);
     let alias = sym.plist.get(&intern(VARIABLE_ALIAS_PROPERTY)).cloned();
     sym.plist.clear();
     if let Some(value) = alias {
@@ -104,15 +149,9 @@ fn plist_lookup_value(plist: &Value, prop: &Value) -> Option<Value> {
 
 pub(crate) fn builtin_boundp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("boundp", &args, 1)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    let resolved = resolve_variable_alias_name(eval, name)?;
+    let resolved = resolve_variable_alias_id(eval, expect_symbol_id(&args[0])?)?;
     Ok(Value::bool(
-        eval.obarray().boundp(&resolved) || eval.obarray().is_constant(&resolved),
+        eval.obarray().boundp_id(resolved) || eval.obarray().is_constant_id(resolved),
     ))
 }
 
@@ -135,15 +174,9 @@ pub(crate) fn builtin_special_variable_p(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("special-variable-p", &args, 1)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    let resolved = resolve_variable_alias_name(eval, name)?;
+    let resolved = resolve_variable_alias_id(eval, expect_symbol_id(&args[0])?)?;
     Ok(Value::bool(
-        eval.obarray().is_special(&resolved) || eval.obarray().is_constant(&resolved),
+        eval.obarray().is_special_id(resolved) || eval.obarray().is_constant_id(resolved),
     ))
 }
 
@@ -152,15 +185,9 @@ pub(crate) fn builtin_default_boundp(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("default-boundp", &args, 1)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    let resolved = resolve_variable_alias_name(eval, name)?;
+    let resolved = resolve_variable_alias_id(eval, expect_symbol_id(&args[0])?)?;
     Ok(Value::bool(
-        eval.obarray().boundp(&resolved) || eval.obarray().is_constant(&resolved),
+        eval.obarray().boundp_id(resolved) || eval.obarray().is_constant_id(resolved),
     ))
 }
 
@@ -169,17 +196,15 @@ pub(crate) fn builtin_default_toplevel_value(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("default-toplevel-value", &args, 1)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    let resolved = resolve_variable_alias_name(eval, name)?;
-    match eval.obarray().symbol_value(&resolved).cloned() {
+    let symbol = expect_symbol_id(&args[0])?;
+    let resolved = resolve_variable_alias_id(eval, symbol)?;
+    let resolved_name = resolve_sym(resolved);
+    match eval.obarray().symbol_value_id(resolved).cloned() {
         Some(value) => Ok(value),
-        None if resolved.starts_with(':') => Ok(Value::symbol(resolved)),
-        None => Err(signal("void-variable", vec![Value::symbol(name)])),
+        None if is_canonical_symbol_id(resolved) && resolved_name.starts_with(':') => {
+            Ok(Value::Keyword(resolved))
+        }
+        None => Err(signal("void-variable", vec![args[0]])),
     }
 }
 
@@ -188,21 +213,17 @@ pub(crate) fn builtin_set_default_toplevel_value(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("set-default-toplevel-value", &args, 2)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    let resolved = resolve_variable_alias_name(eval, name)?;
-    if eval.obarray().is_constant(&resolved) {
-        return Err(signal("setting-constant", vec![Value::symbol(name)]));
+    let symbol = expect_symbol_id(&args[0])?;
+    let resolved = resolve_variable_alias_id(eval, symbol)?;
+    let resolved_name = resolve_sym(resolved);
+    if eval.obarray().is_constant_id(resolved) {
+        return Err(signal("setting-constant", vec![args[0]]));
     }
     let value = args[1];
-    eval.obarray.set_symbol_value(&resolved, value);
-    eval.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
-    if resolved != name {
-        eval.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
+    eval.obarray.set_symbol_value_id(resolved, value);
+    eval.run_variable_watchers(resolved_name, &value, &Value::Nil, "set")?;
+    if resolved != symbol {
+        eval.run_variable_watchers(resolved_name, &value, &Value::Nil, "set")?;
     }
     Ok(Value::Nil)
 }
@@ -212,19 +233,11 @@ pub(crate) fn builtin_defvaralias_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_range_args("defvaralias", &args, 2, 3)?;
-    let new_name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    let old_name = args[1].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[1]],
-        )
-    })?;
-    if eval.obarray().is_constant(new_name) {
+    let new_symbol = expect_symbol_id(&args[0])?;
+    let old_symbol = expect_symbol_id(&args[1])?;
+    let new_name = resolve_sym(new_symbol);
+    let old_name = resolve_sym(old_symbol);
+    if eval.obarray().is_constant_id(new_symbol) {
         return Err(signal(
             "error",
             vec![Value::string(format!(
@@ -233,26 +246,17 @@ pub(crate) fn builtin_defvaralias_eval(
         ));
     }
     if would_create_variable_alias_cycle(eval, new_name, old_name) {
-        return Err(signal(
-            "cyclic-variable-indirection",
-            vec![Value::symbol(old_name)],
-        ));
+        return Err(signal("cyclic-variable-indirection", vec![args[1]]));
     }
     let previous_target = resolve_variable_alias_name(eval, new_name)?;
     {
-        let sym = eval.obarray_mut().get_or_intern(new_name);
+        let sym = eval.obarray_mut().ensure_symbol_id(new_symbol);
         sym.special = true;
-        sym.plist
-            .insert(intern(VARIABLE_ALIAS_PROPERTY), Value::symbol(old_name));
+        sym.plist.insert(intern(VARIABLE_ALIAS_PROPERTY), args[1]);
     }
-    eval.obarray_mut().make_special(old_name);
-    preflight_symbol_plist_put(eval, &Value::symbol(new_name), "variable-documentation")?;
-    eval.run_variable_watchers(
-        &previous_target,
-        &Value::symbol(old_name),
-        &Value::Nil,
-        "defvaralias",
-    )?;
+    eval.obarray_mut().make_special_id(old_symbol);
+    preflight_symbol_plist_put(eval, &args[0], "variable-documentation")?;
+    eval.run_variable_watchers(&previous_target, &args[1], &Value::Nil, "defvaralias")?;
     eval.watchers.clear_watchers(new_name);
     // GNU Emacs updates `variable-documentation` through plist machinery after
     // installing alias state, so malformed raw plists still raise
@@ -260,13 +264,9 @@ pub(crate) fn builtin_defvaralias_eval(
     let docstring = args.get(2).cloned().unwrap_or(Value::Nil);
     builtin_put(
         eval,
-        vec![
-            Value::symbol(new_name),
-            Value::symbol("variable-documentation"),
-            docstring,
-        ],
+        vec![args[0], Value::symbol("variable-documentation"), docstring],
     )?;
-    Ok(Value::symbol(old_name))
+    Ok(args[1])
 }
 
 pub(crate) fn builtin_indirect_variable_eval(
@@ -274,27 +274,26 @@ pub(crate) fn builtin_indirect_variable_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("indirect-variable", &args, 1)?;
-    let Some(name) = args[0].as_symbol_name() else {
+    let Some(symbol) = symbol_id(&args[0]) else {
         return Ok(args[0]);
     };
-    let resolved = resolve_variable_alias_name(eval, name)?;
-    Ok(Value::symbol(resolved))
+    let resolved = resolve_variable_alias_id(eval, symbol)?;
+    Ok(value_from_symbol_id(resolved))
 }
 
 pub(crate) fn builtin_fboundp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("fboundp", &args, 1)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    if eval.obarray().is_function_unbound(name) {
+    let symbol = expect_symbol_id(&args[0])?;
+    let name = resolve_sym(symbol);
+    if eval.obarray().is_function_unbound_id(symbol) {
         return Ok(Value::Nil);
     }
-    if let Some(function) = eval.obarray().symbol_function(name) {
+    if let Some(function) = eval.obarray().symbol_function_id(symbol) {
         let result = !function.is_nil();
         return Ok(Value::bool(result));
+    }
+    if !is_canonical_symbol_id(symbol) {
+        return Ok(Value::Nil);
     }
     let macro_bound = super::subr_info::is_evaluator_macro_name(name);
     let result = super::subr_info::is_special_form(name)
@@ -310,34 +309,31 @@ pub(crate) fn builtin_symbol_value(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("symbol-value", &args, 1)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    let resolved = resolve_variable_alias_name(eval, name)?;
+    let symbol = expect_symbol_id(&args[0])?;
+    let resolved = resolve_variable_alias_id(eval, symbol)?;
+    let resolved_name = resolve_sym(resolved);
     // Check dynamic bindings first
-    let resolved_id = intern(&resolved);
     for frame in eval.dynamic.iter().rev() {
-        if let Some(value) = frame.get(&resolved_id) {
+        if let Some(value) = frame.get(&resolved) {
             return Ok(*value);
         }
     }
     // Check current buffer-local binding.
     if let Some(buf) = eval.buffers.current_buffer() {
-        if let Some(value) = buf.get_buffer_local(&resolved) {
+        if let Some(value) = buf.get_buffer_local(resolved_name) {
             return Ok(*value);
         }
     }
-    match eval.obarray().symbol_value(&resolved).cloned() {
+    match eval.obarray().symbol_value_id(resolved).cloned() {
         Some(value) => Ok(value),
-        None if resolved.starts_with(':') => Ok(Value::symbol(resolved)),
-        None => Err(signal("void-variable", vec![Value::symbol(name)])),
+        None if is_canonical_symbol_id(resolved) && resolved_name.starts_with(':') => {
+            Ok(Value::Keyword(resolved))
+        }
+        None => Err(signal("void-variable", vec![args[0]])),
     }
 }
 
-fn startup_virtual_autoload_function_cell(
+pub(super) fn startup_virtual_autoload_function_cell(
     _eval: &super::eval::Evaluator,
     _name: &str,
 ) -> Option<Value> {
@@ -349,24 +345,20 @@ pub(crate) fn builtin_symbol_function(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("symbol-function", &args, 1)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    if eval.obarray().is_function_unbound(name) {
+    let symbol = expect_symbol_id(&args[0])?;
+    let name = resolve_sym(symbol);
+    if eval.obarray().is_function_unbound_id(symbol) {
         return Ok(Value::Nil);
     }
 
-    if let Some(function) = eval.obarray().symbol_function(name) {
+    if let Some(function) = eval.obarray().symbol_function_id(symbol) {
         // GNU Emacs exposes this symbol as autoload-shaped in startup state,
         // then subr-shaped after first invocation triggers autoload materialization.
         if name == "kmacro-name-last-macro"
             && matches!(function, Value::Subr(subr) if resolve_sym(*subr) == "kmacro-name-last-macro")
             && eval
                 .obarray()
-                .get_property("kmacro-name-last-macro", "neovm--kmacro-autoload-promoted")
+                .get_property_id(symbol, intern("neovm--kmacro-autoload-promoted"))
                 .is_none()
         {
             return Ok(Value::list(vec![
@@ -378,6 +370,10 @@ pub(crate) fn builtin_symbol_function(
             ]));
         }
         return Ok(*function);
+    }
+
+    if !is_canonical_symbol_id(symbol) {
+        return Ok(Value::Nil);
     }
 
     if let Some(function) = startup_virtual_autoload_function_cell(eval, name) {
@@ -498,69 +494,53 @@ fn dispatch_symbol_func_arity_override(
 
 pub(crate) fn builtin_set(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("set", &args, 2)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    let resolved = resolve_variable_alias_name(eval, name)?;
-    if eval.obarray().is_constant(&resolved) {
-        return Err(signal("setting-constant", vec![Value::symbol(name)]));
+    let symbol = expect_symbol_id(&args[0])?;
+    let resolved = resolve_variable_alias_id(eval, symbol)?;
+    if eval.obarray().is_constant_id(resolved) {
+        return Err(signal("setting-constant", vec![args[0]]));
     }
     let value = args[1];
-    eval.assign_with_watchers(&resolved, value, "set")
+    eval.assign_with_watchers_by_id(resolved, value, "set")
 }
 
 pub(crate) fn builtin_fset(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("fset", &args, 2)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    if name == "nil" {
+    let symbol = expect_symbol_id(&args[0])?;
+    if symbol == intern("nil") {
         return Err(signal("setting-constant", vec![Value::symbol("nil")]));
     }
     let def = args[1];
-    if would_create_function_alias_cycle(eval, name, &def) {
-        return Err(signal(
-            "cyclic-function-indirection",
-            vec![Value::symbol(name)],
-        ));
+    if would_create_function_alias_cycle(eval, symbol, &def) {
+        return Err(signal("cyclic-function-indirection", vec![args[0]]));
     }
-    eval.obarray_mut().set_symbol_function(name, def);
+    eval.obarray_mut().set_symbol_function_id(symbol, def);
     Ok(def)
 }
 
 pub(crate) fn would_create_function_alias_cycle(
     eval: &super::eval::Evaluator,
-    target_name: &str,
+    target_symbol: SymId,
     def: &Value,
 ) -> bool {
-    let mut current = match def.as_symbol_name() {
-        Some(name) => name.to_string(),
+    let mut current = match symbol_id(def) {
+        Some(id) => id,
         None => return false,
     };
     let mut seen = HashSet::new();
 
     loop {
-        if current == target_name {
+        if current == target_symbol {
             return true;
         }
-        if !seen.insert(current.clone()) {
+        if !seen.insert(current) {
             return true;
         }
 
-        let next = match eval.obarray().symbol_function(&current) {
-            Some(function) => {
-                if let Some(name) = function.as_symbol_name() {
-                    name.to_string()
-                } else {
-                    return false;
-                }
-            }
+        let next = match eval.obarray().symbol_function_id(current) {
+            Some(function) => match symbol_id(function) {
+                Some(id) => id,
+                None => return false,
+            },
             None => return false,
         };
         current = next;
@@ -572,18 +552,18 @@ pub(crate) fn builtin_makunbound(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("makunbound", &args, 1)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    let resolved = resolve_variable_alias_name(eval, name)?;
-    if eval.obarray().is_constant(&resolved) {
-        return Err(signal("setting-constant", vec![Value::symbol(name)]));
+    let symbol = expect_symbol_id(&args[0])?;
+    let resolved = resolve_variable_alias_id(eval, symbol)?;
+    if eval.obarray().is_constant_id(resolved) {
+        return Err(signal("setting-constant", vec![args[0]]));
     }
-    eval.obarray_mut().makunbound(&resolved);
-    eval.run_variable_watchers(&resolved, &Value::Nil, &Value::Nil, "makunbound")?;
+    eval.obarray_mut().makunbound_id(resolved);
+    eval.run_variable_watchers(
+        resolve_sym(resolved),
+        &Value::Nil,
+        &Value::Nil,
+        "makunbound",
+    )?;
     Ok(args[0])
 }
 
@@ -592,64 +572,39 @@ pub(crate) fn builtin_fmakunbound(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("fmakunbound", &args, 1)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    eval.obarray_mut().fmakunbound(name);
+    let symbol = expect_symbol_id(&args[0])?;
+    eval.obarray_mut().fmakunbound_id(symbol);
     Ok(args[0])
 }
 
 pub(crate) fn builtin_get(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("get", &args, 2)?;
-    let sym = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
+    let sym = expect_symbol_id(&args[0])?;
     if let Some(raw) = symbol_raw_plist_value(eval, sym) {
         return Ok(plist_lookup_value(&raw, &args[1]).unwrap_or(Value::Nil));
     }
-    let prop = args[1].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[1]],
-        )
-    })?;
-    if is_internal_symbol_plist_property(prop) {
+    let prop = expect_symbol_id(&args[1])?;
+    if is_internal_symbol_plist_property(resolve_sym(prop)) {
         return Ok(Value::Nil);
     }
     Ok(eval
         .obarray()
-        .get_property(sym, prop)
+        .get_property_id(sym, prop)
         .cloned()
         .unwrap_or(Value::Nil))
 }
 
 pub(crate) fn builtin_put(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("put", &args, 3)?;
-    let sym = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    let prop = args[1].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[1]],
-        )
-    })?;
+    let sym = expect_symbol_id(&args[0])?;
+    let prop = expect_symbol_id(&args[1])?;
     let value = args[2];
     if let Some(raw) = symbol_raw_plist_value(eval, sym) {
         let plist = builtin_plist_put(vec![raw, args[1], value])?;
         set_symbol_raw_plist(eval, sym, plist);
         return Ok(value);
     }
-    eval.obarray_mut().put_property(sym, prop, value);
+    eval.obarray_mut().put_property_id(sym, prop, value);
     Ok(value)
 }
 
@@ -658,16 +613,11 @@ pub(crate) fn builtin_symbol_plist_fn(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("symbol-plist", &args, 1)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
-    if let Some(raw) = symbol_raw_plist_value(eval, name) {
+    let symbol = expect_symbol_id(&args[0])?;
+    if let Some(raw) = symbol_raw_plist_value(eval, symbol) {
         return Ok(raw);
     }
-    let Some(sym) = eval.obarray().get(name) else {
+    let Some(sym) = eval.obarray().get_by_id(symbol) else {
         return Ok(Value::Nil);
     };
     let mut items = Vec::new();
@@ -675,7 +625,7 @@ pub(crate) fn builtin_symbol_plist_fn(
         if is_internal_symbol_plist_property(resolve_sym(*key)) {
             continue;
         }
-        items.push(Value::symbol(resolve_sym(*key)));
+        items.push(value_from_symbol_id(*key));
         items.push(*value);
     }
     if items.is_empty() {
@@ -790,10 +740,10 @@ fn preflight_symbol_plist_put(
     symbol: &Value,
     property: &str,
 ) -> Result<(), Flow> {
-    let Some(name) = symbol.as_symbol_name() else {
+    let Some(id) = symbol_id(symbol) else {
         return Ok(());
     };
-    let Some(raw) = symbol_raw_plist_value(eval, name) else {
+    let Some(raw) = symbol_raw_plist_value(eval, id) else {
         return Ok(());
     };
     let _ = builtin_plist_put(vec![raw, Value::symbol(property), Value::Nil])?;
@@ -805,18 +755,13 @@ pub(crate) fn builtin_setplist_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("setplist", &args, 2)?;
-    let name = args[0].as_symbol_name().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        )
-    })?;
+    let symbol = expect_symbol_id(&args[0])?;
     let plist = args[1];
-    set_symbol_raw_plist(eval, name, plist);
+    set_symbol_raw_plist(eval, symbol, plist);
     Ok(plist)
 }
 
-fn macroexpand_environment_binding(env: &Value, name: &str) -> Option<Value> {
+fn macroexpand_environment_binding_by_id(env: &Value, target: SymId) -> Option<Value> {
     let mut cursor = *env;
     loop {
         match cursor {
@@ -830,7 +775,7 @@ fn macroexpand_environment_binding(env: &Value, name: &str) -> Option<Value> {
                     continue;
                 };
                 let entry_pair = read_cons(entry_cell);
-                if entry_pair.car.as_symbol_name() == Some(name) {
+                if matches!(symbol_id(&entry_pair.car), Some(id) if id == target) {
                     return Some(entry_pair.cdr);
                 }
             }
@@ -1695,9 +1640,10 @@ fn macroexpand_once_with_environment(
     let form_pair = read_cons(form_cell);
     let head = form_pair.car;
     let tail = form_pair.cdr;
-    let Some(head_name) = head.as_symbol_name() else {
+    let Some(head_id) = symbol_id(&head) else {
         return Ok((form, false));
     };
+    let head_name = resolve_sym(head_id);
 
     // NeoVM handles certain forms as evaluator special forms where the
     // Elisp macro definition would produce incompatible expansions.
@@ -1721,7 +1667,7 @@ fn macroexpand_once_with_environment(
                 vec![Value::symbol("listp"), *env],
             ));
         }
-        if let Some(binding) = macroexpand_environment_binding(env, head_name) {
+        if let Some(binding) = macroexpand_environment_binding_by_id(env, head_id) {
             env_bound = true;
             if !binding.is_nil() {
                 function = Some(macroexpand_environment_callable(eval, &binding)?);
@@ -1734,16 +1680,18 @@ fn macroexpand_once_with_environment(
     let mut resolved_name = head_name.to_string();
     let mut fallback_placeholder = false;
     if function.is_none() {
-        if let Some((resolved, global)) = resolve_indirect_symbol_with_name(eval, head_name) {
+        if let Some((resolved_id, global)) = resolve_indirect_symbol_by_id(eval, head_id) {
+            let resolved = resolve_sym(resolved_id);
             // Check for Value::Macro (native macros) AND cons-cell macros
             // `(macro . fn)` — matches real Emacs eval.c which checks
             // `EQ (XCAR (def), Qmacro)`.
             let is_macro = matches!(global, Value::Macro(_))
                 || (global.is_cons() && global.cons_car().is_symbol_named("macro"));
             if is_macro {
-                fallback_placeholder = super::subr_info::has_fallback_macro(&resolved)
-                    && eval.obarray().symbol_function(&resolved).is_none();
-                resolved_name = resolved;
+                fallback_placeholder = is_canonical_symbol_id(resolved_id)
+                    && super::subr_info::has_fallback_macro(resolved)
+                    && eval.obarray().symbol_function_id(resolved_id).is_none();
+                resolved_name = resolved.to_string();
                 function = Some(if global.is_cons() {
                     // Extract the function from (macro . fn)
                     global.cons_cdr()
@@ -1759,18 +1707,23 @@ fn macroexpand_once_with_environment(
                 // eval.c which calls Fautoload_do_load(def, sym, Qmacro).
                 let _ = super::autoload::builtin_autoload_do_load(
                     eval,
-                    vec![global, Value::symbol(head_name), Value::symbol("macro")],
+                    vec![
+                        global,
+                        value_from_symbol_id(head_id),
+                        Value::symbol("macro"),
+                    ],
                 );
                 // Re-check the function cell after loading
-                if let Some((resolved2, global2)) =
-                    resolve_indirect_symbol_with_name(eval, head_name)
+                if let Some((resolved_id2, global2)) = resolve_indirect_symbol_by_id(eval, head_id)
                 {
+                    let resolved2 = resolve_sym(resolved_id2);
                     let is_macro2 = matches!(global2, Value::Macro(_))
                         || (global2.is_cons() && global2.cons_car().is_symbol_named("macro"));
                     if is_macro2 {
-                        fallback_placeholder = super::subr_info::has_fallback_macro(&resolved2)
-                            && eval.obarray().symbol_function(&resolved2).is_none();
-                        resolved_name = resolved2;
+                        fallback_placeholder = is_canonical_symbol_id(resolved_id2)
+                            && super::subr_info::has_fallback_macro(resolved2)
+                            && eval.obarray().symbol_function_id(resolved_id2).is_none();
+                        resolved_name = resolved2.to_string();
                         function = Some(if global2.is_cons() {
                             global2.cons_cdr()
                         } else {
@@ -1832,11 +1785,16 @@ pub(crate) fn builtin_indirect_function(
     expect_max_args("indirect-function", &args, 2)?;
     let _noerror = args.get(1).is_some_and(|value| value.is_truthy());
 
-    if let Some(name) = args[0].as_symbol_name() {
-        if let Some(function) = startup_virtual_autoload_function_cell(eval, name) {
-            return Ok(function);
+    if let Some(symbol) = symbol_id(&args[0]) {
+        if is_canonical_symbol_id(symbol) {
+            if let Some(function) =
+                startup_virtual_autoload_function_cell(eval, resolve_sym(symbol))
+            {
+                return Ok(function);
+            }
         }
-        if let Some(function) = resolve_indirect_symbol(eval, name) {
+        if let Some(function) = resolve_indirect_symbol_by_id(eval, symbol).map(|(_, value)| value)
+        {
             return Ok(function);
         }
         return Ok(Value::Nil);
@@ -1854,52 +1812,66 @@ fn pure_builtin_symbol_alias_target(name: &str) -> Option<&'static str> {
     }
 }
 
-fn resolve_indirect_symbol_with_name(
+pub(super) fn resolve_indirect_symbol_by_id(
     eval: &super::eval::Evaluator,
-    name: &str,
-) -> Option<(String, Value)> {
-    let mut current = name.to_string();
+    symbol: SymId,
+) -> Option<(SymId, Value)> {
+    let mut current = symbol;
     let mut seen = HashSet::new();
 
     loop {
-        if !seen.insert(current.clone()) {
+        if !seen.insert(current) {
             return None;
         }
 
-        if eval.obarray().is_function_unbound(&current) {
+        if eval.obarray().is_function_unbound_id(current) {
             return None;
         }
 
-        if let Some(function) = eval.obarray().symbol_function(&current) {
-            if let Some(next) = function.as_symbol_name() {
-                if next == "nil" {
-                    return Some(("nil".to_string(), Value::Nil));
+        if let Some(function) = eval.obarray().symbol_function_id(current) {
+            if let Some(next) = symbol_id(function) {
+                if next == intern("nil") {
+                    return Some((next, Value::Nil));
                 }
-                current = next.to_string();
+                current = next;
                 continue;
             }
             return Some((current, *function));
         }
 
-        if let Some(function) = super::subr_info::fallback_macro_value(&current) {
+        if !is_canonical_symbol_id(current) {
+            return None;
+        }
+
+        let current_name = resolve_sym(current);
+
+        if let Some(function) = super::subr_info::fallback_macro_value(current_name) {
             return Some((current, function));
         }
 
-        if let Some(alias_target) = pure_builtin_symbol_alias_target(&current) {
-            current = alias_target.to_string();
+        if let Some(alias_target) = pure_builtin_symbol_alias_target(current_name) {
+            current = intern(alias_target);
             continue;
         }
 
-        if super::subr_info::is_special_form(&current)
-            || super::subr_info::is_evaluator_callable_name(&current)
-            || super::builtin_registry::is_dispatch_builtin_name(&current)
-            || current.parse::<PureBuiltinId>().is_ok()
+        if super::subr_info::is_special_form(current_name)
+            || super::subr_info::is_evaluator_callable_name(current_name)
+            || super::builtin_registry::is_dispatch_builtin_name(current_name)
+            || current_name.parse::<PureBuiltinId>().is_ok()
         {
-            return Some((current.clone(), Value::Subr(intern(&current))));
+            return Some((current, Value::Subr(current)));
         }
 
         return None;
     }
+}
+
+fn resolve_indirect_symbol_with_name(
+    eval: &super::eval::Evaluator,
+    name: &str,
+) -> Option<(String, Value)> {
+    resolve_indirect_symbol_by_id(eval, intern(name))
+        .map(|(resolved, value)| (resolve_sym(resolved).to_string(), value))
 }
 
 pub(super) fn resolve_indirect_symbol(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
@@ -1911,11 +1883,16 @@ pub(crate) fn builtin_macrop_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("macrop", &args, 1)?;
-    if let Some(name) = args[0].as_symbol_name() {
-        if let Some(function) = startup_virtual_autoload_function_cell(eval, name) {
-            return super::subr_info::builtin_macrop(vec![function]);
+    if let Some(symbol) = symbol_id(&args[0]) {
+        if is_canonical_symbol_id(symbol) {
+            if let Some(function) =
+                startup_virtual_autoload_function_cell(eval, resolve_sym(symbol))
+            {
+                return super::subr_info::builtin_macrop(vec![function]);
+            }
         }
-        if let Some(function) = resolve_indirect_symbol(eval, name) {
+        if let Some(function) = resolve_indirect_symbol_by_id(eval, symbol).map(|(_, value)| value)
+        {
             return super::subr_info::builtin_macrop(vec![function]);
         }
         return Ok(Value::Nil);
@@ -1926,7 +1903,9 @@ pub(crate) fn builtin_macrop_eval(
 
 /// Hash a string for custom obarray bucket index.
 fn obarray_hash(s: &str, len: usize) -> usize {
-    let hash = s.bytes().fold(0u64, |h, b| h.wrapping_mul(31).wrapping_add(b as u64));
+    let hash = s
+        .bytes()
+        .fold(0u64, |h, b| h.wrapping_mul(31).wrapping_add(b as u64));
     hash as usize % len
 }
 
@@ -1980,7 +1959,7 @@ pub(crate) fn builtin_intern_fn(eval: &mut super::eval::Evaluator, args: Vec<Val
         }
 
         // Not found: create symbol and prepend to bucket chain
-        let sym = Value::symbol(&name);
+        let sym = Value::Symbol(intern_uninterned(&name));
         let new_bucket = Value::cons(sym, bucket);
         with_heap_mut(|h| {
             h.get_vector_mut(vec_id)[bucket_idx] = new_bucket;
@@ -2013,10 +1992,9 @@ pub(crate) fn builtin_intern_soft(
         let vec_id = *vec_id;
         let name = match &args[0] {
             Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
-            Value::Symbol(id) => resolve_sym(*id).to_owned(),
-            Value::Nil => return Ok(Value::Nil),
+            Value::Symbol(id) | Value::Keyword(id) => resolve_sym(*id).to_owned(),
+            Value::Nil => "nil".to_owned(),
             Value::True => "t".to_owned(),
-            Value::Keyword(_) => return Ok(args[0]),
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -2036,15 +2014,9 @@ pub(crate) fn builtin_intern_soft(
     // Global obarray path
     let name = match &args[0] {
         Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
-        Value::Nil => return Ok(Value::Nil),
-        Value::True => return Ok(Value::True),
-        Value::Keyword(_) => return Ok(args[0]),
-        Value::Symbol(id) => {
-            if eval.obarray().intern_soft(resolve_sym(*id)).is_some() {
-                return Ok(args[0]);
-            }
-            return Ok(Value::Nil);
-        }
+        Value::Nil => "nil".to_owned(),
+        Value::True => "t".to_owned(),
+        Value::Keyword(id) | Value::Symbol(id) => resolve_sym(*id).to_owned(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -2212,19 +2184,14 @@ pub(crate) fn builtin_rename_buffer(
     if name.is_empty() {
         return Err(signal(
             "error",
-            vec![Value::string(
-                "Empty string is invalid as a buffer name",
-            )],
+            vec![Value::string("Empty string is invalid as a buffer name")],
         ));
     }
 
     let current_id = match eval.buffers.current_buffer() {
         Some(buf) => buf.id,
         None => {
-            return Err(signal(
-                "error",
-                vec![Value::string("No current buffer")],
-            ));
+            return Err(signal("error", vec![Value::string("No current buffer")]));
         }
     };
 
@@ -2240,10 +2207,7 @@ pub(crate) fn builtin_rename_buffer(
             if unique.is_nil() {
                 return Err(signal(
                     "error",
-                    vec![Value::string(format!(
-                        "Buffer name `{}' is in use",
-                        name
-                    ))],
+                    vec![Value::string(format!("Buffer name `{}' is in use", name))],
                 ));
             }
             eval.buffers.generate_new_buffer_name(&name)
@@ -3289,7 +3253,10 @@ fn interactive_form_from_quoted_interactive_form(form: &Value) -> Result<Option<
     }
 
     match pair.cdr {
-        Value::Nil => Ok(Some(Value::list(vec![Value::symbol("interactive"), Value::Nil]))),
+        Value::Nil => Ok(Some(Value::list(vec![
+            Value::symbol("interactive"),
+            Value::Nil,
+        ]))),
         Value::Cons(arg_cell) => {
             let arg_pair = read_cons(arg_cell);
             Ok(Some(Value::list(vec![
@@ -3358,12 +3325,10 @@ pub(crate) fn builtin_interactive_form_eval(
 
     let function = match &args[0] {
         Value::Symbol(id) => {
-            let Some((resolved_name, function)) =
-                resolve_indirect_symbol_with_name(eval, resolve_sym(*id))
-            else {
+            let Some((resolved_id, function)) = resolve_indirect_symbol_by_id(eval, *id) else {
                 return Ok(Value::Nil);
             };
-            if resolved_name == "ignore" {
+            if resolve_sym(resolved_id) == "ignore" {
                 return Ok(Value::list(vec![Value::symbol("interactive"), Value::Nil]));
             }
             function

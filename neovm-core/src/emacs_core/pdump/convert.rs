@@ -20,25 +20,25 @@ use crate::emacs_core::custom::{CustomGroup, CustomManager, CustomVariable};
 use crate::emacs_core::eval::Evaluator;
 use crate::emacs_core::expr::Expr;
 use crate::emacs_core::interactive::{InteractiveRegistry, InteractiveSpec};
-use crate::emacs_core::intern::{self, SymId, StringInterner};
+use crate::emacs_core::intern::{self, StringInterner, SymId};
 use crate::emacs_core::kill_ring::KillRing;
 use crate::emacs_core::kmacro::KmacroManager;
 use crate::emacs_core::mode::{
-    self, CustomType as ModeCustomType, CustomGroup as ModeCustomGroup,
-    CustomVariable as ModeCustomVariable, FontLockDefaults, FontLockKeyword,
-    MajorMode, MinorMode, ModeRegistry,
+    self, CustomGroup as ModeCustomGroup, CustomType as ModeCustomType,
+    CustomVariable as ModeCustomVariable, FontLockDefaults, FontLockKeyword, MajorMode, MinorMode,
+    ModeRegistry,
 };
 use crate::emacs_core::rect::RectangleState;
 use crate::emacs_core::register::{RegisterContent, RegisterManager};
 use crate::emacs_core::symbol::{Obarray, SymbolData};
 use crate::emacs_core::syntax::{SyntaxClass, SyntaxEntry, SyntaxFlags, SyntaxTable};
 use crate::emacs_core::value::{
-    HashKey, HashTableTest, HashTableWeakness, LambdaData, LambdaParams,
-    LispHashTable, OrderedSymMap, StringTextPropertyRun, Value,
+    HashKey, HashTableTest, HashTableWeakness, LambdaData, LambdaParams, LispHashTable,
+    OrderedSymMap, StringTextPropertyRun, Value,
 };
 use crate::face::{
-    BoxBorder, BoxStyle, Color, Face, FaceHeight, FaceTable, FontSlant, FontWeight,
-    Underline, UnderlineStyle,
+    BoxBorder, BoxStyle, Color, Face, FaceHeight, FaceTable, FontSlant, FontWeight, Underline,
+    UnderlineStyle,
 };
 use crate::gc::heap::LispHeap;
 use crate::gc::types::{HeapObject, ObjId};
@@ -249,10 +249,9 @@ pub(crate) fn dump_hash_key(k: &HashKey) -> DumpHashKey {
         HashKey::Frame(f) => DumpHashKey::Frame(*f),
         HashKey::Ptr(p) => DumpHashKey::Ptr(*p as u64),
         HashKey::ObjId(a, b) => DumpHashKey::ObjId(*a, *b),
-        HashKey::EqualCons(a, b) => DumpHashKey::EqualCons(
-            Box::new(dump_hash_key(a)),
-            Box::new(dump_hash_key(b)),
-        ),
+        HashKey::EqualCons(a, b) => {
+            DumpHashKey::EqualCons(Box::new(dump_hash_key(a)), Box::new(dump_hash_key(b)))
+        }
         HashKey::EqualVec(v) => DumpHashKey::EqualVec(v.iter().map(dump_hash_key).collect()),
     }
 }
@@ -304,9 +303,7 @@ pub(crate) fn dump_heap_object(obj: &HeapObject) -> DumpHeapObject {
             car: dump_value(car),
             cdr: dump_value(cdr),
         },
-        HeapObject::Vector(items) => {
-            DumpHeapObject::Vector(items.iter().map(dump_value).collect())
-        }
+        HeapObject::Vector(items) => DumpHeapObject::Vector(items.iter().map(dump_value).collect()),
         HeapObject::HashTable(ht) => DumpHeapObject::HashTable(dump_hash_table(ht)),
         HeapObject::Str(s) => DumpHeapObject::Str(s.clone()),
         HeapObject::Lambda(d) => DumpHeapObject::Lambda(dump_lambda_data(d)),
@@ -357,6 +354,7 @@ pub(crate) fn dump_obarray(ob: &Obarray) -> DumpObarray {
             .iter_symbols()
             .map(|(id, sd)| (id.0, dump_symbol_data(sd)))
             .collect(),
+        global_members: ob.global_members().iter().map(|id| id.0).collect(),
         function_unbound: ob.function_unbound_set().iter().map(|id| id.0).collect(),
         function_epoch: ob.function_epoch(),
     }
@@ -366,7 +364,10 @@ pub(crate) fn dump_obarray(ob: &Obarray) -> DumpObarray {
 
 pub(crate) fn dump_ordered_sym_map(m: &OrderedSymMap) -> DumpOrderedSymMap {
     DumpOrderedSymMap {
-        entries: m.iter().map(|(k, v)| (dump_sym_id(*k), dump_value(v))).collect(),
+        entries: m
+            .iter()
+            .map(|(k, v)| (dump_sym_id(*k), dump_value(v)))
+            .collect(),
     }
 }
 
@@ -391,13 +392,21 @@ fn dump_property_interval(pi: &PropertyInterval) -> DumpPropertyInterval {
     DumpPropertyInterval {
         start: pi.start,
         end: pi.end,
-        properties: pi.properties.iter().map(|(k, v)| (k.clone(), dump_value(v))).collect(),
+        properties: pi
+            .properties
+            .iter()
+            .map(|(k, v)| (k.clone(), dump_value(v)))
+            .collect(),
     }
 }
 
 fn dump_text_property_table(tpt: &TextPropertyTable) -> DumpTextPropertyTable {
     DumpTextPropertyTable {
-        intervals: tpt.dump_intervals().iter().map(dump_property_interval).collect(),
+        intervals: tpt
+            .dump_intervals()
+            .iter()
+            .map(dump_property_interval)
+            .collect(),
     }
 }
 
@@ -406,7 +415,11 @@ fn dump_overlay(o: &Overlay) -> DumpOverlay {
         id: o.id,
         start: o.start,
         end: o.end,
-        properties: o.properties.iter().map(|(k, v)| (k.clone(), dump_value(v))).collect(),
+        properties: o
+            .properties
+            .iter()
+            .map(|(k, v)| (k.clone(), dump_value(v)))
+            .collect(),
         front_advance: o.front_advance,
         rear_advance: o.rear_advance,
     }
@@ -450,22 +463,39 @@ fn dump_syntax_entry(se: &SyntaxEntry) -> DumpSyntaxEntry {
 
 fn dump_syntax_table(st: &SyntaxTable) -> DumpSyntaxTable {
     DumpSyntaxTable {
-        entries: st.dump_entries().iter().map(|(c, e)| (*c, dump_syntax_entry(e))).collect(),
-        parent: st.dump_parent().as_ref().map(|p| Box::new(dump_syntax_table(p))),
+        entries: st
+            .dump_entries()
+            .iter()
+            .map(|(c, e)| (*c, dump_syntax_entry(e)))
+            .collect(),
+        parent: st
+            .dump_parent()
+            .as_ref()
+            .map(|p| Box::new(dump_syntax_table(p))),
     }
 }
 
 fn dump_undo_record(r: &UndoRecord) -> DumpUndoRecord {
     match r {
-        UndoRecord::Insert { pos, len } => DumpUndoRecord::Insert { pos: *pos, len: *len },
+        UndoRecord::Insert { pos, len } => DumpUndoRecord::Insert {
+            pos: *pos,
+            len: *len,
+        },
         UndoRecord::Delete { pos, text } => DumpUndoRecord::Delete {
             pos: *pos,
             text: text.clone(),
         },
-        UndoRecord::PropertyChange { pos, len, old_props } => DumpUndoRecord::PropertyChange {
+        UndoRecord::PropertyChange {
+            pos,
+            len,
+            old_props,
+        } => DumpUndoRecord::PropertyChange {
             pos: *pos,
             len: *len,
-            old_props: old_props.iter().map(|(k, v)| (k.clone(), dump_value(v))).collect(),
+            old_props: old_props
+                .iter()
+                .map(|(k, v)| (k.clone(), dump_value(v)))
+                .collect(),
         },
         UndoRecord::CursorMove { pos } => DumpUndoRecord::CursorMove { pos: *pos },
         UndoRecord::Boundary => DumpUndoRecord::Boundary,
@@ -484,7 +514,9 @@ fn dump_buffer(buf: &Buffer) -> DumpBuffer {
     DumpBuffer {
         id: DumpBufferId(buf.id.0),
         name: buf.name.clone(),
-        text: DumpGapBuffer { text: buf.text.dump_text() },
+        text: DumpGapBuffer {
+            text: buf.text.dump_text(),
+        },
         pt: buf.pt,
         mark: buf.mark,
         begv: buf.begv,
@@ -496,7 +528,11 @@ fn dump_buffer(buf: &Buffer) -> DumpBuffer {
         multibyte: buf.multibyte,
         file_name: buf.file_name.clone(),
         markers: buf.markers.iter().map(dump_marker).collect(),
-        properties: buf.properties.iter().map(|(k, v)| (k.clone(), dump_value(v))).collect(),
+        properties: buf
+            .properties
+            .iter()
+            .map(|(k, v)| (k.clone(), dump_value(v)))
+            .collect(),
         text_props: dump_text_property_table(&buf.text_props),
         overlays: dump_overlay_list(&buf.overlays),
         syntax_table: dump_syntax_table(&buf.syntax_table),
@@ -589,7 +625,11 @@ pub(crate) fn dump_custom_manager(cm: &CustomManager) -> DumpCustomManager {
                     k.clone(),
                     DumpCustomGroup {
                         name: g.name.clone(),
-                        members: g.members.iter().map(|(n, v)| (n.clone(), dump_value(v))).collect(),
+                        members: g
+                            .members
+                            .iter()
+                            .map(|(n, v)| (n.clone(), dump_value(v)))
+                            .collect(),
                         documentation: g.documentation.clone(),
                         parent: g.parent.clone(),
                     },
@@ -627,9 +667,14 @@ fn dump_mode_custom_type(ct: &ModeCustomType) -> DumpModeCustomType {
         ModeCustomType::Symbol => DumpModeCustomType::Symbol,
         ModeCustomType::Sexp => DumpModeCustomType::Sexp,
         ModeCustomType::Choice(choices) => DumpModeCustomType::Choice(
-            choices.iter().map(|(s, v)| (s.clone(), dump_value(v))).collect(),
+            choices
+                .iter()
+                .map(|(s, v)| (s.clone(), dump_value(v)))
+                .collect(),
         ),
-        ModeCustomType::List(inner) => DumpModeCustomType::List(Box::new(dump_mode_custom_type(inner))),
+        ModeCustomType::List(inner) => {
+            DumpModeCustomType::List(Box::new(dump_mode_custom_type(inner)))
+        }
         ModeCustomType::Alist(k, v) => DumpModeCustomType::Alist(
             Box::new(dump_mode_custom_type(k)),
             Box::new(dump_mode_custom_type(v)),
@@ -687,8 +732,16 @@ pub(crate) fn dump_mode_registry(mr: &ModeRegistry) -> DumpModeRegistry {
                 )
             })
             .collect(),
-        buffer_major_modes: mr.dump_buffer_major_modes().iter().map(|(k, v)| (*k, v.clone())).collect(),
-        buffer_minor_modes: mr.dump_buffer_minor_modes().iter().map(|(k, v)| (*k, v.clone())).collect(),
+        buffer_major_modes: mr
+            .dump_buffer_major_modes()
+            .iter()
+            .map(|(k, v)| (*k, v.clone()))
+            .collect(),
+        buffer_minor_modes: mr
+            .dump_buffer_minor_modes()
+            .iter()
+            .map(|(k, v)| (*k, v.clone()))
+            .collect(),
         global_minor_modes: mr.dump_global_minor_modes().to_vec(),
         auto_mode_alist: mr.dump_auto_mode_alist().to_vec(),
         custom_variables: mr
@@ -757,13 +810,25 @@ pub(crate) fn dump_coding_system_manager(csm: &CodingSystemManager) -> DumpCodin
                         pre_write_conversion: v.pre_write_conversion.clone(),
                         default_char: v.default_char,
                         for_unibyte: v.for_unibyte,
-                        properties: v.properties.iter().map(|(k, v)| (k.clone(), dump_value(v))).collect(),
-                        int_properties: v.int_properties.iter().map(|(k, v)| (*k, dump_value(v))).collect(),
+                        properties: v
+                            .properties
+                            .iter()
+                            .map(|(k, v)| (k.clone(), dump_value(v)))
+                            .collect(),
+                        int_properties: v
+                            .int_properties
+                            .iter()
+                            .map(|(k, v)| (*k, dump_value(v)))
+                            .collect(),
                     },
                 )
             })
             .collect(),
-        aliases: csm.aliases.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+        aliases: csm
+            .aliases
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect(),
         priority: csm.priority.clone(),
         keyboard_coding: csm.dump_keyboard_coding().to_owned(),
         terminal_coding: csm.dump_terminal_coding().to_owned(),
@@ -771,7 +836,12 @@ pub(crate) fn dump_coding_system_manager(csm: &CodingSystemManager) -> DumpCodin
 }
 
 fn dump_color(c: &Color) -> DumpColor {
-    DumpColor { r: c.r, g: c.g, b: c.b, a: c.a }
+    DumpColor {
+        r: c.r,
+        g: c.g,
+        b: c.b,
+        a: c.a,
+    }
 }
 
 fn dump_font_slant(s: &FontSlant) -> DumpFontSlant {
@@ -840,11 +910,17 @@ fn dump_face(f: &Face) -> DumpFace {
 
 pub(crate) fn dump_face_table(ft: &FaceTable) -> DumpFaceTable {
     DumpFaceTable {
-        faces: ft.dump_faces().iter().map(|(k, f)| (k.clone(), dump_face(f))).collect(),
+        faces: ft
+            .dump_faces()
+            .iter()
+            .map(|(k, f)| (k.clone(), dump_face(f)))
+            .collect(),
     }
 }
 
-pub(crate) fn dump_category_manager(cm: &crate::emacs_core::category::CategoryManager) -> DumpCategoryManager {
+pub(crate) fn dump_category_manager(
+    cm: &crate::emacs_core::category::CategoryManager,
+) -> DumpCategoryManager {
     DumpCategoryManager {
         tables: cm
             .tables
@@ -853,8 +929,16 @@ pub(crate) fn dump_category_manager(cm: &crate::emacs_core::category::CategoryMa
                 (
                     k.clone(),
                     DumpCategoryTable {
-                        entries: t.entries.iter().map(|(c, set)| (*c, set.iter().cloned().collect())).collect(),
-                        descriptions: t.descriptions.iter().map(|(c, s)| (*c, s.clone())).collect(),
+                        entries: t
+                            .entries
+                            .iter()
+                            .map(|(c, set)| (*c, set.iter().cloned().collect()))
+                            .collect(),
+                        descriptions: t
+                            .descriptions
+                            .iter()
+                            .map(|(c, s)| (*c, s.clone()))
+                            .collect(),
                     },
                 )
             })
@@ -880,8 +964,15 @@ pub(crate) fn dump_rectangle(r: &RectangleState) -> DumpRectangleState {
 pub(crate) fn dump_kmacro(km: &KmacroManager) -> DumpKmacroManager {
     DumpKmacroManager {
         current_macro: km.current_macro.iter().map(dump_value).collect(),
-        last_macro: km.last_macro.as_ref().map(|m| m.iter().map(dump_value).collect()),
-        macro_ring: km.macro_ring.iter().map(|m| m.iter().map(dump_value).collect()).collect(),
+        last_macro: km
+            .last_macro
+            .as_ref()
+            .map(|m| m.iter().map(dump_value).collect()),
+        macro_ring: km
+            .macro_ring
+            .iter()
+            .map(|m| m.iter().map(dump_value).collect())
+            .collect(),
         counter: km.counter,
         counter_format: km.counter_format.clone(),
     }
@@ -1005,7 +1096,12 @@ pub(crate) fn dump_watcher_list(wl: &VariableWatcherList) -> DumpVariableWatcher
         watchers: wl
             .dump_watchers()
             .iter()
-            .map(|(k, watchers)| (k.clone(), watchers.iter().map(|w| dump_value(&w.callback)).collect()))
+            .map(|(k, watchers)| {
+                (
+                    k.clone(),
+                    watchers.iter().map(|w| dump_value(&w.callback)).collect(),
+                )
+            })
             .collect(),
     }
 }
@@ -1026,7 +1122,8 @@ fn dump_string_text_property_table(table: &TextPropertyTable) -> Vec<DumpPropert
         if iv.properties.is_empty() {
             continue;
         }
-        let properties: Vec<(String, DumpValue)> = iv.properties
+        let properties: Vec<(String, DumpValue)> = iv
+            .properties
             .iter()
             .map(|(key, val)| (key.clone(), dump_value(val)))
             .collect();
@@ -1280,10 +1377,9 @@ pub(crate) fn load_hash_key(k: &DumpHashKey) -> HashKey {
         DumpHashKey::Frame(f) => HashKey::Frame(*f),
         DumpHashKey::Ptr(p) => HashKey::Ptr(*p as usize),
         DumpHashKey::ObjId(a, b) => HashKey::ObjId(*a, *b),
-        DumpHashKey::EqualCons(a, b) => HashKey::EqualCons(
-            Box::new(load_hash_key(a)),
-            Box::new(load_hash_key(b)),
-        ),
+        DumpHashKey::EqualCons(a, b) => {
+            HashKey::EqualCons(Box::new(load_hash_key(a)), Box::new(load_hash_key(b)))
+        }
         DumpHashKey::EqualVec(v) => HashKey::EqualVec(v.iter().map(load_hash_key).collect()),
     }
 }
@@ -1342,9 +1438,7 @@ fn load_heap_object_phase1(obj: &DumpHeapObject) -> HeapObject {
             car: load_value(car),
             cdr: load_value(cdr),
         },
-        DumpHeapObject::Vector(items) => {
-            HeapObject::Vector(items.iter().map(load_value).collect())
-        }
+        DumpHeapObject::Vector(items) => HeapObject::Vector(items.iter().map(load_value).collect()),
         DumpHeapObject::HashTable(ht) => {
             // Create empty hash table with correct metadata; entries populated in phase 2
             HeapObject::HashTable(LispHashTable {
@@ -1392,7 +1486,8 @@ pub(crate) fn load_heap_hash_tables(heap: &mut LispHeap, dh: &DumpLispHeap) {
                 .iter()
                 .map(|(k, v)| (load_hash_key(k), load_value(v)))
                 .collect();
-            let insertion_order: Vec<HashKey> = ht.insertion_order.iter().map(load_hash_key).collect();
+            let insertion_order: Vec<HashKey> =
+                ht.insertion_order.iter().map(load_hash_key).collect();
             if let HeapObject::HashTable(ref mut table) = heap.objects_mut()[i] {
                 table.data = data;
                 table.key_snapshots = key_snapshots;
@@ -1431,8 +1526,15 @@ pub(crate) fn load_obarray(dob: &DumpObarray) -> Obarray {
         .iter()
         .map(|(id, sd)| (SymId(*id), load_symbol_data(sd)))
         .collect();
-    let function_unbound: HashSet<SymId> = dob.function_unbound.iter().map(|id| SymId(*id)).collect();
-    Obarray::from_dump(symbols, function_unbound, dob.function_epoch)
+    let global_members: HashSet<SymId> = dob.global_members.iter().map(|id| SymId(*id)).collect();
+    let function_unbound: HashSet<SymId> =
+        dob.function_unbound.iter().map(|id| SymId(*id)).collect();
+    Obarray::from_dump(
+        symbols,
+        global_members,
+        function_unbound,
+        dob.function_epoch,
+    )
 }
 
 // --- Buffer types ---
@@ -1456,7 +1558,11 @@ fn load_property_interval(pi: &DumpPropertyInterval) -> PropertyInterval {
     PropertyInterval {
         start: pi.start,
         end: pi.end,
-        properties: pi.properties.iter().map(|(k, v)| (k.clone(), load_value(v))).collect(),
+        properties: pi
+            .properties
+            .iter()
+            .map(|(k, v)| (k.clone(), load_value(v)))
+            .collect(),
     }
 }
 
@@ -1501,15 +1607,25 @@ fn load_syntax_table(st: &DumpSyntaxTable) -> SyntaxTable {
 
 fn load_undo_record(r: &DumpUndoRecord) -> UndoRecord {
     match r {
-        DumpUndoRecord::Insert { pos, len } => UndoRecord::Insert { pos: *pos, len: *len },
+        DumpUndoRecord::Insert { pos, len } => UndoRecord::Insert {
+            pos: *pos,
+            len: *len,
+        },
         DumpUndoRecord::Delete { pos, text } => UndoRecord::Delete {
             pos: *pos,
             text: text.clone(),
         },
-        DumpUndoRecord::PropertyChange { pos, len, old_props } => UndoRecord::PropertyChange {
+        DumpUndoRecord::PropertyChange {
+            pos,
+            len,
+            old_props,
+        } => UndoRecord::PropertyChange {
             pos: *pos,
             len: *len,
-            old_props: old_props.iter().map(|(k, v)| (k.clone(), load_value(v))).collect(),
+            old_props: old_props
+                .iter()
+                .map(|(k, v)| (k.clone(), load_value(v)))
+                .collect(),
         },
         DumpUndoRecord::CursorMove { pos } => UndoRecord::CursorMove { pos: *pos },
         DumpUndoRecord::Boundary => UndoRecord::Boundary,
@@ -1532,21 +1648,35 @@ fn load_buffer(db: &DumpBuffer) -> Buffer {
         multibyte: db.multibyte,
         file_name: db.file_name.clone(),
         markers: db.markers.iter().map(load_marker).collect(),
-        properties: db.properties.iter().map(|(k, v)| (k.clone(), load_value(v))).collect(),
+        properties: db
+            .properties
+            .iter()
+            .map(|(k, v)| (k.clone(), load_value(v)))
+            .collect(),
         text_props: TextPropertyTable::from_dump(
-            db.text_props.intervals.iter().map(load_property_interval).collect(),
+            db.text_props
+                .intervals
+                .iter()
+                .map(load_property_interval)
+                .collect(),
         ),
         overlays: OverlayList::from_dump(
-            db.overlays.overlays.iter().map(|o| {
-                Overlay {
+            db.overlays
+                .overlays
+                .iter()
+                .map(|o| Overlay {
                     id: o.id,
                     start: o.start,
                     end: o.end,
-                    properties: o.properties.iter().map(|(k, v)| (k.clone(), load_value(v))).collect(),
+                    properties: o
+                        .properties
+                        .iter()
+                        .map(|(k, v)| (k.clone(), load_value(v)))
+                        .collect(),
                     front_advance: o.front_advance,
                     rear_advance: o.rear_advance,
-                }
-            }).collect(),
+                })
+                .collect(),
             db.overlays.next_id,
         ),
         syntax_table: load_syntax_table(&db.syntax_table),
@@ -1604,8 +1734,14 @@ pub(crate) fn load_autoload_manager(dam: &DumpAutoloadManager) -> AutoloadManage
         entries,
         after_load,
         dam.loaded_files.clone(),
-        dam.obsolete_functions.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
-        dam.obsolete_variables.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+        dam.obsolete_functions
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect(),
+        dam.obsolete_variables
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect(),
     )
 }
 
@@ -1638,7 +1774,11 @@ pub(crate) fn load_custom_manager(dcm: &DumpCustomManager) -> CustomManager {
                     k.clone(),
                     CustomGroup {
                         name: g.name.clone(),
-                        members: g.members.iter().map(|(n, v)| (n.clone(), load_value(v))).collect(),
+                        members: g
+                            .members
+                            .iter()
+                            .map(|(n, v)| (n.clone(), load_value(v)))
+                            .collect(),
                         documentation: g.documentation.clone(),
                         parent: g.parent.clone(),
                     },
@@ -1658,9 +1798,14 @@ fn load_mode_custom_type(ct: &DumpModeCustomType) -> ModeCustomType {
         DumpModeCustomType::Symbol => ModeCustomType::Symbol,
         DumpModeCustomType::Sexp => ModeCustomType::Sexp,
         DumpModeCustomType::Choice(choices) => ModeCustomType::Choice(
-            choices.iter().map(|(s, v)| (s.clone(), load_value(v))).collect(),
+            choices
+                .iter()
+                .map(|(s, v)| (s.clone(), load_value(v)))
+                .collect(),
         ),
-        DumpModeCustomType::List(inner) => ModeCustomType::List(Box::new(load_mode_custom_type(inner))),
+        DumpModeCustomType::List(inner) => {
+            ModeCustomType::List(Box::new(load_mode_custom_type(inner)))
+        }
         DumpModeCustomType::Alist(k, v) => ModeCustomType::Alist(
             Box::new(load_mode_custom_type(k)),
             Box::new(load_mode_custom_type(v)),
@@ -1696,13 +1841,17 @@ pub(crate) fn load_mode_registry(dmr: &DumpModeRegistry) -> ModeRegistry {
                     syntax_table_name: m.syntax_table_name.clone(),
                     abbrev_table_name: m.abbrev_table_name.clone(),
                     font_lock: m.font_lock.as_ref().map(|fl| FontLockDefaults {
-                        keywords: fl.keywords.iter().map(|kw| FontLockKeyword {
-                            pattern: kw.pattern.clone(),
-                            face: kw.face.clone(),
-                            group: kw.group,
-                            override_: kw.override_,
-                            laxmatch: kw.laxmatch,
-                        }).collect(),
+                        keywords: fl
+                            .keywords
+                            .iter()
+                            .map(|kw| FontLockKeyword {
+                                pattern: kw.pattern.clone(),
+                                face: kw.face.clone(),
+                                group: kw.group,
+                                override_: kw.override_,
+                                laxmatch: kw.laxmatch,
+                            })
+                            .collect(),
                         case_fold: fl.case_fold,
                         syntax_table: fl.syntax_table.clone(),
                     }),
@@ -1764,8 +1913,14 @@ pub(crate) fn load_mode_registry(dmr: &DumpModeRegistry) -> ModeRegistry {
     ModeRegistry::from_dump(
         major_modes,
         minor_modes,
-        dmr.buffer_major_modes.iter().map(|(k, v)| (*k, v.clone())).collect(),
-        dmr.buffer_minor_modes.iter().map(|(k, v)| (*k, v.clone())).collect(),
+        dmr.buffer_major_modes
+            .iter()
+            .map(|(k, v)| (*k, v.clone()))
+            .collect(),
+        dmr.buffer_minor_modes
+            .iter()
+            .map(|(k, v)| (*k, v.clone()))
+            .collect(),
         dmr.global_minor_modes.clone(),
         dmr.auto_mode_alist.clone(),
         custom_variables,
@@ -1797,15 +1952,26 @@ pub(crate) fn load_coding_system_manager(dcsm: &DumpCodingSystemManager) -> Codi
                     pre_write_conversion: v.pre_write_conversion.clone(),
                     default_char: v.default_char,
                     for_unibyte: v.for_unibyte,
-                    properties: v.properties.iter().map(|(k, v)| (k.clone(), load_value(v))).collect(),
-                    int_properties: v.int_properties.iter().map(|(k, v)| (*k, load_value(v))).collect(),
+                    properties: v
+                        .properties
+                        .iter()
+                        .map(|(k, v)| (k.clone(), load_value(v)))
+                        .collect(),
+                    int_properties: v
+                        .int_properties
+                        .iter()
+                        .map(|(k, v)| (*k, load_value(v)))
+                        .collect(),
                 },
             )
         })
         .collect();
     CodingSystemManager::from_dump(
         systems,
-        dcsm.aliases.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+        dcsm.aliases
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect(),
         dcsm.priority.clone(),
         dcsm.keyboard_coding.clone(),
         dcsm.terminal_coding.clone(),
@@ -1813,7 +1979,12 @@ pub(crate) fn load_coding_system_manager(dcsm: &DumpCodingSystemManager) -> Codi
 }
 
 fn load_color(c: &DumpColor) -> Color {
-    Color { r: c.r, g: c.g, b: c.b, a: c.a }
+    Color {
+        r: c.r,
+        g: c.g,
+        b: c.b,
+        a: c.a,
+    }
 }
 
 fn load_font_slant(s: &DumpFontSlant) -> FontSlant {
@@ -1870,11 +2041,16 @@ fn load_face(df: &DumpFace) -> Face {
 
 pub(crate) fn load_face_table(dft: &DumpFaceTable) -> FaceTable {
     FaceTable::from_dump(
-        dft.faces.iter().map(|(k, f)| (k.clone(), load_face(f))).collect(),
+        dft.faces
+            .iter()
+            .map(|(k, f)| (k.clone(), load_face(f)))
+            .collect(),
     )
 }
 
-pub(crate) fn load_category_manager(dcm: &DumpCategoryManager) -> crate::emacs_core::category::CategoryManager {
+pub(crate) fn load_category_manager(
+    dcm: &DumpCategoryManager,
+) -> crate::emacs_core::category::CategoryManager {
     crate::emacs_core::category::CategoryManager {
         tables: dcm
             .tables
@@ -1883,8 +2059,16 @@ pub(crate) fn load_category_manager(dcm: &DumpCategoryManager) -> crate::emacs_c
                 (
                     k.clone(),
                     crate::emacs_core::category::CategoryTable {
-                        entries: t.entries.iter().map(|(c, cats)| (*c, cats.iter().cloned().collect())).collect(),
-                        descriptions: t.descriptions.iter().map(|(c, s)| (*c, s.clone())).collect(),
+                        entries: t
+                            .entries
+                            .iter()
+                            .map(|(c, cats)| (*c, cats.iter().cloned().collect()))
+                            .collect(),
+                        descriptions: t
+                            .descriptions
+                            .iter()
+                            .map(|(c, s)| (*c, s.clone()))
+                            .collect(),
                     },
                 )
             })
@@ -1908,8 +2092,15 @@ pub(crate) fn load_kmacro(dkm: &DumpKmacroManager) -> KmacroManager {
         recording: false,
         executing: false,
         current_macro: dkm.current_macro.iter().map(load_value).collect(),
-        last_macro: dkm.last_macro.as_ref().map(|m| m.iter().map(load_value).collect()),
-        macro_ring: dkm.macro_ring.iter().map(|m| m.iter().map(load_value).collect()).collect(),
+        last_macro: dkm
+            .last_macro
+            .as_ref()
+            .map(|m| m.iter().map(load_value).collect()),
+        macro_ring: dkm
+            .macro_ring
+            .iter()
+            .map(|m| m.iter().map(load_value).collect())
+            .collect(),
         counter: dkm.counter,
         counter_format: dkm.counter_format.clone(),
     }
@@ -1929,10 +2120,16 @@ pub(crate) fn load_register_manager(drm: &DumpRegisterManager) -> RegisterManage
                         buffer: buffer.clone(),
                         point: *point,
                     },
-                    DumpRegisterContent::Rectangle(lines) => RegisterContent::Rectangle(lines.clone()),
-                    DumpRegisterContent::FrameConfig(v) => RegisterContent::FrameConfig(load_value(v)),
+                    DumpRegisterContent::Rectangle(lines) => {
+                        RegisterContent::Rectangle(lines.clone())
+                    }
+                    DumpRegisterContent::FrameConfig(v) => {
+                        RegisterContent::FrameConfig(load_value(v))
+                    }
                     DumpRegisterContent::File(s) => RegisterContent::File(s.clone()),
-                    DumpRegisterContent::KbdMacro(keys) => RegisterContent::KbdMacro(keys.iter().map(load_value).collect()),
+                    DumpRegisterContent::KbdMacro(keys) => {
+                        RegisterContent::KbdMacro(keys.iter().map(load_value).collect())
+                    }
                 },
             )
         })
@@ -2020,7 +2217,12 @@ pub(crate) fn load_watcher_list(dwl: &DumpVariableWatcherList) -> VariableWatche
         .map(|(k, callbacks)| {
             (
                 k.clone(),
-                callbacks.iter().map(|v| VariableWatcher { callback: load_value(v) }).collect(),
+                callbacks
+                    .iter()
+                    .map(|v| VariableWatcher {
+                        callback: load_value(v),
+                    })
+                    .collect(),
             )
         })
         .collect();

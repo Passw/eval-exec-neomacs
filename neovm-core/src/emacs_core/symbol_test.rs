@@ -91,3 +91,38 @@ fn makunbound_doesnt_touch_constants() {
     ob.makunbound("t");
     assert!(ob.boundp("t")); // t is constant, can't unbind
 }
+
+#[test]
+fn canonical_id_mutators_keep_symbol_globally_interned() {
+    let mut ob = Obarray::new();
+    let sym = intern("vm-ghost");
+
+    ob.set_symbol_value_id(sym, Value::Int(1));
+    assert!(ob.intern_soft("vm-ghost").is_some());
+    assert!(ob.all_symbols().contains(&"vm-ghost"));
+
+    ob.put_property_id(sym, intern("vm-prop"), Value::Int(2));
+    assert_eq!(ob.get_property("vm-ghost", "vm-prop"), Some(&Value::Int(2)));
+
+    ob.set_symbol_function_id(sym, Value::Subr(intern("+")));
+    assert!(ob.fboundp("vm-ghost"));
+
+    ob.make_special_id(sym);
+    assert!(ob.is_special("vm-ghost"));
+}
+
+#[test]
+fn uninterned_keyword_and_nil_names_are_not_canonical_constants() {
+    let mut eval = crate::emacs_core::eval::Evaluator::new();
+    let nil_id = crate::emacs_core::intern::intern_uninterned("nil");
+    let kw_id = crate::emacs_core::intern::intern_uninterned(":vm-k");
+
+    assert!(!eval.obarray().is_constant_id(nil_id));
+    assert!(!eval.obarray().is_constant_id(kw_id));
+
+    eval.obarray_mut()
+        .set_symbol_function_id(nil_id, Value::Subr(intern("+")));
+    assert!(eval.obarray().symbol_function_id(nil_id).is_some());
+    assert!(eval.obarray().intern_soft("nil").is_some());
+    assert!(eval.obarray().intern_soft(":vm-k").is_none());
+}

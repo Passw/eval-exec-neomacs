@@ -57,6 +57,11 @@ impl StringInterner {
         SymId(idx)
     }
 
+    /// Look up the canonical interned id for a string without interning it.
+    pub fn lookup(&self, s: &str) -> Option<SymId> {
+        self.map.get(s).copied().map(SymId)
+    }
+
     /// Resolve a SymId back to its string. Panics if id is invalid.
     #[inline]
     pub fn resolve(&self, id: SymId) -> &str {
@@ -153,6 +158,13 @@ pub fn intern(s: &str) -> SymId {
 pub fn intern_uninterned(s: &str) -> SymId {
     let ptr = current_interner_ptr();
     unsafe { &mut *ptr }.intern_uninterned(s)
+}
+
+/// Look up the canonical interned id for a string without interning it.
+#[inline]
+pub fn lookup_interned(s: &str) -> Option<SymId> {
+    let ptr = current_interner_ptr();
+    unsafe { &*ptr }.lookup(s)
 }
 
 /// Resolve a SymId to its string using the thread-local interner.
