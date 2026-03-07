@@ -246,10 +246,14 @@ pub(super) fn builtin_lookup_key(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
+    builtin_lookup_key_in_obarray(eval.obarray(), &args)
+}
+
+pub(crate) fn builtin_lookup_key_in_obarray(obarray: &Obarray, args: &[Value]) -> EvalResult {
     expect_min_args("lookup-key", &args, 2)?;
     expect_max_args("lookup-key", &args, 3)?;
     // Optional 3rd arg ACCEPT-DEFAULTS is accepted but ignored.
-    let keymap = expect_keymap(eval, &args[0])?;
+    let keymap = expect_keymap_in_obarray(obarray, &args[0])?;
     let events = expect_key_events(&args[1])?;
 
     if events.is_empty() {
@@ -387,13 +391,17 @@ pub(super) fn is_lisp_keymap_object(value: &Value) -> bool {
 
 /// (keymapp OBJ) -> t or nil
 pub(super) fn builtin_keymapp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    builtin_keymapp_in_obarray(eval.obarray(), &args)
+}
+
+pub(crate) fn builtin_keymapp_in_obarray(obarray: &Obarray, args: &[Value]) -> EvalResult {
     expect_args("keymapp", &args, 1)?;
     if is_list_keymap(&args[0]) {
         return Ok(Value::True);
     }
     // Check if it's a symbol whose function cell is a keymap
     if let Some(sym_name) = args[0].as_symbol_name() {
-        if let Some(func) = eval.obarray.symbol_function(sym_name) {
+        if let Some(func) = obarray.symbol_function(sym_name) {
             if is_list_keymap(&func) {
                 return Ok(Value::True);
             }

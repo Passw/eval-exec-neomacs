@@ -1880,6 +1880,18 @@ impl<'a> Vm<'a> {
                 builtins::expect_args("current-global-map", args, 0)
                     .map(|_| self.ensure_global_keymap()),
             ),
+            "lookup-key" => Some(
+                crate::emacs_core::builtins::keymaps::builtin_lookup_key_in_obarray(
+                    &*self.obarray,
+                    args,
+                ),
+            ),
+            "keymapp" => Some(
+                crate::emacs_core::builtins::keymaps::builtin_keymapp_in_obarray(
+                    &*self.obarray,
+                    args,
+                ),
+            ),
             "define-key" => Some((|| -> EvalResult {
                 builtins::expect_min_args("define-key", args, 3)?;
                 builtins::expect_max_args("define-key", args, 4)?;

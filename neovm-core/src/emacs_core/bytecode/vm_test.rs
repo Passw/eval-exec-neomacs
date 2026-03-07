@@ -386,6 +386,20 @@ fn vm_roots_bytecode_constants_across_gc_during_eval_builtin_dispatch() {
 }
 
 #[test]
+fn vm_keymap_predicate_and_lookup_resolve_symbol_function_cells() {
+    assert_eq!(
+        vm_eval_str(
+            "(let ((map (make-sparse-keymap)))
+               (define-key map [97] 'ignore)
+               (fset 'vm-test-keymap map)
+               (list (keymapp 'vm-test-keymap)
+                     (lookup-key 'vm-test-keymap [97])))"
+        ),
+        "OK (t ignore)"
+    );
+}
+
+#[test]
 fn vm_throw_restores_saved_stack_before_resuming_catch() {
     let func = ByteCodeFunction {
         ops: vec![
