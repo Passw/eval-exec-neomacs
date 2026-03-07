@@ -1,5 +1,6 @@
 use super::*;
 use crate::emacs_core::bytecode::compiler::Compiler;
+use crate::emacs_core::coding::CodingSystemManager;
 use crate::emacs_core::parse_forms;
 use crate::emacs_core::value::HashTableTest;
 
@@ -16,6 +17,7 @@ fn vm_eval(src: &str) -> Result<Value, EvalError> {
     let mut lexenv: Value = Value::Nil;
     let mut features: Vec<SymId> = Vec::new();
     let mut buffers = crate::buffer::BufferManager::new();
+    let mut coding_systems = CodingSystemManager::new();
     let mut match_data: Option<MatchData> = None;
     let mut watchers = VariableWatcherList::new();
     let mut catch_tags: Vec<Value> = Vec::new();
@@ -29,6 +31,7 @@ fn vm_eval(src: &str) -> Result<Value, EvalError> {
             &mut lexenv,
             &mut features,
             &mut buffers,
+            &mut coding_systems,
             &mut match_data,
             &mut watchers,
             &mut catch_tags,
@@ -273,6 +276,7 @@ fn vm_switch_branches_using_hash_table_jump_table() {
     let mut lexenv: Value = Value::Nil;
     let mut features: Vec<SymId> = Vec::new();
     let mut buffers = crate::buffer::BufferManager::new();
+    let mut coding_systems = CodingSystemManager::new();
     let mut match_data: Option<MatchData> = None;
     let mut watchers = VariableWatcherList::new();
     let mut catch_tags: Vec<Value> = Vec::new();
@@ -283,6 +287,7 @@ fn vm_switch_branches_using_hash_table_jump_table() {
         &mut lexenv,
         &mut features,
         &mut buffers,
+        &mut coding_systems,
         &mut match_data,
         &mut watchers,
         &mut catch_tags,
@@ -326,6 +331,33 @@ fn vm_define_charset_alias_survives_eval_builtin_bridge() {
 }
 
 #[test]
+fn vm_define_coding_system_alias_survives_eval_builtin_bridge() {
+    assert_eq!(
+        vm_eval_str(
+            "(progn
+               (apply #'define-coding-system-internal
+                      '(vm-utf8-emacs
+                        85
+                        utf-8
+                        (unicode)
+                        t
+                        nil
+                        nil
+                        nil
+                        nil
+                        nil
+                        nil
+                        (:name vm-utf8-emacs :docstring \"VM UTF-8 Emacs\")
+                        nil))
+               (define-coding-system-alias 'vm-emacs-internal 'vm-utf8-emacs-unix)
+               (list (coding-system-p 'vm-utf8-emacs-unix)
+                     (coding-system-p 'vm-emacs-internal)))"
+        ),
+        "OK (t t)"
+    );
+}
+
+#[test]
 fn vm_throw_restores_saved_stack_before_resuming_catch() {
     let func = ByteCodeFunction {
         ops: vec![
@@ -353,6 +385,7 @@ fn vm_throw_restores_saved_stack_before_resuming_catch() {
     let mut lexenv: Value = Value::Nil;
     let mut features: Vec<SymId> = Vec::new();
     let mut buffers = crate::buffer::BufferManager::new();
+    let mut coding_systems = CodingSystemManager::new();
     let mut match_data: Option<MatchData> = None;
     let mut watchers = VariableWatcherList::new();
     let mut catch_tags: Vec<Value> = Vec::new();
@@ -363,6 +396,7 @@ fn vm_throw_restores_saved_stack_before_resuming_catch() {
         &mut lexenv,
         &mut features,
         &mut buffers,
+        &mut coding_systems,
         &mut match_data,
         &mut watchers,
         &mut catch_tags,

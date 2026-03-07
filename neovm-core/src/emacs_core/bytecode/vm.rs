@@ -7,6 +7,7 @@ use super::opcode::Op;
 use crate::buffer::BufferManager;
 use crate::emacs_core::advice::VariableWatcherList;
 use crate::emacs_core::builtins;
+use crate::emacs_core::coding::CodingSystemManager;
 use crate::emacs_core::error::*;
 use crate::emacs_core::errors::signal_matches_condition_value;
 use crate::emacs_core::intern::{SymId, intern, resolve_sym};
@@ -47,6 +48,7 @@ pub struct Vm<'a> {
     #[allow(dead_code)]
     features: &'a mut Vec<SymId>,
     buffers: &'a mut BufferManager,
+    coding_systems: &'a mut CodingSystemManager,
     match_data: &'a mut Option<MatchData>,
     watchers: &'a mut VariableWatcherList,
     /// Active catch tags from the evaluator — shared with interpreter
@@ -63,6 +65,7 @@ impl<'a> Vm<'a> {
         lexenv: &'a mut Value,
         features: &'a mut Vec<SymId>,
         buffers: &'a mut BufferManager,
+        coding_systems: &'a mut CodingSystemManager,
         match_data: &'a mut Option<MatchData>,
         watchers: &'a mut VariableWatcherList,
         catch_tags: &'a mut Vec<Value>,
@@ -73,6 +76,7 @@ impl<'a> Vm<'a> {
             lexenv,
             features,
             buffers,
+            coding_systems,
             match_data,
             watchers,
             catch_tags,
@@ -1524,6 +1528,7 @@ impl<'a> Vm<'a> {
         eval.match_data = self.match_data.clone();
         eval.depth = self.depth;
         eval.max_depth = self.max_depth;
+        std::mem::swap(self.coding_systems, &mut eval.coding_systems);
         std::mem::swap(self.watchers, &mut eval.watchers);
 
         let result = builtins::dispatch_builtin(&mut eval, name, args);
@@ -1534,6 +1539,7 @@ impl<'a> Vm<'a> {
         std::mem::swap(self.features, &mut eval.features);
         std::mem::swap(self.buffers, &mut eval.buffers);
         std::mem::swap(self.match_data, &mut eval.match_data);
+        std::mem::swap(self.coding_systems, &mut eval.coding_systems);
         std::mem::swap(self.watchers, &mut eval.watchers);
         self.depth = eval.depth;
 
