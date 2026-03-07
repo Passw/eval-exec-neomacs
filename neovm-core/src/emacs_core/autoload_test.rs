@@ -283,6 +283,16 @@ fn eval_when_compile_multiple_forms() {
 }
 
 #[test]
+fn eval_when_compile_propagates_errors() {
+    let result = eval_one(
+        r#"(condition-case err
+              (eval-when-compile (signal 'error '("boom")))
+            (error (list (car err) (cdr err))))"#,
+    );
+    assert_eq!(result, r#"OK (error ("boom"))"#);
+}
+
+#[test]
 fn eval_and_compile_evaluates_body() {
     let result = eval_one("(eval-and-compile (+ 10 20))");
     assert_eq!(result, "OK 30");

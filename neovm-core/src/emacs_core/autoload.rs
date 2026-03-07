@@ -504,19 +504,19 @@ pub(crate) fn sf_autoload(
 /// `(eval-when-compile &rest BODY)`
 ///
 /// In the interpreter, evaluates BODY sequentially and returns the last
-/// result.  When loading source `.el` files, compile-time dependencies
-/// (e.g. `(require 'cl-lib)`) may not yet be available.  In that case
-/// we silently return nil rather than propagating the error — matching
-/// the behavior of loading `.elc` files where `eval-when-compile`
-/// bodies have already been resolved at compile time.
+/// result.  This mirrors GNU Emacs's interpreter semantics: the macro
+/// expansion of `eval-when-compile` in `byte-run.el` ultimately computes
+/// the body via `eval` and exposes the result as a quoted constant.
+///
+/// Swallowing errors here is wrong because it hides real bootstrap
+/// dependency/order bugs.  Source bootstrap relies on forms like
+/// `(eval-when-compile (require 'cl-lib))` actually running; if they fail,
+/// the failure must surface so bootstrap can be fixed rather than masked.
 pub(crate) fn sf_eval_when_compile(
     eval: &mut super::eval::Evaluator,
     tail: &[super::expr::Expr],
 ) -> super::error::EvalResult {
-    match eval.sf_progn(tail) {
-        Ok(val) => Ok(val),
-        Err(_) => Ok(Value::Nil),
-    }
+    eval.sf_progn(tail)
 }
 
 /// `(eval-and-compile &rest BODY)`
