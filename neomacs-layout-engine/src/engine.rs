@@ -1753,12 +1753,14 @@ impl LayoutEngine {
         let has_margins = params.left_margin_width > 0.0 || params.right_margin_width > 0.0;
 
         // Clear margin backgrounds with default face background so they don't
-        // show visual artifacts.  The left margin sits between the left fringe
-        // and the text area; the right margin sits between the text area and
-        // the right fringe.
+        // show visual artifacts.  Default Emacs layout (fringes-outside-margins
+        // nil): | LEFT_MARGIN | LEFT_FRINGE | TEXT_AREA | RIGHT_FRINGE | RIGHT_MARGIN |
+        // So left margin is outermost (before fringe), right margin is outermost
+        // (after fringe).
         if has_margins {
             if params.left_margin_width > 0.0 {
-                let margin_x = text_x - params.left_margin_width;
+                let margin_x =
+                    text_x - params.left_fringe_width - params.left_margin_width;
                 frame_glyphs.add_stretch(
                     margin_x,
                     text_y,
@@ -1770,7 +1772,7 @@ impl LayoutEngine {
                 );
             }
             if params.right_margin_width > 0.0 {
-                let margin_x = text_x + text_width;
+                let margin_x = text_x + text_width + params.right_fringe_width;
                 frame_glyphs.add_stretch(
                     margin_x,
                     text_y,
@@ -5034,8 +5036,11 @@ impl LayoutEngine {
                     }
 
                     // Render left margin: image or text
+                    // Default layout (fringes inside margins):
+                    // | LEFT_MARGIN | LEFT_FRINGE | TEXT_AREA |
                     if left_image_gpu_id != 0 && params.left_margin_width > 0.0 {
-                        let margin_x = text_x - params.left_margin_width;
+                        let margin_x =
+                            text_x - left_fringe_width - params.left_margin_width;
                         let gy = row_y[row as usize];
                         frame_glyphs.add_image(
                             left_image_gpu_id as u32,
@@ -5045,7 +5050,8 @@ impl LayoutEngine {
                             left_image_h as f32,
                         );
                     } else if left_len > 0 && params.left_margin_width > 0.0 {
-                        let margin_x = text_x - params.left_margin_width;
+                        let margin_x =
+                            text_x - left_fringe_width - params.left_margin_width;
                         let gy = row_y[row as usize];
                         let margin_cols = (params.left_margin_width / char_w).floor() as i32;
 
@@ -5085,8 +5091,10 @@ impl LayoutEngine {
                     }
 
                     // Render right margin: image or text
+                    // Default layout (fringes inside margins):
+                    // | TEXT_AREA | RIGHT_FRINGE | RIGHT_MARGIN |
                     if right_image_gpu_id != 0 && params.right_margin_width > 0.0 {
-                        let margin_x = text_x + text_width;
+                        let margin_x = text_x + text_width + right_fringe_width;
                         let gy = row_y[row as usize];
                         frame_glyphs.add_image(
                             right_image_gpu_id as u32,
@@ -5096,7 +5104,7 @@ impl LayoutEngine {
                             right_image_h as f32,
                         );
                     } else if right_len > 0 && params.right_margin_width > 0.0 {
-                        let margin_x = text_x + text_width;
+                        let margin_x = text_x + text_width + right_fringe_width;
                         let gy = row_y[row as usize];
                         let margin_cols = (params.right_margin_width / char_w).floor() as i32;
 
