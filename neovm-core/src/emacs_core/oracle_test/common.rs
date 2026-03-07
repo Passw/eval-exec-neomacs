@@ -58,17 +58,25 @@ fn oracle_emacs_path() -> String {
     std::env::var("NEOVM_FORCE_ORACLE_PATH").unwrap_or_else(|_| "emacs".to_string())
 }
 
-fn write_oracle_form_file(form: &str) -> Result<tempfile::TempPath, String> {
+fn write_temp_elisp_file(
+    prefix: &str,
+    suffix: &str,
+    content: &str,
+) -> Result<tempfile::TempPath, String> {
     let mut file = tempfile::Builder::new()
-        .prefix("neovm-oracle-form-")
-        .suffix(".el")
+        .prefix(prefix)
+        .suffix(suffix)
         .tempfile()
         .map_err(|e| format!("failed to create oracle form file: {e}"))?;
-    file.write_all(form.as_bytes())
+    file.write_all(content.as_bytes())
         .map_err(|e| format!("failed to write oracle form file: {e}"))?;
     file.flush()
         .map_err(|e| format!("failed to flush oracle form file: {e}"))?;
     Ok(file.into_temp_path())
+}
+
+fn write_oracle_form_file(form: &str) -> Result<tempfile::TempPath, String> {
+    write_temp_elisp_file("neovm-oracle-form-", ".el", form)
 }
 
 pub(crate) fn run_oracle_eval(form: &str) -> Result<String, String> {
@@ -116,7 +124,7 @@ pub(crate) fn run_oracle_eval(form: &str) -> Result<String, String> {
             "--eval",
             "(setq native-comp-jit-compilation nil inhibit-automatic-native-compilation t native-comp-enable-subr-trampolines nil)",
             "--eval",
-            program,
+            &program,
         ]);
 
     // Safety: `pre_exec` runs between fork and exec in the child process.
@@ -148,6 +156,10 @@ pub(crate) fn run_oracle_eval(form: &str) -> Result<String, String> {
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+pub(crate) fn run_oracle_eval_with_bootstrap(form: &str) -> Result<String, String> {
+    run_oracle_eval(form)
 }
 
 pub(crate) fn run_neovm_eval(form: &str) -> Result<String, String> {
@@ -228,21 +240,19 @@ pub(crate) fn run_neovm_eval_with_load(form: &str, load_files: &[&str]) -> Resul
 }
 
 pub(crate) fn eval_oracle_and_neovm(form: &str) -> (String, String) {
-    std::thread::scope(|s| {
-        let oracle_handle = s.spawn(|| run_oracle_eval(form).expect("oracle eval should run"));
-        let neovm = run_neovm_eval(form).expect("neovm eval should run");
-        let oracle = oracle_handle.join().expect("oracle thread panicked");
-        (oracle, neovm)
-    })
+    // Keep oracle tests deterministic.  Running GNU Emacs and NeoVM in
+    // parallel inside one test process exposes unrelated shared-state and
+    // thread-local interactions; nextest already provides cross-test
+    // parallelism, so per-test comparisons should stay sequential.
+    let neovm = run_neovm_eval(form).expect("neovm eval should run");
+    let oracle = run_oracle_eval(form).expect("oracle eval should run");
+    (oracle, neovm)
 }
 
 pub(crate) fn eval_oracle_and_neovm_with_bootstrap(form: &str) -> (String, String) {
-    std::thread::scope(|s| {
-        let oracle_handle = s.spawn(|| run_oracle_eval(form).expect("oracle eval should run"));
-        let neovm = run_neovm_eval_with_bootstrap(form).expect("neovm eval should run");
-        let oracle = oracle_handle.join().expect("oracle thread panicked");
-        (oracle, neovm)
-    })
+    let neovm = run_neovm_eval_with_bootstrap(form).expect("neovm eval should run");
+    let oracle = run_oracle_eval_with_bootstrap(form).expect("oracle eval should run");
+    (oracle, neovm)
 }
 
 pub(crate) fn assert_ok_eq(expected_payload: &str, oracle: &str, neovm: &str) {
@@ -253,12 +263,8 @@ pub(crate) fn assert_ok_eq(expected_payload: &str, oracle: &str, neovm: &str) {
 }
 
 pub(crate) fn assert_oracle_parity_with_load(form: &str, load_files: &[&str]) {
-    let (oracle, neovm) = std::thread::scope(|s| {
-        let oracle_handle = s.spawn(|| run_oracle_eval(form).expect("oracle eval should run"));
-        let neovm = run_neovm_eval_with_load(form, load_files).expect("neovm eval should run");
-        let oracle = oracle_handle.join().expect("oracle thread panicked");
-        (oracle, neovm)
-    });
+    let neovm = run_neovm_eval_with_load(form, load_files).expect("neovm eval should run");
+    let oracle = run_oracle_eval(form).expect("oracle eval should run");
     assert_eq!(neovm, oracle, "oracle parity mismatch for form: {form}");
 }
 
@@ -296,12 +302,8 @@ pub(crate) fn run_neovm_eval_with_bootstrap(form: &str) -> Result<String, String
 
 pub(crate) fn assert_oracle_parity_with_bootstrap(form: &str) {
     let t0 = std::time::Instant::now();
-    let (oracle, neovm) = std::thread::scope(|s| {
-        let oracle_handle = s.spawn(|| run_oracle_eval(form).expect("oracle eval should run"));
-        let neovm = run_neovm_eval_with_bootstrap(form).expect("neovm eval should run");
-        let oracle = oracle_handle.join().expect("oracle thread panicked");
-        (oracle, neovm)
-    });
+    let neovm = run_neovm_eval_with_bootstrap(form).expect("neovm eval should run");
+    let oracle = run_oracle_eval_with_bootstrap(form).expect("oracle eval should run");
     let t1 = std::time::Instant::now();
     tracing::info!("total: {:.3?}", t1 - t0);
     assert_eq!(neovm, oracle, "oracle parity mismatch for form: {form}");

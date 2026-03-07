@@ -722,6 +722,7 @@ fn oracle_prop_compressed_trie_end_to_end() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = r#"(progn
+  (require 'cl-lib)
   (fset 'neovm--rt6-make (lambda () (list nil nil)))
   (fset 'neovm--rt6-end-p (lambda (n) (car n)))
   (fset 'neovm--rt6-children (lambda (n) (cadr n)))

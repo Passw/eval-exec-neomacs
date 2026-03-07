@@ -653,7 +653,9 @@ fn oracle_prop_alist_set_operations() {
 fn oracle_prop_alist_zip_and_unzip() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r#"(progn
+  (require 'cl-lib)
+  (list
   ;; Zip two lists into alist
   (let ((keys '(a b c d e))
         (vals '(1 2 3 4 5)))
@@ -692,7 +694,7 @@ fn oracle_prop_alist_zip_and_unzip() {
           (dolist (col table)
             (setq row (cons (cons (car col) (nth i (cdr col))) row)))
           (setq result (cons (nreverse row) result))))
-      (nreverse result))))"#;
+      (nreverse result)))))"#;
     assert_oracle_parity_with_bootstrap(form);
 }
 

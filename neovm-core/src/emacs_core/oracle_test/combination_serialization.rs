@@ -142,6 +142,7 @@ fn oracle_prop_serialization_csv_format() {
     // - Parser splits on commas, handles quoted fields
     let form = r#"(unwind-protect
       (progn
+        (require 'cl-lib)
         (defun test--csv-escape-field (field)
           "Escape a single CSV field. Quote if necessary."
           (let ((s (cond
