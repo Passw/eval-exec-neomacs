@@ -4,6 +4,7 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
 use super::intern::{SymId, intern, resolve_sym};
+use super::print::PrintOptions;
 use super::value::{Value, read_cons, with_heap};
 use crate::window::WindowId;
 
@@ -141,7 +142,7 @@ pub fn format_eval_result(result: &Result<Value, EvalError>) -> String {
 
 /// Render a value with evaluator-context-aware opaque handle formatting.
 pub fn print_value_with_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
-    format_value_with_eval(eval, value)
+    format_value_with_eval(eval, value, print_options_from_eval(eval))
 }
 
 fn format_opaque_handle_with_eval(eval: &super::eval::Evaluator, value: &Value) -> Option<String> {
@@ -188,26 +189,43 @@ fn format_window_handle_with_eval(eval: &super::eval::Evaluator, id: u64) -> Str
     format!("#<window {id}>")
 }
 
-fn format_value_with_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
+fn print_options_from_eval(eval: &super::eval::Evaluator) -> PrintOptions {
+    PrintOptions {
+        print_gensym: eval
+            .obarray
+            .symbol_value("print-gensym")
+            .is_some_and(Value::is_truthy),
+    }
+}
+
+fn format_value_with_eval(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+    options: PrintOptions,
+) -> String {
     if let Some(handle) = format_opaque_handle_with_eval(eval, value) {
         return handle;
     }
     match value {
         super::value::Value::Cons(_) | super::value::Value::Vector(_) => {
-            format_value_with_eval_slow(eval, value)
+            format_value_with_eval_slow(eval, value, options)
         }
-        _ => super::print::print_value(value),
+        _ => super::print::print_value_with_options(value, options),
     }
 }
 
-fn format_value_with_eval_slow(eval: &super::eval::Evaluator, value: &Value) -> String {
+fn format_value_with_eval_slow(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+    options: PrintOptions,
+) -> String {
     match value {
         Value::Cons(_) => {
-            if let Some(shorthand) = format_list_shorthand_with_eval(eval, value) {
+            if let Some(shorthand) = format_list_shorthand_with_eval(eval, value, options) {
                 return shorthand;
             }
             let mut out = String::from("(");
-            format_cons_with_eval(eval, value, &mut out);
+            format_cons_with_eval(eval, value, &mut out, options);
             out.push(')');
             out
         }
@@ -218,16 +236,20 @@ fn format_value_with_eval_slow(eval: &super::eval::Evaluator, value: &Value) -> 
                 if idx > 0 {
                     out.push(' ');
                 }
-                out.push_str(&format_value_with_eval(eval, item));
+                out.push_str(&format_value_with_eval(eval, item, options));
             }
             out.push(']');
             out
         }
-        _ => super::print::print_value(value),
+        _ => super::print::print_value_with_options(value, options),
     }
 }
 
-fn format_list_shorthand_with_eval(eval: &super::eval::Evaluator, value: &Value) -> Option<String> {
+fn format_list_shorthand_with_eval(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+    options: PrintOptions,
+) -> Option<String> {
     let items = super::value::list_to_vec(value)?;
     if items.len() != 2 {
         return None;
@@ -240,7 +262,10 @@ fn format_list_shorthand_with_eval(eval: &super::eval::Evaluator, value: &Value)
 
     if head == "make-hash-table-from-literal" {
         let payload = quote_payload(&items[1])?;
-        return Some(format!("#s{}", format_value_with_eval(eval, &payload)));
+        return Some(format!(
+            "#s{}",
+            format_value_with_eval(eval, &payload, options)
+        ));
     }
 
     let (prefix, quoted) = match head {
@@ -252,10 +277,18 @@ fn format_list_shorthand_with_eval(eval: &super::eval::Evaluator, value: &Value)
         _ => None,
     }?;
 
-    Some(format!("{prefix}{}", format_value_with_eval(eval, quoted)))
+    Some(format!(
+        "{prefix}{}",
+        format_value_with_eval(eval, quoted, options)
+    ))
 }
 
-fn format_cons_with_eval(eval: &super::eval::Evaluator, value: &Value, out: &mut String) {
+fn format_cons_with_eval(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+    out: &mut String,
+    options: PrintOptions,
+) {
     let mut cursor = *value;
     let mut first = true;
     loop {
@@ -265,7 +298,7 @@ fn format_cons_with_eval(eval: &super::eval::Evaluator, value: &Value, out: &mut
                     out.push(' ');
                 }
                 let pair = read_cons(cell);
-                out.push_str(&format_value_with_eval(eval, &pair.car));
+                out.push_str(&format_value_with_eval(eval, &pair.car, options));
                 cursor = pair.cdr;
                 first = false;
             }
@@ -274,7 +307,7 @@ fn format_cons_with_eval(eval: &super::eval::Evaluator, value: &Value, out: &mut
                 if !first {
                     out.push_str(" . ");
                 }
-                out.push_str(&format_value_with_eval(eval, &other));
+                out.push_str(&format_value_with_eval(eval, &other, options));
                 return;
             }
         }
@@ -286,29 +319,41 @@ pub fn print_value_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value)
     if let Some(handle) = format_opaque_handle_with_eval(eval, value) {
         return handle.into_bytes();
     }
-    format_value_bytes_with_eval(eval, value)
+    format_value_bytes_with_eval(eval, value, print_options_from_eval(eval))
 }
 
-fn format_value_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value) -> Vec<u8> {
+fn format_value_bytes_with_eval(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+    options: PrintOptions,
+) -> Vec<u8> {
     match value {
-        Value::Cons(_) => format_cons_bytes_with_eval(eval, value),
-        Value::Vector(_) => format_vector_bytes_with_eval(eval, value),
-        _ => super::print::print_value_bytes(value),
+        Value::Cons(_) => format_cons_bytes_with_eval(eval, value, options),
+        Value::Vector(_) => format_vector_bytes_with_eval(eval, value, options),
+        _ => super::print::print_value_bytes_with_options(value, options),
     }
 }
 
-fn format_cons_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value) -> Vec<u8> {
-    if let Some(shorthand) = format_list_shorthand_bytes_with_eval(eval, value) {
+fn format_cons_bytes_with_eval(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+    options: PrintOptions,
+) -> Vec<u8> {
+    if let Some(shorthand) = format_list_shorthand_bytes_with_eval(eval, value, options) {
         return shorthand;
     }
     let mut out = Vec::new();
     out.push(b'(');
-    append_cons_bytes_with_eval(eval, value, &mut out);
+    append_cons_bytes_with_eval(eval, value, &mut out, options);
     out.push(b')');
     out
 }
 
-fn format_vector_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value) -> Vec<u8> {
+fn format_vector_bytes_with_eval(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+    options: PrintOptions,
+) -> Vec<u8> {
     let mut out = Vec::new();
     out.push(b'[');
     let Value::Vector(items) = value else {
@@ -319,7 +364,7 @@ fn format_vector_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value) -
         if idx > 0 {
             out.push(b' ');
         }
-        out.extend(print_value_bytes_with_eval(eval, item));
+        out.extend(format_value_bytes_with_eval(eval, item, options));
     }
     out.push(b']');
     out
@@ -328,6 +373,7 @@ fn format_vector_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value) -
 fn format_list_shorthand_bytes_with_eval(
     eval: &super::eval::Evaluator,
     value: &Value,
+    options: PrintOptions,
 ) -> Option<Vec<u8>> {
     let items = super::value::list_to_vec(value)?;
     if items.len() != 2 {
@@ -343,7 +389,7 @@ fn format_list_shorthand_bytes_with_eval(
         let payload = quote_payload(&items[1])?;
         let mut out = Vec::new();
         out.extend_from_slice(b"#s");
-        out.extend(print_value_bytes_with_eval(eval, &payload));
+        out.extend(format_value_bytes_with_eval(eval, &payload, options));
         return Some(out);
     }
 
@@ -358,7 +404,7 @@ fn format_list_shorthand_bytes_with_eval(
 
     let mut out = Vec::new();
     out.extend_from_slice(prefix);
-    out.extend(print_value_bytes_with_eval(eval, quoted));
+    out.extend(format_value_bytes_with_eval(eval, quoted, options));
     Some(out)
 }
 
@@ -373,7 +419,12 @@ fn quote_payload(value: &Value) -> Option<Value> {
     }
 }
 
-fn append_cons_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value, out: &mut Vec<u8>) {
+fn append_cons_bytes_with_eval(
+    eval: &super::eval::Evaluator,
+    value: &Value,
+    out: &mut Vec<u8>,
+    options: PrintOptions,
+) {
     let mut cursor = *value;
     let mut first = true;
     loop {
@@ -383,7 +434,7 @@ fn append_cons_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value, out
                     out.push(b' ');
                 }
                 let pair = read_cons(cell);
-                out.extend(print_value_bytes_with_eval(eval, &pair.car));
+                out.extend(format_value_bytes_with_eval(eval, &pair.car, options));
                 cursor = pair.cdr;
                 first = false;
             }
@@ -392,7 +443,7 @@ fn append_cons_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value, out
                 if !first {
                     out.extend_from_slice(b" . ");
                 }
-                out.extend(print_value_bytes_with_eval(eval, &other));
+                out.extend(format_value_bytes_with_eval(eval, &other, options));
                 return;
             }
         }

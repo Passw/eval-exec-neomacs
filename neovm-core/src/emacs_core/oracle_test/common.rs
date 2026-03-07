@@ -223,25 +223,8 @@ pub(crate) fn run_neovm_eval_with_load(form: &str, load_files: &[&str]) -> Resul
     let Some(first) = forms.first() else {
         return Err("no form parsed".to_string());
     };
-    let rendered = match eval.eval_expr(first) {
-        Ok(value) => format!("OK {}", print_value_with_buffers(&value, &eval.buffers)),
-        Err(EvalError::Signal { symbol, data }) => {
-            let mut values = Vec::with_capacity(data.len() + 1);
-            values.push(Value::Symbol(symbol));
-            values.extend(data);
-            format!(
-                "ERR {}",
-                print_value_with_buffers(&Value::list(values), &eval.buffers)
-            )
-        }
-        Err(EvalError::UncaughtThrow { tag, value }) => {
-            format!(
-                "ERR (no-catch {} {})",
-                print_value_with_buffers(&tag, &eval.buffers),
-                print_value_with_buffers(&value, &eval.buffers),
-            )
-        }
-    };
+    let result = eval.eval_expr(first);
+    let rendered = crate::emacs_core::format_eval_result_with_eval(&eval, &result);
     Ok(rendered)
 }
 

@@ -9,6 +9,11 @@ use super::value::{
     read_cons, with_heap,
 };
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PrintOptions {
+    pub print_gensym: bool,
+}
+
 fn print_special_handle(value: &Value) -> Option<String> {
     super::terminal::pure::print_terminal_handle(value)
 }
@@ -22,7 +27,11 @@ fn format_frame_handle(id: u64) -> String {
     }
 }
 
-fn format_lisp_propertized_string(s: &str, runs: &[StringTextPropertyRun]) -> String {
+fn format_lisp_propertized_string(
+    s: &str,
+    runs: &[StringTextPropertyRun],
+    options: PrintOptions,
+) -> String {
     let mut out = String::from("#(");
     out.push_str(&format_lisp_string(s));
     for run in runs {
@@ -31,7 +40,7 @@ fn format_lisp_propertized_string(s: &str, runs: &[StringTextPropertyRun]) -> St
         out.push(' ');
         out.push_str(&run.end.to_string());
         out.push(' ');
-        out.push_str(&print_value(&run.plist));
+        out.push_str(&print_value_with_options(&run.plist, options));
     }
     out.push(')');
     out
@@ -40,6 +49,14 @@ fn format_lisp_propertized_string(s: &str, runs: &[StringTextPropertyRun]) -> St
 /// Print a `Value` as a Lisp string, with buffer-manager awareness for
 /// proper buffer name / killed-buffer rendering.
 pub fn print_value_with_buffers(value: &Value, buffers: &crate::buffer::BufferManager) -> String {
+    print_value_with_buffers_and_options(value, buffers, PrintOptions::default())
+}
+
+pub fn print_value_with_buffers_and_options(
+    value: &Value,
+    buffers: &crate::buffer::BufferManager,
+    options: PrintOptions,
+) -> String {
     if let Some(handle) = print_special_handle(value) {
         return handle;
     }
@@ -55,11 +72,11 @@ pub fn print_value_with_buffers(value: &Value, buffers: &crate::buffer::BufferMa
         }
         Value::Cons(_) => {
             // Recurse with buffer awareness
-            if let Some(shorthand) = print_list_shorthand_with_buffers(value, buffers) {
+            if let Some(shorthand) = print_list_shorthand_with_buffers(value, buffers, options) {
                 return shorthand;
             }
             let mut out = String::from("(");
-            print_cons_with_buffers(value, &mut out, buffers);
+            print_cons_with_buffers(value, &mut out, buffers, options);
             out.push(')');
             out
         }
@@ -70,17 +87,18 @@ pub fn print_value_with_buffers(value: &Value, buffers: &crate::buffer::BufferMa
             let items = with_heap(|h| h.get_vector(*v).clone());
             let parts: Vec<String> = items
                 .iter()
-                .map(|v| print_value_with_buffers(v, buffers))
+                .map(|v| print_value_with_buffers_and_options(v, buffers, options))
                 .collect();
             format!("[{}]", parts.join(" "))
         }
-        _ => print_value(value),
+        _ => print_value_with_options(value, options),
     }
 }
 
 fn print_list_shorthand_with_buffers(
     value: &Value,
     buffers: &crate::buffer::BufferManager,
+    options: PrintOptions,
 ) -> Option<String> {
     let items = list_to_vec(value)?;
     if items.len() != 2 {
@@ -92,7 +110,10 @@ fn print_list_shorthand_with_buffers(
     };
     if head == "make-hash-table-from-literal" {
         if let Some(payload) = quote_payload(&items[1]) {
-            return Some(format!("#s{}", print_value_with_buffers(&payload, buffers)));
+            return Some(format!(
+                "#s{}",
+                print_value_with_buffers_and_options(&payload, buffers, options)
+            ));
         }
         return None;
     }
@@ -106,7 +127,7 @@ fn print_list_shorthand_with_buffers(
     };
     Some(format!(
         "{prefix}{}",
-        print_value_with_buffers(&items[1], buffers)
+        print_value_with_buffers_and_options(&items[1], buffers, options)
     ))
 }
 
@@ -114,6 +135,7 @@ fn print_cons_with_buffers(
     value: &Value,
     out: &mut String,
     buffers: &crate::buffer::BufferManager,
+    options: PrintOptions,
 ) {
     let mut cursor = *value;
     let mut first = true;
@@ -124,7 +146,9 @@ fn print_cons_with_buffers(
                     out.push(' ');
                 }
                 let pair = read_cons(cell);
-                out.push_str(&print_value_with_buffers(&pair.car, buffers));
+                out.push_str(&print_value_with_buffers_and_options(
+                    &pair.car, buffers, options,
+                ));
                 cursor = pair.cdr;
                 first = false;
             }
@@ -133,7 +157,9 @@ fn print_cons_with_buffers(
                 if !first {
                     out.push_str(" . ");
                 }
-                out.push_str(&print_value_with_buffers(&other, buffers));
+                out.push_str(&print_value_with_buffers_and_options(
+                    &other, buffers, options,
+                ));
                 return;
             }
         }
@@ -142,6 +168,10 @@ fn print_cons_with_buffers(
 
 /// Print a `Value` as a Lisp string.
 pub fn print_value(value: &Value) -> String {
+    print_value_with_options(value, PrintOptions::default())
+}
+
+pub fn print_value_with_options(value: &Value, options: PrintOptions) -> String {
     if let Some(handle) = print_special_handle(value) {
         return handle;
     }
@@ -150,33 +180,23 @@ pub fn print_value(value: &Value) -> String {
         Value::True => "t".to_string(),
         Value::Int(v) => v.to_string(),
         Value::Float(f, _) => format_float(*f),
-        Value::Symbol(id) => {
-            let name = resolve_sym(*id);
-            let canonical = lookup_interned(name);
-            if canonical == Some(*id) {
-                format_symbol_name(name)
-            } else if name.is_empty() {
-                "#:".to_string()
-            } else {
-                format!("#:{}", format_symbol_name(name))
-            }
-        }
+        Value::Symbol(id) => format_symbol(*id, options),
         Value::Keyword(id) => resolve_sym(*id).to_owned(),
         Value::Str(id) => {
             let s = with_heap(|h| h.get_string(*id).clone());
             match get_string_text_properties(*id) {
-                Some(runs) => format_lisp_propertized_string(&s, &runs),
+                Some(runs) => format_lisp_propertized_string(&s, &runs, options),
                 None => format_lisp_string(&s),
             }
         }
         // Emacs chars are integer values, so print as codepoint.
         Value::Char(c) => (*c as u32).to_string(),
         Value::Cons(_) => {
-            if let Some(shorthand) = print_list_shorthand(value) {
+            if let Some(shorthand) = print_list_shorthand(value, options) {
                 return shorthand;
             }
             let mut out = String::from("(");
-            print_cons(value, &mut out);
+            print_cons(value, &mut out, options);
             out.push(')');
             out
         }
@@ -185,15 +205,21 @@ pub fn print_value(value: &Value) -> String {
                 return format_bool_vector(value, nbits as usize);
             }
             let items = with_heap(|h| h.get_vector(*v).clone());
-            let parts: Vec<String> = items.iter().map(print_value).collect();
+            let parts: Vec<String> = items
+                .iter()
+                .map(|item| print_value_with_options(item, options))
+                .collect();
             format!("[{}]", parts.join(" "))
         }
         Value::Record(v) => {
             let items = with_heap(|h| h.get_vector(*v).clone());
-            let parts: Vec<String> = items.iter().map(print_value).collect();
+            let parts: Vec<String> = items
+                .iter()
+                .map(|item| print_value_with_options(item, options))
+                .collect();
             format!("#s({})", parts.join(" "))
         }
-        Value::HashTable(id) => format_hash_table(*id),
+        Value::HashTable(id) => format_hash_table(*id, options),
         Value::Lambda(_id) => {
             let lambda = value.get_lambda_data().unwrap();
             let params = format_params(&lambda.params);
@@ -209,7 +235,7 @@ pub fn print_value(value: &Value) -> String {
                 let env_str = if env == Value::Nil {
                     "(t)".to_string()
                 } else {
-                    print_value(&env)
+                    print_value_with_options(&env, options)
                 };
                 format!("(closure {} {} {})", env_str, params, body)
             } else {
@@ -244,12 +270,16 @@ pub fn print_value(value: &Value) -> String {
 ///
 /// This preserves non-UTF-8 byte payloads encoded via NeoVM string sentinels.
 pub fn print_value_bytes(value: &Value) -> Vec<u8> {
+    print_value_bytes_with_options(value, PrintOptions::default())
+}
+
+pub fn print_value_bytes_with_options(value: &Value, options: PrintOptions) -> Vec<u8> {
     let mut out = Vec::new();
-    append_print_value_bytes(value, &mut out);
+    append_print_value_bytes(value, &mut out, options);
     out
 }
 
-fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
+fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>, options: PrintOptions) {
     if let Some(handle) = print_special_handle(value) {
         out.extend_from_slice(handle.as_bytes());
         return;
@@ -259,7 +289,7 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
         Value::True => out.extend_from_slice(b"t"),
         Value::Int(v) => out.extend_from_slice(v.to_string().as_bytes()),
         Value::Float(f, _) => out.extend_from_slice(format_float(*f).as_bytes()),
-        Value::Symbol(id) => out.extend_from_slice(format_symbol_name(resolve_sym(*id)).as_bytes()),
+        Value::Symbol(id) => append_symbol_bytes(*id, out, options),
         Value::Keyword(id) => out.extend_from_slice(resolve_sym(*id).as_bytes()),
         Value::Str(id) => {
             let s = with_heap(|h| h.get_string(*id).clone());
@@ -272,7 +302,7 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
                     out.push(b' ');
                     out.extend_from_slice(run.end.to_string().as_bytes());
                     out.push(b' ');
-                    append_print_value_bytes(&run.plist, out);
+                    append_print_value_bytes(&run.plist, out, options);
                 }
                 out.push(b')');
             } else {
@@ -281,12 +311,12 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
         }
         Value::Char(c) => out.extend_from_slice((*c as u32).to_string().as_bytes()),
         Value::Cons(_) => {
-            if let Some(shorthand) = print_list_shorthand_bytes(value) {
+            if let Some(shorthand) = print_list_shorthand_bytes(value, options) {
                 out.extend_from_slice(&shorthand);
                 return;
             }
             out.push(b'(');
-            print_cons_bytes(value, out);
+            print_cons_bytes(value, out, options);
             out.push(b')');
         }
         Value::Vector(v) => {
@@ -300,7 +330,7 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
                 if idx > 0 {
                     out.push(b' ');
                 }
-                append_print_value_bytes(item, out);
+                append_print_value_bytes(item, out, options);
             }
             out.push(b']');
         }
@@ -311,12 +341,12 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
                 if idx > 0 {
                     out.push(b' ');
                 }
-                append_print_value_bytes(item, out);
+                append_print_value_bytes(item, out, options);
             }
             out.push(b')');
         }
         Value::HashTable(id) => {
-            out.extend_from_slice(format_hash_table(*id).as_bytes());
+            out.extend_from_slice(format_hash_table(*id, options).as_bytes());
         }
         Value::Lambda(_id) => {
             let lambda = value.get_lambda_data().unwrap();
@@ -365,6 +395,26 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
 /// Re-export for compatibility.
 pub fn print_expr(expr: &Expr) -> String {
     expr::print_expr(expr)
+}
+
+fn format_symbol(id: super::intern::SymId, options: PrintOptions) -> String {
+    let name = resolve_sym(id);
+    let canonical = lookup_interned(name);
+    if canonical == Some(id) {
+        format_symbol_name(name)
+    } else if options.print_gensym {
+        if name.is_empty() {
+            "#:".to_string()
+        } else {
+            format!("#:{}", format_symbol_name(name))
+        }
+    } else {
+        format_symbol_name(name)
+    }
+}
+
+fn append_symbol_bytes(id: super::intern::SymId, out: &mut Vec<u8>, options: PrintOptions) {
+    out.extend_from_slice(format_symbol(id, options).as_bytes());
 }
 
 fn format_symbol_name(name: &str) -> String {
@@ -547,7 +597,7 @@ fn format_params(params: &super::value::LambdaParams) -> String {
     }
 }
 
-fn print_list_shorthand(value: &Value) -> Option<String> {
+fn print_list_shorthand(value: &Value, options: PrintOptions) -> Option<String> {
     let items = list_to_vec(value)?;
     if items.len() != 2 {
         return None;
@@ -560,7 +610,7 @@ fn print_list_shorthand(value: &Value) -> Option<String> {
 
     if head == "make-hash-table-from-literal" {
         if let Some(payload) = quote_payload(&items[1]) {
-            return Some(format!("#s{}", print_value(&payload)));
+            return Some(format!("#s{}", print_value_with_options(&payload, options)));
         }
         return None;
     }
@@ -574,10 +624,13 @@ fn print_list_shorthand(value: &Value) -> Option<String> {
         _ => return None,
     };
 
-    Some(format!("{prefix}{}", print_value(&items[1])))
+    Some(format!(
+        "{prefix}{}",
+        print_value_with_options(&items[1], options)
+    ))
 }
 
-fn print_list_shorthand_bytes(value: &Value) -> Option<Vec<u8>> {
+fn print_list_shorthand_bytes(value: &Value, options: PrintOptions) -> Option<Vec<u8>> {
     let items = list_to_vec(value)?;
     if items.len() != 2 {
         return None;
@@ -592,7 +645,7 @@ fn print_list_shorthand_bytes(value: &Value) -> Option<Vec<u8>> {
         let payload = quote_payload(&items[1])?;
         let mut out = Vec::new();
         out.extend_from_slice(b"#s");
-        append_print_value_bytes(&payload, &mut out);
+        append_print_value_bytes(&payload, &mut out, options);
         return Some(out);
     }
 
@@ -607,7 +660,7 @@ fn print_list_shorthand_bytes(value: &Value) -> Option<Vec<u8>> {
 
     let mut out = Vec::new();
     out.extend_from_slice(prefix);
-    append_print_value_bytes(&items[1], &mut out);
+    append_print_value_bytes(&items[1], &mut out, options);
     Some(out)
 }
 
@@ -622,7 +675,7 @@ fn quote_payload(value: &Value) -> Option<Value> {
     }
 }
 
-fn print_cons(value: &Value, out: &mut String) {
+fn print_cons(value: &Value, out: &mut String, options: PrintOptions) {
     let mut cursor = *value;
     let mut first = true;
     loop {
@@ -632,7 +685,7 @@ fn print_cons(value: &Value, out: &mut String) {
                     out.push(' ');
                 }
                 let pair = read_cons(cell);
-                out.push_str(&print_value(&pair.car));
+                out.push_str(&print_value_with_options(&pair.car, options));
                 cursor = pair.cdr;
                 first = false;
             }
@@ -641,14 +694,14 @@ fn print_cons(value: &Value, out: &mut String) {
                 if !first {
                     out.push_str(" . ");
                 }
-                out.push_str(&print_value(&other));
+                out.push_str(&print_value_with_options(&other, options));
                 return;
             }
         }
     }
 }
 
-fn print_cons_bytes(value: &Value, out: &mut Vec<u8>) {
+fn print_cons_bytes(value: &Value, out: &mut Vec<u8>, options: PrintOptions) {
     let mut cursor = *value;
     let mut first = true;
     loop {
@@ -658,7 +711,7 @@ fn print_cons_bytes(value: &Value, out: &mut Vec<u8>) {
                     out.push(b' ');
                 }
                 let pair = read_cons(cell);
-                append_print_value_bytes(&pair.car, out);
+                append_print_value_bytes(&pair.car, out, options);
                 cursor = pair.cdr;
                 first = false;
             }
@@ -667,7 +720,7 @@ fn print_cons_bytes(value: &Value, out: &mut Vec<u8>) {
                 if !first {
                     out.extend_from_slice(b" . ");
                 }
-                append_print_value_bytes(&other, out);
+                append_print_value_bytes(&other, out, options);
                 return;
             }
         }
@@ -727,7 +780,7 @@ fn append_bool_vector_bytes(value: &Value, nbits: usize, out: &mut Vec<u8>) {
 
 // -- Hash-table printing ----------------------------------------------------
 
-fn format_hash_table(id: crate::gc::types::ObjId) -> String {
+fn format_hash_table(id: crate::gc::types::ObjId, options: PrintOptions) -> String {
     let table = with_heap(|h| h.get_hash_table(id).clone());
     let mut out = String::from("#s(hash-table");
 
@@ -760,9 +813,9 @@ fn format_hash_table(id: crate::gc::types::ObjId) -> String {
                     out.push(' ');
                 }
                 let key_val = super::hashtab::hash_key_to_visible_value(&table, key);
-                out.push_str(&print_value(&key_val));
+                out.push_str(&print_value_with_options(&key_val, options));
                 out.push(' ');
-                out.push_str(&print_value(val));
+                out.push_str(&print_value_with_options(val, options));
                 first = false;
             }
         }

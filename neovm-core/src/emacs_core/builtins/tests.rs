@@ -5757,6 +5757,23 @@ fn prin1_to_string_supports_noescape_for_strings() {
 }
 
 #[test]
+fn prin1_to_string_respects_print_gensym_binding() {
+    let mut eval = crate::emacs_core::eval::Evaluator::new();
+    let sym = Value::Symbol(intern_uninterned("vm-print-gensym"));
+
+    let default_text = dispatch_builtin(&mut eval, "prin1-to-string", vec![sym])
+        .expect("prin1-to-string should resolve")
+        .expect("prin1-to-string should evaluate");
+    assert_eq!(default_text, Value::string("vm-print-gensym"));
+
+    eval.set_variable("print-gensym", Value::True);
+    let gensym_text = dispatch_builtin(&mut eval, "prin1-to-string", vec![sym])
+        .expect("prin1-to-string should resolve with print-gensym")
+        .expect("prin1-to-string should evaluate with print-gensym");
+    assert_eq!(gensym_text, Value::string("#:vm-print-gensym"));
+}
+
+#[test]
 fn prin1_to_string_ignores_extra_args_for_compat() {
     let mut eval = crate::emacs_core::eval::Evaluator::new();
     let result = dispatch_builtin(

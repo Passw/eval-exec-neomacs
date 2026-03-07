@@ -688,7 +688,7 @@ fn print_threading_handle(eval: &super::eval::Evaluator, value: &Value) -> Optio
 }
 
 pub(super) fn print_value_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
-    print_threading_handle(eval, value).unwrap_or_else(|| super::print::print_value(value))
+    super::error::print_value_with_eval(eval, value)
 }
 
 fn princ_text_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
@@ -723,7 +723,7 @@ fn prin1_to_string_value_eval(
     } else if let Some(handle) = print_threading_handle(eval, value) {
         handle
     } else {
-        bytes_to_storage_string(&super::print::print_value_bytes(value))
+        bytes_to_storage_string(&super::error::print_value_bytes_with_eval(eval, value))
     }
 }
 

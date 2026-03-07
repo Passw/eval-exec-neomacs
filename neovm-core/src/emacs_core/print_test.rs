@@ -37,16 +37,30 @@ fn print_symbol_escapes_reader_sensitive_chars() {
 }
 
 #[test]
-fn print_uninterned_symbols_with_reader_round_trip_syntax() {
+fn print_uninterned_symbols_follow_gnu_default_print_gensym_nil() {
+    assert_eq!(print_value(&Value::Symbol(intern_uninterned("foo"))), "foo");
     assert_eq!(
-        print_value(&Value::Symbol(intern_uninterned("foo"))),
+        print_value(&Value::Symbol(intern_uninterned(":foo"))),
+        ":foo"
+    );
+    assert_eq!(print_value(&Value::Symbol(intern_uninterned(""))), "##");
+}
+
+#[test]
+fn print_uninterned_symbols_support_print_gensym_round_trip_syntax() {
+    let options = PrintOptions { print_gensym: true };
+    assert_eq!(
+        print_value_with_options(&Value::Symbol(intern_uninterned("foo")), options),
         "#:foo"
     );
     assert_eq!(
-        print_value(&Value::Symbol(intern_uninterned(":foo"))),
+        print_value_with_options(&Value::Symbol(intern_uninterned(":foo")), options),
         "#::foo"
     );
-    assert_eq!(print_value(&Value::Symbol(intern_uninterned(""))), "#:");
+    assert_eq!(
+        print_value_with_options(&Value::Symbol(intern_uninterned("")), options),
+        "#:"
+    );
 }
 
 #[test]
