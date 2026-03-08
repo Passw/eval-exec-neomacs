@@ -4,8 +4,9 @@ use super::error::{EvalError, map_flow};
 use super::eval::{quote_to_value, value_to_expr};
 use super::expr::Expr;
 use super::expr::print_expr;
-use super::intern::{intern, resolve_sym};
+use super::intern::{intern, intern_uninterned, lookup_interned, resolve_sym, SymId};
 use super::value::{HashTableTest, Value, list_to_vec, with_heap_mut};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
@@ -664,12 +665,163 @@ fn cache_key(lexical_binding: bool) -> String {
     format!("{ELISP_CACHE_SCHEMA};vm={ELISP_CACHE_VM_VERSION};lexical={lexical}")
 }
 
-const ELISP_EXPANDED_CACHE_MAGIC: &str = "NEOVM-ELISP-CACHE-V2";
-const ELISP_EXPANDED_CACHE_SCHEMA: &str = "schema=2";
+// V3 stores expanded forms in a structural binary encoding so uninterned symbol
+// identity survives cache round-trips. V2 used printed text and cannot preserve
+// repeated `#:foo` identity, so it must not share a wire format/version.
+const ELISP_EXPANDED_CACHE_MAGIC: &str = "NEOVM-ELISP-CACHE-V3";
+const ELISP_EXPANDED_CACHE_SCHEMA: &str = "schema=3";
+const ELISP_EXPANDED_CACHE_LEGACY_MAGIC: &str = "NEOVM-ELISP-CACHE-V2";
+const ELISP_EXPANDED_CACHE_LEGACY_SCHEMA: &str = "schema=2";
+
+#[derive(Serialize, Deserialize, Debug)]
+enum CachedExpr {
+    Int(i64),
+    Float(f64),
+    Symbol(String),
+    UninternedSymbol { slot: u32, name: String },
+    ReaderLoadFileName,
+    Keyword(String),
+    Str(String),
+    Char(char),
+    List(Vec<CachedExpr>),
+    Vector(Vec<CachedExpr>),
+    DottedList(Vec<CachedExpr>, Box<CachedExpr>),
+    Bool(bool),
+}
+
+#[derive(Default)]
+struct CacheExprEncoder {
+    uninterned_slots: std::collections::HashMap<SymId, u32>,
+    next_slot: u32,
+}
+
+#[derive(Default)]
+struct CacheExprDecoder {
+    uninterned_slots: std::collections::HashMap<u32, SymId>,
+}
 
 fn expanded_cache_key(lexical_binding: bool) -> String {
     let lexical = if lexical_binding { "1" } else { "0" };
     format!("{ELISP_EXPANDED_CACHE_SCHEMA};vm={ELISP_CACHE_VM_VERSION};lexical={lexical}")
+}
+
+fn legacy_expanded_cache_key(lexical_binding: bool) -> String {
+    let lexical = if lexical_binding { "1" } else { "0" };
+    format!("{ELISP_EXPANDED_CACHE_LEGACY_SCHEMA};vm={ELISP_CACHE_VM_VERSION};lexical={lexical}")
+}
+
+fn is_canonical_symbol_id(id: SymId) -> bool {
+    lookup_interned(resolve_sym(id)).is_some_and(|canonical| canonical == id)
+}
+
+fn expr_contains_noncanonical_symbols(expr: &Expr) -> bool {
+    match expr {
+        Expr::Symbol(id) => !is_canonical_symbol_id(*id),
+        Expr::List(items) | Expr::Vector(items) => {
+            items.iter().any(expr_contains_noncanonical_symbols)
+        }
+        Expr::DottedList(items, tail) => {
+            items.iter().any(expr_contains_noncanonical_symbols)
+                || expr_contains_noncanonical_symbols(tail)
+        }
+        _ => false,
+    }
+}
+
+fn legacy_expanded_cache_is_lossless(forms: &[Expr]) -> bool {
+    !forms.iter().any(expr_contains_noncanonical_symbols)
+}
+
+impl CacheExprEncoder {
+    fn encode(&mut self, expr: &Expr) -> Option<CachedExpr> {
+        Some(match expr {
+            Expr::Int(n) => CachedExpr::Int(*n),
+            Expr::Float(f) => CachedExpr::Float(*f),
+            Expr::Symbol(id) => {
+                let name = resolve_sym(*id).to_owned();
+                if is_canonical_symbol_id(*id) {
+                    CachedExpr::Symbol(name)
+                } else {
+                    let slot = *self.uninterned_slots.entry(*id).or_insert_with(|| {
+                        let slot = self.next_slot;
+                        self.next_slot += 1;
+                        slot
+                    });
+                    CachedExpr::UninternedSymbol { slot, name }
+                }
+            }
+            Expr::ReaderLoadFileName => CachedExpr::ReaderLoadFileName,
+            Expr::Keyword(id) => CachedExpr::Keyword(resolve_sym(*id).to_owned()),
+            Expr::Str(s) => CachedExpr::Str(s.clone()),
+            Expr::Char(c) => CachedExpr::Char(*c),
+            Expr::List(items) => CachedExpr::List(
+                items
+                    .iter()
+                    .map(|item| self.encode(item))
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            Expr::Vector(items) => CachedExpr::Vector(
+                items
+                    .iter()
+                    .map(|item| self.encode(item))
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            Expr::DottedList(items, tail) => CachedExpr::DottedList(
+                items
+                    .iter()
+                    .map(|item| self.encode(item))
+                    .collect::<Option<Vec<_>>>()?,
+                Box::new(self.encode(tail)?),
+            ),
+            Expr::Bool(b) => CachedExpr::Bool(*b),
+            Expr::OpaqueValue(_) => return None,
+        })
+    }
+}
+
+impl CacheExprDecoder {
+    fn decode(&mut self, expr: &CachedExpr) -> Expr {
+        match expr {
+            CachedExpr::Int(n) => Expr::Int(*n),
+            CachedExpr::Float(f) => Expr::Float(*f),
+            CachedExpr::Symbol(name) => Expr::Symbol(intern(name)),
+            CachedExpr::UninternedSymbol { slot, name } => {
+                let sym = *self
+                    .uninterned_slots
+                    .entry(*slot)
+                    .or_insert_with(|| intern_uninterned(name));
+                Expr::Symbol(sym)
+            }
+            CachedExpr::ReaderLoadFileName => Expr::ReaderLoadFileName,
+            CachedExpr::Keyword(name) => Expr::Keyword(intern(name)),
+            CachedExpr::Str(s) => Expr::Str(s.clone()),
+            CachedExpr::Char(c) => Expr::Char(*c),
+            CachedExpr::List(items) => Expr::List(items.iter().map(|item| self.decode(item)).collect()),
+            CachedExpr::Vector(items) => {
+                Expr::Vector(items.iter().map(|item| self.decode(item)).collect())
+            }
+            CachedExpr::DottedList(items, tail) => Expr::DottedList(
+                items.iter().map(|item| self.decode(item)).collect(),
+                Box::new(self.decode(tail)),
+            ),
+            CachedExpr::Bool(b) => Expr::Bool(*b),
+        }
+    }
+}
+
+fn serialize_cached_exprs(forms: &[Expr]) -> Option<Vec<u8>> {
+    let mut encoder = CacheExprEncoder::default();
+    let cached = forms
+        .iter()
+        .map(|form| encoder.encode(form))
+        .collect::<Option<Vec<_>>>()?;
+    bincode::serialize(&cached).ok()
+}
+
+fn deserialize_cached_exprs(bytes: &[u8]) -> Option<Vec<Expr>> {
+    let cached: Vec<CachedExpr> = bincode::deserialize(bytes).ok()?;
+    let mut decoder = CacheExprDecoder::default();
+    Some(cached.iter().map(|expr| decoder.decode(expr)).collect())
 }
 
 fn source_hash(content: &str) -> u64 {
@@ -813,31 +965,44 @@ fn maybe_load_expanded_cache(
     lexical_binding: bool,
 ) -> Option<Vec<Expr>> {
     let cache_path = cache_sidecar_path(source_path);
-    let raw = fs::read_to_string(cache_path).ok()?;
-    let mut parts = raw.splitn(5, '\n');
-    let magic = parts.next()?;
-    let key = parts.next()?;
-    let hash = parts.next()?;
+    let raw = fs::read(cache_path).ok()?;
+    let mut parts = raw.splitn(5, |byte| *byte == b'\n');
+    let magic = std::str::from_utf8(parts.next()?).ok()?;
+    let key = std::str::from_utf8(parts.next()?).ok()?;
+    let hash = std::str::from_utf8(parts.next()?).ok()?;
     let blank = parts.next()?;
-    let payload = parts.next().unwrap_or("");
+    let payload = parts.next().unwrap_or(&[]);
 
-    if magic != ELISP_EXPANDED_CACHE_MAGIC {
-        return None;
-    }
     if !blank.is_empty() {
         return None;
     }
 
-    let expected_key = format!("key={}", expanded_cache_key(lexical_binding));
-    if key != expected_key {
-        return None;
-    }
     let expected_hash = format!("source-hash={:016x}", source_hash(source));
     if hash != expected_hash {
         return None;
     }
 
-    super::parser::parse_forms(payload).ok()
+    if magic == ELISP_EXPANDED_CACHE_MAGIC {
+        let expected_key = format!("key={}", expanded_cache_key(lexical_binding));
+        if key != expected_key {
+            return None;
+        }
+        return deserialize_cached_exprs(payload);
+    }
+
+    if magic == ELISP_EXPANDED_CACHE_LEGACY_MAGIC {
+        let expected_key = format!("key={}", legacy_expanded_cache_key(lexical_binding));
+        if key != expected_key {
+            return None;
+        }
+        let payload = std::str::from_utf8(payload).ok()?;
+        let forms = super::parser::parse_forms(payload).ok()?;
+        if legacy_expanded_cache_is_lossless(&forms) {
+            return Some(forms);
+        }
+    }
+
+    None
 }
 
 fn write_expanded_cache(
@@ -847,20 +1012,22 @@ fn write_expanded_cache(
     forms: &[Expr],
 ) -> std::io::Result<()> {
     let cache_path = cache_sidecar_path(source_path);
-    let payload = forms.iter().map(print_expr).collect::<Vec<_>>().join("\n");
-    let raw = format!(
-        "{ELISP_EXPANDED_CACHE_MAGIC}\nkey={}\nsource-hash={:016x}\n\n{}\n",
+    let payload = serialize_cached_exprs(forms)
+        .ok_or_else(|| std::io::Error::other("failed to serialize expanded cache payload"))?;
+    let header = format!(
+        "{ELISP_EXPANDED_CACHE_MAGIC}\nkey={}\nsource-hash={:016x}\n\n",
         expanded_cache_key(lexical_binding),
         source_hash(source),
-        payload
     );
+    let mut raw = header.into_bytes();
+    raw.extend_from_slice(&payload);
 
     let tmp_path = cache_temp_path(source_path);
     let write_result = (|| -> std::io::Result<()> {
         maybe_inject_cache_write_failure(CACHE_WRITE_PHASE_BEFORE_WRITE)?;
 
         let mut file = fs::File::create(&tmp_path)?;
-        file.write_all(raw.as_bytes())?;
+        file.write_all(&raw)?;
         file.sync_data()?;
 
         maybe_inject_cache_write_failure(CACHE_WRITE_PHASE_AFTER_WRITE)?;

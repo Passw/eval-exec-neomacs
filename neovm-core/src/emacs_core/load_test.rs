@@ -167,6 +167,37 @@ fn partial_bootstrap_eval_until(stop_before: &str, prefer_compiled: bool) -> Eva
     eval
 }
 
+fn eval_rendered(eval: &mut Evaluator, form: &str) -> String {
+    let parsed = crate::emacs_core::parser::parse_forms(form).expect("parse eval form");
+    match eval.eval_expr(&parsed[0]) {
+        Ok(value) => format!(
+            "OK {}",
+            crate::emacs_core::print::print_value_with_buffers(&value, &eval.buffers)
+        ),
+        Err(err) => format!("ERR {}", format_eval_error(eval, &err)),
+    }
+}
+
+fn cached_bootstrap_eval_with_loaded_file(path: &std::path::Path, form: &str) -> String {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    load_file(&mut eval, path).unwrap_or_else(|err| {
+        panic!(
+            "failed loading {}: {}",
+            path.display(),
+            format_eval_error(&eval, &err)
+        )
+    });
+    eval_rendered(&mut eval, form)
+}
+
+fn cached_bootstrap_with_loaded_source(source: &str, form: &str) -> String {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("vm-gv-load.el");
+    std::fs::write(&path, source).expect("write temp elisp source");
+    cached_bootstrap_eval_with_loaded_file(&path, form)
+}
+
 #[test]
 fn profile_single_bootstrap_file_load() {
     if std::env::var("NEOVM_PROFILE_BOOTSTRAP_FILE").is_err() {
@@ -1564,6 +1595,211 @@ fn oracle_bootstrap_helper_matches_char_syntax_comprehensive_form() {
 }
 
 #[test]
+fn bootstrap_cl_subseq_setf_updates_vector() {
+    let rendered = crate::emacs_core::oracle_test::common::run_neovm_eval_with_bootstrap(
+        r#"
+(progn
+  (require 'cl-lib)
+  (let ((v (vector 1 2 3 4 5)))
+    (setf (cl-subseq v 1 3) '(20 30))
+    (append v nil)))
+"#,
+    )
+    .expect("bootstrapped cl-subseq setf evaluation");
+    assert_eq!(rendered, "OK (1 20 30 4 5)");
+}
+
+#[test]
+fn bootstrap_function_put_gv_expander_round_trip() {
+    let rendered = crate::emacs_core::oracle_test::common::run_neovm_eval_with_bootstrap(
+        r#"
+(progn
+  (require 'gv)
+  (function-put
+   'vm-direct-gv
+   'gv-expander
+   (lambda (do &rest args)
+     (gv--defsetter
+      'vm-direct-gv
+      (lambda (new seq start &optional end)
+        (macroexp-let2 nil new new
+          `(progn
+             (list ,new ,seq ,start ,end)
+             ,new)))
+      do args)))
+  (funcall
+   (function-get 'vm-direct-gv 'gv-expander)
+   (lambda (_getter setter) (funcall setter '(20 30)))
+   'v 1 3))
+"#,
+    )
+    .expect("bootstrapped direct gv expander evaluation");
+    assert_eq!(rendered, "OK (20 30)");
+}
+
+#[test]
+fn bootstrap_gv_define_setter_round_trip() {
+    let rendered = crate::emacs_core::oracle_test::common::run_neovm_eval_with_bootstrap(
+        r#"
+(progn
+  (require 'gv)
+  (gv-define-setter vm-gv-defined (new seq start &optional end)
+    (macroexp-let2 nil new new
+      `(progn
+         (list ,new ,seq ,start ,end)
+         ,new)))
+  (funcall
+   (function-get 'vm-gv-defined 'gv-expander)
+   (lambda (_getter setter) (funcall setter '(20 30)))
+   'v 1 3))
+"#,
+    )
+    .expect("bootstrapped gv-define-setter evaluation");
+    assert_eq!(rendered, "OK (let* ((v v) (new (20 30))) (progn (list new v 1 3) new))");
+}
+
+#[test]
+fn bootstrap_defun_gv_setter_declaration_round_trip() {
+    let rendered = crate::emacs_core::oracle_test::common::run_neovm_eval_with_bootstrap(
+        r#"
+(progn
+  (defun vm-decl-gv (seq start &optional end)
+    (declare
+     (gv-setter
+      (lambda (new)
+        (macroexp-let2 nil new new
+          `(progn
+             (list ,seq ,new ,start ,end)
+             ,new)))))
+    (list seq start end))
+  (funcall
+   (function-get 'vm-decl-gv 'gv-expander)
+   (lambda (_getter setter) (funcall setter '(20 30)))
+   'v 1 3))
+"#,
+    )
+    .expect("bootstrapped defun gv-setter declaration evaluation");
+    assert_eq!(rendered, "OK (let* ((v v) (new (20 30))) (progn (list v new 1 3) new))");
+}
+
+#[test]
+fn bootstrap_defun_gv_setter_declaration_evaluates_generated_form() {
+    let rendered = crate::emacs_core::oracle_test::common::run_neovm_eval_with_bootstrap(
+        r#"
+(progn
+  (defun vm-decl-gv-subseq (seq start &optional end)
+    (declare
+     (gv-setter
+      (lambda (new)
+        (macroexp-let2 nil new new
+          `(progn
+             (cl-replace ,seq ,new :start1 ,start :end1 ,end)
+             ,new)))))
+    (seq-subseq seq start end))
+  (let ((v (vector 1 2 3 4 5)))
+    (eval
+     (funcall
+      (function-get 'vm-decl-gv-subseq 'gv-expander)
+      (lambda (_getter setter) (funcall setter ''(20 30)))
+      'v 1 3)
+     t)
+    (append v nil)))
+"#,
+    )
+    .expect("bootstrapped defun gv-setter declaration setter-eval");
+    assert_eq!(rendered, "OK (1 20 30 4 5)");
+}
+
+#[test]
+fn bootstrap_cl_extra_source_vs_compiled_cl_subseq_setf() {
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest.parent().expect("project root");
+    let cl_extra_base = project_root.join("lisp/emacs-lisp/cl-extra");
+    let source_path = source_suffixed_path(&cl_extra_base);
+    let compiled_path = compiled_suffixed_path(&cl_extra_base);
+
+    let form = r#"
+(let ((v (vector 1 2 3 4 5)))
+  (setf (cl-subseq v 1 3) '(20 30))
+  (append v nil))
+"#;
+
+    let source_rendered = cached_bootstrap_eval_with_loaded_file(&source_path, form);
+    let compiled_rendered = cached_bootstrap_eval_with_loaded_file(&compiled_path, form);
+
+    assert_eq!(source_rendered, "OK (1 20 30 4 5)");
+    assert_eq!(compiled_rendered, "OK (1 20 30 4 5)");
+}
+
+#[test]
+fn bootstrap_cl_extra_compiled_gv_expander_matches_source() {
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest.parent().expect("project root");
+    let cl_extra_base = project_root.join("lisp/emacs-lisp/cl-extra");
+    let source_path = source_suffixed_path(&cl_extra_base);
+    let compiled_path = compiled_suffixed_path(&cl_extra_base);
+
+    let form = r#"
+(let* ((expander (function-get 'cl-subseq 'gv-expander))
+       (setter (funcall expander (lambda (_getter setter) setter) 'v 1 3)))
+  (funcall setter ''(20 30)))
+"#;
+
+    let source_rendered = cached_bootstrap_eval_with_loaded_file(&source_path, form);
+    let compiled_rendered = cached_bootstrap_eval_with_loaded_file(&compiled_path, form);
+
+    assert_eq!(compiled_rendered, source_rendered);
+}
+
+#[test]
+fn bootstrap_load_file_defun_gv_setter_declaration_evaluates_generated_form() {
+    let source = r#"
+(defun vm-loaded-gv-subseq (seq start &optional end)
+  (declare
+   (gv-setter
+    (lambda (new)
+      (macroexp-let2 nil new new
+        `(progn
+           (cl-replace ,seq ,new :start1 ,start :end1 ,end)
+           ,new)))))
+  (seq-subseq seq start end))
+"#;
+    let form = r#"
+(let ((v (vector 1 2 3 4 5)))
+  (setf (vm-loaded-gv-subseq v 1 3) '(20 30))
+  (append v nil))
+"#;
+    let rendered = cached_bootstrap_with_loaded_source(source, form);
+    assert_eq!(rendered, "OK (1 20 30 4 5)");
+}
+
+#[test]
+fn bootstrap_load_file_exact_cl_subseq_shape_evaluates_generated_form() {
+    let source = r#"
+(defun vm-loaded-cl-subseq-shape (seq start &optional end)
+  "Return the subsequence of SEQ from START to END.
+If END is omitted, it defaults to the length of the sequence.
+If START or END is negative, it counts from the end.
+Signal an error if START or END are outside of the sequence (i.e
+too large if positive or too small if negative)."
+  (declare (side-effect-free t)
+           (gv-setter
+            (lambda (new)
+              (macroexp-let2 nil new new
+                `(progn (cl-replace ,seq ,new :start1 ,start :end1 ,end)
+                        ,new)))))
+  (seq-subseq seq start end))
+"#;
+    let form = r#"
+(let ((v (vector 1 2 3 4 5)))
+  (setf (vm-loaded-cl-subseq-shape v 1 3) '(20 30))
+  (append v nil))
+"#;
+    let rendered = cached_bootstrap_with_loaded_source(source, form);
+    assert_eq!(rendered, "OK (1 20 30 4 5)");
+}
+
+#[test]
 fn cl_callf_updates_generalized_place() {
     let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
     let form = crate::emacs_core::parser::parse_forms(
@@ -2207,6 +2443,40 @@ fn expanded_cache_round_trip() {
 }
 
 #[test]
+fn expanded_cache_preserves_uninterned_symbol_identity() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock before epoch")
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("neovm-v2-cache-uninterned-{unique}"));
+    fs::create_dir_all(&dir).expect("create temp fixture dir");
+    let file = dir.join("probe.el");
+    let source = "(let* ((#:exp 1) (x #:exp)) x)\n";
+    fs::write(&file, source).expect("write fixture");
+
+    let mut eval = Evaluator::new();
+    let exp = crate::emacs_core::intern::intern_uninterned("exp");
+    let forms = vec![Expr::List(vec![
+        Expr::Symbol(intern("let*")),
+        Expr::List(vec![
+            Expr::List(vec![Expr::Symbol(exp), Expr::Int(1)]),
+            Expr::List(vec![Expr::Symbol(intern("x")), Expr::Symbol(exp)]),
+        ]),
+        Expr::Symbol(intern("x")),
+    ])];
+
+    write_expanded_cache(&file, source, true, &forms).expect("write V2 cache");
+    let loaded = maybe_load_expanded_cache(&file, source, true).expect("load V2 cache");
+    let value = eval.eval_expr(&loaded[0]).expect("evaluate cached form");
+    assert_eq!(
+        crate::emacs_core::print::print_value_with_buffers(&value, &eval.buffers),
+        "1"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn expanded_cache_invalidated_by_source_change() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -2239,7 +2509,7 @@ fn expanded_cache_invalidated_by_source_change() {
 }
 
 #[test]
-fn v2_cache_overwrites_v1() {
+fn v3_cache_overwrites_v1() {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("clock before epoch")
@@ -2263,19 +2533,77 @@ fn v2_cache_overwrites_v1() {
         "V1 cache should be readable"
     );
 
-    // Write V2 cache — overwrites the same .neoc file
+    // Write V3 cache — overwrites the same .neoc file
     write_expanded_cache(&file, source, true, &forms).expect("write V2 cache");
 
-    // V1 reader should NOT match V2 cache (different magic)
+    // V1 reader should NOT match V3 cache (different magic)
     assert!(
         maybe_load_cached_forms(&file, source, true).is_none(),
-        "V1 reader should return None after V2 overwrites the cache file"
+        "V1 reader should return None after V3 overwrites the cache file"
     );
 
-    // V2 reader should still work
+    // V3 reader should still work
     assert!(
         maybe_load_expanded_cache(&file, source, true).is_some(),
-        "V2 reader should still work after overwrite"
+        "V3 reader should still work after overwrite"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn v3_reader_rejects_legacy_textual_v2_cache() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock before epoch")
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("neovm-v3-rejects-v2-{unique}"));
+    fs::create_dir_all(&dir).expect("create temp fixture dir");
+    let file = dir.join("probe.el");
+    let source = "(let* ((#:exp 1) (x #:exp)) x)\n";
+    fs::write(&file, source).expect("write fixture");
+
+    let legacy_payload = format!(
+        "NEOVM-ELISP-CACHE-V2\nkey=schema=2;vm={};lexical=1\nsource-hash={:016x}\n\n{}",
+        ELISP_CACHE_VM_VERSION,
+        source_hash(source),
+        source.trim_end()
+    );
+    fs::write(cache_sidecar_path(&file), legacy_payload).expect("write legacy V2 cache");
+
+    assert!(
+        maybe_load_expanded_cache(&file, source, true).is_none(),
+        "V3 reader must reject legacy textual V2 caches"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn v3_reader_accepts_lossless_legacy_textual_v2_cache() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock before epoch")
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("neovm-v3-accepts-v2-{unique}"));
+    fs::create_dir_all(&dir).expect("create temp fixture dir");
+    let file = dir.join("probe.el");
+    let source = "(setq x '(1 2 3))\n";
+    fs::write(&file, source).expect("write fixture");
+
+    let legacy_payload = format!(
+        "{ELISP_EXPANDED_CACHE_LEGACY_MAGIC}\nkey={}\nsource-hash={:016x}\n\n{}",
+        legacy_expanded_cache_key(true),
+        source_hash(source),
+        source.trim_end()
+    );
+    fs::write(cache_sidecar_path(&file), legacy_payload).expect("write legacy V2 cache");
+
+    let loaded = maybe_load_expanded_cache(&file, source, true).expect("load legacy V2 cache");
+    assert_eq!(
+        loaded,
+        crate::emacs_core::parser::parse_forms(source).expect("parse source"),
+        "lossless legacy V2 cache should still load"
     );
 
     let _ = fs::remove_dir_all(&dir);
