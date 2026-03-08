@@ -591,12 +591,6 @@ pub(crate) fn builtin_fillarray(args: Vec<Value>) -> EvalResult {
     }
 }
 
-pub(crate) fn builtin_find_coding_systems_region_internal(args: Vec<Value>) -> EvalResult {
-    expect_range_args("find-coding-systems-region-internal", &args, 2, 3)?;
-    let _ = expect_integer_or_marker(&args[1])?;
-    Ok(Value::True)
-}
-
 pub(crate) fn builtin_define_fringe_bitmap(args: Vec<Value>) -> EvalResult {
     expect_range_args("define-fringe-bitmap", &args, 2, 5)?;
     if args[0].as_symbol_name().is_none() {

@@ -44,8 +44,8 @@ fn aliases_resolve() {
     assert!(m.is_known("iso-8859-1")); // alias for latin-1
     assert!(m.is_known("us-ascii")); // alias for ascii
     assert!(m.is_known("mule-utf-8")); // alias for utf-8
-    assert_eq!(m.resolve("iso-8859-1"), Some("latin-1"));
-    assert_eq!(m.resolve("us-ascii"), Some("ascii"));
+    assert_eq!(m.resolve("iso-8859-1"), Some("iso-latin-1"));
+    assert_eq!(m.resolve("ascii"), Some("us-ascii"));
 }
 
 #[test]
@@ -120,6 +120,20 @@ fn coding_system_aliases_found() {
     assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "utf-8"));
     // Should include aliases like mule-utf-8
     assert!(items.len() > 1);
+}
+
+#[test]
+fn coding_system_aliases_derive_eol_suffixes() {
+    let m = mgr();
+    let result = builtin_coding_system_aliases(&m, vec![Value::symbol("latin-1-unix")]).unwrap();
+    assert_eq!(
+        result,
+        Value::list(vec![
+            Value::symbol("iso-latin-1-unix"),
+            Value::symbol("iso-8859-1-unix"),
+            Value::symbol("latin-1-unix"),
+        ])
+    );
 }
 
 #[test]

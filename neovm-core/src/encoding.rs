@@ -259,6 +259,51 @@ pub fn is_multibyte_string(s: &str) -> bool {
     })
 }
 
+fn encode_eol_text(s: &str, coding_system: &str) -> String {
+    if coding_system.ends_with("-dos") {
+        let mut out = String::with_capacity(s.len() + s.matches('\n').count());
+        for ch in s.chars() {
+            if ch == '\n' {
+                out.push('\r');
+            }
+            out.push(ch);
+        }
+        return out;
+    }
+
+    if coding_system.ends_with("-mac") {
+        return s.replace('\n', "\r");
+    }
+
+    s.to_string()
+}
+
+fn decode_eol_text(bytes: &[u8], coding_system: &str) -> Vec<u8> {
+    if coding_system.ends_with("-dos") {
+        let mut out = Vec::with_capacity(bytes.len());
+        let mut i = 0usize;
+        while i < bytes.len() {
+            if bytes[i] == b'\r' && bytes.get(i + 1) == Some(&b'\n') {
+                out.push(b'\n');
+                i += 2;
+            } else {
+                out.push(bytes[i]);
+                i += 1;
+            }
+        }
+        return out;
+    }
+
+    if coding_system.ends_with("-mac") {
+        return bytes
+            .iter()
+            .map(|byte| if *byte == b'\r' { b'\n' } else { *byte })
+            .collect();
+    }
+
+    bytes.to_vec()
+}
+
 // ---------------------------------------------------------------------------
 // Encoding conversion
 // ---------------------------------------------------------------------------
@@ -266,33 +311,35 @@ pub fn is_multibyte_string(s: &str) -> bool {
 /// Encode a string to bytes using the specified coding system.
 /// Currently only UTF-8 is supported.
 pub fn encode_string(s: &str, coding_system: &str) -> Vec<u8> {
+    let eol_text = encode_eol_text(s, coding_system);
     match coding_system {
-        "utf-8" | "utf-8-unix" | "utf-8-dos" | "utf-8-mac" => s.as_bytes().to_vec(),
-        "latin-1" | "iso-8859-1" | "iso-latin-1" => s
+        "utf-8" | "utf-8-unix" | "utf-8-dos" | "utf-8-mac" => eol_text.as_bytes().to_vec(),
+        "latin-1" | "iso-8859-1" | "iso-latin-1" => eol_text
             .chars()
             .map(|c| if (c as u32) <= 0xff { c as u8 } else { b'?' })
             .collect(),
-        "ascii" | "us-ascii" => s
+        "ascii" | "us-ascii" => eol_text
             .chars()
             .map(|c| if c.is_ascii() { c as u8 } else { b'?' })
             .collect(),
-        _ => s.as_bytes().to_vec(), // default to UTF-8
+        _ => eol_text.as_bytes().to_vec(), // default to UTF-8
     }
 }
 
 /// Decode bytes to a string using the specified coding system.
 /// Currently only UTF-8 is supported.
 pub fn decode_bytes(bytes: &[u8], coding_system: &str) -> String {
+    let bytes = decode_eol_text(bytes, coding_system);
     match coding_system {
         "utf-8" | "utf-8-unix" | "utf-8-dos" | "utf-8-mac" => {
-            String::from_utf8_lossy(bytes).into_owned()
+            String::from_utf8_lossy(&bytes).into_owned()
         }
         "latin-1" | "iso-8859-1" | "iso-latin-1" => bytes.iter().map(|&b| b as char).collect(),
         "ascii" | "us-ascii" => bytes
             .iter()
             .map(|&b| if b < 128 { b as char } else { '?' })
             .collect(),
-        _ => String::from_utf8_lossy(bytes).into_owned(),
+        _ => String::from_utf8_lossy(&bytes).into_owned(),
     }
 }
 
@@ -538,13 +585,19 @@ pub(crate) fn builtin_encode_coding_string(args: Vec<Value>) -> EvalResult {
         coding.as_str(),
         "utf-8" | "utf-8-unix" | "utf-8-dos" | "utf-8-mac"
     ) {
+        let encoded = encode_eol_text(&s, &coding);
         return Ok(Value::unibyte_string(bytes_to_unibyte_storage_string(
-            &storage_string_to_bytes(&s),
+            &storage_string_to_bytes(&encoded),
         )));
     }
     if is_byte_preserving_coding_system(&coding) {
+        let encoded = if coding.starts_with("raw-text") {
+            encode_eol_text(&s, &coding)
+        } else {
+            s.clone()
+        };
         return Ok(Value::unibyte_string(bytes_to_unibyte_storage_string(
-            &storage_string_to_bytes(&s),
+            &storage_string_to_bytes(&encoded),
         )));
     }
     let bytes = encode_string(&s, &coding);
@@ -581,6 +634,11 @@ pub(crate) fn builtin_decode_coding_string(args: Vec<Value>) -> EvalResult {
     }
     let bytes = storage_string_to_bytes(&s);
     if is_byte_preserving_coding_system(&coding) {
+        let bytes = if coding.starts_with("raw-text") {
+            decode_eol_text(&bytes, &coding)
+        } else {
+            bytes
+        };
         return Ok(Value::unibyte_string(bytes_to_unibyte_storage_string(
             &bytes,
         )));
@@ -589,6 +647,7 @@ pub(crate) fn builtin_decode_coding_string(args: Vec<Value>) -> EvalResult {
         coding.as_str(),
         "utf-8" | "utf-8-unix" | "utf-8-dos" | "utf-8-mac"
     ) {
+        let bytes = decode_eol_text(&bytes, &coding);
         return match String::from_utf8(bytes.clone()) {
             Ok(text) => Ok(Value::multibyte_string(text)),
             Err(_) => Ok(Value::multibyte_string(bytes_to_multibyte_raw_string(
@@ -1050,6 +1109,43 @@ mod tests {
         assert_eq!(bytes, b"hello");
         let decoded = decode_bytes(b"hello", "utf-8");
         assert_eq!(decoded, "hello");
+    }
+
+    #[test]
+    fn encoding_utf8_dos_applies_eol_conversion() {
+        let bytes = encode_string("a\nb", "utf-8-dos");
+        assert_eq!(bytes, b"a\r\nb");
+        let decoded = decode_bytes(b"a\r\nb", "utf-8-dos");
+        assert_eq!(decoded, "a\nb");
+    }
+
+    #[test]
+    fn raw_text_dos_preserves_bytes_but_converts_eol() {
+        let encoded = builtin_encode_coding_string(vec![
+            Value::string("a\nb"),
+            Value::symbol("raw-text-dos"),
+        ])
+        .unwrap();
+        let Value::Str(id) = encoded else {
+            panic!("encode-coding-string should return a string");
+        };
+        assert_eq!(
+            with_heap(|heap| heap.get_string(id).clone()),
+            bytes_to_unibyte_storage_string(b"a\r\nb")
+        );
+
+        let decoded = builtin_decode_coding_string(vec![
+            Value::unibyte_string(bytes_to_unibyte_storage_string(b"a\r\nb")),
+            Value::symbol("raw-text-dos"),
+        ])
+        .unwrap();
+        let Value::Str(id) = decoded else {
+            panic!("decode-coding-string should return a string");
+        };
+        assert_eq!(
+            with_heap(|heap| heap.get_string(id).clone()),
+            bytes_to_unibyte_storage_string(b"a\nb")
+        );
     }
 
     #[test]

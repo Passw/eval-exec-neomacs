@@ -5109,9 +5109,20 @@ fn dispatch_builtin_pure_handles_fillarray_and_find_coding_region_internal() {
         &[Value::Int(9), Value::Int(9), Value::Int(9)]
     );
 
-    let coding = dispatch_builtin_pure(
+    assert!(
+        dispatch_builtin_pure(
+            "find-coding-systems-region-internal",
+            vec![Value::Int(0), Value::Int(1)]
+        )
+        .is_none(),
+        "find-coding-systems-region-internal should use the eval-aware path"
+    );
+
+    let mut eval = crate::emacs_core::eval::Evaluator::new();
+    let coding = dispatch_builtin(
+        &mut eval,
         "find-coding-systems-region-internal",
-        vec![Value::Int(0), Value::Int(1)],
+        vec![Value::string("hello"), Value::Nil],
     )
     .expect("find-coding-systems-region-internal should resolve")
     .expect("find-coding-systems-region-internal should evaluate");

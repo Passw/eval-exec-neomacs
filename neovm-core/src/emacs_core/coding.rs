@@ -17,6 +17,7 @@
 //!   set-terminal-coding-system, coding-system-priority-list
 
 use super::error::{EvalResult, Flow, signal};
+use super::eval::Evaluator;
 use super::intern::resolve_sym;
 use super::value::*;
 use std::collections::{HashMap, HashSet};
@@ -303,49 +304,49 @@ impl CodingSystemManager {
             EolType::Mac,
         ));
         mgr.register(CodingSystemInfo::new(
-            "latin-1",
+            "iso-latin-1",
             "charset",
             'l',
             EolType::Undecided,
         ));
         mgr.register(CodingSystemInfo::new(
-            "latin-1-unix",
+            "iso-latin-1-unix",
             "charset",
             'l',
             EolType::Unix,
         ));
         mgr.register(CodingSystemInfo::new(
-            "latin-1-dos",
+            "iso-latin-1-dos",
             "charset",
             'l',
             EolType::Dos,
         ));
         mgr.register(CodingSystemInfo::new(
-            "latin-1-mac",
+            "iso-latin-1-mac",
             "charset",
             'l',
             EolType::Mac,
         ));
         mgr.register(CodingSystemInfo::new(
-            "ascii",
+            "us-ascii",
             "charset",
             'A',
             EolType::Undecided,
         ));
         mgr.register(CodingSystemInfo::new(
-            "ascii-unix",
+            "us-ascii-unix",
             "charset",
             'A',
             EolType::Unix,
         ));
         mgr.register(CodingSystemInfo::new(
-            "ascii-dos",
+            "us-ascii-dos",
             "charset",
             'A',
             EolType::Dos,
         ));
         mgr.register(CodingSystemInfo::new(
-            "ascii-mac",
+            "us-ascii-mac",
             "charset",
             'A',
             EolType::Mac,
@@ -441,21 +442,21 @@ impl CodingSystemManager {
         mgr.aliases
             .insert("cp65001".to_string(), "utf-8".to_string());
         mgr.aliases
-            .insert("iso-8859-1".to_string(), "latin-1".to_string());
+            .insert("iso-8859-1".to_string(), "iso-latin-1".to_string());
         mgr.aliases
-            .insert("iso-latin-1".to_string(), "latin-1".to_string());
+            .insert("latin-1".to_string(), "iso-latin-1".to_string());
         mgr.aliases
-            .insert("us-ascii".to_string(), "ascii".to_string());
+            .insert("ascii".to_string(), "us-ascii".to_string());
         mgr.aliases
-            .insert("iso-safe".to_string(), "ascii".to_string());
+            .insert("iso-safe".to_string(), "us-ascii".to_string());
 
         // Default priority list
         mgr.priority = vec![
             "utf-8".to_string(),
             "utf-8-unix".to_string(),
             "undecided".to_string(),
-            "latin-1".to_string(),
-            "ascii".to_string(),
+            "iso-latin-1".to_string(),
+            "us-ascii".to_string(),
             "raw-text".to_string(),
             "binary".to_string(),
             "no-conversion".to_string(),
@@ -622,6 +623,9 @@ pub(crate) fn builtin_coding_system_aliases(
         ]));
     }
 
+    let suffix = EolType::from_suffix(&resolved_name)
+        .map(|eol| eol.suffix())
+        .unwrap_or("");
     let canonical = runtime_bucket_name(mgr, &resolved_name)
         .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
     let display = display_base_name(strip_eol_suffix(&resolved_name)).to_string();
@@ -631,16 +635,20 @@ pub(crate) fn builtin_coding_system_aliases(
             .cmp(&alias_sort_rank(&canonical, b))
             .then_with(|| a.cmp(b))
     });
-    let mut result = vec![Value::symbol(display.clone())];
+    let mut names = vec![format!("{display}{suffix}")];
     for alias in aliases {
         if alias != display {
-            result.push(Value::symbol(alias));
+            names.push(format!("{alias}{suffix}"));
         }
     }
-    if canonical != display {
-        result.push(Value::symbol(canonical));
+    if canonical != display
+        && !names
+            .iter()
+            .any(|name| name == &format!("{canonical}{suffix}"))
+    {
+        names.push(format!("{canonical}{suffix}"));
     }
-    Ok(Value::list(result))
+    Ok(Value::list(names.into_iter().map(Value::symbol).collect()))
 }
 
 /// `(coding-system-get CODING-SYSTEM PROP)` -- get a property of a coding system.
@@ -1738,8 +1746,8 @@ fn default_mnemonic_for_base(base: &str) -> Option<i64> {
 
 fn properties_bucket_base(base: &str) -> &str {
     match base {
-        "latin-1" | "iso-8859-1" | "iso-latin-1" => "latin-1",
-        "ascii" | "us-ascii" => "ascii",
+        "latin-1" | "iso-8859-1" | "iso-latin-1" => "iso-latin-1",
+        "ascii" | "us-ascii" => "us-ascii",
         "binary" | "no-conversion" | "nil" => "no-conversion",
         "emacs-internal" | "utf-8-emacs" => "utf-8-emacs",
         "mule-utf-8" => "utf-8",
@@ -1825,13 +1833,145 @@ fn alias_sort_rank(canonical: &str, alias: &str) -> usize {
             "cp65001" => 1,
             _ => 2,
         },
-        "ascii" => match alias {
+        "iso-latin-1" => match alias {
+            "iso-8859-1" => 0,
+            "latin-1" => 1,
+            _ => 2,
+        },
+        "us-ascii" => match alias {
             "iso-safe" => 0,
-            "us-ascii" => 1,
+            "ascii" => 1,
             _ => 2,
         },
         _ => 0,
     }
+}
+
+fn raw_coding_candidates(mgr: &CodingSystemManager, exclude: Option<&[Value]>) -> Vec<String> {
+    let excluded: HashSet<String> = exclude
+        .unwrap_or(&[])
+        .iter()
+        .filter_map(|value| value.as_symbol_name().map(|name| name.to_string()))
+        .collect();
+
+    let mut names: Vec<String> = mgr
+        .systems
+        .values()
+        .filter(|info| info.eol_type == EolType::Undecided)
+        .map(|info| display_base_name(strip_eol_suffix(&info.name)).to_string())
+        .filter(|name| {
+            !matches!(
+                name.as_str(),
+                "raw-text" | "no-conversion" | "binary" | "undecided"
+            )
+        })
+        .filter(|name| !excluded.contains(name))
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
+fn coding_can_encode_char(coding: &str, ch: char) -> bool {
+    match properties_bucket_base(coding) {
+        "utf-8" | "utf-8-emacs" | "utf-8-auto" | "prefer-utf-8" => true,
+        "iso-latin-1" => (ch as u32) <= 0xFF,
+        "us-ascii" => ch.is_ascii(),
+        _ => false,
+    }
+}
+
+fn safe_coding_systems_for_text(
+    mgr: &CodingSystemManager,
+    text: &str,
+    multibyte: bool,
+    exclude: Option<&[Value]>,
+) -> Value {
+    if !multibyte || text.is_ascii() {
+        return Value::True;
+    }
+
+    if !text.is_ascii() {
+        let mut safe_codings = Vec::new();
+        for coding in raw_coding_candidates(mgr, exclude) {
+            if text
+                .chars()
+                .filter(|ch| !ch.is_ascii())
+                .all(|ch| coding_can_encode_char(&coding, ch))
+            {
+                safe_codings.push(Value::symbol(coding));
+            }
+        }
+        safe_codings.push(Value::symbol("raw-text"));
+        safe_codings.push(Value::symbol("no-conversion"));
+        return Value::list(safe_codings);
+    }
+
+    Value::True
+}
+
+fn marker_or_integer_position(value: &Value) -> Result<i64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n),
+        v if super::marker::is_marker(v) => super::marker::marker_position_as_int(v),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("integer-or-marker-p"), *other],
+        )),
+    }
+}
+
+pub(crate) fn builtin_find_coding_systems_region_internal_eval(
+    eval: &mut Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("find-coding-systems-region-internal", &args, 2)?;
+    expect_max_args("find-coding-systems-region-internal", &args, 3)?;
+
+    if let Value::Str(string) = args[0] {
+        let exclude = args.get(2).and_then(super::value::list_to_vec);
+        let (text, multibyte) = with_heap(|heap| {
+            (
+                heap.get_string(string).clone(),
+                heap.string_is_multibyte(string),
+            )
+        });
+        return Ok(safe_coding_systems_for_text(
+            &eval.coding_systems,
+            &text,
+            multibyte,
+            exclude.as_deref(),
+        ));
+    }
+
+    let start = marker_or_integer_position(&args[0])?;
+    let end = marker_or_integer_position(&args[1])?;
+    let exclude = args.get(2).and_then(super::value::list_to_vec);
+
+    let buffer = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    if !buffer.multibyte {
+        return Ok(Value::True);
+    }
+
+    let char_count = buffer.text.char_count() as i64;
+    if !(1..=char_count + 1).contains(&start) || !(1..=char_count + 1).contains(&end) || start > end
+    {
+        return Err(signal("args-out-of-range", vec![args[0], args[1]]));
+    }
+
+    let start_byte = buffer.text.char_to_byte((start - 1) as usize);
+    let end_byte = buffer.text.char_to_byte((end - 1) as usize);
+    let text = buffer.text.to_string();
+    let slice = &text[start_byte..end_byte];
+    Ok(safe_coding_systems_for_text(
+        &eval.coding_systems,
+        slice,
+        buffer.multibyte,
+        exclude.as_deref(),
+    ))
 }
 
 // ===========================================================================

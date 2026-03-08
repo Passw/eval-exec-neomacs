@@ -2887,6 +2887,11 @@ pub(crate) fn dispatch_builtin(
                 args,
             ));
         }
+        "find-coding-systems-region-internal" => {
+            return Some(
+                super::coding::builtin_find_coding_systems_region_internal_eval(eval, args),
+            );
+        }
         "seq-position" => return Some(super::cl_lib::builtin_seq_position(eval, args)),
         "seq-contains-p" => return Some(super::cl_lib::builtin_seq_contains_p(eval, args)),
         "seq-mapn" => return Some(super::cl_lib::builtin_seq_mapn(eval, args)),
@@ -4008,8 +4013,6 @@ pub(crate) fn dispatch_builtin(
         "sqlitep" => builtin_sqlitep(args),
         "fillarray" => builtin_fillarray(args),
         "define-hash-table-test" => builtin_define_hash_table_test(args),
-        "find-coding-systems-region-internal" => builtin_find_coding_systems_region_internal(args),
-
         // Native compilation compatibility (pure)
         "comp--compile-ctxt-to-file0" => super::comp::builtin_comp_compile_ctxt_to_file0(args),
         "comp--init-ctxt" => super::comp::builtin_comp_init_ctxt(args),
@@ -4954,8 +4957,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "internal--hash-table-index-size" => {
             super::hashtab::builtin_internal_hash_table_index_size(args)
         }
-        "find-coding-systems-region-internal" => builtin_find_coding_systems_region_internal(args),
-
         // atimer.c gap-fill
         "debug-timer-check" => builtin_debug_timer_check(args),
 
