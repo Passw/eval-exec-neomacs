@@ -28,7 +28,7 @@ mod ui_commands;
 mod window_commands;
 mod window_events;
 
-pub(crate) use bootstrap::run_render_loop;
+pub use bootstrap::run_render_loop;
 #[cfg(feature = "wpe-webkit")]
 use state::WebKitImportPolicy;
 use state::{FpsCounter, ImeCursorArea, RenderApp, WindowChrome};

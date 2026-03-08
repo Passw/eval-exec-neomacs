@@ -216,7 +216,7 @@ impl RenderApp {
 }
 
 /// Run the render loop (called on render thread)
-pub(crate) fn run_render_loop(
+pub fn run_render_loop(
     comms: RenderComms,
     width: u32,
     height: u32,
