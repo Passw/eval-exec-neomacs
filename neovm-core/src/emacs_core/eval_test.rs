@@ -601,6 +601,17 @@ fn lambda_captures_docstring_metadata() {
 }
 
 #[test]
+fn lambda_single_string_body_is_a_return_value_not_a_docstring() {
+    let mut ev = Evaluator::new();
+    let forms = parse_forms("(lambda nil \"ok-1\")").expect("parse");
+    let value = ev.eval_expr(&forms[0]).expect("eval");
+    let lambda = value.get_lambda_data().expect("expected lambda value");
+    assert_eq!(lambda.docstring, None);
+    assert_eq!(lambda.body.as_ref(), &vec![Expr::Str("ok-1".to_string())]);
+    assert_eq!(eval_one("(funcall (lambda nil \"ok-1\"))"), "OK \"ok-1\"");
+}
+
+#[test]
 fn defmacro_captures_docstring_metadata() {
     let mut ev = Evaluator::new();
     let forms = parse_forms("(defmacro vm-doc-macro (x) \"macro-doc\" x)").expect("parse");

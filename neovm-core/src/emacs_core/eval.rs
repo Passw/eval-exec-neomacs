@@ -4743,8 +4743,8 @@ impl Evaluator {
         let params = self.parse_lambda_params(&tail[0])?;
 
         // Extract docstring if present as the first body element.
-        let (docstring, body_start) = match tail.get(1) {
-            Some(Expr::Str(s)) => (Some(s.clone()), 2),
+        let (docstring, body_start) = match (tail.get(1), tail.get(2)) {
+            (Some(Expr::Str(s)), Some(_)) => (Some(s.clone()), 2),
             _ => (None, 1),
         };
 
