@@ -53,6 +53,59 @@ fn basic_arithmetic() {
 }
 
 #[test]
+fn substring_accepts_vectors_like_gnu_emacs() {
+    assert_eq!(eval_one("(substring [10 20 30 40 50] 1 4)"), "OK [20 30 40]");
+    assert_eq!(eval_one("(substring [10 20 30 40 50] -3 -1)"), "OK [30 40]");
+    assert_eq!(eval_one("(substring [10 20 30] 0)"), "OK [10 20 30]");
+}
+
+#[test]
+fn eval_of_generated_lambda_preserves_uninterned_symbol_identity() {
+    assert_eq!(
+        eval_one(
+            r#"
+(let* ((exp (make-symbol "exp"))
+       (form (list 'let
+                   '((lexical-binding t))
+                   (list 'lambda
+                         '(new)
+                         (list 'let*
+                               (list (list exp 'new)
+                                     (list 'x exp))
+                               'x))))
+       (f (eval form t)))
+  (funcall f 42))
+"#
+        ),
+        "OK 42"
+    );
+}
+
+#[test]
+fn put_get_preserves_closure_captured_uninterned_symbol_identity() {
+    assert_eq!(
+        eval_one(
+            r#"
+(let* ((exp (make-symbol "exp"))
+       (form (list 'let
+                   '((lexical-binding t))
+                   (list 'lambda
+                         '(new)
+                         (list 'let*
+                               (list (list exp 'new)
+                                     (list 'x exp))
+                               'x))))
+       (f (eval form t)))
+  (put 'vm-closure-prop 'vm-test-prop f)
+  (garbage-collect)
+  (funcall (get 'vm-closure-prop 'vm-test-prop) 42))
+"#
+        ),
+        "OK 42"
+    );
+}
+
+#[test]
 fn recent_input_events_are_bounded() {
     let mut ev = Evaluator::new();
     for i in 0..(RECENT_INPUT_EVENT_LIMIT + 1) {

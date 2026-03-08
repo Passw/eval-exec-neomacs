@@ -28,79 +28,124 @@ pub(crate) fn builtin_string_greaterp(args: Vec<Value>) -> EvalResult {
 fn substring_impl(name: &str, args: &[Value], preserve_props: bool) -> EvalResult {
     expect_min_args(name, args, 1)?;
     expect_max_args(name, args, 3)?;
-    let src_id = match &args[0] {
-        Value::Str(id) => Some(*id),
-        _ => None,
-    };
-    let s = expect_string(&args[0])?;
-    let len = storage_char_len(&s) as i64;
+    match &args[0] {
+        Value::Str(src_id) => {
+            let s = with_heap(|h| h.get_string(*src_id).clone());
+            let len = storage_char_len(&s) as i64;
 
-    let normalize_index = |value: &Value, default: i64| -> Result<i64, Flow> {
-        let raw = if value.is_nil() {
-            default
-        } else {
-            expect_int(value)?
-        };
-        let idx = if raw < 0 { len + raw } else { raw };
-        if idx < 0 || idx > len {
-            return Err(signal(
-                "args-out-of-range",
-                vec![args[0], args[1], args.get(2).cloned().unwrap_or(Value::Nil)],
-            ));
-        }
-        Ok(idx)
-    };
+            let normalize_index = |value: &Value, default: i64| -> Result<i64, Flow> {
+                let raw = if value.is_nil() {
+                    default
+                } else {
+                    expect_int(value)?
+                };
+                let idx = if raw < 0 { len + raw } else { raw };
+                if idx < 0 || idx > len {
+                    return Err(signal(
+                        "args-out-of-range",
+                        vec![args[0], args[1], args.get(2).cloned().unwrap_or(Value::Nil)],
+                    ));
+                }
+                Ok(idx)
+            };
 
-    let from = if args.len() > 1 {
-        normalize_index(&args[1], 0)?
-    } else {
-        0
-    } as usize;
+            let from = if args.len() > 1 {
+                normalize_index(&args[1], 0)?
+            } else {
+                0
+            } as usize;
 
-    let to = if args.len() > 2 {
-        normalize_index(&args[2], len)?
-    } else {
-        len
-    } as usize;
+            let to = if args.len() > 2 {
+                normalize_index(&args[2], len)?
+            } else {
+                len
+            } as usize;
 
-    if from > to {
-        return Err(signal(
-            "args-out-of-range",
-            vec![
-                args[0],
-                args.get(1).cloned().unwrap_or(Value::Int(0)),
-                args.get(2).cloned().unwrap_or(Value::Nil),
-            ],
-        ));
-    }
-    let result = storage_substring(&s, from, to).ok_or_else(|| {
-        signal(
-            "args-out-of-range",
-            vec![
-                args[0],
-                args.get(1).cloned().unwrap_or(Value::Int(0)),
-                args.get(2).cloned().unwrap_or(Value::Nil),
-            ],
-        )
-    })?;
-    let new_val = Value::string(&result);
+            if from > to {
+                return Err(signal(
+                    "args-out-of-range",
+                    vec![
+                        args[0],
+                        args.get(1).cloned().unwrap_or(Value::Int(0)),
+                        args.get(2).cloned().unwrap_or(Value::Nil),
+                    ],
+                ));
+            }
+            let result = storage_substring(&s, from, to).ok_or_else(|| {
+                signal(
+                    "args-out-of-range",
+                    vec![
+                        args[0],
+                        args.get(1).cloned().unwrap_or(Value::Int(0)),
+                        args.get(2).cloned().unwrap_or(Value::Nil),
+                    ],
+                )
+            })?;
+            let new_val = Value::string(&result);
 
-    // Preserve text properties from source string
-    if preserve_props {
-        if let (Some(sid), Value::Str(new_id)) = (src_id, &new_val) {
-            if let Some(src_table) = get_string_text_properties_table(sid) {
-                use super::super::string_escape::storage_char_to_byte;
-                let byte_from = storage_char_to_byte(&s, from);
-                let byte_to = storage_char_to_byte(&s, to);
-                let sliced = src_table.slice(byte_from, byte_to);
-                if !sliced.is_empty() {
-                    set_string_text_properties_table(*new_id, sliced);
+            // Preserve text properties from source string
+            if preserve_props {
+                if let Value::Str(new_id) = &new_val {
+                    if let Some(src_table) = get_string_text_properties_table(*src_id) {
+                        use super::super::string_escape::storage_char_to_byte;
+                        let byte_from = storage_char_to_byte(&s, from);
+                        let byte_to = storage_char_to_byte(&s, to);
+                        let sliced = src_table.slice(byte_from, byte_to);
+                        if !sliced.is_empty() {
+                            set_string_text_properties_table(*new_id, sliced);
+                        }
+                    }
                 }
             }
+
+            Ok(new_val)
+        }
+        Value::Vector(v) | Value::Record(v) if name == "substring" => {
+            let items = with_heap(|h| h.get_vector(*v).clone());
+            let len = items.len() as i64;
+            let normalize_index = |value: &Value, default: i64| -> Result<i64, Flow> {
+                let raw = if value.is_nil() {
+                    default
+                } else {
+                    expect_int(value)?
+                };
+                let idx = if raw < 0 { len + raw } else { raw };
+                if idx < 0 || idx > len {
+                    return Err(signal(
+                        "args-out-of-range",
+                        vec![args[0], args[1], args.get(2).cloned().unwrap_or(Value::Nil)],
+                    ));
+                }
+                Ok(idx)
+            };
+            let from = if args.len() > 1 {
+                normalize_index(&args[1], 0)?
+            } else {
+                0
+            } as usize;
+            let to = if args.len() > 2 {
+                normalize_index(&args[2], len)?
+            } else {
+                len
+            } as usize;
+            if from > to {
+                return Err(signal(
+                    "args-out-of-range",
+                    vec![
+                        args[0],
+                        args.get(1).cloned().unwrap_or(Value::Int(0)),
+                        args.get(2).cloned().unwrap_or(Value::Nil),
+                    ],
+                ));
+            }
+            Ok(Value::vector(items[from..to].to_vec()))
+        }
+        _ => {
+            let s = expect_string(&args[0])?;
+            let _ = s;
+            unreachable!("expect_string either returns a string or signals")
         }
     }
-
-    Ok(new_val)
 }
 
 pub(crate) fn builtin_substring(args: Vec<Value>) -> EvalResult {

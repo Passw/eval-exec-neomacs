@@ -1535,9 +1535,9 @@ impl Evaluator {
         // Stub macros needed during bootstrap — these are normally defined in
         // gv.el which cannot load yet (NeoVM's pcase special form can't handle
         // gv.el's pcase patterns).  The stubs make (gv-define-expander NAME ...)
-        // and (gv-define-setter NAME ...) expand to nil so cl-lib.el can load.
-        // gv-define-simple-setter and gv-define-setter are also handled as
-        // evaluator special forms (sf_gv_define_simple_setter / sf_gv_define_setter).
+        // and (gv-define-setter NAME ...) expand to nil so cl-lib.el can load
+        // before gv.el is available.  Once gv.el loads, its real macro
+        // definitions replace these bootstrap stubs.
         let noop_macro = Value::make_macro(LambdaData {
             params: LambdaParams {
                 required: Vec::new(),
@@ -3544,7 +3544,7 @@ impl Evaluator {
                 .is_some_and(|e| matches!(e, Expr::Symbol(s) if resolve_sym(*s) == "declare"))
             {
                 for spec in &decl_form[1..] {
-                    self.process_defun_declaration(name, spec);
+                    self.process_defun_declaration(name, &tail[1], spec)?;
                 }
                 idx += 1;
             } else {
@@ -3557,10 +3557,17 @@ impl Evaluator {
 
     /// Process a single declaration spec from a `(declare ...)` form.
     /// Handles key declarations that byte-run.el's defun macro would process.
-    fn process_defun_declaration(&mut self, fn_name: &str, spec: &Expr) {
-        let Expr::List(items) = spec else { return };
+    fn process_defun_declaration(
+        &mut self,
+        fn_name: &str,
+        params: &Expr,
+        spec: &Expr,
+    ) -> Result<(), Flow> {
+        let Expr::List(items) = spec else {
+            return Ok(());
+        };
         let Some(Expr::Symbol(key_id)) = items.first() else {
-            return;
+            return Ok(());
         };
         let key = resolve_sym(*key_id);
         match key {
@@ -3570,27 +3577,49 @@ impl Evaluator {
                     let cm_val = quote_to_value(cm_expr);
                     self.obarray.put_property(fn_name, "compiler-macro", cm_val);
                 }
+                Ok(())
             }
             "side-effect-free" => {
                 if let Some(val_expr) = items.get(1) {
                     let val = quote_to_value(val_expr);
                     self.obarray.put_property(fn_name, "side-effect-free", val);
                 }
+                Ok(())
             }
             "pure" => {
                 if let Some(val_expr) = items.get(1) {
                     let val = quote_to_value(val_expr);
                     self.obarray.put_property(fn_name, "pure", val);
                 }
+                Ok(())
             }
             "gv-expander" | "gv-setter" => {
-                // (gv-expander BODY) → (put 'fn-name 'gv-expander (lambda ...))
-                // (gv-setter BODY) → (put 'fn-name 'gv-setter BODY)
-                if let Some(val_expr) = items.get(1) {
-                    if let Ok(val) = self.eval(val_expr) {
-                        self.obarray.put_property(fn_name, key, val);
+                // GNU Emacs routes these declarations through gv.el's
+                // defun-declaration helpers, which synthesize the correct
+                // generalized-variable expander/setter definitions.  Storing
+                // the raw declaration on the function is not sufficient.
+                if let Some(handler_expr) = items.get(1) {
+                    let helper_name = match key {
+                        "gv-expander" => "gv--expander-defun-declaration",
+                        "gv-setter" => "gv--setter-defun-declaration",
+                        _ => unreachable!(),
+                    };
+                    if let Some(helper) = self.obarray.symbol_function(helper_name).copied() {
+                        let expansion = self.apply(
+                            helper,
+                            vec![
+                                Value::symbol(fn_name),
+                                quote_to_value(params),
+                                quote_to_value(handler_expr),
+                            ],
+                        )?;
+                        let _ = self.eval_value(&expansion)?;
+                    } else {
+                        self.obarray
+                            .put_property(fn_name, key, quote_to_value(handler_expr));
                     }
                 }
+                Ok(())
             }
             "doc-string" => {
                 // (doc-string N) → (put 'fn-name 'doc-string-elt N)
@@ -3598,10 +3627,12 @@ impl Evaluator {
                     let val = quote_to_value(val_expr);
                     self.obarray.put_property(fn_name, "doc-string-elt", val);
                 }
+                Ok(())
             }
             _ => {
                 // Unknown declarations: check defun-declarations-alist
                 // For now, silently ignore.
+                Ok(())
             }
         }
     }

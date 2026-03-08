@@ -1752,6 +1752,53 @@ fn bootstrap_cl_extra_compiled_gv_expander_matches_source() {
 }
 
 #[test]
+fn debug_compiled_cl_extra_setter_bytecode_disasm() {
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest.parent().expect("project root");
+    let cl_extra_base = project_root.join("lisp/emacs-lisp/cl-extra");
+    let compiled_path = compiled_suffixed_path(&cl_extra_base);
+
+    let form = r#"
+(let* ((expander (function-get 'cl-subseq 'gv-expander)))
+  (funcall expander (lambda (_getter setter) setter) 'v 1 3))
+"#;
+
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    load_file(&mut eval, &compiled_path).expect("load compiled cl-extra");
+
+    let expander_form = r#"(function-get 'cl-subseq 'gv-expander)"#;
+    let parsed_expander = crate::emacs_core::parser::parse_forms(expander_form).expect("parse");
+    let expander = eval.eval_expr(&parsed_expander[0]).expect("evaluate expander");
+    let gv_defsetter = eval
+        .obarray()
+        .symbol_function("gv--defsetter")
+        .copied()
+        .expect("gv--defsetter fboundp");
+    eprintln!(
+        "gv--defsetter runtime value: {}",
+        crate::emacs_core::print::print_value_with_buffers(&gv_defsetter, &eval.buffers)
+    );
+    if let Some(bc) = gv_defsetter.get_bytecode_data() {
+        eprintln!("gv--defsetter bytecode:\n{}", bc.disassemble());
+    }
+    let expander_bc = expander.get_bytecode_data().expect("expander bytecode");
+    eprintln!("compiled expander bytecode:\n{}", expander_bc.disassemble());
+
+    let parsed = crate::emacs_core::parser::parse_forms(form).expect("parse");
+    let value = eval.eval_expr(&parsed[0]).expect("evaluate setter form");
+    eprintln!(
+        "compiled setter form: {}",
+        crate::emacs_core::print::print_value_with_buffers(&value, &eval.buffers)
+    );
+
+    let items = crate::emacs_core::value::list_to_vec(&value).expect("setter list");
+    let body = items.last().copied().expect("setter body");
+    let bc = body.get_bytecode_data().expect("setter bytecode");
+    eprintln!("compiled setter bytecode:\n{}", bc.disassemble());
+}
+
+#[test]
 fn bootstrap_load_file_defun_gv_setter_declaration_evaluates_generated_form() {
     let source = r#"
 (defun vm-loaded-gv-subseq (seq start &optional end)
