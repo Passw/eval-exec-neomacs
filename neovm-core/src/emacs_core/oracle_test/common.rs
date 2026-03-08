@@ -5,11 +5,10 @@
 
 use std::io::Write;
 use std::os::unix::process::CommandExt;
+use std::path::PathBuf;
 use std::process::Command;
 
-use crate::emacs_core::{
-    EvalError, Evaluator, Value, parse_forms, print_value, print_value_with_buffers,
-};
+use crate::emacs_core::{EvalError, Evaluator, Value, parse_forms, print_value_with_buffers};
 
 /// Maximum virtual address space (in bytes) for each spawned oracle Emacs
 /// process.  This prevents runaway evaluations from consuming unbounded
@@ -79,7 +78,25 @@ fn write_oracle_form_file(form: &str) -> Result<tempfile::TempPath, String> {
     write_temp_elisp_file("neovm-oracle-form-", ".el", form)
 }
 
-pub(crate) fn run_oracle_eval(form: &str) -> Result<String, String> {
+fn project_lisp_dir() -> PathBuf {
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest.parent().expect("project root").join("lisp")
+}
+
+fn project_lisp_subdirs() -> &'static [&'static str] {
+    &[
+        "",
+        "emacs-lisp",
+        "progmodes",
+        "language",
+        "international",
+        "textmodes",
+        "vc",
+        "leim",
+    ]
+}
+
+fn run_oracle_eval_inner(form: &str, load_files: &[&str]) -> Result<String, String> {
     let form_path = write_oracle_form_file(form)?;
     let program = r#"(condition-case err
     (progn
@@ -101,11 +118,25 @@ pub(crate) fn run_oracle_eval(form: &str) -> Result<String, String> {
     (let* ((coding-system-for-read 'utf-8-unix)
            (coding-system-for-write 'utf-8-unix)
            (_ (set-language-environment "UTF-8"))
+           (load-root (getenv "NEOVM_ORACLE_LOAD_ROOT"))
+           (load-files (split-string (or (getenv "NEOVM_ORACLE_LOAD_FILES") "") "\n" t))
            (form-file (getenv "NEOVM_ORACLE_FORM_FILE"))
            (result
             (let ((source-buf (generate-new-buffer " *neovm-oracle-form*")))
               (unwind-protect
                   (progn
+                    (when load-root
+                      (let ((extra-load-path nil))
+                        (dolist (sub '("" "emacs-lisp" "progmodes" "language"
+                                       "international" "textmodes" "vc" "leim"))
+                          (let ((dir (if (equal sub "")
+                                         load-root
+                                       (expand-file-name sub load-root))))
+                            (when (file-directory-p dir)
+                              (push dir extra-load-path))))
+                        (setq load-path (append (nreverse extra-load-path) load-path))))
+                    (dolist (file load-files)
+                      (load file nil t nil t))
                     (with-current-buffer source-buf
                       (insert-file-contents form-file)
                       (goto-char (point-min)))
@@ -123,10 +154,18 @@ pub(crate) fn run_oracle_eval(form: &str) -> Result<String, String> {
             (prin1-to-string
              (neovm--oracle-normalize (cons (car err) (cdr err))))))))"#;
     let oracle_bin = oracle_emacs_path();
+    let lisp_dir = project_lisp_dir();
+    let oracle_load_files = load_files
+        .iter()
+        .map(|file| lisp_dir.join(file).to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join("\n");
 
     let mem_limit = oracle_mem_limit_bytes();
     let mut cmd = Command::new(&oracle_bin);
     cmd.env("NEOVM_ORACLE_FORM_FILE", form_path.as_os_str())
+        .env("NEOVM_ORACLE_LOAD_ROOT", &lisp_dir)
+        .env("NEOVM_ORACLE_LOAD_FILES", oracle_load_files)
         .env("EMACSNATIVELOADPATH", "/dev/null")
         .args([
             "--batch",
@@ -166,6 +205,112 @@ pub(crate) fn run_oracle_eval(form: &str) -> Result<String, String> {
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn run_oracle_eval_inner_raw(form: &str, load_files: &[&str]) -> Result<String, String> {
+    let form_path = write_oracle_form_file(form)?;
+    let program = r#"(condition-case err
+    (progn
+      (let* ((coding-system-for-read 'utf-8-unix)
+             (coding-system-for-write 'utf-8-unix)
+             (_ (set-language-environment "UTF-8"))
+             (load-root (getenv "NEOVM_ORACLE_LOAD_ROOT"))
+             (load-files (split-string (or (getenv "NEOVM_ORACLE_LOAD_FILES") "") "\n" t))
+             (form-file (getenv "NEOVM_ORACLE_FORM_FILE"))
+             (result
+              (let ((source-buf (generate-new-buffer " *neovm-oracle-form*")))
+                (unwind-protect
+                    (progn
+                      (when load-root
+                        (let ((extra-load-path nil))
+                          (dolist (sub '("" "emacs-lisp" "progmodes" "language"
+                                         "international" "textmodes" "vc" "leim"))
+                            (let ((dir (if (equal sub "")
+                                           load-root
+                                         (expand-file-name sub load-root))))
+                              (when (file-directory-p dir)
+                                (push dir extra-load-path))))
+                          (setq load-path (append (nreverse extra-load-path) load-path))))
+                      (dolist (file load-files)
+                        (load file nil t nil t))
+                      (with-current-buffer source-buf
+                        (insert-file-contents form-file)
+                        (goto-char (point-min)))
+                      (let ((last nil))
+                        (condition-case nil
+                            (while t
+                              (setq last (eval (read source-buf) t)))
+                          (end-of-file last))))
+                  (when (buffer-live-p source-buf)
+                    (kill-buffer source-buf))))))
+        (princ (concat "OK " (prin1-to-string result)))))
+  (error
+   (princ (concat "ERR " (prin1-to-string err)))))"#;
+    let oracle_bin = oracle_emacs_path();
+    let lisp_dir = project_lisp_dir();
+    let oracle_load_files = load_files
+        .iter()
+        .map(|file| lisp_dir.join(file).to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let mem_limit = oracle_mem_limit_bytes();
+    let mut cmd = Command::new(&oracle_bin);
+    cmd.env("NEOVM_ORACLE_FORM_FILE", form_path.as_os_str())
+        .env("NEOVM_ORACLE_LOAD_ROOT", &lisp_dir)
+        .env("NEOVM_ORACLE_LOAD_FILES", oracle_load_files)
+        .env("EMACSNATIVELOADPATH", "/dev/null")
+        .args([
+            "--batch",
+            "-Q",
+            "--eval",
+            "(setq native-comp-jit-compilation nil inhibit-automatic-native-compilation t native-comp-enable-subr-trampolines nil)",
+            "--eval",
+            &program,
+        ]);
+
+    unsafe {
+        cmd.pre_exec(move || {
+            let rlim = libc::rlimit {
+                rlim_cur: mem_limit as libc::rlim_t,
+                rlim_max: mem_limit as libc::rlim_t,
+            };
+            if libc::setrlimit(libc::RLIMIT_AS, &rlim) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+
+    let output = cmd
+        .output()
+        .map_err(|e| format!("failed to run oracle Emacs: {e}"))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "oracle Emacs failed: status={}\nstdout:\n{}\nstderr:\n{}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        ));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+pub(crate) fn run_oracle_eval(form: &str) -> Result<String, String> {
+    run_oracle_eval_inner(form, &[])
+}
+
+pub(crate) fn run_oracle_eval_with_load(form: &str, load_files: &[&str]) -> Result<String, String> {
+    run_oracle_eval_inner(form, load_files)
+}
+
+pub(crate) fn run_oracle_eval_with_load_raw(
+    form: &str,
+    load_files: &[&str],
+) -> Result<String, String> {
+    run_oracle_eval_inner_raw(form, load_files)
 }
 
 pub(crate) fn run_oracle_eval_with_bootstrap(form: &str) -> Result<String, String> {
@@ -246,21 +391,9 @@ pub(crate) fn run_neovm_eval_with_load(form: &str, load_files: &[&str]) -> Resul
     if !load_files.is_empty() {
         // Set up load-path from the project's lisp/ tree so that any
         // `require` calls inside the loaded files can find dependencies.
-        let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let project_root = manifest.parent().expect("project root");
-        let lisp_dir = project_root.join("lisp");
-        let subdirs = [
-            "",
-            "emacs-lisp",
-            "progmodes",
-            "language",
-            "international",
-            "textmodes",
-            "vc",
-            "leim",
-        ];
+        let lisp_dir = project_lisp_dir();
         let mut load_path_entries = Vec::new();
-        for sub in &subdirs {
+        for sub in project_lisp_subdirs() {
             let dir = if sub.is_empty() {
                 lisp_dir.clone()
             } else {
@@ -287,7 +420,7 @@ pub(crate) fn run_neovm_eval_with_load(form: &str, load_files: &[&str]) -> Resul
     }
 
     let result = run_neovm_eval_in_temp_buffer(&mut eval, form)?;
-    let rendered = crate::emacs_core::format_eval_result_with_eval(&eval, &result);
+    let rendered = render_neovm_oracle_result(&eval, result);
     Ok(rendered)
 }
 
@@ -320,7 +453,75 @@ pub(crate) fn assert_ok_eq(expected_payload: &str, oracle: &str, neovm: &str) {
 
 pub(crate) fn assert_oracle_parity_with_load(form: &str, load_files: &[&str]) {
     let neovm = run_neovm_eval_with_load(form, load_files).expect("neovm eval should run");
-    let oracle = run_oracle_eval(form).expect("oracle eval should run");
+    let oracle = run_oracle_eval_with_load(form, load_files).expect("oracle eval should run");
+    assert_eq!(neovm, oracle, "oracle parity mismatch for form: {form}");
+}
+
+pub(crate) fn run_neovm_eval_with_bootstrap_and_load(
+    form: &str,
+    load_files: &[&str],
+) -> Result<String, String> {
+    let mut eval = crate::emacs_core::load::create_bootstrap_evaluator_cached()
+        .map_err(|e| format!("bootstrap failed: {e:?}"))?;
+    crate::emacs_core::load::apply_runtime_startup_state(&mut eval)
+        .map_err(|e| format!("startup state failed: {e:?}"))?;
+
+    let lisp_dir = project_lisp_dir();
+    for file in load_files {
+        let path = lisp_dir.join(file);
+        eval.load_file_internal(&path)
+            .map_err(|e| format!("failed to load '{}': {e:?}", path.display()))?;
+    }
+
+    if parse_forms(form)
+        .map_err(|e| format!("parse error: {e}"))?
+        .is_empty()
+    {
+        return Err("no form parsed".to_string());
+    }
+
+    let result = run_neovm_eval_in_temp_buffer(&mut eval, form)?;
+    Ok(render_neovm_oracle_result(&eval, result))
+}
+
+pub(crate) fn assert_oracle_parity_with_bootstrap_and_load(form: &str, load_files: &[&str]) {
+    let neovm =
+        run_neovm_eval_with_bootstrap_and_load(form, load_files).expect("neovm eval should run");
+    let oracle = run_oracle_eval_with_load(form, load_files).expect("oracle eval should run");
+    assert_eq!(neovm, oracle, "oracle parity mismatch for form: {form}");
+}
+
+pub(crate) fn run_neovm_eval_with_bootstrap_and_load_raw(
+    form: &str,
+    load_files: &[&str],
+) -> Result<String, String> {
+    let mut eval = crate::emacs_core::load::create_bootstrap_evaluator_cached()
+        .map_err(|e| format!("bootstrap failed: {e:?}"))?;
+    crate::emacs_core::load::apply_runtime_startup_state(&mut eval)
+        .map_err(|e| format!("startup state failed: {e:?}"))?;
+
+    let lisp_dir = project_lisp_dir();
+    for file in load_files {
+        let path = lisp_dir.join(file);
+        eval.load_file_internal(&path)
+            .map_err(|e| format!("failed to load '{}': {e:?}", path.display()))?;
+    }
+
+    if parse_forms(form)
+        .map_err(|e| format!("parse error: {e}"))?
+        .is_empty()
+    {
+        return Err("no form parsed".to_string());
+    }
+
+    let result = run_neovm_eval_in_temp_buffer(&mut eval, form)?;
+    Ok(render_neovm_raw_oracle_result(&eval, result))
+}
+
+pub(crate) fn assert_oracle_parity_with_bootstrap_and_load_raw(form: &str, load_files: &[&str]) {
+    let neovm = run_neovm_eval_with_bootstrap_and_load_raw(form, load_files)
+        .expect("neovm eval should run");
+    let oracle = run_oracle_eval_with_load_raw(form, load_files).expect("oracle eval should run");
     assert_eq!(neovm, oracle, "oracle parity mismatch for form: {form}");
 }
 
@@ -341,25 +542,7 @@ pub(crate) fn run_neovm_eval_with_bootstrap(form: &str) -> Result<String, String
 
     let result = run_neovm_eval_in_temp_buffer(&mut eval, form)?;
 
-    let rendered = match result {
-        Ok(value) => format!("OK {}", print_value_with_buffers(&value, &eval.buffers)),
-        Err(EvalError::Signal { symbol, data }) => {
-            let mut values = Vec::with_capacity(data.len() + 1);
-            values.push(Value::Symbol(symbol));
-            values.extend(data);
-            format!(
-                "ERR {}",
-                print_value_with_buffers(&Value::list(values), &eval.buffers)
-            )
-        }
-        Err(EvalError::UncaughtThrow { tag, value }) => {
-            format!(
-                "ERR (no-catch {} {})",
-                print_value_with_buffers(&tag, &eval.buffers),
-                print_value_with_buffers(&value, &eval.buffers),
-            )
-        }
-    };
+    let rendered = render_neovm_oracle_result(&eval, result);
     Ok(rendered)
 }
 
@@ -407,4 +590,121 @@ pub(crate) fn assert_err_kind(oracle: &str, neovm: &str, err_kind: &str) {
         neovm_payload.contains(err_kind),
         "neovm error kind should contain '{err_kind}': {neovm_payload}"
     );
+}
+
+fn normalize_neovm_oracle_value(value: Value) -> Value {
+    match value {
+        Value::Lambda(_) => normalize_interpreted_function_for_oracle(value).unwrap_or(value),
+        Value::Cons(cell) => {
+            let pair = crate::emacs_core::value::read_cons(cell);
+            let car = normalize_neovm_oracle_value(pair.car);
+            crate::emacs_core::eval::push_scratch_gc_root(car);
+            let cdr = normalize_neovm_oracle_value(pair.cdr);
+            crate::emacs_core::eval::push_scratch_gc_root(cdr);
+            let out = Value::cons(car, cdr);
+            crate::emacs_core::eval::push_scratch_gc_root(out);
+            out
+        }
+        Value::Vector(id) => {
+            let items = crate::emacs_core::value::with_heap(|h| h.get_vector(id).clone());
+            let mut normalized = Vec::with_capacity(items.len());
+            for item in items {
+                let item = normalize_neovm_oracle_value(item);
+                crate::emacs_core::eval::push_scratch_gc_root(item);
+                normalized.push(item);
+            }
+            let out = Value::vector(normalized);
+            crate::emacs_core::eval::push_scratch_gc_root(out);
+            out
+        }
+        _ => value,
+    }
+}
+
+fn normalize_interpreted_function_for_oracle(value: Value) -> Option<Value> {
+    let lambda = value.get_lambda_data()?.clone();
+    let closure_vec = crate::emacs_core::builtins::lambda_to_closure_vector(&value);
+    if closure_vec.len() < 3 {
+        return None;
+    }
+
+    let args = normalize_neovm_oracle_value(closure_vec[0]);
+    crate::emacs_core::eval::push_scratch_gc_root(args);
+
+    let body_forms = crate::emacs_core::value::list_to_vec(&closure_vec[1]).unwrap_or_default();
+    let mut elements = Vec::with_capacity(body_forms.len() + 3);
+
+    if lambda.env.is_some() {
+        elements.push(Value::symbol("closure"));
+        let env = if closure_vec[2] == Value::True {
+            Value::list(vec![Value::True])
+        } else {
+            normalize_neovm_oracle_value(closure_vec[2])
+        };
+        crate::emacs_core::eval::push_scratch_gc_root(env);
+        elements.push(env);
+    } else {
+        elements.push(Value::symbol("lambda"));
+    }
+
+    elements.push(args);
+    for form in body_forms {
+        let form = normalize_neovm_oracle_value(form);
+        crate::emacs_core::eval::push_scratch_gc_root(form);
+        elements.push(form);
+    }
+
+    let out = Value::list(elements);
+    crate::emacs_core::eval::push_scratch_gc_root(out);
+    Some(out)
+}
+
+fn render_neovm_oracle_result(eval: &Evaluator, result: Result<Value, EvalError>) -> String {
+    let saved_roots = crate::emacs_core::eval::save_scratch_gc_roots();
+    let rendered = match result {
+        Ok(value) => {
+            let value = normalize_neovm_oracle_value(value);
+            format!("OK {}", print_value_with_buffers(&value, &eval.buffers))
+        }
+        Err(EvalError::Signal { symbol, data }) => {
+            let mut values = Vec::with_capacity(data.len() + 1);
+            values.push(Value::Symbol(symbol));
+            values.extend(data);
+            let payload = normalize_neovm_oracle_value(Value::list(values));
+            format!("ERR {}", print_value_with_buffers(&payload, &eval.buffers))
+        }
+        Err(EvalError::UncaughtThrow { tag, value }) => {
+            let tag = normalize_neovm_oracle_value(tag);
+            let value = normalize_neovm_oracle_value(value);
+            format!(
+                "ERR (no-catch {} {})",
+                print_value_with_buffers(&tag, &eval.buffers),
+                print_value_with_buffers(&value, &eval.buffers),
+            )
+        }
+    };
+    crate::emacs_core::eval::restore_scratch_gc_roots(saved_roots);
+    rendered
+}
+
+fn render_neovm_raw_oracle_result(eval: &Evaluator, result: Result<Value, EvalError>) -> String {
+    match result {
+        Ok(value) => format!("OK {}", print_value_with_buffers(&value, &eval.buffers)),
+        Err(EvalError::Signal { symbol, data }) => {
+            let mut values = Vec::with_capacity(data.len() + 1);
+            values.push(Value::Symbol(symbol));
+            values.extend(data);
+            format!(
+                "ERR {}",
+                print_value_with_buffers(&Value::list(values), &eval.buffers)
+            )
+        }
+        Err(EvalError::UncaughtThrow { tag, value }) => {
+            format!(
+                "ERR (no-catch {} {})",
+                print_value_with_buffers(&tag, &eval.buffers),
+                print_value_with_buffers(&value, &eval.buffers),
+            )
+        }
+    }
 }

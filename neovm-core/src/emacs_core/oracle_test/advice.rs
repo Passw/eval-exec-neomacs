@@ -1,7 +1,8 @@
 //! Oracle parity tests for advice functions.
 
 use super::common::{
-    assert_oracle_parity_with_bootstrap, return_if_neovm_enable_oracle_proptest_not_set,
+    assert_oracle_parity_with_bootstrap, assert_oracle_parity_with_bootstrap_and_load_raw,
+    return_if_neovm_enable_oracle_proptest_not_set,
 };
 
 #[test]
@@ -111,8 +112,15 @@ fn oracle_prop_advice_before_and_after_ordering() {
 fn oracle_prop_advice_non_callable_advice_function_error_shape() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity_with_bootstrap(
+    // `nadvice.el` is Elisp-defined. NeoVM loads the GNU source file directly,
+    // so compare against GNU Emacs running the same source, not the default
+    // byte-compiled dump where this path is accidentally masked.
+    //
+    // Use the raw parity helper here: source-loading nadvice can rewrite `car`,
+    // so the recursive oracle normalizer itself is no longer a valid observer.
+    assert_oracle_parity_with_bootstrap_and_load_raw(
         "(condition-case err (advice-add 'car :before 1) (error err))",
+        &["emacs-lisp/oclosure.el", "emacs-lisp/nadvice.el"],
     );
 }
 
