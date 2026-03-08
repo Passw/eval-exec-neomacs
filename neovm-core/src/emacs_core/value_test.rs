@@ -1,4 +1,5 @@
 use super::*;
+use crate::emacs_core::Expr;
 
 /// Helper: set up a temporary heap for tests that use Value constructors.
 fn with_test_heap<R>(f: impl FnOnce() -> R) -> R {
@@ -94,6 +95,71 @@ fn string_equality() {
         assert!(equal_value(&a, &b, 0));
         // eq compares ObjId identity — different allocations
         assert!(!eq_value(&a, &b));
+    });
+}
+
+#[test]
+fn closure_equal_is_structural() {
+    with_test_heap(|| {
+        let env_a = Value::list(vec![Value::cons(Value::symbol("n"), Value::Int(5))]);
+        let env_b = Value::list(vec![Value::cons(Value::symbol("n"), Value::Int(5))]);
+        let env_c = Value::list(vec![Value::cons(Value::symbol("n"), Value::Int(10))]);
+
+        let make = |env| {
+            Value::make_lambda(LambdaData {
+                params: LambdaParams::simple(vec![intern("x")]),
+                body: vec![Expr::List(vec![
+                    Expr::Symbol(intern("+")),
+                    Expr::Symbol(intern("n")),
+                    Expr::Symbol(intern("x")),
+                ])]
+                .into(),
+                env: Some(env),
+                docstring: None,
+                doc_form: None,
+            })
+        };
+
+        let left = make(env_a);
+        let same = make(env_b);
+        let different = make(env_c);
+
+        assert!(!eq_value(&left, &same));
+        assert!(equal_value(&left, &same, 0));
+        assert!(!equal_value(&left, &different, 0));
+        assert_eq!(
+            left.to_hash_key(&HashTableTest::Equal),
+            same.to_hash_key(&HashTableTest::Equal)
+        );
+    });
+}
+
+#[test]
+fn recursive_closure_equal_and_hash_are_structural() {
+    with_test_heap(|| {
+        let make_recursive = || {
+            let binding = Value::cons(Value::symbol("f"), Value::Nil);
+            let env = Value::list(vec![binding]);
+            let closure = Value::make_lambda(LambdaData {
+                params: LambdaParams::simple(vec![]),
+                body: vec![Expr::Symbol(intern("f"))].into(),
+                env: Some(env),
+                docstring: None,
+                doc_form: None,
+            });
+            binding.set_cdr(closure);
+            closure
+        };
+
+        let left = make_recursive();
+        let right = make_recursive();
+
+        assert!(!eq_value(&left, &right));
+        assert!(equal_value(&left, &right, 0));
+        assert_eq!(
+            left.to_hash_key(&HashTableTest::Equal),
+            right.to_hash_key(&HashTableTest::Equal)
+        );
     });
 }
 

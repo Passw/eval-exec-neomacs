@@ -1,5 +1,7 @@
 //! Value printing (Lisp representation).
 
+use std::cell::RefCell;
+
 use super::chartable::{bool_vector_length, char_table_external_slots};
 use super::expr::{self, Expr};
 use super::intern::{lookup_interned, resolve_sym};
@@ -8,10 +10,37 @@ use super::value::{
     HashTableTest, StringTextPropertyRun, Value, get_string_text_properties, list_to_vec,
     read_cons, with_heap,
 };
+use crate::gc::types::ObjId;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct PrintOptions {
     pub print_gensym: bool,
+}
+
+thread_local! {
+    static PRINT_OBJECT_STACK: RefCell<Vec<PrintObjectRef>> = const { RefCell::new(Vec::new()) };
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PrintObjectRef {
+    Lambda(ObjId),
+}
+
+fn with_print_object_guard<R>(
+    object: PrintObjectRef,
+    on_cycle: impl FnOnce(usize) -> R,
+    render: impl FnOnce() -> R,
+) -> R {
+    PRINT_OBJECT_STACK.with(|stack| {
+        if let Some(index) = stack.borrow().iter().position(|entry| *entry == object) {
+            return on_cycle(index);
+        }
+
+        stack.borrow_mut().push(object);
+        let rendered = render();
+        stack.borrow_mut().pop();
+        rendered
+    })
 }
 
 fn print_special_handle(value: &Value) -> Option<String> {
@@ -234,28 +263,24 @@ pub fn print_value_with_options(value: &Value, options: PrintOptions) -> String 
             format!("#s({})", parts.join(" "))
         }
         Value::HashTable(id) => format_hash_table(*id, options),
-        Value::Lambda(_id) => {
-            let lambda = value.get_lambda_data().unwrap();
-            let params = format_params(&lambda.params);
-            let body = lambda
-                .body
-                .iter()
-                .map(expr::print_expr)
-                .collect::<Vec<_>>()
-                .join(" ");
-            if let Some(env) = lambda.env {
-                // Match GNU Emacs oracle normalizer: (closure ENV ARGS . BODY)
-                // Empty lexical env (nil) is printed as (t) to match Emacs convention.
-                let env_str = if env == Value::Nil {
-                    "(t)".to_string()
-                } else {
-                    print_value_with_options(&env, options)
-                };
-                format!("(closure {} {} {})", env_str, params, body)
-            } else {
+        Value::Lambda(id) => with_print_object_guard(
+            PrintObjectRef::Lambda(*id),
+            |index| format!("#{index}"),
+            || {
+                let lambda = value.get_lambda_data().unwrap();
+                if lambda.env.is_some() {
+                    return format_interpreted_closure(lambda, options);
+                }
+                let params = format_params(&lambda.params);
+                let body = lambda
+                    .body
+                    .iter()
+                    .map(expr::print_expr)
+                    .collect::<Vec<_>>()
+                    .join(" ");
                 format!("(lambda {} {})", params, body)
-            }
-        }
+            },
+        ),
         Value::Macro(_id) => {
             let m = value.get_lambda_data().unwrap();
             let params = format_params(&m.params);
@@ -373,20 +398,26 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>, options: PrintOpti
         Value::HashTable(id) => {
             out.extend_from_slice(format_hash_table(*id, options).as_bytes());
         }
-        Value::Lambda(_id) => {
-            let lambda = value.get_lambda_data().unwrap();
-            let params = format_params(&lambda.params);
-            let body = lambda
-                .body
-                .iter()
-                .map(expr::print_expr)
-                .collect::<Vec<_>>()
-                .join(" ");
-            let text = if lambda.env.is_some() {
-                format!("(closure {} {})", params, body)
-            } else {
-                format!("(lambda {} {})", params, body)
-            };
+        Value::Lambda(id) => {
+            let text = with_print_object_guard(
+                PrintObjectRef::Lambda(*id),
+                |index| format!("#{index}"),
+                || {
+                    let lambda = value.get_lambda_data().unwrap();
+                    if lambda.env.is_some() {
+                        format_interpreted_closure(lambda, options)
+                    } else {
+                        let params = format_params(&lambda.params);
+                        let body = lambda
+                            .body
+                            .iter()
+                            .map(expr::print_expr)
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        format!("(lambda {} {})", params, body)
+                    }
+                },
+            );
             out.extend_from_slice(text.as_bytes());
         }
         Value::Macro(_id) => {
@@ -620,6 +651,43 @@ fn format_params(params: &super::value::LambdaParams) -> String {
     } else {
         format!("({})", parts.join(" "))
     }
+}
+
+fn format_lambda_body_forms(body: &[Expr]) -> String {
+    if body.is_empty() {
+        "nil".to_string()
+    } else {
+        format!(
+            "({})",
+            body.iter()
+                .map(expr::print_expr)
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    }
+}
+
+fn format_interpreted_closure(lambda: &super::value::LambdaData, options: PrintOptions) -> String {
+    let mut slots = Vec::with_capacity(5);
+    slots.push(format_params(&lambda.params));
+    slots.push(format_lambda_body_forms(lambda.body.as_ref()));
+    let env = lambda.env.expect("closure env");
+    slots.push(if env == Value::Nil {
+        "(t)".to_string()
+    } else {
+        print_value_with_options(&env, options)
+    });
+    if lambda.docstring.is_some() || lambda.doc_form.is_some() {
+        slots.push("nil".to_string());
+        slots.push(if let Some(doc_form) = lambda.doc_form {
+            print_value_with_options(&doc_form, options)
+        } else if let Some(docstring) = &lambda.docstring {
+            format_lisp_string(docstring)
+        } else {
+            "nil".to_string()
+        });
+    }
+    format!("#[{}]", slots.join(" "))
 }
 
 fn print_list_shorthand(value: &Value, options: PrintOptions) -> Option<String> {

@@ -227,6 +227,52 @@ fn print_lambda() {
 }
 
 #[test]
+fn print_lexical_closure_uses_gnu_vector_syntax() {
+    let closure = Value::make_lambda(LambdaData {
+        params: LambdaParams::simple(vec![intern("a"), intern("b")]),
+        body: vec![Expr::List(vec![
+            Expr::Symbol(intern("+")),
+            Expr::Symbol(intern("a")),
+            Expr::Symbol(intern("b")),
+            Expr::Symbol(intern("x")),
+        ])]
+        .into(),
+        env: Some(Value::list(vec![Value::cons(
+            Value::symbol("x"),
+            Value::Int(42),
+        )])),
+        docstring: None,
+        doc_form: None,
+    });
+
+    assert_eq!(print_value(&closure), "#[(a b) ((+ a b x)) ((x . 42))]");
+    assert_eq!(
+        String::from_utf8(print_value_bytes(&closure)).expect("utf8"),
+        "#[(a b) ((+ a b x)) ((x . 42))]"
+    );
+}
+
+#[test]
+fn print_recursive_closure_uses_backreference() {
+    let binding = Value::cons(Value::symbol("f"), Value::Nil);
+    let env = Value::list(vec![binding]);
+    let closure = Value::make_lambda(LambdaData {
+        params: LambdaParams::simple(vec![]),
+        body: vec![Expr::Symbol(intern("f"))].into(),
+        env: Some(env),
+        docstring: None,
+        doc_form: None,
+    });
+    binding.set_cdr(closure);
+
+    assert_eq!(print_value(&closure), "#[nil (f) ((f . #0))]");
+    assert_eq!(
+        String::from_utf8(print_value_bytes(&closure)).expect("utf8"),
+        "#[nil (f) ((f . #0))]"
+    );
+}
+
+#[test]
 fn print_terminal_handle_special_form() {
     let list = super::super::terminal::pure::builtin_terminal_list(vec![]).unwrap();
     let items = list_to_vec(&list).expect("terminal-list should return a list");

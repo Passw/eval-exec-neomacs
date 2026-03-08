@@ -94,6 +94,8 @@ fn hash_key_to_value(key: &HashKey) -> Value {
             let vals: Vec<Value> = items.iter().map(hash_key_to_value).collect();
             Value::vector(vals)
         }
+        HashKey::Cycle(index) => Value::string(format!("#{}", index)),
+        HashKey::Text(text) => Value::string(text.clone()),
     }
 }
 

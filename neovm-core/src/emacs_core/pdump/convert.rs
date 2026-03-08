@@ -263,6 +263,8 @@ pub(crate) fn dump_hash_key(k: &HashKey) -> DumpHashKey {
             DumpHashKey::EqualCons(Box::new(dump_hash_key(a)), Box::new(dump_hash_key(b)))
         }
         HashKey::EqualVec(v) => DumpHashKey::EqualVec(v.iter().map(dump_hash_key).collect()),
+        HashKey::Cycle(index) => DumpHashKey::Cycle(*index),
+        HashKey::Text(text) => DumpHashKey::Text(text.clone()),
     }
 }
 
@@ -1411,6 +1413,8 @@ pub(crate) fn load_hash_key(k: &DumpHashKey) -> HashKey {
             HashKey::EqualCons(Box::new(load_hash_key(a)), Box::new(load_hash_key(b)))
         }
         DumpHashKey::EqualVec(v) => HashKey::EqualVec(v.iter().map(load_hash_key).collect()),
+        DumpHashKey::Cycle(index) => HashKey::Cycle(*index),
+        DumpHashKey::Text(text) => HashKey::Text(text.clone()),
     }
 }
 

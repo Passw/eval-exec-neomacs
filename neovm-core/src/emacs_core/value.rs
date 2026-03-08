@@ -407,7 +407,7 @@ pub struct LambdaData {
 }
 
 /// Describes a lambda parameter list including &optional and &rest.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LambdaParams {
     pub required: Vec<SymId>,
     pub optional: Vec<SymId>,
@@ -501,6 +501,10 @@ pub enum HashKey {
     EqualCons(Box<HashKey>, Box<HashKey>),
     /// Structural vector/record key for `equal`-test hash tables.
     EqualVec(Vec<HashKey>),
+    /// Back-reference marker used when structural objects recurse.
+    Cycle(u32),
+    /// Owned textual key used for structural hashing of AST-backed objects.
+    Text(String),
 }
 
 impl std::hash::Hash for HashKey {
@@ -521,6 +525,8 @@ impl std::hash::Hash for HashKey {
             HashKey::EqualCons(_, _) => 12,
             HashKey::EqualVec(_) => 13,
             HashKey::Keyword(_) => 14,
+            HashKey::Cycle(_) => 15,
+            HashKey::Text(_) => 16,
         };
         tag.hash(state);
         match self {
@@ -551,6 +557,8 @@ impl std::hash::Hash for HashKey {
                     item.hash(state);
                 }
             }
+            HashKey::Cycle(index) => index.hash(state),
+            HashKey::Text(text) => text.hash(state),
         }
     }
 }
@@ -577,6 +585,8 @@ impl PartialEq for HashKey {
                 a_car == b_car && a_cdr == b_cdr
             }
             (HashKey::EqualVec(a), HashKey::EqualVec(b)) => a == b,
+            (HashKey::Cycle(a), HashKey::Cycle(b)) => a == b,
+            (HashKey::Text(a), HashKey::Text(b)) => a == b,
             _ => false,
         }
     }
@@ -1040,11 +1050,12 @@ impl Value {
     }
 
     fn to_equal_key(&self) -> HashKey {
-        self.to_equal_key_depth(0)
+        let mut seen = Vec::new();
+        self.to_equal_key_depth(0, &mut seen)
     }
 
-    fn to_equal_key_depth(&self, depth: usize) -> HashKey {
-        if depth > 64 {
+    fn to_equal_key_depth(&self, depth: usize, seen: &mut Vec<StructuralRef>) -> HashKey {
+        if depth > 200 {
             // Prevent runaway recursion on circular structures; fall back to eq.
             return self.to_eq_key();
         }
@@ -1061,19 +1072,49 @@ impl Value {
             Value::Frame(id) => HashKey::Frame(*id),
             // Structural comparison for cons cells (critical for cl-generic memoization).
             Value::Cons(cons) => {
+                if let Some(index) = seen
+                    .iter()
+                    .position(|entry| matches!(entry, StructuralRef::Cons(id) if id == cons))
+                {
+                    return HashKey::Cycle(index as u32);
+                }
+                seen.push(StructuralRef::Cons(*cons));
                 let pair = read_cons(*cons);
-                let car_key = pair.car.to_equal_key_depth(depth + 1);
-                let cdr_key = pair.cdr.to_equal_key_depth(depth + 1);
+                let car_key = pair.car.to_equal_key_depth(depth + 1, seen);
+                let cdr_key = pair.cdr.to_equal_key_depth(depth + 1, seen);
+                seen.pop();
                 HashKey::EqualCons(Box::new(car_key), Box::new(cdr_key))
             }
             // Structural comparison for vectors and records.
             Value::Vector(v) | Value::Record(v) => {
+                let marker = match self {
+                    Value::Vector(_) => StructuralRef::Vector(*v),
+                    _ => StructuralRef::Record(*v),
+                };
+                if let Some(index) = seen.iter().position(|entry| *entry == marker) {
+                    return HashKey::Cycle(index as u32);
+                }
+                seen.push(marker);
                 let items = with_heap(|h| h.get_vector(*v).clone());
                 let keys: Vec<HashKey> = items
                     .iter()
-                    .map(|item| item.to_equal_key_depth(depth + 1))
+                    .map(|item| item.to_equal_key_depth(depth + 1, seen))
                     .collect();
+                seen.pop();
                 HashKey::EqualVec(keys)
+            }
+            Value::Lambda(id) => {
+                if let Some(index) = seen
+                    .iter()
+                    .position(|entry| matches!(entry, StructuralRef::Lambda(other) if other == id))
+                {
+                    return HashKey::Cycle(index as u32);
+                }
+                seen.push(StructuralRef::Lambda(*id));
+                let lambda = with_heap(|h| h.get_lambda(*id).clone());
+                let key = lambda_to_equal_key(&lambda, depth + 1, seen);
+                seen.pop();
+                key
             }
             // Functions, hash tables, etc. use identity.
             other => other.to_eq_key(),
@@ -1126,7 +1167,17 @@ pub fn eql_value(left: &Value, right: &Value) -> bool {
 
 /// `equal` — structural comparison.
 pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
-    if depth > 4096 {
+    let mut seen = Vec::new();
+    equal_value_inner(left, right, depth, &mut seen)
+}
+
+fn equal_value_inner(
+    left: &Value,
+    right: &Value,
+    depth: usize,
+    seen: &mut Vec<EqualPairRef>,
+) -> bool {
+    if depth > 200 {
         return false;
     }
     match (left, right) {
@@ -1149,16 +1200,32 @@ pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
             if a == b {
                 return true;
             }
+            let pair_ref = EqualPairRef::Cons(*a, *b);
+            if seen.contains(&pair_ref) {
+                return true;
+            }
+            seen.push(pair_ref);
             let a_car = with_heap(|h| h.cons_car(*a));
             let a_cdr = with_heap(|h| h.cons_cdr(*a));
             let b_car = with_heap(|h| h.cons_car(*b));
             let b_cdr = with_heap(|h| h.cons_cdr(*b));
-            equal_value(&a_car, &b_car, depth + 1) && equal_value(&a_cdr, &b_cdr, depth + 1)
+            let equal = equal_value_inner(&a_car, &b_car, depth + 1, seen)
+                && equal_value_inner(&a_cdr, &b_cdr, depth + 1, seen);
+            seen.pop();
+            equal
         }
         (Value::Vector(a), Value::Vector(b)) | (Value::Record(a), Value::Record(b)) => {
             if a == b {
                 return true;
             }
+            let pair_ref = match (left, right) {
+                (Value::Vector(_), Value::Vector(_)) => EqualPairRef::Vector(*a, *b),
+                _ => EqualPairRef::Record(*a, *b),
+            };
+            if seen.contains(&pair_ref) {
+                return true;
+            }
+            seen.push(pair_ref);
             // Copy element pairs out (Value is Copy) to compare outside the borrow.
             // Returns None if lengths differ, Some(pairs) otherwise.
             let pairs: Option<Vec<(Value, Value)>> = with_heap(|h| {
@@ -1169,12 +1236,30 @@ pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
                 }
                 Some(av.iter().copied().zip(bv.iter().copied()).collect())
             });
-            matches!(pairs, Some(ref p) if p.iter().all(|(x, y)| equal_value(x, y, depth + 1)))
+            let equal = matches!(pairs, Some(ref p) if p
+                .iter()
+                .all(|(x, y)| equal_value_inner(x, y, depth + 1, seen)));
+            seen.pop();
+            equal
         }
         // Hash tables: identity comparison only (same as eq), matching GNU Emacs
         // where PVEC_HASH_TABLE < PVEC_CLOSURE causes early return false.
         (Value::HashTable(a), Value::HashTable(b)) => a == b,
-        (Value::Lambda(a), Value::Lambda(b)) => a == b,
+        (Value::Lambda(a), Value::Lambda(b)) => {
+            if a == b {
+                return true;
+            }
+            let pair_ref = EqualPairRef::Lambda(*a, *b);
+            if seen.contains(&pair_ref) {
+                return true;
+            }
+            seen.push(pair_ref);
+            let (left_lambda, right_lambda) =
+                with_heap(|h| (h.get_lambda(*a).clone(), h.get_lambda(*b).clone()));
+            let equal = lambda_data_equal(&left_lambda, &right_lambda, depth + 1, seen);
+            seen.pop();
+            equal
+        }
         (Value::Macro(a), Value::Macro(b)) => a == b,
         (Value::Subr(a), Value::Subr(b)) => a == b,
         (Value::ByteCode(a), Value::ByteCode(b)) => a == b,
@@ -1184,6 +1269,105 @@ pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
         (Value::Timer(a), Value::Timer(b)) => a == b,
         _ => false,
     }
+}
+
+fn lambda_to_equal_key(
+    lambda: &LambdaData,
+    depth: usize,
+    seen: &mut Vec<StructuralRef>,
+) -> HashKey {
+    if depth > 200 {
+        return HashKey::Text("#<lambda-depth-limit>".to_string());
+    }
+
+    let mut params =
+        Vec::with_capacity(lambda.params.required.len() + lambda.params.optional.len() + 3);
+    params.push(HashKey::Text("params".to_string()));
+    for sym in &lambda.params.required {
+        params.push(HashKey::Symbol(*sym));
+    }
+    if !lambda.params.optional.is_empty() {
+        params.push(HashKey::Text("&optional".to_string()));
+        for sym in &lambda.params.optional {
+            params.push(HashKey::Symbol(*sym));
+        }
+    }
+    if let Some(rest) = lambda.params.rest {
+        params.push(HashKey::Text("&rest".to_string()));
+        params.push(HashKey::Symbol(rest));
+    }
+
+    let mut slots = vec![
+        HashKey::Text("lambda".to_string()),
+        HashKey::EqualVec(params),
+        HashKey::EqualVec(
+            lambda
+                .body
+                .iter()
+                .map(|expr| HashKey::Text(super::expr::print_expr(expr)))
+                .collect(),
+        ),
+        match lambda.env {
+            Some(env) => env.to_equal_key_depth(depth + 1, seen),
+            None => HashKey::Text("dynamic".to_string()),
+        },
+    ];
+
+    if lambda.docstring.is_some() || lambda.doc_form.is_some() {
+        slots.push(HashKey::Nil);
+        let doc = if let Some(doc_form) = lambda.doc_form {
+            doc_form.to_equal_key_depth(depth + 1, seen)
+        } else if let Some(docstring) = &lambda.docstring {
+            HashKey::Text(docstring.clone())
+        } else {
+            HashKey::Nil
+        };
+        slots.push(doc);
+    }
+
+    HashKey::EqualVec(slots)
+}
+
+fn lambda_data_equal(
+    left: &LambdaData,
+    right: &LambdaData,
+    depth: usize,
+    seen: &mut Vec<EqualPairRef>,
+) -> bool {
+    if left.params != right.params || left.body.as_ref() != right.body.as_ref() {
+        return false;
+    }
+
+    let env_equal = match (left.env, right.env) {
+        (None, None) => true,
+        (Some(l), Some(r)) => equal_value_inner(&l, &r, depth + 1, seen),
+        _ => false,
+    };
+    if !env_equal || left.docstring != right.docstring {
+        return false;
+    }
+
+    match (left.doc_form, right.doc_form) {
+        (None, None) => true,
+        (Some(l), Some(r)) => equal_value_inner(&l, &r, depth + 1, seen),
+        _ => false,
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum StructuralRef {
+    Cons(ObjId),
+    Vector(ObjId),
+    Record(ObjId),
+    Lambda(ObjId),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum EqualPairRef {
+    Cons(ObjId, ObjId),
+    Vector(ObjId, ObjId),
+    Record(ObjId, ObjId),
+    Lambda(ObjId, ObjId),
 }
 
 // ---------------------------------------------------------------------------

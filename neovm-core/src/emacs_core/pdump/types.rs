@@ -249,6 +249,8 @@ pub enum DumpHashKey {
     ObjId(u32, u32),
     EqualCons(Box<DumpHashKey>, Box<DumpHashKey>),
     EqualVec(Vec<DumpHashKey>),
+    Cycle(u32),
+    Text(String),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
