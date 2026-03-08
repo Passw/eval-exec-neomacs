@@ -2870,6 +2870,20 @@ neomacs_layout_tab_bar_height (void *frame_ptr)
   return (float) FRAME_TAB_BAR_HEIGHT (f);
 }
 
+/* Return the window pointer used for tab-bar face/font resolution.
+   Returns tab_bar_window if valid, otherwise selected_window.
+   Returns NULL if no tab bar.  */
+void *
+neomacs_layout_tab_bar_window (void *frame_ptr)
+{
+  struct frame *f = (struct frame *) frame_ptr;
+  if (!f || FRAME_TAB_BAR_LINES (f) <= 0)
+    return NULL;
+  if (WINDOWP (f->tab_bar_window))
+    return XWINDOW (f->tab_bar_window);
+  return XWINDOW (f->selected_window);
+}
+
 /* FFI struct for line number configuration.
    Matches Rust LineNumberConfigFFI.  */
 struct LineNumberConfigFFI {

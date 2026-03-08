@@ -182,6 +182,10 @@ unsafe extern "C" {
     /// Get tab-bar pixel height for a frame.  Returns 0 if disabled.
     pub fn neomacs_layout_tab_bar_height(frame: EmacsFrame) -> f32;
 
+    /// Get the window pointer used for tab-bar font resolution.
+    /// Returns tab_bar_window if valid, otherwise selected_window.  NULL if no tab bar.
+    pub fn neomacs_layout_tab_bar_window(frame: EmacsFrame) -> EmacsWindow;
+
     // ========================================================================
     // Line numbers
     // ========================================================================

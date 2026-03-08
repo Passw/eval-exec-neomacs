@@ -10,7 +10,8 @@
 ;; What to check:
 ;; - Each tab shows a different face style (all visible at once)
 ;; - Per-tab face colors (tab-bar-tab vs tab-bar-tab-inactive) work
-;; - Image icon appears before the IMG tab label
+;; - Image glyphs (Pik.png, Pik_left.png) appear correctly
+;; - Box-faced "LISP" label with green box and bold text
 ;; - Active tab (click to switch) shows tab-bar-tab face
 ;;
 ;; Tab bar is rendered via the layout engine's status-line pipeline
@@ -20,8 +21,26 @@
 
 (require 'cl-lib)
 
-;; Each test case defines a short tab label and face attributes to apply
-;; to that tab's caption via propertize.
+;; ---- Image glyph helpers (from user config) ----
+(defun tab-bar-face-test--glyph-create (path)
+  "Create an image glyph from PATH."
+  (create-image path nil nil :ascent 'center :height 24))
+
+(defvar tab-bar-face-test--glyph-right
+  (let ((f (expand-file-name "~/Pictures/Pik.png")))
+    (when (file-exists-p f)
+      (tab-bar-face-test--glyph-create f)))
+  "Right skeleton glyph image (Pik.png).")
+
+(defvar tab-bar-face-test--glyph-left
+  (let ((f (expand-file-name "~/Pictures/Pik_left.png")))
+    (when (file-exists-p f)
+      (tab-bar-face-test--glyph-create f)))
+  "Left skeleton glyph image (Pik_left.png).")
+
+;; Each test case: (LABEL FACE-SPEC DESCRIPTION)
+;; FACE-SPEC is a face plist, :image for image test, :glyph-combo for
+;; the user's image+box+face combo, or nil for default.
 (defvar tab-bar-face-test-cases
   `(("D"   nil                                        "Default (no extra face)")
     ("R"   (foreground-color . "red")                 "Red foreground")
@@ -41,10 +60,9 @@
             :background "dark red"
             :box (:line-width 1 :color "yellow"))
                                                       "All decorations")
+    ("GLY" :glyph-combo                               "Image+box glyph combo")
     ("IMG" :image                                     "Image icon in tab"))
-  "List of (LABEL FACE-SPEC DESCRIPTION) test cases.
-FACE-SPEC is a face property list to propertize the tab name with,
-or :image for the image display test, or nil for default.")
+  "List of (LABEL FACE-SPEC DESCRIPTION) test cases.")
 
 (defun tab-bar-face-test--format-tab-name (tab _i)
   "Custom tab name formatter that applies per-tab face from buffer-local var."
@@ -54,6 +72,22 @@ or :image for the image display test, or nil for default.")
          (face-spec (and buf (buffer-local-value 'tab-bar-face-test--face buf))))
     (unless label (setq label buf-name))
     (cond
+     ;; Glyph combo: image + boxed LISP + image (user's config pattern)
+     ((eq face-spec :glyph-combo)
+      (concat
+       " "
+       (if tab-bar-face-test--glyph-right
+           (propertize "  " 'display tab-bar-face-test--glyph-right)
+         "[R]")
+       (propertize " LISP " 'face
+                   '((:box (:style nil :line-width -2 :color "green")
+                      :weight bold
+                      :foreground "green")))
+       (propertize " Machine " 'face '(:background "green"))
+       (if tab-bar-face-test--glyph-left
+           (propertize "  " 'display tab-bar-face-test--glyph-left)
+         "[L]")
+       " "))
      ;; Image test: prepend a scaled image icon
      ((eq face-spec :image)
       (let ((img (create-image (expand-file-name "~/Pictures/4k_image_10.jpg")

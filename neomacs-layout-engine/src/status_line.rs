@@ -822,6 +822,17 @@ impl LayoutEngine {
         let display_start = text_len + nruns * 10;
         let align_start = display_start + ndisplay * 16;
 
+        // Get the tab-bar window for measured font advance (same window
+        // used by neomacs_layout_tab_bar_text for face resolution).
+        let tab_bar_window = unsafe { neomacs_layout_tab_bar_window(frame) };
+        let advance_mode = if !tab_bar_window.is_null() {
+            StatusLineAdvanceMode::Measured {
+                window: tab_bar_window,
+            }
+        } else {
+            StatusLineAdvanceMode::Fixed
+        };
+
         Some(StatusLineSpec {
             kind: StatusLineKind::TabBar,
             x,
@@ -836,7 +847,7 @@ impl LayoutEngine {
             face_runs: parse_overlay_face_runs(&line_buf, text_len, nruns as i32),
             display_props: parse_display_props(&line_buf, display_start, ndisplay),
             align_entries: parse_status_line_align_entries(&line_buf, align_start, naligns),
-            advance_mode: StatusLineAdvanceMode::Fixed,
+            advance_mode,
         })
     }
 
