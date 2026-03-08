@@ -1495,6 +1495,46 @@ fn cached_bootstrap_reload_evaluates_full_advice_remove_member_form() {
 }
 
 #[test]
+fn bootstrap_source_eval_honors_advised_subr_function_cell() {
+    let rendered = crate::emacs_core::oracle_test::common::run_neovm_eval_with_bootstrap(
+        r#"(progn
+           (let ((log nil))
+             (fset 'neovm--combo-plus-before
+                   (lambda (&rest args)
+                     (setq log (cons args log))))
+             (unwind-protect
+                 (list
+                   (progn
+                     (advice-add '+ :before 'neovm--combo-plus-before)
+                     (setq log nil)
+                     (list
+                       (+ 4 7)
+                       (funcall '+ 4 7)
+                       (apply '+ (list 4 7))
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-before '+) t nil)))
+                   (progn
+                     (advice-remove '+ 'neovm--combo-plus-before)
+                     (setq log nil)
+                     (list
+                       (+ 4 7)
+                       (funcall '+ 4 7)
+                       (apply '+ (list 4 7))
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-before '+) t nil))))
+               (condition-case nil
+                   (advice-remove '+ 'neovm--combo-plus-before)
+                 (error nil))
+               (fmakunbound 'neovm--combo-plus-before))))"#,
+    )
+    .expect("evaluate plus advice shape");
+    assert_eq!(
+        rendered,
+        "OK ((11 11 11 ((4 7) (4 7) (4 7)) t) (11 11 11 nil nil))"
+    );
+}
+
+#[test]
 fn runtime_startup_state_matches_char_syntax_comprehensive_form() {
     let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
     apply_runtime_startup_state(&mut eval).expect("runtime startup state");

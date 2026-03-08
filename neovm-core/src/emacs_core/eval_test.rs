@@ -1304,6 +1304,26 @@ fn excessive_recursion_detected() {
 }
 
 #[test]
+fn excessive_recursion_reports_overflow_depth_like_gnu_emacs() {
+    let results = eval_all("(defun inf () (inf))\n(inf)");
+    assert_eq!(results[1], "ERR (excessive-lisp-nesting (1601))");
+}
+
+#[test]
+fn lambda_can_call_symbol_function_subr_as_first_class_value() {
+    assert_eq!(
+        eval_one("((lambda (orig x y) (funcall orig (+ x 1) y)) (symbol-function '+) 4 7)"),
+        "OK 12"
+    );
+    assert_eq!(
+        eval_one(
+            "(apply (lambda (orig x y) (funcall orig (+ x 1) y)) (symbol-function '+) '(4 7))"
+        ),
+        "OK 12"
+    );
+}
+
+#[test]
 fn lexical_binding_closure() {
     // With lexical binding, closures capture the lexical environment
     let mut ev = Evaluator::new();

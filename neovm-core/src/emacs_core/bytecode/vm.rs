@@ -221,10 +221,11 @@ impl<'a> Vm<'a> {
     ) -> EvalResult {
         self.depth += 1;
         if self.depth > self.max_depth {
+            let overflow_depth = self.depth as i64;
             self.depth -= 1;
             return Err(signal(
                 "excessive-lisp-nesting",
-                vec![Value::Int(self.max_depth as i64)],
+                vec![Value::Int(overflow_depth)],
             ));
         }
 
