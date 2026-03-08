@@ -1549,61 +1549,6 @@ impl<'a> Vm<'a> {
         crate::emacs_core::builtins::symbols::builtin_fboundp_in_obarray(self.obarray, args)
     }
 
-    fn bind_params(
-        &self,
-        params: &LambdaParams,
-        args: Vec<Value>,
-        func_value: Value,
-    ) -> Result<OrderedSymMap, Flow> {
-        let mut frame = OrderedSymMap::new();
-        let mut arg_idx = 0;
-
-        if args.len() < params.min_arity() {
-            tracing::warn!(
-                "wrong-number-of-arguments (vm too few): got {} args, min={}, params={:?}",
-                args.len(),
-                params.min_arity(),
-                params
-            );
-            return Err(signal(
-                "wrong-number-of-arguments",
-                vec![func_value, Value::Int(args.len() as i64)],
-            ));
-        }
-        if let Some(max) = params.max_arity() {
-            if args.len() > max {
-                tracing::warn!(
-                    "wrong-number-of-arguments (vm too many): got {} args, max={}, params={:?}",
-                    args.len(),
-                    max,
-                    params
-                );
-                return Err(signal(
-                    "wrong-number-of-arguments",
-                    vec![func_value, Value::Int(args.len() as i64)],
-                ));
-            }
-        }
-
-        for param in &params.required {
-            frame.insert(*param, args[arg_idx]);
-            arg_idx += 1;
-        }
-        for param in &params.optional {
-            if arg_idx < args.len() {
-                frame.insert(*param, args[arg_idx]);
-                arg_idx += 1;
-            } else {
-                frame.insert(*param, Value::Nil);
-            }
-        }
-        if let Some(rest_name) = params.rest {
-            let rest_args: Vec<Value> = args[arg_idx..].to_vec();
-            frame.insert(rest_name, Value::list(rest_args));
-        }
-        Ok(frame)
-    }
-
     fn call_function(&mut self, func_val: Value, args: Vec<Value>) -> EvalResult {
         match func_val {
             Value::ByteCode(_) => {
@@ -1611,41 +1556,10 @@ impl<'a> Vm<'a> {
                 self.execute_with_func_value(&bc_data, args, func_val)
             }
             Value::Lambda(_) => {
-                // Fall back to tree-walking for non-compiled lambdas
-                // This creates a temporary evaluator context
-                // Clone all needed data from heap BEFORE any &mut self calls
-                let lambda_data = func_val.get_lambda_data().unwrap().clone();
-                let frame = self.bind_params(&lambda_data.params, args, func_val)?;
-
-                let saved_lexenv = if let Some(env) = lambda_data.env {
-                    let old = std::mem::replace(self.lexenv, env);
-                    // Prepend param bindings onto captured env
-                    for (sym_id, val) in frame.iter() {
-                        *self.lexenv = lexenv_prepend(*self.lexenv, *sym_id, *val);
-                    }
-                    Some(old)
-                } else {
-                    self.dynamic.push(frame);
-                    None
-                };
-
-                // Execute lambda body forms
-                let mut result = Value::Nil;
-                let has_lexenv = saved_lexenv.is_some();
-                for form in lambda_data.body.iter() {
-                    // We need to eval Expr — but we only have a VM.
-                    // Compile the body on-the-fly and execute.
-                    let mut compiler = super::compiler::Compiler::new(has_lexenv);
-                    let compiled = compiler.compile_toplevel(form);
-                    result = self.execute_inline(&compiled)?;
-                }
-
-                if let Some(old_lexenv) = saved_lexenv {
-                    *self.lexenv = old_lexenv;
-                } else {
-                    self.dynamic.pop();
-                }
-                Ok(result)
+                let mut extra_roots = Vec::with_capacity(args.len() + 1);
+                extra_roots.push(func_val);
+                extra_roots.extend(args.iter().copied());
+                self.with_mirrored_evaluator(&extra_roots, move |eval| eval.apply(func_val, args))
             }
             Value::Subr(id) => self.dispatch_vm_builtin(resolve_sym(id), args),
             Value::Symbol(id) => {
@@ -2265,21 +2179,13 @@ impl<'a> Vm<'a> {
         }
     }
 
-    /// Dispatch builtins that require evaluator context by running them
-    /// on a temporary evaluator mirrored from the VM's current obarray/env.
-    fn dispatch_vm_builtin_eval(&mut self, name: &str, args: Vec<Value>) -> Option<EvalResult> {
+    fn with_mirrored_evaluator<T>(
+        &mut self,
+        extra_roots: &[Value],
+        f: impl FnOnce(&mut crate::emacs_core::eval::Evaluator) -> T,
+    ) -> T {
         use crate::emacs_core::intern::with_saved_interner;
         use crate::emacs_core::value::{current_heap_ptr, set_current_heap, with_saved_heap};
-        let trace_vm_builtins = std::env::var_os("NEOVM_TRACE_VM_BUILTINS").is_some();
-        let trace_load_file_name = if trace_vm_builtins {
-            self.obarray
-                .symbol_value("load-file-name")
-                .and_then(|value| value.as_str().map(str::to_owned))
-                .unwrap_or_else(|| "<unknown>".to_string())
-        } else {
-            String::new()
-        };
-        let trace_start = trace_vm_builtins.then(std::time::Instant::now);
         // Evaluator::new() overwrites the thread-local heap/interner pointers.
         // Save and restore them so ObjIds/SymIds from the caller remain valid.
         let mut eval = with_saved_interner(|| {
@@ -2324,27 +2230,17 @@ impl<'a> Vm<'a> {
         for root in &self.gc_roots {
             eval.push_temp_root(*root);
         }
-        for arg in &args {
-            eval.push_temp_root(*arg);
+        for root in extra_roots {
+            eval.push_temp_root(*root);
         }
 
-        let result = builtins::dispatch_builtin(&mut eval, name, args);
-        if let Some(start) = trace_start {
-            let elapsed = start.elapsed();
-            if elapsed.as_millis() > 0 {
-                tracing::info!(
-                    "VM-BUILTIN-EVAL file={} name={} elapsed={:.2?}",
-                    trace_load_file_name,
-                    name,
-                    elapsed
-                );
-            }
-        }
+        let result = f(&mut eval);
 
         std::mem::swap(self.obarray, &mut eval.obarray);
         std::mem::swap(self.dynamic, &mut eval.dynamic);
         std::mem::swap(self.lexenv, &mut eval.lexenv);
         std::mem::swap(self.features, &mut eval.features);
+        std::mem::swap(self.catch_tags, &mut eval.catch_tags);
         std::mem::swap(self.custom, &mut eval.custom);
         std::mem::swap(self.buffers, &mut eval.buffers);
         std::mem::swap(self.frames, &mut eval.frames);
@@ -2365,6 +2261,37 @@ impl<'a> Vm<'a> {
             set_current_heap(&mut *original_heap_ptr);
         }
 
+        result
+    }
+
+    /// Dispatch builtins that require evaluator context by running them
+    /// on a temporary evaluator mirrored from the VM's current obarray/env.
+    fn dispatch_vm_builtin_eval(&mut self, name: &str, args: Vec<Value>) -> Option<EvalResult> {
+        let trace_vm_builtins = std::env::var_os("NEOVM_TRACE_VM_BUILTINS").is_some();
+        let trace_load_file_name = if trace_vm_builtins {
+            self.obarray
+                .symbol_value("load-file-name")
+                .and_then(|value| value.as_str().map(str::to_owned))
+                .unwrap_or_else(|| "<unknown>".to_string())
+        } else {
+            String::new()
+        };
+        let trace_start = trace_vm_builtins.then(std::time::Instant::now);
+        let extra_roots = args.clone();
+        let result = self.with_mirrored_evaluator(&extra_roots, move |eval| {
+            builtins::dispatch_builtin(eval, name, args)
+        });
+        if let Some(start) = trace_start {
+            let elapsed = start.elapsed();
+            if elapsed.as_millis() > 0 {
+                tracing::info!(
+                    "VM-BUILTIN-EVAL file={} name={} elapsed={:.2?}",
+                    trace_load_file_name,
+                    name,
+                    elapsed
+                );
+            }
+        }
         result
     }
 }

@@ -1738,7 +1738,7 @@ fn bootstrap_cl_extra_source_vs_compiled_cl_subseq_setf() {
 }
 
 #[test]
-fn bootstrap_cl_extra_compiled_gv_expander_matches_source() {
+fn bootstrap_cl_extra_gv_expander_requires_eval_in_source_and_compiled_paths() {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let project_root = manifest.parent().expect("project root");
     let cl_extra_base = project_root.join("lisp/emacs-lisp/cl-extra");
@@ -1747,14 +1747,25 @@ fn bootstrap_cl_extra_compiled_gv_expander_matches_source() {
 
     let form = r#"
 (let* ((expander (function-get 'cl-subseq 'gv-expander))
-       (setter (funcall expander (lambda (_getter setter) setter) 'v 1 3)))
-  (funcall setter ''(20 30)))
+       (setter-form (funcall expander (lambda (_getter setter) setter) 'v 1 3)))
+  (let* ((direct
+          (condition-case err
+              (funcall setter-form ''(20 30))
+            (invalid-function 'invalid-function)
+            (error (car err))))
+         (setter
+          (let ((v 'placeholder-seq))
+            (eval setter-form t))))
+    (list direct
+          (functionp setter)
+          (closurep setter))))
 "#;
 
     let source_rendered = cached_bootstrap_eval_with_loaded_file(&source_path, form);
     let compiled_rendered = cached_bootstrap_eval_with_loaded_file(&compiled_path, form);
 
-    assert_eq!(compiled_rendered, source_rendered);
+    assert_eq!(source_rendered, "OK (invalid-function t t)");
+    assert_eq!(compiled_rendered, "OK (invalid-function t t)");
 }
 
 #[test]
