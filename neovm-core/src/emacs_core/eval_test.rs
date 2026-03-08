@@ -54,7 +54,10 @@ fn basic_arithmetic() {
 
 #[test]
 fn substring_accepts_vectors_like_gnu_emacs() {
-    assert_eq!(eval_one("(substring [10 20 30 40 50] 1 4)"), "OK [20 30 40]");
+    assert_eq!(
+        eval_one("(substring [10 20 30 40 50] 1 4)"),
+        "OK [20 30 40]"
+    );
     assert_eq!(eval_one("(substring [10 20 30 40 50] -3 -1)"), "OK [30 40]");
     assert_eq!(eval_one("(substring [10 20 30] 0)"), "OK [10 20 30]");
 }

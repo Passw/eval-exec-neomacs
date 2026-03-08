@@ -1655,7 +1655,10 @@ fn bootstrap_gv_define_setter_round_trip() {
 "#,
     )
     .expect("bootstrapped gv-define-setter evaluation");
-    assert_eq!(rendered, "OK (let* ((v v) (new (20 30))) (progn (list new v 1 3) new))");
+    assert_eq!(
+        rendered,
+        "OK (let* ((v v) (new (20 30))) (progn (list new v 1 3) new))"
+    );
 }
 
 #[test]
@@ -1679,7 +1682,10 @@ fn bootstrap_defun_gv_setter_declaration_round_trip() {
 "#,
     )
     .expect("bootstrapped defun gv-setter declaration evaluation");
-    assert_eq!(rendered, "OK (let* ((v v) (new (20 30))) (progn (list v new 1 3) new))");
+    assert_eq!(
+        rendered,
+        "OK (let* ((v v) (new (20 30))) (progn (list v new 1 3) new))"
+    );
 }
 
 #[test]
@@ -1769,7 +1775,9 @@ fn debug_compiled_cl_extra_setter_bytecode_disasm() {
 
     let expander_form = r#"(function-get 'cl-subseq 'gv-expander)"#;
     let parsed_expander = crate::emacs_core::parser::parse_forms(expander_form).expect("parse");
-    let expander = eval.eval_expr(&parsed_expander[0]).expect("evaluate expander");
+    let expander = eval
+        .eval_expr(&parsed_expander[0])
+        .expect("evaluate expander");
     let gv_defsetter = eval
         .obarray()
         .symbol_function("gv--defsetter")

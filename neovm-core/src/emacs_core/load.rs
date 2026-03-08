@@ -4,7 +4,7 @@ use super::error::{EvalError, map_flow};
 use super::eval::{quote_to_value, value_to_expr};
 use super::expr::Expr;
 use super::expr::print_expr;
-use super::intern::{intern, intern_uninterned, lookup_interned, resolve_sym, SymId};
+use super::intern::{SymId, intern, intern_uninterned, lookup_interned, resolve_sym};
 use super::value::{HashTableTest, Value, list_to_vec, with_heap_mut};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -796,7 +796,9 @@ impl CacheExprDecoder {
             CachedExpr::Keyword(name) => Expr::Keyword(intern(name)),
             CachedExpr::Str(s) => Expr::Str(s.clone()),
             CachedExpr::Char(c) => Expr::Char(*c),
-            CachedExpr::List(items) => Expr::List(items.iter().map(|item| self.decode(item)).collect()),
+            CachedExpr::List(items) => {
+                Expr::List(items.iter().map(|item| self.decode(item)).collect())
+            }
             CachedExpr::Vector(items) => {
                 Expr::Vector(items.iter().map(|item| self.decode(item)).collect())
             }
