@@ -109,6 +109,21 @@ fn expect_completing_read_initial_input(value: &Value) -> Result<(), Flow> {
     }
 }
 
+fn signal_invalid_read_syntax_in_buffer(
+    buffer_text: &str,
+    absolute_error_pos: usize,
+    message: String,
+) -> Flow {
+    let clamped_pos = absolute_error_pos.min(buffer_text.len());
+    let prefix = &buffer_text[..clamped_pos];
+    let line = prefix.bytes().filter(|b| *b == b'\n').count() as i64 + 1;
+    let column = prefix.rsplit('\n').next().unwrap_or("").chars().count() as i64;
+    signal(
+        "invalid-read-syntax",
+        vec![Value::string(message), Value::Int(line), Value::Int(column)],
+    )
+}
+
 // ---------------------------------------------------------------------------
 // 1. read-from-string
 // ---------------------------------------------------------------------------
@@ -185,42 +200,33 @@ pub(crate) fn builtin_read_from_string(
             vec![Value::string("End of file during parsing")],
         ));
     }
-    let end_pos = compute_read_end_position(substring);
-    if end_pos == 0 {
-        return Err(signal(
-            "end-of-file",
-            vec![Value::string("End of file during parsing")],
-        ));
-    }
-
-    let consumed = &substring[..end_pos.min(substring.len())];
-    let forms = super::parser::parse_forms(consumed).map_err(|e| {
-        if e.message.contains("unterminated") || e.message.contains("end of input") {
+    let (expr, end_pos) = super::parser::parse_form(substring)
+        .map_err(|e| {
+            if e.message.contains("unterminated") || e.message.contains("end of input") {
+                signal(
+                    "end-of-file",
+                    vec![Value::string("End of file during parsing")],
+                )
+            } else {
+                signal(
+                    "invalid-read-syntax",
+                    vec![Value::string(e.message.clone())],
+                )
+            }
+        })?
+        .ok_or_else(|| {
             signal(
                 "end-of-file",
                 vec![Value::string("End of file during parsing")],
             )
-        } else {
-            signal(
-                "invalid-read-syntax",
-                vec![Value::string(e.message.clone())],
-            )
-        }
-    })?;
+        })?;
 
-    if forms.is_empty() {
-        return Err(signal(
-            "end-of-file",
-            vec![Value::string("End of file during parsing")],
-        ));
-    }
-
-    let value = if let Some(bytecode) = first_form_byte_code_literal_value(eval, &forms[0]) {
+    let value = if let Some(bytecode) = first_form_byte_code_literal_value(eval, &expr) {
         bytecode
-    } else if let Some(hash_table) = first_form_hash_table_literal_value(eval, &forms[0]) {
+    } else if let Some(hash_table) = first_form_hash_table_literal_value(eval, &expr) {
         hash_table
     } else {
-        eval.quote_to_runtime_value(&forms[0])
+        eval.quote_to_runtime_value(&expr)
     };
     let absolute_end = start + end_pos;
 
@@ -370,31 +376,6 @@ fn starts_with_hash_skip_dispatch(input: &str) -> bool {
     pos + 1 < bytes.len() && bytes[pos] == b'#' && bytes[pos + 1] == b'@'
 }
 
-/// Estimate the end position of the first parsed form in the input string.
-/// We re-parse character by character to find where the parser would stop
-/// after reading one expression.
-fn compute_read_end_position(input: &str) -> usize {
-    // Use a simple approach: parse just one form and see how far we get.
-    // We create a mini-parser that tracks position.
-    let mut pos = 0;
-    let bytes = input.as_bytes();
-
-    // Skip leading whitespace and comments
-    pos = skip_ws_comments(input, pos);
-
-    if pos >= input.len() {
-        return input.len();
-    }
-
-    // Now skip one sexp
-    pos = skip_one_sexp(input, pos);
-
-    // Skip any trailing whitespace up to the end of the consumed region
-    // (Emacs `read-from-string` stops right after the sexp, no trailing ws skip)
-    let _ = bytes;
-    pos
-}
-
 fn skip_ws_comments(input: &str, mut pos: usize) -> usize {
     let bytes = input.as_bytes();
     loop {
@@ -435,328 +416,6 @@ fn skip_ws_comments(input: &str, mut pos: usize) -> usize {
         }
         return pos;
     }
-}
-
-fn skip_one_sexp(input: &str, mut pos: usize) -> usize {
-    let bytes = input.as_bytes();
-    if pos >= bytes.len() {
-        return pos;
-    }
-
-    let ch = bytes[pos];
-
-    match ch {
-        b'(' => {
-            pos += 1;
-            let mut depth = 1;
-            while depth > 0 && pos < bytes.len() {
-                match bytes[pos] {
-                    b'(' => {
-                        depth += 1;
-                        pos += 1;
-                    }
-                    b')' => {
-                        depth -= 1;
-                        pos += 1;
-                    }
-                    b'"' => {
-                        pos = skip_string(input, pos);
-                    }
-                    b';' => {
-                        while pos < bytes.len() && bytes[pos] != b'\n' {
-                            pos += 1;
-                        }
-                    }
-                    b'\\' => {
-                        pos += 1; // skip backslash
-                        if pos < bytes.len() {
-                            pos += 1; // skip escaped char
-                        }
-                    }
-                    _ => {
-                        pos += 1;
-                    }
-                }
-            }
-            pos
-        }
-        b'[' => {
-            pos += 1;
-            let mut depth = 1;
-            while depth > 0 && pos < bytes.len() {
-                match bytes[pos] {
-                    b'[' => {
-                        depth += 1;
-                        pos += 1;
-                    }
-                    b']' => {
-                        depth -= 1;
-                        pos += 1;
-                    }
-                    b'"' => {
-                        pos = skip_string(input, pos);
-                    }
-                    b'\\' => {
-                        pos += 1;
-                        if pos < bytes.len() {
-                            pos += 1;
-                        }
-                    }
-                    _ => {
-                        pos += 1;
-                    }
-                }
-            }
-            pos
-        }
-        b'"' => skip_string(input, pos),
-        b'\'' | b'`' => {
-            // quote / backquote — skip prefix then one sexp
-            pos += 1;
-            pos = skip_ws_comments(input, pos);
-            skip_one_sexp(input, pos)
-        }
-        b',' => {
-            pos += 1;
-            if pos < bytes.len() && bytes[pos] == b'@' {
-                pos += 1;
-            }
-            pos = skip_ws_comments(input, pos);
-            skip_one_sexp(input, pos)
-        }
-        b'#' => {
-            pos += 1;
-            if pos >= bytes.len() {
-                return pos;
-            }
-            match bytes[pos] {
-                b'\'' => {
-                    // #'symbol
-                    pos += 1;
-                    pos = skip_ws_comments(input, pos);
-                    skip_one_sexp(input, pos)
-                }
-                b'(' => {
-                    // #(vector)
-                    skip_one_sexp(input, pos)
-                }
-                b'[' => {
-                    // #[vector] compiled-function literal
-                    skip_one_sexp(input, pos)
-                }
-                b'@' => {
-                    // #@N<bytes> ... next-object
-                    pos += 1;
-                    let digits_start = pos;
-                    while pos < bytes.len() && bytes[pos].is_ascii_digit() {
-                        pos += 1;
-                    }
-                    if pos == digits_start {
-                        return pos;
-                    }
-                    let len = std::str::from_utf8(&bytes[digits_start..pos])
-                        .ok()
-                        .and_then(|s| s.parse::<usize>().ok());
-                    let Some(len) = len else {
-                        return pos;
-                    };
-                    let Some(after_data) = pos.checked_add(len) else {
-                        return bytes.len();
-                    };
-                    if after_data > bytes.len() {
-                        return bytes.len();
-                    }
-                    pos = skip_ws_comments(input, after_data);
-                    if pos >= bytes.len() {
-                        pos
-                    } else {
-                        skip_one_sexp(input, pos)
-                    }
-                }
-                b'$' => {
-                    // #$ pseudo object
-                    pos + 1
-                }
-                b':' => {
-                    // #:symbol — uninterned symbol reader syntax.
-                    pos += 1;
-                    skip_symbol_token(input, pos)
-                }
-                b'#' => {
-                    // ## empty-symbol reader spelling
-                    pos + 1
-                }
-                b'&' => {
-                    // #&SIZE"DATA" bool-vector literal.
-                    pos += 1;
-                    while pos < bytes.len() && bytes[pos].is_ascii_digit() {
-                        pos += 1;
-                    }
-                    if pos < bytes.len() && bytes[pos] == b'"' {
-                        skip_string(input, pos)
-                    } else {
-                        pos
-                    }
-                }
-                b's' => {
-                    // #s(hash-table ...)
-                    pos += 1;
-                    if pos < bytes.len() && bytes[pos] == b'(' {
-                        skip_one_sexp(input, pos)
-                    } else {
-                        pos
-                    }
-                }
-                b'x' | b'X' | b'o' | b'O' | b'b' | b'B' => {
-                    // radix number
-                    pos += 1;
-                    while pos < bytes.len()
-                        && (bytes[pos].is_ascii_alphanumeric() || bytes[pos] == b'_')
-                    {
-                        pos += 1;
-                    }
-                    pos
-                }
-                b'0'..=b'9' => {
-                    // #N=EXPR / #N#
-                    while pos < bytes.len() && bytes[pos].is_ascii_digit() {
-                        pos += 1;
-                    }
-                    if pos >= bytes.len() {
-                        return pos;
-                    }
-                    match bytes[pos] {
-                        b'=' => {
-                            pos += 1;
-                            pos = skip_ws_comments(input, pos);
-                            skip_one_sexp(input, pos)
-                        }
-                        b'#' => pos + 1,
-                        _ => pos,
-                    }
-                }
-                _ => pos + 1,
-            }
-        }
-        b'?' => {
-            // char literal
-            pos += 1;
-            if pos < bytes.len() && bytes[pos] == b'\\' {
-                pos += 1;
-                if pos < bytes.len() {
-                    let esc = bytes[pos];
-                    pos += 1;
-                    match esc {
-                        b'x' => {
-                            while pos < bytes.len() && bytes[pos].is_ascii_hexdigit() {
-                                pos += 1;
-                            }
-                            // Optional terminating ';'
-                            if pos < bytes.len() && bytes[pos] == b';' {
-                                pos += 1;
-                            }
-                        }
-                        b'u' => {
-                            for _ in 0..4 {
-                                if pos < bytes.len() && bytes[pos].is_ascii_hexdigit() {
-                                    pos += 1;
-                                }
-                            }
-                        }
-                        b'U' => {
-                            for _ in 0..8 {
-                                if pos < bytes.len() && bytes[pos].is_ascii_hexdigit() {
-                                    pos += 1;
-                                }
-                            }
-                        }
-                        b'0'..=b'7' => {
-                            for _ in 0..2 {
-                                if pos < bytes.len() && bytes[pos] >= b'0' && bytes[pos] <= b'7' {
-                                    pos += 1;
-                                }
-                            }
-                        }
-                        b'C' | b'M' | b'S' => {
-                            if pos < bytes.len() && bytes[pos] == b'-' {
-                                pos += 1;
-                                if pos < bytes.len() {
-                                    pos += 1;
-                                }
-                            }
-                        }
-                        _ => {} // single escaped char already consumed
-                    }
-                }
-            } else if pos < bytes.len() {
-                // Regular character — consume one UTF-8 char
-                let ch = input[pos..].chars().next();
-                if let Some(c) = ch {
-                    pos += c.len_utf8();
-                }
-            }
-            pos
-        }
-        _ => {
-            // Atom: symbol or number
-            skip_symbol_token(input, pos)
-        }
-    }
-}
-
-fn skip_symbol_token(input: &str, mut pos: usize) -> usize {
-    let bytes = input.as_bytes();
-    while pos < bytes.len() {
-        let b = bytes[pos];
-        if b.is_ascii_whitespace()
-            || b == b'('
-            || b == b')'
-            || b == b'['
-            || b == b']'
-            || b == b'\''
-            || b == b'`'
-            || b == b','
-            || b == b'"'
-            || b == b';'
-        {
-            break;
-        }
-        if b == b'\\' {
-            pos += 1;
-            if pos < bytes.len() {
-                pos += 1;
-            }
-        } else {
-            pos += 1;
-        }
-    }
-    pos
-}
-
-fn skip_string(input: &str, mut pos: usize) -> usize {
-    let bytes = input.as_bytes();
-    if pos >= bytes.len() || bytes[pos] != b'"' {
-        return pos;
-    }
-    pos += 1; // opening quote
-    while pos < bytes.len() {
-        match bytes[pos] {
-            b'"' => {
-                pos += 1;
-                return pos;
-            }
-            b'\\' => {
-                pos += 1;
-                if pos < bytes.len() {
-                    pos += 1;
-                }
-            }
-            _ => {
-                pos += 1;
-            }
-        }
-    }
-    pos
 }
 
 // ---------------------------------------------------------------------------
@@ -812,28 +471,31 @@ pub(crate) fn builtin_read(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
                 ));
             }
             let substring = &text[start..];
-            let forms = super::parser::parse_forms(substring).map_err(|e| {
-                signal(
-                    "invalid-read-syntax",
-                    vec![Value::string(e.message.clone())],
-                )
-            })?;
-            if forms.is_empty() {
-                return Err(signal(
-                    "end-of-file",
-                    vec![Value::string("End of file during parsing")],
-                ));
-            }
-            let value = if let Some(bytecode) = first_form_byte_code_literal_value(eval, &forms[0])
-            {
+            let (expr, end_offset) = super::parser::parse_form(substring)
+                .map_err(|e| {
+                    if e.message.contains("unterminated") || e.message.contains("end of input") {
+                        signal(
+                            "end-of-file",
+                            vec![Value::string("End of file during parsing")],
+                        )
+                    } else {
+                        signal_invalid_read_syntax_in_buffer(&text, start + e.position, e.message)
+                    }
+                })?
+                .ok_or_else(|| {
+                    signal(
+                        "end-of-file",
+                        vec![Value::string("End of file during parsing")],
+                    )
+                })?;
+            let value = if let Some(bytecode) = first_form_byte_code_literal_value(eval, &expr) {
                 bytecode
-            } else if let Some(hash_table) = first_form_hash_table_literal_value(eval, &forms[0]) {
+            } else if let Some(hash_table) = first_form_hash_table_literal_value(eval, &expr) {
                 hash_table
             } else {
-                eval.quote_to_runtime_value(&forms[0])
+                eval.quote_to_runtime_value(&expr)
             };
             // Advance point past the read form
-            let end_offset = compute_read_end_position(substring);
             let new_pt = pt + end_offset;
             if let Some(buf) = eval.buffers.get_mut(buf_id) {
                 buf.pt = new_pt;

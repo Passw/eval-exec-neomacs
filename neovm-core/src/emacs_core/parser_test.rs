@@ -198,6 +198,18 @@ fn parse_char_literals() {
 }
 
 #[test]
+fn parse_char_literal_single_space_syntax_matches_gnu_emacs() {
+    let forms = parse_forms("? x ?\ty").unwrap();
+    assert_eq!(forms, vec![Expr::Char(' '), Expr::Char('\t')]);
+}
+
+#[test]
+fn parse_char_literal_requires_gnu_emacs_delimiter() {
+    let err = parse_forms("?child").expect_err("?child should be invalid reader syntax");
+    assert_eq!(err.message, "?");
+}
+
+#[test]
 fn parse_control_char_literals() {
     // GNU Emacs lread.c rules for \C-:
     //   \C-a = 1 (letter → & 0x1F, no ctrl bit)

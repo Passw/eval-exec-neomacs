@@ -8,7 +8,7 @@ use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 
-use crate::emacs_core::{EvalError, Evaluator, Value, parse_forms, print_value_with_buffers};
+use crate::emacs_core::{EvalError, Evaluator, Value, print_value_with_buffers};
 
 /// Maximum virtual address space (in bytes) for each spawned oracle Emacs
 /// process.  This prevents runaway evaluations from consuming unbounded
@@ -94,6 +94,14 @@ fn project_lisp_subdirs() -> &'static [&'static str] {
         "vc",
         "leim",
     ]
+}
+
+fn ensure_nonempty_form(form: &str) -> Result<(), String> {
+    if form.trim().is_empty() {
+        Err("no form parsed".to_string())
+    } else {
+        Ok(())
+    }
 }
 
 fn run_oracle_eval_inner(form: &str, load_files: &[&str]) -> Result<String, String> {
@@ -412,12 +420,7 @@ pub(crate) fn run_neovm_eval_with_load(form: &str, load_files: &[&str]) -> Resul
         }
     }
 
-    if parse_forms(form)
-        .map_err(|e| format!("parse error: {e}"))?
-        .is_empty()
-    {
-        return Err("no form parsed".to_string());
-    }
+    ensure_nonempty_form(form)?;
 
     let result = run_neovm_eval_in_temp_buffer(&mut eval, form)?;
     let rendered = render_neovm_oracle_result(&eval, result);
@@ -473,12 +476,7 @@ pub(crate) fn run_neovm_eval_with_bootstrap_and_load(
             .map_err(|e| format!("failed to load '{}': {e:?}", path.display()))?;
     }
 
-    if parse_forms(form)
-        .map_err(|e| format!("parse error: {e}"))?
-        .is_empty()
-    {
-        return Err("no form parsed".to_string());
-    }
+    ensure_nonempty_form(form)?;
 
     let result = run_neovm_eval_in_temp_buffer(&mut eval, form)?;
     Ok(render_neovm_oracle_result(&eval, result))
@@ -507,12 +505,7 @@ pub(crate) fn run_neovm_eval_with_bootstrap_and_load_raw(
             .map_err(|e| format!("failed to load '{}': {e:?}", path.display()))?;
     }
 
-    if parse_forms(form)
-        .map_err(|e| format!("parse error: {e}"))?
-        .is_empty()
-    {
-        return Err("no form parsed".to_string());
-    }
+    ensure_nonempty_form(form)?;
 
     let result = run_neovm_eval_in_temp_buffer(&mut eval, form)?;
     Ok(render_neovm_raw_oracle_result(&eval, result))
@@ -533,12 +526,7 @@ pub(crate) fn run_neovm_eval_with_bootstrap(form: &str) -> Result<String, String
     crate::emacs_core::load::apply_runtime_startup_state(&mut eval)
         .map_err(|e| format!("startup state failed: {e:?}"))?;
 
-    if parse_forms(form)
-        .map_err(|e| format!("parse error: {e}"))?
-        .is_empty()
-    {
-        return Err("no form parsed".to_string());
-    }
+    ensure_nonempty_form(form)?;
 
     let result = run_neovm_eval_in_temp_buffer(&mut eval, form)?;
 

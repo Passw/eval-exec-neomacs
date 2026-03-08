@@ -1837,6 +1837,19 @@ fn read_from_string_hash_s_without_list_payload_matches_oracle() {
 }
 
 #[test]
+fn read_from_string_char_literal_requires_gnu_emacs_delimiter() {
+    let mut ev = Evaluator::new();
+    let result = builtin_read_from_string(&mut ev, vec![Value::string("?child")]);
+    match result {
+        Err(Flow::Signal(sig)) => {
+            assert_eq!(sig.symbol_name(), "invalid-read-syntax");
+            assert_eq!(sig.data, vec![Value::string("?")]);
+        }
+        other => panic!("expected invalid-read-syntax, got {other:?}"),
+    }
+}
+
+#[test]
 fn read_from_string_hash_skip_without_length_signals_eof() {
     let mut ev = Evaluator::new();
 
@@ -2047,6 +2060,43 @@ fn read_from_buffer_preserves_string_literals_during_eval() {
     let form = builtin_read(&mut ev, vec![Value::Buffer(buf_id)]).expect("read form");
     let result = ev.eval_value(&form).expect("eval form");
     assert_eq!(result.as_str(), Some("abc"));
+}
+
+#[test]
+fn read_from_buffer_incomplete_list_signals_end_of_file_like_gnu_emacs() {
+    let mut ev = Evaluator::new();
+    let buf_id = ev.buffers.create_buffer(" *reader-incomplete-list*");
+    {
+        let buf = ev.buffers.get_mut(buf_id).expect("buffer");
+        buf.insert("(progn (list 1 2)");
+        buf.pt = 0;
+    }
+
+    let result = builtin_read(&mut ev, vec![Value::Buffer(buf_id)]);
+    assert!(matches!(result, Err(Flow::Signal(sig)) if sig.symbol_name() == "end-of-file"));
+}
+
+#[test]
+fn read_from_buffer_invalid_read_syntax_reports_line_and_column_like_gnu_emacs() {
+    let mut ev = Evaluator::new();
+    let buf_id = ev.buffers.create_buffer(" *reader-invalid-syntax*");
+    {
+        let buf = ev.buffers.get_mut(buf_id).expect("buffer");
+        buf.insert("?child");
+        buf.pt = 0;
+    }
+
+    let result = builtin_read(&mut ev, vec![Value::Buffer(buf_id)]);
+    match result {
+        Err(Flow::Signal(sig)) => {
+            assert_eq!(sig.symbol_name(), "invalid-read-syntax");
+            assert_eq!(
+                sig.data,
+                vec![Value::string("?"), Value::Int(1), Value::Int(2)]
+            );
+        }
+        other => panic!("expected invalid-read-syntax, got {other:?}"),
+    }
 }
 
 #[test]

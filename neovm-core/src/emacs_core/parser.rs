@@ -18,6 +18,15 @@ pub fn parse_forms(input: &str) -> Result<Vec<Expr>, ParseError> {
     Ok(forms)
 }
 
+pub fn parse_form(input: &str) -> Result<Option<(Expr, usize)>, ParseError> {
+    let mut parser = Parser::new(input);
+    if !parser.skip_ws_and_comments() {
+        return Ok(None);
+    }
+    let expr = parser.parse_expr()?;
+    Ok(Some((expr, parser.pos)))
+}
+
 struct Parser<'a> {
     input: &'a str,
     pos: usize,
@@ -468,7 +477,16 @@ impl<'a> Parser<'a> {
 
     fn parse_char_literal(&mut self) -> Result<Expr, ParseError> {
         self.expect('?')?;
+        if matches!(self.current(), Some(' ' | '\t')) {
+            let ch = self.current().expect("matched whitespace char literal");
+            self.bump();
+            return Ok(Expr::Char(ch));
+        }
+
         let val = self.parse_char_value(0)?;
+        if matches!(self.current(), Some(ch) if !is_char_literal_delimiter(ch)) {
+            return Err(self.error("?"));
+        }
         // Character literals with modifier bits (control, meta, etc.) produce
         // values beyond the Unicode range.  Emit them as integers, matching
         // GNU Emacs where characters ARE integers.
@@ -951,6 +969,14 @@ impl<'a> Parser<'a> {
         self.pos = new_pos;
         Ok(())
     }
+}
+
+fn is_char_literal_delimiter(ch: char) -> bool {
+    (ch as u32) <= 32
+        || matches!(
+            ch,
+            '"' | '\'' | ';' | '(' | ')' | '[' | ']' | '#' | '?' | '`' | ',' | '.'
+        )
 }
 
 fn looks_like_float(s: &str) -> bool {
