@@ -1634,7 +1634,10 @@ fn bootstrap_function_put_gv_expander_round_trip() {
 "#,
     )
     .expect("bootstrapped direct gv expander evaluation");
-    assert_eq!(rendered, "OK (20 30)");
+    assert_eq!(
+        rendered,
+        "OK (let* ((v v) (new (20 30))) (progn (list new v 1 3) new))"
+    );
 }
 
 #[test]
