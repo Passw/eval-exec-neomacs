@@ -3569,7 +3569,64 @@ impl Evaluator {
         let Some(Expr::Symbol(key_id)) = items.first() else {
             return Ok(());
         };
+        if self.apply_defun_declaration_from_alist(fn_name, params, items)? {
+            return Ok(());
+        }
+        self.process_defun_declaration_fallback(fn_name, params, items, *key_id)
+    }
+
+    fn apply_defun_declaration_from_alist(
+        &mut self,
+        fn_name: &str,
+        params: &Expr,
+        items: &[Expr],
+    ) -> Result<bool, Flow> {
+        let Some(Expr::Symbol(key_id)) = items.first() else {
+            return Ok(false);
+        };
         let key = resolve_sym(*key_id);
+        let Some(alist) = self
+            .obarray()
+            .symbol_value("defun-declarations-alist")
+            .cloned()
+        else {
+            return Ok(false);
+        };
+        let Some(entries) = list_to_vec(&alist) else {
+            return Ok(false);
+        };
+
+        for entry in entries {
+            let Some(parts) = list_to_vec(&entry) else {
+                continue;
+            };
+            if parts.first().and_then(Value::as_symbol_name) != Some(key) {
+                continue;
+            }
+            let Some(handler) = parts.get(1).copied() else {
+                return Ok(false);
+            };
+            let mut args = Vec::with_capacity(items.len() + 1);
+            args.push(Value::symbol(fn_name));
+            args.push(quote_to_value(params));
+            args.extend(items[1..].iter().map(quote_to_value));
+            let expansion = self.apply(handler, args)?;
+            if expansion.is_truthy() {
+                let _ = self.eval_value(&expansion)?;
+            }
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    fn process_defun_declaration_fallback(
+        &mut self,
+        fn_name: &str,
+        params: &Expr,
+        items: &[Expr],
+        key_id: SymId,
+    ) -> Result<(), Flow> {
+        let key = resolve_sym(key_id);
         match key {
             "compiler-macro" => {
                 // (compiler-macro CM-FN) → (put 'fn-name 'compiler-macro #'CM-FN)

@@ -1720,6 +1720,200 @@ fn bootstrap_defun_gv_setter_declaration_evaluates_generated_form() {
 }
 
 #[test]
+fn bootstrap_eieio_core_preserves_accessor_compiler_macro() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"
+(progn
+  (require 'eieio-core)
+  (let* ((cm (function-get 'eieio--class-index-table 'compiler-macro))
+         (class (eieio--class-make 'foo))
+         (idx (make-hash-table :test 'eq)))
+    (puthash 'x 1 idx)
+    (setf (eieio--class-index-table class) idx)
+    (list (symbolp cm)
+          (eq cm 'eieio--class-index-table--inliner)
+          (gethash 'x (cl--class-index-table class)))))
+"#,
+    );
+
+    assert_eq!(rendered, "OK (t t 1)");
+}
+
+#[test]
+fn bootstrap_defun_compiler_macro_declaration_sets_properties() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"
+(progn
+  (defun vm--cmacro-probe (x)
+    (declare (compiler-macro vm--cmacro-probe--cm))
+    x)
+  (defun vm--cmacro-probe--cm (_form x) x)
+  (list (get 'vm--cmacro-probe 'compiler-macro)
+        (function-get 'vm--cmacro-probe 'compiler-macro)))
+"#,
+    );
+
+    assert_eq!(rendered, "OK (vm--cmacro-probe--cm vm--cmacro-probe--cm)");
+}
+
+#[test]
+fn bootstrap_define_inline_sets_compiler_macro_properties() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"
+(progn
+  (require 'inline)
+  (define-inline vm--inline-probe (x) x)
+  (list (get 'vm--inline-probe 'compiler-macro)
+        (function-get 'vm--inline-probe 'compiler-macro)))
+"#,
+    );
+
+    assert_eq!(
+        rendered,
+        "OK (vm--inline-probe--inliner vm--inline-probe--inliner)"
+    );
+}
+
+#[test]
+fn expanded_cache_replay_preserves_define_inline_compiler_macro() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("vm-inline-cache.el");
+    std::fs::write(
+        &path,
+        r#"
+(require 'inline)
+(define-inline vm--inline-cache-probe (x) x)
+"#,
+    )
+    .expect("write inline fixture");
+
+    let form = r#"
+(list (get 'vm--inline-cache-probe 'compiler-macro)
+      (function-get 'vm--inline-cache-probe 'compiler-macro))
+"#;
+
+    let first = cached_bootstrap_eval_with_loaded_file(&path, form);
+    let second = cached_bootstrap_eval_with_loaded_file(&path, form);
+
+    assert_eq!(
+        first,
+        "OK (vm--inline-cache-probe--inliner vm--inline-cache-probe--inliner)"
+    );
+    assert_eq!(
+        second,
+        "OK (vm--inline-cache-probe--inliner vm--inline-cache-probe--inliner)"
+    );
+}
+
+#[test]
+fn bootstrap_eieio_core_accessor_macroexpand_matches_gnu_source_shape() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"
+(progn
+  (require 'eieio-core)
+  (list (symbolp (get 'eieio--class-index-table 'compiler-macro))
+        (eq (get 'eieio--class-index-table 'compiler-macro)
+            'eieio--class-index-table--inliner)
+        (eq (get 'eieio--class-index-table 'compiler-macro)
+            (function-get 'eieio--class-index-table 'compiler-macro))
+        (macroexpand '(setf (eieio--class-index-table class) idx))))
+"#,
+    );
+
+    assert_eq!(
+        rendered,
+        "OK (t t t (progn (or (eieio--class-p class) (signal 'wrong-type-argument (list 'eieio--class class))) (let* ((v class)) (aset v 5 idx))))"
+    );
+}
+
+#[test]
+fn bootstrap_eieio_core_accessor_compiler_macro_properties_visible() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"
+(progn
+  (require 'eieio-core)
+  (list (symbolp (get 'eieio--class-index-table 'compiler-macro))
+        (eq (get 'eieio--class-index-table 'compiler-macro)
+            'eieio--class-index-table--inliner)
+        (eq (get 'eieio--class-index-table 'compiler-macro)
+            (function-get 'eieio--class-index-table 'compiler-macro))))
+"#,
+    );
+
+    assert_eq!(rendered, "OK (t t t)");
+}
+
+#[test]
+fn bootstrap_eieio_core_accessor_compiler_macro_call_matches_gnu_source_shape() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"
+(progn
+  (require 'eieio-core)
+  (apply (get 'eieio--class-index-table 'compiler-macro)
+         '(eieio--class-index-table class)
+         '(class)))
+"#,
+    );
+
+    assert_eq!(
+        rendered,
+        "OK (progn (or (eieio--class-p class) (signal 'wrong-type-argument (list 'eieio--class class))) (aref class 5))"
+    );
+}
+
+#[test]
+fn bootstrap_eieio_runtime_defclass_metadata_matches_oracle() {
+    let form = r#"
+(progn
+  (require 'eieio)
+  (defclass neovm--dbg-point ()
+    ((x :initarg :x :initform 0)
+     (y :initarg :y :initform 0)))
+  (unwind-protect
+      (let* ((class (cl--find-class 'neovm--dbg-point))
+             (obj (make-instance 'neovm--dbg-point :x 3 :y 4))
+             (slots (eieio-class-slots class))
+             (idx (cl--class-index-table class)))
+        (list
+         (mapcar #'cl--slot-descriptor-name slots)
+         (symbolp (aref class 0))
+         (eq (aref class 0) 'eieio--class)
+         (gethash 'x idx)
+         (gethash 'y idx)
+         (symbolp (aref obj 0))
+         (eq (aref obj 0) 'neovm--dbg-point)
+         (aref obj 1)
+         (aref obj 2)))
+    (fmakunbound 'neovm--dbg-point)))
+"#;
+    crate::emacs_core::oracle_test::common::assert_oracle_parity_with_bootstrap(form);
+}
+
+#[test]
 fn bootstrap_cl_extra_source_vs_compiled_cl_subseq_setf() {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let project_root = manifest.parent().expect("project root");

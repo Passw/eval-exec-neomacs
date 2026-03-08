@@ -665,11 +665,14 @@ fn cache_key(lexical_binding: bool) -> String {
     format!("{ELISP_CACHE_SCHEMA};vm={ELISP_CACHE_VM_VERSION};lexical={lexical}")
 }
 
-// V3 stores expanded forms in a structural binary encoding so uninterned symbol
-// identity survives cache round-trips. V2 used printed text and cannot preserve
-// repeated `#:foo` identity, so it must not share a wire format/version.
-const ELISP_EXPANDED_CACHE_MAGIC: &str = "NEOVM-ELISP-CACHE-V3";
-const ELISP_EXPANDED_CACHE_SCHEMA: &str = "schema=3";
+// V5 stores expanded forms in the same structural binary encoding as V4, but
+// invalidates older expanded caches whose replay flattened side-effectful
+// top-level macros like `define-inline`, losing `compiler-macro` installation
+// for `cl-defstruct`/`eieio` accessors. V2 used printed text and cannot
+// preserve repeated `#:foo` identity, so it must not share a wire
+// format/version.
+const ELISP_EXPANDED_CACHE_MAGIC: &str = "NEOVM-ELISP-CACHE-V5";
+const ELISP_EXPANDED_CACHE_SCHEMA: &str = "schema=5";
 const ELISP_EXPANDED_CACHE_LEGACY_MAGIC: &str = "NEOVM-ELISP-CACHE-V2";
 const ELISP_EXPANDED_CACHE_LEGACY_SCHEMA: &str = "schema=2";
 
@@ -1336,6 +1339,14 @@ fn is_quote_form(val: Value, heap: &crate::gc::heap::LispHeap) -> bool {
     }
 }
 
+fn should_cache_original_form(form_value: Value, heap: &crate::gc::heap::LispHeap) -> bool {
+    let Value::Cons(id) = form_value else {
+        return false;
+    };
+    let head = heap.cons_car(id);
+    head.is_symbol_named("define-inline")
+}
+
 /// Like `eager_expand_eval`, but also collects fully-expanded forms into a
 /// `Vec<Expr>` for V2 cache serialization. The expanded Expr is captured
 /// BEFORE eval (while the heap value is still rooted and stable).
@@ -1368,20 +1379,22 @@ fn eager_expand_eval_and_collect(
             return eval.eval_value(&form_value).map_err(map_flow);
         }
     };
+    // Detect expansion-time side-effect loss while the original form is still
+    // rooted, and eagerly materialize the original Expr if we need to cache
+    // it for replay.
+    let use_original_for_cache = (is_quote_form(val, &eval.heap)
+        && !is_quote_form(form_value, &eval.heap))
+        || should_cache_original_form(form_value, &eval.heap);
+    let original_cached_expr = use_original_for_cache.then(|| value_to_expr(&form_value));
     eval.restore_temp_roots(saved);
 
-    // Detect expansion-time side-effect loss: if one-level expand turned a
-    // non-quote form into (quote ...), the macro (e.g., eval-and-compile)
-    // evaluated its body during expansion. Cache the ORIGINAL form so that
-    // side effects re-occur on V2 replay.
-    let use_original_for_cache =
-        is_quote_form(val, &eval.heap) && !is_quote_form(form_value, &eval.heap);
-
-    // Step 2: if result is (progn ...), recurse into subforms (flattens into collector)
+    // Step 2: if result is (progn ...), recurse into subforms (flattens into
+    // collector), unless we intentionally need the original top-level macro
+    // form to replay its expansion-time semantics (for example `define-inline`).
     if let Value::Cons(id) = val {
         let car = eval.heap.cons_car(id);
         let cdr = eval.heap.cons_cdr(id);
-        if car.is_symbol_named("progn") {
+        if car.is_symbol_named("progn") && !use_original_for_cache {
             let saved_progn = eval.save_temp_roots();
             eval.push_temp_root(val);
             let mut result = Value::Nil;
@@ -1416,7 +1429,7 @@ fn eager_expand_eval_and_collect(
     let saved = eval.save_temp_roots();
     eval.push_temp_root(fully_expanded);
     if use_original_for_cache {
-        collector.push(value_to_expr(&form_value));
+        collector.push(original_cached_expr.expect("cached original expr"));
     } else {
         collector.push(value_to_expr(&fully_expanded));
     }
@@ -1452,7 +1465,6 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
     // silently skip the recursive load.  This prevents infinite recursion
     // from eager expansion of compile-time constructs like define-inline.
     let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-
     let load_count = eval
         .loads_in_progress
         .iter()
