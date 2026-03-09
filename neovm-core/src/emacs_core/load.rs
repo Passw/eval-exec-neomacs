@@ -2165,7 +2165,8 @@ fn collect_compile_only_function_names(
         | "cl-defsubst"
         | "cl-define-compiler-macro" => {
             if let Some(name_expr) = items.get(1)
-                && let Some(name) = expr_symbol_name(name_expr)
+                && let Some(name) =
+                    expr_symbol_name(name_expr).or_else(|| expr_quoted_symbol_name(name_expr))
             {
                 names.insert(name);
             }
@@ -2196,6 +2197,25 @@ fn compile_only_bootstrap_function_names(
         for form in &forms {
             collect_compile_only_function_names(form, &mut names);
         }
+    }
+    names
+}
+
+fn retained_runtime_cl_lib_function_names(
+    project_root: &Path,
+) -> std::collections::BTreeSet<String> {
+    let mut names = std::collections::BTreeSet::new();
+    let path = project_root.join("lisp/emacs-lisp/cl-lib.el");
+    let Ok(source) = fs::read_to_string(&path) else {
+        tracing::warn!("bootstrap cleanup: failed reading {}", path.display());
+        return names;
+    };
+    let Ok(forms) = crate::emacs_core::parser::parse_forms(&source) else {
+        tracing::warn!("bootstrap cleanup: failed parsing {}", path.display());
+        return names;
+    };
+    for form in &forms {
+        collect_compile_only_function_names(form, &mut names);
     }
     names
 }
@@ -2388,7 +2408,13 @@ fn normalize_bootstrap_runtime_surface(
     let restore_autoload_files = ["cl-extra", "cl-macs", "cl-seq", "gv"];
     let (restore_autoload_args, restore_property_forms) =
         runtime_loaddefs_restore_state(project_root, &restore_autoload_files)?;
-    let compile_only_names = compile_only_bootstrap_function_names(project_root);
+    let mut compile_only_names = compile_only_bootstrap_function_names(project_root);
+    let retained_runtime_names = retained_runtime_cl_lib_function_names(project_root);
+    compile_only_names.retain(|name| !retained_runtime_names.contains(name));
+    // The current dumped nadvice bytecode still dereferences gv refs via this
+    // runtime helper. Stripping it here leaves the cached bootstrap image
+    // internally inconsistent even though `featurep 'gv` remains nil.
+    compile_only_names.remove("gv-deref");
 
     for feature in compile_only_features {
         eval.remove_feature(feature);
@@ -2732,8 +2758,8 @@ pub fn create_bootstrap_evaluator_with_features(
             continue;
         }
         if *name == "!reload-subr-after-gv" {
-            let path = find_file_in_load_path("subr", &load_path)
-                .unwrap_or_else(|| panic!("bootstrap file not found: subr"));
+            let path = find_file_in_load_path("subr.el", &load_path)
+                .unwrap_or_else(|| panic!("bootstrap source file not found: subr.el"));
             tracing::info!("REPLAYING: subr runtime-macro defs (post-gv eager replay) ...");
             let start = std::time::Instant::now();
             match replay_selected_source_defuns_with_eager_expansion(

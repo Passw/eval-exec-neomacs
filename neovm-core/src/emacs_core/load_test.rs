@@ -209,6 +209,8 @@ fn bootstrap_runtime_does_not_leak_eval_when_compile_cl_lib_side_effects() {
                (featurep 'gv)
                (featurep 'seq)
                (featurep 'cl-generic)
+               (fboundp 'cl--block-wrapper)
+               (fboundp 'cl--block-throw)
                (fboundp 'cl-every)
                (autoloadp (symbol-function 'cl-every))
                (fboundp 'cl-defstruct)
@@ -224,7 +226,7 @@ fn bootstrap_runtime_does_not_leak_eval_when_compile_cl_lib_side_effects() {
                (functionp (symbol-function 'emacs-lisp-mode)))",
     );
     assert_eq!(
-        rendered, "OK (t nil nil nil nil t t t t t t t t t t t t t nil t)",
+        rendered, "OK (t nil nil nil nil t t t t t t t t t t t t t t t nil t)",
         "bootstrap runtime should match GNU -Q startup visibility for cl preload and loaddefs"
     );
 }
