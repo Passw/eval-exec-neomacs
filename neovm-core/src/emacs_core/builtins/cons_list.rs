@@ -31,7 +31,7 @@ pub(crate) fn lambda_to_cons_list(value: &Value) -> Option<Value> {
     if let Some(env_val) = data.env {
         elements.push(Value::symbol("closure"));
         if env_val.is_nil() {
-            elements.push(Value::True); // t for empty lexical env (top-level)
+            elements.push(Value::list(vec![Value::True]));
         } else {
             elements.push(env_val);
         }
@@ -103,9 +103,9 @@ pub(crate) fn lambda_to_closure_vector(value: &Value) -> Vec<Value> {
     // Env — already stored as a flat cons alist matching GNU Emacs's
     // Vinternal_interpreter_environment.
     let env = match data.env {
-        Some(env_val) if env_val.is_nil() => Value::True, // empty lexical env
+        Some(env_val) if env_val.is_nil() => Value::list(vec![Value::True]),
         Some(env_val) => env_val,
-        None => Value::Nil, // nil = dynamic scope
+        None => Value::Nil,
     };
 
     let mut result = vec![args, body, env];

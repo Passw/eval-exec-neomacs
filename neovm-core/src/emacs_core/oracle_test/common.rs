@@ -624,11 +624,7 @@ fn normalize_interpreted_function_for_oracle(value: Value) -> Option<Value> {
 
     if lambda.env.is_some() {
         elements.push(Value::symbol("closure"));
-        let env = if closure_vec[2] == Value::True {
-            Value::list(vec![Value::True])
-        } else {
-            normalize_neovm_oracle_value(closure_vec[2])
-        };
+        let env = normalize_neovm_oracle_value(closure_vec[2]);
         crate::emacs_core::eval::push_scratch_gc_root(env);
         elements.push(env);
     } else {

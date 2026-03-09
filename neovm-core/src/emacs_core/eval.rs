@@ -524,6 +524,7 @@ impl Evaluator {
         obarray.set_symbol_value("file-coding-system-alist", Value::Nil);
         obarray.set_symbol_value("features", Value::Nil);
         obarray.set_symbol_value("debug-on-error", Value::Nil);
+        obarray.set_symbol_value("internal-make-interpreted-closure-function", Value::Nil);
         obarray.set_symbol_value("lexical-binding", Value::Nil);
         obarray.set_symbol_value("load-prefer-newer", Value::Nil);
         obarray.set_symbol_value("load-file-name", Value::Nil);
@@ -1603,6 +1604,7 @@ impl Evaluator {
             "load-file-name",
             "noninteractive",
             "inhibit-quit",
+            "internal-make-interpreted-closure-function",
             "print-length",
             "print-level",
             "standard-output",
@@ -4766,8 +4768,6 @@ impl Evaluator {
             ));
         }
 
-        let params = self.parse_lambda_params(&tail[0])?;
-
         // Extract docstring if present as the first body element.
         let (docstring, body_start) = match (tail.get(1), tail.get(2)) {
             (Some(Expr::Str(s)), Some(_)) => (Some(s.clone()), 2),
@@ -4799,35 +4799,69 @@ impl Evaluator {
             (None, body_start)
         };
 
-        // Capture lexical environment for closures.
-        // Match GNU Emacs Ffunction (src/eval.c): create a closure whenever
-        // Vinternal_interpreter_environment is non-nil OR lexical-binding is on.
-        // This ensures inner lambdas capture outer params even when created
-        // inside a closure body that was itself created in lexical scope.
-        //
-        // env = None  → dynamic binding (plain lambda, no capture)
-        // env = Some(Nil) → lexical binding, empty environment
-        // env = Some(alist) → lexical binding with captured variables
-        //
-        // Like GNU Emacs (cconv.el), filter the captured environment to only
-        // include variables that are actually free in the lambda body.  This
-        // avoids capturing the entire lexenv and matches the printed closure
-        // representation that oracle tests expect.
-        let env = if self.lexical_binding() || self.lexenv != Value::Nil {
-            let body = &tail[body_start..];
-            let free = free_vars_in_lambda(&params, body);
-            Some(filter_lexenv(self.lexenv, &free))
+        let params_value = quote_to_value(&tail[0]);
+        let body_value = Value::list(tail[body_start..].iter().map(quote_to_value).collect());
+        let env_value = if self.lexical_binding() || self.lexenv != Value::Nil {
+            if self.lexenv == Value::Nil {
+                Value::list(vec![Value::True])
+            } else {
+                self.lexenv
+            }
         } else {
-            None
+            Value::Nil
+        };
+        let docstring_value = match (&docstring, doc_form) {
+            (Some(s), _) => Value::string(s.clone()),
+            (None, Some(form)) => form,
+            (None, None) => Value::Nil,
+        };
+        let iform_value = Value::Nil;
+
+        let saved_roots = self.temp_roots.len();
+        self.push_temp_root(params_value);
+        self.push_temp_root(body_value);
+        self.push_temp_root(env_value);
+        self.push_temp_root(docstring_value);
+        self.push_temp_root(iform_value);
+
+        let result = if env_value != Value::Nil {
+            let closure_hook =
+                self.visible_variable_value_or_nil("internal-make-interpreted-closure-function");
+            if closure_hook != Value::Nil {
+                self.push_temp_root(closure_hook);
+                let result = self.apply(
+                    closure_hook,
+                    vec![
+                        params_value,
+                        body_value,
+                        env_value,
+                        docstring_value,
+                        iform_value,
+                    ],
+                );
+                self.temp_roots.pop();
+                result
+            } else {
+                builtins::symbols::make_interpreted_closure_from_parts(
+                    &params_value,
+                    &body_value,
+                    &env_value,
+                    Some(&docstring_value),
+                    Some(&iform_value),
+                )
+            }
+        } else {
+            builtins::symbols::make_interpreted_closure_from_parts(
+                &params_value,
+                &body_value,
+                &env_value,
+                Some(&docstring_value),
+                Some(&iform_value),
+            )
         };
 
-        Ok(Value::make_lambda(LambdaData {
-            params,
-            body: tail[body_start..].to_vec().into(),
-            env,
-            docstring,
-            doc_form,
-        }))
+        self.restore_temp_roots(saved_roots);
+        result
     }
 
     fn parse_lambda_params(&self, expr: &Expr) -> Result<LambdaParams, Flow> {
@@ -5572,377 +5606,6 @@ impl Evaluator {
         self.literal_cache.insert(key, value);
         value
     }
-}
-
-// ---------------------------------------------------------------------------
-// Free variable analysis for closure environment filtering
-// ---------------------------------------------------------------------------
-
-/// Compute the set of free variables in a lambda body, excluding the lambda's
-/// own parameters.  Used to filter the captured lexenv to only the variables
-/// actually referenced, matching GNU Emacs (cconv.el) behavior.
-fn free_vars_in_lambda(params: &LambdaParams, body: &[Expr]) -> HashSet<SymId> {
-    let mut free = HashSet::new();
-    let mut bound = HashSet::new();
-    // The lambda's own params are bound, not free.
-    for p in &params.required {
-        bound.insert(*p);
-    }
-    for p in &params.optional {
-        bound.insert(*p);
-    }
-    if let Some(r) = params.rest {
-        bound.insert(r);
-    }
-    for expr in body {
-        collect_free_vars(expr, &bound, &mut free);
-    }
-    free
-}
-
-/// Recursively walk an `Expr` AST and collect free variable references.
-/// `bound` tracks variables that are locally bound (not free).
-fn collect_free_vars(expr: &Expr, bound: &HashSet<SymId>, free: &mut HashSet<SymId>) {
-    match expr {
-        Expr::ReaderLoadFileName => {}
-        Expr::Symbol(id) => {
-            let name = resolve_sym(*id);
-            // Skip nil, t, and keyword-like symbols — they're not variable references.
-            if name != "nil" && name != "t" && !name.starts_with(':') {
-                if !bound.contains(id) {
-                    free.insert(*id);
-                }
-            }
-        }
-        Expr::List(items) if items.is_empty() => {}
-        Expr::List(items) => {
-            // Check for special forms that introduce bindings.
-            if let Expr::Symbol(head_id) = &items[0] {
-                let head = resolve_sym(*head_id);
-                match head {
-                    "`" => {
-                        if items.len() == 2 {
-                            collect_free_vars_backquote(&items[1], bound, free, 1);
-                            return;
-                        }
-                    }
-                    "quote" => {
-                        // Quoted forms contain no free variables.
-                        return;
-                    }
-                    "function" => {
-                        // #'symbol — no free vars.  #'(lambda ...) — analyze the lambda.
-                        if items.len() == 2 {
-                            if let Expr::List(inner) = &items[1] {
-                                if !inner.is_empty() {
-                                    if let Expr::Symbol(s) = &inner[0] {
-                                        if resolve_sym(*s) == "lambda" {
-                                            collect_free_vars_lambda_form(&inner[1..], bound, free);
-                                            return;
-                                        }
-                                    }
-                                }
-                            }
-                            // #'some-symbol — not a variable reference
-                        }
-                        return;
-                    }
-                    "lambda" => {
-                        if items.len() > 1 {
-                            collect_free_vars_lambda_form(&items[1..], bound, free);
-                        }
-                        return;
-                    }
-                    "let" => {
-                        collect_free_vars_let(items, bound, free, false);
-                        return;
-                    }
-                    "let*" => {
-                        collect_free_vars_let(items, bound, free, true);
-                        return;
-                    }
-                    "condition-case" | "condition-case-unless-debug" => {
-                        // (condition-case VAR BODYFORM (CONDITION HANDLER...)...)
-                        // VAR is bound in the handler clauses but NOT in BODYFORM.
-                        if items.len() >= 3 {
-                            let var_sym = if let Expr::Symbol(id) = &items[1] {
-                                let n = resolve_sym(*id);
-                                if n != "nil" { Some(*id) } else { None }
-                            } else {
-                                None
-                            };
-                            // BODYFORM — var is NOT bound here
-                            collect_free_vars(&items[2], bound, free);
-                            // Handler clauses — var IS bound
-                            let mut handler_bound = bound.clone();
-                            if let Some(v) = var_sym {
-                                handler_bound.insert(v);
-                            }
-                            for clause in &items[3..] {
-                                // Each clause is (CONDITION BODY...) — skip the condition symbol(s)
-                                if let Expr::List(clause_items) = clause {
-                                    for body_expr in clause_items.iter().skip(1) {
-                                        collect_free_vars(body_expr, &handler_bound, free);
-                                    }
-                                }
-                            }
-                        }
-                        return;
-                    }
-                    "defvar" | "defconst" | "defcustom" => {
-                        // (defvar VAR [VALUE [DOCSTRING]])
-                        // The variable name is not a free reference; the value form is.
-                        if items.len() >= 3 {
-                            collect_free_vars(&items[2], bound, free);
-                        }
-                        // docstring and remaining forms may have expressions
-                        for expr in items.iter().skip(3) {
-                            collect_free_vars(expr, bound, free);
-                        }
-                        return;
-                    }
-                    "setq" | "setq-default" => {
-                        // (setq VAR1 VAL1 VAR2 VAL2 ...)
-                        // Variable names on the left are references (they might be
-                        // lexical variables being set), value forms are walked.
-                        let mut i = 1;
-                        while i + 1 < items.len() {
-                            // The var being set IS a reference (it's read/written)
-                            collect_free_vars(&items[i], bound, free);
-                            collect_free_vars(&items[i + 1], bound, free);
-                            i += 2;
-                        }
-                        return;
-                    }
-                    "interactive" | "declare" => {
-                        // These are declarations, not executable code that captures
-                        // variables.  However, `interactive` can contain forms that
-                        // reference variables, so walk them conservatively.
-                        for item in items.iter().skip(1) {
-                            collect_free_vars(item, bound, free);
-                        }
-                        return;
-                    }
-                    _ => {}
-                }
-            }
-            // Default: recurse into all sub-expressions (including the head).
-            for item in items {
-                collect_free_vars(item, bound, free);
-            }
-        }
-        Expr::DottedList(items, last) => {
-            // Same as List but with a tail.  Check for special forms too.
-            if !items.is_empty() {
-                if let Expr::Symbol(head_id) = &items[0] {
-                    let head = resolve_sym(*head_id);
-                    if head == "quote" {
-                        return;
-                    }
-                }
-            }
-            for item in items {
-                collect_free_vars(item, bound, free);
-            }
-            collect_free_vars(last, bound, free);
-        }
-        Expr::Vector(items) => {
-            for item in items {
-                collect_free_vars(item, bound, free);
-            }
-        }
-        Expr::OpaqueValue(_) => {
-            // Opaque runtime values — can't analyze, but they don't introduce
-            // free variable references at the source level.
-        }
-        // Literals: no free variables
-        Expr::Int(_)
-        | Expr::Float(_)
-        | Expr::Str(_)
-        | Expr::Char(_)
-        | Expr::Bool(_)
-        | Expr::Keyword(_) => {}
-    }
-}
-
-fn collect_free_vars_backquote(
-    expr: &Expr,
-    bound: &HashSet<SymId>,
-    free: &mut HashSet<SymId>,
-    depth: usize,
-) {
-    match expr {
-        // Backquote templates are data by default. Only active unquotes
-        // contribute free-variable references to the surrounding closure.
-        Expr::Symbol(_)
-        | Expr::ReaderLoadFileName
-        | Expr::Keyword(_)
-        | Expr::Int(_)
-        | Expr::Float(_)
-        | Expr::Str(_)
-        | Expr::Char(_)
-        | Expr::Bool(_)
-        | Expr::OpaqueValue(_) => {}
-        Expr::List(items) if items.len() == 2 => {
-            if let Expr::Symbol(head_id) = &items[0] {
-                match resolve_sym(*head_id) {
-                    "`" => {
-                        collect_free_vars_backquote(
-                            &items[1],
-                            bound,
-                            free,
-                            depth.saturating_add(1),
-                        );
-                        return;
-                    }
-                    "," | ",@" => {
-                        if depth <= 1 {
-                            collect_free_vars(&items[1], bound, free);
-                        } else {
-                            collect_free_vars_backquote(
-                                &items[1],
-                                bound,
-                                free,
-                                depth.saturating_sub(1),
-                            );
-                        }
-                        return;
-                    }
-                    _ => {}
-                }
-            }
-            for item in items {
-                collect_free_vars_backquote(item, bound, free, depth);
-            }
-        }
-        Expr::List(items) | Expr::Vector(items) => {
-            for item in items {
-                collect_free_vars_backquote(item, bound, free, depth);
-            }
-        }
-        Expr::DottedList(items, last) => {
-            for item in items {
-                collect_free_vars_backquote(item, bound, free, depth);
-            }
-            collect_free_vars_backquote(last, bound, free, depth);
-        }
-    }
-}
-
-/// Handle `(lambda (PARAMS...) BODY...)` form inside free-var analysis.
-/// `tail` is the slice after the `lambda` symbol: `[(PARAMS...) BODY...]`.
-fn collect_free_vars_lambda_form(
-    tail: &[Expr],
-    outer_bound: &HashSet<SymId>,
-    free: &mut HashSet<SymId>,
-) {
-    if tail.is_empty() {
-        return;
-    }
-    // Collect parameter names from the param list.
-    let mut inner_bound = outer_bound.clone();
-    if let Expr::List(param_list) = &tail[0] {
-        for p in param_list {
-            if let Expr::Symbol(id) = p {
-                let n = resolve_sym(*id);
-                if n != "&optional" && n != "&rest" {
-                    inner_bound.insert(*id);
-                }
-            }
-        }
-    }
-    // Walk the body with inner bindings.
-    for expr in &tail[1..] {
-        collect_free_vars(expr, &inner_bound, free);
-    }
-}
-
-/// Handle `let` and `let*` forms for free-var analysis.
-/// `items` is the full list: `[let BINDINGS BODY...]`.
-fn collect_free_vars_let(
-    items: &[Expr],
-    bound: &HashSet<SymId>,
-    free: &mut HashSet<SymId>,
-    is_star: bool,
-) {
-    if items.len() < 2 {
-        return;
-    }
-    let bindings_expr = &items[1];
-    let body = &items[2..];
-
-    let mut new_bound = bound.clone();
-
-    // Parse bindings — each is either SYMBOL or (SYMBOL VALUE).
-    if let Expr::List(bindings) = bindings_expr {
-        for binding in bindings {
-            match binding {
-                Expr::Symbol(id) => {
-                    let n = resolve_sym(*id);
-                    if n != "nil" {
-                        new_bound.insert(*id);
-                    }
-                }
-                Expr::List(bpair) => {
-                    if let Some(Expr::Symbol(id)) = bpair.first() {
-                        // Value expression: for let*, earlier bindings are visible;
-                        // for let, use the original bound set.
-                        if bpair.len() >= 2 {
-                            let value_bound = if is_star { &new_bound } else { bound };
-                            collect_free_vars(&bpair[1], value_bound, free);
-                        }
-                        let n = resolve_sym(*id);
-                        if n != "nil" {
-                            new_bound.insert(*id);
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    // Body is evaluated with all let-bindings visible.
-    for expr in body {
-        collect_free_vars(expr, &new_bound, free);
-    }
-}
-
-/// Filter a lexenv alist to only keep bindings whose key (a SymId) is in `free`.
-/// Returns a new alist Value containing only the matching entries, preserving order.
-fn filter_lexenv(lexenv: Value, free: &HashSet<SymId>) -> Value {
-    if lexenv == Value::Nil || free.is_empty() {
-        // If there are no free variables or the env is already empty,
-        // return Nil (empty env).  This matches GNU Emacs: `(closure nil ...)`.
-        // But if lexenv is Nil and free is non-empty, we still return Nil.
-        return Value::Nil;
-    }
-    // Collect matching bindings in order (walk the alist front-to-back).
-    let mut kept = Vec::new();
-    let mut cursor = lexenv;
-    loop {
-        match cursor {
-            Value::Cons(cell) => {
-                let pair = read_cons(cell);
-                if let Value::Cons(binding) = pair.car {
-                    let bp = read_cons(binding);
-                    if let Value::Symbol(s) = bp.car {
-                        if free.contains(&s) {
-                            kept.push(pair.car);
-                        }
-                    }
-                }
-                cursor = pair.cdr;
-            }
-            _ => break,
-        }
-    }
-    // Rebuild alist from kept bindings (preserve original order).
-    let mut result = Value::Nil;
-    for binding in kept.into_iter().rev() {
-        result = Value::cons(binding, result);
-    }
-    result
 }
 
 fn rewrite_wrong_arity_function_object(flow: Flow, name: &str) -> Flow {

@@ -4082,8 +4082,6 @@ pub(crate) fn make_interpreted_closure_from_parts(
 
     let env = if env_value.is_nil() {
         None
-    } else if matches!(env_value, Value::True) {
-        Some(Value::Nil)
     } else {
         Some(*env_value)
     };

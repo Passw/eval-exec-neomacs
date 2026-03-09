@@ -2512,6 +2512,10 @@ pub fn apply_runtime_startup_state(eval: &mut super::eval::Evaluator) -> Result<
               (with-current-buffer "*scratch*"
                 (if (eq major-mode 'fundamental-mode)
                     (funcall initial-major-mode))))
+          (when (and (null internal-make-interpreted-closure-function)
+                     (fboundp 'cconv-make-interpreted-closure))
+            (setq internal-make-interpreted-closure-function
+                  #'cconv-make-interpreted-closure))
         "#,
     )
 }

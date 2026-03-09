@@ -3364,3 +3364,17 @@ fn contains_opaque_value_detection() {
         "clean dotted list should not contain opaque values"
     );
 }
+
+#[test]
+fn bootstrap_interpreted_closure_body_shape_matches_gnu_emacs() {
+    let form = r#"(let* ((compose (lambda (f g) (lambda (x) (funcall f (funcall g x)))))
+         (church-zero (lambda (f) (lambda (x) x))))
+    (list (aref compose 1)
+          (aref church-zero 1)))"#;
+    let rendered = crate::emacs_core::oracle_test::common::run_neovm_eval_with_bootstrap(form)
+        .expect("bootstrap eval should run");
+    assert_eq!(
+        rendered,
+        "OK (((lambda (x) (funcall f (funcall g x)))) (#'(lambda (x) x)))"
+    );
+}
