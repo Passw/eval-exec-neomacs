@@ -39,8 +39,6 @@ enum Handler {
     },
     /// unwind-protect: cleanup target.
     UnwindProtect { target: u32 },
-    /// GNU-style unwind-protect: cleanup function popped from TOS.
-    UnwindProtectFn { cleanup: Value },
 }
 
 #[derive(Clone, Debug)]
@@ -58,6 +56,7 @@ enum SavedRestriction {
 #[derive(Clone, Debug)]
 enum VmUnwindEntry {
     DynamicBinding { name: String, restored_value: Value },
+    Cleanup { cleanup: Value },
     CurrentBuffer { buffer_id: BufferId },
     Excursion { buffer_id: BufferId, marker_id: u64 },
     Restriction(SavedRestriction),
@@ -168,15 +167,18 @@ impl<'a> Vm<'a> {
                 Handler::Catch { tag, .. } => out.push(*tag),
                 Handler::ConditionCase { conditions, .. } => out.push(*conditions),
                 Handler::UnwindProtect { .. } => {}
-                Handler::UnwindProtectFn { cleanup } => out.push(*cleanup),
             }
         }
     }
 
     fn collect_specpdl_roots(specpdl: &[VmUnwindEntry], out: &mut Vec<Value>) {
         for entry in specpdl {
-            if let VmUnwindEntry::DynamicBinding { restored_value, .. } = entry {
-                out.push(*restored_value);
+            match entry {
+                VmUnwindEntry::DynamicBinding { restored_value, .. } => out.push(*restored_value),
+                VmUnwindEntry::Cleanup { cleanup } => out.push(*cleanup),
+                VmUnwindEntry::CurrentBuffer { .. }
+                | VmUnwindEntry::Excursion { .. }
+                | VmUnwindEntry::Restriction(_) => {}
             }
         }
     }
@@ -1061,10 +1063,6 @@ impl<'a> Vm<'a> {
                                 // Remove from evaluator's catch_tags registry.
                                 self.catch_tags.pop();
                             }
-                            Handler::UnwindProtectFn { cleanup } => {
-                                // GNU-style: call the cleanup function.
-                                let _ = vm_try!(self.call_function(cleanup, vec![]));
-                            }
                             _ => {}
                         }
                     }
@@ -1074,7 +1072,7 @@ impl<'a> Vm<'a> {
                 }
                 Op::UnwindProtectPop => {
                     let cleanup = stack.pop().unwrap_or(Value::Nil);
-                    handlers.push(Handler::UnwindProtectFn { cleanup });
+                    specpdl.push(VmUnwindEntry::Cleanup { cleanup });
                 }
                 Op::Throw => {
                     let val = stack.pop().unwrap_or(Value::Nil);
@@ -1315,10 +1313,16 @@ impl<'a> Vm<'a> {
             return Ok(Value::Keyword(intern(name)));
         }
 
-        // Check lexenv
         let name_id = intern(name);
-        if let Some(val) = lexenv_lookup(*self.lexenv, name_id) {
-            return Ok(val);
+        let is_special = self.obarray.is_special_id(name_id)
+            || crate::emacs_core::value::lexenv_declares_special(*self.lexenv, name_id);
+
+        // GNU Emacs resolves declared-special vars dynamically even when
+        // lexical binding is active; the interpreter path already does this.
+        if !is_special {
+            if let Some(val) = lexenv_lookup(*self.lexenv, name_id) {
+                return Ok(val);
+            }
         }
 
         // Check dynamic
@@ -1345,11 +1349,16 @@ impl<'a> Vm<'a> {
 
     fn assign_var(&mut self, name: &str, value: Value) -> Result<(), Flow> {
         let name_id = intern(name);
-        // Check lexenv
-        if let Some(cell_id) = lexenv_assq(*self.lexenv, name_id) {
-            lexenv_set(cell_id, value);
-            return Ok(());
+        let is_special = self.obarray.is_special_id(name_id)
+            || crate::emacs_core::value::lexenv_declares_special(*self.lexenv, name_id);
+
+        if !is_special {
+            if let Some(cell_id) = lexenv_assq(*self.lexenv, name_id) {
+                lexenv_set(cell_id, value);
+                return Ok(());
+            }
         }
+
         // Check dynamic
         for frame in self.dynamic.iter_mut().rev() {
             if frame.contains_key(&name_id) {
@@ -1579,6 +1588,15 @@ impl<'a> Vm<'a> {
                 let name = resolve_sym(id);
                 // Try obarray function cell
                 if let Some(func) = self.obarray.symbol_function(name).cloned() {
+                    if crate::emacs_core::autoload::is_autoload_value(&func) {
+                        let mut extra_roots = Vec::with_capacity(args.len() + 2);
+                        extra_roots.push(Value::Symbol(id));
+                        extra_roots.push(func);
+                        extra_roots.extend(args.iter().copied());
+                        return self.with_mirrored_evaluator(&extra_roots, move |eval| {
+                            eval.apply(Value::Symbol(id), args)
+                        });
+                    }
                     return self.call_function(func, args);
                 }
                 // Try builtin
@@ -1754,6 +1772,10 @@ impl<'a> Vm<'a> {
             } => {
                 self.dynamic.pop();
                 self.run_variable_watchers(&name, &restored_value, &Value::Nil, "unlet")?;
+            }
+            VmUnwindEntry::Cleanup { cleanup } => {
+                let cleanup_root = [cleanup];
+                self.with_extra_roots(&cleanup_root, |vm| vm.call_function(cleanup, vec![]))?;
             }
             VmUnwindEntry::CurrentBuffer { buffer_id } => {
                 self.buffers.set_current(buffer_id);
@@ -2320,7 +2342,7 @@ fn merge_result_with_cleanup(result: EvalResult, cleanup: Result<(), Flow>) -> E
 // -- Arithmetic helpers --
 
 /// Result of resolving a throw target, including any cleanup functions
-/// from `UnwindProtectFn` handlers that were unwound through.
+/// from handler frames that were unwound through before reaching the target.
 struct ThrowResolution {
     target: u32,
     stack_len: usize,
@@ -2340,7 +2362,7 @@ fn resolve_throw_target(
     catch_tags: &mut Vec<Value>,
     tag: &Value,
 ) -> Option<ThrowResolution> {
-    let mut cleanups = Vec::new();
+    let cleanups = Vec::new();
     while let Some(handler) = handlers.pop() {
         match handler {
             Handler::Catch {
@@ -2360,9 +2382,6 @@ fn resolve_throw_target(
                     });
                 }
             }
-            Handler::UnwindProtectFn { cleanup } => {
-                cleanups.push(cleanup);
-            }
             _ => {}
         }
     }
@@ -2375,7 +2394,7 @@ fn resolve_signal_target(
     obarray: &Obarray,
     sig: &SignalData,
 ) -> Option<SignalResolution> {
-    let mut cleanups = Vec::new();
+    let cleanups = Vec::new();
     while let Some(handler) = handlers.pop() {
         match handler {
             Handler::Catch { .. } => {
@@ -2396,7 +2415,6 @@ fn resolve_signal_target(
                     });
                 }
             }
-            Handler::UnwindProtectFn { cleanup } => cleanups.push(cleanup),
             Handler::UnwindProtect { .. } => {}
         }
     }

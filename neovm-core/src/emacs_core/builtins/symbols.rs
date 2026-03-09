@@ -1859,7 +1859,7 @@ fn macroexpand_once_with_environment(
     for arg in &args {
         eval.push_temp_root(*arg);
     }
-    let expanded = eval.apply(function, args)?;
+    let expanded = eval.with_macro_expansion_scope(|eval| eval.apply(function, args))?;
     eval.restore_temp_roots(saved_roots);
     // Match real Emacs (eval.c line 1319): if the macro expander returned
     // the same form object (EQ), treat it as "no expansion occurred".

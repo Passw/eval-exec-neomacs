@@ -1564,6 +1564,7 @@ fn load_file_body(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Valu
 
     // Save dynamic loader context and restore it even on parse/eval errors.
     let old_lexical = eval.lexical_binding();
+    let old_lexenv = eval.lexenv;
     let old_load_file = eval.obarray().symbol_value("load-file-name").cloned();
 
     // Root the saved load-file-name value: it sits in a Rust local variable
@@ -1571,6 +1572,7 @@ fn load_file_body(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Valu
     // a loaded file) can trigger gc_safe_point which sweeps the string,
     // causing stale ObjId panics when we try to restore it later.
     let saved_roots = eval.save_temp_roots();
+    eval.push_temp_root(old_lexenv);
     if let Some(ref v) = old_load_file {
         eval.push_temp_root(*v);
     }
@@ -1578,6 +1580,7 @@ fn load_file_body(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Valu
     // Check for lexical-binding file variable in file-local line.
     if lexical_binding_enabled_for_source(&content) {
         eval.set_lexical_binding(true);
+        eval.lexenv = Value::list(vec![Value::True]);
     }
 
     eval.set_variable(
@@ -1797,6 +1800,7 @@ fn load_file_body(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Valu
     })();
 
     eval.set_lexical_binding(old_lexical);
+    eval.lexenv = old_lexenv;
     if let Some(old) = old_load_file {
         eval.set_variable("load-file-name", old);
     } else {
@@ -1835,8 +1839,10 @@ fn load_elc_file_body(eval: &mut super::eval::Evaluator, path: &Path) -> Result<
 
     // Save dynamic loader context
     let old_lexical = eval.lexical_binding();
+    let old_lexenv = eval.lexenv;
     let old_load_file = eval.obarray().symbol_value("load-file-name").cloned();
     let saved_roots = eval.save_temp_roots();
+    eval.push_temp_root(old_lexenv);
     if let Some(ref v) = old_load_file {
         eval.push_temp_root(*v);
     }
@@ -1845,6 +1851,7 @@ fn load_elc_file_body(eval: &mut super::eval::Evaluator, path: &Path) -> Result<
     // Check the raw bytes for the cookie before we stripped the header.
     if elc_has_lexical_binding(&raw_bytes) {
         eval.set_lexical_binding(true);
+        eval.lexenv = Value::list(vec![Value::True]);
     }
 
     eval.set_variable(
@@ -1907,6 +1914,7 @@ fn load_elc_file_body(eval: &mut super::eval::Evaluator, path: &Path) -> Result<
     })();
 
     eval.set_lexical_binding(old_lexical);
+    eval.lexenv = old_lexenv;
     if let Some(old) = old_load_file {
         eval.set_variable("load-file-name", old);
     } else {
@@ -2403,10 +2411,9 @@ fn normalize_bootstrap_runtime_surface(
     project_root: &Path,
 ) -> Result<(), EvalError> {
     let compile_only_features = ["cl-lib", "cl-macs", "cl-extra", "cl-seq", "gv"];
-    let strip_autoload_files = ["cl-extra", "cl-macs", "cl-seq", "gv"];
-    let restore_autoload_files = ["gv"];
+    let runtime_autoload_files = ["cl-extra", "cl-macs", "cl-seq", "gv"];
     let (restore_autoload_args, restore_property_forms) =
-        runtime_loaddefs_restore_state(project_root, &restore_autoload_files)?;
+        runtime_loaddefs_restore_state(project_root, &runtime_autoload_files)?;
     let mut compile_only_names = compile_only_bootstrap_function_names(project_root);
     // The current dumped nadvice bytecode still dereferences gv refs via this
     // runtime helper. Stripping it here leaves the cached bootstrap image
@@ -2432,7 +2439,7 @@ fn normalize_bootstrap_runtime_surface(
 
     let autoload_entries = eval.autoloads.entries_snapshot();
     for entry in &autoload_entries {
-        if strip_autoload_files.contains(&entry.file.as_str())
+        if runtime_autoload_files.contains(&entry.file.as_str())
             || compile_only_names.contains(&entry.name)
         {
             eval.autoloads.remove(&entry.name);
@@ -2529,12 +2536,29 @@ pub fn apply_runtime_startup_state(eval: &mut super::eval::Evaluator) -> Result<
               (with-current-buffer "*scratch*"
                 (if (eq major-mode 'fundamental-mode)
                     (funcall initial-major-mode))))
+          ;; Mirror GNU loadup.el exactly here: setting the closure filter while
+          ;; cconv is still interpreted makes interpreted-closure creation
+          ;; catastrophically slow.
           (when (and (null internal-make-interpreted-closure-function)
-                     (fboundp 'cconv-make-interpreted-closure))
+                     (compiled-function-p (symbol-function 'cconv-fv)))
             (setq internal-make-interpreted-closure-function
                   #'cconv-make-interpreted-closure))
         "#,
-    )
+    )?;
+
+    let filter_fn = eval
+        .obarray()
+        .symbol_value("internal-make-interpreted-closure-function")
+        .cloned()
+        .and_then(|value| match value {
+            Value::Symbol(sym) if resolve_sym(sym) == "cconv-make-interpreted-closure" => eval
+                .obarray()
+                .symbol_function("cconv-make-interpreted-closure")
+                .cloned(),
+            _ => None,
+        });
+    eval.set_interpreted_closure_filter_fn(filter_fn);
+    Ok(())
 }
 
 pub(crate) const BOOTSTRAP_LOAD_SEQUENCE: &[&str] = &[

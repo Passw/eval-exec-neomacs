@@ -57,6 +57,55 @@ fn vm_eval_str(src: &str) -> String {
     }
 }
 
+fn vm_eval_with_lexical(src: &str, lexical: bool) -> Result<Value, EvalError> {
+    let forms = parse_forms(src).expect("parse");
+    let mut compiler = Compiler::new(lexical);
+    let mut obarray = Obarray::new();
+    crate::emacs_core::errors::init_standard_errors(&mut obarray);
+    obarray.set_symbol_value("most-positive-fixnum", Value::Int(i64::MAX >> 2));
+    obarray.set_symbol_value("most-negative-fixnum", Value::Int(-(i64::MAX >> 2) - 1));
+
+    let mut dynamic: Vec<OrderedSymMap> = Vec::new();
+    let mut lexenv: Value = Value::Nil;
+    let mut features: Vec<SymId> = Vec::new();
+    let mut custom = CustomManager::new();
+    let mut buffers = crate::buffer::BufferManager::new();
+    let mut category_manager = CategoryManager::new();
+    let mut frames = FrameManager::new();
+    let mut coding_systems = CodingSystemManager::new();
+    let mut match_data: Option<MatchData> = None;
+    let mut watchers = VariableWatcherList::new();
+    let mut catch_tags: Vec<Value> = Vec::new();
+
+    let mut last = Value::Nil;
+    for form in &forms {
+        let func = compiler.compile_toplevel(form);
+        let mut vm = Vm::new(
+            &mut obarray,
+            &mut dynamic,
+            &mut lexenv,
+            &mut features,
+            &mut custom,
+            &mut buffers,
+            &mut category_manager,
+            &mut frames,
+            &mut coding_systems,
+            &mut match_data,
+            &mut watchers,
+            &mut catch_tags,
+        );
+        last = vm.execute(&func, vec![]).map_err(map_flow)?;
+    }
+    Ok(last)
+}
+
+fn vm_eval_lexical_str(src: &str) -> String {
+    match vm_eval_with_lexical(src, true) {
+        Ok(val) => format!("OK {}", val),
+        Err(e) => format!("ERR {:?}", e),
+    }
+}
+
 fn execute_manual_vm<T>(
     mut func: ByteCodeFunction,
     init: impl FnOnce(&mut ByteCodeFunction, &mut crate::buffer::BufferManager) -> T,
@@ -171,6 +220,37 @@ fn vm_varbind_and_unbind_trigger_variable_watcher_callbacks() {
 }
 
 #[test]
+fn vm_declared_special_ignores_lexical_lookup() {
+    assert_eq!(
+        vm_eval_lexical_str(
+            "(progn
+               (defvar vm-special 10)
+               (let ((vm-special 20))
+                 (let ((f (lambda () vm-special)))
+                   (let ((vm-special 30))
+                     (funcall f)))))"
+        ),
+        "OK 30"
+    );
+}
+
+#[test]
+fn vm_declared_special_setq_updates_dynamic_binding() {
+    assert_eq!(
+        vm_eval_lexical_str(
+            "(progn
+               (defvar vm-special 10)
+               (let ((vm-special 20))
+                 (let ((f (lambda () (setq vm-special (+ vm-special 1)))))
+                   (let ((vm-special 30))
+                     (funcall f)
+                     vm-special))))"
+        ),
+        "OK 31"
+    );
+}
+
+#[test]
 fn vm_unbind_restores_saved_current_buffer() {
     let mut func = ByteCodeFunction::new(LambdaParams {
         required: vec![],
@@ -203,6 +283,44 @@ fn vm_unbind_restores_saved_current_buffer() {
         buffers.current_buffer().map(|buffer| buffer.id),
         Some(saved_buffer)
     );
+}
+
+#[test]
+fn vm_unbind_counts_unwind_protect_entries_like_gnu() {
+    let mut noop_func = ByteCodeFunction::new(LambdaParams {
+        required: vec![],
+        optional: vec![],
+        rest: None,
+    });
+    noop_func.ops = vec![Op::Nil, Op::Return];
+    noop_func.max_stack = 1;
+    let noop = Value::make_bytecode(noop_func);
+
+    let mut func = ByteCodeFunction::new(LambdaParams {
+        required: vec![],
+        optional: vec![],
+        rest: None,
+    });
+    let a_idx = func.add_symbol("vm-up-a");
+    let b_idx = func.add_symbol("vm-up-b");
+    let a_val_idx = func.add_constant(Value::Int(7));
+    let b_val_idx = func.add_constant(Value::Int(9));
+    let cleanup_idx = func.add_constant(noop);
+    func.ops = vec![
+        Op::Constant(a_val_idx),
+        Op::VarBind(a_idx),
+        Op::Constant(b_val_idx),
+        Op::VarBind(b_idx),
+        Op::Constant(cleanup_idx),
+        Op::UnwindProtectPop,
+        Op::Unbind(1),
+        Op::VarRef(b_idx),
+        Op::Return,
+    ];
+    func.max_stack = 2;
+
+    let (result, _buffers, _) = execute_manual_vm(func, |_func, _buffers| ());
+    assert_eq!(result, Value::Int(9));
 }
 
 #[test]

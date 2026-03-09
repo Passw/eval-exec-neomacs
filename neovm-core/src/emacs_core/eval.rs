@@ -2,6 +2,7 @@
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use super::abbrev::AbbrevManager;
@@ -92,6 +93,67 @@ fn expr_fingerprint(expr: &Expr, hasher: &mut impl std::hash::Hasher, depth: usi
     }
 }
 
+fn interpreted_closure_env_entries(lexenv: Value) -> Vec<InterpretedClosureEnvEntry> {
+    let mut cursor = lexenv;
+    let mut entries = Vec::new();
+    loop {
+        match cursor {
+            Value::Cons(cell) => {
+                let pair = read_cons(cell);
+                match pair.car {
+                    Value::True => entries.push(InterpretedClosureEnvEntry::TopLevelSentinel),
+                    Value::Symbol(sym) => entries.push(InterpretedClosureEnvEntry::Special(sym)),
+                    Value::Cons(binding) => {
+                        let binding_pair = read_cons(binding);
+                        if let Value::Symbol(sym) = binding_pair.car {
+                            entries.push(InterpretedClosureEnvEntry::Binding(sym));
+                        }
+                    }
+                    _ => {}
+                }
+                cursor = pair.cdr;
+            }
+            _ => return entries,
+        }
+    }
+}
+
+fn interpreted_closure_trim_fingerprint(
+    params_expr: &Expr,
+    body_exprs: &[Expr],
+    iform_expr: &Expr,
+    env_shape: &[InterpretedClosureEnvEntry],
+) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    expr_fingerprint(params_expr, &mut hasher, 8);
+    body_exprs.len().hash(&mut hasher);
+    for expr in body_exprs {
+        expr_fingerprint(expr, &mut hasher, 8);
+    }
+    expr_fingerprint(iform_expr, &mut hasher, 8);
+    env_shape.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn rebuild_trimmed_interpreted_closure_env(
+    source_env: Value,
+    template: &[InterpretedClosureEnvEntry],
+) -> Value {
+    let mut entries = Vec::with_capacity(template.len());
+    for entry in template {
+        match entry {
+            InterpretedClosureEnvEntry::TopLevelSentinel => entries.push(Value::True),
+            InterpretedClosureEnvEntry::Special(sym) => entries.push(Value::Symbol(*sym)),
+            InterpretedClosureEnvEntry::Binding(sym) => {
+                let cell = lexenv_assq(source_env, *sym)
+                    .expect("cached interpreted-closure env binding should exist");
+                entries.push(Value::Cons(cell));
+            }
+        }
+    }
+    Value::list(entries)
+}
+
 #[derive(Clone, Debug)]
 enum NamedCallTarget {
     Obarray(Value),
@@ -107,6 +169,39 @@ struct NamedCallCache {
     symbol: SymId,
     function_epoch: u64,
     target: NamedCallTarget,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum InterpretedClosureEnvEntry {
+    TopLevelSentinel,
+    Special(SymId),
+    Binding(SymId),
+}
+
+#[derive(Clone, Debug)]
+struct InterpretedClosureTrimCacheEntry {
+    params_expr: Expr,
+    body_exprs: Vec<Expr>,
+    iform_expr: Expr,
+    env_shape: Vec<InterpretedClosureEnvEntry>,
+    params: LambdaParams,
+    trimmed_body: Rc<Vec<Expr>>,
+    trimmed_env_template: Vec<InterpretedClosureEnvEntry>,
+}
+
+impl InterpretedClosureTrimCacheEntry {
+    fn matches(
+        &self,
+        params_expr: &Expr,
+        body_exprs: &[Expr],
+        iform_expr: &Expr,
+        env_shape: &[InterpretedClosureEnvEntry],
+    ) -> bool {
+        self.params_expr == *params_expr
+            && self.body_exprs == body_exprs
+            && self.iform_expr == *iform_expr
+            && self.env_shape == env_shape
+    }
 }
 
 fn value_from_symbol_id(sym_id: SymId) -> Value {
@@ -298,6 +393,15 @@ pub struct Evaluator {
     pub(crate) macro_expand_total_us: u64,
     /// When true, skip cache lookups (still populate cache for timing).
     pub(crate) macro_cache_disabled: bool,
+    /// Bootstrapped standard interpreted-closure filter function object.
+    /// Used to memoize the GNU cconv closure-trimming path without changing
+    /// semantics when users later rebind/advice the hook.
+    interpreted_closure_filter_fn: Option<Value>,
+    /// Cache of standard cconv interpreted-closure trimming results keyed by
+    /// lambda syntax plus lexical-environment shape. The cached data stores
+    /// only the selected env template and trimmed body, so captured values are
+    /// always rebuilt from the current runtime environment on a hit.
+    interpreted_closure_trim_cache: HashMap<u64, Vec<InterpretedClosureTrimCacheEntry>>,
 }
 
 impl Default for Evaluator {
@@ -1677,6 +1781,8 @@ impl Evaluator {
             macro_cache_misses: 0,
             macro_expand_total_us: 0,
             macro_cache_disabled: false,
+            interpreted_closure_filter_fn: None,
+            interpreted_closure_trim_cache: HashMap::new(),
         };
         // The heap and interner are boxed so their addresses are stable across moves.
         // Re-point anyway to be explicit about thread-local state.
@@ -1771,6 +1877,8 @@ impl Evaluator {
             macro_cache_misses: 0,
             macro_expand_total_us: 0,
             macro_cache_disabled: false,
+            interpreted_closure_filter_fn: None,
+            interpreted_closure_trim_cache: HashMap::new(),
         };
         // Re-point thread-local pointers to the evaluator's owned boxes.
         set_current_interner(&mut ev.interner);
@@ -1808,6 +1916,16 @@ impl Evaluator {
         // Macro expansion cache — root any OpaqueValue nodes in cached Expr trees
         for (expr, _fingerprint) in self.macro_expansion_cache.values() {
             expr.collect_opaque_values(&mut roots);
+        }
+        if let Some(filter_fn) = self.interpreted_closure_filter_fn {
+            roots.push(filter_fn);
+        }
+        for entries in self.interpreted_closure_trim_cache.values() {
+            for entry in entries {
+                for expr in entry.trimmed_body.iter() {
+                    expr.collect_opaque_values(&mut roots);
+                }
+            }
         }
 
         // Named call cache — holds a Value when target is Obarray(val)
@@ -2027,6 +2145,13 @@ impl Evaluator {
     pub fn set_lexical_binding(&mut self, enabled: bool) {
         self.obarray
             .set_symbol_value("lexical-binding", Value::bool(enabled));
+    }
+
+    pub(crate) fn set_interpreted_closure_filter_fn(&mut self, filter_fn: Option<Value>) {
+        self.interpreted_closure_filter_fn = filter_fn;
+        if filter_fn.is_none() {
+            self.interpreted_closure_trim_cache.clear();
+        }
     }
 
     /// Load a file, converting EvalError back to Flow for use in special forms.
@@ -2285,12 +2410,18 @@ impl Evaluator {
 
         let resolved = super::builtins::resolve_variable_alias_id(self, sym_id)?;
         let resolved_name = resolve_sym(resolved);
+        let locally_special = lexenv_declares_special(self.lexenv, sym_id)
+            || (resolved != sym_id && lexenv_declares_special(self.lexenv, resolved));
 
         // Check the lexical environment first whenever lexical binding is
         // active. This preserves GNU Emacs behavior for function parameters
         // named `t`/`nil`: they remain lexical locals inside the current
         // lambda body, even though the global symbols are self-evaluating.
-        if self.lexical_binding() {
+        if self.lexical_binding()
+            && !self.obarray.is_special_id(sym_id)
+            && !self.obarray.is_special_id(resolved)
+            && !locally_special
+        {
             if let Some(value) = lexenv_lookup(self.lexenv, sym_id) {
                 return Ok(value);
             }
@@ -2526,7 +2657,8 @@ impl Evaluator {
                         for v in &arg_values {
                             self.push_temp_root(*v);
                         }
-                        let expanded_value = self.apply(macro_fn, arg_values)?;
+                        let expanded_value = self
+                            .with_macro_expansion_scope(|eval| eval.apply(macro_fn, arg_values))?;
                         // Root expansion result during value_to_expr traversal
                         // AND during eval of expanded_expr (OpaqueValues reference
                         // heap objects reachable only through expanded_value).
@@ -2982,7 +3114,10 @@ impl Evaluator {
                                 continue;
                             }
                             let old_value = self.visible_variable_value_or_nil(name);
-                            if use_lexical && !self.obarray.is_special(name) {
+                            if use_lexical
+                                && !self.obarray.is_special(name)
+                                && !lexenv_declares_special(self.lexenv, *id)
+                            {
                                 lexical_bindings.push((*id, Value::Nil));
                             } else {
                                 dynamic_bindings.insert(*id, Value::Nil);
@@ -3017,7 +3152,10 @@ impl Evaluator {
                                 continue;
                             }
                             let old_value = self.visible_variable_value_or_nil(name);
-                            if use_lexical && !self.obarray.is_special(name) {
+                            if use_lexical
+                                && !self.obarray.is_special(name)
+                                && !lexenv_declares_special(self.lexenv, *id)
+                            {
                                 lexical_bindings.push((*id, value));
                             } else {
                                 dynamic_bindings.insert(*id, value);
@@ -3149,7 +3287,10 @@ impl Evaluator {
                             return Err(signal("setting-constant", vec![Value::symbol(name)]));
                         }
                         let old_value = self.visible_variable_value_or_nil(name);
-                        if use_lexical && !self.obarray.is_special(name) {
+                        if use_lexical
+                            && !self.obarray.is_special(name)
+                            && !lexenv_declares_special(self.lexenv, *id)
+                        {
                             self.bind_lexical_value_rooted(*id, Value::Nil);
                         } else if let Some(frame) = self.dynamic.last_mut() {
                             frame.insert(*id, Value::Nil);
@@ -3174,7 +3315,10 @@ impl Evaluator {
                             return Err(signal("setting-constant", vec![Value::symbol(name)]));
                         }
                         let old_value = self.visible_variable_value_or_nil(name);
-                        if use_lexical && !self.obarray.is_special(name) {
+                        if use_lexical
+                            && !self.obarray.is_special(name)
+                            && !lexenv_declares_special(self.lexenv, *id)
+                        {
                             self.bind_lexical_value_rooted(*id, value);
                         } else if let Some(frame) = self.dynamic.last_mut() {
                             frame.insert(*id, value);
@@ -3710,11 +3854,18 @@ impl Evaluator {
         let name = resolve_sym(*id);
         // Only set value if INITVALUE is provided and symbol is not already bound.
         // (defvar x) without INITVALUE only marks as special, does NOT bind.
-        if tail.len() > 1 && !self.obarray.boundp(name) {
-            let value = self.eval(&tail[1])?;
-            self.obarray.set_symbol_value(name, value);
+        if tail.len() > 1 {
+            if !self.obarray.boundp(name) {
+                let value = self.eval(&tail[1])?;
+                self.obarray.set_symbol_value(name, value);
+            }
+            self.obarray.make_special(name);
+        } else if self.lexical_binding() && !self.lexenv.is_nil() && !self.obarray.is_special(name)
+        {
+            // Mirror GNU eval.c: simple `(defvar foo)` inside a lexical scope
+            // only declares `foo` dynamically within the current lexical env.
+            self.lexenv = Value::cons(Value::Symbol(*id), self.lexenv);
         }
-        self.obarray.make_special(name);
         Ok(Value::symbol(name))
     }
 
@@ -4760,6 +4911,118 @@ impl Evaluator {
     // Lambda / Function application
     // -----------------------------------------------------------------------
 
+    fn maybe_use_cached_interpreted_closure_filter(
+        &mut self,
+        closure_hook: Value,
+        params_expr: &Expr,
+        body_exprs: &[Expr],
+        env_value: Value,
+        docstring: Option<String>,
+        doc_form: Option<Value>,
+        iform_value: Value,
+    ) -> Option<Value> {
+        let Value::Symbol(hook_sym) = closure_hook else {
+            return None;
+        };
+        if resolve_sym(hook_sym) != "cconv-make-interpreted-closure" {
+            return None;
+        }
+        let Some(expected_fn) = self.interpreted_closure_filter_fn else {
+            return None;
+        };
+        let Some(current_fn) = self
+            .obarray
+            .symbol_function("cconv-make-interpreted-closure")
+            .cloned()
+        else {
+            return None;
+        };
+        if !eq_value(&current_fn, &expected_fn) {
+            return None;
+        }
+
+        let env_shape = interpreted_closure_env_entries(env_value);
+        let iform_expr = value_to_expr(&iform_value);
+        let cache_fp =
+            interpreted_closure_trim_fingerprint(params_expr, body_exprs, &iform_expr, &env_shape);
+        let entry = self
+            .interpreted_closure_trim_cache
+            .get(&cache_fp)?
+            .iter()
+            .find(|entry| entry.matches(params_expr, body_exprs, &iform_expr, &env_shape))?
+            .clone();
+        let rebuilt_env =
+            rebuild_trimmed_interpreted_closure_env(env_value, &entry.trimmed_env_template);
+        Some(Value::make_lambda(LambdaData {
+            params: entry.params,
+            body: entry.trimmed_body,
+            env: Some(rebuilt_env),
+            docstring,
+            doc_form,
+        }))
+    }
+
+    fn maybe_cache_interpreted_closure_filter_result(
+        &mut self,
+        closure_hook: Value,
+        params_expr: &Expr,
+        body_exprs: &[Expr],
+        env_value: Value,
+        iform_value: Value,
+        result: &Value,
+    ) {
+        let Value::Symbol(hook_sym) = closure_hook else {
+            return;
+        };
+        if resolve_sym(hook_sym) != "cconv-make-interpreted-closure" {
+            return;
+        }
+        let Some(expected_fn) = self.interpreted_closure_filter_fn else {
+            return;
+        };
+        let Some(current_fn) = self
+            .obarray
+            .symbol_function("cconv-make-interpreted-closure")
+            .cloned()
+        else {
+            return;
+        };
+        if !eq_value(&current_fn, &expected_fn) {
+            return;
+        }
+        let Value::Lambda(id) = result else {
+            return;
+        };
+        let lambda_data = self.heap.get_lambda(*id).clone();
+        let Some(trimmed_env) = lambda_data.env else {
+            return;
+        };
+
+        let env_shape = interpreted_closure_env_entries(env_value);
+        let iform_expr = value_to_expr(&iform_value);
+        let cache_fp =
+            interpreted_closure_trim_fingerprint(params_expr, body_exprs, &iform_expr, &env_shape);
+        let bucket = self
+            .interpreted_closure_trim_cache
+            .entry(cache_fp)
+            .or_default();
+        if bucket
+            .iter()
+            .any(|entry| entry.matches(params_expr, body_exprs, &iform_expr, &env_shape))
+        {
+            return;
+        }
+        bucket.push(InterpretedClosureTrimCacheEntry {
+            params_expr: params_expr.clone(),
+            body_exprs: body_exprs.to_vec(),
+            iform_expr,
+            env_shape,
+            params: lambda_data.params,
+            trimmed_body: lambda_data.body,
+            trimmed_env_template: interpreted_closure_env_entries(trimmed_env),
+        });
+    }
+
     pub(crate) fn eval_lambda(&mut self, tail: &[Expr]) -> EvalResult {
         if tail.is_empty() {
             return Err(signal(
@@ -4828,19 +5091,41 @@ impl Evaluator {
             let closure_hook =
                 self.visible_variable_value_or_nil("internal-make-interpreted-closure-function");
             if closure_hook != Value::Nil {
-                self.push_temp_root(closure_hook);
-                let result = self.apply(
+                if let Some(cached) = self.maybe_use_cached_interpreted_closure_filter(
                     closure_hook,
-                    vec![
-                        params_value,
-                        body_value,
-                        env_value,
-                        docstring_value,
-                        iform_value,
-                    ],
-                );
-                self.temp_roots.pop();
-                result
+                    &tail[0],
+                    &tail[body_start..],
+                    env_value,
+                    docstring.clone(),
+                    doc_form,
+                    iform_value,
+                ) {
+                    Ok(cached)
+                } else {
+                    self.push_temp_root(closure_hook);
+                    let result = self.apply(
+                        closure_hook,
+                        vec![
+                            params_value,
+                            body_value,
+                            env_value,
+                            docstring_value,
+                            iform_value,
+                        ],
+                    );
+                    self.temp_roots.pop();
+                    if let Ok(value) = &result {
+                        self.maybe_cache_interpreted_closure_filter_result(
+                            closure_hook,
+                            &tail[0],
+                            &tail[body_start..],
+                            env_value,
+                            iform_value,
+                            value,
+                        );
+                    }
+                    result
+                }
             } else {
                 builtins::symbols::make_interpreted_closure_from_parts(
                     &params_value,
@@ -5376,8 +5661,9 @@ impl Evaluator {
             self.push_temp_root(*v);
         }
 
-        // Apply the macro body
-        let expanded_value = self.apply_lambda(&lambda_data, arg_values, Value::Macro(id))?;
+        let expanded_value = self.with_macro_expansion_scope(|eval| {
+            eval.apply_lambda(&lambda_data, arg_values, Value::Macro(id))
+        })?;
         // Root expansion result during value_to_expr traversal
         self.push_temp_root(expanded_value);
 
@@ -5405,6 +5691,46 @@ impl Evaluator {
         Ok(result)
     }
 
+    pub(crate) fn with_macro_expansion_scope<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, Flow>,
+    ) -> Result<T, Flow> {
+        let saved_roots = self.save_temp_roots();
+        let old_lexical = self.lexical_binding();
+        let old_dynvars = self
+            .obarray()
+            .symbol_value("macroexp--dynvars")
+            .cloned()
+            .unwrap_or(Value::Nil);
+        self.push_temp_root(old_dynvars);
+
+        let mut dynvars = old_dynvars;
+        for sym in lexenv_bare_symbols(self.lexenv) {
+            let name = resolve_sym(sym);
+            if name == "t" || name == "nil" {
+                continue;
+            }
+            dynvars = Value::cons(Value::Symbol(sym), dynvars);
+        }
+        for frame in self.dynamic.iter().rev() {
+            for (sym, _) in frame.iter() {
+                let name = resolve_sym(*sym);
+                if name == "t" || name == "nil" {
+                    continue;
+                }
+                dynvars = Value::cons(Value::Symbol(*sym), dynvars);
+            }
+        }
+
+        self.set_lexical_binding(!self.lexenv.is_nil());
+        self.set_variable("macroexp--dynvars", dynvars);
+        let result = f(self);
+        self.set_variable("macroexp--dynvars", old_dynvars);
+        self.set_lexical_binding(old_lexical);
+        self.restore_temp_roots(saved_roots);
+        result
+    }
+
     // -----------------------------------------------------------------------
     // Variable assignment
     // -----------------------------------------------------------------------
@@ -5415,7 +5741,10 @@ impl Evaluator {
     pub(crate) fn assign_by_id(&mut self, sym_id: SymId, value: Value) {
         let name = resolve_sym(sym_id);
         // If lexical binding and not special, check lexenv first
-        if self.lexical_binding() && !self.obarray.is_special_id(sym_id) {
+        if self.lexical_binding()
+            && !self.obarray.is_special_id(sym_id)
+            && !lexenv_declares_special(self.lexenv, sym_id)
+        {
             if let Some(cell_id) = lexenv_assq(self.lexenv, sym_id) {
                 lexenv_set(cell_id, value);
                 return;
@@ -5480,7 +5809,9 @@ impl Evaluator {
             return Value::True;
         }
         let name_id = intern(name);
-        if let Some(value) = lexenv_lookup(self.lexenv, name_id) {
+        if !lexenv_declares_special(self.lexenv, name_id)
+            && let Some(value) = lexenv_lookup(self.lexenv, name_id)
+        {
             return value;
         }
         for frame in self.dynamic.iter().rev() {

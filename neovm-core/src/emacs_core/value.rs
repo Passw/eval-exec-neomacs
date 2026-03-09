@@ -1461,13 +1461,15 @@ pub fn lexenv_assq(lexenv: Value, sym_id: SymId) -> Option<ObjId> {
         match cursor {
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                // Each element should be (sym . val)
+                // Elements are either (sym . val) lexical bindings, bare
+                // symbols declaring local dynamic scope, or the GNU top-level
+                // lexical sentinel `(t)`.
                 if let Value::Cons(binding) = pair.car {
                     let bp = read_cons(binding);
-                    if let Value::Symbol(s) = bp.car {
-                        if s == sym_id {
-                            return Some(binding);
-                        }
+                    if let Value::Symbol(s) = bp.car
+                        && s == sym_id
+                    {
+                        return Some(binding);
                     }
                 }
                 cursor = pair.cdr;
@@ -1480,6 +1482,46 @@ pub fn lexenv_assq(lexenv: Value, sym_id: SymId) -> Option<ObjId> {
 /// Look up symbol value in a cons-alist lexenv.
 pub fn lexenv_lookup(lexenv: Value, sym_id: SymId) -> Option<Value> {
     lexenv_assq(lexenv, sym_id).map(|cell| read_cons(cell).cdr)
+}
+
+/// Return true if the lexical environment contains a bare-symbol declaration
+/// marking SYM_ID as locally special/dynamic.
+pub fn lexenv_declares_special(lexenv: Value, sym_id: SymId) -> bool {
+    let mut cursor = lexenv;
+    loop {
+        match cursor {
+            Value::Cons(cell) => {
+                let pair = read_cons(cell);
+                if let Value::Symbol(s) = pair.car
+                    && s == sym_id
+                {
+                    return true;
+                }
+                cursor = pair.cdr;
+            }
+            _ => return false,
+        }
+    }
+}
+
+/// Collect bare-symbol entries from the lexical environment. GNU Emacs uses
+/// these to propagate local `defvar` declarations into `macroexp--dynvars`
+/// during macro expansion.
+pub fn lexenv_bare_symbols(lexenv: Value) -> Vec<SymId> {
+    let mut cursor = lexenv;
+    let mut symbols = Vec::new();
+    loop {
+        match cursor {
+            Value::Cons(cell) => {
+                let pair = read_cons(cell);
+                if let Value::Symbol(s) = pair.car {
+                    symbols.push(s);
+                }
+                cursor = pair.cdr;
+            }
+            _ => return symbols,
+        }
+    }
 }
 
 /// Mutate a binding in place: set cdr of the `(sym . val)` cons cell.

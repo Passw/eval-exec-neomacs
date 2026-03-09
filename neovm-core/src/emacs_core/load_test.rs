@@ -329,6 +329,255 @@ fn bootstrap_runtime_loaded_bytecode_preserves_wrong_arity_shape() {
     );
 }
 
+#[test]
+fn bootstrap_runtime_restores_cl_loaddefs_autoload_surface() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(list
+             (autoloadp (symbol-function 'cl-defstruct))
+             (autoloadp (symbol-function 'cl-reduce))
+             (autoloadp (symbol-function 'cl--adjoin))
+             (autoloadp (symbol-function 'cl-subseq)))"#,
+    );
+    assert_eq!(rendered, "OK (t t t t)");
+}
+
+#[test]
+fn bootstrap_runtime_cl_adjoin_entry_point_works() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(progn
+             (require 'cl-lib)
+             (condition-case err (cl-adjoin 4 '(1 2 3)) (error err)))"#,
+    );
+    assert_eq!(rendered, "OK (4 1 2 3)");
+}
+
+#[test]
+fn bootstrap_runtime_require_cl_lib_works() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(condition-case err
+               (progn
+                 (require 'cl-lib)
+                 (list (featurep 'cl-lib)
+                       (autoloadp (symbol-function 'cl-defstruct))
+                       (autoloadp (symbol-function 'cl-reduce))))
+             (error err))"#,
+    );
+    assert_eq!(rendered, "OK (t t t)");
+}
+
+#[test]
+fn bootstrap_runtime_cl_reduce_entry_point_works() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(progn
+             (require 'cl-lib)
+             (condition-case err (cl-reduce #'+ '(1 2 3)) (error err)))"#,
+    );
+    assert_eq!(rendered, "OK 6");
+}
+
+#[test]
+fn bootstrap_runtime_cl_defstruct_entry_point_works() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(progn
+             (require 'cl-lib)
+             (condition-case err
+                 (progn
+                   (cl-defstruct neovm--dbg-point x y)
+                   (let ((p (make-neovm--dbg-point :x 1 :y 2)))
+                     (list (neovm--dbg-point-p p)
+                           (neovm--dbg-point-x p)
+                           (neovm--dbg-point-y p))))
+               (error err)))"#,
+    );
+    assert_eq!(rendered, "OK (t 1 2)");
+}
+
+#[test]
+fn bootstrap_runtime_interpreted_closure_filter_state_matches_gnu_emacs() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(list
+             (compiled-function-p (symbol-function 'cconv-fv))
+             (compiled-function-p (symbol-function 'cconv-make-interpreted-closure))
+             internal-make-interpreted-closure-function)"#,
+    );
+    assert_eq!(rendered, "OK (t t cconv-make-interpreted-closure)");
+}
+
+#[test]
+fn bootstrap_runtime_rebound_interpreted_closure_filter_remains_observable() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(progn
+             (setq neovm--hook-count 0)
+             (fset 'neovm--counting-make-interpreted-closure
+                   (lambda (args body env docstring iform)
+                     (setq neovm--hook-count (1+ neovm--hook-count))
+                     (make-interpreted-closure args body env docstring iform)))
+             (let ((internal-make-interpreted-closure-function
+                    'neovm--counting-make-interpreted-closure))
+               (unwind-protect
+                   (list
+                    (funcall (let ((x 1)) (lambda () x)))
+                    (funcall (let ((x 1)) (lambda () x)))
+                    neovm--hook-count)
+                 (fmakunbound 'neovm--counting-make-interpreted-closure)
+                 (makunbound 'neovm--hook-count))))"#,
+    );
+    assert_eq!(rendered, "OK (1 1 2)");
+}
+
+#[test]
+fn bootstrap_runtime_cl_defstruct_macroexpand_all_head_matches_gnu() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(progn
+             (require 'cl-lib)
+             (condition-case err
+                 (car (macroexpand-all '(cl-defstruct neovm--dbg-point x y)))
+               (error err)))"#,
+    );
+    assert_eq!(rendered, "OK progn");
+}
+
+#[test]
+fn bootstrap_runtime_cl_defstruct_autoload_state_matches_gnu() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(progn
+             (require 'cl-lib)
+             (let ((before (symbol-function 'cl-defstruct)))
+               (list
+                 (autoloadp before)
+                 (condition-case err
+                     (type-of (autoload-do-load before 'cl-defstruct t))
+                   (error err))
+                 (featurep 'cl-macs)
+                 (boundp 'cl--bind-forms)
+                 (special-variable-p 'cl--bind-forms)
+                 (condition-case err
+                     (car (macroexpand '(cl-defstruct neovm--dbg-point x y)))
+                   (error err))
+                 (boundp 'cl--bind-forms)
+                 (special-variable-p 'cl--bind-forms))))"#,
+    );
+    assert_eq!(rendered, "OK (t cons t nil nil progn nil nil)");
+}
+
+#[test]
+fn bootstrap_runtime_cl_transform_lambda_matches_gnu() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(progn
+             (require 'cl-lib)
+             (autoload-do-load (symbol-function 'cl-defstruct) 'cl-defstruct t)
+             (condition-case err
+                 (cl--transform-lambda '((x) 1) 'vm-foo)
+               (error err)))"#,
+    );
+    assert_eq!(rendered, "OK ((x) (cl-block vm-foo 1))");
+}
+
+#[test]
+fn bootstrap_runtime_cl_defun_entry_point_matches_gnu() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(progn
+             (require 'cl-lib)
+             (condition-case err
+                 (progn
+                   (cl-defun vm-foo () 1)
+                   (vm-foo))
+               (error err)))"#,
+    );
+    assert_eq!(rendered, "OK 1");
+}
+
+#[test]
+fn bootstrap_runtime_cl_defsubst_key_defaults_matches_gnu() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(progn
+             (require 'cl-lib)
+             (condition-case err
+                 (progn
+                   (cl-defsubst vm-make (&cl-defs (nil (a) (b)) &key a b)
+                     (list a b))
+                   (vm-make :a 1 :b 2))
+               (error err)))"#,
+    );
+    assert_eq!(rendered, "OK (1 2)");
+}
+
+#[test]
+fn bootstrap_runtime_cl_defun_cl_quote_key_defaults_matches_gnu() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(progn
+             (require 'cl-lib)
+             (condition-case err
+                 (progn
+                   (cl-defun vm-cmpr (cl-whole &cl-quote &cl-defs (nil (a) (b)) &key a b)
+                     (list cl-whole a b))
+                   (vm-cmpr 'whole :a 1 :b 2))
+               (error err)))"#,
+    );
+    assert_eq!(rendered, "OK (whole 1 2)");
+}
+
+#[test]
+fn bootstrap_runtime_cl_transform_lambda_cl_quote_key_defaults_matches_gnu() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(progn
+             (require 'cl-lib)
+             (autoload-do-load (symbol-function 'cl-defstruct) 'cl-defstruct t)
+             (condition-case err
+                 (cl--transform-lambda
+                  '((cl-whole &cl-quote &cl-defs (nil (a) (b)) &key a b)
+                    (list cl-whole a b))
+                  'vm-cmpr)
+               (error err)))"#,
+    );
+    assert_eq!(
+        rendered,
+        "OK ((cl-whole &rest --cl-rest--) \"\n\n(fn CL-WHOLE &cl-quote &key A B)\" (let* ((a (car (cdr (plist-member --cl-rest-- ':a)))) (b (car (cdr (plist-member --cl-rest-- ':b))))) (progn (let ((--cl-keys-- --cl-rest--)) (while --cl-keys-- (cond ((memq (car --cl-keys--) '(:a :b :allow-other-keys)) (unless (cdr --cl-keys--) (error \"Missing argument for %s\" (car --cl-keys--))) (setq --cl-keys-- (cdr (cdr --cl-keys--)))) ((car (cdr (memq ':allow-other-keys --cl-rest--))) (setq --cl-keys-- nil)) (t (error \"Keyword argument %S not one of (:a :b)\" (car --cl-keys--)))))) (cl-block vm-cmpr (list cl-whole a b)))))"
+    );
+}
+
 fn eval_rendered(eval: &mut Evaluator, form: &str) -> String {
     let parsed = crate::emacs_core::parser::parse_forms(form).expect("parse eval form");
     match eval.eval_expr(&parsed[0]) {
@@ -1639,7 +1888,6 @@ fn pdump_roundtrip_preserves_advice_remove_member_lifecycle() {
     ];
 
     for (label, form, expected) in steps {
-        eprintln!("pdump advice lifecycle step: {label}");
         let parsed = crate::emacs_core::parser::parse_forms(form).expect("parse step");
         let value = loaded.eval_expr(&parsed[0]).expect("evaluate step");
         if let Some(expected) = expected {
@@ -2322,55 +2570,6 @@ fn bootstrap_cl_extra_gv_expander_requires_eval_in_source_and_compiled_paths() {
 
     assert_eq!(source_rendered, "OK (invalid-function t t)");
     assert_eq!(compiled_rendered, "OK (invalid-function t t)");
-}
-
-#[test]
-fn debug_compiled_cl_extra_setter_bytecode_disasm() {
-    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let project_root = manifest.parent().expect("project root");
-    let cl_extra_base = project_root.join("lisp/emacs-lisp/cl-extra");
-    let compiled_path = compiled_suffixed_path(&cl_extra_base);
-
-    let form = r#"
-(let* ((expander (function-get 'cl-subseq 'gv-expander)))
-  (funcall expander (lambda (_getter setter) setter) 'v 1 3))
-"#;
-
-    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
-    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
-    load_file(&mut eval, &compiled_path).expect("load compiled cl-extra");
-
-    let expander_form = r#"(function-get 'cl-subseq 'gv-expander)"#;
-    let parsed_expander = crate::emacs_core::parser::parse_forms(expander_form).expect("parse");
-    let expander = eval
-        .eval_expr(&parsed_expander[0])
-        .expect("evaluate expander");
-    let gv_defsetter = eval
-        .obarray()
-        .symbol_function("gv--defsetter")
-        .copied()
-        .expect("gv--defsetter fboundp");
-    eprintln!(
-        "gv--defsetter runtime value: {}",
-        crate::emacs_core::print::print_value_with_buffers(&gv_defsetter, &eval.buffers)
-    );
-    if let Some(bc) = gv_defsetter.get_bytecode_data() {
-        eprintln!("gv--defsetter bytecode:\n{}", bc.disassemble());
-    }
-    let expander_bc = expander.get_bytecode_data().expect("expander bytecode");
-    eprintln!("compiled expander bytecode:\n{}", expander_bc.disassemble());
-
-    let parsed = crate::emacs_core::parser::parse_forms(form).expect("parse");
-    let value = eval.eval_expr(&parsed[0]).expect("evaluate setter form");
-    eprintln!(
-        "compiled setter form: {}",
-        crate::emacs_core::print::print_value_with_buffers(&value, &eval.buffers)
-    );
-
-    let items = crate::emacs_core::value::list_to_vec(&value).expect("setter list");
-    let body = items.last().copied().expect("setter body");
-    let bc = body.get_bytecode_data().expect("setter bytecode");
-    eprintln!("compiled setter bytecode:\n{}", bc.disassemble());
 }
 
 #[test]

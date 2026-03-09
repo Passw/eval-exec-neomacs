@@ -85,6 +85,28 @@ fn eval_of_generated_lambda_preserves_uninterned_symbol_identity() {
 }
 
 #[test]
+fn simple_defvar_declares_local_dynamic_scope_in_lexical_environment() {
+    let mut ev = Evaluator::new();
+    ev.set_lexical_binding(true);
+    ev.lexenv = Value::list(vec![Value::True]);
+
+    let forms = parse_forms(
+        r#"
+        (progn
+          (defvar vm-local-special)
+          (let ((vm-local-special 10))
+            (let ((f (lambda () vm-local-special)))
+              (let ((vm-local-special 20))
+                (funcall f)))))
+    "#,
+    )
+    .expect("parse");
+
+    let result = ev.eval_expr(&forms[0]);
+    assert_eq!(format_eval_result(&result), "OK 20");
+}
+
+#[test]
 fn put_get_preserves_closure_captured_uninterned_symbol_identity() {
     assert_eq!(
         eval_one(
