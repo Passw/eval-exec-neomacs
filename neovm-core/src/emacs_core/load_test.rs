@@ -534,18 +534,22 @@ fn bootstrap_runtime_loaded_bytecode_preserves_wrong_arity_shape() {
 }
 
 #[test]
-fn bootstrap_runtime_restores_cl_loaddefs_autoload_surface() {
+fn bootstrap_runtime_keeps_cl_loaddefs_out_of_default_q_surface() {
     let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
     apply_runtime_startup_state(&mut eval).expect("runtime startup state");
     let rendered = eval_rendered(
         &mut eval,
         r#"(list
+             (fboundp 'cl-every)
+             (autoloadp (symbol-function 'cl-every))
+             (fboundp 'cl-defstruct)
              (autoloadp (symbol-function 'cl-defstruct))
+             (fboundp 'cl-reduce)
              (autoloadp (symbol-function 'cl-reduce))
-             (autoloadp (symbol-function 'cl--adjoin))
+             (fboundp 'cl-subseq)
              (autoloadp (symbol-function 'cl-subseq)))"#,
     );
-    assert_eq!(rendered, "OK (t t t t)");
+    assert_eq!(rendered, "OK (nil nil nil nil nil nil nil nil)");
 }
 
 #[test]
@@ -571,11 +575,13 @@ fn bootstrap_runtime_require_cl_lib_works() {
                (progn
                  (require 'cl-lib)
                  (list (featurep 'cl-lib)
+                       (autoloadp (symbol-function 'cl-every))
                        (autoloadp (symbol-function 'cl-defstruct))
-                       (autoloadp (symbol-function 'cl-reduce))))
+                       (autoloadp (symbol-function 'cl-reduce))
+                       (autoloadp (symbol-function 'cl-subseq))))
              (error err))"#,
     );
-    assert_eq!(rendered, "OK (t t t)");
+    assert_eq!(rendered, "OK (t t t t t)");
 }
 
 #[test]

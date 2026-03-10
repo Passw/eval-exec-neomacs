@@ -2365,10 +2365,11 @@ fn runtime_loaddefs_restore_state(
     project_root: &Path,
     restore_autoload_files: &[&str],
 ) -> Result<(Vec<Vec<Value>>, Vec<Expr>), EvalError> {
-    let loaddefs_paths = [
-        project_root.join("lisp/ldefs-boot.el"),
-        project_root.join("lisp/emacs-lisp/cl-loaddefs.el"),
-    ];
+    // GNU Emacs -Q runtime carries only the core loaddefs surface from
+    // ldefs-boot.el here (not cl-loaddefs.el).  The Common Lisp entry points
+    // such as cl-every/cl-reduce/cl-defstruct become visible only after
+    // `cl-lib.el` is required, because cl-lib.el itself loads cl-loaddefs.
+    let loaddefs_paths = [project_root.join("lisp/ldefs-boot.el")];
 
     let mut args = Vec::new();
     let mut restore_names = std::collections::BTreeSet::new();
@@ -2411,7 +2412,7 @@ fn normalize_bootstrap_runtime_surface(
     project_root: &Path,
 ) -> Result<(), EvalError> {
     let compile_only_features = ["cl-lib", "cl-macs", "cl-extra", "cl-seq", "gv"];
-    let runtime_autoload_files = ["cl-extra", "cl-macs", "cl-seq", "gv"];
+    let runtime_autoload_files = ["gv"];
     let (restore_autoload_args, restore_property_forms) =
         runtime_loaddefs_restore_state(project_root, &runtime_autoload_files)?;
     let mut compile_only_names = compile_only_bootstrap_function_names(project_root);

@@ -2786,7 +2786,19 @@ impl Evaluator {
                 }
             }
 
-            // Regular function call — evaluate args then dispatch
+            match self.resolve_named_call_target(name) {
+                NamedCallTarget::Void => {
+                    return Err(signal("void-function", vec![Value::symbol(name)]));
+                }
+                NamedCallTarget::SpecialForm => {
+                    return Err(signal("invalid-function", vec![Value::Subr(intern(name))]));
+                }
+                _ => {}
+            }
+
+            // Regular function call — GNU resolves the callee first. A
+            // void/invalid function symbol must signal before any argument
+            // forms are evaluated.
             let (args, args_saved) = self.eval_args(tail)?;
 
             let writeback_args = args.clone();
@@ -5356,8 +5368,10 @@ impl Evaluator {
             NamedCallTarget::EvaluatorCallable
         } else if super::subr_info::is_special_form(name) {
             NamedCallTarget::SpecialForm
+        } else if super::builtin_registry::is_dispatch_builtin_name(name) {
+            NamedCallTarget::Builtin
         } else {
-            NamedCallTarget::Probe
+            NamedCallTarget::Void
         };
 
         self.named_call_cache = Some(NamedCallCache {

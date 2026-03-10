@@ -63,6 +63,24 @@ fn substring_accepts_vectors_like_gnu_emacs() {
 }
 
 #[test]
+fn void_function_symbol_signals_before_evaluating_arguments_like_gnu_emacs() {
+    assert_eq!(
+        eval_one(
+            r#"
+(let ((vm-side nil))
+  (condition-case err
+      (vm-undefined-function
+       (progn
+         (setq vm-side t)
+         1))
+    (error (list err vm-side))))
+"#
+        ),
+        "OK ((void-function vm-undefined-function) nil)"
+    );
+}
+
+#[test]
 fn eval_of_generated_lambda_preserves_uninterned_symbol_identity() {
     assert_eq!(
         eval_one(
