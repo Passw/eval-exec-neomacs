@@ -4,7 +4,10 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{
+    assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
+};
 
 // ---------------------------------------------------------------------------
 // Map/filter/reduce pipeline with complex transformations
@@ -380,6 +383,6 @@ fn oracle_prop_fp_church_numerals() {
                   (funcall church-to-int c3)
                   (funcall church-to-int c5)
                   (funcall church-to-int c6))))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(0 1 2 3 5 6)", &o, &n);
 }

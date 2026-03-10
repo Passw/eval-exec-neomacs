@@ -6,7 +6,10 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{
+    assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
+};
 
 // ---------------------------------------------------------------------------
 // Multiple cleanup forms
@@ -39,7 +42,7 @@ fn oracle_prop_unwind_protect_cleanup_values_discarded() {
                     (+ 1 2)
                     (+ 3 4)
                     (* 5 6))"#;
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("42", &o, &n);
 }
 
@@ -148,7 +151,7 @@ fn oracle_prop_unwind_protect_nested_lifo_with_throw() {
                             (setq log (cons 'cleanup-2 log)))
                         (setq log (cons 'cleanup-1 log))))
                     (nreverse log))"#;
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(deepest cleanup-3 cleanup-2 cleanup-1)", &o, &n);
 }
 

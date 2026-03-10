@@ -1117,7 +1117,7 @@ fn funcall_named_symbol_propagates_inner_invalid_function_payload() {
                (unwind-protect
                    (condition-case err
                        (funcall 'vm-invalid-wrap)
-                     (invalid-function (cadr err)))
+                     (invalid-function (nth 1 err)))
                  (fmakunbound 'vm-invalid-wrap)))"
         ),
         "OK (1 2 3)"
@@ -3298,11 +3298,6 @@ fn condition_case_lexical_handler_binding_restores_outer_let() {
     .expect("parse");
     let result = format_eval_result(&eval.eval_expr(&forms[0]));
     assert_eq!(result, "OK ((caught arith-error) original)");
-}
-
-#[test]
-fn pure_builtin_cadr_is_callable_without_subr_runtime() {
-    assert_eq!(eval_one("(cadr '(1 2 3))"), "OK 2");
 }
 
 #[test]

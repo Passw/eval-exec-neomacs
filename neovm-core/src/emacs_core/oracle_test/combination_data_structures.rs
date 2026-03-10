@@ -6,7 +6,10 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{
+    assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
+};
 
 // ---------------------------------------------------------------------------
 // Set operations via hash tables
@@ -229,7 +232,7 @@ fn oracle_prop_ds_stack_calculator() {
                     (funcall rpn-eval '(3 4 + 2 *))
                     ;; 5 + ((1 + 2) * 4) - 3
                     (funcall rpn-eval '(5 1 2 + 4 * + 3 -))))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(7 14 14)", &o, &n);
 }
 

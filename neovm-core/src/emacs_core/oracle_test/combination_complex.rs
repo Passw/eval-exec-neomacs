@@ -79,7 +79,7 @@ fn oracle_prop_combo_pipeline_via_funcall_chain() {
                                  (lambda (x) (* x 2))
                                  (lambda (x) (- x 3)))
                            5))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("27", &o, &n);
 }
 
@@ -115,7 +115,7 @@ fn oracle_prop_combo_filter_map_via_closures() {
                           (funcall my-filter
                                    (lambda (x) (= 0 (% x 2)))
                                    '(1 2 3 4 5 6 7 8 9 10))))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(4 16 36 64 100)", &o, &n);
 }
 
@@ -348,7 +348,7 @@ fn oracle_prop_combo_deeply_nested_lets() {
                       (let ((d (+ c 1)))
                         (let ((e (+ d 1)))
                           (list a b c d e (+ a b c d e)))))))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(1 2 3 4 5 15)", &o, &n);
 }
 
@@ -400,7 +400,7 @@ fn oracle_prop_combo_setq_multiple_pairs() {
     let form = "(let (a b c)
                   (setq a 1 b 2 c 3)
                   (list a b c))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(1 2 3)", &o, &n);
 }
 
@@ -412,7 +412,7 @@ fn oracle_prop_combo_setq_sequential_dependency() {
     let form = "(let ((x 0))
                   (setq x 5 x (+ x 10))
                   x)";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("15", &o, &n);
 }
 
@@ -429,7 +429,7 @@ fn oracle_prop_combo_vector_map_pattern() {
                   (dotimes (i (length v))
                     (setq result (cons (* 2 (aref v i)) result)))
                   (nreverse result))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(20 40 60 80 100)", &o, &n);
 }
 
@@ -441,7 +441,7 @@ fn oracle_prop_combo_vector_accumulate_with_aset() {
                   (dotimes (i 5)
                     (aset v i (* i i)))
                   (list (aref v 0) (aref v 1) (aref v 2) (aref v 3) (aref v 4)))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(0 1 4 9 16)", &o, &n);
 }
 
@@ -551,7 +551,7 @@ fn oracle_prop_combo_build_binary_tree() {
                         (funcall 'neovm--test-tree-inorder tree))
                     (fmakunbound 'neovm--test-tree-insert)
                     (fmakunbound 'neovm--test-tree-inorder)))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(1 2 3 4 5 6 7 8)", &o, &n);
 }
 
@@ -598,7 +598,7 @@ fn oracle_prop_combo_unwind_protect_chain() {
                         (setq log (cons 'cleanup-3 log)))
                     (error nil))
                   (nreverse log))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(body cleanup-1 cleanup-2 cleanup-3)", &o, &n);
 }
 
@@ -645,7 +645,7 @@ proptest! {
                    (setq sum (+ sum x)))))",
             a, b, c, d
         );
-        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        let (oracle, neovm) = eval_oracle_and_neovm_with_bootstrap(&form);
         prop_assert_eq!(neovm.as_str(), oracle.as_str());
     }
 
@@ -663,7 +663,7 @@ proptest! {
                  (list (funcall f) (funcall g) (+ (funcall f) (funcall g)))))",
             x, y
         );
-        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        let (oracle, neovm) = eval_oracle_and_neovm_with_bootstrap(&form);
         prop_assert_eq!(neovm.as_str(), oracle.as_str());
     }
 
@@ -686,7 +686,7 @@ proptest! {
                  (fmakunbound 'neovm--test-rsum)))",
             a, b, c, d, e
         );
-        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        let (oracle, neovm) = eval_oracle_and_neovm_with_bootstrap(&form);
         prop_assert_eq!(neovm.as_str(), oracle.as_str());
     }
 }

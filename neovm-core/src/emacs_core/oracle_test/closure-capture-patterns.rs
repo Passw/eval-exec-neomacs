@@ -5,7 +5,10 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{
+    assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
+};
 
 // ---------------------------------------------------------------------------
 // Closures capturing lexical variables with deep nesting and shadowing
@@ -30,7 +33,7 @@ fn oracle_prop_closure_capture_lexical_deep_nesting() {
                   ;; Verify independence
                   (funcall f1)
                   (funcall f2))))))))"#;
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq(
         "((1 2 3) (10 2 3 40) (100 200 300 400) (1 2 3) (10 2 3 40))",
         &o,
@@ -161,7 +164,7 @@ fn oracle_prop_closure_nested_composition_pipeline() {
           ;; Verify independence of closures
           (funcall (funcall make-adder 100) 1)
           (funcall (funcall make-multiplier 100) 2))))"#;
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(16 11 19 (10 12 14 16 18) 101 200)", &o, &n);
 }
 

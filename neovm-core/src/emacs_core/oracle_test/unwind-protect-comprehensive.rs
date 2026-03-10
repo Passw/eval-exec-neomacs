@@ -7,7 +7,10 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{
+    assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
+};
 
 // ---------------------------------------------------------------------------
 // Cleanup runs on normal (non-error) exit
@@ -50,7 +53,7 @@ fn oracle_prop_unwind_protect_comp_normal_exit_return_value() {
   :ignored-keyword
   t)
 "#;
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_eq!(o, "OK 600");
     assert_eq!(n, o);
 }

@@ -6,6 +6,7 @@ use proptest::prelude::*;
 
 use super::common::{
     ORACLE_PROP_CASES, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
 };
 
 #[test]
@@ -122,7 +123,7 @@ proptest! {
             "(sort (list {} {} {} {} {}) '<)",
             a, b, c, d, e
         );
-        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        let (oracle, neovm) = eval_oracle_and_neovm_with_bootstrap(&form);
         prop_assert_eq!(neovm.as_str(), oracle.as_str());
     }
 }

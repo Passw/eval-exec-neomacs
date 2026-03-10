@@ -4,7 +4,10 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{
+    assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
+};
 
 // ---------------------------------------------------------------------------
 // dolist with result form referencing accumulator and loop var
@@ -82,7 +85,7 @@ fn oracle_prop_dotimes_fibonacci() {
                       (let ((next (+ a b)))
                         (setq a b
                               b next))))"#;
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(0 1 1 2 3 5 8 13 21 34 55 89 144 233 377)", &o, &n);
 }
 

@@ -5,7 +5,10 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{
+    assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
+};
 
 // ---------------------------------------------------------------------------
 // Higher-order function combinators
@@ -257,7 +260,7 @@ fn oracle_prop_functional_memoize() {
                             (r4 (funcall expensive 3))
                             (r5 (funcall expensive 5)))
                         (list r1 r2 r3 r4 r5 call-count)))))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(125 125 27 27 125 2)", &o, &n);
 }
 

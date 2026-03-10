@@ -510,62 +510,6 @@ enum PureBuiltinId {
     Car,
     #[strum(serialize = "cdr")]
     Cdr,
-    #[strum(serialize = "caar")]
-    Caar,
-    #[strum(serialize = "cadr")]
-    Cadr,
-    #[strum(serialize = "cdar")]
-    Cdar,
-    #[strum(serialize = "cddr")]
-    Cddr,
-    #[strum(serialize = "caaar")]
-    Caaar,
-    #[strum(serialize = "caadr")]
-    Caadr,
-    #[strum(serialize = "cadar")]
-    Cadar,
-    #[strum(serialize = "caddr")]
-    Caddr,
-    #[strum(serialize = "cdaar")]
-    Cdaar,
-    #[strum(serialize = "cdadr")]
-    Cdadr,
-    #[strum(serialize = "cddar")]
-    Cddar,
-    #[strum(serialize = "cdddr")]
-    Cdddr,
-    #[strum(serialize = "cadddr")]
-    Cadddr,
-    #[strum(serialize = "cddddr")]
-    Cddddr,
-    #[strum(serialize = "caaaar")]
-    Caaaar,
-    #[strum(serialize = "caaadr")]
-    Caaadr,
-    #[strum(serialize = "caadar")]
-    Caadar,
-    #[strum(serialize = "caaddr")]
-    Caaddr,
-    #[strum(serialize = "cadaar")]
-    Cadaar,
-    #[strum(serialize = "cadadr")]
-    Cadadr,
-    #[strum(serialize = "caddar")]
-    Caddar,
-    #[strum(serialize = "cdaaar")]
-    Cdaaar,
-    #[strum(serialize = "cdaadr")]
-    Cdaadr,
-    #[strum(serialize = "cdadar")]
-    Cdadar,
-    #[strum(serialize = "cdaddr")]
-    Cdaddr,
-    #[strum(serialize = "cddaar")]
-    Cddaar,
-    #[strum(serialize = "cddadr")]
-    Cddadr,
-    #[strum(serialize = "cdddar")]
-    Cdddar,
     #[strum(serialize = "car-safe")]
     CarSafe,
     #[strum(serialize = "cdr-safe")]
@@ -794,34 +738,6 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::Cons => builtin_cons(args),
         PureBuiltinId::Car => builtin_car(args),
         PureBuiltinId::Cdr => builtin_cdr(args),
-        PureBuiltinId::Caar => builtin_caar(args),
-        PureBuiltinId::Cadr => builtin_cadr(args),
-        PureBuiltinId::Cdar => builtin_cdar(args),
-        PureBuiltinId::Cddr => builtin_cddr(args),
-        PureBuiltinId::Caaar => builtin_caaar(args),
-        PureBuiltinId::Caadr => builtin_caadr(args),
-        PureBuiltinId::Cadar => builtin_cadar(args),
-        PureBuiltinId::Caddr => builtin_caddr(args),
-        PureBuiltinId::Cdaar => builtin_cdaar(args),
-        PureBuiltinId::Cdadr => builtin_cdadr(args),
-        PureBuiltinId::Cddar => builtin_cddar(args),
-        PureBuiltinId::Cdddr => builtin_cdddr(args),
-        PureBuiltinId::Cadddr => builtin_cadddr(args),
-        PureBuiltinId::Cddddr => builtin_cddddr(args),
-        PureBuiltinId::Caaaar => builtin_caaaar(args),
-        PureBuiltinId::Caaadr => builtin_caaadr(args),
-        PureBuiltinId::Caadar => builtin_caadar(args),
-        PureBuiltinId::Caaddr => builtin_caaddr(args),
-        PureBuiltinId::Cadaar => builtin_cadaar(args),
-        PureBuiltinId::Cadadr => builtin_cadadr(args),
-        PureBuiltinId::Caddar => builtin_caddar(args),
-        PureBuiltinId::Cdaaar => builtin_cdaaar(args),
-        PureBuiltinId::Cdaadr => builtin_cdaadr(args),
-        PureBuiltinId::Cdadar => builtin_cdadar(args),
-        PureBuiltinId::Cdaddr => builtin_cdaddr(args),
-        PureBuiltinId::Cddaar => builtin_cddaar(args),
-        PureBuiltinId::Cddadr => builtin_cddadr(args),
-        PureBuiltinId::Cdddar => builtin_cdddar(args),
         PureBuiltinId::CarSafe => builtin_car_safe(args),
         PureBuiltinId::CdrSafe => builtin_cdr_safe(args),
         PureBuiltinId::Setcar => builtin_setcar(args),
@@ -3032,34 +2948,6 @@ pub(crate) fn dispatch_builtin(
         "cons" => builtin_cons(args),
         "car" => builtin_car(args),
         "cdr" => builtin_cdr(args),
-        "caar" => builtin_caar(args),
-        "cadr" => builtin_cadr(args),
-        "cdar" => builtin_cdar(args),
-        "cddr" => builtin_cddr(args),
-        "caaar" => builtin_caaar(args),
-        "caadr" => builtin_caadr(args),
-        "cadar" => builtin_cadar(args),
-        "caddr" => builtin_caddr(args),
-        "cdaar" => builtin_cdaar(args),
-        "cdadr" => builtin_cdadr(args),
-        "cddar" => builtin_cddar(args),
-        "cdddr" => builtin_cdddr(args),
-        "cadddr" => builtin_cadddr(args),
-        "cddddr" => builtin_cddddr(args),
-        "caaaar" => builtin_caaaar(args),
-        "caaadr" => builtin_caaadr(args),
-        "caadar" => builtin_caadar(args),
-        "caaddr" => builtin_caaddr(args),
-        "cadaar" => builtin_cadaar(args),
-        "cadadr" => builtin_cadadr(args),
-        "caddar" => builtin_caddar(args),
-        "cdaaar" => builtin_cdaaar(args),
-        "cdaadr" => builtin_cdaadr(args),
-        "cdadar" => builtin_cdadar(args),
-        "cdaddr" => builtin_cdaddr(args),
-        "cddaar" => builtin_cddaar(args),
-        "cddadr" => builtin_cddadr(args),
-        "cdddar" => builtin_cdddar(args),
         "car-safe" => builtin_car_safe(args),
         "cdr-safe" => builtin_cdr_safe(args),
         "setcar" => builtin_setcar(args),

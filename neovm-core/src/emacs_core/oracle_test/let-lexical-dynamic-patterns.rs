@@ -5,7 +5,10 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{
+    assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
+};
 
 // ---------------------------------------------------------------------------
 // Lexical closures capturing let-bound variables
@@ -51,7 +54,7 @@ fn oracle_prop_let_lexical_closure_mutation() {
           (funcall inc 3)
           (funcall inc 2)
           (funcall get))))"#;
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(0 5 5 8 10 10)", &o, &n);
 }
 

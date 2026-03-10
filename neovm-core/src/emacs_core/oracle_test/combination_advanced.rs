@@ -86,7 +86,7 @@ fn oracle_prop_adv_closure_iterator() {
                         (setq result (cons val result))
                         (setq val (funcall iter))))
                     (nreverse result)))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(1 2 3 4 5)", &o, &n);
 }
 
@@ -141,7 +141,7 @@ fn oracle_prop_adv_env_chain_lookup() {
                             (funcall lookup 'y env)
                             (funcall lookup 'z env)
                             (funcall lookup 'w env)))))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(10 2 30 nil)", &o, &n);
 }
 
@@ -164,7 +164,7 @@ fn oracle_prop_adv_matrix_transpose() {
       (funcall 'neovm--test-transpose
                '((1 2 3) (4 5 6) (7 8 9)))
     (fmakunbound 'neovm--test-transpose)))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("((1 4 7) (2 5 8) (3 6 9))", &o, &n);
 }
 
@@ -181,7 +181,7 @@ fn oracle_prop_adv_matrix_multiply_row_col() {
                                         b (cdr b)))
                                 sum))))
                   (funcall dot '(1 2 3) '(4 5 6)))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("32", &o, &n);
 }
 
@@ -231,7 +231,7 @@ fn oracle_prop_adv_trampoline_pattern() {
                                  (funcall 'neovm--test-tramp-sum
                                           100 0)))
                     (fmakunbound 'neovm--test-tramp-sum)))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("5050", &o, &n);
 }
 
@@ -257,7 +257,7 @@ fn oracle_prop_adv_cps_factorial() {
                10
                (lambda (x) x))
     (fmakunbound 'neovm--test-cps-fact)))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("3628800", &o, &n);
 }
 
@@ -285,7 +285,7 @@ fn oracle_prop_adv_church_numerals() {
                           (funcall to-int one)
                           (funcall to-int two)
                           (funcall to-int three))))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(0 1 2 3)", &o, &n);
 }
 
@@ -315,7 +315,7 @@ proptest! {
                         {}))",
             a, b
         );
-        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        let (oracle, neovm) = eval_oracle_and_neovm_with_bootstrap(&form);
         prop_assert_eq!(neovm.as_str(), oracle.as_str());
     }
 }

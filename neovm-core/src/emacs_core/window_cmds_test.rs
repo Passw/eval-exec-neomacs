@@ -2445,10 +2445,10 @@ fn switch_display_pop_enforce_max_arity() {
 #[test]
 fn switch_display_pop_reject_non_buffer_designators() {
     let results = eval_with_frame(
-        "(condition-case err (switch-to-buffer 1) (error (list (car err) (cadr err) (caddr err))))
-         (condition-case err (display-buffer 1) (error (list (car err) (cadr err) (caddr err))))
-         (condition-case err (pop-to-buffer 1) (error (list (car err) (cadr err) (caddr err))))
-         (condition-case err (set-window-buffer (selected-window) 1) (error (list (car err) (cadr err) (caddr err))))",
+        "(condition-case err (switch-to-buffer 1) (error (list (car err) (nth 1 err) (nth 2 err))))
+         (condition-case err (display-buffer 1) (error (list (car err) (nth 1 err) (nth 2 err))))
+         (condition-case err (pop-to-buffer 1) (error (list (car err) (nth 1 err) (nth 2 err))))
+         (condition-case err (set-window-buffer (selected-window) 1) (error (list (car err) (nth 1 err) (nth 2 err))))",
     );
     assert_eq!(results[0], "OK (wrong-type-argument stringp 1)");
     assert_eq!(results[1], "OK (wrong-type-argument stringp 1)");

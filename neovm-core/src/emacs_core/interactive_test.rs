@@ -907,7 +907,7 @@ fn key_binding_integer_position_out_of_range_signals_args_out_of_range() {
                    (let ((err (condition-case e
                                   (key-binding (kbd "a") t nil 0)
                                 (error e))))
-                     (list (car err) (bufferp (cadr err)) (caddr err)))))"#
+                     (list (car err) (bufferp (nth 1 err)) (nth 2 err)))))"#
         ),
         "OK (args-out-of-range t 0)"
     );
@@ -920,7 +920,7 @@ fn key_binding_integer_position_out_of_range_signals_args_out_of_range() {
                    (let ((err (condition-case e
                                   (key-binding (kbd "a") t nil 2)
                                 (error e))))
-                     (list (car err) (bufferp (cadr err)) (caddr err)))))"#
+                     (list (car err) (bufferp (nth 1 err)) (nth 2 err)))))"#
         ),
         "OK (args-out-of-range t 2)"
     );
@@ -2829,15 +2829,15 @@ fn interactive_lambda_invalid_control_letter_signals_error() {
                         (error err))))
                (list (if (consp r) (car r) 'non-error)
                      (and (consp r)
-                          (stringp (cadr r))
-                          (string-prefix-p "Invalid control letter" (cadr r)))))
+                          (stringp (nth 1 r))
+                          (string-prefix-p "Invalid control letter" (nth 1 r)))))
              (let ((r (condition-case err
                           (command-execute (lambda (x) (interactive "q") x))
                         (error err))))
                (list (if (consp r) (car r) 'non-error)
                      (and (consp r)
-                          (stringp (cadr r))
-                          (string-prefix-p "Invalid control letter" (cadr r)))))
+                          (stringp (nth 1 r))
+                          (string-prefix-p "Invalid control letter" (nth 1 r)))))
              (let ((called nil)
                    (r nil))
                (setq r (condition-case err
@@ -2845,16 +2845,16 @@ fn interactive_lambda_invalid_control_letter_signals_error() {
                          (error err)))
                (list (if (consp r) (car r) 'non-error)
                      (and (consp r)
-                          (stringp (cadr r))
-                          (string-prefix-p "Invalid control letter" (cadr r)))
+                          (stringp (nth 1 r))
+                          (string-prefix-p "Invalid control letter" (nth 1 r)))
                      called))
              (let ((r (condition-case err
                           (call-interactively (lambda (x) (interactive "*q") x))
                         (error err))))
                (list (if (consp r) (car r) 'non-error)
                      (and (consp r)
-                          (stringp (cadr r))
-                          (string-prefix-p "Invalid control letter" (cadr r))))))"#,
+                          (stringp (nth 1 r))
+                          (string-prefix-p "Invalid control letter" (nth 1 r))))))"#,
     );
     assert_eq!(
         results[0],
@@ -3578,7 +3578,7 @@ fn command_remapping_integer_position_range_and_ordering_semantics() {
                  (let ((err (condition-case e
                                 (command-remapping 'ignore 0)
                               (error e))))
-                   (list (car err) (bufferp (cadr err)) (caddr err))))"#
+                   (list (car err) (bufferp (nth 1 err)) (nth 2 err))))"#
         ),
         "OK (args-out-of-range t 0)"
     );
@@ -3588,7 +3588,7 @@ fn command_remapping_integer_position_range_and_ordering_semantics() {
                  (let ((err (condition-case e
                                 (command-remapping 'ignore -1)
                               (error e))))
-                   (list (car err) (bufferp (cadr err)) (caddr err))))"#
+                   (list (car err) (bufferp (nth 1 err)) (nth 2 err))))"#
         ),
         "OK (args-out-of-range t -1)"
     );
@@ -3598,7 +3598,7 @@ fn command_remapping_integer_position_range_and_ordering_semantics() {
                  (let ((err (condition-case e
                                 (command-remapping 'ignore 2)
                               (error e))))
-                   (list (car err) (bufferp (cadr err)) (caddr err))))"#
+                   (list (car err) (bufferp (nth 1 err)) (nth 2 err))))"#
         ),
         "OK (args-out-of-range t 2)"
     );
@@ -3625,7 +3625,7 @@ fn command_remapping_integer_position_range_and_ordering_semantics() {
                  (let ((err (condition-case e
                                 (command-remapping nil 0)
                               (error e))))
-                   (list (car err) (bufferp (cadr err)) (caddr err))))"#
+                   (list (car err) (bufferp (nth 1 err)) (nth 2 err))))"#
         ),
         "OK (args-out-of-range t 0)"
     );

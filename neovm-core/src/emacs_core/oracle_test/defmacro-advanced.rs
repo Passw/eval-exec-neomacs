@@ -4,7 +4,10 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{
+    assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
+};
 
 // ---------------------------------------------------------------------------
 // Macro with backquote and splicing
@@ -44,7 +47,7 @@ fn oracle_prop_defmacro_with_let() {
                       (neovm--test-with-val x (+ 1 2)
                         (* x x))
                     (fmakunbound 'neovm--test-with-val)))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("9", &o, &n);
 }
 
@@ -83,7 +86,7 @@ fn oracle_prop_macroexpand_nested() {
                         counter)
                     (fmakunbound 'neovm--test-inc)
                     (fmakunbound 'neovm--test-inc-twice)))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("2", &o, &n);
 }
 

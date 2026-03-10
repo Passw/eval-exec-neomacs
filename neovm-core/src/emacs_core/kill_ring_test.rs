@@ -1204,17 +1204,17 @@ fn just_one_space_zero() {
 fn just_one_space_argument_contract_subset() {
     let results = eval_all(
         r#"(with-temp-buffer
-             (condition-case err (just-one-space "x") (error (list (car err) (cadr err)))))
+             (condition-case err (just-one-space "x") (error (list (car err) (nth 1 err)))))
            (with-temp-buffer
-             (condition-case err (just-one-space t) (error (list (car err) (cadr err)))))
+             (condition-case err (just-one-space t) (error (list (car err) (nth 1 err)))))
            (with-temp-buffer
-             (condition-case err (just-one-space 1.5) (error (list (car err) (cadr err) (caddr err)))))
+             (condition-case err (just-one-space 1.5) (error (list (car err) (nth 1 err) (nth 2 err)))))
            (with-temp-buffer
-             (condition-case err (just-one-space -1.5) (error (list (car err) (cadr err) (caddr err)))))
+             (condition-case err (just-one-space -1.5) (error (list (car err) (nth 1 err) (nth 2 err)))))
            (with-temp-buffer
              (let ((m (make-marker)))
                (set-marker m 1)
-               (condition-case err (just-one-space m) (error (list (car err) (cadr err))))))
+               (condition-case err (just-one-space m) (error (list (car err) (nth 1 err))))))
            (with-temp-buffer
              (insert "a \t  b")
              (goto-char 4)

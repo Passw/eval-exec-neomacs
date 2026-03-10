@@ -1415,8 +1415,8 @@ fn process_network_interface_and_signal_runtime_surface() {
                      network-lookup-address-info
                      signal-names))
            (let* ((ifname (or (and (fboundp 'network-interface-list)
-                                   (stringp (caar (network-interface-list)))
-                                   (caar (network-interface-list)))
+                                   (stringp (car (car (network-interface-list))))
+                                   (car (car (network-interface-list))))
                               "lo")))
              (list
               (format-network-address [127 0 0 1 80])
@@ -1431,8 +1431,8 @@ fn process_network_interface_and_signal_runtime_surface() {
               (condition-case err (format-network-address) (error err))
               (listp (network-interface-list))
               (consp (car (network-interface-list)))
-              (stringp (caar (network-interface-list)))
-              (vectorp (cdar (network-interface-list)))
+              (stringp (car (car (network-interface-list))))
+              (vectorp (cdr (car (network-interface-list))))
               (listp (network-interface-list nil))
               (let ((entry (car (network-interface-list t))))
                 (and (listp entry)

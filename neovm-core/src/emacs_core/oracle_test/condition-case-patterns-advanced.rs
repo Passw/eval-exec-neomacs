@@ -5,7 +5,10 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{
+    assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
+};
 
 // ---------------------------------------------------------------------------
 // Exhaustive error symbol testing
@@ -374,6 +377,6 @@ fn oracle_prop_ccpat_adv_cleanup_ordering_with_unwind() {
      (setq execution-order (cons 'handler execution-order))
      ;; Return the full execution order
      (nreverse execution-order))))"#;
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(body cleanup handler)", &o, &n);
 }

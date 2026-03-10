@@ -2,7 +2,10 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{
+    assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
+};
 
 #[test]
 fn oracle_prop_condition_case_multiple_handlers() {
@@ -32,7 +35,7 @@ fn oracle_prop_condition_case_no_error() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // When no error occurs, body value is returned
-    let (o, n) = eval_oracle_and_neovm("(condition-case err (+ 1 2) (error 'oops))");
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap("(condition-case err (+ 1 2) (error 'oops))");
     assert_ok_eq("3", &o, &n);
 }
 
@@ -56,7 +59,7 @@ fn oracle_prop_condition_case_nil_var() {
     let form = "(condition-case nil
                   (car 1)
                   (wrong-type-argument 'caught-it))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("caught-it", &o, &n);
 }
 
@@ -121,7 +124,7 @@ fn oracle_prop_condition_case_with_unwind_cleanup() {
                         (setq resource 'released))
                     (arith-error nil))
                   resource)";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("released", &o, &n);
 }
 
