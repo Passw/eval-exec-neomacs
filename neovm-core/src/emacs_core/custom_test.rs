@@ -463,7 +463,7 @@ fn make_local_variable_preserves_existing_buffer_local_binding() {
 #[test]
 fn make_local_variable_captures_dynamic_value_in_new_local_binding() {
     let result = eval_all(
-        r#"(let ((buf (generate-new-buffer "vm-mlv-buf")))
+        r#"(let ((buf (get-buffer-create "vm-mlv-buf")))
              (let ((vm-mlv-cross 5))
                (set-buffer buf)
                (make-local-variable 'vm-mlv-cross))
@@ -559,7 +559,7 @@ fn buffer_local_bound_p_matches_emacs_shape() {
              (make-local-variable 'neomacs-buffer-local-boundp-local)
              (setq neomacs-buffer-local-boundp-local 7)
              (buffer-local-boundp 'neomacs-buffer-local-boundp-local buf))
-           (let ((buf (generate-new-buffer "dead-buf")))
+           (let ((buf (get-buffer-create "dead-buf")))
              (kill-buffer buf)
              (buffer-local-boundp 'neomacs-buffer-local-boundp-global buf))
            (condition-case err (buffer-local-boundp 1 (current-buffer)) (error (car err)))

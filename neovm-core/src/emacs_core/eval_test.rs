@@ -17,6 +17,16 @@ fn eval_all(src: &str) -> Vec<String> {
         .collect()
 }
 
+fn eval_all_with_subr(src: &str) -> Vec<String> {
+    let mut ev = Evaluator::new();
+    load_minimal_backquote_runtime(&mut ev);
+    let forms = parse_forms(src).expect("parse");
+    ev.eval_forms(&forms)
+        .iter()
+        .map(format_eval_result)
+        .collect()
+}
+
 fn load_minimal_backquote_runtime(eval: &mut Evaluator) {
     use crate::emacs_core::load::{find_file_in_load_path, get_load_path, load_file};
 
@@ -1200,7 +1210,11 @@ fn funcall_autoload_object_signals_wrong_type_argument_symbolp() {
         eval_one(
             "(condition-case err
                  (funcall '(autoload \"x\" nil nil nil) 3)
-               (wrong-type-argument (list (car err) (nth 1 err) (autoloadp (nth 2 err)))))"
+               (wrong-type-argument
+                (list (car err)
+                      (nth 1 err)
+                      (and (consp (nth 2 err))
+                           (eq (car (nth 2 err)) 'autoload)))))"
         ),
         "OK (wrong-type-argument symbolp t)"
     );
@@ -1212,7 +1226,11 @@ fn apply_autoload_object_signals_wrong_type_argument_symbolp() {
         eval_one(
             "(condition-case err
                  (apply '(autoload \"x\" nil nil nil) '(3))
-               (wrong-type-argument (list (car err) (nth 1 err) (autoloadp (nth 2 err)))))"
+               (wrong-type-argument
+                (list (car err)
+                      (nth 1 err)
+                      (and (consp (nth 2 err))
+                           (eq (car (nth 2 err)) 'autoload)))))"
         ),
         "OK (wrong-type-argument symbolp t)"
     );
@@ -2514,7 +2532,7 @@ fn buffer_list_and_kill() {
 
 #[test]
 fn buffer_generate_new_buffer() {
-    let results = eval_all(
+    let results = eval_all_with_subr(
         "(buffer-name (generate-new-buffer \"test\"))
          (buffer-name (generate-new-buffer \"test\"))",
     );
@@ -3285,17 +3303,6 @@ fn condition_case_lexical_handler_binding_restores_outer_let() {
 #[test]
 fn pure_builtin_cadr_is_callable_without_subr_runtime() {
     assert_eq!(eval_one("(cadr '(1 2 3))"), "OK 2");
-}
-
-#[test]
-fn generate_new_buffer_is_callable_without_subr_runtime() {
-    let result = eval_one(
-        r#"(let ((buf (generate-new-buffer " *eval-test-generate-new-buffer*")))
-             (unwind-protect
-                 (list (bufferp buf) (buffer-live-p buf))
-               (kill-buffer buf)))"#,
-    );
-    assert_eq!(result, "OK (t t)");
 }
 
 #[test]

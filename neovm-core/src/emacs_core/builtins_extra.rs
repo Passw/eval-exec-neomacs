@@ -414,14 +414,6 @@ pub(crate) fn builtin_string_search(args: Vec<Value>) -> EvalResult {
     }
 }
 
-/// `(string-to-vector STRING)` — convert string to vector of chars.
-pub(crate) fn builtin_string_to_vector(args: Vec<Value>) -> EvalResult {
-    expect_args("string-to-vector", &args, 1)?;
-    let s = expect_string(&args[0])?;
-    let chars: Vec<Value> = s.chars().map(Value::Char).collect();
-    Ok(Value::vector(chars))
-}
-
 // ---------------------------------------------------------------------------
 // Predicate additions
 // ---------------------------------------------------------------------------

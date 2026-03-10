@@ -201,11 +201,12 @@ fn is_autoload_value_negative() {
 fn autoload_special_form_registers() {
     let results = eval_all(
         r#"(autoload 'my-func "my-file" "A function." t)
-           (autoloadp (symbol-function 'my-func))"#,
+           (let ((f (symbol-function 'my-func)))
+             (and (consp f) (eq (car f) 'autoload)))"#,
     );
     // autoload should return the function name as a symbol
     assert_eq!(results[0], "OK my-func");
-    // autoloadp should recognize the autoload form
+    // The registered definition should be an autoload form.
     assert_eq!(results[1], "OK t");
 }
 
@@ -214,7 +215,8 @@ fn autoload_minimal_form() {
     // Minimal autoload: just function name and file
     let results = eval_all(
         r#"(autoload 'minimal-fn "min-file")
-           (autoloadp (symbol-function 'minimal-fn))"#,
+           (let ((f (symbol-function 'minimal-fn)))
+             (and (consp f) (eq (car f) 'autoload)))"#,
     );
     assert_eq!(results[0], "OK minimal-fn");
     assert_eq!(results[1], "OK t");
@@ -224,7 +226,8 @@ fn autoload_minimal_form() {
 fn autoload_with_type() {
     let results = eval_all(
         r#"(autoload 'my-macro "macro-file" nil nil 'macro)
-           (autoloadp (symbol-function 'my-macro))"#,
+           (let ((f (symbol-function 'my-macro)))
+             (and (consp f) (eq (car f) 'autoload)))"#,
     );
     assert_eq!(results[0], "OK my-macro");
     assert_eq!(results[1], "OK t");
@@ -239,7 +242,8 @@ fn autoload_is_callable_subr_surface() {
            (subr-arity (symbol-function 'autoload))
            (func-arity 'autoload)
            (funcall 'autoload 'my-funcall-fn "my-funcall-file")
-           (autoloadp (symbol-function 'my-funcall-fn))"#,
+           (let ((f (symbol-function 'my-funcall-fn)))
+             (and (consp f) (eq (car f) 'autoload)))"#,
     );
     assert_eq!(results[0], "OK t");
     assert_eq!(results[1], "OK nil");
@@ -355,18 +359,6 @@ fn symbol_file_accepts_third_arg_but_not_fourth() {
     );
     assert_eq!(results[1], r#"OK "sym-file-arity-probe-file""#);
     assert_eq!(results[2], "OK (wrong-number-of-arguments symbol-file 4)");
-}
-
-#[test]
-fn autoloadp_non_autoload() {
-    let result = eval_one("(autoloadp 42)");
-    assert_eq!(result, "OK nil");
-}
-
-#[test]
-fn autoloadp_nil() {
-    let result = eval_one("(autoloadp nil)");
-    assert_eq!(result, "OK nil");
 }
 
 #[test]

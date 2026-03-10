@@ -6,7 +6,7 @@ use proptest::prelude::*;
 
 use super::common::{
     ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity_with_bootstrap,
-    eval_oracle_and_neovm,
+    eval_oracle_and_neovm, eval_oracle_and_neovm_with_bootstrap,
 };
 
 #[test]
@@ -79,7 +79,7 @@ fn oracle_prop_apply_autoload_object_error_payload_shape() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(condition-case err (apply '(autoload \"x\" nil nil nil) '(3)) (wrong-type-argument (list (car err) (nth 1 err) (autoloadp (nth 2 err)))))";
-    let (oracle, neovm) = eval_oracle_and_neovm(form);
+    let (oracle, neovm) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(wrong-type-argument symbolp t)", &oracle, &neovm);
 }
 

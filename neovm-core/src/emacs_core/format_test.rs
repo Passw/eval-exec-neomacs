@@ -459,51 +459,6 @@ fn string_glyph_split_unicode() {
 }
 
 // ===================================================================
-// string-equal-ignore-case tests
-// ===================================================================
-
-#[test]
-fn string_equal_ignore_case_equal() {
-    let result =
-        builtin_string_equal_ignore_case(vec![Value::string("Hello"), Value::string("hello")]);
-    assert!(result.unwrap().is_truthy());
-}
-
-#[test]
-fn string_equal_ignore_case_not_equal() {
-    let result =
-        builtin_string_equal_ignore_case(vec![Value::string("Hello"), Value::string("world")]);
-    assert!(result.unwrap().is_nil());
-}
-
-#[test]
-fn string_equal_ignore_case_identical() {
-    let result = builtin_string_equal_ignore_case(vec![Value::string("abc"), Value::string("abc")]);
-    assert!(result.unwrap().is_truthy());
-}
-
-#[test]
-fn string_equal_ignore_case_empty() {
-    let result = builtin_string_equal_ignore_case(vec![Value::string(""), Value::string("")]);
-    assert!(result.unwrap().is_truthy());
-}
-
-#[test]
-fn string_equal_ignore_case_unicode() {
-    let result = builtin_string_equal_ignore_case(vec![
-        Value::string("\u{00DF}"), // German sharp s
-        Value::string("\u{00DF}"),
-    ]);
-    assert!(result.unwrap().is_truthy());
-}
-
-#[test]
-fn string_equal_ignore_case_wrong_type() {
-    let result = builtin_string_equal_ignore_case(vec![Value::Int(42), Value::string("hello")]);
-    assert!(result.is_err());
-}
-
-// ===================================================================
 // unix_to_broken_down internal tests
 // ===================================================================
 

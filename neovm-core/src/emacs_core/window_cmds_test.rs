@@ -592,6 +592,12 @@ fn get_buffer_window_list_returns_matching_windows() {
 #[test]
 fn get_buffer_window_and_list_match_optional_and_missing_buffer_semantics() {
     let mut ev = Evaluator::new();
+    let buf = ev.buffers.create_buffer("*scratch*");
+    ev.frames.create_frame("F1", 800, 600, buf);
+    let live = Value::Buffer(ev.buffers.create_buffer("gbwl-live"));
+    let dead = Value::Buffer(ev.buffers.create_buffer("gbwl-dead"));
+    ev.set_variable("vm-gbwl-live", live);
+    ev.set_variable("vm-gbwl-dead", dead);
     let forms = parse_forms(
         "(condition-case err (get-buffer-window) (error err))
          (condition-case err (get-buffer-window nil) (error err))
@@ -602,12 +608,11 @@ fn get_buffer_window_and_list_match_optional_and_missing_buffer_semantics() {
          (length (get-buffer-window-list \"*scratch*\"))
          (condition-case err (get-buffer-window-list \"missing\") (error err))
          (condition-case err (get-buffer-window-list 1) (error err))
-         (let ((b (generate-new-buffer \"gbwl-live\")))
-           (prog1 (condition-case err (get-buffer-window-list b) (error err))
-             (kill-buffer b)))
-         (let ((b (generate-new-buffer \"gbwl-dead\")))
-           (kill-buffer b)
-           (condition-case err (get-buffer-window-list b) (error err)))",
+         (prog1 (condition-case err (get-buffer-window-list vm-gbwl-live) (error err))
+           (kill-buffer vm-gbwl-live))
+         (progn
+           (kill-buffer vm-gbwl-dead)
+           (condition-case err (get-buffer-window-list vm-gbwl-dead) (error err)))",
     )
     .expect("parse");
     let results = ev
@@ -2471,27 +2476,49 @@ fn switch_and_pop_create_missing_named_buffers() {
 
 #[test]
 fn display_buffer_missing_or_dead_signals_invalid_buffer() {
-    let results = eval_with_frame(
+    let mut ev = Evaluator::new();
+    let buf = ev.buffers.create_buffer("*scratch*");
+    ev.frames.create_frame("F1", 800, 600, buf);
+    let dead = Value::Buffer(ev.buffers.create_buffer("db-dead"));
+    ev.set_variable("vm-db-dead", dead);
+    let forms = parse_forms(
         "(condition-case err (display-buffer \"db-missing\") (error err))
-         (let ((b (generate-new-buffer \"db-dead\")))
-           (kill-buffer b)
-           (condition-case err (display-buffer b) (error err)))",
-    );
+         (progn
+           (kill-buffer vm-db-dead)
+           (condition-case err (display-buffer vm-db-dead) (error err)))",
+    )
+    .expect("parse");
+    let results = ev
+        .eval_forms(&forms)
+        .iter()
+        .map(format_eval_result)
+        .collect::<Vec<_>>();
     assert_eq!(results[0], "OK (error \"Invalid buffer\")");
     assert_eq!(results[1], "OK (error \"Invalid buffer\")");
 }
 
 #[test]
 fn set_window_buffer_matches_window_and_buffer_designator_errors() {
-    let results = eval_with_frame(
+    let mut ev = Evaluator::new();
+    let buf = ev.buffers.create_buffer("*scratch*");
+    ev.frames.create_frame("F1", 800, 600, buf);
+    let dead = Value::Buffer(ev.buffers.create_buffer("swb-dead"));
+    ev.set_variable("vm-swb-dead", dead);
+    let forms = parse_forms(
         "(condition-case err (set-window-buffer nil \"*scratch*\") (error err))
          (condition-case err (set-window-buffer nil \"swb-missing\") (error err))
-         (let ((b (generate-new-buffer \"swb-dead\")))
-           (kill-buffer b)
-           (condition-case err (set-window-buffer nil b) (error err)))
+         (progn
+           (kill-buffer vm-swb-dead)
+           (condition-case err (set-window-buffer nil vm-swb-dead) (error err)))
          (condition-case err (set-window-buffer 999999 \"*scratch*\") (error err))
          (condition-case err (set-window-buffer 'foo \"*scratch*\") (error err))",
-    );
+    )
+    .expect("parse");
+    let results = ev
+        .eval_forms(&forms)
+        .iter()
+        .map(format_eval_result)
+        .collect::<Vec<_>>();
     assert_eq!(results[0], "OK nil");
     assert_eq!(results[1], "OK (wrong-type-argument bufferp nil)");
     assert_eq!(

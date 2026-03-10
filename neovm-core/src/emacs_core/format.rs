@@ -12,7 +12,6 @@
 //! - `string-limit` — truncate string to a given length
 //! - `string-pixel-width` — batch-compatible display-column width
 //! - `string-glyph-split` — split string into grapheme clusters (chars)
-//! - `string-equal-ignore-case` — case-insensitive string comparison
 
 use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
@@ -1018,29 +1017,6 @@ pub(crate) fn builtin_string_glyph_split(args: Vec<Value>) -> EvalResult {
     let s = require_string("string-glyph-split", &args[0])?;
     let chars: Vec<Value> = s.chars().map(|c| Value::string(c.to_string())).collect();
     Ok(Value::list(chars))
-}
-
-// ---------------------------------------------------------------------------
-// string-equal-ignore-case
-// ---------------------------------------------------------------------------
-
-/// `(string-equal-ignore-case S1 S2)` -- case-insensitive string comparison.
-///
-/// Returns `t` if S1 and S2 are equal when compared case-insensitively,
-/// `nil` otherwise.
-pub(crate) fn builtin_string_equal_ignore_case(args: Vec<Value>) -> EvalResult {
-    expect_args("string-equal-ignore-case", &args, 2)?;
-    let s1 = require_string("string-equal-ignore-case", &args[0])?;
-    let s2 = require_string("string-equal-ignore-case", &args[1])?;
-
-    if s1.eq_ignore_ascii_case(&s2) {
-        Ok(Value::True)
-    } else {
-        // Fall back to full Unicode casefold comparison.
-        let fold1: String = s1.chars().flat_map(|c| c.to_lowercase()).collect();
-        let fold2: String = s2.chars().flat_map(|c| c.to_lowercase()).collect();
-        Ok(Value::bool(fold1 == fold2))
-    }
 }
 
 // ---------------------------------------------------------------------------

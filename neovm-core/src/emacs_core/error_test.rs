@@ -7,8 +7,10 @@ use crate::emacs_core::{
 #[test]
 fn list_prints_buffers_with_names_in_eval_context() -> Result<(), EvalError> {
     let mut eval = Evaluator::new();
+    let stale = Value::Buffer(eval.buffers.create_buffer("stale-win-buf"));
+    eval.set_variable("vm-stale-win-buf", stale);
     let forms = parse_forms(
-        "(let ((b (generate-new-buffer \"stale-win-buf\") )
+        "(let ((b vm-stale-win-buf)
            (w (selected-window)))
   (set-window-buffer nil b)
   (kill-buffer b)

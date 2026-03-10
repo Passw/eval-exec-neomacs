@@ -93,11 +93,11 @@ fn eval_move_to_column_force_subset() {
         (with-temp-buffer
           (insert "abc")
           (goto-char (point-min))
-          (list (move-to-column 10 t) (point) (string-to-list (buffer-string))))
+          (list (move-to-column 10 t) (point) (append (buffer-string) nil)))
         (with-temp-buffer
           (insert "a\tb")
           (goto-char (point-min))
-          (list (move-to-column 5 t) (point) (string-to-list (buffer-string))))
+          (list (move-to-column 5 t) (point) (append (buffer-string) nil)))
         "#,
     )
     .expect("parse forms");
@@ -186,15 +186,15 @@ fn eval_indent_region_column_subset() {
         (with-temp-buffer
           (insert (string 97 10 32 32 98 10 10 9 99))
           (indent-region (point-min) (point-max) 2)
-          (string-to-list (buffer-string)))
+          (append (buffer-string) nil))
         (with-temp-buffer
           (insert (string 97 10 32 32 98))
           (indent-region (point-min) (point-max))
-          (string-to-list (buffer-string)))
+          (append (buffer-string) nil))
         (with-temp-buffer
           (insert (string 97 10 98))
           (indent-region (point-max) (point-min) 1)
-          (string-to-list (buffer-string)))
+          (append (buffer-string) nil))
         (with-temp-buffer
           (insert "a")
           (indent-region (point-min) (point-max) "x"))
@@ -250,7 +250,7 @@ fn eval_indent_mode_subset() {
           (insert (string 32 32 97))
           (goto-char (point-max))
           (indent-according-to-mode)
-          (string-to-list (buffer-string)))
+          (append (buffer-string) nil))
         (with-temp-buffer
           (insert (string 32 32 97))
           (goto-char (point-max))
@@ -260,7 +260,7 @@ fn eval_indent_mode_subset() {
           (insert (string 32 32 97))
           (goto-char (point-max))
           (reindent-then-newline-and-indent)
-          (string-to-list (buffer-string)))
+          (append (buffer-string) nil))
         (with-temp-buffer
           (insert (string 32 32 97))
           (goto-char (point-max))
@@ -304,7 +304,7 @@ fn reindent_then_newline_and_indent_normalizes_split_whitespace() {
              (goto-char 3)
              (list (reindent-then-newline-and-indent)
                    (point)
-                   (string-to-list (buffer-string))))"#,
+                   (append (buffer-string) nil)))"#,
     )
     .expect("parse forms");
     let value = ev.eval(&forms[0]).expect("eval");
@@ -376,7 +376,7 @@ fn indent_for_tab_command_normalizes_leading_whitespace_at_point() {
         r#"(with-temp-buffer
              (insert "  x")
              (goto-char 3)
-             (list (indent-for-tab-command) (point) (string-to-list (buffer-string))))"#,
+             (list (indent-for-tab-command) (point) (append (buffer-string) nil)))"#,
     )
     .expect("parse forms");
     let value = ev.eval(&forms[0]).expect("eval");

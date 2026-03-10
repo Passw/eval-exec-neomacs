@@ -1010,17 +1010,17 @@ fn newline_prefix_arg_coercion_contract() {
              (insert "ab")
              (goto-char 2)
              (newline 1.5)
-             (list (point) (string-to-list (buffer-string))))
+             (list (point) (append (buffer-string) nil)))
            (with-temp-buffer
              (insert "ab")
              (goto-char 2)
              (newline t)
-             (list (point) (string-to-list (buffer-string))))
+             (list (point) (append (buffer-string) nil)))
            (with-temp-buffer
              (insert "ab")
              (goto-char 2)
              (newline "x")
-             (list (point) (string-to-list (buffer-string))))"#,
+             (list (point) (append (buffer-string) nil)))"#,
     );
     assert_eq!(results[0], "OK (3 (97 10 98))");
     assert_eq!(results[1], "OK (3 (97 10 98))");
@@ -1110,7 +1110,7 @@ fn open_line_accepts_float_and_rejects_non_number_marker() {
              (insert "ab")
              (goto-char 2)
              (open-line 1.5)
-             (list (point) (string-to-list (buffer-string))))
+             (list (point) (append (buffer-string) nil)))
            (with-temp-buffer (condition-case err (open-line "x") (error err)))
            (with-temp-buffer (condition-case err (open-line t) (error err)))"#,
     );
@@ -1131,17 +1131,17 @@ fn open_line_count_coercion_contract() {
              (insert "ab")
              (goto-char 2)
              (open-line 2)
-             (list (point) (string-to-list (buffer-string))))
+             (list (point) (append (buffer-string) nil)))
            (with-temp-buffer
              (insert "ab")
              (goto-char 2)
              (open-line 2.0)
-             (list (point) (string-to-list (buffer-string))))
+             (list (point) (append (buffer-string) nil)))
            (with-temp-buffer
              (insert "ab")
              (goto-char 2)
              (open-line -2.5)
-             (list (point) (string-to-list (buffer-string))))"#,
+             (list (point) (append (buffer-string) nil)))"#,
     );
     assert_eq!(
         results[0],
@@ -1219,7 +1219,7 @@ fn just_one_space_argument_contract_subset() {
              (insert "a \t  b")
              (goto-char 4)
              (just-one-space -2)
-             (list (point) (string-to-list (buffer-string))))"#,
+             (list (point) (append (buffer-string) nil)))"#,
     );
     assert_eq!(results[0], "OK (wrong-type-argument number-or-marker-p)");
     assert_eq!(results[1], "OK (wrong-type-argument number-or-marker-p)");
@@ -1254,11 +1254,11 @@ fn delete_indentation_keeps_point_before_join_space() {
         r#"(with-temp-buffer
              (insert "a\n  b")
              (goto-char 3)
-             (list (delete-indentation) (point) (string-to-list (buffer-string))))
+             (list (delete-indentation) (point) (append (buffer-string) nil)))
            (with-temp-buffer
              (insert "a\n  b")
              (goto-char 2)
-             (list (delete-indentation t) (point) (string-to-list (buffer-string))))"#,
+             (list (delete-indentation t) (point) (append (buffer-string) nil)))"#,
     );
     assert_eq!(results[0], "OK (nil 2 (97 32 98))");
     assert_eq!(results[1], "OK (nil 2 (97 32 98))");

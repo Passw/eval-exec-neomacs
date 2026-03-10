@@ -3,7 +3,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::eval_oracle_and_neovm;
+use super::common::{eval_oracle_and_neovm, eval_oracle_and_neovm_with_bootstrap};
 
 #[test]
 fn oracle_prop_special_forms_semantics_quote() {
@@ -81,7 +81,7 @@ fn oracle_prop_special_forms_semantics_save_current_buffer() {
          (eq (current-buffer) orig)))
     (kill-buffer a)
     (kill-buffer b)))"#;
-    let (oracle, neovm) = eval_oracle_and_neovm(form);
+    let (oracle, neovm) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_eq!(neovm, oracle, "oracle parity mismatch for form: {form}");
 }
 

@@ -40,6 +40,11 @@ fn install_variable_watcher_probe(eval: &mut crate::emacs_core::eval::Evaluator,
     eval.obarray_mut().set_symbol_function(callback, lambda);
 }
 
+fn create_unique_test_buffer(eval: &mut crate::emacs_core::eval::Evaluator, name: &str) -> Value {
+    let unique_name = eval.buffers.generate_new_buffer_name(name);
+    Value::Buffer(eval.buffers.create_buffer(&unique_name))
+}
+
 #[test]
 fn pure_dispatch_typed_add_still_works() {
     let result = dispatch_builtin_pure("+", vec![Value::Int(2), Value::Int(3)])
@@ -962,8 +967,7 @@ fn kill_buffer_optional_arg_and_error_semantics() {
     }
 
     // Dead buffer object returns nil.
-    let dead =
-        builtin_generate_new_buffer(&mut eval, vec![Value::string("*kb-opt-dead*")]).unwrap();
+    let dead = create_unique_test_buffer(&mut eval, "*kb-opt-dead*");
     assert_eq!(
         builtin_kill_buffer(&mut eval, vec![dead]).unwrap(),
         Value::True
@@ -990,7 +994,7 @@ fn kill_buffer_optional_arg_and_error_semantics() {
 #[test]
 fn set_buffer_rejects_deleted_buffer_object() {
     let mut eval = super::super::eval::Evaluator::new();
-    let dead = builtin_generate_new_buffer(&mut eval, vec![Value::string("*sb-dead*")]).unwrap();
+    let dead = create_unique_test_buffer(&mut eval, "*sb-dead*");
     let _ = builtin_kill_buffer(&mut eval, vec![dead]).unwrap();
 
     let err = builtin_set_buffer(&mut eval, vec![dead])
@@ -1069,19 +1073,6 @@ fn buffer_creation_helpers_reject_missing_required_name_arg() {
         }
         other => panic!("unexpected flow: {other:?}"),
     }
-
-    let err = builtin_generate_new_buffer(&mut eval, vec![])
-        .expect_err("generate-new-buffer should reject missing required arg");
-    match err {
-        Flow::Signal(sig) => {
-            assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
-            assert_eq!(
-                sig.data,
-                vec![Value::symbol("generate-new-buffer"), Value::Int(0)]
-            );
-        }
-        other => panic!("unexpected flow: {other:?}"),
-    }
 }
 
 #[test]
@@ -1099,38 +1090,9 @@ fn get_buffer_rejects_non_string_non_buffer_designators() {
         }
     }
 
-    let dead = builtin_generate_new_buffer(&mut eval, vec![Value::string("*gb-dead*")]).unwrap();
+    let dead = create_unique_test_buffer(&mut eval, "*gb-dead*");
     let _ = builtin_kill_buffer(&mut eval, vec![dead]).unwrap();
     assert_eq!(builtin_get_buffer(&mut eval, vec![dead]).unwrap(), dead);
-}
-
-#[test]
-fn generate_new_buffer_accepts_optional_second_arg() {
-    let mut eval = super::super::eval::Evaluator::new();
-    let one = builtin_generate_new_buffer(&mut eval, vec![Value::string("*gnb-opt*"), Value::Nil])
-        .unwrap();
-    let two =
-        builtin_generate_new_buffer(&mut eval, vec![Value::string("*gnb-opt*"), Value::Int(1)])
-            .unwrap();
-    assert!(matches!(one, Value::Buffer(_)));
-    assert!(matches!(two, Value::Buffer(_)));
-    assert_ne!(one, two);
-
-    let err = builtin_generate_new_buffer(
-        &mut eval,
-        vec![Value::string("*gnb-opt*"), Value::Nil, Value::Nil],
-    )
-    .expect_err("generate-new-buffer should reject more than two args");
-    match err {
-        Flow::Signal(sig) => {
-            assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
-            assert_eq!(
-                sig.data,
-                vec![Value::symbol("generate-new-buffer"), Value::Int(3)]
-            );
-        }
-        other => panic!("unexpected flow: {other:?}"),
-    }
 }
 
 #[test]
@@ -1193,14 +1155,12 @@ fn generate_new_buffer_name_optional_arg_matches_expected_types() {
 fn buffer_size_and_modified_p_return_defaults_for_deleted_buffer_objects() {
     let mut eval = super::super::eval::Evaluator::new();
 
-    let dead_for_size =
-        builtin_generate_new_buffer(&mut eval, vec![Value::string("*bs-dead*")]).unwrap();
+    let dead_for_size = create_unique_test_buffer(&mut eval, "*bs-dead*");
     let _ = builtin_kill_buffer(&mut eval, vec![dead_for_size]).unwrap();
     let size = builtin_buffer_size(&mut eval, vec![dead_for_size]).unwrap();
     assert_eq!(size, Value::Int(0));
 
-    let dead_for_modified =
-        builtin_generate_new_buffer(&mut eval, vec![Value::string("*bm-dead*")]).unwrap();
+    let dead_for_modified = create_unique_test_buffer(&mut eval, "*bm-dead*");
     let _ = builtin_kill_buffer(&mut eval, vec![dead_for_modified]).unwrap();
     let modified = builtin_buffer_modified_p(&mut eval, vec![dead_for_modified]).unwrap();
     assert_eq!(modified, Value::Nil);
@@ -1273,7 +1233,7 @@ fn buffer_base_buffer_and_last_name_semantics() {
         other => panic!("unexpected flow: {other:?}"),
     }
 
-    let dead = builtin_generate_new_buffer(&mut eval, vec![Value::string("*bln-dead*")]).unwrap();
+    let dead = create_unique_test_buffer(&mut eval, "*bln-dead*");
     let live_name = builtin_buffer_name(&mut eval, vec![dead]).unwrap();
     let _ = builtin_kill_buffer(&mut eval, vec![dead]).unwrap();
 
@@ -1330,7 +1290,7 @@ fn buffer_modified_tick_semantics() {
         Value::Int(3)
     );
 
-    let dead = builtin_generate_new_buffer(&mut eval, vec![Value::string("*ticks-dead*")]).unwrap();
+    let dead = create_unique_test_buffer(&mut eval, "*ticks-dead*");
     let _ = builtin_kill_buffer(&mut eval, vec![dead]).unwrap();
     assert_eq!(
         builtin_buffer_modified_tick(&mut eval, vec![dead]).unwrap(),
@@ -1766,7 +1726,7 @@ fn barf_bury_char_equal_cl_type_and_cancel_semantics() {
         buf.set_buffer_local("buffer-read-only", Value::Nil);
     }
 
-    let buffer = builtin_generate_new_buffer(&mut eval, vec![Value::string("*bury*")]).unwrap();
+    let buffer = create_unique_test_buffer(&mut eval, "*bury*");
     assert_eq!(
         builtin_bury_buffer_internal(&mut eval, vec![buffer]).unwrap(),
         Value::Nil
@@ -1971,16 +1931,12 @@ fn buffer_undo_designators_match_deleted_and_missing_buffer_semantics() {
         other => panic!("unexpected flow: {other:?}"),
     }
 
-    let dead_for_enable =
-        builtin_generate_new_buffer(&mut eval, vec![Value::string("*undo-enable-deleted*")])
-            .unwrap();
+    let dead_for_enable = create_unique_test_buffer(&mut eval, "*undo-enable-deleted*");
     let _ = builtin_kill_buffer(&mut eval, vec![dead_for_enable]).unwrap();
     let enable_deleted = builtin_buffer_enable_undo(&mut eval, vec![dead_for_enable]).unwrap();
     assert_eq!(enable_deleted, Value::Nil);
 
-    let dead_for_disable =
-        builtin_generate_new_buffer(&mut eval, vec![Value::string("*undo-disable-deleted*")])
-            .unwrap();
+    let dead_for_disable = create_unique_test_buffer(&mut eval, "*undo-disable-deleted*");
     let _ = builtin_kill_buffer(&mut eval, vec![dead_for_disable]).unwrap();
     let disable_deleted = builtin_buffer_disable_undo(&mut eval, vec![dead_for_disable])
         .expect_err("buffer-disable-undo should reject deleted buffer objects");
@@ -5965,13 +5921,7 @@ fn format_and_message_render_mutex_condvar_handles_in_eval_dispatch() {
 #[test]
 fn format_and_message_render_killed_buffer_handles_in_eval_dispatch() {
     let mut eval = crate::emacs_core::eval::Evaluator::new();
-    let buffer = dispatch_builtin(
-        &mut eval,
-        "generate-new-buffer",
-        vec![Value::string("*format-killed-buffer*")],
-    )
-    .expect("generate-new-buffer should resolve")
-    .expect("generate-new-buffer should evaluate");
+    let buffer = create_unique_test_buffer(&mut eval, "*format-killed-buffer*");
     let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![buffer])
         .expect("kill-buffer should resolve")
         .expect("kill-buffer should evaluate");
@@ -5990,13 +5940,7 @@ fn format_and_message_render_killed_buffer_handles_in_eval_dispatch() {
 #[test]
 fn format_and_message_render_live_buffer_handles_in_eval_dispatch() {
     let mut eval = crate::emacs_core::eval::Evaluator::new();
-    let buffer = dispatch_builtin(
-        &mut eval,
-        "generate-new-buffer",
-        vec![Value::string("*format-live-buffer*")],
-    )
-    .expect("generate-new-buffer should resolve")
-    .expect("generate-new-buffer should evaluate");
+    let buffer = create_unique_test_buffer(&mut eval, "*format-live-buffer*");
 
     let formatted = dispatch_builtin(&mut eval, "format", vec![Value::string("%S"), buffer])
         .expect("format should resolve")
@@ -6023,13 +5967,7 @@ fn format_and_message_render_live_buffer_handles_in_eval_dispatch() {
 fn format_and_message_percent_s_render_live_buffer_names_in_eval_dispatch() {
     let mut eval = crate::emacs_core::eval::Evaluator::new();
     let expected = "*format-live-s-buffer*";
-    let buffer = dispatch_builtin(
-        &mut eval,
-        "generate-new-buffer",
-        vec![Value::string(expected)],
-    )
-    .expect("generate-new-buffer should resolve")
-    .expect("generate-new-buffer should evaluate");
+    let buffer = create_unique_test_buffer(&mut eval, expected);
 
     let formatted = dispatch_builtin(&mut eval, "format", vec![Value::string("%s"), buffer])
         .expect("format should resolve")
@@ -6045,13 +5983,7 @@ fn format_and_message_percent_s_render_live_buffer_names_in_eval_dispatch() {
 #[test]
 fn format_and_message_percent_s_render_killed_buffer_handles_in_eval_dispatch() {
     let mut eval = crate::emacs_core::eval::Evaluator::new();
-    let buffer = dispatch_builtin(
-        &mut eval,
-        "generate-new-buffer",
-        vec![Value::string("*format-killed-s-buffer*")],
-    )
-    .expect("generate-new-buffer should resolve")
-    .expect("generate-new-buffer should evaluate");
+    let buffer = create_unique_test_buffer(&mut eval, "*format-killed-s-buffer*");
     let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![buffer])
         .expect("kill-buffer should resolve")
         .expect("kill-buffer should evaluate");
@@ -6165,13 +6097,7 @@ fn format_message_renders_opaque_handles_in_eval_dispatch() {
     );
 
     let live_name = "*format-message-live-buffer*";
-    let live_buffer = dispatch_builtin(
-        &mut eval,
-        "generate-new-buffer",
-        vec![Value::string(live_name)],
-    )
-    .expect("generate-new-buffer should resolve")
-    .expect("generate-new-buffer should evaluate");
+    let live_buffer = create_unique_test_buffer(&mut eval, live_name);
     let live_upper = dispatch_builtin(
         &mut eval,
         "format-message",
@@ -6197,13 +6123,7 @@ fn format_message_renders_opaque_handles_in_eval_dispatch() {
         .expect("kill-buffer should resolve")
         .expect("kill-buffer should evaluate");
 
-    let killed_buffer = dispatch_builtin(
-        &mut eval,
-        "generate-new-buffer",
-        vec![Value::string("*format-message-killed-buffer*")],
-    )
-    .expect("generate-new-buffer should resolve")
-    .expect("generate-new-buffer should evaluate");
+    let killed_buffer = create_unique_test_buffer(&mut eval, "*format-message-killed-buffer*");
     let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![killed_buffer])
         .expect("kill-buffer should resolve")
         .expect("kill-buffer should evaluate");
@@ -6252,13 +6172,7 @@ fn error_message_string_preserves_percent_s_handle_semantics() {
         };
 
     let live_name = "*ems-live-lower*";
-    let live_buffer = dispatch_builtin(
-        &mut eval,
-        "generate-new-buffer",
-        vec![Value::string(live_name)],
-    )
-    .expect("generate-new-buffer should resolve")
-    .expect("generate-new-buffer should evaluate");
+    let live_buffer = create_unique_test_buffer(&mut eval, live_name);
     assert_eq!(
         render_error_message(&mut eval, "%s", live_buffer),
         live_name
@@ -6465,13 +6379,7 @@ fn message_box_wrappers_render_opaque_handles_in_eval_dispatch() {
     }
 
     let live_name = "*message-box-live-buffer*";
-    let live_buffer = dispatch_builtin(
-        &mut eval,
-        "generate-new-buffer",
-        vec![Value::string(live_name)],
-    )
-    .expect("generate-new-buffer should resolve")
-    .expect("generate-new-buffer should evaluate");
+    let live_buffer = create_unique_test_buffer(&mut eval, live_name);
     let live_upper = dispatch_builtin(
         &mut eval,
         "message-box",
@@ -6518,13 +6426,7 @@ fn message_box_wrappers_render_opaque_handles_in_eval_dispatch() {
         .expect("kill-buffer should resolve")
         .expect("kill-buffer should evaluate");
 
-    let killed_buffer = dispatch_builtin(
-        &mut eval,
-        "generate-new-buffer",
-        vec![Value::string("*message-box-killed-buffer*")],
-    )
-    .expect("generate-new-buffer should resolve")
-    .expect("generate-new-buffer should evaluate");
+    let killed_buffer = create_unique_test_buffer(&mut eval, "*message-box-killed-buffer*");
     let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![killed_buffer])
         .expect("kill-buffer should resolve")
         .expect("kill-buffer should evaluate");

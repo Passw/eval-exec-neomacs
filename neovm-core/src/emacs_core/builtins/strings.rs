@@ -1427,16 +1427,6 @@ pub(crate) fn builtin_clear_buffer_auto_save_failure(args: Vec<Value>) -> EvalRe
     Ok(Value::Nil)
 }
 
-pub(crate) fn builtin_string_to_list(args: Vec<Value>) -> EvalResult {
-    expect_args("string-to-list", &args, 1)?;
-    let s = expect_string(&args[0])?;
-    let chars: Vec<Value> = decode_storage_char_codes(&s)
-        .into_iter()
-        .map(|cp| Value::Int(cp as i64))
-        .collect();
-    Ok(Value::list(chars))
-}
-
 pub(crate) fn builtin_string_width(args: Vec<Value>) -> EvalResult {
     expect_min_args("string-width", &args, 1)?;
     expect_max_args("string-width", &args, 3)?;

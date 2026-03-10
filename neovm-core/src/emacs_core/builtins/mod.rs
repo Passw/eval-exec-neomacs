@@ -706,8 +706,6 @@ enum PureBuiltinId {
     StringTrimRight,
     #[strum(serialize = "make-string")]
     MakeString,
-    #[strum(serialize = "string-to-list")]
-    StringToList,
     #[strum(serialize = "string-width")]
     StringWidth,
     #[strum(serialize = "last")]
@@ -894,7 +892,6 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::StringTrimLeft => builtin_string_trim_left(args),
         PureBuiltinId::StringTrimRight => builtin_string_trim_right(args),
         PureBuiltinId::MakeString => builtin_make_string(args),
-        PureBuiltinId::StringToList => builtin_string_to_list(args),
         PureBuiltinId::StringWidth => builtin_string_width(args),
         PureBuiltinId::Last => builtin_last(args),
         PureBuiltinId::Butlast => builtin_butlast(args),
@@ -1074,7 +1071,6 @@ pub(crate) fn dispatch_builtin(
         "buffer-list" => return Some(builtin_buffer_list(eval, args)),
         "other-buffer" => return Some(builtin_other_buffer(eval, args)),
         "generate-new-buffer-name" => return Some(builtin_generate_new_buffer_name(eval, args)),
-        "generate-new-buffer" => return Some(builtin_generate_new_buffer(eval, args)),
         "char-after" => return Some(builtin_char_after(eval, args)),
         "char-before" => return Some(builtin_char_before(eval, args)),
         "byte-to-position" => return Some(builtin_byte_to_position(eval, args)),
@@ -3461,7 +3457,6 @@ pub(crate) fn dispatch_builtin(
         "string-blank-p" => super::builtins_extra::builtin_string_blank_p(args),
         "string-replace" => super::builtins_extra::builtin_string_replace(args),
         "string-search" => super::builtins_extra::builtin_string_search(args),
-        "string-to-vector" => super::builtins_extra::builtin_string_to_vector(args),
         "bare-symbol" => super::builtins_extra::builtin_bare_symbol(args),
         "bare-symbol-p" => super::builtins_extra::builtin_bare_symbol_p(args),
         "byteorder" => super::builtins_extra::builtin_byteorder(args),
@@ -3484,9 +3479,6 @@ pub(crate) fn dispatch_builtin(
         "emacs-pid" => super::builtins_extra::builtin_emacs_pid(args),
         "memory-use-counts" => super::builtins_extra::builtin_memory_use_counts(args),
         // Note: overlayp is in the eval-dependent section above
-
-        // Autoload (pure)
-        "autoloadp" => super::autoload::builtin_autoloadp(args),
         "symbol-file" => super::autoload::builtin_symbol_file(args),
 
         // Time/date (pure)
@@ -4072,8 +4064,6 @@ pub(crate) fn dispatch_builtin(
         "string-clean-whitespace" => super::format::builtin_string_clean_whitespace(args),
         "string-pixel-width" => super::format::builtin_string_pixel_width(args),
         "string-glyph-split" => super::format::builtin_string_glyph_split(args),
-        "string-equal-ignore-case" => super::format::builtin_string_equal_ignore_case(args),
-
         // Marker (pure)
         "markerp" => super::marker::builtin_markerp(args),
         "marker-buffer" => super::marker::builtin_marker_buffer(args),
@@ -4390,7 +4380,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "string-trim-right" => builtin_string_trim_right(args),
         "make-string" => builtin_make_string(args),
         "string" => builtin_string(args),
-        "string-to-list" => builtin_string_to_list(args),
         "string-width" => builtin_string_width(args),
         // Extended list
         "last" => builtin_last(args),

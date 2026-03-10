@@ -1615,7 +1615,6 @@ impl Evaluator {
                 obarray.set_symbol_function(name, Value::make_bytecode(bc));
             };
         for name in [
-            "autoloadp",
             "seq-count",
             "seq-concatenate",
             "seq-contains-p",
@@ -1638,14 +1637,11 @@ impl Evaluator {
             "seq-uniq",
             "string-blank-p",
             "string-empty-p",
-            "string-equal-ignore-case",
-            "string-to-vector",
         ] {
             seed_function_wrapper(&mut obarray, name);
         }
 
         seed_fixed_arity_wrapper(&mut obarray, "string-join", &["strings"], &["separator"]);
-        seed_fixed_arity_wrapper(&mut obarray, "string-to-list", &["string"], &[]);
 
         // Keep word-at-point unavailable at startup; symbol-at-point lazily
         // materializes it to mirror GNU Emacs thing-at-point bootstrap.

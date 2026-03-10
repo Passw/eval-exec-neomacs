@@ -1911,19 +1911,6 @@ pub(crate) fn builtin_generate_new_buffer_name(
     Ok(Value::string(eval.buffers.generate_new_buffer_name(&base)))
 }
 
-/// (generate-new-buffer NAME) → buffer
-pub(crate) fn builtin_generate_new_buffer(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_min_args("generate-new-buffer", &args, 1)?;
-    expect_max_args("generate-new-buffer", &args, 2)?;
-    let base = expect_string(&args[0])?;
-    let name = eval.buffers.generate_new_buffer_name(&base);
-    let id = eval.buffers.create_buffer(&name);
-    Ok(Value::Buffer(id))
-}
-
 /// (bufferp OBJECT) → t or nil
 pub(crate) fn builtin_bufferp(args: Vec<Value>) -> EvalResult {
     expect_args("bufferp", &args, 1)?;

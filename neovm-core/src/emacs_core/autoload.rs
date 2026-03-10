@@ -229,20 +229,6 @@ impl AutoloadManager {
 // Builtins (pure — need evaluator access)
 // ---------------------------------------------------------------------------
 
-/// `(autoloadp OBJ)` — return t if OBJ is an autoload object.
-/// In our implementation, autoload objects are stored as special list values
-/// of the form (autoload FILE DOCSTRING INTERACTIVE TYPE).
-pub(crate) fn builtin_autoloadp(args: Vec<Value>) -> EvalResult {
-    if args.len() != 1 {
-        return Err(signal(
-            "wrong-number-of-arguments",
-            vec![Value::symbol("autoloadp"), Value::Int(args.len() as i64)],
-        ));
-    }
-    // Check if the value is an autoload form: a list starting with 'autoload
-    Ok(Value::bool(is_autoload_value(&args[0])))
-}
-
 /// Check whether a value is an autoload form (autoload FILE ...).
 pub(crate) fn is_autoload_value(val: &Value) -> bool {
     if let Some(items) = list_to_vec(val) {
