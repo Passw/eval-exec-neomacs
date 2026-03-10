@@ -22,6 +22,8 @@
 .*
 !.clang-format
 !.clangd
+!.config/
+!.config/**
 !.dir-locals.el
 !.gitattributes
 !.gitignore
