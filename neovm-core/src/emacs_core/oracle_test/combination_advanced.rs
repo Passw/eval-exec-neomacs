@@ -6,6 +6,7 @@ use proptest::prelude::*;
 
 use super::common::{
     ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
 };
 
 // ---------------------------------------------------------------------------
@@ -16,7 +17,8 @@ use super::common::{
 fn oracle_prop_adv_lisp_interpreter_in_lisp() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    // A tiny Lisp interpreter written in Elisp, evaluated by NeoVM
+    // This depends on GNU's dumped subr runtime (`cadr`, `caddr`, ...),
+    // so it must be checked against the bootstrapped runtime surface.
     let form = "(progn
   (fset 'neovm--mini-eval
     (lambda (expr env)
@@ -57,7 +59,7 @@ fn oracle_prop_adv_lisp_interpreter_in_lisp() {
                     (let1 (b 4)
                       (+ (* a a) (* b b)))) nil))
     (fmakunbound 'neovm--mini-eval)))";
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("(3 30 yes 25)", &o, &n);
 }
 
