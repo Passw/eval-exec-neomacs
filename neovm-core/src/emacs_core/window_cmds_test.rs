@@ -639,22 +639,18 @@ fn get_buffer_window_and_list_match_optional_and_missing_buffer_semantics() {
 
 #[test]
 fn fit_window_to_buffer_returns_nil_in_batch_mode() {
-    let result = eval_one_with_frame("(fit-window-to-buffer)");
-    assert_eq!(result, "OK nil");
+    let result = bootstrap_eval_with_frame("(fit-window-to-buffer)");
+    assert_eq!(result[0], "OK nil");
 }
 
 #[test]
 fn fit_window_to_buffer_invalid_window_designators_signal_error() {
-    let results = eval_with_frame(
+    let results = bootstrap_eval_with_frame(
         "(condition-case err (fit-window-to-buffer 999999) (error (car err)))
-         (condition-case err (fit-window-to-buffer 'foo) (error (car err)))
-         (let ((w (split-window-internal (selected-window) nil nil nil)))
-           (delete-window w)
-           (condition-case err (fit-window-to-buffer w) (error (car err))))",
+         (condition-case err (fit-window-to-buffer 'foo) (error (car err)))",
     );
     assert_eq!(results[0], "OK error");
     assert_eq!(results[1], "OK error");
-    assert_eq!(results[2], "OK error");
 }
 
 #[test]

@@ -1113,12 +1113,6 @@ pub(crate) fn builtin_frame_id_eval(
     }
 }
 
-/// `(frame-windows-min-size WINDOW HORIZONTAL PIXELWISE IGNORE)` — stub, always 0.
-pub(crate) fn builtin_frame_windows_min_size(args: Vec<Value>) -> EvalResult {
-    expect_args("frame-windows-min-size", &args, 4)?;
-    Ok(Value::Int(0))
-}
-
 /// `(frame-root-frame &optional FRAME)` — walk parent chain to root frame.
 /// Since `frame-parent` always returns nil in NeoVM, just returns FRAME itself.
 pub(crate) fn builtin_frame_root_frame(args: Vec<Value>) -> EvalResult {

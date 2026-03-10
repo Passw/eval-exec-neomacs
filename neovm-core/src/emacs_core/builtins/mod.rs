@@ -1942,9 +1942,6 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ));
         }
-        "fit-window-to-buffer" => {
-            return Some(super::window_cmds::builtin_fit_window_to_buffer(eval, args));
-        }
         "window-dedicated-p" => {
             return Some(super::window_cmds::builtin_window_dedicated_p(eval, args));
         }
@@ -3469,7 +3466,6 @@ pub(crate) fn dispatch_builtin(
 
         // frame.c missing builtins (pure stubs)
         "frame-id" => builtin_frame_id(args),
-        "frame-windows-min-size" => builtin_frame_windows_min_size(args),
         "frame-root-frame" => builtin_frame_root_frame(args),
         "set-frame-size-and-position-pixelwise" => {
             builtin_set_frame_size_and_position_pixelwise(args)
@@ -4375,7 +4371,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "display-pixel-height" => super::display::builtin_display_pixel_height(args),
         // frame.c missing builtins (pure stubs)
         "frame-id" => builtin_frame_id(args),
-        "frame-windows-min-size" => builtin_frame_windows_min_size(args),
         "frame-root-frame" => builtin_frame_root_frame(args),
         "set-frame-size-and-position-pixelwise" => {
             builtin_set_frame_size_and_position_pixelwise(args)

@@ -2311,36 +2311,6 @@ pub(crate) fn builtin_get_buffer_window_list(
     }
 }
 
-/// `(fit-window-to-buffer &optional WINDOW MAX-HEIGHT MIN-HEIGHT MAX-WIDTH PRESERVE-SIZE)`
-/// -> nil in current batch compatibility mode.
-///
-/// Batch-compatible no-op: validates WINDOW and returns nil.
-/// GNU Emacs signals generic `error` for invalid/deleted designators here.
-pub(crate) fn builtin_fit_window_to_buffer(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_max_args("fit-window-to-buffer", &args, 6)?;
-    let wid = match args.first() {
-        None | Some(Value::Nil) => {
-            let (_, wid) = resolve_window_id(eval, None)?;
-            wid
-        }
-        Some(value) => {
-            let Some(wid) = window_id_from_designator(value) else {
-                return Err(signal("error", vec![Value::string("Invalid window")]));
-            };
-            if eval.frames.find_window_frame_id(wid).is_some() {
-                wid
-            } else {
-                return Err(signal("error", vec![Value::string("Invalid window")]));
-            }
-        }
-    };
-    let _ = wid;
-    Ok(Value::Nil)
-}
-
 /// `(window-dedicated-p &optional WINDOW)` -> t or nil.
 pub(crate) fn builtin_window_dedicated_p(
     eval: &mut super::eval::Evaluator,
