@@ -587,6 +587,41 @@ impl LayoutEngine {
         }
     }
 
+    /// Render a run of UTF-8 text with a given face. Returns total advance consumed.
+    ///
+    /// Both `render_status_line_spec()` and overlay string rendering can use
+    /// this to measure and emit glyphs for a contiguous segment of text sharing
+    /// a single face.  The caller is responsible for setting the active face on
+    /// `frame_glyphs` before calling this method.
+    pub(crate) unsafe fn render_text_run(
+        &mut self,
+        text: &[u8],
+        x: f32,
+        y: f32,
+        max_width: f32,
+        row_height: f32,
+        ascent: f32,
+        face: &StatusLineFace,
+        advance_mode: &StatusLineAdvanceMode,
+        fallback_char_width: f32,
+        frame_glyphs: &mut FrameGlyphBuffer,
+    ) -> f32 {
+        let mut offset = 0usize;
+        let mut x_offset = 0.0f32;
+        while offset < text.len() && x_offset < max_width {
+            let (ch, ch_len) = decode_utf8(&text[offset..]);
+            offset += ch_len;
+            if ch == '\n' || ch == '\r' {
+                continue;
+            }
+            let advance =
+                self.status_line_advance(advance_mode, face, fallback_char_width, ch);
+            frame_glyphs.add_char(ch, x + x_offset, y, advance, row_height, ascent, true);
+            x_offset += advance;
+        }
+        x_offset
+    }
+
     pub(crate) fn render_status_line_spec(
         &mut self,
         spec: &StatusLineSpec,
@@ -639,8 +674,10 @@ impl LayoutEngine {
         let mut current_run = 0usize;
         let mut dp_idx = 0usize;
         let mut align_idx = 0usize;
+        let mut active_run_face: Option<StatusLineFace> = None;
 
         while byte_idx < spec.text.len() && sl_x_offset < spec.width {
+            // --- Handle align-to entries ---
             if align_idx < spec.align_entries.len()
                 && byte_idx == spec.align_entries[align_idx].byte_offset as usize
             {
@@ -666,6 +703,7 @@ impl LayoutEngine {
                 continue;
             }
 
+            // --- Handle display properties (images) ---
             if dp_idx < spec.display_props.len() {
                 let dp = &spec.display_props[dp_idx];
                 if byte_idx == dp.byte_offset as usize {
@@ -693,6 +731,7 @@ impl LayoutEngine {
                 }
             }
 
+            // --- Resolve face for current run ---
             if current_run < spec.face_runs.len() {
                 while current_run + 1 < spec.face_runs.len()
                     && byte_idx >= spec.face_runs[current_run + 1].byte_offset as usize
@@ -704,7 +743,6 @@ impl LayoutEngine {
                     if run.fg != 0 || run.bg != 0 {
                         if run.face_id != 0 {
                             if let Some(fr) = frame {
-                                // Resolve full face attributes via FFI
                                 let mut face_ffi = FaceDataFFI::default();
                                 unsafe {
                                     neomacs_layout_face_by_id(fr, run.face_id as i32, &mut face_ffi)
@@ -726,6 +764,7 @@ impl LayoutEngine {
                                     rf.overline_color,
                                     rf.overstrike,
                                 );
+                                active_run_face = Some(rf);
                             } else {
                                 frame_glyphs.set_face(
                                     spec.face.face_id,
@@ -740,6 +779,7 @@ impl LayoutEngine {
                                     if spec.face.overline { 1 } else { 0 },
                                     spec.face.overline_color,
                                 );
+                                active_run_face = None;
                             }
                         } else {
                             frame_glyphs.set_face(
@@ -755,25 +795,44 @@ impl LayoutEngine {
                                 if spec.face.overline { 1 } else { 0 },
                                 spec.face.overline_color,
                             );
+                            active_run_face = None;
                         }
                     }
                 }
             }
 
-            let (ch, ch_len) = decode_utf8(&spec.text[byte_idx..]);
-            byte_idx += ch_len;
-
-            if ch == '\n' || ch == '\r' {
-                continue;
+            // --- Compute end of current text segment ---
+            let mut end_byte = spec.text.len();
+            if align_idx < spec.align_entries.len() {
+                end_byte = end_byte.min(spec.align_entries[align_idx].byte_offset as usize);
             }
+            if dp_idx < spec.display_props.len() {
+                end_byte = end_byte.min(spec.display_props[dp_idx].byte_offset as usize);
+            }
+            if current_run + 1 < spec.face_runs.len() {
+                end_byte = end_byte.min(spec.face_runs[current_run + 1].byte_offset as usize);
+            }
+            end_byte = end_byte.max(byte_idx);
 
-            let advance = unsafe {
-                self.status_line_advance(&spec.advance_mode, &spec.face, spec.char_width, ch)
+            // --- Render text run up to next boundary ---
+            let effective_face = active_run_face.as_ref().unwrap_or(&spec.face);
+            let remaining_width = spec.width - sl_x_offset;
+            let run_advance = unsafe {
+                self.render_text_run(
+                    &spec.text[byte_idx..end_byte],
+                    spec.x + sl_x_offset,
+                    text_y,
+                    remaining_width,
+                    spec.height,
+                    ascent,
+                    effective_face,
+                    &spec.advance_mode,
+                    spec.char_width,
+                    frame_glyphs,
+                )
             };
-
-            let gx = spec.x + sl_x_offset;
-            frame_glyphs.add_char(ch, gx, text_y, advance, spec.height, ascent, true);
-            sl_x_offset += advance;
+            sl_x_offset += run_advance;
+            byte_idx = end_byte;
         }
 
         frame_glyphs.set_face_with_font(
