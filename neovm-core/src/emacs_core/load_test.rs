@@ -853,6 +853,25 @@ fn eval_rendered(eval: &mut Evaluator, form: &str) -> String {
     }
 }
 
+#[test]
+fn bootstrap_condition_case_lexical_handler_binding_restores_outer_let() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(let ((outer 'original))
+             (list
+              (condition-case outer
+                  (/ 1 0)
+                (arith-error
+                 (setq outer (list 'caught (car outer)))
+                 outer))
+              outer))"#,
+    );
+    assert_eq!(rendered, "OK ((caught arith-error) original)");
+}
+
 fn cached_bootstrap_eval_with_loaded_file(path: &std::path::Path, form: &str) -> String {
     let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
     apply_runtime_startup_state(&mut eval).expect("runtime startup state");

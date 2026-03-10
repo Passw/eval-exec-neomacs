@@ -4099,7 +4099,7 @@ impl Evaluator {
         }
 
         let var = match &tail[0] {
-            Expr::Symbol(id) => resolve_sym(*id).to_owned(),
+            Expr::Symbol(id) => *id,
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -4146,13 +4146,35 @@ impl Evaluator {
                         sig.symbol_name(),
                         &handler_items[0],
                     ) {
+                        let bind_var = resolve_sym(var) != "nil";
+                        let binding_value = make_signal_binding_value(&sig);
+                        let use_lexical_binding = bind_var
+                            && self.lexical_binding()
+                            && !is_runtime_dynamically_special(&self.obarray, var)
+                            && !lexenv_declares_special(self.lexenv, var);
+
                         let mut frame = OrderedSymMap::new();
-                        if var != "nil" {
-                            frame.insert(intern(&var), make_signal_binding_value(&sig));
+                        let pushed_lexenv = if use_lexical_binding {
+                            let saved = self.lexenv;
+                            self.saved_lexenvs.push(saved);
+                            self.bind_lexical_value_rooted(var, binding_value);
+                            true
+                        } else {
+                            if bind_var {
+                                frame.insert(var, binding_value);
+                            }
+                            false
+                        };
+                        if !frame.is_empty() {
+                            self.dynamic.push(frame);
                         }
-                        self.dynamic.push(frame);
                         let result = self.sf_progn(&handler_items[1..]);
-                        self.dynamic.pop();
+                        if bind_var && !use_lexical_binding {
+                            self.dynamic.pop();
+                        }
+                        if pushed_lexenv {
+                            self.lexenv = self.saved_lexenvs.pop().unwrap();
+                        }
                         return result;
                     }
                 }

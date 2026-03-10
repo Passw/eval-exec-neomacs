@@ -3245,6 +3245,26 @@ fn real_backquote_nested_eval_chain_matches_gnu_error_shape() {
 }
 
 #[test]
+fn condition_case_lexical_handler_binding_restores_outer_let() {
+    let mut eval = Evaluator::new();
+    eval.set_lexical_binding(true);
+
+    let forms = parse_forms(
+        r#"(let ((outer 'original))
+             (list
+              (condition-case outer
+                  (/ 1 0)
+                (arith-error
+                 (setq outer (list 'caught (car outer)))
+                 outer))
+              outer))"#,
+    )
+    .expect("parse");
+    let result = format_eval_result(&eval.eval_expr(&forms[0]));
+    assert_eq!(result, "OK ((caught arith-error) original)");
+}
+
+#[test]
 fn gc_stress_lexical_closure_mutation() {
     // GC stress variant of closure mutation.
     let r = eval_stress(
