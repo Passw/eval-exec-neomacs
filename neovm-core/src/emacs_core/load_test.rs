@@ -670,6 +670,7 @@ fn bootstrap_runtime_loads_gnu_subr_helpers() {
              (equal (single-key-description
                      (event-apply-modifier ?a 'control 26 "C-"))
                     "C-a")
+             (equal (last '(1 2 3 4)) '(4))
              (equal (listify-key-sequence "Az") '(65 122))
              (key-valid-p "C-x C-f")
              (substring-no-properties
@@ -686,7 +687,7 @@ fn bootstrap_runtime_loads_gnu_subr_helpers() {
     );
     assert_eq!(
         rendered,
-        "OK (t (ignored (bar . 2)) (1 2) (1 2 3 4) (\"a\" \"b\") t t \"vm\" \"vm  \" \"  vm\" t (t t) \"a-b-c\" t t (control meta) 97 t t t \"C-a\" \"1.5k\" \"1.5MiB\" t \"1.5 KiB\" t)"
+        "OK (t (ignored (bar . 2)) (1 2) (1 2 3 4) (\"a\" \"b\") t t \"vm\" \"vm  \" \"  vm\" t (t t) \"a-b-c\" t t (control meta) 97 t t t t \"C-a\" \"1.5k\" \"1.5MiB\" t \"1.5 KiB\" t)"
     );
 }
 

@@ -77,7 +77,7 @@ fn minibuffer_window_frame_first_window_and_window_minibuffer_p_semantics() {
          (eq (frame-first-window) (selected-window))
          (eq (frame-first-window (selected-window)) (selected-window))
          (eq (frame-first-window (minibuffer-window)) (selected-window))
-         (eq (minibuffer-window) (car (last (window-list nil t))))
+         (eq (minibuffer-window) (car (nthcdr (1- (length (window-list nil t))) (window-list nil t))))
          (condition-case err (minibuffer-window 999999) (error err))
          (condition-case err (window-minibuffer-p 999999) (error err))
          (condition-case err (frame-first-window 999999) (error err))
@@ -760,7 +760,7 @@ fn window_list_matches_frame_minibuffer_and_all_frames_batch_semantics() {
 fn minibuffer_window_from_window_list_supports_basic_accessors() {
     let mut ev = Evaluator::new();
     let forms = parse_forms(
-        "(let ((m (car (last (window-list nil t)))))
+        "(let ((m (car (nthcdr (1- (length (window-list nil t))) (window-list nil t)))))
            (list (window-live-p m)
                  (windowp m)
                  (buffer-name (window-buffer m))
@@ -768,10 +768,10 @@ fn minibuffer_window_from_window_list_supports_basic_accessors() {
                  (window-point m)
                  (window-body-height m)
                  (window-body-height m t)))
-         (let ((m (car (last (window-list nil t)))))
+         (let ((m (car (nthcdr (1- (length (window-list nil t))) (window-list nil t)))))
            (set-window-start m 7)
            (window-start m))
-         (let ((m (car (last (window-list nil t)))))
+         (let ((m (car (nthcdr (1- (length (window-list nil t))) (window-list nil t)))))
            (set-window-point m 8)
            (window-point m))",
     )
@@ -1184,7 +1184,7 @@ fn window_geometry_helper_queries_match_batch_defaults_and_error_predicates() {
     let mut ev = Evaluator::new();
     let forms = parse_forms(
         "(let* ((w (selected-window))
-                (m (car (last (window-list nil t)))))
+                (m (minibuffer-window)))
            (list (window-left-column w)
                  (window-left-column m)
                  (window-top-line w)
@@ -1231,7 +1231,7 @@ fn window_use_time_and_old_state_queries_match_batch_defaults_and_error_predicat
     let mut ev = Evaluator::new();
     let forms = parse_forms(
         "(let* ((w (selected-window))
-                (m (car (last (window-list nil t)))))
+                (m (minibuffer-window)))
            (list (window-use-time w)
                  (window-use-time m)
                  (window-old-point w)
@@ -1244,7 +1244,7 @@ fn window_use_time_and_old_state_queries_match_batch_defaults_and_error_predicat
                  (window-next-buffers m)))
          (let* ((w1 (selected-window))
                 (w2 (split-window))
-                (m (car (last (window-list nil t)))))
+                (m (minibuffer-window)))
            (list (window-use-time w1)
                  (window-use-time w2)
                  (window-use-time m)
@@ -1318,7 +1318,7 @@ fn window_vscroll_helpers_match_batch_defaults_and_error_predicates() {
     let mut ev = Evaluator::new();
     let forms = parse_forms(
         "(let* ((w (selected-window))
-                (m (car (last (window-list nil t)))))
+                (m (minibuffer-window)))
            (list (window-vscroll w)
                  (window-vscroll m)
                  (window-vscroll w t)
@@ -1360,7 +1360,7 @@ fn window_hscroll_and_margin_setters_match_batch_defaults_and_error_predicates()
     let mut ev = Evaluator::new();
     let forms = parse_forms(
         "(let* ((w (selected-window))
-                (m (car (last (window-list nil t)))))
+                (m (minibuffer-window)))
            (list (window-hscroll w)
                  (set-window-hscroll w 3)
                  (window-hscroll w)
@@ -1425,7 +1425,7 @@ fn window_fringes_and_scroll_bar_setters_match_batch_defaults_and_error_predicat
     let mut ev = Evaluator::new();
     let forms = parse_forms(
         "(let* ((w (selected-window))
-                (m (car (last (window-list nil t)))))
+                (m (minibuffer-window)))
            (list (window-fringes w)
                  (window-fringes m)
                  (set-window-fringes w 0 0)
@@ -1478,7 +1478,7 @@ fn window_parameter_helpers_match_batch_defaults_and_key_semantics() {
     let mut ev = Evaluator::new();
     let forms = parse_forms(
         "(let* ((w (selected-window))
-                (m (car (last (window-list nil t)))))
+                (m (minibuffer-window)))
            (list (window-parameters w)
                  (window-parameters m)
                  (window-parameter w 'foo)
@@ -1527,7 +1527,7 @@ fn window_display_table_helpers_match_batch_defaults_and_set_get_semantics() {
     let mut ev = Evaluator::new();
     let forms = parse_forms(
         "(let* ((w (selected-window))
-                (m (car (last (window-list nil t))))
+                (m (minibuffer-window))
                 (dt '(1 2 3)))
            (list (null (window-display-table w))
                  (null (window-display-table m))
@@ -1571,7 +1571,7 @@ fn window_cursor_type_helpers_match_batch_defaults_and_set_get_semantics() {
     let mut ev = Evaluator::new();
     let forms = parse_forms(
         "(let* ((w (selected-window))
-                (m (car (last (window-list nil t)))))
+                (m (minibuffer-window)))
            (list (window-cursor-type w)
                  (window-cursor-type m)
                  (set-window-cursor-type w nil)
@@ -1687,7 +1687,7 @@ fn window_geometry_queries_match_batch_alias_and_edge_shapes() {
         "(list (symbol-function 'window-inside-pixel-edges)
                (symbol-function 'window-inside-edges))
          (let* ((w (selected-window))
-                (m (car (last (window-list nil t)))))
+                (m (minibuffer-window)))
            (list (window-mode-line-height w)
                  (window-mode-line-height m)
                  (window-header-line-height w)

@@ -2778,11 +2778,6 @@ fn pure_dispatch_typed_extended_list_ops_work() {
         Value::Int(4),
     ]);
 
-    let last = dispatch_builtin_pure("last", vec![seq])
-        .expect("builtin last should resolve")
-        .expect("builtin last should evaluate");
-    assert_eq!(last, Value::list(vec![Value::Int(4)]));
-
     let truncated = dispatch_builtin_pure(
         "ntake",
         vec![

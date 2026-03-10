@@ -638,8 +638,6 @@ enum PureBuiltinId {
     MakeString,
     #[strum(serialize = "string-width")]
     StringWidth,
-    #[strum(serialize = "last")]
-    Last,
     #[strum(serialize = "delete")]
     Delete,
     #[strum(serialize = "delq")]
@@ -784,7 +782,6 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::Isnan => builtin_isnan(args),
         PureBuiltinId::MakeString => builtin_make_string(args),
         PureBuiltinId::StringWidth => builtin_string_width(args),
-        PureBuiltinId::Last => builtin_last(args),
         PureBuiltinId::Delete => builtin_delete(args),
         PureBuiltinId::Delq => builtin_delq(args),
         PureBuiltinId::Elt => builtin_elt(args),
@@ -4222,7 +4219,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "string" => builtin_string(args),
         "string-width" => builtin_string_width(args),
         // Extended list
-        "last" => builtin_last(args),
         "delete" => builtin_delete(args),
         "delq" => builtin_delq(args),
         "elt" => builtin_elt(args),

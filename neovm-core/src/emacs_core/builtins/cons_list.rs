@@ -931,66 +931,6 @@ pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
 // Extended list operations
 // ===========================================================================
 
-pub(crate) fn builtin_last(args: Vec<Value>) -> EvalResult {
-    expect_min_args("last", &args, 1)?;
-    let n = if args.len() > 1 && !args[1].is_nil() {
-        expect_number_or_marker(&args[1])?
-    } else {
-        NumberOrMarker::Int(1)
-    };
-
-    match n {
-        NumberOrMarker::Int(n) => {
-            if n < 0 {
-                return Ok(Value::Nil);
-            }
-
-            let mut lag = args[0];
-            let mut lead = args[0];
-            for _ in 0..(n as usize) {
-                match lead {
-                    Value::Cons(cell) => {
-                        lead = with_heap(|h| h.cons_cdr(cell));
-                    }
-                    _ => return Ok(lag),
-                }
-            }
-
-            loop {
-                match lead {
-                    Value::Cons(cell) => {
-                        lead = with_heap(|h| h.cons_cdr(cell));
-                        lag = match lag {
-                            Value::Cons(lag_cell) => with_heap(|h| h.cons_cdr(lag_cell)),
-                            _ => unreachable!("lag should be a cons while lead is a cons"),
-                        };
-                    }
-                    _ => return Ok(lag),
-                }
-            }
-        }
-        NumberOrMarker::Float(n) => {
-            if n < 0.0 {
-                return Ok(Value::Nil);
-            }
-
-            if let Some(len) = list_length(&args[0]) {
-                let remaining = len as f64 - n;
-                if remaining > 0.0 {
-                    return Err(signal(
-                        "wrong-type-argument",
-                        vec![
-                            Value::symbol("integerp"),
-                            Value::Float(remaining, next_float_id()),
-                        ],
-                    ));
-                }
-            }
-            Ok(args[0])
-        }
-    }
-}
-
 fn delete_from_list_in_place_result<F>(seq: &Value, mut should_delete: F) -> Result<Value, Flow>
 where
     F: FnMut(&Value) -> Result<bool, Flow>,
