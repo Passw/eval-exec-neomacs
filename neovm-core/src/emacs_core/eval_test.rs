@@ -764,6 +764,28 @@ fn lambda_parameters_can_shadow_nil_and_t_like_gnu_emacs() {
 }
 
 #[test]
+fn setq_can_assign_shadowing_nil_and_t_parameters_like_gnu_emacs() {
+    let results = eval_all(
+        "(list
+            (funcall (lambda (t) (setq t 9) t) 7)
+            (funcall (lambda (nil) (setq nil 11) nil) 8))",
+    );
+    assert_eq!(results[0], "OK (9 11)");
+}
+
+#[test]
+fn random_accepts_string_seed_and_repeats_sequences_like_gnu_emacs() {
+    let results = eval_all(
+        "(let ((seq1 (progn (random \"vm-random-seed\") (list (random 1000) (random 1000) (random 1000))))
+               (seq2 (progn (random \"vm-random-seed\") (list (random 1000) (random 1000) (random 1000)))))
+           (list (integerp (random \"vm-random-seed\"))
+                 (equal seq1 seq2)
+                 (random 1)))",
+    );
+    assert_eq!(results[0], "OK (t t 0)");
+}
+
+#[test]
 fn setq_constants_signal_setting_constant_after_rhs_evaluation() {
     let results = eval_all(
         "(setq vm-setq-side 0)

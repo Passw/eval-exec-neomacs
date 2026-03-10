@@ -1466,7 +1466,7 @@ pub fn lexenv_assq(lexenv: Value, sym_id: SymId) -> Option<ObjId> {
                 // lexical sentinel `(t)`.
                 if let Value::Cons(binding) = pair.car {
                     let bp = read_cons(binding);
-                    if let Value::Symbol(s) = bp.car
+                    if let Some(s) = lexenv_binding_symbol_id(bp.car)
                         && s == sym_id
                     {
                         return Some(binding);
@@ -1476,6 +1476,23 @@ pub fn lexenv_assq(lexenv: Value, sym_id: SymId) -> Option<ObjId> {
             }
             _ => return None,
         }
+    }
+}
+
+fn lexenv_binding_symbol_id(value: Value) -> Option<SymId> {
+    match value {
+        Value::Symbol(sym) => Some(sym),
+        Value::True => Some(intern("t")),
+        Value::Nil => Some(intern("nil")),
+        _ => None,
+    }
+}
+
+fn lexenv_binding_symbol_value(sym_id: SymId) -> Value {
+    match resolve_sym(sym_id) {
+        "t" => Value::True,
+        "nil" => Value::Nil,
+        _ => Value::Symbol(sym_id),
     }
 }
 
@@ -1531,7 +1548,7 @@ pub fn lexenv_set(cell_id: ObjId, value: Value) {
 
 /// Prepend a `(sym . val)` binding onto a lexenv alist.  Returns the new head.
 pub fn lexenv_prepend(lexenv: Value, sym_id: SymId, val: Value) -> Value {
-    let binding = Value::cons(Value::Symbol(sym_id), val);
+    let binding = Value::cons(lexenv_binding_symbol_value(sym_id), val);
     Value::cons(binding, lexenv)
 }
 

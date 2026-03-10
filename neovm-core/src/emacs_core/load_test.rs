@@ -183,14 +183,218 @@ fn bootstrap_lambda_parameters_bind_special_symbols_like_gnu_emacs() {
               (funcall (lambda (t) (vm-bootstrap-shadow-foo)) 7)
               (funcall (lambda (t) (let ((ok t)) ok)) 7)
               (mapcar (lambda (t) t) '(1 2 3))
-              (mapcar (lambda (nil) nil) '(4 5 6))))",
+              (mapcar (lambda (nil) nil) '(4 5 6))
+              (let* ((captured 42)
+                     (shadow (lambda (t) (list t captured))))
+                (funcall shadow 7))
+              (funcall (lambda (t) (setq t 10) t) 7)))",
     )
     .expect("parse");
     let result = eval.eval_expr(&forms[0]);
     assert_eq!(
         format_eval_result(&result),
-        "OK (7 9 t 7 (1 2 3) (4 5 6))",
+        "OK (7 9 t 7 (1 2 3) (4 5 6) (7 42) 10)",
         "bootstrap evaluator should match GNU's special-symbol parameter binding"
+    );
+}
+
+#[test]
+fn bootstrap_cconv_closure_keeps_captured_canonical_t_binding() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).unwrap_or_else(|err| {
+        panic!("startup state: {}", format_eval_error(&eval, &err));
+    });
+    let rendered = eval_rendered(
+        &mut eval,
+        "(funcall (funcall (lambda (h t) (lambda () t)) 1 2))",
+    );
+    assert_eq!(
+        rendered, "OK 2",
+        "bootstrap cconv closure should preserve captured lexical binding named t"
+    );
+}
+
+#[test]
+fn bootstrap_church_list_tail_and_to_list_keep_captured_t() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).unwrap_or_else(|err| {
+        panic!("startup state: {}", format_eval_error(&eval, &err));
+    });
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(let* ((cnil (lambda (on-cons on-nil) (funcall on-nil)))
+                  (ccons (lambda (h t)
+                           (lambda (on-cons on-nil)
+                             (funcall on-cons h t))))
+                  (ctail (lambda (lst)
+                           (funcall lst
+                                    (lambda (h t) t)
+                                    (lambda () cnil)))))
+             (fset 'neovm--test-church-to-list
+                   (lambda (lst)
+                     (funcall lst
+                              (lambda (h t)
+                                (cons h (funcall 'neovm--test-church-to-list t)))
+                              (lambda () nil))))
+             (unwind-protect
+                 (let* ((l1 (funcall ccons 10
+                                     (funcall ccons 20
+                                              (funcall ccons 30 cnil)))))
+                   (list
+                    (funcall 'neovm--test-church-to-list l1)
+                    (funcall 'neovm--test-church-to-list (funcall ctail l1))))
+               (fmakunbound 'neovm--test-church-to-list)))"#,
+    );
+    assert_eq!(
+        rendered, "OK ((10 20 30) (20 30))",
+        "bootstrap recursive church list helpers should preserve captured lexical binding named t"
+    );
+}
+
+#[test]
+fn bootstrap_church_map_keeps_local_t_with_outer_captures() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).unwrap_or_else(|err| {
+        panic!("startup state: {}", format_eval_error(&eval, &err));
+    });
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(let* ((cnil (lambda (on-cons on-nil) (funcall on-nil)))
+                  (ccons (lambda (h t)
+                           (lambda (on-cons on-nil)
+                             (funcall on-cons h t))))
+                  (to-list nil)
+                  (cmap nil))
+             (fset 'neovm--test-church-to-list
+                   (lambda (lst)
+                     (funcall lst
+                              (lambda (h t)
+                                (cons h (funcall 'neovm--test-church-to-list t)))
+                              (lambda () nil))))
+             (setq to-list (lambda (lst) (funcall 'neovm--test-church-to-list lst)))
+             (fset 'neovm--test-church-map
+                   (lambda (f lst)
+                     (funcall lst
+                              (lambda (h t)
+                                (funcall ccons (funcall f h)
+                                         (funcall 'neovm--test-church-map f t)))
+                              (lambda () cnil))))
+             (setq cmap (lambda (f lst) (funcall 'neovm--test-church-map f lst)))
+             (unwind-protect
+                 (let* ((l1 (funcall ccons 10
+                                     (funcall ccons 20
+                                              (funcall ccons 30 cnil)))))
+                   (funcall to-list (funcall cmap (lambda (x) (* x 2)) l1)))
+               (fmakunbound 'neovm--test-church-to-list)
+               (fmakunbound 'neovm--test-church-map)))"#,
+    );
+    assert_eq!(
+        rendered, "OK (20 40 60)",
+        "bootstrap recursive church map should preserve local t while capturing outer vars"
+    );
+}
+
+#[test]
+fn bootstrap_church_foldr_keeps_local_t_with_outer_captures() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).unwrap_or_else(|err| {
+        panic!("startup state: {}", format_eval_error(&eval, &err));
+    });
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(let* ((cnil (lambda (on-cons on-nil) (funcall on-nil)))
+                  (ccons (lambda (h t)
+                           (lambda (on-cons on-nil)
+                             (funcall on-cons h t))))
+                  (cfoldr nil))
+             (fset 'neovm--test-church-foldr
+                   (lambda (f init lst)
+                     (funcall lst
+                              (lambda (h t)
+                                (funcall f h (funcall 'neovm--test-church-foldr f init t)))
+                              (lambda () init))))
+             (setq cfoldr (lambda (f init lst) (funcall 'neovm--test-church-foldr f init lst)))
+             (unwind-protect
+                 (let* ((l1 (funcall ccons 10
+                                     (funcall ccons 20
+                                              (funcall ccons 30 cnil)))))
+                   (list
+                    (funcall cfoldr (lambda (h acc) (+ h acc)) 0 l1)
+                    (funcall cfoldr (lambda (h acc) (1+ acc)) 0 l1)))
+               (fmakunbound 'neovm--test-church-foldr)))"#,
+    );
+    assert_eq!(
+        rendered, "OK (60 3)",
+        "bootstrap recursive church foldr should preserve local t while capturing outer vars"
+    );
+}
+
+#[test]
+fn bootstrap_church_append_roundtrip_and_map_sum_match_gnu() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).unwrap_or_else(|err| {
+        panic!("startup state: {}", format_eval_error(&eval, &err));
+    });
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(let* ((cnil (lambda (on-cons on-nil) (funcall on-nil)))
+                  (ccons (lambda (h t)
+                           (lambda (on-cons on-nil)
+                             (funcall on-cons h t))))
+                  (to-list nil)
+                  (from-list nil)
+                  (cmap nil)
+                  (cfoldr nil))
+             (fset 'neovm--test-church-to-list
+                   (lambda (lst)
+                     (funcall lst
+                              (lambda (h t)
+                                (cons h (funcall 'neovm--test-church-to-list t)))
+                              (lambda () nil))))
+             (setq to-list (lambda (lst) (funcall 'neovm--test-church-to-list lst)))
+             (fset 'neovm--test-church-from-list
+                   (lambda (lst)
+                     (if (null lst) cnil
+                       (funcall ccons (car lst)
+                                (funcall 'neovm--test-church-from-list (cdr lst))))))
+             (setq from-list (lambda (lst) (funcall 'neovm--test-church-from-list lst)))
+             (fset 'neovm--test-church-map
+                   (lambda (f lst)
+                     (funcall lst
+                              (lambda (h t)
+                                (funcall ccons (funcall f h)
+                                         (funcall 'neovm--test-church-map f t)))
+                              (lambda () cnil))))
+             (setq cmap (lambda (f lst) (funcall 'neovm--test-church-map f lst)))
+             (fset 'neovm--test-church-foldr
+                   (lambda (f init lst)
+                     (funcall lst
+                              (lambda (h t)
+                                (funcall f h (funcall 'neovm--test-church-foldr f init t)))
+                              (lambda () init))))
+             (setq cfoldr (lambda (f init lst) (funcall 'neovm--test-church-foldr f init lst)))
+             (unwind-protect
+                 (let* ((l1 (funcall ccons 10
+                                     (funcall ccons 20
+                                              (funcall ccons 30
+                                                       (funcall ccons 40 cnil)))))
+                        (l2 (funcall from-list '(5 6 7)))
+                        (cappend (lambda (l1 l2)
+                                   (funcall cfoldr (lambda (h acc) (funcall ccons h acc)) l2 l1)))
+                        (csum (lambda (lst)
+                                (funcall cfoldr (lambda (h acc) (+ h acc)) 0 lst))))
+                   (list
+                    (funcall to-list (funcall from-list '(100 200 300)))
+                    (funcall to-list (funcall cappend l1 l2))
+                    (funcall csum (funcall cmap (lambda (x) (* x x)) l2))))
+               (fmakunbound 'neovm--test-church-to-list)
+               (fmakunbound 'neovm--test-church-from-list)
+               (fmakunbound 'neovm--test-church-map)
+               (fmakunbound 'neovm--test-church-foldr)))"#,
+    );
+    assert_eq!(
+        rendered, "OK ((100 200 300) (10 20 30 40 5 6 7) 110)",
+        "bootstrap church helper composition should match GNU Emacs"
     );
 }
 

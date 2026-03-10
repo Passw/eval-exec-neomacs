@@ -1,4 +1,11 @@
 use super::*;
+use std::sync::Mutex;
+
+#[cfg(unix)]
+unsafe extern "C" {
+    fn random() -> libc::c_long;
+    fn srandom(seed: libc::c_uint);
+}
 
 // ===========================================================================
 // Arithmetic
@@ -586,20 +593,108 @@ pub(crate) fn builtin_expt(args: Vec<Value>) -> EvalResult {
 }
 
 pub(crate) fn builtin_random(args: Vec<Value>) -> EvalResult {
-    if args.is_empty() {
-        // Random integer
-        Ok(Value::Int(rand_simple()))
-    } else {
-        let limit = expect_int(&args[0])?;
-        if limit <= 0 {
-            return Err(signal("args-out-of-range", vec![args[0]]));
+    expect_max_args("random", &args, 1)?;
+
+    if let Some(limit) = args.first() {
+        match limit {
+            Value::True => emacs_init_random(),
+            Value::Str(id) => {
+                let bytes = with_heap(|h| h.get_string(*id).as_bytes().to_vec());
+                emacs_seed_random(&bytes);
+            }
+            Value::Int(lim) => {
+                if *lim <= 0 {
+                    return Err(signal("args-out-of-range", vec![*limit]));
+                }
+                return Ok(Value::Int(emacs_get_random_fixnum(*lim)));
+            }
+            _ => {}
         }
-        Ok(Value::Int(rand_simple().unsigned_abs() as i64 % limit))
+    }
+
+    Ok(Value::Int(emacs_get_random()))
+}
+
+#[cfg(unix)]
+fn emacs_random_lock() -> &'static Mutex<()> {
+    static RANDOM_LOCK: Mutex<()> = Mutex::new(());
+    &RANDOM_LOCK
+}
+
+#[cfg(unix)]
+fn emacs_intmask() -> u64 {
+    (1_u64 << emacs_random_fixnum_bits()) - 1
+}
+
+#[cfg(unix)]
+fn emacs_random_fixnum_bits() -> u32 {
+    // Match GNU Emacs get_random()/INTMASK behavior on current 64-bit builds:
+    // FIXNUM_BITS is 62 even though most-positive-fixnum is 2^61 - 1.
+    62
+}
+
+#[cfg(unix)]
+fn emacs_get_random_unlocked() -> i64 {
+    const RAND_BITS: u32 = 31;
+    const EMACS_INT_WIDTH: u32 = 64;
+    let fixnum_bits = emacs_random_fixnum_bits();
+    let mut val: u64 = 0;
+    for _ in 0..fixnum_bits.div_ceil(RAND_BITS) {
+        let r = unsafe { random() as u64 };
+        val = r ^ (val << RAND_BITS) ^ (val >> (EMACS_INT_WIDTH - RAND_BITS));
+    }
+    val ^= val >> (EMACS_INT_WIDTH - fixnum_bits);
+    (val & emacs_intmask()) as i64
+}
+
+#[cfg(unix)]
+fn emacs_get_random() -> i64 {
+    let _guard = emacs_random_lock().lock().expect("random lock poisoned");
+    emacs_get_random_unlocked()
+}
+
+#[cfg(unix)]
+fn emacs_get_random_fixnum(limit: i64) -> i64 {
+    let lim = limit as u64;
+    let intmask = emacs_intmask();
+    let difflim = intmask - lim + 1;
+    let _guard = emacs_random_lock().lock().expect("random lock poisoned");
+    loop {
+        let r = emacs_get_random_unlocked() as u64;
+        let remainder = r % lim;
+        let diff = r - remainder;
+        if difflim >= diff {
+            return remainder as i64;
+        }
     }
 }
 
-/// Simple PRNG (xorshift64) — not cryptographically secure.
-fn rand_simple() -> i64 {
+#[cfg(unix)]
+fn emacs_seed_random(seed: &[u8]) {
+    let _guard = emacs_random_lock().lock().expect("random lock poisoned");
+    let mut arg = [0u8; std::mem::size_of::<u32>()];
+    for (index, byte) in seed.iter().enumerate() {
+        arg[index % arg.len()] ^= *byte;
+    }
+    let seed = u32::from_ne_bytes(arg);
+    unsafe {
+        srandom(seed);
+    }
+}
+
+#[cfg(unix)]
+fn emacs_init_random() {
+    let seed = (std::process::id() as u64)
+        ^ (std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() ^ u64::from(d.subsec_nanos()))
+            .unwrap_or(0));
+    let bytes = seed.to_ne_bytes();
+    emacs_seed_random(&bytes);
+}
+
+#[cfg(not(unix))]
+fn emacs_get_random() -> i64 {
     use std::cell::Cell;
     thread_local! {
         static STATE: Cell<u64> = const { Cell::new(0x12345678_9abcdef0) };
@@ -610,8 +705,36 @@ fn rand_simple() -> i64 {
         x ^= x >> 7;
         x ^= x << 17;
         s.set(x);
-        x as i64
+        (x as i64) & (i64::MAX >> 2)
     })
+}
+
+#[cfg(not(unix))]
+fn emacs_get_random_fixnum(limit: i64) -> i64 {
+    emacs_get_random().unsigned_abs() as i64 % limit
+}
+
+#[cfg(not(unix))]
+fn emacs_seed_random(seed: &[u8]) {
+    use std::cell::Cell;
+    thread_local! {
+        static STATE: Cell<u64> = const { Cell::new(0x12345678_9abcdef0) };
+    }
+    let mut arg = 0u64;
+    for (index, byte) in seed.iter().enumerate() {
+        arg ^= u64::from(*byte) << ((index % 8) * 8);
+    }
+    STATE.with(|state| state.set(arg));
+}
+
+#[cfg(not(unix))]
+fn emacs_init_random() {
+    let seed = (std::process::id() as u64)
+        ^ (std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() ^ u64::from(d.subsec_nanos()))
+            .unwrap_or(0));
+    emacs_seed_random(&seed.to_ne_bytes());
 }
 
 pub(crate) fn builtin_isnan(args: Vec<Value>) -> EvalResult {

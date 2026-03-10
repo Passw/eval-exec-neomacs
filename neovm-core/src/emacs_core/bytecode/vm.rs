@@ -1314,7 +1314,8 @@ impl<'a> Vm<'a> {
         }
 
         let name_id = intern(name);
-        let is_special = self.obarray.is_special_id(name_id)
+        let is_special = (self.obarray.is_special_id(name_id)
+            && !self.obarray.is_constant_id(name_id))
             || crate::emacs_core::value::lexenv_declares_special(*self.lexenv, name_id);
 
         // GNU Emacs resolves declared-special vars dynamically even when
@@ -1349,7 +1350,8 @@ impl<'a> Vm<'a> {
 
     fn assign_var(&mut self, name: &str, value: Value) -> Result<(), Flow> {
         let name_id = intern(name);
-        let is_special = self.obarray.is_special_id(name_id)
+        let is_special = (self.obarray.is_special_id(name_id)
+            && !self.obarray.is_constant_id(name_id))
             || crate::emacs_core::value::lexenv_declares_special(*self.lexenv, name_id);
 
         if !is_special {

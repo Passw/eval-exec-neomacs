@@ -105,7 +105,7 @@ fn interpreted_closure_env_entries(lexenv: Value) -> Vec<InterpretedClosureEnvEn
                     Value::Symbol(sym) => entries.push(InterpretedClosureEnvEntry::Special(sym)),
                     Value::Cons(binding) => {
                         let binding_pair = read_cons(binding);
-                        if let Value::Symbol(sym) = binding_pair.car {
+                        if let Some(sym) = binding_symbol_id(binding_pair.car) {
                             entries.push(InterpretedClosureEnvEntry::Binding(sym));
                         }
                     }
@@ -115,6 +115,15 @@ fn interpreted_closure_env_entries(lexenv: Value) -> Vec<InterpretedClosureEnvEn
             }
             _ => return entries,
         }
+    }
+}
+
+fn binding_symbol_id(value: Value) -> Option<SymId> {
+    match value {
+        Value::Symbol(sym) => Some(sym),
+        Value::True => Some(intern("t")),
+        Value::Nil => Some(intern("nil")),
+        _ => None,
     }
 }
 
@@ -218,6 +227,10 @@ fn value_from_symbol_id(sym_id: SymId) -> Value {
         }
     }
     Value::Symbol(sym_id)
+}
+
+fn is_runtime_dynamically_special(obarray: &Obarray, sym_id: SymId) -> bool {
+    obarray.is_special_id(sym_id) && !obarray.is_constant_id(sym_id)
 }
 
 /// Limit for stored recent input events to match GNU Emacs: 300 entries.
@@ -2418,8 +2431,8 @@ impl Evaluator {
         // named `t`/`nil`: they remain lexical locals inside the current
         // lambda body, even though the global symbols are self-evaluating.
         if self.lexical_binding()
-            && !self.obarray.is_special_id(sym_id)
-            && !self.obarray.is_special_id(resolved)
+            && !is_runtime_dynamically_special(&self.obarray, sym_id)
+            && !is_runtime_dynamically_special(&self.obarray, resolved)
             && !locally_special
         {
             if let Some(value) = lexenv_lookup(self.lexenv, sym_id) {
@@ -3383,7 +3396,11 @@ impl Evaluator {
             };
             let value = self.eval(&tail[i + 1])?;
             let resolved = super::builtins::resolve_variable_alias_name(self, name)?;
-            if self.obarray.is_constant(&resolved) {
+            let resolved_id = intern(&resolved);
+            if self.obarray.is_constant_id(resolved_id)
+                && !self.has_local_binding_by_id(sym_id)
+                && (resolved_id == sym_id || !self.has_local_binding_by_id(resolved_id))
+            {
                 return Err(signal("setting-constant", vec![Value::symbol(name)]));
             }
             // If the variable has an alias, use the resolved (interned) name.
@@ -5742,7 +5759,7 @@ impl Evaluator {
         let name = resolve_sym(sym_id);
         // If lexical binding and not special, check lexenv first
         if self.lexical_binding()
-            && !self.obarray.is_special_id(sym_id)
+            && !is_runtime_dynamically_special(&self.obarray, sym_id)
             && !lexenv_declares_special(self.lexenv, sym_id)
         {
             if let Some(cell_id) = lexenv_assq(self.lexenv, sym_id) {
@@ -5801,15 +5818,19 @@ impl Evaluator {
         self.assign_by_id(intern(name), value);
     }
 
+    fn has_local_binding_by_id(&self, sym_id: SymId) -> bool {
+        lexenv_assq(self.lexenv, sym_id).is_some()
+            || self
+                .dynamic
+                .iter()
+                .rev()
+                .any(|frame| frame.contains_key(&sym_id))
+    }
+
     pub(crate) fn visible_variable_value_or_nil(&self, name: &str) -> Value {
-        if name == "nil" {
-            return Value::Nil;
-        }
-        if name == "t" {
-            return Value::True;
-        }
         let name_id = intern(name);
-        if !lexenv_declares_special(self.lexenv, name_id)
+        if !is_runtime_dynamically_special(&self.obarray, name_id)
+            && !lexenv_declares_special(self.lexenv, name_id)
             && let Some(value) = lexenv_lookup(self.lexenv, name_id)
         {
             return value;
@@ -5824,10 +5845,16 @@ impl Evaluator {
                 return value;
             }
         }
-        self.obarray
-            .symbol_value(name)
-            .cloned()
-            .unwrap_or(Value::Nil)
+        if let Some(value) = self.obarray.symbol_value(name).cloned() {
+            return value;
+        }
+        if name == "nil" {
+            return Value::Nil;
+        }
+        if name == "t" {
+            return Value::True;
+        }
+        Value::Nil
     }
 
     fn run_unlet_watchers(&mut self, bindings: &[(String, Value, Value)]) -> Result<(), Flow> {
