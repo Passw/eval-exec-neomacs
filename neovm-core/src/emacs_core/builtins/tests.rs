@@ -4951,6 +4951,63 @@ fn looking_at_p_preserves_match_data() {
 }
 
 #[test]
+fn string_match_inhibit_modify_preserves_match_data() {
+    use crate::emacs_core::eval::Evaluator;
+
+    let mut eval = Evaluator::new();
+    let baseline = Value::list(vec![Value::Int(10), Value::Int(11)]);
+    builtin_set_match_data_eval(&mut eval, vec![baseline]).expect("seed baseline");
+
+    let result = builtin_string_match_eval(
+        &mut eval,
+        vec![
+            Value::string("\\(foo\\)\\(bar\\)"),
+            Value::string("foobar"),
+            Value::Nil,
+            Value::True,
+        ],
+    )
+    .expect("string-match with inhibit-modify");
+    assert_eq!(result, Value::Int(0));
+
+    let observed = builtin_match_data_eval(&mut eval, vec![]).expect("read match-data");
+    assert_eq!(observed, baseline);
+}
+
+#[test]
+fn replace_match_missing_subexp_signals_error() {
+    use crate::emacs_core::eval::Evaluator;
+
+    let mut eval = Evaluator::new();
+    builtin_string_match_eval(
+        &mut eval,
+        vec![Value::string("\\(foo\\)"), Value::string("foo")],
+    )
+    .expect("seed match data");
+
+    let result = builtin_replace_match(
+        &mut eval,
+        vec![
+            Value::string("bar"),
+            Value::Nil,
+            Value::Nil,
+            Value::string("foo"),
+            Value::Int(2),
+        ],
+    );
+    assert!(matches!(
+        result,
+        Err(Flow::Signal(sig))
+            if sig.symbol_name() == "error"
+                && sig.data
+                    == vec![
+                        Value::string("replace-match subexpression does not exist"),
+                        Value::Int(2),
+                    ]
+    ));
+}
+
+#[test]
 fn looking_at_p_respects_case_fold_search() {
     use crate::emacs_core::eval::Evaluator;
 

@@ -3,7 +3,10 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{
+    assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
+};
 
 // ---------------------------------------------------------------------------
 // regexp-quote
@@ -38,7 +41,7 @@ fn oracle_prop_regexp_quote_roundtrip() {
     // After quoting, the string should match literally
     let form = r####"(let ((literal "foo.bar*baz"))
                     (string-match-p (regexp-quote literal) literal))"####;
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq("0", &o, &n);
 }
 
@@ -62,8 +65,9 @@ fn oracle_prop_regexp_quote_used_in_search() {
 fn oracle_prop_replace_regexp_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) =
-        eval_oracle_and_neovm(r#"(replace-regexp-in-string "[0-9]+" "NUM" "foo123bar456")"#);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(
+        r#"(replace-regexp-in-string "[0-9]+" "NUM" "foo123bar456")"#,
+    );
     assert_ok_eq(r#""fooNUMbarNUM""#, &o, &n);
 }
 
@@ -71,7 +75,9 @@ fn oracle_prop_replace_regexp_basic() {
 fn oracle_prop_replace_regexp_no_match() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(r#"(replace-regexp-in-string "xyz" "ABC" "hello world")"#);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(
+        r#"(replace-regexp-in-string "xyz" "ABC" "hello world")"#,
+    );
     assert_ok_eq(r#""hello world""#, &o, &n);
 }
 
@@ -137,7 +143,7 @@ fn oracle_prop_replace_regexp_complex_pattern() {
     // Complex: strip HTML-like tags
     let form = r####"(replace-regexp-in-string
                     "<[^>]+>" "" "<b>bold</b> and <i>italic</i>")"####;
-    let (o, n) = eval_oracle_and_neovm(form);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(form);
     assert_ok_eq(r#""bold and italic""#, &o, &n);
 }
 

@@ -2177,15 +2177,6 @@ impl<'a> Vm<'a> {
                     args,
                 )
             }),
-            "string-match-p" => Some({
-                let case_fold = self
-                    .lookup_var("case-fold-search")
-                    .map(|value| !value.is_nil())
-                    .unwrap_or(true);
-                crate::emacs_core::builtins::search::builtin_string_match_p_with_case_fold(
-                    case_fold, args,
-                )
-            }),
             "match-beginning" => Some(
                 crate::emacs_core::builtins::search::builtin_match_beginning_with_state(
                     self.buffers.current_buffer(),

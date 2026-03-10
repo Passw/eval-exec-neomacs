@@ -1636,8 +1636,6 @@ impl Evaluator {
             "seq-subseq",
             "seq-take",
             "seq-uniq",
-            "looking-at-p",
-            "string-match-p",
             "string-blank-p",
             "string-empty-p",
             "string-equal-ignore-case",

@@ -498,8 +498,13 @@ pub(crate) fn builtin_string_match_with_state(
     let pattern = expect_string(&args[0])?;
     let s = expect_string(&args[1])?;
     let start = normalize_string_start_arg(&s, args.get(2))?;
-    match super::regex::string_match_full_with_case_fold(&pattern, &s, start, case_fold, match_data)
-    {
+    let inhibit_modify = args.get(3).is_some_and(|v| v.is_truthy());
+    let target = if inhibit_modify {
+        &mut None
+    } else {
+        match_data
+    };
+    match super::regex::string_match_full_with_case_fold(&pattern, &s, start, case_fold, target) {
         // string_match_full_with_case_fold returns a character position
         Ok(Some(char_pos)) => Ok(Value::Int(char_pos as i64)),
         Ok(None) => Ok(Value::Nil),
@@ -880,23 +885,10 @@ pub(crate) fn builtin_replace_match(
             Err(msg) if msg == missing_subexp_error && subexp == 0 => {
                 Err(signal("args-out-of-range", vec![Value::Int(0)]))
             }
-            Err(msg) if msg == missing_subexp_error => {
-                if md.as_ref().is_some_and(|m| subexp > m.groups.len()) {
-                    Err(signal(
-                        "args-out-of-range",
-                        vec![
-                            Value::Int(subexp as i64),
-                            Value::Int(0),
-                            Value::Int(source.chars().count() as i64),
-                        ],
-                    ))
-                } else {
-                    Err(signal(
-                        "error",
-                        vec![Value::string(msg), Value::Int(subexp as i64)],
-                    ))
-                }
-            }
+            Err(msg) if msg == missing_subexp_error => Err(signal(
+                "error",
+                vec![Value::string(msg), Value::Int(subexp as i64)],
+            )),
             Err(msg) => Err(signal("error", vec![Value::string(msg)])),
         };
     }
@@ -914,23 +906,10 @@ pub(crate) fn builtin_replace_match(
         Err(msg) if msg == missing_subexp_error && subexp == 0 => {
             Err(signal("args-out-of-range", vec![Value::Int(0)]))
         }
-        Err(msg) if msg == missing_subexp_error => {
-            if md.as_ref().is_some_and(|m| subexp > m.groups.len()) {
-                Err(signal(
-                    "args-out-of-range",
-                    vec![
-                        Value::Int(subexp as i64),
-                        Value::Int(0),
-                        Value::Int(buf.text.char_count() as i64),
-                    ],
-                ))
-            } else {
-                Err(signal(
-                    "error",
-                    vec![Value::string(msg), Value::Int(subexp as i64)],
-                ))
-            }
-        }
+        Err(msg) if msg == missing_subexp_error => Err(signal(
+            "error",
+            vec![Value::string(msg), Value::Int(subexp as i64)],
+        )),
         Err(msg) => Err(signal("error", vec![Value::string(msg)])),
     }
 }

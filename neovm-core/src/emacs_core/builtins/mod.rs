@@ -1095,10 +1095,8 @@ pub(crate) fn dispatch_builtin(
         "isearch-forward" => return Some(super::isearch::builtin_isearch_forward(args)),
         "isearch-backward" => return Some(super::isearch::builtin_isearch_backward(args)),
         "looking-at" => return Some(builtin_looking_at(eval, args)),
-        "looking-at-p" => return Some(builtin_looking_at_p(eval, args)),
         "posix-looking-at" => return Some(builtin_posix_looking_at(eval, args)),
         "string-match" => return Some(builtin_string_match_eval(eval, args)),
-        "string-match-p" => return Some(builtin_string_match_p_eval(eval, args)),
         "posix-string-match" => return Some(builtin_posix_string_match(eval, args)),
         "match-string" => return Some(builtin_match_string(eval, args)),
         "match-beginning" => return Some(builtin_match_beginning(eval, args)),
@@ -1107,11 +1105,6 @@ pub(crate) fn dispatch_builtin(
         "match-data--translate" => return Some(builtin_match_data_translate_eval(eval, args)),
         "set-match-data" => return Some(builtin_set_match_data_eval(eval, args)),
         "replace-match" => return Some(builtin_replace_match(eval, args)),
-        "replace-regexp-in-string" => {
-            return Some(super::search::builtin_replace_regexp_in_string_eval(
-                eval, args,
-            ));
-        }
         "query-replace" => return Some(super::isearch::builtin_query_replace_eval(eval, args)),
         "query-replace-regexp" => {
             return Some(super::isearch::builtin_query_replace_regexp_eval(
@@ -4220,15 +4213,12 @@ pub(crate) fn dispatch_builtin(
         "seq-max" => super::cl_lib::builtin_seq_max(args),
         // Search (pure)
         "string-match" => super::search::builtin_string_match(args),
-        "string-match-p" => super::search::builtin_string_match_p(args),
         "regexp-quote" => super::search::builtin_regexp_quote(args),
         "match-beginning" => super::search::builtin_match_beginning(args),
         "match-end" => super::search::builtin_match_end(args),
         "match-data" => super::search::builtin_match_data(args),
         "set-match-data" => super::search::builtin_set_match_data(args),
         "looking-at" => super::search::builtin_looking_at(args),
-        "looking-at-p" => super::search::builtin_looking_at_p(args),
-        "replace-regexp-in-string" => super::search::builtin_replace_regexp_in_string(args),
 
         // Lread (pure)
         "get-load-suffixes" => super::lread::builtin_get_load_suffixes(args),

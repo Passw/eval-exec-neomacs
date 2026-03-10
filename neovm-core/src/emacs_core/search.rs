@@ -238,6 +238,16 @@ pub(crate) fn builtin_string_match(args: Vec<Value>) -> EvalResult {
     let pattern = expect_string(&args[0])?;
     let s = expect_string(&args[1])?;
     let start = normalize_string_start_arg(&s, args.get(2))?;
+    let inhibit_modify = args.get(3).is_some_and(|v| v.is_truthy());
+
+    if inhibit_modify {
+        let mut throwaway = None;
+        return match super::regex::string_match_full(&pattern, &s, start, &mut throwaway) {
+            Ok(Some(char_pos)) => Ok(Value::Int(char_pos as i64)),
+            Ok(None) => Ok(Value::Nil),
+            Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
+        };
+    }
 
     PURE_MATCH_DATA.with(|slot| {
         let mut md = slot.borrow_mut();
