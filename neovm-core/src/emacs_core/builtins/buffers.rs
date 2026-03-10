@@ -893,7 +893,7 @@ pub(crate) fn builtin_split_window_internal(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    expect_args("split-window-internal", &args, 4)?;
+    expect_range_args("split-window-internal", &args, 4, 5)?;
     if !args[0].is_nil() {
         let windowp = super::window_cmds::builtin_windowp(eval, vec![args[0]])?;
         if windowp.is_nil() {
@@ -913,8 +913,12 @@ pub(crate) fn builtin_split_window_internal(
         ));
     }
 
-    // NORMALIZE is accepted for arity compatibility and ignored in this subset.
-    super::window_cmds::builtin_split_window(eval, vec![args[0], args[1], args[2]])
+    // NORMALIZE and REFER are accepted for arity compatibility and ignored in this subset.
+    let _ = &args[3];
+    if let Some(refer) = args.get(4) {
+        let _ = refer;
+    }
+    super::window_cmds::split_window_internal_impl(eval, args[0], args[2])
 }
 
 /// `(buffer-text-pixel-size &optional BUFFER WINDOW FROM TO)` -> (WIDTH . HEIGHT)

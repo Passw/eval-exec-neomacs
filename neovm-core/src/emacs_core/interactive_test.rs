@@ -1,4 +1,5 @@
 use super::*;
+use crate::emacs_core::load::{apply_runtime_startup_state, create_bootstrap_evaluator_cached};
 use crate::emacs_core::{Evaluator, format_eval_result, parse_forms};
 
 fn eval_all(src: &str) -> Vec<String> {
@@ -20,6 +21,12 @@ fn eval_all_with(ev: &mut Evaluator, src: &str) -> Vec<String> {
         .iter()
         .map(format_eval_result)
         .collect()
+}
+
+fn bootstrap_eval_all(src: &str) -> Vec<String> {
+    let mut ev = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut ev).expect("runtime startup state");
+    eval_all_with(&mut ev, src)
 }
 
 // -------------------------------------------------------------------
@@ -1971,9 +1978,7 @@ fn command_execute_builtin_transpose_words_uses_default_prefix_arg() {
 
 #[test]
 fn command_execute_builtin_other_window_uses_default_prefix_arg() {
-    let mut ev = Evaluator::new();
-    let results = eval_all_with(
-        &mut ev,
+    let results = bootstrap_eval_all(
         r#"(let ((w1 (selected-window)))
              (split-window)
              (command-execute 'other-window)
@@ -2002,7 +2007,7 @@ fn call_interactively_builtin_other_window_uses_default_prefix_arg() {
     let results = eval_all_with(
         &mut ev,
         r#"(let ((w1 (selected-window)))
-             (split-window)
+             (split-window-internal (selected-window) nil nil nil)
              (call-interactively 'other-window)
              (not (eq (selected-window) w1)))"#,
     );

@@ -2007,7 +2007,6 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ));
         }
-        "split-window" => return Some(super::window_cmds::builtin_split_window(eval, args)),
         "split-window-internal" => return Some(builtin_split_window_internal(eval, args)),
         "delete-window" => return Some(super::window_cmds::builtin_delete_window(eval, args)),
         "delete-window-internal" => {

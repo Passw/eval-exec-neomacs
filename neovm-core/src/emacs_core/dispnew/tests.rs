@@ -105,10 +105,12 @@ fn eval_internal_show_cursor_per_window_state() {
     let _ = crate::emacs_core::window_cmds::ensure_selected_frame_id(&mut eval);
     let selected =
         crate::emacs_core::window_cmds::builtin_selected_window(&mut eval, vec![]).unwrap();
-    let other = crate::emacs_core::window_cmds::builtin_split_window(
+    let other = crate::emacs_core::builtins::dispatch_builtin(
         &mut eval,
+        "split-window-internal",
         vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil],
     )
+    .unwrap()
     .unwrap();
 
     // Both start visible

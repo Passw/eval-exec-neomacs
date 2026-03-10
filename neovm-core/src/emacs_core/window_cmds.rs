@@ -1,7 +1,8 @@
 //! Window, frame, and display-related builtins for the Elisp VM.
 //!
 //! Bridges the `FrameManager` (in `crate::window`) to Elisp by exposing
-//! builtins such as `selected-window`, `split-window`, `selected-frame`, etc.
+//! builtins such as `selected-window`, `split-window-internal`,
+//! `selected-frame`, etc.
 //! Frames are represented as frame handles. Windows are represented as window
 //! handles, while legacy integer designators are still accepted in resolver
 //! paths for compatibility.
@@ -2594,19 +2595,16 @@ pub(crate) fn builtin_window_at(eval: &mut super::eval::Evaluator, args: Vec<Val
 // Window manipulation
 // ===========================================================================
 
-/// `(split-window &optional WINDOW SIZE SIDE)` -> new window object.
-///
-/// SIDE: nil or `below` = vertical split, `right` = horizontal split.
-pub(crate) fn builtin_split_window(
+pub(crate) fn split_window_internal_impl(
     eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
+    window: Value,
+    side: Value,
 ) -> EvalResult {
-    expect_max_args("split-window", &args, 4)?;
-    let (fid, wid) = resolve_window_id_or_error(eval, args.first())?;
+    let (fid, wid) = resolve_window_id_or_error(eval, Some(&window))?;
 
     // Determine split direction from SIDE argument.
-    let direction = match args.get(2) {
-        Some(Value::Symbol(id)) if resolve_sym(*id) == "right" || resolve_sym(*id) == "left" => {
+    let direction = match side {
+        Value::Symbol(id) if resolve_sym(id) == "right" || resolve_sym(id) == "left" => {
             SplitDirection::Horizontal
         }
         _ => SplitDirection::Vertical,

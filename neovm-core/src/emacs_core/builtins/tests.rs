@@ -6850,9 +6850,13 @@ fn internal_save_selected_window_helpers_restore_selected_window() {
     let selected = dispatch_builtin(&mut eval, "selected-window", vec![])
         .expect("selected-window should resolve")
         .expect("selected-window should evaluate");
-    let split = dispatch_builtin(&mut eval, "split-window", vec![selected])
-        .expect("split-window should resolve")
-        .expect("split-window should evaluate");
+    let split = dispatch_builtin(
+        &mut eval,
+        "split-window-internal",
+        vec![selected, Value::Nil, Value::Nil, Value::Nil],
+    )
+    .expect("split-window-internal should resolve")
+    .expect("split-window-internal should evaluate");
     let state = dispatch_builtin(&mut eval, "internal--before-save-selected-window", vec![])
         .expect("before helper should resolve")
         .expect("before helper should evaluate");

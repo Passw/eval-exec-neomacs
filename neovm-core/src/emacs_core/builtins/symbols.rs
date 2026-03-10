@@ -2993,21 +2993,32 @@ pub(crate) fn builtin_set_window_combination_limit(args: Vec<Value>) -> EvalResu
 pub(crate) fn builtin_set_window_new_normal(args: Vec<Value>) -> EvalResult {
     expect_range_args("set-window-new-normal", &args, 1, 2)?;
     expect_window_valid_or_nil(&args[0])?;
-    Ok(args.get(1).cloned().unwrap_or(Value::Nil))
+    Ok(super::stubs::set_window_new_normal_value(
+        &args[0],
+        args.get(1).cloned().unwrap_or(Value::Nil),
+    ))
 }
 
 pub(crate) fn builtin_set_window_new_pixel(args: Vec<Value>) -> EvalResult {
     expect_range_args("set-window-new-pixel", &args, 2, 3)?;
     expect_window_valid_or_nil(&args[0])?;
-    let _ = expect_int(&args[1])?;
-    Ok(args[1])
+    let size = expect_int(&args[1])?;
+    Ok(super::stubs::set_window_new_pixel_value(
+        &args[0],
+        size,
+        args.get(2).is_some_and(Value::is_truthy),
+    ))
 }
 
 pub(crate) fn builtin_set_window_new_total(args: Vec<Value>) -> EvalResult {
     expect_range_args("set-window-new-total", &args, 2, 3)?;
     expect_window_valid_or_nil(&args[0])?;
-    let _ = expect_fixnum(&args[1])?;
-    Ok(args[1])
+    let size = expect_fixnum(&args[1])?;
+    Ok(super::stubs::set_window_new_total_value(
+        &args[0],
+        size,
+        args.get(2).is_some_and(Value::is_truthy),
+    ))
 }
 
 pub(crate) fn builtin_sort_charsets(args: Vec<Value>) -> EvalResult {

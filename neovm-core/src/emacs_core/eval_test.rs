@@ -1,4 +1,5 @@
 use super::*;
+use crate::emacs_core::load::{apply_runtime_startup_state, create_bootstrap_evaluator_cached};
 use crate::emacs_core::{format_eval_result, parse_forms};
 
 fn eval_one(src: &str) -> String {
@@ -20,6 +21,16 @@ fn eval_all(src: &str) -> Vec<String> {
 fn eval_all_with_subr(src: &str) -> Vec<String> {
     let mut ev = Evaluator::new();
     load_minimal_backquote_runtime(&mut ev);
+    let forms = parse_forms(src).expect("parse");
+    ev.eval_forms(&forms)
+        .iter()
+        .map(format_eval_result)
+        .collect()
+}
+
+fn bootstrap_eval_all(src: &str) -> Vec<String> {
+    let mut ev = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut ev).expect("runtime startup state");
     let forms = parse_forms(src).expect("parse");
     ev.eval_forms(&forms)
         .iter()
@@ -2374,9 +2385,9 @@ fn save_mark_and_excursion_restores_mark_and_mark_active() {
 
 #[test]
 fn save_window_excursion_restores_selected_window_on_success_and_error() {
-    let results = eval_all(
+    let results = bootstrap_eval_all(
         "(let ((w1 (selected-window))
-               (w2 (split-window (selected-window))))
+               (w2 (split-window)))
            (prog1
                (list
                 (save-window-excursion
@@ -2385,7 +2396,7 @@ fn save_window_excursion_restores_selected_window_on_success_and_error() {
                 (eq (selected-window) w1))
              (ignore-errors (delete-window w2))))
          (let ((w1 (selected-window))
-               (w2 (split-window (selected-window))))
+               (w2 (split-window)))
            (prog1
                (list
                 (condition-case err
@@ -2406,7 +2417,7 @@ fn save_window_excursion_restores_window_layout_after_split() {
         "(let ((before (length (window-list))))
            (list
             (save-window-excursion
-              (split-window (selected-window))
+              (split-window-internal (selected-window) nil nil nil)
               (length (window-list)))
             (length (window-list))
             before))",
@@ -2416,9 +2427,9 @@ fn save_window_excursion_restores_window_layout_after_split() {
 
 #[test]
 fn save_selected_window_restores_selected_window_on_success_and_error() {
-    let results = eval_all(
+    let results = bootstrap_eval_all(
         "(let ((w1 (selected-window))
-               (w2 (split-window (selected-window))))
+               (w2 (split-window)))
            (prog1
                (list
                 (save-selected-window
@@ -2427,7 +2438,7 @@ fn save_selected_window_restores_selected_window_on_success_and_error() {
                 (eq (selected-window) w1))
              (ignore-errors (delete-window w2))))
          (let ((w1 (selected-window))
-               (w2 (split-window (selected-window))))
+               (w2 (split-window)))
            (prog1
                (list
                 (condition-case err

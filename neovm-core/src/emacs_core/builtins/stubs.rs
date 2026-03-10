@@ -265,6 +265,9 @@ pub(crate) fn builtin_neomacs_core_backend(args: Vec<Value>) -> EvalResult {
 pub(super) fn reset_stubs_thread_locals() {
     SQLITE_NEXT_HANDLE_ID.with(|slot| *slot.borrow_mut() = 0);
     SQLITE_OPEN_HANDLES.with(|slot| slot.borrow_mut().clear());
+    WINDOW_NEW_NORMAL.with(|slot| slot.borrow_mut().clear());
+    WINDOW_NEW_PIXEL.with(|slot| slot.borrow_mut().clear());
+    WINDOW_NEW_TOTAL.with(|slot| slot.borrow_mut().clear());
     INOTIFY_NEXT_WATCH_ID.with(|slot| *slot.borrow_mut() = 0);
     INOTIFY_ACTIVE_WATCHES.with(|slot| slot.borrow_mut().clear());
 }
@@ -272,6 +275,91 @@ pub(super) fn reset_stubs_thread_locals() {
 thread_local! {
     static SQLITE_NEXT_HANDLE_ID: RefCell<i64> = RefCell::new(0);
     static SQLITE_OPEN_HANDLES: RefCell<Vec<i64>> = RefCell::new(Vec::new());
+    static WINDOW_NEW_NORMAL: RefCell<HashMap<u64, Value>> = RefCell::new(HashMap::new());
+    static WINDOW_NEW_PIXEL: RefCell<HashMap<u64, i64>> = RefCell::new(HashMap::new());
+    static WINDOW_NEW_TOTAL: RefCell<HashMap<u64, i64>> = RefCell::new(HashMap::new());
+}
+
+fn window_state_id(value: &Value) -> Option<u64> {
+    match value {
+        Value::Window(id) => Some(*id),
+        Value::Int(id) if *id >= 0 => Some(*id as u64),
+        _ => None,
+    }
+}
+
+pub(super) fn window_new_normal_value(window: Option<&Value>) -> Value {
+    let Some(id) = window.and_then(window_state_id) else {
+        return Value::Nil;
+    };
+    WINDOW_NEW_NORMAL
+        .with(|slot| slot.borrow().get(&id).copied())
+        .unwrap_or(Value::Nil)
+}
+
+pub(super) fn set_window_new_normal_value(window: &Value, value: Value) -> Value {
+    if let Some(id) = window_state_id(window) {
+        WINDOW_NEW_NORMAL.with(|slot| {
+            slot.borrow_mut().insert(id, value);
+        });
+    }
+    value
+}
+
+pub(super) fn window_new_pixel_value(window: Option<&Value>) -> Value {
+    let Some(id) = window.and_then(window_state_id) else {
+        return Value::Int(0);
+    };
+    Value::Int(
+        WINDOW_NEW_PIXEL
+            .with(|slot| slot.borrow().get(&id).copied())
+            .unwrap_or(0),
+    )
+}
+
+pub(super) fn set_window_new_pixel_value(window: &Value, size: i64, add: bool) -> Value {
+    let Some(id) = window_state_id(window) else {
+        return Value::Int(size);
+    };
+    let stored = WINDOW_NEW_PIXEL.with(|slot| {
+        let mut state = slot.borrow_mut();
+        let entry = state.entry(id).or_insert(0);
+        if add {
+            *entry += size;
+        } else {
+            *entry = size;
+        }
+        *entry
+    });
+    Value::Int(stored)
+}
+
+pub(super) fn window_new_total_value(window: Option<&Value>) -> Value {
+    let Some(id) = window.and_then(window_state_id) else {
+        return Value::Int(0);
+    };
+    Value::Int(
+        WINDOW_NEW_TOTAL
+            .with(|slot| slot.borrow().get(&id).copied())
+            .unwrap_or(0),
+    )
+}
+
+pub(super) fn set_window_new_total_value(window: &Value, size: i64, add: bool) -> Value {
+    let Some(id) = window_state_id(window) else {
+        return Value::Int(size);
+    };
+    let stored = WINDOW_NEW_TOTAL.with(|slot| {
+        let mut state = slot.borrow_mut();
+        let entry = state.entry(id).or_insert(0);
+        if add {
+            *entry += size;
+        } else {
+            *entry = size;
+        }
+        *entry
+    });
+    Value::Int(stored)
 }
 
 fn sqlite_handle_id(value: &Value) -> Option<i64> {
@@ -1593,7 +1681,7 @@ pub(crate) fn builtin_window_new_normal(args: Vec<Value>) -> EvalResult {
     if let Some(window) = args.first() {
         expect_window_valid_or_nil(window)?;
     }
-    Ok(Value::Int(0))
+    Ok(window_new_normal_value(args.first()))
 }
 
 pub(crate) fn builtin_window_new_pixel(args: Vec<Value>) -> EvalResult {
@@ -1601,7 +1689,7 @@ pub(crate) fn builtin_window_new_pixel(args: Vec<Value>) -> EvalResult {
     if let Some(window) = args.first() {
         expect_window_valid_or_nil(window)?;
     }
-    Ok(Value::Int(0))
+    Ok(window_new_pixel_value(args.first()))
 }
 
 pub(crate) fn builtin_window_new_total(args: Vec<Value>) -> EvalResult {
@@ -1609,7 +1697,7 @@ pub(crate) fn builtin_window_new_total(args: Vec<Value>) -> EvalResult {
     if let Some(window) = args.first() {
         expect_window_valid_or_nil(window)?;
     }
-    Ok(Value::Int(0))
+    Ok(window_new_total_value(args.first()))
 }
 
 fn compatibility_window_sibling_placeholder(window: Option<&Value>, next: bool) -> Value {

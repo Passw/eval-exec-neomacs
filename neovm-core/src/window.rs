@@ -601,6 +601,7 @@ impl FrameManager {
         direction: SplitDirection,
         new_buffer_id: BufferId,
     ) -> Option<WindowId> {
+        let internal_id = self.alloc_window_id();
         let new_id = self.alloc_window_id();
         let frame = self.frames.get_mut(&frame_id)?;
 
@@ -608,6 +609,7 @@ impl FrameManager {
             &mut frame.root_window,
             window_id,
             direction,
+            internal_id,
             new_id,
             new_buffer_id,
         )?;
@@ -868,6 +870,7 @@ fn split_window_in_tree(
     tree: &mut Window,
     target: WindowId,
     direction: SplitDirection,
+    internal_id: WindowId,
     new_id: WindowId,
     new_buffer_id: BufferId,
 ) -> Option<()> {
@@ -909,7 +912,7 @@ fn split_window_in_tree(
             let new_leaf = Window::new_leaf(new_id, new_buffer_id, right_bounds);
 
             *tree = Window::Internal {
-                id: WindowId(target.0 + 10000), // synthetic internal ID
+                id: internal_id,
                 direction,
                 children: vec![old_leaf, new_leaf],
                 bounds: old_bounds,
@@ -922,7 +925,9 @@ fn split_window_in_tree(
     // Recurse into children.
     if let Window::Internal { children, .. } = tree {
         for child in children {
-            if split_window_in_tree(child, target, direction, new_id, new_buffer_id).is_some() {
+            if split_window_in_tree(child, target, direction, internal_id, new_id, new_buffer_id)
+                .is_some()
+            {
                 return Some(());
             }
         }

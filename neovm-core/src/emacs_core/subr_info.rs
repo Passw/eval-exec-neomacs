@@ -726,7 +726,7 @@ fn subr_arity_value(name: &str) -> Value {
         "set-buffer-major-mode" => arity_cons(1, Some(1)),
         "set-buffer-multibyte" => arity_cons(1, Some(1)),
         "setplist" => arity_cons(2, Some(2)),
-        "split-window-internal" => arity_cons(4, Some(4)),
+        "split-window-internal" => arity_cons(4, Some(5)),
         "suspend-emacs" => arity_cons(0, Some(1)),
         "vertical-motion" => arity_cons(1, Some(3)),
         "x-begin-drag" => arity_cons(1, Some(6)),

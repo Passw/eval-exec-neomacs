@@ -692,6 +692,20 @@ fn bootstrap_runtime_loads_gnu_subr_helpers() {
 }
 
 #[test]
+fn bootstrap_runtime_loads_gnu_window_split_entry_point() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    let forms = parse_forms(
+        "(list (fboundp 'split-window)
+               (let ((w (split-window)))
+                 (list (window-live-p w)
+                       (length (window-list)))))",
+    )
+    .expect("parse");
+    let rendered = format_eval_result(&eval.eval_expr(&forms[0]));
+    assert_eq!(rendered, "OK (t (t 2))");
+}
+
+#[test]
 fn bootstrap_runtime_cl_reduce_entry_point_works() {
     let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
     apply_runtime_startup_state(&mut eval).expect("runtime startup state");

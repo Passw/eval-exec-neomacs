@@ -1069,7 +1069,7 @@ fn subr_arity_command_read_primitives_match_oracle() {
     assert_subr_arity("set-buffer-major-mode", 1, Some(1));
     assert_subr_arity("set-buffer-multibyte", 1, Some(1));
     assert_subr_arity("setplist", 2, Some(2));
-    assert_subr_arity("split-window-internal", 4, Some(4));
+    assert_subr_arity("split-window-internal", 4, Some(5));
     assert_subr_arity("suspend-emacs", 0, Some(1));
     assert_subr_arity("vertical-motion", 1, Some(3));
     assert_subr_arity("x-begin-drag", 1, Some(6));
