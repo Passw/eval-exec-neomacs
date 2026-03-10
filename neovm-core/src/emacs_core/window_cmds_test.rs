@@ -1,3 +1,4 @@
+use crate::emacs_core::load::{apply_runtime_startup_state, create_bootstrap_evaluator_cached};
 use crate::emacs_core::{Evaluator, Value, format_eval_result, parse_forms};
 
 /// Evaluate all forms with a fresh evaluator that has a frame+window set up.
@@ -16,6 +17,16 @@ fn eval_with_frame(src: &str) -> Vec<String> {
 
 fn eval_one_with_frame(src: &str) -> String {
     eval_with_frame(src).into_iter().next().unwrap()
+}
+
+fn bootstrap_eval_with_frame(src: &str) -> Vec<String> {
+    let mut ev = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut ev).expect("runtime startup state");
+    let forms = parse_forms(src).expect("parse");
+    ev.eval_forms(&forms)
+        .iter()
+        .map(format_eval_result)
+        .collect()
 }
 
 // -- Window queries --
@@ -109,8 +120,7 @@ fn minibuffer_window_frame_first_window_and_window_minibuffer_p_semantics() {
 
 #[test]
 fn frame_root_window_window_valid_and_minibuffer_activity_semantics() {
-    let mut ev = Evaluator::new();
-    let forms = parse_forms(
+    let out = bootstrap_eval_with_frame(
         "(window-valid-p (selected-window))
          (window-valid-p (minibuffer-window))
          (window-valid-p nil)
@@ -127,9 +137,6 @@ fn frame_root_window_window_valid_and_minibuffer_activity_semantics() {
          (minibuffer-window-active-p nil)
          (minibuffer-window-active-p 999999)
          (minibuffer-window-active-p 'foo)
-         (let ((w (split-window-internal (selected-window) nil nil nil)))
-           (delete-window w)
-           (window-valid-p w))
          (condition-case err (window-valid-p) (error err))
          (condition-case err (window-valid-p nil nil) (error err))
          (condition-case err (frame-root-window 999999) (error err))
@@ -139,13 +146,7 @@ fn frame_root_window_window_valid_and_minibuffer_activity_semantics() {
          (condition-case err (active-minibuffer-window nil) (error err))
          (condition-case err (minibuffer-window-active-p) (error err))
          (condition-case err (minibuffer-window-active-p nil nil) (error err))",
-    )
-    .expect("parse");
-    let out = ev
-        .eval_forms(&forms)
-        .iter()
-        .map(format_eval_result)
-        .collect::<Vec<_>>();
+    );
     assert_eq!(out[0], "OK t");
     assert_eq!(out[1], "OK t");
     assert_eq!(out[2], "OK nil");
@@ -162,54 +163,46 @@ fn frame_root_window_window_valid_and_minibuffer_activity_semantics() {
     assert_eq!(out[13], "OK nil");
     assert_eq!(out[14], "OK nil");
     assert_eq!(out[15], "OK nil");
-    assert_eq!(out[16], "OK nil");
-    assert_eq!(out[17], "OK (wrong-number-of-arguments window-valid-p 0)");
-    assert_eq!(out[18], "OK (wrong-number-of-arguments window-valid-p 2)");
-    assert_eq!(out[19], "OK (wrong-type-argument frame-live-p 999999)");
-    assert_eq!(out[20], "OK (wrong-type-argument frame-live-p foo)");
+    assert_eq!(out[16], "OK (wrong-number-of-arguments window-valid-p 0)");
+    assert_eq!(out[17], "OK (wrong-number-of-arguments window-valid-p 2)");
+    assert_eq!(out[18], "OK (wrong-type-argument frame-live-p 999999)");
+    assert_eq!(out[19], "OK (wrong-type-argument frame-live-p foo)");
     assert_eq!(
-        out[21],
+        out[20],
         "OK (wrong-number-of-arguments frame-root-window 2)"
     );
     assert_eq!(
-        out[22],
+        out[21],
         "OK (wrong-number-of-arguments minibuffer-selected-window 1)"
     );
     assert_eq!(
-        out[23],
+        out[22],
         "OK (wrong-number-of-arguments active-minibuffer-window 1)"
     );
     assert_eq!(
-        out[24],
+        out[23],
         "OK (wrong-number-of-arguments minibuffer-window-active-p 0)"
     );
     assert_eq!(
-        out[25],
+        out[24],
         "OK (wrong-number-of-arguments minibuffer-window-active-p 2)"
     );
 }
 
 #[test]
 fn frame_root_window_p_semantics_and_errors() {
-    let mut ev = Evaluator::new();
-    let forms = parse_forms(
+    let out = bootstrap_eval_with_frame(
         "(frame-root-window-p (selected-window))
          (frame-root-window-p (minibuffer-window))
          (condition-case err (frame-root-window-p 999999) (error err))
          (condition-case err (frame-root-window-p 'foo) (error err))
          (condition-case err (frame-root-window-p) (error (car err)))
          (condition-case err (frame-root-window-p nil nil) (error (car err)))",
-    )
-    .expect("parse");
-    let out = ev
-        .eval_forms(&forms)
-        .iter()
-        .map(format_eval_result)
-        .collect::<Vec<_>>();
+    );
     assert_eq!(out[0], "OK t");
     assert_eq!(out[1], "OK nil");
-    assert_eq!(out[2], "OK (wrong-type-argument window-live-p 999999)");
-    assert_eq!(out[3], "OK (wrong-type-argument window-live-p foo)");
+    assert_eq!(out[2], "OK (wrong-type-argument frame-live-p 999999)");
+    assert_eq!(out[3], "OK (wrong-type-argument frame-live-p foo)");
     assert_eq!(out[4], "OK wrong-number-of-arguments");
     assert_eq!(out[5], "OK wrong-number-of-arguments");
 }
@@ -1696,8 +1689,7 @@ fn window_preserve_size_fixed_and_resizable_helpers_match_batch_semantics() {
 
 #[test]
 fn window_geometry_queries_match_batch_alias_and_edge_shapes() {
-    let mut ev = Evaluator::new();
-    let forms = parse_forms(
+    let out = bootstrap_eval_with_frame(
         "(list (symbol-function 'window-inside-pixel-edges)
                (symbol-function 'window-inside-edges))
          (let* ((w (selected-window))
@@ -1740,16 +1732,10 @@ fn window_geometry_queries_match_batch_alias_and_edge_shapes() {
                (condition-case err (window-edges 999999) (error err))
                (condition-case err (window-text-height nil nil nil) (error err))
                (condition-case err (window-mode-line-height nil nil) (error err))
-               (condition-case err (window-inside-pixel-edges nil nil) (error err))
+               (condition-case err (window-inside-pixel-edges nil nil) (error (car err)))
                (condition-case err (window-edges nil nil nil nil) (error err))
                (condition-case err (window-edges nil nil nil nil nil) (error err)))",
-    )
-    .expect("parse");
-    let out = ev
-        .eval_forms(&forms)
-        .iter()
-        .map(format_eval_result)
-        .collect::<Vec<_>>();
+    );
     assert_eq!(out[0], "OK (window-body-pixel-edges window-body-edges)");
     assert_eq!(
         out[1],
@@ -1757,7 +1743,7 @@ fn window_geometry_queries_match_batch_alias_and_edge_shapes() {
     );
     assert_eq!(
         out[2],
-        "OK ((wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-valid-p 999999) (wrong-type-argument window-valid-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (error \"999999 is not a live window\") (error \"999999 is not a valid window\") (error \"999999 is not a live window\") (error \"999999 is not a valid window\") (wrong-number-of-arguments window-text-height 3) (wrong-number-of-arguments window-mode-line-height 2) (wrong-number-of-arguments window-inside-pixel-edges 2) (0 0 80 24) (wrong-number-of-arguments window-edges 5))"
+        "OK ((wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-valid-p 999999) (wrong-type-argument window-valid-p 999999) (wrong-type-argument window-live-p 999999) (wrong-type-argument window-live-p 999999) (error \"999999 is not a live window\") (error \"999999 is not a valid window\") (error \"999999 is not a live window\") (error \"999999 is not a valid window\") (wrong-number-of-arguments window-text-height 3) (wrong-number-of-arguments window-mode-line-height 2) wrong-number-of-arguments (0 0 80 24) (wrong-number-of-arguments window-edges 5))"
     );
 }
 

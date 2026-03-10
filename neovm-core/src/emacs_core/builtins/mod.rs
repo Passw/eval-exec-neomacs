@@ -1824,9 +1824,6 @@ pub(crate) fn dispatch_builtin(
         "minibuffer-selected-window" => {
             return Some(super::window_cmds::builtin_minibuffer_selected_window(args));
         }
-        "minibuffer-window-active-p" => {
-            return Some(super::window_cmds::builtin_minibuffer_window_active_p(args));
-        }
         "window-parameter" => {
             return Some(super::window_cmds::builtin_window_parameter(eval, args));
         }
@@ -1880,6 +1877,12 @@ pub(crate) fn dispatch_builtin(
             return Some(super::window_cmds::builtin_window_left_column(eval, args));
         }
         "window-top-line" => return Some(super::window_cmds::builtin_window_top_line(eval, args)),
+        "window-pixel-left" => {
+            return Some(super::window_cmds::builtin_window_pixel_left(eval, args));
+        }
+        "window-pixel-top" => {
+            return Some(super::window_cmds::builtin_window_pixel_top(eval, args));
+        }
         "window-hscroll" => return Some(super::window_cmds::builtin_window_hscroll(eval, args)),
         "window-vscroll" => return Some(super::window_cmds::builtin_window_vscroll(eval, args)),
         "window-margins" => return Some(super::window_cmds::builtin_window_margins(eval, args)),
@@ -1914,17 +1917,6 @@ pub(crate) fn dispatch_builtin(
         }
         "window-text-width" => {
             return Some(super::window_cmds::builtin_window_text_width(eval, args));
-        }
-        "window-body-pixel-edges" => {
-            return Some(super::window_cmds::builtin_window_body_pixel_edges(
-                eval, args,
-            ));
-        }
-        "window-body-edges" => {
-            return Some(super::window_cmds::builtin_window_body_edges(eval, args));
-        }
-        "window-pixel-edges" => {
-            return Some(super::window_cmds::builtin_window_pixel_edges(eval, args));
         }
         "window-edges" => return Some(super::window_cmds::builtin_window_edges(eval, args)),
         "window-total-height" => {
@@ -2139,9 +2131,6 @@ pub(crate) fn dispatch_builtin(
         }
         "frame-root-window" => {
             return Some(super::window_cmds::builtin_frame_root_window(eval, args));
-        }
-        "frame-root-window-p" => {
-            return Some(super::window_cmds::builtin_frame_root_window_p(eval, args));
         }
         "windowp" => return Some(super::window_cmds::builtin_windowp(eval, args)),
         "window-valid-p" => return Some(super::window_cmds::builtin_window_valid_p(eval, args)),
@@ -4170,7 +4159,8 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "one-window-p"
         | "old-selected-window"
         | "frame-old-selected-window"
-        | "frame-root-window-p"
+        | "window-pixel-left"
+        | "window-pixel-top"
         | "set-frame-selected-window"
         | "window-system"
         | "frame-edges"

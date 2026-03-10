@@ -894,25 +894,6 @@ pub(crate) fn builtin_frame_root_window(
     Ok(window_value(root))
 }
 
-/// `(frame-root-window-p WINDOW)` -> t if WINDOW is the root window of its frame.
-pub(crate) fn builtin_frame_root_window_p(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_args("frame-root-window-p", &args, 1)?;
-    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-live-p")?;
-    let frame = eval
-        .frames
-        .get(fid)
-        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
-    let root = frame
-        .window_list()
-        .first()
-        .copied()
-        .unwrap_or(frame.selected_window);
-    Ok(Value::bool(root == wid))
-}
-
 /// `(minibuffer-window &optional FRAME)` -> minibuffer window of FRAME.
 pub(crate) fn builtin_minibuffer_window(
     eval: &mut super::eval::Evaluator,
@@ -953,12 +934,6 @@ pub(crate) fn builtin_minibuffer_selected_window(args: Vec<Value>) -> EvalResult
 /// `(active-minibuffer-window)` -> nil in batch.
 pub(crate) fn builtin_active_minibuffer_window(args: Vec<Value>) -> EvalResult {
     expect_args("active-minibuffer-window", &args, 0)?;
-    Ok(Value::Nil)
-}
-
-/// `(minibuffer-window-active-p WINDOW)` -> nil in batch.
-pub(crate) fn builtin_minibuffer_window_active_p(args: Vec<Value>) -> EvalResult {
-    expect_args("minibuffer-window-active-p", &args, 1)?;
     Ok(Value::Nil)
 }
 
@@ -1629,6 +1604,42 @@ pub(crate) fn builtin_window_top_line(
     Ok(Value::Int(top))
 }
 
+/// `(window-pixel-left &optional WINDOW)` -> integer.
+pub(crate) fn builtin_window_pixel_left(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-pixel-left", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    let cw = eval.frames.get(fid).map(|f| f.char_width).unwrap_or(8.0);
+    let left = if cw > 0.0 {
+        (w.bounds().x / cw) as i64
+    } else {
+        0
+    };
+    Ok(Value::Int(left))
+}
+
+/// `(window-pixel-top &optional WINDOW)` -> integer.
+pub(crate) fn builtin_window_pixel_top(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-pixel-top", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    let ch = eval.frames.get(fid).map(|f| f.char_height).unwrap_or(16.0);
+    let top = if ch > 0.0 {
+        (w.bounds().y / ch) as i64
+    } else {
+        0
+    };
+    Ok(Value::Int(top))
+}
+
 /// `(window-hscroll &optional WINDOW)` -> integer.
 pub(crate) fn builtin_window_hscroll(
     eval: &mut super::eval::Evaluator,
@@ -2041,67 +2052,6 @@ pub(crate) fn builtin_window_text_width(
     Ok(Value::Int(window_width_cols(w, cw)))
 }
 
-/// `(window-body-pixel-edges &optional WINDOW)` -> (LEFT TOP RIGHT BOTTOM).
-pub(crate) fn builtin_window_body_pixel_edges(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_max_args("window-body-pixel-edges", &args, 1)?;
-    let _ = ensure_selected_frame_id(eval);
-    let (fid, wid) = resolve_window_id_or_window_error(eval, args.first(), true)?;
-    let w = get_leaf(&eval.frames, fid, wid)?;
-    let frame = eval
-        .frames
-        .get(fid)
-        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
-    let (left, top, right, bottom) = window_body_edges_cols_lines(
-        &eval.frames,
-        fid,
-        wid,
-        w,
-        frame.char_width,
-        frame.char_height,
-    );
-    Ok(Value::list(vec![
-        Value::Int(left),
-        Value::Int(top),
-        Value::Int(right),
-        Value::Int(bottom),
-    ]))
-}
-
-/// `(window-body-edges &optional WINDOW)` -> (LEFT TOP RIGHT BOTTOM).
-pub(crate) fn builtin_window_body_edges(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_max_args("window-body-edges", &args, 1)?;
-    builtin_window_body_pixel_edges(eval, args)
-}
-
-/// `(window-pixel-edges &optional WINDOW)` -> (LEFT TOP RIGHT BOTTOM).
-pub(crate) fn builtin_window_pixel_edges(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_max_args("window-pixel-edges", &args, 1)?;
-    let _ = ensure_selected_frame_id(eval);
-    let (fid, wid) = resolve_window_id_or_window_error(eval, args.first(), false)?;
-    let w = get_leaf(&eval.frames, fid, wid)?;
-    let frame = eval
-        .frames
-        .get(fid)
-        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
-    let (left, top, right, bottom) =
-        window_edges_cols_lines(w, frame.char_width, frame.char_height);
-    Ok(Value::list(vec![
-        Value::Int(left),
-        Value::Int(top),
-        Value::Int(right),
-        Value::Int(bottom),
-    ]))
-}
-
 /// `(window-edges &optional WINDOW BODY ABSOLUTE)`.
 ///
 /// GNU Emacs currently reports max arity 4; trailing args are accepted.
@@ -2112,10 +2062,31 @@ pub(crate) fn builtin_window_edges(
     expect_max_args("window-edges", &args, 4)?;
     let _ = ensure_selected_frame_id(eval);
     let body = args.get(1).is_some_and(Value::is_truthy);
-    if body {
-        return builtin_window_body_edges(eval, vec![args.first().cloned().unwrap_or(Value::Nil)]);
-    }
-    builtin_window_pixel_edges(eval, vec![args.first().cloned().unwrap_or(Value::Nil)])
+    let live_only = body;
+    let (fid, wid) = resolve_window_id_or_window_error(eval, args.first(), live_only)?;
+    let w = get_leaf(&eval.frames, fid, wid)?;
+    let frame = eval
+        .frames
+        .get(fid)
+        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+    let (left, top, right, bottom) = if body {
+        window_body_edges_cols_lines(
+            &eval.frames,
+            fid,
+            wid,
+            w,
+            frame.char_width,
+            frame.char_height,
+        )
+    } else {
+        window_edges_cols_lines(w, frame.char_width, frame.char_height)
+    };
+    Ok(Value::list(vec![
+        Value::Int(left),
+        Value::Int(top),
+        Value::Int(right),
+        Value::Int(bottom),
+    ]))
 }
 
 /// `(window-total-height &optional WINDOW ROUND)` -> integer.
