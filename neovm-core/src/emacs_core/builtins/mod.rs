@@ -1937,11 +1937,6 @@ pub(crate) fn dispatch_builtin(
         "get-buffer-window" => {
             return Some(super::window_cmds::builtin_get_buffer_window(eval, args));
         }
-        "get-buffer-window-list" => {
-            return Some(super::window_cmds::builtin_get_buffer_window_list(
-                eval, args,
-            ));
-        }
         "window-dedicated-p" => {
             return Some(super::window_cmds::builtin_window_dedicated_p(eval, args));
         }

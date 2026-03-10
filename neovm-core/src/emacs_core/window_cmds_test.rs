@@ -586,54 +586,34 @@ fn get_buffer_window_finds_selected_window_for_current_buffer() {
 
 #[test]
 fn get_buffer_window_list_returns_matching_windows() {
-    let result = eval_one_with_frame("(length (get-buffer-window-list (window-buffer)))");
-    assert_eq!(result, "OK 1");
+    let result = bootstrap_eval_with_frame("(length (get-buffer-window-list (window-buffer)))");
+    assert_eq!(result[0], "OK 1");
 }
 
 #[test]
 fn get_buffer_window_and_list_match_optional_and_missing_buffer_semantics() {
-    let mut ev = Evaluator::new();
-    let buf = ev.buffers.create_buffer("*scratch*");
-    ev.frames.create_frame("F1", 800, 600, buf);
-    let live = Value::Buffer(ev.buffers.create_buffer("gbwl-live"));
-    let dead = Value::Buffer(ev.buffers.create_buffer("gbwl-dead"));
-    ev.set_variable("vm-gbwl-live", live);
-    ev.set_variable("vm-gbwl-dead", dead);
-    let forms = parse_forms(
-        "(condition-case err (get-buffer-window) (error err))
-         (condition-case err (get-buffer-window nil) (error err))
-         (condition-case err (get-buffer-window \"missing\") (error err))
-         (windowp (get-buffer-window \"*scratch*\"))
-         (condition-case err (get-buffer-window-list) (error err))
-         (condition-case err (get-buffer-window-list nil) (error err))
-         (length (get-buffer-window-list \"*scratch*\"))
-         (condition-case err (get-buffer-window-list \"missing\") (error err))
-         (condition-case err (get-buffer-window-list 1) (error err))
-         (prog1 (condition-case err (get-buffer-window-list vm-gbwl-live) (error err))
-           (kill-buffer vm-gbwl-live))
-         (progn
-           (kill-buffer vm-gbwl-dead)
-           (condition-case err (get-buffer-window-list vm-gbwl-dead) (error err)))",
-    )
-    .expect("parse");
-    let results = ev
-        .eval_forms(&forms)
-        .iter()
-        .map(format_eval_result)
-        .collect::<Vec<_>>();
-    assert_eq!(results[0], "OK nil");
-    assert_eq!(results[1], "OK nil");
-    assert_eq!(results[2], "OK nil");
-    assert_eq!(results[3], "OK t");
-    assert_eq!(results[4], "OK nil");
-    assert_eq!(results[5], "OK nil");
-    assert_eq!(results[6], "OK 1");
-    assert_eq!(results[7], "OK (error \"No such live buffer missing\")");
-    assert_eq!(results[8], "OK (error \"No such buffer 1\")");
-    assert_eq!(results[9], "OK nil");
+    let results = bootstrap_eval_with_frame(
+        "(let ((vm-gbwl-live (generate-new-buffer \"gbwl-live\"))
+               (vm-gbwl-dead (generate-new-buffer \"gbwl-dead\")))
+           (list
+            (condition-case err (get-buffer-window) (error err))
+            (condition-case err (get-buffer-window nil) (error err))
+            (condition-case err (get-buffer-window \"missing\") (error err))
+            (windowp (get-buffer-window \"*scratch*\"))
+            (length (get-buffer-window-list))
+            (length (get-buffer-window-list nil))
+            (length (get-buffer-window-list \"*scratch*\"))
+            (condition-case err (get-buffer-window-list \"missing\") (error err))
+            (condition-case err (get-buffer-window-list 1) (error err))
+            (prog1 (condition-case err (get-buffer-window-list vm-gbwl-live) (error err))
+              (kill-buffer vm-gbwl-live))
+            (progn
+              (kill-buffer vm-gbwl-dead)
+              (condition-case err (get-buffer-window-list vm-gbwl-dead) (error err)))))",
+    );
     assert_eq!(
-        results[10],
-        "OK (error \"No such live buffer #<killed buffer>\")"
+        results[0],
+        "OK (nil nil nil t 1 1 1 (error \"No such live buffer missing\") (error \"No such buffer 1\") nil (error \"No such live buffer #<killed buffer>\"))"
     );
 }
 
