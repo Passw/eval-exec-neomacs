@@ -1619,8 +1619,7 @@ fn window_cursor_type_helpers_match_batch_defaults_and_set_get_semantics() {
 
 #[test]
 fn window_preserve_size_fixed_and_resizable_helpers_match_batch_semantics() {
-    let mut ev = Evaluator::new();
-    let forms = parse_forms(
+    let out = bootstrap_eval_with_frame(
         "(let ((w (selected-window)))
            (list (window-size-fixed-p w)
                  (window-size-fixed-p w t)
@@ -1669,13 +1668,7 @@ fn window_preserve_size_fixed_and_resizable_helpers_match_batch_semantics() {
                (condition-case err (window-size-fixed-p nil nil nil nil) (error err))
                (condition-case err (window-preserve-size nil nil nil nil) (error err))
                (condition-case err (window-resizable nil 1 nil nil nil nil) (error err)))",
-    )
-    .expect("parse");
-    let out = ev
-        .eval_forms(&forms)
-        .iter()
-        .map(format_eval_result)
-        .collect::<Vec<_>>();
+    );
     assert_eq!(
         out[0],
         "OK (nil nil (t nil t) t nil (t t t) t t nil nil (nil nil))"
@@ -1684,6 +1677,39 @@ fn window_preserve_size_fixed_and_resizable_helpers_match_batch_semantics() {
     assert_eq!(
         out[2],
         "OK (error error error wrong-type-argument (wrong-number-of-arguments window-size-fixed-p 4) (wrong-number-of-arguments window-preserve-size 4) (wrong-number-of-arguments window-resizable 6))"
+    );
+}
+
+#[test]
+fn window_tree_navigation_and_normal_size_match_gnu_runtime() {
+    let out = bootstrap_eval_with_frame(
+        "(let* ((left (selected-window))
+                (right (split-window nil nil 'right))
+                (bottom (split-window right nil 'below))
+                (root (frame-root-window))
+                (vparent (window-parent right)))
+           (list (window-valid-p root)
+                 (window-live-p root)
+                 (eq (window-parent left) root)
+                 (eq (window-next-sibling left) vparent)
+                 (eq (window-left-child root) left)
+                 (window-top-child root)
+                 (eq (window-parent right) vparent)
+                 (eq (window-parent bottom) vparent)
+                 (eq (window-top-child vparent) right)
+                 (window-left-child vparent)
+                 (eq (window-next-sibling right) bottom)
+                 (eq (window-prev-sibling bottom) right)
+                 (window-normal-size left)
+                 (window-normal-size left t)
+                 (window-normal-size right)
+                 (window-normal-size right t)
+                 (window-normal-size vparent)
+                 (window-normal-size vparent t)))",
+    );
+    assert_eq!(
+        out[0],
+        "OK (t nil t t t nil t t t nil t t 1.0 0.5 0.5 1.0 1.0 0.5)"
     );
 }
 

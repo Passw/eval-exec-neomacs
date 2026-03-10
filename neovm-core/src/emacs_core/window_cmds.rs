@@ -11,7 +11,10 @@ use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::{Value, list_to_vec, next_float_id, read_cons, with_heap};
 use crate::buffer::BufferId;
-use crate::window::{FrameId, FrameManager, SplitDirection, Window, WindowId};
+use crate::window::{
+    FrameId, FrameManager, SplitDirection, Window, WindowId, window_first_child_id,
+    window_next_sibling_id, window_parent_id, window_prev_sibling_id,
+};
 use std::collections::HashSet;
 
 // ---------------------------------------------------------------------------
@@ -186,22 +189,6 @@ fn expect_number_or_marker(value: &Value) -> Result<f64, Flow> {
     }
 }
 
-/// Convert a numeric result into Lisp integer/float shape.
-fn numeric_value(value: f64) -> Value {
-    if value.abs() < f64::EPSILON {
-        return Value::Int(0);
-    }
-    if value.fract().abs() < f64::EPSILON
-        && value.is_finite()
-        && value >= i64::MIN as f64
-        && value <= i64::MAX as f64
-    {
-        Value::Int(value as i64)
-    } else {
-        Value::Float(value, next_float_id())
-    }
-}
-
 /// Parse a window margin argument (`nil` or non-negative integer).
 fn expect_margin_width(value: &Value) -> Result<usize, Flow> {
     const MAX_MARGIN: i64 = 2_147_483_647;
@@ -237,6 +224,17 @@ fn window_value(wid: WindowId) -> Value {
     Value::Window(wid.0)
 }
 
+fn resolve_window_frame_id_for_pred(
+    frames: &FrameManager,
+    wid: WindowId,
+    pred: &str,
+) -> Option<FrameId> {
+    match pred {
+        "window-valid-p" => frames.find_valid_window_frame_id(wid),
+        _ => frames.find_window_frame_id(wid),
+    }
+}
+
 fn window_id_from_designator(value: &Value) -> Option<WindowId> {
     match value {
         Value::Window(id) => Some(WindowId(*id)),
@@ -270,7 +268,7 @@ fn resolve_window_id_with_pred(
                     vec![Value::symbol(pred), *val],
                 ));
             };
-            if let Some(frame_id) = eval.frames.find_window_frame_id(wid) {
+            if let Some(frame_id) = resolve_window_frame_id_for_pred(&eval.frames, wid, pred) {
                 Ok((frame_id, wid))
             } else {
                 Err(signal(
@@ -373,7 +371,12 @@ fn resolve_window_id_or_window_error(
                     ))],
                 ));
             };
-            if let Some(fid) = eval.frames.find_window_frame_id(wid) {
+            let frame_id = if live_only {
+                eval.frames.find_window_frame_id(wid)
+            } else {
+                eval.frames.find_valid_window_frame_id(wid)
+            };
+            if let Some(fid) = frame_id {
                 Ok((fid, wid))
             } else {
                 let window_kind = if live_only { "live" } else { "valid" };
@@ -457,7 +460,7 @@ fn resolve_frame_or_window_frame_id(
                 return Ok(fid);
             }
             let wid = WindowId(*n as u64);
-            if let Some(fid) = eval.frames.find_window_frame_id(wid) {
+            if let Some(fid) = eval.frames.find_valid_window_frame_id(wid) {
                 return Ok(fid);
             }
             Err(signal(
@@ -467,7 +470,7 @@ fn resolve_frame_or_window_frame_id(
         }
         Some(Value::Window(id)) => {
             let wid = WindowId(*id);
-            if let Some(fid) = eval.frames.find_window_frame_id(wid) {
+            if let Some(fid) = eval.frames.find_valid_window_frame_id(wid) {
                 return Ok(fid);
             }
             Err(signal(
@@ -571,128 +574,6 @@ fn window_body_height_lines(frames: &FrameManager, fid: FrameId, wid: WindowId, 
     } else {
         lines.saturating_sub(1)
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ResizeAxis {
-    Vertical,
-    Horizontal,
-}
-
-fn resize_axis(horizontal: bool) -> ResizeAxis {
-    if horizontal {
-        ResizeAxis::Horizontal
-    } else {
-        ResizeAxis::Vertical
-    }
-}
-
-fn axis_size_units(window: &Window, axis: ResizeAxis, char_width: f32, char_height: f32) -> i64 {
-    match axis {
-        ResizeAxis::Vertical => window_height_lines(window, char_height),
-        ResizeAxis::Horizontal => window_width_cols(window, char_width),
-    }
-}
-
-fn split_matches_axis(direction: SplitDirection, axis: ResizeAxis) -> bool {
-    matches!(
-        (direction, axis),
-        (SplitDirection::Vertical, ResizeAxis::Vertical)
-            | (SplitDirection::Horizontal, ResizeAxis::Horizontal)
-    )
-}
-
-/// Find resize capacities for TARGET in NODE.
-///
-/// Returns `(target_size, sibling_expand_capacity)` where expand capacity is
-/// derived from the nearest ancestor split matching AXIS.
-fn find_resize_caps(
-    node: &Window,
-    target: WindowId,
-    axis: ResizeAxis,
-    min_size: i64,
-    char_width: f32,
-    char_height: f32,
-) -> Option<(i64, Option<i64>)> {
-    match node {
-        Window::Leaf { id, .. } => {
-            if *id == target {
-                Some((axis_size_units(node, axis, char_width, char_height), None))
-            } else {
-                None
-            }
-        }
-        Window::Internal {
-            direction,
-            children,
-            ..
-        } => {
-            for (idx, child) in children.iter().enumerate() {
-                if let Some((target_size, expand_capacity)) =
-                    find_resize_caps(child, target, axis, min_size, char_width, char_height)
-                {
-                    if expand_capacity.is_some() {
-                        return Some((target_size, expand_capacity));
-                    }
-                    if split_matches_axis(*direction, axis) {
-                        let capacity = children
-                            .iter()
-                            .enumerate()
-                            .filter(|(sibling_idx, _)| *sibling_idx != idx)
-                            .map(|(_, sibling)| {
-                                let sibling_size =
-                                    axis_size_units(sibling, axis, char_width, char_height);
-                                (sibling_size - min_size).max(0)
-                            })
-                            .sum::<i64>();
-                        return Some((target_size, Some(capacity)));
-                    }
-                    return Some((target_size, None));
-                }
-            }
-            None
-        }
-    }
-}
-
-fn window_preserved_size_key() -> Value {
-    Value::symbol("window-preserved-size")
-}
-
-fn decode_preserved_size(raw: &Value) -> Result<(Value, Value), Flow> {
-    if raw.is_nil() {
-        return Ok((Value::Nil, Value::Nil));
-    }
-    let items = list_to_vec(raw)
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), *raw]))?;
-    let width = items.get(1).cloned().unwrap_or(Value::Nil);
-    let height = items.get(2).cloned().unwrap_or(Value::Nil);
-    Ok((width, height))
-}
-
-fn preserved_size_components(frames: &FrameManager, wid: WindowId) -> Result<(Value, Value), Flow> {
-    let key = window_preserved_size_key();
-    match frames.window_parameter(wid, &key) {
-        Some(raw) => decode_preserved_size(&raw),
-        None => Ok((Value::Nil, Value::Nil)),
-    }
-}
-
-fn window_is_fixed_for_axis(
-    frames: &FrameManager,
-    wid: WindowId,
-    horizontal: bool,
-    ignore: bool,
-) -> Result<bool, Flow> {
-    if ignore {
-        return Ok(false);
-    }
-    let (width, height) = preserved_size_components(frames, wid)?;
-    Ok(if horizontal {
-        !width.is_nil()
-    } else {
-        !height.is_nil()
-    })
 }
 
 fn window_edges_cols_lines(w: &Window, char_width: f32, char_height: f32) -> (i64, i64, i64, i64) {
@@ -873,9 +754,6 @@ pub(crate) fn builtin_frame_first_window(
 }
 
 /// `(frame-root-window &optional FRAME-OR-WINDOW)` -> root window on frame.
-///
-/// NeoVM currently models leaf window IDs only; batch startup parity in our
-/// corpus expects root and first windows to coincide.
 pub(crate) fn builtin_frame_root_window(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -886,12 +764,7 @@ pub(crate) fn builtin_frame_root_window(
         .frames
         .get(fid)
         .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
-    let root = frame
-        .window_list()
-        .first()
-        .copied()
-        .unwrap_or(frame.selected_window);
-    Ok(window_value(root))
+    Ok(window_value(frame.root_window.id()))
 }
 
 /// `(minibuffer-window &optional FRAME)` -> minibuffer window of FRAME.
@@ -1035,112 +908,6 @@ pub(crate) fn builtin_set_window_cursor_type(
     Ok(cursor_type)
 }
 
-/// `(window-size-fixed-p &optional WINDOW HORIZONTAL IGNORE)` -> t/nil.
-pub(crate) fn builtin_window_size_fixed_p(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_max_args("window-size-fixed-p", &args, 3)?;
-    let _ = ensure_selected_frame_id(eval);
-    let (_fid, wid) = resolve_window_id_or_window_error(eval, args.first(), false)?;
-    let horizontal = args.get(1).is_some_and(Value::is_truthy);
-    let ignore = args.get(2).is_some_and(Value::is_truthy);
-    Ok(Value::bool(window_is_fixed_for_axis(
-        &eval.frames,
-        wid,
-        horizontal,
-        ignore,
-    )?))
-}
-
-/// `(window-preserve-size &optional WINDOW HORIZONTAL PRESERVE)` -> size tuple.
-pub(crate) fn builtin_window_preserve_size(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_max_args("window-preserve-size", &args, 3)?;
-    let _ = ensure_selected_frame_id(eval);
-    let (fid, wid) = resolve_window_id_or_window_error(eval, args.first(), true)?;
-
-    let horizontal = args.get(1).is_some_and(Value::is_truthy);
-    let preserve = args.get(2).is_some_and(Value::is_truthy);
-    let (mut width, mut height) = preserved_size_components(&eval.frames, wid)?;
-
-    let window = get_leaf(&eval.frames, fid, wid)?;
-    let buffer = Value::Buffer(window.buffer_id().unwrap_or(BufferId(0)));
-    let frame = eval
-        .frames
-        .get(fid)
-        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
-    let current_width = Value::Int(window_width_cols(window, frame.char_width));
-    let current_height = Value::Int(window_body_height_lines(&eval.frames, fid, wid, window));
-
-    if horizontal {
-        width = if preserve { current_width } else { Value::Nil };
-    } else {
-        height = if preserve { current_height } else { Value::Nil };
-    }
-    let preserved = Value::list(vec![buffer, width, height]);
-    eval.frames
-        .set_window_parameter(wid, window_preserved_size_key(), preserved);
-    Ok(preserved)
-}
-
-/// `(window-resizable WINDOW DELTA &optional HORIZONTAL IGNORE PIXELWISE)` -> number.
-pub(crate) fn builtin_window_resizable(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_min_args("window-resizable", &args, 2)?;
-    expect_max_args("window-resizable", &args, 5)?;
-    let _ = ensure_selected_frame_id(eval);
-
-    let (fid, wid) = resolve_window_id_or_window_error(eval, args.first(), false)?;
-    let delta = expect_number_or_marker(&args[1])?;
-    let horizontal = args.get(2).is_some_and(Value::is_truthy);
-    let ignore = args.get(3).is_some_and(Value::is_truthy);
-    let _pixelwise = args.get(4).is_some_and(Value::is_truthy);
-
-    if window_is_fixed_for_axis(&eval.frames, wid, horizontal, ignore)? {
-        return Ok(Value::Int(0));
-    }
-
-    let axis = resize_axis(horizontal);
-    let frame = eval
-        .frames
-        .get(fid)
-        .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
-
-    if frame.minibuffer_window == Some(wid) {
-        return Ok(Value::Int(0));
-    }
-
-    let min_size = match axis {
-        ResizeAxis::Vertical => 4,
-        ResizeAxis::Horizontal => 10,
-    };
-    let (target_size, expand_capacity) = find_resize_caps(
-        &frame.root_window,
-        wid,
-        axis,
-        min_size,
-        frame.char_width,
-        frame.char_height,
-    )
-    .unwrap_or((0, Some(0)));
-    let max_expand = expand_capacity.unwrap_or(0).max(0) as f64;
-    let max_shrink = (target_size - min_size).max(0) as f64;
-
-    let result = if delta > 0.0 {
-        delta.min(max_expand)
-    } else if delta < 0.0 {
-        delta.max(-max_shrink)
-    } else {
-        0.0
-    };
-    Ok(numeric_value(result))
-}
-
 /// `(window-parameter WINDOW PARAMETER)` -> window parameter or nil.
 pub(crate) fn builtin_window_parameter(
     eval: &mut super::eval::Evaluator,
@@ -1177,6 +944,124 @@ pub(crate) fn builtin_window_parameters(
     let _ = ensure_selected_frame_id(eval);
     let (_fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
     Ok(eval.frames.window_parameters_alist(wid))
+}
+
+/// `(window-parent &optional WINDOW)` -> parent window or nil.
+pub(crate) fn builtin_window_parent(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-parent", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
+    let Some(frame) = eval.frames.get(fid) else {
+        return Err(signal("error", vec![Value::string("Frame not found")]));
+    };
+    Ok(window_parent_id(frame, wid).map_or(Value::Nil, window_value))
+}
+
+/// `(window-top-child &optional WINDOW)` -> top child for vertical combinations.
+pub(crate) fn builtin_window_top_child(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-top-child", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
+    let Some(frame) = eval.frames.get(fid) else {
+        return Err(signal("error", vec![Value::string("Frame not found")]));
+    };
+    Ok(
+        window_first_child_id(frame, wid, SplitDirection::Vertical)
+            .map_or(Value::Nil, window_value),
+    )
+}
+
+/// `(window-left-child &optional WINDOW)` -> left child for horizontal combinations.
+pub(crate) fn builtin_window_left_child(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-left-child", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
+    let Some(frame) = eval.frames.get(fid) else {
+        return Err(signal("error", vec![Value::string("Frame not found")]));
+    };
+    Ok(
+        window_first_child_id(frame, wid, SplitDirection::Horizontal)
+            .map_or(Value::Nil, window_value),
+    )
+}
+
+/// `(window-next-sibling &optional WINDOW)` -> next sibling or nil.
+pub(crate) fn builtin_window_next_sibling(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-next-sibling", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
+    let Some(frame) = eval.frames.get(fid) else {
+        return Err(signal("error", vec![Value::string("Frame not found")]));
+    };
+    Ok(window_next_sibling_id(frame, wid).map_or(Value::Nil, window_value))
+}
+
+/// `(window-prev-sibling &optional WINDOW)` -> previous sibling or nil.
+pub(crate) fn builtin_window_prev_sibling(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-prev-sibling", &args, 1)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
+    let Some(frame) = eval.frames.get(fid) else {
+        return Err(signal("error", vec![Value::string("Frame not found")]));
+    };
+    Ok(window_prev_sibling_id(frame, wid).map_or(Value::Nil, window_value))
+}
+
+/// `(window-normal-size &optional WINDOW HORIZONTAL)` -> proportional size.
+pub(crate) fn builtin_window_normal_size(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_max_args("window-normal-size", &args, 2)?;
+    let _ = ensure_selected_frame_id(eval);
+    let (fid, wid) = resolve_window_id_with_pred(eval, args.first(), "window-valid-p")?;
+    let horizontal = args.get(1).is_some_and(Value::is_truthy);
+    let Some(frame) = eval.frames.get(fid) else {
+        return Err(signal("error", vec![Value::string("Frame not found")]));
+    };
+    let window = frame
+        .find_window(wid)
+        .ok_or_else(|| signal("error", vec![Value::string("Window not found")]))?;
+    let Some(parent_id) = window_parent_id(frame, wid) else {
+        return Ok(Value::Float(1.0, next_float_id()));
+    };
+    let parent = frame
+        .find_window(parent_id)
+        .ok_or_else(|| signal("error", vec![Value::string("Window not found")]))?;
+
+    let ratio = match parent {
+        Window::Internal {
+            direction,
+            bounds: parent_bounds,
+            ..
+        } => match (horizontal, direction) {
+            (true, SplitDirection::Horizontal) if parent_bounds.width > 0.0 => {
+                window.bounds().width / parent_bounds.width
+            }
+            (false, SplitDirection::Vertical) if parent_bounds.height > 0.0 => {
+                window.bounds().height / parent_bounds.height
+            }
+            _ => 1.0,
+        },
+        Window::Leaf { .. } => 1.0,
+    };
+
+    Ok(Value::Float(ratio as f64, next_float_id()))
 }
 
 /// `(window-start &optional WINDOW)` -> integer position.
@@ -2511,7 +2396,7 @@ pub(crate) fn builtin_window_valid_p(
         Some(wid) => wid,
         None => return Ok(Value::Nil),
     };
-    Ok(Value::bool(eval.frames.is_live_window_id(wid)))
+    Ok(Value::bool(eval.frames.is_valid_window_id(wid)))
 }
 
 /// `(window-live-p OBJ)` -> t if OBJ is a live leaf window.

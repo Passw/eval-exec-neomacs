@@ -1833,17 +1833,24 @@ pub(crate) fn dispatch_builtin(
         "window-parameters" => {
             return Some(super::window_cmds::builtin_window_parameters(eval, args));
         }
+        "window-parent" => return Some(super::window_cmds::builtin_window_parent(eval, args)),
+        "window-top-child" => {
+            return Some(super::window_cmds::builtin_window_top_child(eval, args));
+        }
+        "window-left-child" => {
+            return Some(super::window_cmds::builtin_window_left_child(eval, args));
+        }
+        "window-next-sibling" => {
+            return Some(super::window_cmds::builtin_window_next_sibling(eval, args));
+        }
+        "window-prev-sibling" => {
+            return Some(super::window_cmds::builtin_window_prev_sibling(eval, args));
+        }
+        "window-normal-size" => {
+            return Some(super::window_cmds::builtin_window_normal_size(eval, args));
+        }
         "window-display-table" => {
             return Some(super::window_cmds::builtin_window_display_table(eval, args));
-        }
-        "window-size-fixed-p" => {
-            return Some(super::window_cmds::builtin_window_size_fixed_p(eval, args));
-        }
-        "window-preserve-size" => {
-            return Some(super::window_cmds::builtin_window_preserve_size(eval, args));
-        }
-        "window-resizable" => {
-            return Some(super::window_cmds::builtin_window_resizable(eval, args));
         }
         "window-cursor-type" => {
             return Some(super::window_cmds::builtin_window_cursor_type(eval, args));
@@ -4159,10 +4166,16 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "one-window-p"
         | "old-selected-window"
         | "frame-old-selected-window"
+        | "window-left-child"
+        | "window-next-sibling"
+        | "window-normal-size"
+        | "window-parent"
         | "window-pixel-left"
         | "window-pixel-top"
+        | "window-prev-sibling"
         | "set-frame-selected-window"
         | "window-system"
+        | "window-top-child"
         | "frame-edges"
         | "window-at" => return None,
         _ => {}

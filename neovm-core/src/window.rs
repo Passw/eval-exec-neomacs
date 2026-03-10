@@ -673,14 +673,32 @@ impl FrameManager {
         })
     }
 
+    /// Return the frame containing a valid window ID, if any.
+    ///
+    /// Valid windows include live leaf windows, internal windows, and the
+    /// minibuffer window of a live frame.
+    pub fn find_valid_window_frame_id(&self, window_id: WindowId) -> Option<FrameId> {
+        self.frames.iter().find_map(|(frame_id, frame)| {
+            if frame.minibuffer_window == Some(window_id) {
+                return Some(*frame_id);
+            }
+            frame.find_window(window_id).map(|_| *frame_id)
+        })
+    }
+
     /// Return true when WINDOW-ID designates a live window in any frame.
     pub fn is_live_window_id(&self, window_id: WindowId) -> bool {
         self.find_window_frame_id(window_id).is_some()
     }
 
+    /// Return true when WINDOW-ID designates a valid live or internal window.
+    pub fn is_valid_window_id(&self, window_id: WindowId) -> bool {
+        self.find_valid_window_frame_id(window_id).is_some()
+    }
+
     /// Return true when WINDOW-ID designates a live or stale window object.
     pub fn is_window_object_id(&self, window_id: WindowId) -> bool {
-        self.is_live_window_id(window_id) || self.deleted_windows.contains(&window_id)
+        self.is_valid_window_id(window_id) || self.deleted_windows.contains(&window_id)
     }
 
     /// Return window parameter KEY for WINDOW-ID, or nil when unset.
@@ -967,6 +985,103 @@ fn delete_window_in_tree(tree: &mut Window, target: WindowId) -> bool {
     }
 
     false
+}
+
+fn find_parent_in_tree(node: &Window, target: WindowId) -> Option<WindowId> {
+    let Window::Internal { children, .. } = node else {
+        return None;
+    };
+
+    for child in children {
+        if child.id() == target {
+            return Some(node.id());
+        }
+        if let Some(parent) = find_parent_in_tree(child, target) {
+            return Some(parent);
+        }
+    }
+
+    None
+}
+
+fn find_sibling_in_tree(node: &Window, target: WindowId, next: bool) -> Option<WindowId> {
+    let Window::Internal { children, .. } = node else {
+        return None;
+    };
+
+    if let Some(index) = children.iter().position(|child| child.id() == target) {
+        let sibling = if next {
+            children.get(index + 1)
+        } else {
+            index.checked_sub(1).and_then(|idx| children.get(idx))
+        };
+        return sibling.map(Window::id);
+    }
+
+    children
+        .iter()
+        .find_map(|child| find_sibling_in_tree(child, target, next))
+}
+
+fn find_first_child_in_tree(
+    node: &Window,
+    target: WindowId,
+    direction: SplitDirection,
+) -> Option<WindowId> {
+    match node {
+        Window::Leaf { .. } => None,
+        Window::Internal {
+            id,
+            direction: node_direction,
+            children,
+            ..
+        } => {
+            if *id == target {
+                return (*node_direction == direction)
+                    .then(|| children.first().map(Window::id))
+                    .flatten();
+            }
+            children
+                .iter()
+                .find_map(|child| find_first_child_in_tree(child, target, direction))
+        }
+    }
+}
+
+/// Return the parent of WINDOW-ID inside FRAME, if any.
+pub fn window_parent_id(frame: &Frame, window_id: WindowId) -> Option<WindowId> {
+    if frame.minibuffer_window == Some(window_id) {
+        return None;
+    }
+    find_parent_in_tree(&frame.root_window, window_id)
+}
+
+/// Return the first child of WINDOW-ID when it is combined in DIRECTION.
+pub fn window_first_child_id(
+    frame: &Frame,
+    window_id: WindowId,
+    direction: SplitDirection,
+) -> Option<WindowId> {
+    if frame.minibuffer_window == Some(window_id) {
+        return None;
+    }
+    find_first_child_in_tree(&frame.root_window, window_id, direction)
+}
+
+/// Return the next sibling of WINDOW-ID, if any.
+pub fn window_next_sibling_id(frame: &Frame, window_id: WindowId) -> Option<WindowId> {
+    if frame.minibuffer_window == Some(window_id) {
+        return None;
+    }
+    find_sibling_in_tree(&frame.root_window, window_id, true)
+}
+
+/// Return the previous sibling of WINDOW-ID, if any.
+pub fn window_prev_sibling_id(frame: &Frame, window_id: WindowId) -> Option<WindowId> {
+    if frame.minibuffer_window == Some(window_id) {
+        return None;
+    }
+    find_sibling_in_tree(&frame.root_window, window_id, false)
 }
 
 /// Redistribute bounds equally among children.
