@@ -48,7 +48,7 @@ fn print_uninterned_symbols_follow_gnu_default_print_gensym_nil() {
 
 #[test]
 fn print_uninterned_symbols_support_print_gensym_round_trip_syntax() {
-    let options = PrintOptions { print_gensym: true };
+    let options = PrintOptions::with_print_gensym(true);
     assert_eq!(
         print_value_with_options(&Value::Symbol(intern_uninterned("foo")), options),
         "#:foo"
@@ -193,8 +193,21 @@ fn print_quote_shorthand_lists() {
     assert_eq!(print_value(&quoted), "'foo");
     assert_eq!(print_value(&function), "#'car");
     assert_eq!(print_value(&quasiquoted), "`(a b)");
-    assert_eq!(print_value(&unquoted), ",x");
-    assert_eq!(print_value(&unquote_splice), ",@xs");
+    assert_eq!(print_value(&unquoted), "(\\, x)");
+    assert_eq!(print_value(&unquote_splice), "(\\,@ xs)");
+}
+
+#[test]
+fn print_backquote_preserves_nested_unquote_shorthand_only_in_context() {
+    let nested = Value::list(vec![
+        Value::symbol("`"),
+        Value::list(vec![
+            Value::symbol("a"),
+            Value::list(vec![Value::symbol(","), Value::symbol("x")]),
+        ]),
+    ]);
+
+    assert_eq!(print_value(&nested), "`(a ,x)");
 }
 
 #[test]

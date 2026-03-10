@@ -190,12 +190,11 @@ fn format_window_handle_with_eval(eval: &super::eval::Evaluator, id: u64) -> Str
 }
 
 fn print_options_from_eval(eval: &super::eval::Evaluator) -> PrintOptions {
-    PrintOptions {
-        print_gensym: eval
-            .obarray
+    PrintOptions::with_print_gensym(
+        eval.obarray
             .symbol_value("print-gensym")
             .is_some_and(Value::is_truthy),
-    }
+    )
 }
 
 fn format_value_with_eval(
@@ -268,18 +267,26 @@ fn format_list_shorthand_with_eval(
         ));
     }
 
-    let (prefix, quoted) = match head {
-        "quote" => Some(("'", &items[1])),
-        "function" => Some(("#'", &items[1])),
-        "`" => Some(("`", &items[1])),
-        "," => Some((",", &items[1])),
-        ",@" => Some((",@", &items[1])),
+    let (prefix, quoted, nested_options) = match head {
+        "quote" => Some(("'", &items[1], options)),
+        "function" => Some(("#'", &items[1], options)),
+        "`" => Some(("`", &items[1], options.enter_backquote())),
+        "," => {
+            options
+                .allow_unquote_shorthand()
+                .then_some((",", &items[1], options.exit_backquote()))
+        }
+        ",@" => {
+            options
+                .allow_unquote_shorthand()
+                .then_some((",@", &items[1], options.exit_backquote()))
+        }
         _ => None,
     }?;
 
     Some(format!(
         "{prefix}{}",
-        format_value_with_eval(eval, quoted, options)
+        format_value_with_eval(eval, quoted, nested_options)
     ))
 }
 
@@ -398,18 +405,26 @@ fn format_list_shorthand_bytes_with_eval(
         return Some(out);
     }
 
-    let (prefix, quoted) = match head {
-        "quote" => Some((b"'" as &[u8], &items[1])),
-        "function" => Some((b"#'" as &[u8], &items[1])),
-        "`" => Some((b"`" as &[u8], &items[1])),
-        "," => Some((b"," as &[u8], &items[1])),
-        ",@" => Some((b",@" as &[u8], &items[1])),
+    let (prefix, quoted, nested_options) = match head {
+        "quote" => Some((b"'" as &[u8], &items[1], options)),
+        "function" => Some((b"#'" as &[u8], &items[1], options)),
+        "`" => Some((b"`" as &[u8], &items[1], options.enter_backquote())),
+        "," => options.allow_unquote_shorthand().then_some((
+            b"," as &[u8],
+            &items[1],
+            options.exit_backquote(),
+        )),
+        ",@" => options.allow_unquote_shorthand().then_some((
+            b",@" as &[u8],
+            &items[1],
+            options.exit_backquote(),
+        )),
         _ => None,
     }?;
 
     let mut out = Vec::new();
     out.extend_from_slice(prefix);
-    out.extend(format_value_bytes_with_eval(eval, quoted, options));
+    out.extend(format_value_bytes_with_eval(eval, quoted, nested_options));
     Some(out)
 }
 

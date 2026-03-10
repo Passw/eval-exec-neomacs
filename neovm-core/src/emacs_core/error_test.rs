@@ -174,6 +174,27 @@ fn eval_context_printer_renders_terminal_thread_handles_consistently() -> Result
     Ok(())
 }
 
+#[test]
+fn eval_context_printer_matches_gnu_backquote_shorthand_rules() {
+    let eval = Evaluator::new();
+    let raw_unquote = Value::list(vec![Value::symbol(","), Value::symbol("x")]);
+    let nested = Value::list(vec![
+        Value::symbol("`"),
+        Value::list(vec![Value::symbol("a"), raw_unquote]),
+    ]);
+
+    assert_eq!(print_value_with_eval(&eval, &raw_unquote), "(\\, x)");
+    assert_eq!(
+        String::from_utf8(print_value_bytes_with_eval(&eval, &raw_unquote)).unwrap(),
+        "(\\, x)"
+    );
+    assert_eq!(print_value_with_eval(&eval, &nested), "`(a ,x)");
+    assert_eq!(
+        String::from_utf8(print_value_bytes_with_eval(&eval, &nested)).unwrap(),
+        "`(a ,x)"
+    );
+}
+
 // --- signal / Flow tests ---
 
 #[test]

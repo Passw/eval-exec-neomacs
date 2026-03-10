@@ -15,6 +15,34 @@ use crate::gc::types::ObjId;
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct PrintOptions {
     pub print_gensym: bool,
+    backquote_output_level: usize,
+}
+
+impl PrintOptions {
+    pub const fn with_print_gensym(print_gensym: bool) -> Self {
+        Self {
+            print_gensym,
+            backquote_output_level: 0,
+        }
+    }
+
+    pub(crate) fn enter_backquote(self) -> Self {
+        Self {
+            backquote_output_level: self.backquote_output_level + 1,
+            ..self
+        }
+    }
+
+    pub(crate) fn exit_backquote(self) -> Self {
+        Self {
+            backquote_output_level: self.backquote_output_level.saturating_sub(1),
+            ..self
+        }
+    }
+
+    pub(crate) fn allow_unquote_shorthand(self) -> bool {
+        self.backquote_output_level > 0
+    }
 }
 
 thread_local! {
@@ -153,17 +181,27 @@ fn print_list_shorthand_with_buffers(
         }
         return None;
     }
-    let prefix = match head {
-        "quote" => "'",
-        "function" => "#'",
-        "`" => "`",
-        "," => ",",
-        ",@" => ",@",
+    let (prefix, nested_options) = match head {
+        "quote" => ("'", options),
+        "function" => ("#'", options),
+        "`" => ("`", options.enter_backquote()),
+        "," => {
+            if !options.allow_unquote_shorthand() {
+                return None;
+            }
+            (",", options.exit_backquote())
+        }
+        ",@" => {
+            if !options.allow_unquote_shorthand() {
+                return None;
+            }
+            (",@", options.exit_backquote())
+        }
         _ => return None,
     };
     Some(format!(
         "{prefix}{}",
-        print_value_with_buffers_and_options(&items[1], buffers, options)
+        print_value_with_buffers_and_options(&items[1], buffers, nested_options)
     ))
 }
 
@@ -708,18 +746,28 @@ fn print_list_shorthand(value: &Value, options: PrintOptions) -> Option<String> 
         return None;
     }
 
-    let prefix = match head {
-        "quote" => "'",
-        "function" => "#'",
-        "`" => "`",
-        "," => ",",
-        ",@" => ",@",
+    let (prefix, nested_options) = match head {
+        "quote" => ("'", options),
+        "function" => ("#'", options),
+        "`" => ("`", options.enter_backquote()),
+        "," => {
+            if !options.allow_unquote_shorthand() {
+                return None;
+            }
+            (",", options.exit_backquote())
+        }
+        ",@" => {
+            if !options.allow_unquote_shorthand() {
+                return None;
+            }
+            (",@", options.exit_backquote())
+        }
         _ => return None,
     };
 
     Some(format!(
         "{prefix}{}",
-        print_value_with_options(&items[1], options)
+        print_value_with_options(&items[1], nested_options)
     ))
 }
 
@@ -742,18 +790,28 @@ fn print_list_shorthand_bytes(value: &Value, options: PrintOptions) -> Option<Ve
         return Some(out);
     }
 
-    let prefix: &[u8] = match head {
-        "quote" => b"'",
-        "function" => b"#'",
-        "`" => b"`",
-        "," => b",",
-        ",@" => b",@",
+    let (prefix, nested_options): (&[u8], PrintOptions) = match head {
+        "quote" => (b"'", options),
+        "function" => (b"#'", options),
+        "`" => (b"`", options.enter_backquote()),
+        "," => {
+            if !options.allow_unquote_shorthand() {
+                return None;
+            }
+            (b",", options.exit_backquote())
+        }
+        ",@" => {
+            if !options.allow_unquote_shorthand() {
+                return None;
+            }
+            (b",@", options.exit_backquote())
+        }
         _ => return None,
     };
 
     let mut out = Vec::new();
     out.extend_from_slice(prefix);
-    append_print_value_bytes(&items[1], &mut out, options);
+    append_print_value_bytes(&items[1], &mut out, nested_options);
     Some(out)
 }
 
