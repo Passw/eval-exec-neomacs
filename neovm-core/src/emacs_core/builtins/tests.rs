@@ -2757,20 +2757,7 @@ fn pure_dispatch_typed_round_half_ties_to_even() {
 }
 
 #[test]
-fn pure_dispatch_typed_extended_string_ops_work() {
-    let prefix = dispatch_builtin_pure(
-        "string-prefix-p",
-        vec![Value::string("neo"), Value::string("neovm")],
-    )
-    .expect("builtin string-prefix-p should resolve")
-    .expect("builtin string-prefix-p should evaluate");
-    assert!(prefix.is_truthy());
-
-    let trimmed = dispatch_builtin_pure("string-trim", vec![Value::string("  vm  ")])
-        .expect("builtin string-trim should resolve")
-        .expect("builtin string-trim should evaluate");
-    assert_eq!(trimmed, Value::string("vm"));
-
+fn pure_dispatch_typed_string_width_and_bytes_work() {
     let width = dispatch_builtin_pure("string-width", vec![Value::string("ab")])
         .expect("builtin string-width should resolve")
         .expect("builtin string-width should evaluate");
@@ -2784,18 +2771,12 @@ fn pure_dispatch_typed_extended_string_ops_work() {
 
 #[test]
 fn pure_dispatch_typed_extended_list_ops_work() {
-    let seq = dispatch_builtin_pure("number-sequence", vec![Value::Int(1), Value::Int(4)])
-        .expect("builtin number-sequence should resolve")
-        .expect("builtin number-sequence should evaluate");
-    assert_eq!(
-        seq,
-        Value::list(vec![
-            Value::Int(1),
-            Value::Int(2),
-            Value::Int(3),
-            Value::Int(4)
-        ])
-    );
+    let seq = Value::list(vec![
+        Value::Int(1),
+        Value::Int(2),
+        Value::Int(3),
+        Value::Int(4),
+    ]);
 
     let last = dispatch_builtin_pure("last", vec![seq])
         .expect("builtin last should resolve")
@@ -6597,53 +6578,6 @@ fn timeout_event_p_matches_emacs_shape_and_arity() {
 }
 
 #[test]
-fn always_accepts_any_arity_and_returns_true() {
-    let zero = dispatch_builtin_pure("always", vec![])
-        .expect("always should resolve")
-        .expect("always should evaluate");
-    assert_eq!(zero, Value::True);
-
-    let many = dispatch_builtin_pure(
-        "always",
-        vec![
-            Value::Int(1),
-            Value::symbol("x"),
-            Value::list(vec![Value::Nil]),
-        ],
-    )
-    .expect("always should resolve")
-    .expect("always should evaluate");
-    assert_eq!(many, Value::True);
-}
-
-#[test]
-fn assq_delete_all_removes_matching_pairs_and_ignores_atoms() {
-    let entry_foo_1 = Value::cons(Value::symbol("foo"), Value::Int(1));
-    let entry_bar = Value::cons(Value::symbol("bar"), Value::Int(2));
-    let entry_foo_3 = Value::cons(Value::symbol("foo"), Value::Int(3));
-    let alist = Value::list(vec![
-        entry_foo_1,
-        Value::symbol("ignored-atom"),
-        entry_bar,
-        entry_foo_3,
-    ]);
-
-    let result = dispatch_builtin_pure("assq-delete-all", vec![Value::symbol("foo"), alist])
-        .expect("assq-delete-all should resolve")
-        .expect("assq-delete-all should evaluate");
-    let expected = Value::list(vec![Value::symbol("ignored-atom"), entry_bar]);
-    assert_eq!(result, expected);
-
-    let err = dispatch_builtin_pure("assq-delete-all", vec![Value::symbol("foo"), Value::Int(7)])
-        .expect("assq-delete-all should resolve")
-        .expect_err("assq-delete-all should reject non-lists");
-    match err {
-        Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
-        other => panic!("expected signal, got {other:?}"),
-    }
-}
-
-#[test]
 fn assoc_delete_all_supports_default_equal_and_optional_test() {
     let mut eval = crate::emacs_core::eval::Evaluator::new();
 
@@ -8953,61 +8887,5 @@ fn get_byte_unibyte_string_returns_raw_byte_values() {
     assert_eq!(
         builtin_get_byte(&mut eval, vec![Value::Int(1), s]).unwrap(),
         Value::Int(65)
-    );
-}
-
-#[test]
-fn gensym_prefix_coercion_matches_oracle_shapes() {
-    let plain = builtin_gensym(vec![]).expect("gensym without prefix should succeed");
-    let plain_name = match plain {
-        Value::Symbol(id) => resolve_sym(id).to_owned(),
-        other => panic!("unexpected gensym result: {other:?}"),
-    };
-    assert!(
-        plain_name.starts_with('g'),
-        "default gensym prefix should start with g"
-    );
-
-    let nil_prefix =
-        builtin_gensym(vec![Value::Nil]).expect("gensym nil prefix should match default");
-    let nil_name = match nil_prefix {
-        Value::Symbol(id) => resolve_sym(id).to_owned(),
-        other => panic!("unexpected gensym result: {other:?}"),
-    };
-    assert!(
-        nil_name.starts_with('g'),
-        "explicit nil prefix should start with g"
-    );
-
-    let int_prefix = builtin_gensym(vec![Value::Int(1)]).expect("gensym integer prefix");
-    let int_name = match int_prefix {
-        Value::Symbol(id) => resolve_sym(id).to_owned(),
-        other => panic!("unexpected gensym result: {other:?}"),
-    };
-    assert!(
-        int_name.starts_with('1'),
-        "integer prefix should be stringified with %s semantics"
-    );
-
-    let keyword_prefix =
-        builtin_gensym(vec![Value::keyword(":kw")]).expect("gensym keyword prefix");
-    let keyword_name = match keyword_prefix {
-        Value::Symbol(id) => resolve_sym(id).to_owned(),
-        other => panic!("unexpected gensym result: {other:?}"),
-    };
-    assert!(
-        keyword_name.starts_with(":kw"),
-        "keyword prefix should preserve leading colon"
-    );
-
-    let vector_prefix = builtin_gensym(vec![Value::vector(vec![Value::Int(1), Value::Int(2)])])
-        .expect("gensym vector prefix");
-    let vector_name = match vector_prefix {
-        Value::Symbol(id) => resolve_sym(id).to_owned(),
-        other => panic!("unexpected gensym result: {other:?}"),
-    };
-    assert!(
-        vector_name.starts_with("[1 2]"),
-        "vector prefix should use lisp %s rendering"
     );
 }

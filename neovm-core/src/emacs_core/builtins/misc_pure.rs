@@ -31,10 +31,6 @@ pub(crate) fn builtin_ignore(_args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-pub(crate) fn builtin_always(_args: Vec<Value>) -> EvalResult {
-    Ok(Value::True)
-}
-
 pub(crate) fn builtin_message(args: Vec<Value>) -> EvalResult {
     expect_min_args("message", &args, 1)?;
     if args.len() == 1 && args[0].is_nil() {
@@ -157,11 +153,6 @@ pub(crate) fn builtin_current_message(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_daemonp(args: Vec<Value>) -> EvalResult {
     expect_args("daemonp", &args, 0)?;
     Ok(Value::Nil)
-}
-
-pub(crate) fn builtin_json_available_p(args: Vec<Value>) -> EvalResult {
-    expect_args("json-available-p", &args, 0)?;
-    Ok(Value::True)
 }
 
 pub(crate) fn builtin_daemon_initialized(args: Vec<Value>) -> EvalResult {

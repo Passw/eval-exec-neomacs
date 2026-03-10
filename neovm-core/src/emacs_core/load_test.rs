@@ -639,6 +639,37 @@ fn bootstrap_runtime_require_cl_lib_works() {
 }
 
 #[test]
+fn bootstrap_runtime_loads_gnu_subr_helpers() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(list
+             (always 1 2 3)
+             (assq-delete-all 'foo '((foo . 1) ignored (bar . 2) (foo . 3)))
+             (butlast '(1 2 3 4) 2)
+             (number-sequence 1 4)
+             (split-string " a  b " nil t)
+             (string-prefix-p "neo" "neovm")
+             (string-suffix-p "vm" "neovm")
+             (string-trim "  vm  ")
+             (string-trim-left "  vm  ")
+             (string-trim-right "  vm  ")
+             (json-available-p)
+             (let ((g1 (gensym))
+                   (g2 (gensym [1 2])))
+               (list (and (symbolp g1)
+                          (string-prefix-p "g" (symbol-name g1)))
+                     (and (symbolp g2)
+                          (string-prefix-p "[1 2]" (symbol-name g2))))))"#,
+    );
+    assert_eq!(
+        rendered,
+        "OK (t (ignored (bar . 2)) (1 2) (1 2 3 4) (\"a\" \"b\") t t \"vm\" \"vm  \" \"  vm\" t (t t))"
+    );
+}
+
+#[test]
 fn bootstrap_runtime_cl_reduce_entry_point_works() {
     let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
     apply_runtime_startup_state(&mut eval).expect("runtime startup state");

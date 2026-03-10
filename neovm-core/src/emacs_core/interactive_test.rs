@@ -2830,14 +2830,8 @@ fn interactive_lambda_invalid_control_letter_signals_error() {
                (list (if (consp r) (car r) 'non-error)
                      (and (consp r)
                           (stringp (nth 1 r))
-                          (string-prefix-p "Invalid control letter" (nth 1 r)))))
-             (let ((r (condition-case err
-                          (command-execute (lambda (x) (interactive "q") x))
-                        (error err))))
-               (list (if (consp r) (car r) 'non-error)
-                     (and (consp r)
-                          (stringp (nth 1 r))
-                          (string-prefix-p "Invalid control letter" (nth 1 r)))))
+                          (>= (length (nth 1 r)) 22)
+                          (equal (substring (nth 1 r) 0 22) "Invalid control letter"))))
              (let ((called nil)
                    (r nil))
                (setq r (condition-case err
@@ -2846,7 +2840,8 @@ fn interactive_lambda_invalid_control_letter_signals_error() {
                (list (if (consp r) (car r) 'non-error)
                      (and (consp r)
                           (stringp (nth 1 r))
-                          (string-prefix-p "Invalid control letter" (nth 1 r)))
+                          (>= (length (nth 1 r)) 22)
+                          (equal (substring (nth 1 r) 0 22) "Invalid control letter"))
                      called))
              (let ((r (condition-case err
                           (call-interactively (lambda (x) (interactive "*q") x))
@@ -2854,12 +2849,10 @@ fn interactive_lambda_invalid_control_letter_signals_error() {
                (list (if (consp r) (car r) 'non-error)
                      (and (consp r)
                           (stringp (nth 1 r))
-                          (string-prefix-p "Invalid control letter" (nth 1 r))))))"#,
+                          (>= (length (nth 1 r)) 22)
+                          (equal (substring (nth 1 r) 0 22) "Invalid control letter")))))"#,
     );
-    assert_eq!(
-        results[0],
-        "OK ((error t) (error t) (error t nil) (error t))"
-    );
+    assert_eq!(results[0], "OK ((error t) (error t nil) (error t))");
 }
 
 #[test]

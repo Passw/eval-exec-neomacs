@@ -5,7 +5,9 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
+use super::common::{
+    assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm_with_bootstrap,
+};
 
 // ---------------------------------------------------------------------------
 // FROM only (single-argument): should produce list of one element
@@ -149,7 +151,7 @@ fn oracle_prop_number_sequence_edge_cases() {
     assert_oracle_parity_with_bootstrap("(number-sequence 42 42 0)");
 
     // INCR = 0 with FROM != TO should signal an error
-    let (oracle, neovm) = eval_oracle_and_neovm(
+    let (oracle, neovm) = eval_oracle_and_neovm_with_bootstrap(
         "(condition-case err
            (number-sequence 1 10 0)
            (error (list 'error (car err))))",

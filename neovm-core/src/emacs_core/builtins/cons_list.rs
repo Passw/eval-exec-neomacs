@@ -846,18 +846,6 @@ pub(crate) fn builtin_assq(args: Vec<Value>) -> EvalResult {
     }
 }
 
-pub(crate) fn builtin_assq_delete_all(args: Vec<Value>) -> EvalResult {
-    expect_args("assq-delete-all", &args, 2)?;
-    let key = args[0];
-    delete_from_list_in_place(&args[1], |entry| match entry {
-        Value::Cons(cell) => {
-            let pair = read_cons(*cell);
-            eq_value(&key, &pair.car)
-        }
-        _ => false,
-    })
-}
-
 pub(crate) fn builtin_assoc_delete_all(args: Vec<Value>) -> EvalResult {
     expect_args("assoc-delete-all", &args, 2)?;
     let key = args[0];
@@ -1000,72 +988,6 @@ pub(crate) fn builtin_last(args: Vec<Value>) -> EvalResult {
             }
             Ok(args[0])
         }
-    }
-}
-
-pub(crate) fn builtin_butlast(args: Vec<Value>) -> EvalResult {
-    expect_min_args("butlast", &args, 1)?;
-    let n = if args.len() > 1 && !args[1].is_nil() {
-        expect_number_or_marker(&args[1])?
-    } else {
-        NumberOrMarker::Int(1)
-    };
-
-    let n_non_positive = match n {
-        NumberOrMarker::Int(v) => v <= 0,
-        NumberOrMarker::Float(v) => v <= 0.0,
-    };
-    if n_non_positive {
-        return Ok(args[0]);
-    }
-
-    match &args[0] {
-        Value::Nil | Value::Cons(_) => {}
-        Value::Vector(_) | Value::Str(_) => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("listp"), args[0]],
-            ));
-        }
-        _ => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("sequencep"), args[0]],
-            ));
-        }
-    }
-
-    let mut items = Vec::new();
-    let mut cursor = args[0];
-    loop {
-        match cursor {
-            Value::Nil => break,
-            Value::Cons(cell) => {
-                let pair = read_cons(cell);
-                items.push(pair.car);
-                cursor = pair.cdr;
-            }
-            tail => {
-                return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("listp"), tail],
-                ));
-            }
-        }
-    }
-
-    match n {
-        NumberOrMarker::Int(v) => {
-            let keep = items.len().saturating_sub(v as usize);
-            Ok(Value::list(items[..keep].to_vec()))
-        }
-        NumberOrMarker::Float(v) => Err(signal(
-            "wrong-type-argument",
-            vec![
-                Value::symbol("integerp"),
-                Value::Float(items.len() as f64 - v, next_float_id()),
-            ],
-        )),
     }
 }
 
@@ -1365,111 +1287,6 @@ pub(crate) fn builtin_alist_get_eval(
 
     eval.restore_temp_roots(saved_roots);
     result
-}
-
-pub(crate) fn builtin_number_sequence(args: Vec<Value>) -> EvalResult {
-    use super::super::value::next_float_id;
-
-    expect_min_args("number-sequence", &args, 1)?;
-
-    // Detect if any argument is a float to decide output type.
-    let use_float = args.iter().take(3).any(|v| matches!(v, Value::Float(_, _)));
-
-    if use_float {
-        let from = expect_number(&args[0])?;
-        let to = if args.len() > 1 {
-            match &args[1] {
-                Value::Nil => {
-                    return Ok(Value::list(vec![Value::Float(from, next_float_id())]));
-                }
-                v => expect_number(v)?,
-            }
-        } else {
-            return Ok(Value::list(vec![Value::Float(from, next_float_id())]));
-        };
-
-        if from == to {
-            return Ok(Value::list(vec![Value::Float(from, next_float_id())]));
-        }
-
-        let inc = if args.len() > 2 {
-            let v = expect_number(&args[2])?;
-            if v == 0.0 {
-                return Err(signal(
-                    "error",
-                    vec![Value::string("The increment can not be zero")],
-                ));
-            }
-            v
-        } else {
-            1.0
-        };
-
-        // Match subr.el: compute next = from + n * inc to reduce drift.
-        let mut seq = Vec::new();
-        let mut n: i64 = 0;
-        let mut next = from;
-        if inc > 0.0 {
-            while next <= to {
-                seq.push(Value::Float(next, next_float_id()));
-                n += 1;
-                next = from + (n as f64) * inc;
-            }
-        } else {
-            while next >= to {
-                seq.push(Value::Float(next, next_float_id()));
-                n += 1;
-                next = from + (n as f64) * inc;
-            }
-        }
-        Ok(Value::list(seq))
-    } else {
-        let from = expect_int(&args[0])?;
-        let to = if args.len() > 1 {
-            match &args[1] {
-                Value::Nil => return Ok(Value::list(vec![Value::Int(from)])),
-                v => expect_int(v)?,
-            }
-        } else {
-            return Ok(Value::list(vec![Value::Int(from)]));
-        };
-
-        if from == to {
-            return Ok(Value::list(vec![Value::Int(from)]));
-        }
-
-        let step = if args.len() > 2 {
-            let v = expect_int(&args[2])?;
-            if v == 0 {
-                return Err(signal(
-                    "error",
-                    vec![Value::string("The increment can not be zero")],
-                ));
-            }
-            v
-        } else {
-            // Match subr.el: always default to 1 (not -1)
-            1
-        };
-
-        let mut result = Vec::new();
-        let mut n: i64 = 0;
-        let mut next = from;
-        if step > 0 {
-            while next <= to {
-                result.push(Value::Int(next));
-                n += 1;
-                next = from + n * step;
-            }
-        } else {
-            while next >= to {
-                result.push(Value::Int(next));
-                n += 1;
-                next = from + n * step;
-            }
-        }
-        Ok(Value::list(result))
-    }
 }
 
 // ===========================================================================

@@ -6,6 +6,7 @@ use proptest::prelude::*;
 
 use super::common::{
     ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
 };
 
 #[test]
@@ -21,13 +22,13 @@ fn oracle_prop_string_width() {
 fn oracle_prop_string_prefix_p() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(r#"(string-prefix-p "hel" "hello")"#);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(r#"(string-prefix-p "hel" "hello")"#);
     assert_ok_eq("t", &o, &n);
 
-    let (o, n) = eval_oracle_and_neovm(r#"(string-prefix-p "xyz" "hello")"#);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(r#"(string-prefix-p "xyz" "hello")"#);
     assert_ok_eq("nil", &o, &n);
 
-    let (o, n) = eval_oracle_and_neovm(r#"(string-prefix-p "" "hello")"#);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(r#"(string-prefix-p "" "hello")"#);
     assert_ok_eq("t", &o, &n);
 }
 
@@ -35,10 +36,10 @@ fn oracle_prop_string_prefix_p() {
 fn oracle_prop_string_suffix_p() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(r#"(string-suffix-p "llo" "hello")"#);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(r#"(string-suffix-p "llo" "hello")"#);
     assert_ok_eq("t", &o, &n);
 
-    let (o, n) = eval_oracle_and_neovm(r#"(string-suffix-p "xyz" "hello")"#);
+    let (o, n) = eval_oracle_and_neovm_with_bootstrap(r#"(string-suffix-p "xyz" "hello")"#);
     assert_ok_eq("nil", &o, &n);
 }
 

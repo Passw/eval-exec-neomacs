@@ -634,28 +634,14 @@ enum PureBuiltinId {
     Random,
     #[strum(serialize = "isnan")]
     Isnan,
-    #[strum(serialize = "string-prefix-p")]
-    StringPrefixP,
-    #[strum(serialize = "string-suffix-p")]
-    StringSuffixP,
     #[strum(serialize = "string-join")]
     StringJoin,
-    #[strum(serialize = "split-string")]
-    SplitString,
-    #[strum(serialize = "string-trim")]
-    StringTrim,
-    #[strum(serialize = "string-trim-left")]
-    StringTrimLeft,
-    #[strum(serialize = "string-trim-right")]
-    StringTrimRight,
     #[strum(serialize = "make-string")]
     MakeString,
     #[strum(serialize = "string-width")]
     StringWidth,
     #[strum(serialize = "last")]
     Last,
-    #[strum(serialize = "butlast")]
-    Butlast,
     #[strum(serialize = "delete")]
     Delete,
     #[strum(serialize = "delq")]
@@ -666,8 +652,6 @@ enum PureBuiltinId {
     Nconc,
     #[strum(serialize = "alist-get")]
     AlistGet,
-    #[strum(serialize = "number-sequence")]
-    NumberSequence,
     #[strum(serialize = "bitmap-spec-p")]
     BitmapSpecP,
     #[strum(serialize = "byte-to-string")]
@@ -800,23 +784,15 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::Expt => builtin_expt(args),
         PureBuiltinId::Random => builtin_random(args),
         PureBuiltinId::Isnan => builtin_isnan(args),
-        PureBuiltinId::StringPrefixP => builtin_string_prefix_p(args),
-        PureBuiltinId::StringSuffixP => builtin_string_suffix_p(args),
         PureBuiltinId::StringJoin => builtin_string_join(args),
-        PureBuiltinId::SplitString => builtin_split_string(args),
-        PureBuiltinId::StringTrim => builtin_string_trim(args),
-        PureBuiltinId::StringTrimLeft => builtin_string_trim_left(args),
-        PureBuiltinId::StringTrimRight => builtin_string_trim_right(args),
         PureBuiltinId::MakeString => builtin_make_string(args),
         PureBuiltinId::StringWidth => builtin_string_width(args),
         PureBuiltinId::Last => builtin_last(args),
-        PureBuiltinId::Butlast => builtin_butlast(args),
         PureBuiltinId::Delete => builtin_delete(args),
         PureBuiltinId::Delq => builtin_delq(args),
         PureBuiltinId::Elt => builtin_elt(args),
         PureBuiltinId::Nconc => builtin_nconc(args),
         PureBuiltinId::AlistGet => builtin_alist_get(args),
-        PureBuiltinId::NumberSequence => builtin_number_sequence(args),
         PureBuiltinId::BitmapSpecP => builtin_bitmap_spec_p(args),
         PureBuiltinId::ByteToString => builtin_byte_to_string(args),
         PureBuiltinId::ClearBufferAutoSaveFailure => builtin_clear_buffer_auto_save_failure(args),
@@ -2966,7 +2942,6 @@ pub(crate) fn dispatch_builtin(
         "memq" => builtin_memq(args),
         "memql" => builtin_memql(args),
         "assq" => builtin_assq(args),
-        "assq-delete-all" => builtin_assq_delete_all(args),
         "copy-sequence" => builtin_copy_sequence(args),
         "purecopy" => builtin_purecopy(args),
         "substring-no-properties" => builtin_substring_no_properties(args),
@@ -2995,7 +2970,6 @@ pub(crate) fn dispatch_builtin(
         // Extended list (typed subset is dispatched above)
 
         // Output / misc
-        "always" => builtin_always(args),
         "identity" => builtin_identity(args),
         "message" => builtin_message(args),
         "message-box" => builtin_message_box(args),
@@ -3019,7 +2993,6 @@ pub(crate) fn dispatch_builtin(
         "terpri" => builtin_terpri(args),
         "write-char" => builtin_write_char(args),
         "propertize" => builtin_propertize(args),
-        "gensym" => builtin_gensym(args),
         "string-to-syntax" => builtin_string_to_syntax(args),
         "syntax-class-to-char" => super::syntax::builtin_syntax_class_to_char(args),
         // matching-paren is now dispatched in dispatch_builtin (eval-dependent)
@@ -3033,7 +3006,6 @@ pub(crate) fn dispatch_builtin(
         "current-idle-time" => builtin_current_idle_time(args),
         "get-internal-run-time" => builtin_get_internal_run_time(args),
         "float-time" => builtin_float_time(args),
-        "json-available-p" => builtin_json_available_p(args),
         "daemonp" => builtin_daemonp(args),
         "daemon-initialized" => builtin_daemon_initialized(args),
         "flush-standard-output" => builtin_flush_standard_output(args),
@@ -4259,28 +4231,18 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "random" => builtin_random(args),
         "isnan" => builtin_isnan(args),
         // Extended string
-        "string-prefix-p" => builtin_string_prefix_p(args),
-        "string-suffix-p" => builtin_string_suffix_p(args),
         "string-join" => builtin_string_join(args),
-        "split-string" => builtin_split_string(args),
-        "string-trim" => builtin_string_trim(args),
-        "string-trim-left" => builtin_string_trim_left(args),
-        "string-trim-right" => builtin_string_trim_right(args),
         "make-string" => builtin_make_string(args),
         "string" => builtin_string(args),
         "string-width" => builtin_string_width(args),
         // Extended list
         "last" => builtin_last(args),
-        "butlast" => builtin_butlast(args),
         "delete" => builtin_delete(args),
         "delq" => builtin_delq(args),
         "elt" => builtin_elt(args),
         "memql" => builtin_memql(args),
-        "assq-delete-all" => builtin_assq_delete_all(args),
         "nconc" => builtin_nconc(args),
-        "number-sequence" => builtin_number_sequence(args),
         // Output / misc
-        "always" => builtin_always(args),
         "identity" => builtin_identity(args),
         "purecopy" => builtin_purecopy(args),
         "current-message" => builtin_current_message(args),
@@ -4291,7 +4253,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "secure-hash-algorithms" => builtin_secure_hash_algorithms(args),
         "prefix-numeric-value" => builtin_prefix_numeric_value(args),
         "propertize" => builtin_propertize(args),
-        "gensym" => builtin_gensym(args),
         "documentation-stringp" => super::builtins::misc_pure::builtin_documentation_stringp(args),
         "bare-symbol" => super::builtins_extra::builtin_bare_symbol(args),
         "capitalize" => super::casefiddle::builtin_capitalize(args),
@@ -4317,7 +4278,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "current-idle-time" => builtin_current_idle_time(args),
         "get-internal-run-time" => builtin_get_internal_run_time(args),
         "float-time" => builtin_float_time(args),
-        "json-available-p" => builtin_json_available_p(args),
         "daemonp" => builtin_daemonp(args),
         "daemon-initialized" => builtin_daemon_initialized(args),
         "flush-standard-output" => builtin_flush_standard_output(args),

@@ -1624,7 +1624,9 @@ fn default_directory_is_bound_to_directory_path() {
     let results = eval_all(
         "(stringp default-directory)
          (file-directory-p default-directory)
-         (string-suffix-p \"/\" default-directory)",
+         (let ((len (length default-directory)))
+           (and (> len 0)
+                (eq (aref default-directory (1- len)) ?/)))",
     );
     assert_eq!(results[0], "OK t");
     assert_eq!(results[1], "OK t");

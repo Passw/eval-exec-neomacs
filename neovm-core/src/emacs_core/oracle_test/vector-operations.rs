@@ -7,6 +7,7 @@ use proptest::prelude::*;
 
 use super::common::{
     ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm,
+    eval_oracle_and_neovm_with_bootstrap,
 };
 
 // ---------------------------------------------------------------------------
@@ -302,7 +303,7 @@ proptest! {
             "(length (number-sequence {} {}))",
             from, to
         );
-        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        let (oracle, neovm) = eval_oracle_and_neovm_with_bootstrap(&form);
         let expected = format!("OK {}", count);
         prop_assert_eq!(neovm.as_str(), expected.as_str());
         prop_assert_eq!(oracle.as_str(), expected.as_str());

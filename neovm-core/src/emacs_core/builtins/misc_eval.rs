@@ -935,34 +935,6 @@ pub(crate) fn builtin_propertize(args: Vec<Value>) -> EvalResult {
     Ok(new_str)
 }
 
-fn gensym_prefix_string(value: &Value) -> String {
-    match value {
-        // Oracle treats explicit nil like omitted prefix.
-        Value::Nil => "g".to_string(),
-        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
-        Value::Symbol(id) => resolve_sym(*id).to_owned(),
-        Value::Keyword(id) => resolve_sym(*id).to_owned(),
-        Value::True => "t".to_string(),
-        // For other objects, gensym follows `%s`-style coercion.
-        other => super::print::print_value(other),
-    }
-}
-
-pub(crate) fn builtin_gensym(args: Vec<Value>) -> EvalResult {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
-    expect_max_args("gensym", &args, 1)?;
-    let prefix = args
-        .first()
-        .map(gensym_prefix_string)
-        .unwrap_or_else(|| "g".to_string());
-    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    Ok(Value::Symbol(intern_uninterned(&format!(
-        "{}{}",
-        prefix, n
-    ))))
-}
-
 pub(crate) fn builtin_string_to_syntax(args: Vec<Value>) -> EvalResult {
     super::syntax::builtin_string_to_syntax(args)
 }
