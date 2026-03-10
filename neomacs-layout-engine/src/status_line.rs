@@ -764,6 +764,7 @@ impl LayoutEngine {
                                     rf.overline_color,
                                     rf.overstrike,
                                 );
+                                frame_glyphs.faces.insert(run.face_id, rf.render_face());
                                 active_run_face = Some(rf);
                             } else {
                                 frame_glyphs.set_face(
