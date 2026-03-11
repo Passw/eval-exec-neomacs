@@ -1,6 +1,18 @@
 use super::*;
+use crate::emacs_core::load::{apply_runtime_startup_state, create_bootstrap_evaluator_cached};
 use crate::emacs_core::value::list_to_vec;
+use crate::emacs_core::{format_eval_result, parse_forms};
 use std::io::Write;
+
+fn bootstrap_eval(src: &str) -> Vec<String> {
+    let mut ev = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut ev).expect("runtime startup state");
+    let forms = parse_forms(src).expect("parse");
+    ev.eval_forms(&forms)
+        .iter()
+        .map(format_eval_result)
+        .collect()
+}
 
 // -----------------------------------------------------------------------
 // Path operations
@@ -1486,16 +1498,6 @@ fn test_builtin_file_name_ops() {
     let result = builtin_file_name_base(vec![Value::string("/tmp/dir/")]);
     assert_eq!(result.unwrap().as_str(), Some(""));
 
-    let result = builtin_file_name_with_extension(vec![Value::string("foo"), Value::string("el")]);
-    assert_eq!(result.unwrap().as_str(), Some("foo.el"));
-
-    let result =
-        builtin_file_name_with_extension(vec![Value::string("foo.el"), Value::string("txt")]);
-    assert_eq!(result.unwrap().as_str(), Some("foo.txt"));
-
-    let result = builtin_file_name_with_extension(vec![Value::string("foo"), Value::string(".el")]);
-    assert_eq!(result.unwrap().as_str(), Some("foo.el"));
-
     let result = builtin_file_name_sans_versions(vec![Value::string("foo.~12~")]);
     assert_eq!(result.unwrap().as_str(), Some("foo"));
 
@@ -1550,21 +1552,6 @@ fn test_builtin_file_name_ops() {
 
     let split = builtin_file_name_split(vec![Value::string("")]).unwrap();
     assert_eq!(split, Value::Nil);
-
-    let malformed = builtin_file_name_with_extension(vec![Value::string("foo"), Value::string("")])
-        .expect_err("empty extension should be rejected");
-    match malformed {
-        Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
-        other => panic!("unexpected flow: {other:?}"),
-    }
-
-    let directory_target =
-        builtin_file_name_with_extension(vec![Value::string("/tmp/dir/"), Value::string("el")])
-            .expect_err("directory filenames should be rejected");
-    match directory_target {
-        Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
-        other => panic!("unexpected flow: {other:?}"),
-    }
 
     let result = builtin_file_name_as_directory(vec![Value::string("/home/user")]);
     assert_eq!(result.unwrap().as_str(), Some("/home/user/"));
@@ -1623,12 +1610,6 @@ fn test_builtin_file_name_ops_strict_types() {
     assert!(builtin_file_name_sans_extension(vec![Value::symbol("x")]).is_err());
     assert!(builtin_file_name_base(vec![Value::symbol("x")]).is_err());
     assert!(builtin_file_name_base(vec![]).is_err());
-    assert!(
-        builtin_file_name_with_extension(vec![Value::symbol("x"), Value::string("el")]).is_err()
-    );
-    assert!(
-        builtin_file_name_with_extension(vec![Value::string("x"), Value::symbol("el")]).is_err()
-    );
     assert!(builtin_file_name_sans_versions(vec![Value::symbol("x")]).is_err());
     assert!(builtin_file_name_sans_versions(vec![]).is_err());
     assert!(
@@ -1647,6 +1628,28 @@ fn test_builtin_file_name_ops_strict_types() {
     assert!(builtin_abbreviate_file_name(vec![Value::symbol("x")]).is_err());
     assert!(builtin_convert_standard_filename(vec![]).is_err());
     assert!(builtin_convert_standard_filename(vec![Value::Nil, Value::Nil]).is_err());
+}
+
+#[test]
+fn file_name_with_extension_bootstrap_matches_gnu_elisp() {
+    let results = bootstrap_eval(
+        r#"
+        (file-name-with-extension "foo" "el")
+        (file-name-with-extension "foo.el" "txt")
+        (file-name-with-extension "foo" ".el")
+        (condition-case err (file-name-with-extension "foo" "") (error (car err)))
+        (condition-case err (file-name-with-extension "/tmp/dir/" "el") (error (car err)))
+        (condition-case err (file-name-with-extension 'x "el") (error (car err)))
+        (condition-case err (file-name-with-extension "x" 'el) (error (car err)))
+        "#,
+    );
+    assert_eq!(results[0], r#"OK "foo.el""#);
+    assert_eq!(results[1], r#"OK "foo.txt""#);
+    assert_eq!(results[2], r#"OK "foo.el""#);
+    assert_eq!(results[3], "OK error");
+    assert_eq!(results[4], "OK error");
+    assert_eq!(results[5], "OK wrong-type-argument");
+    assert_eq!(results[6], "OK wrong-type-argument");
 }
 
 #[test]

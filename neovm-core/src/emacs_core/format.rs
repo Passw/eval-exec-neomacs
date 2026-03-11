@@ -494,52 +494,6 @@ pub(crate) fn builtin_string_pad(args: Vec<Value>) -> EvalResult {
 // string-fill
 // ---------------------------------------------------------------------------
 
-/// `(string-fill STRING LENGTH &optional JUSTIFY NOSQUEEZE)` -- wrap STRING.
-///
-/// This compatibility implementation wraps whitespace-separated words so each
-/// output line is at most LENGTH characters.  JUSTIFY/NOSQUEEZE are accepted
-/// for arity compatibility and currently ignored.
-pub(crate) fn builtin_string_fill(args: Vec<Value>) -> EvalResult {
-    expect_min_max_args("string-fill", &args, 2, 4)?;
-    let s = require_string("string-fill", &args[0])?;
-    let width = require_natnum(&args[1])?;
-    if width == 0 || s.is_empty() {
-        return Ok(Value::string(s));
-    }
-
-    let mut out_lines: Vec<String> = Vec::new();
-    for source_line in s.split('\n') {
-        let words: Vec<&str> = source_line.split_whitespace().collect();
-        if words.is_empty() {
-            out_lines.push(String::new());
-            continue;
-        }
-
-        let mut current = String::new();
-        for word in words {
-            if current.is_empty() {
-                current.push_str(word);
-                continue;
-            }
-
-            if current.len() + 1 + word.len() <= width {
-                current.push(' ');
-                current.push_str(word);
-            } else {
-                out_lines.push(current);
-                current = word.to_string();
-            }
-        }
-        out_lines.push(current);
-    }
-
-    Ok(Value::string(out_lines.join("\n")))
-}
-
-// ---------------------------------------------------------------------------
-// string-limit
-// ---------------------------------------------------------------------------
-
 /// `(string-limit STRING LENGTH &optional END ELLIPSIS)` -- limit STRING size.
 ///
 /// If STRING exceeds LENGTH, truncate to fit.  END non-nil truncates from the
@@ -613,39 +567,6 @@ pub(crate) fn builtin_string_lines(args: Vec<Value>) -> EvalResult {
         .collect();
 
     Ok(Value::list(lines))
-}
-
-// ---------------------------------------------------------------------------
-// string-clean-whitespace
-// ---------------------------------------------------------------------------
-
-/// `(string-clean-whitespace STRING)` -- collapse runs of whitespace into
-/// single spaces and trim leading/trailing whitespace.
-pub(crate) fn builtin_string_clean_whitespace(args: Vec<Value>) -> EvalResult {
-    expect_args("string-clean-whitespace", &args, 1)?;
-    let s = require_string("string-clean-whitespace", &args[0])?;
-
-    let mut result = String::new();
-    let mut in_whitespace = false;
-
-    for ch in s.chars() {
-        if ch.is_whitespace() {
-            if !in_whitespace && !result.is_empty() {
-                result.push(' ');
-            }
-            in_whitespace = true;
-        } else {
-            in_whitespace = false;
-            result.push(ch);
-        }
-    }
-
-    // Trim trailing space that might have been added.
-    if result.ends_with(' ') {
-        result.pop();
-    }
-
-    Ok(Value::string(result))
 }
 
 // ---------------------------------------------------------------------------

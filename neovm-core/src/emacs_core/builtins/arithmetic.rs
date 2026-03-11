@@ -177,6 +177,9 @@ pub(crate) fn builtin_add1(args: Vec<Value>) -> EvalResult {
         Value::Int(n) => Ok(Value::Int(n.wrapping_add(1))),
         Value::Float(f, _) => Ok(Value::Float(f + 1.0, next_float_id())),
         Value::Char(c) => Ok(Value::Int(*c as i64 + 1)),
+        other if super::marker::is_marker(other) => Ok(Value::Int(
+            super::marker::marker_position_as_int(other)?.wrapping_add(1),
+        )),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("number-or-marker-p"), *other],
@@ -191,6 +194,9 @@ pub(crate) fn builtin_sub1(args: Vec<Value>) -> EvalResult {
         Value::Int(n) => Ok(Value::Int(n.wrapping_sub(1))),
         Value::Float(f, _) => Ok(Value::Float(f - 1.0, next_float_id())),
         Value::Char(c) => Ok(Value::Int(*c as i64 - 1)),
+        other if super::marker::is_marker(other) => Ok(Value::Int(
+            super::marker::marker_position_as_int(other)?.wrapping_sub(1),
+        )),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("number-or-marker-p"), *other],
@@ -212,6 +218,9 @@ pub(crate) fn builtin_max(args: Vec<Value>) -> EvalResult {
     match best_value {
         Value::Int(_) | Value::Float(_, _) => Ok(best_value),
         Value::Char(c) => Ok(Value::Int(c as i64)),
+        other if super::marker::is_marker(&other) => {
+            Ok(Value::Int(super::marker::marker_position_as_int(&other)?))
+        }
         _ => unreachable!("max winner must be numeric"),
     }
 }
@@ -230,6 +239,9 @@ pub(crate) fn builtin_min(args: Vec<Value>) -> EvalResult {
     match best_value {
         Value::Int(_) | Value::Float(_, _) => Ok(best_value),
         Value::Char(c) => Ok(Value::Int(c as i64)),
+        other if super::marker::is_marker(&other) => {
+            Ok(Value::Int(super::marker::marker_position_as_int(&other)?))
+        }
         _ => unreachable!("min winner must be numeric"),
     }
 }

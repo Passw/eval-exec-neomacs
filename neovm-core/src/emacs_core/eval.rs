@@ -1526,8 +1526,7 @@ impl Evaluator {
             "Return the width of STRING in pixels.",
         );
         // Keep these as non-interactive autoload wrappers to match GNU Emacs
-        // `symbol-function` shape while preserving runtime callability through
-        // builtin dispatch.
+        // `symbol-function` shape during bootstrap.
         drop(seed_autoload_noninteractive);
         obarray.set_symbol_function(
             "string-chop-newline",

@@ -410,22 +410,6 @@ pub(crate) fn builtin_keymapp_in_obarray(obarray: &Obarray, args: &[Value]) -> E
     Ok(Value::Nil)
 }
 
-/// (kbd STRING) -> string-or-vector
-/// Parses key description text and returns Emacs-style event encoding.
-pub(super) fn builtin_kbd(args: Vec<Value>) -> EvalResult {
-    expect_args("kbd", &args, 1)?;
-    let desc = match &args[0] {
-        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
-        other => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("stringp"), *other],
-            ));
-        }
-    };
-    super::kbd::parse_kbd_string(&desc).map_err(|msg| signal("error", vec![Value::string(msg)]))
-}
-
 /// `(event-convert-list EVENT-DESC)` -> event object or nil
 pub(super) fn builtin_event_convert_list(args: Vec<Value>) -> EvalResult {
     expect_args("event-convert-list", &args, 1)?;

@@ -846,38 +846,6 @@ pub(crate) fn builtin_assq(args: Vec<Value>) -> EvalResult {
     }
 }
 
-pub(crate) fn builtin_assoc_delete_all(args: Vec<Value>) -> EvalResult {
-    expect_args("assoc-delete-all", &args, 2)?;
-    let key = args[0];
-    delete_from_list_in_place(&args[1], |entry| match entry {
-        Value::Cons(cell) => {
-            let pair = read_cons(*cell);
-            equal_value(&key, &pair.car, 0)
-        }
-        _ => false,
-    })
-}
-
-pub(crate) fn builtin_assoc_delete_all_eval(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_range_args("assoc-delete-all", &args, 2, 3)?;
-    if args.len() < 3 || args[2].is_nil() {
-        return builtin_assoc_delete_all(vec![args[0], args[1]]);
-    }
-
-    let key = args[0];
-    let test_fn = args[2];
-    delete_from_list_in_place_result(&args[1], |entry| match entry {
-        Value::Cons(cell) => {
-            let pair = read_cons(*cell);
-            Ok(eval.apply(test_fn, vec![key, pair.car])?.is_truthy())
-        }
-        _ => Ok(false),
-    })
-}
-
 pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
     expect_args("copy-sequence", &args, 1)?;
     match &args[0] {

@@ -164,12 +164,13 @@ pub(super) fn char_equal_folded(code: i64) -> Option<String> {
 
 /// Extract an integer/marker-ish position value.
 ///
-/// NeoVM does not expose marker values yet, so this currently accepts
-/// integers (including char values) and signals with `integer-or-marker-p`.
+/// GNU Emacs accepts marker designators anywhere `integer-or-marker-p`
+/// is allowed, using the marker's current position.
 pub(super) fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) => Ok(*n),
         Value::Char(c) => Ok(*c as i64),
+        other if super::marker::is_marker(other) => super::marker::marker_position_as_int(other),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("integer-or-marker-p"), *other],
@@ -208,6 +209,9 @@ pub(super) fn expect_number_or_marker(value: &Value) -> Result<NumberOrMarker, F
         Value::Int(n) => Ok(NumberOrMarker::Int(*n)),
         Value::Char(c) => Ok(NumberOrMarker::Int(*c as i64)),
         Value::Float(f, _) => Ok(NumberOrMarker::Float(*f)),
+        other if super::marker::is_marker(other) => Ok(NumberOrMarker::Int(
+            super::marker::marker_position_as_int(other)?,
+        )),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("number-or-marker-p"), *other],
@@ -1720,9 +1724,6 @@ pub(crate) fn dispatch_builtin(
             return Some(super::custom::builtin_make_local_variable(eval, args));
         }
         "local-variable-p" => return Some(super::custom::builtin_local_variable_p(eval, args)),
-        "buffer-local-boundp" => {
-            return Some(super::custom::builtin_buffer_local_bound_p(eval, args));
-        }
         "buffer-local-variables" => {
             return Some(super::custom::builtin_buffer_local_variables(eval, args));
         }
@@ -2764,7 +2765,6 @@ pub(crate) fn dispatch_builtin(
         "seq-every-p" => return Some(super::cl_lib::builtin_seq_every_p(eval, args)),
         "seq-sort" => return Some(super::cl_lib::builtin_seq_sort(eval, args)),
         "assoc" => return Some(builtin_assoc_eval(eval, args)),
-        "assoc-delete-all" => return Some(builtin_assoc_delete_all_eval(eval, args)),
         "plist-member" => return Some(builtin_plist_member(eval, args)),
         "json-parse-buffer" => return Some(super::json::builtin_json_parse_buffer(eval, args)),
         "json-insert" => return Some(super::json::builtin_json_insert(eval, args)),
@@ -3002,7 +3002,6 @@ pub(crate) fn dispatch_builtin(
         "convert-standard-filename" => super::fileio::builtin_convert_standard_filename(args),
         "file-name-absolute-p" => super::fileio::builtin_file_name_absolute_p(args),
         "file-name-base" => super::fileio::builtin_file_name_base(args),
-        "file-name-with-extension" => super::fileio::builtin_file_name_with_extension(args),
         "file-name-sans-versions" => super::fileio::builtin_file_name_sans_versions(args),
         "file-name-parent-directory" => super::fileio::builtin_file_name_parent_directory(args),
         "file-name-split" => super::fileio::builtin_file_name_split(args),
@@ -3063,7 +3062,6 @@ pub(crate) fn dispatch_builtin(
         "file-attributes" => super::dired::builtin_file_attributes(args),
 
         // Keymap (pure — no evaluator needed)
-        "kbd" => builtin_kbd(args),
         "single-key-description" => builtin_single_key_description(args),
         "key-description" => builtin_key_description(args),
         "event-convert-list" => builtin_event_convert_list(args),
@@ -3874,11 +3872,9 @@ pub(crate) fn dispatch_builtin(
         // Format/string utilities (pure)
         "format-time-string" => super::format::builtin_format_time_string(args),
         "string-pad" => super::format::builtin_string_pad(args),
-        "string-fill" => super::format::builtin_string_fill(args),
         "string-limit" => super::format::builtin_string_limit(args),
         "string-chop-newline" => super::format::builtin_string_chop_newline(args),
         "string-lines" => super::format::builtin_string_lines(args),
-        "string-clean-whitespace" => super::format::builtin_string_clean_whitespace(args),
         "string-pixel-width" => super::format::builtin_string_pixel_width(args),
         "string-glyph-split" => super::format::builtin_string_glyph_split(args),
         // Marker (pure)
@@ -4136,7 +4132,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "undo-boundary"
         | "write-char"
         | "assoc"
-        | "assoc-delete-all"
         | "plist-member"
         | "window-list-1"
         | "window-bump-use-time"
@@ -4257,7 +4252,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "convert-standard-filename" => super::fileio::builtin_convert_standard_filename(args),
         "file-name-absolute-p" => super::fileio::builtin_file_name_absolute_p(args),
         "file-name-base" => super::fileio::builtin_file_name_base(args),
-        "file-name-with-extension" => super::fileio::builtin_file_name_with_extension(args),
         "file-name-sans-versions" => super::fileio::builtin_file_name_sans_versions(args),
         "file-name-parent-directory" => super::fileio::builtin_file_name_parent_directory(args),
         "file-name-split" => super::fileio::builtin_file_name_split(args),
@@ -4312,7 +4306,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "find-file-name-handler" => super::fileio::builtin_find_file_name_handler(args),
         "file-attributes" => super::dired::builtin_file_attributes(args),
         // Keymap (pure)
-        "kbd" => builtin_kbd(args),
         "single-key-description" => builtin_single_key_description(args),
         "key-description" => builtin_key_description(args),
         "event-convert-list" => builtin_event_convert_list(args),

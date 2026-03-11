@@ -51,6 +51,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) => Ok(*n),
         Value::Char(c) => Ok(*c as i64),
+        marker if super::marker::is_marker(marker) => super::marker::marker_position_as_int(marker),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("integerp"), *other],
@@ -62,6 +63,7 @@ fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) => Ok(*n),
         Value::Char(c) => Ok(*c as i64),
+        marker if super::marker::is_marker(marker) => super::marker::marker_position_as_int(marker),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("integer-or-marker-p"), *other],

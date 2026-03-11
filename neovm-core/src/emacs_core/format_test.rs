@@ -170,27 +170,19 @@ fn string_pad_type_errors() {
 // ===================================================================
 
 #[test]
-fn string_fill_no_wrap() {
-    let result = builtin_string_fill(vec![Value::string("x"), Value::Int(2)]).unwrap();
-    assert_eq!(result.as_str().unwrap(), "x");
-}
-
-#[test]
-fn string_fill_wraps_words() {
-    let result = builtin_string_fill(vec![Value::string("aa bb ccc d"), Value::Int(5)]).unwrap();
-    assert_eq!(result.as_str().unwrap(), "aa bb\nccc d");
-}
-
-#[test]
-fn string_fill_preserves_blank_lines() {
-    let result = builtin_string_fill(vec![Value::string("a b\n\nc d"), Value::Int(10)]).unwrap();
-    assert_eq!(result.as_str().unwrap(), "a b\n\nc d");
-}
-
-#[test]
-fn string_fill_type_errors() {
-    assert!(builtin_string_fill(vec![Value::Int(1), Value::Int(2)]).is_err());
-    assert!(builtin_string_fill(vec![Value::string("x"), Value::Int(-1)]).is_err());
+fn string_fill_bootstrap_matches_gnu_elisp() {
+    let results = bootstrap_eval(
+        r#"
+        (string-fill "x" 2)
+        (string-fill "aa bb ccc d" 5)
+        (string-fill "a b\n\nc d" 10)
+        (condition-case err (string-fill 1 2) (error (car err)))
+        "#,
+    );
+    assert_eq!(results[0], r#"OK "x""#);
+    assert_eq!(results[1], "OK \"aa bb\nccc d\"");
+    assert_eq!(results[2], "OK \"a b\n\nc d\"");
+    assert_eq!(results[3], "OK \"\u{1}\"");
 }
 
 // ===================================================================
@@ -307,33 +299,23 @@ fn string_lines_empty_string() {
 // ===================================================================
 
 #[test]
-fn string_clean_whitespace_basic() {
-    let result = builtin_string_clean_whitespace(vec![Value::string("  hello   world  ")]);
-    assert_eq!(result.unwrap().as_str().unwrap(), "hello world");
-}
-
-#[test]
-fn string_clean_whitespace_tabs_and_newlines() {
-    let result = builtin_string_clean_whitespace(vec![Value::string("a\t\tb\n\nc")]);
-    assert_eq!(result.unwrap().as_str().unwrap(), "a b c");
-}
-
-#[test]
-fn string_clean_whitespace_no_change() {
-    let result = builtin_string_clean_whitespace(vec![Value::string("hello world")]);
-    assert_eq!(result.unwrap().as_str().unwrap(), "hello world");
-}
-
-#[test]
-fn string_clean_whitespace_empty() {
-    let result = builtin_string_clean_whitespace(vec![Value::string("")]);
-    assert_eq!(result.unwrap().as_str().unwrap(), "");
-}
-
-#[test]
-fn string_clean_whitespace_only_spaces() {
-    let result = builtin_string_clean_whitespace(vec![Value::string("   ")]);
-    assert_eq!(result.unwrap().as_str().unwrap(), "");
+fn string_clean_whitespace_bootstrap_matches_gnu_elisp() {
+    let results = bootstrap_eval(
+        r#"
+        (string-clean-whitespace "  hello   world  ")
+        (string-clean-whitespace "a\t\tb\n\nc")
+        (string-clean-whitespace "hello world")
+        (string-clean-whitespace "")
+        (string-clean-whitespace "   ")
+        (condition-case err (string-clean-whitespace 1) (error (car err)))
+        "#,
+    );
+    assert_eq!(results[0], r#"OK "hello world""#);
+    assert_eq!(results[1], r#"OK "a b c""#);
+    assert_eq!(results[2], r#"OK "hello world""#);
+    assert_eq!(results[3], "OK \"\"");
+    assert_eq!(results[4], "OK \"\"");
+    assert_eq!(results[5], "OK wrong-type-argument");
 }
 
 // ===================================================================

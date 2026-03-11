@@ -98,6 +98,14 @@ fn translate_complex_pattern() {
 }
 
 #[test]
+fn translate_category_escape_keeps_fill_patterns_compilable() {
+    let emacs = "[ \t]\\|\\c|.\\|.\\c|";
+    let rust = translate_emacs_regex(emacs);
+    assert_eq!(rust, "[ \t]|[^\\x00-\\x7F].|.[^\\x00-\\x7F]");
+    compile_emacs_regex_case_fold(emacs, true).expect("fill category regexp should compile");
+}
+
+#[test]
 fn translate_empty_pattern() {
     assert_eq!(translate_emacs_regex(""), "");
 }

@@ -355,6 +355,19 @@ pub fn translate_emacs_regex(pattern: &str) -> String {
                             out.push_str("\\S");
                         }
                     }
+                    'c' => {
+                        i += 1 + next_len;
+                        if i < len {
+                            let (_, class_len) =
+                                next_char_at(pattern, i).expect("byte index must be char boundary");
+                            i += class_len;
+                        }
+                        // GNU Emacs category regexps are implemented in C and depend on
+                        // the active category table. Rust's `regex` backend has no
+                        // equivalent dynamic character-category predicate, so approximate
+                        // category escapes as non-ASCII until the native engine is ported.
+                        out.push_str("[^\\x00-\\x7F]");
+                    }
                     // \= (match at point) → \A (match at start of search region)
                     '=' => {
                         out.push_str("\\A");

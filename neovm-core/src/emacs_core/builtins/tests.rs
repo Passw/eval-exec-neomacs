@@ -1,6 +1,8 @@
 use super::*;
 use crate::emacs_core::expr::Expr;
+use crate::emacs_core::load::{apply_runtime_startup_state, create_bootstrap_evaluator_cached};
 use crate::emacs_core::value::{LambdaData, LambdaParams};
+use crate::emacs_core::{format_eval_result, parse_forms};
 
 fn install_variable_watcher_probe(eval: &mut crate::emacs_core::eval::Evaluator, callback: &str) {
     let lambda = Value::make_lambda(LambdaData {
@@ -43,6 +45,16 @@ fn install_variable_watcher_probe(eval: &mut crate::emacs_core::eval::Evaluator,
 fn create_unique_test_buffer(eval: &mut crate::emacs_core::eval::Evaluator, name: &str) -> Value {
     let unique_name = eval.buffers.generate_new_buffer_name(name);
     Value::Buffer(eval.buffers.create_buffer(&unique_name))
+}
+
+fn bootstrap_eval_all(src: &str) -> Vec<String> {
+    let mut ev = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut ev).expect("runtime startup state");
+    let forms = parse_forms(src).expect("parse");
+    ev.eval_forms(&forms)
+        .iter()
+        .map(format_eval_result)
+        .collect()
 }
 
 #[test]
@@ -132,6 +144,43 @@ fn pure_dispatch_typed_max_min_preserve_selected_operand_type() {
     .expect("builtin max should resolve")
     .expect("builtin max should evaluate");
     assert_eq!(max_float, Value::Float(1.0, next_float_id()));
+}
+
+#[test]
+fn pure_dispatch_typed_numeric_primitives_accept_markers() {
+    let marker = crate::emacs_core::marker::make_marker_value(Some("*scratch*"), Some(4), false);
+
+    let max_with_marker = dispatch_builtin_pure("max", vec![Value::Int(1), marker])
+        .expect("builtin max should resolve")
+        .expect("builtin max should evaluate");
+    assert_eq!(max_with_marker, Value::Int(4));
+
+    let marker = crate::emacs_core::marker::make_marker_value(Some("*scratch*"), Some(4), false);
+    let min_with_marker = dispatch_builtin_pure("min", vec![Value::Int(10), marker])
+        .expect("builtin min should resolve")
+        .expect("builtin min should evaluate");
+    assert_eq!(min_with_marker, Value::Int(4));
+
+    let left_marker =
+        crate::emacs_core::marker::make_marker_value(Some("*scratch*"), Some(2), false);
+    let right_marker =
+        crate::emacs_core::marker::make_marker_value(Some("*scratch*"), Some(5), false);
+    let lt_with_markers = dispatch_builtin_pure("<", vec![left_marker, right_marker])
+        .expect("builtin < should resolve")
+        .expect("builtin < should evaluate");
+    assert_eq!(lt_with_markers, Value::True);
+
+    let marker = crate::emacs_core::marker::make_marker_value(Some("*scratch*"), Some(4), false);
+    let add1_with_marker = dispatch_builtin_pure("1+", vec![marker])
+        .expect("builtin 1+ should resolve")
+        .expect("builtin 1+ should evaluate");
+    assert_eq!(add1_with_marker, Value::Int(5));
+
+    let marker = crate::emacs_core::marker::make_marker_value(Some("*scratch*"), Some(4), false);
+    let sub1_with_marker = dispatch_builtin_pure("1-", vec![marker])
+        .expect("builtin 1- should resolve")
+        .expect("builtin 1- should evaluate");
+    assert_eq!(sub1_with_marker, Value::Int(3));
 }
 
 #[test]
@@ -6543,52 +6592,18 @@ fn text_char_description_nonunicode_char_code_bounds_match_oracle() {
 
 #[test]
 fn assoc_delete_all_supports_default_equal_and_optional_test() {
-    let mut eval = crate::emacs_core::eval::Evaluator::new();
-
-    let entry_foo_1 = Value::cons(Value::string("foo"), Value::Int(1));
-    let entry_bar = Value::cons(Value::string("bar"), Value::Int(2));
-    let entry_foo_3 = Value::cons(Value::string("foo"), Value::Int(3));
-    let alist_default = Value::list(vec![
-        entry_foo_1,
-        Value::symbol("ignored-atom"),
-        entry_bar,
-        entry_foo_3,
-    ]);
-    let removed_default = dispatch_builtin(
-        &mut eval,
-        "assoc-delete-all",
-        vec![Value::string("foo"), alist_default],
-    )
-    .expect("assoc-delete-all should resolve")
-    .expect("assoc-delete-all should evaluate");
-    let expected_default = Value::list(vec![Value::symbol("ignored-atom"), entry_bar]);
-    assert_eq!(removed_default, expected_default);
-
-    let eq_key = Value::string("foo");
-    let entry_same_key = Value::cons(eq_key, Value::Int(9));
-    let entry_equal_only = Value::cons(Value::string("foo"), Value::Int(10));
-    let alist_eq = Value::list(vec![entry_same_key, entry_equal_only]);
-    let removed_eq = dispatch_builtin(
-        &mut eval,
-        "assoc-delete-all",
-        vec![eq_key, alist_eq, Value::symbol("eq")],
-    )
-    .expect("assoc-delete-all should resolve")
-    .expect("assoc-delete-all should evaluate");
-    let expected_eq = Value::list(vec![entry_equal_only]);
-    assert_eq!(removed_eq, expected_eq);
-
-    let arity = dispatch_builtin(
-        &mut eval,
-        "assoc-delete-all",
-        vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil],
-    )
-    .expect("assoc-delete-all should resolve")
-    .expect_err("assoc-delete-all should enforce arity");
-    match arity {
-        Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
-        other => panic!("expected signal, got {other:?}"),
-    }
+    let results = bootstrap_eval_all(
+        r#"
+        (assoc-delete-all "foo" '(("foo" . 1) ignored ("bar" . 2) ("foo" . 3)))
+        (let* ((key "foo")
+               (alist (list (cons key 9) (cons (copy-sequence "foo") 10))))
+          (assoc-delete-all key alist 'eq))
+        (condition-case err (assoc-delete-all nil nil nil nil) (error (car err)))
+        "#,
+    );
+    assert_eq!(results[0], r#"OK (ignored ("bar" . 2))"#);
+    assert_eq!(results[1], r#"OK (("foo" . 10))"#);
+    assert_eq!(results[2], "OK wrong-number-of-arguments");
 }
 
 #[test]

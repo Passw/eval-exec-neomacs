@@ -38,6 +38,10 @@ fn bootstrap_eval_all(src: &str) -> Vec<String> {
         .collect()
 }
 
+fn bootstrap_eval_one(src: &str) -> String {
+    bootstrap_eval_all(src).into_iter().next().expect("result")
+}
+
 fn load_minimal_backquote_runtime(eval: &mut Evaluator) {
     use crate::emacs_core::load::{find_file_in_load_path, get_load_path, load_file};
 
@@ -413,7 +417,7 @@ fn setq_local_constant_and_type_payloads_match_oracle() {
 
 #[test]
 fn setq_local_follows_variable_alias_resolution() {
-    let result = eval_one(
+    let result = bootstrap_eval_one(
         "(progn
            (defvaralias 'vm-setq-local-alias 'vm-setq-local-base)
            (with-temp-buffer

@@ -1,8 +1,19 @@
 use super::*;
+use crate::emacs_core::load::{apply_runtime_startup_state, create_bootstrap_evaluator_cached};
 use crate::emacs_core::{Evaluator, format_eval_result, parse_forms};
 
 fn eval_all(src: &str) -> Vec<String> {
     let mut ev = Evaluator::new();
+    let forms = parse_forms(src).expect("parse");
+    ev.eval_forms(&forms)
+        .iter()
+        .map(format_eval_result)
+        .collect()
+}
+
+fn bootstrap_eval_all(src: &str) -> Vec<String> {
+    let mut ev = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut ev).expect("runtime startup state");
     let forms = parse_forms(src).expect("parse");
     ev.eval_forms(&forms)
         .iter()
@@ -533,7 +544,7 @@ fn local_variable_p_enforces_buffer_and_symbol_contracts() {
 
 #[test]
 fn local_and_buffer_local_predicates_follow_alias_resolution() {
-    let results = eval_all(
+    let results = bootstrap_eval_all(
         r#"(defvaralias 'vm-local-p-alias 'vm-local-p-base)
            (let ((buf (get-buffer-create "vm-local-p-buf")))
              (set-buffer buf)
@@ -548,7 +559,7 @@ fn local_and_buffer_local_predicates_follow_alias_resolution() {
 
 #[test]
 fn buffer_local_bound_p_matches_emacs_shape() {
-    let results = eval_all(
+    let results = bootstrap_eval_all(
         r#"(defvar neomacs-buffer-local-boundp-global 1)
            (let ((buf (get-buffer-create "test-buf")))
              (buffer-local-boundp 'neomacs-buffer-local-boundp-global buf))
@@ -570,7 +581,7 @@ fn buffer_local_bound_p_matches_emacs_shape() {
     assert_eq!(results[1], "OK t");
     assert_eq!(results[2], "OK nil");
     assert_eq!(results[3], "OK t");
-    assert_eq!(results[4], "OK nil");
+    assert_eq!(results[4], r#"ERR (error ("No such buffer"))"#);
     assert_eq!(results[5], "OK wrong-type-argument");
     assert_eq!(results[6], "OK wrong-type-argument");
     assert_eq!(results[7], "OK wrong-number-of-arguments");

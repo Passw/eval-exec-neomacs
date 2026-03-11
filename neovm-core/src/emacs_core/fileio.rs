@@ -210,24 +210,6 @@ pub fn file_name_base(filename: &str) -> String {
     file_name_sans_extension(&nondirectory)
 }
 
-/// Return FILENAME with EXTENSION replacing any existing final extension.
-pub fn file_name_with_extension(filename: &str, extension: &str) -> Result<String, String> {
-    if filename.ends_with('/') {
-        return Err(format!("Filename is a directory: {filename}"));
-    }
-
-    let normalized_extension = extension.strip_prefix('.').unwrap_or(extension);
-    if normalized_extension.is_empty() {
-        return Err(format!("Malformed extension: {extension}"));
-    }
-
-    Ok(format!(
-        "{}.{}",
-        file_name_sans_extension(filename),
-        normalized_extension
-    ))
-}
-
 /// Return FILENAME without trailing backup version markers.
 ///
 /// With KEEP_BACKUP_VERSION non-nil, returns FILENAME unchanged.
@@ -1750,17 +1732,6 @@ pub(crate) fn builtin_file_name_base(args: Vec<Value>) -> EvalResult {
     let filename = args.first().cloned().unwrap_or(Value::Nil);
     let filename = expect_string_strict(&filename)?;
     Ok(Value::string(file_name_base(&filename)))
-}
-
-/// (file-name-with-extension FILENAME EXTENSION) -> string
-pub(crate) fn builtin_file_name_with_extension(args: Vec<Value>) -> EvalResult {
-    expect_args("file-name-with-extension", &args, 2)?;
-    let filename = expect_string_strict(&args[0])?;
-    let extension = expect_string_strict(&args[1])?;
-    match file_name_with_extension(&filename, &extension) {
-        Ok(path) => Ok(Value::string(path)),
-        Err(message) => Err(signal("error", vec![Value::string(message)])),
-    }
 }
 
 /// (file-name-sans-versions FILENAME &optional KEEP-BACKUP-VERSION) -> string

@@ -2432,18 +2432,8 @@ fn arith_add(a: &Value, b: &Value) -> EvalResult {
     match (a, b) {
         (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a.wrapping_add(*b))),
         _ => {
-            let a = a.as_number_f64().ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), *a],
-                )
-            })?;
-            let b = b.as_number_f64().ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), *b],
-                )
-            })?;
+            let a = number_or_marker_as_f64(a)?;
+            let b = number_or_marker_as_f64(b)?;
             Ok(Value::Float(a + b, next_float_id()))
         }
     }
@@ -2453,18 +2443,8 @@ fn arith_sub(a: &Value, b: &Value) -> EvalResult {
     match (a, b) {
         (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a.wrapping_sub(*b))),
         _ => {
-            let a = a.as_number_f64().ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), *a],
-                )
-            })?;
-            let b = b.as_number_f64().ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), *b],
-                )
-            })?;
+            let a = number_or_marker_as_f64(a)?;
+            let b = number_or_marker_as_f64(b)?;
             Ok(Value::Float(a - b, next_float_id()))
         }
     }
@@ -2474,18 +2454,8 @@ fn arith_mul(a: &Value, b: &Value) -> EvalResult {
     match (a, b) {
         (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a.wrapping_mul(*b))),
         _ => {
-            let a = a.as_number_f64().ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), *a],
-                )
-            })?;
-            let b = b.as_number_f64().ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), *b],
-                )
-            })?;
+            let a = number_or_marker_as_f64(a)?;
+            let b = number_or_marker_as_f64(b)?;
             Ok(Value::Float(a * b, next_float_id()))
         }
     }
@@ -2499,18 +2469,8 @@ fn arith_div(a: &Value, b: &Value) -> EvalResult {
         )),
         (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a / b)),
         _ => {
-            let a = a.as_number_f64().ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), *a],
-                )
-            })?;
-            let b = b.as_number_f64().ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), *b],
-                )
-            })?;
+            let a = number_or_marker_as_f64(a)?;
+            let b = number_or_marker_as_f64(b)?;
             if b == 0.0 {
                 return Err(signal(
                     "arith-error",
@@ -2540,6 +2500,9 @@ fn arith_add1(a: &Value) -> EvalResult {
     match a {
         Value::Int(n) => Ok(Value::Int(n.wrapping_add(1))),
         Value::Float(f, _) => Ok(Value::Float(f + 1.0, next_float_id())),
+        marker if crate::emacs_core::marker::is_marker(marker) => Ok(Value::Int(
+            crate::emacs_core::marker::marker_position_as_int(marker)?.wrapping_add(1),
+        )),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("number-or-marker-p"), *a],
@@ -2551,6 +2514,9 @@ fn arith_sub1(a: &Value) -> EvalResult {
     match a {
         Value::Int(n) => Ok(Value::Int(n.wrapping_sub(1))),
         Value::Float(f, _) => Ok(Value::Float(f - 1.0, next_float_id())),
+        marker if crate::emacs_core::marker::is_marker(marker) => Ok(Value::Int(
+            crate::emacs_core::marker::marker_position_as_int(marker)?.wrapping_sub(1),
+        )),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("number-or-marker-p"), *a],
@@ -2562,6 +2528,9 @@ fn arith_negate(a: &Value) -> EvalResult {
     match a {
         Value::Int(n) => Ok(Value::Int(-n)),
         Value::Float(f, _) => Ok(Value::Float(-f, next_float_id())),
+        marker if crate::emacs_core::marker::is_marker(marker) => Ok(Value::Int(
+            -crate::emacs_core::marker::marker_position_as_int(marker)?,
+        )),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("number-or-marker-p"), *a],
@@ -2573,18 +2542,8 @@ fn num_eq(a: &Value, b: &Value) -> Result<bool, Flow> {
     match (a, b) {
         (Value::Int(a), Value::Int(b)) => Ok(a == b),
         _ => {
-            let a = a.as_number_f64().ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), *a],
-                )
-            })?;
-            let b = b.as_number_f64().ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), *b],
-                )
-            })?;
+            let a = number_or_marker_as_f64(a)?;
+            let b = number_or_marker_as_f64(b)?;
             Ok(a == b)
         }
     }
@@ -2594,18 +2553,8 @@ fn num_cmp(a: &Value, b: &Value) -> Result<i32, Flow> {
     match (a, b) {
         (Value::Int(a), Value::Int(b)) => Ok(a.cmp(b) as i32),
         _ => {
-            let a = a.as_number_f64().ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), *a],
-                )
-            })?;
-            let b = b.as_number_f64().ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), *b],
-                )
-            })?;
+            let a = number_or_marker_as_f64(a)?;
+            let b = number_or_marker_as_f64(b)?;
             Ok(if a < b {
                 -1
             } else if a > b {
@@ -2614,6 +2563,21 @@ fn num_cmp(a: &Value, b: &Value) -> Result<i32, Flow> {
                 0
             })
         }
+    }
+}
+
+fn number_or_marker_as_f64(value: &Value) -> Result<f64, Flow> {
+    match value {
+        Value::Int(n) => Ok(*n as f64),
+        Value::Float(f, _) => Ok(*f),
+        Value::Char(c) => Ok(*c as u32 as f64),
+        marker if crate::emacs_core::marker::is_marker(marker) => {
+            Ok(crate::emacs_core::marker::marker_position_as_int(marker)? as f64)
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("number-or-marker-p"), *other],
+        )),
     }
 }
 

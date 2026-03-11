@@ -373,46 +373,6 @@ pub(crate) fn builtin_local_variable_p(
     }
 }
 
-/// `(buffer-local-boundp SYMBOL BUFFER)` -- test if SYMBOL is bound in BUFFER.
-pub(crate) fn builtin_buffer_local_bound_p(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_args("buffer-local-boundp", &args, 2)?;
-    let name = match &args[0] {
-        Value::Symbol(id) => resolve_sym(*id).to_owned(),
-        Value::Nil => "nil".to_string(),
-        Value::True => "t".to_string(),
-        other => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("symbolp"), *other],
-            ));
-        }
-    };
-    let resolved = super::builtins::resolve_variable_alias_name(eval, &name)?;
-
-    let buffer_id = match args[1] {
-        Value::Buffer(id) => id,
-        ref other => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("bufferp"), *other],
-            ));
-        }
-    };
-
-    let Some(buf) = eval.buffers.get(buffer_id) else {
-        return Ok(Value::Nil);
-    };
-
-    if buf.get_buffer_local(&resolved).is_some() {
-        return Ok(Value::True);
-    }
-
-    Ok(Value::bool(eval.obarray().boundp(&resolved)))
-}
-
 /// `(buffer-local-variables &optional BUFFER)` -- list all local variables.
 pub(crate) fn builtin_buffer_local_variables(
     eval: &mut super::eval::Evaluator,

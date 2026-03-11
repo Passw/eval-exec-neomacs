@@ -1290,7 +1290,7 @@ pub(crate) fn builtin_point_max(eval: &mut super::eval::Evaluator, args: Vec<Val
 /// (goto-char POS) → POS
 pub(crate) fn builtin_goto_char(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("goto-char", &args, 1)?;
-    let pos = expect_int(&args[0])?;
+    let pos = expect_integer_or_marker(&args[0])?;
     let buf = eval
         .buffers
         .current_buffer_mut()
