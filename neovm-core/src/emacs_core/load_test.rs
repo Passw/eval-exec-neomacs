@@ -200,6 +200,26 @@ fn bootstrap_lambda_parameters_bind_special_symbols_like_gnu_emacs() {
 }
 
 #[test]
+fn bootstrap_lambda_parameter_named_pi_shadows_obsolete_global_constant() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).unwrap_or_else(|err| {
+        panic!("startup state: {}", format_eval_error(&eval, &err));
+    });
+    let rendered = eval_rendered(
+        &mut eval,
+        "(list
+            (funcall (lambda (pi) pi) 7)
+            (funcall (lambda (pi) (let ((shadow pi)) shadow)) 11)
+            (let ((fn (lambda (pi) (lambda () pi))))
+              (funcall (funcall fn 13))))",
+    );
+    assert_eq!(
+        rendered, "OK (7 11 13)",
+        "bootstrap evaluator should let local pi bindings shadow the obsolete global constant"
+    );
+}
+
+#[test]
 fn bootstrap_cconv_closure_keeps_captured_canonical_t_binding() {
     let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
     apply_runtime_startup_state(&mut eval).unwrap_or_else(|err| {

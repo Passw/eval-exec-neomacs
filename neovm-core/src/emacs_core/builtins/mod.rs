@@ -830,6 +830,9 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ));
         }
+        "internal-make-var-non-special" => {
+            return Some(builtin_internal_make_var_non_special_eval(eval, args));
+        }
         "indirect-variable" => return Some(builtin_indirect_variable_eval(eval, args)),
         "symbol-value" => return Some(builtin_symbol_value(eval, args)),
         "symbol-function" => return Some(builtin_symbol_function(eval, args)),
@@ -3549,7 +3552,7 @@ pub(crate) fn dispatch_builtin(
             builtin_internal_event_symbol_parse_modifiers(args)
         }
         "internal-handle-focus-in" => builtin_internal_handle_focus_in(args),
-        "internal-make-var-non-special" => builtin_internal_make_var_non_special(args),
+        "internal-make-var-non-special" => return None,
         "internal-set-lisp-face-attribute-from-resource" => {
             builtin_internal_set_lisp_face_attribute_from_resource(args)
         }
@@ -4438,7 +4441,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
             builtin_internal_event_symbol_parse_modifiers(args)
         }
         "internal-handle-focus-in" => builtin_internal_handle_focus_in(args),
-        "internal-make-var-non-special" => builtin_internal_make_var_non_special(args),
+        "internal-make-var-non-special" => return None,
         "internal-set-lisp-face-attribute-from-resource" => {
             builtin_internal_set_lisp_face_attribute_from_resource(args)
         }

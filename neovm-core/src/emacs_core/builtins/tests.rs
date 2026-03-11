@@ -4025,12 +4025,6 @@ fn pure_dispatch_internal_placeholder_cluster_matches_compat_contracts() {
         other => panic!("unexpected flow: {other:?}"),
     }
 
-    let make_var_non_special =
-        dispatch_builtin_pure("internal-make-var-non-special", vec![Value::symbol("x")])
-            .expect("builtin internal-make-var-non-special should resolve")
-            .expect("builtin internal-make-var-non-special should evaluate");
-    assert!(make_var_non_special.is_nil());
-
     let set_face_attr = dispatch_builtin_pure(
         "internal-set-lisp-face-attribute-from-resource",
         vec![
@@ -4052,6 +4046,24 @@ fn pure_dispatch_internal_placeholder_cluster_matches_compat_contracts() {
         .expect("builtin internal-subr-documentation should resolve")
         .expect("builtin internal-subr-documentation should evaluate");
     assert_eq!(subr_doc, Value::True);
+}
+
+#[test]
+fn internal_make_var_non_special_clears_special_flag() {
+    let mut eval = crate::emacs_core::eval::Evaluator::new();
+    eval.obarray_mut().make_special("x");
+    assert!(eval.obarray().is_special("x"));
+
+    let result = dispatch_builtin(
+        &mut eval,
+        "internal-make-var-non-special",
+        vec![Value::symbol("x")],
+    )
+    .expect("builtin internal-make-var-non-special should resolve")
+    .expect("builtin internal-make-var-non-special should evaluate");
+
+    assert!(result.is_nil());
+    assert!(!eval.obarray().is_special("x"));
 }
 
 #[test]

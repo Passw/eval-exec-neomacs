@@ -3622,14 +3622,13 @@ pub(crate) fn builtin_internal_handle_focus_in(args: Vec<Value>) -> EvalResult {
     ))
 }
 
-pub(crate) fn builtin_internal_make_var_non_special(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_internal_make_var_non_special_eval(
+    eval: &mut crate::emacs_core::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("internal-make-var-non-special", &args, 1)?;
-    if args[0].as_symbol_name().is_none() {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0]],
-        ));
-    }
+    let symbol = expect_symbol_id(&args[0])?;
+    eval.obarray_mut().make_non_special_id(symbol);
     Ok(Value::Nil)
 }
 

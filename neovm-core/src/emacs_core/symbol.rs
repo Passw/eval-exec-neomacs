@@ -364,6 +364,19 @@ impl Obarray {
         self.ensure_symbol_id(id).special = true;
     }
 
+    /// Clear the special flag on a symbol.
+    pub fn make_non_special(&mut self, name: &str) {
+        let id = intern(name);
+        self.global_members.insert(id);
+        self.ensure_symbol_id(id).special = false;
+    }
+
+    /// Clear the special flag on a symbol by identity.
+    pub fn make_non_special_id(&mut self, id: SymId) {
+        self.ensure_global_member_if_canonical(id);
+        self.ensure_symbol_id(id).special = false;
+    }
+
     /// Check if a symbol is special.
     pub fn is_special(&self, name: &str) -> bool {
         self.is_special_id(intern(name))
