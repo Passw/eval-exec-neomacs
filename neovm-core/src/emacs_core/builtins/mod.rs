@@ -3279,8 +3279,6 @@ pub(crate) fn dispatch_builtin(
         "seq-uniq" => super::builtins_extra::builtin_seq_uniq(args),
         "seq-length" => super::builtins_extra::builtin_seq_length(args),
         "seq-into" => super::builtins_extra::builtin_seq_into(args),
-        "string-empty-p" => super::builtins_extra::builtin_string_empty_p(args),
-        "string-blank-p" => super::builtins_extra::builtin_string_blank_p(args),
         "string-replace" => super::builtins_extra::builtin_string_replace(args),
         "string-search" => super::builtins_extra::builtin_string_search(args),
         "bare-symbol" => super::builtins_extra::builtin_bare_symbol(args),

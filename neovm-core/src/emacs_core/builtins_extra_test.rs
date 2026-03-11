@@ -1,6 +1,18 @@
 use super::*;
 use crate::emacs_core::intern::intern;
+use crate::emacs_core::load::{apply_runtime_startup_state, create_bootstrap_evaluator};
 use crate::emacs_core::value::{LambdaData, LambdaParams, next_float_id};
+use crate::emacs_core::{format_eval_result, parse_forms};
+
+fn bootstrap_eval(src: &str) -> Vec<String> {
+    let mut ev = create_bootstrap_evaluator().expect("bootstrap");
+    apply_runtime_startup_state(&mut ev).expect("runtime startup state");
+    let forms = parse_forms(src).expect("parse");
+    ev.eval_forms(&forms)
+        .iter()
+        .map(format_eval_result)
+        .collect()
+}
 
 #[test]
 fn remove_from_list() {
@@ -37,19 +49,18 @@ fn take_from_list() {
 
 #[test]
 fn string_empty_blank() {
-    assert!(matches!(
-        builtin_string_empty_p(vec![Value::string("")]).unwrap(),
-        Value::True,
-    ));
-    assert!(
-        builtin_string_empty_p(vec![Value::string("a")])
-            .unwrap()
-            .is_nil(),
+    let results = bootstrap_eval(
+        r#"
+        (string-empty-p "")
+        (string-empty-p "a")
+        (string-blank-p "  ")
+        (string-blank-p "x")
+        "#,
     );
-    assert!(matches!(
-        builtin_string_blank_p(vec![Value::string("  ")]).unwrap(),
-        Value::True,
-    ));
+    assert_eq!(results[0], "OK t");
+    assert_eq!(results[1], "OK nil");
+    assert_eq!(results[2], "OK 0");
+    assert_eq!(results[3], "OK nil");
 }
 
 #[test]

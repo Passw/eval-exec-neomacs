@@ -362,20 +362,6 @@ pub(crate) fn builtin_seq_into(args: Vec<Value>) -> EvalResult {
 // String utilities (subr-x compatible)
 // ---------------------------------------------------------------------------
 
-/// `(string-empty-p STRING)` -> t or nil.
-pub(crate) fn builtin_string_empty_p(args: Vec<Value>) -> EvalResult {
-    expect_args("string-empty-p", &args, 1)?;
-    let s = expect_string(&args[0])?;
-    Ok(Value::bool(s.is_empty()))
-}
-
-/// `(string-blank-p STRING)` -> t or nil.
-pub(crate) fn builtin_string_blank_p(args: Vec<Value>) -> EvalResult {
-    expect_args("string-blank-p", &args, 1)?;
-    let s = expect_string(&args[0])?;
-    Ok(Value::bool(s.trim().is_empty()))
-}
-
 /// `(string-replace FROM TO IN)` — replace all occurrences.
 pub(crate) fn builtin_string_replace(args: Vec<Value>) -> EvalResult {
     expect_args("string-replace", &args, 3)?;
