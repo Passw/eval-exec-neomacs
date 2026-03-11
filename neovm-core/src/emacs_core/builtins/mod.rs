@@ -1798,7 +1798,6 @@ pub(crate) fn dispatch_builtin(
         "indent-rigidly" => return Some(super::kill_ring::builtin_indent_rigidly(eval, args)),
 
         // Rectangle operations (evaluator-dependent — buffer access)
-        "extract-rectangle" => return Some(super::rect::builtin_extract_rectangle(eval, args)),
         "delete-rectangle" => return Some(super::rect::builtin_delete_rectangle(eval, args)),
         "kill-rectangle" => return Some(super::rect::builtin_kill_rectangle(eval, args)),
         "yank-rectangle" => return Some(super::rect::builtin_yank_rectangle(eval, args)),

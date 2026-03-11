@@ -414,35 +414,6 @@ pub(crate) fn builtin_extract_rectangle_line(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(""))
 }
 
-/// `(extract-rectangle START END)` -- return a list of strings, one per line,
-/// representing the rectangular region between START and END.
-///
-/// Compatibility behavior:
-/// - columns come from START/END positions
-/// - iteration starts at START's line and proceeds downward to END's line
-///   (or just START's line when START is below END)
-/// - lines shorter than the rectangle are padded with spaces
-pub(crate) fn builtin_extract_rectangle(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_args("extract-rectangle", &args, 2)?;
-    let start = expect_int(&args[0])?;
-    let end = expect_int(&args[1])?;
-    let Some((text, _pmin, _pmax, start_line, _start_col, end_line, _end_col, left_col, right_col)) =
-        clamped_rect_inputs(eval, start, end)
-    else {
-        return Ok(Value::list(Vec::new()));
-    };
-
-    let strings: Vec<Value> =
-        extract_rectangle_from_text(&text, start_line, end_line, left_col, right_col)
-            .into_iter()
-            .map(Value::string)
-            .collect();
-    Ok(Value::list(strings))
-}
-
 /// `(delete-rectangle START END)` -- delete the rectangular region between
 /// START and END.
 ///
