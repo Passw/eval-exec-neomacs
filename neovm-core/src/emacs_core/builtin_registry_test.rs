@@ -73,20 +73,8 @@ fn registry_contains_predicates() {
 #[test]
 fn registry_contains_list_ops() {
     for name in [
-        "cons",
-        "car",
-        "cdr",
-        "nth",
-        "length",
-        "append",
-        "mapcar",
-        "reverse",
-        "nreverse",
-        "member",
-        "memq",
-        "assoc",
-        "assq",
-        "alist-get",
+        "cons", "car", "cdr", "nth", "length", "append", "mapcar", "reverse", "nreverse", "member",
+        "memq", "assoc", "assq",
     ] {
         assert!(is_dispatch_builtin_name(name), "missing list op: {name}");
     }

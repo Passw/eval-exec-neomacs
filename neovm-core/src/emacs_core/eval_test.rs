@@ -2454,6 +2454,20 @@ fn save_selected_window_restores_selected_window_on_success_and_error() {
 }
 
 #[test]
+fn alist_get_comes_from_gnu_subr_runtime() {
+    let results = bootstrap_eval_all(
+        r#"(let ((foo '((a . 1) (b . 2))))
+             (list
+              (alist-get 'a foo)
+              (alist-get 'z foo 'missing)
+              (progn
+                (setf (alist-get 'c foo) 3)
+                foo)))"#,
+    );
+    assert_eq!(results[0], "OK (1 missing ((c . 3) (a . 1) (b . 2)))");
+}
+
+#[test]
 fn with_local_quit_catches_quit_and_sets_quit_flag() {
     let results = eval_all(
         "(setq quit-flag nil)

@@ -646,8 +646,6 @@ enum PureBuiltinId {
     Elt,
     #[strum(serialize = "nconc")]
     Nconc,
-    #[strum(serialize = "alist-get")]
-    AlistGet,
     #[strum(serialize = "bitmap-spec-p")]
     BitmapSpecP,
     #[strum(serialize = "byte-to-string")]
@@ -786,7 +784,6 @@ fn dispatch_builtin_id_pure(id: PureBuiltinId, args: Vec<Value>) -> EvalResult {
         PureBuiltinId::Delq => builtin_delq(args),
         PureBuiltinId::Elt => builtin_elt(args),
         PureBuiltinId::Nconc => builtin_nconc(args),
-        PureBuiltinId::AlistGet => builtin_alist_get(args),
         PureBuiltinId::BitmapSpecP => builtin_bitmap_spec_p(args),
         PureBuiltinId::ByteToString => builtin_byte_to_string(args),
         PureBuiltinId::ClearBufferAutoSaveFailure => builtin_clear_buffer_auto_save_failure(args),
@@ -2768,7 +2765,6 @@ pub(crate) fn dispatch_builtin(
         "seq-sort" => return Some(super::cl_lib::builtin_seq_sort(eval, args)),
         "assoc" => return Some(builtin_assoc_eval(eval, args)),
         "assoc-delete-all" => return Some(builtin_assoc_delete_all_eval(eval, args)),
-        "alist-get" => return Some(builtin_alist_get_eval(eval, args)),
         "plist-member" => return Some(builtin_plist_member(eval, args)),
         "json-parse-buffer" => return Some(super::json::builtin_json_parse_buffer(eval, args)),
         "json-insert" => return Some(super::json::builtin_json_insert(eval, args)),
@@ -4146,7 +4142,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "write-char"
         | "assoc"
         | "assoc-delete-all"
-        | "alist-get"
         | "plist-member"
         | "window-list-1"
         | "window-bump-use-time"
