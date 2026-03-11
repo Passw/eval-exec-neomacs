@@ -8034,6 +8034,41 @@ fn setplist_runtime_controls_get_put_and_symbol_plist_edges() {
 }
 
 #[test]
+fn put_promotes_symbol_properties_to_live_raw_plists() {
+    let mut eval = crate::emacs_core::eval::Evaluator::new();
+    let sym = Value::symbol("vm-live-plist");
+
+    builtin_put(
+        &mut eval,
+        vec![sym, Value::symbol("type"), Value::symbol("float")],
+    )
+    .expect("first put should succeed");
+    builtin_put(
+        &mut eval,
+        vec![sym, Value::symbol("doc"), Value::string("A z value")],
+    )
+    .expect("second put should succeed");
+
+    let plist = builtin_symbol_plist_fn(&mut eval, vec![sym])
+        .expect("symbol-plist should return a live plist object");
+
+    builtin_put(&mut eval, vec![sym, Value::symbol("type"), Value::Nil])
+        .expect("put should mutate the live plist in place");
+    builtin_put(&mut eval, vec![sym, Value::symbol("doc"), Value::Nil])
+        .expect("put should mutate the live plist in place");
+
+    assert_eq!(
+        plist,
+        Value::list(vec![
+            Value::symbol("type"),
+            Value::Nil,
+            Value::symbol("doc"),
+            Value::Nil,
+        ])
+    );
+}
+
+#[test]
 fn register_code_conversion_map_publishes_symbol_properties() {
     let mut eval = crate::emacs_core::eval::Evaluator::new();
     let map = Value::vector(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);

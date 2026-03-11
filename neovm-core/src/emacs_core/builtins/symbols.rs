@@ -122,14 +122,82 @@ fn symbol_raw_plist_value(eval: &super::eval::Evaluator, symbol: SymId) -> Optio
     symbol_raw_plist_value_in_obarray(eval.obarray(), symbol)
 }
 
+fn visible_symbol_plist_snapshot_in_obarray(obarray: &Obarray, symbol: SymId) -> Value {
+    let Some(sym) = obarray.get_by_id(symbol) else {
+        return Value::Nil;
+    };
+
+    let mut items = Vec::new();
+    for (key, value) in &sym.plist {
+        if is_internal_symbol_plist_property(resolve_sym(*key)) {
+            continue;
+        }
+        items.push(value_from_symbol_id(*key));
+        items.push(*value);
+    }
+
+    if items.is_empty() {
+        Value::Nil
+    } else {
+        Value::list(items)
+    }
+}
+
+fn sync_visible_symbol_plist_entries(
+    sym: &mut crate::emacs_core::symbol::SymbolData,
+    plist: Value,
+) {
+    let mut cursor = plist;
+    loop {
+        match cursor {
+            Value::Nil => return,
+            Value::Cons(key_cell) => {
+                let pair = read_cons(key_cell);
+                let key = pair.car;
+                let rest = pair.cdr;
+                drop(pair);
+
+                let Some(key_id) = symbol_id(&key) else {
+                    return;
+                };
+                let Value::Cons(value_cell) = rest else {
+                    return;
+                };
+
+                let value_pair = read_cons(value_cell);
+                let value = value_pair.car;
+                cursor = value_pair.cdr;
+                drop(value_pair);
+
+                if is_internal_symbol_plist_property(resolve_sym(key_id)) {
+                    continue;
+                }
+                sym.plist.insert(key_id, value);
+            }
+            _ => return,
+        }
+    }
+}
+
 pub(crate) fn set_symbol_raw_plist_in_obarray(obarray: &mut Obarray, symbol: SymId, plist: Value) {
+    let preserved_internal = obarray
+        .get_by_id(symbol)
+        .map(|sym| {
+            sym.plist
+                .iter()
+                .filter(|(key, _)| is_internal_symbol_plist_property(resolve_sym(**key)))
+                .map(|(key, value)| (*key, *value))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
     let sym = obarray.ensure_symbol_id(symbol);
-    let alias = sym.plist.get(&intern(VARIABLE_ALIAS_PROPERTY)).cloned();
     sym.plist.clear();
-    if let Some(value) = alias {
-        sym.plist.insert(intern(VARIABLE_ALIAS_PROPERTY), value);
+    for (key, value) in preserved_internal {
+        sym.plist.insert(key, value);
     }
     sym.plist.insert(intern(RAW_SYMBOL_PLIST_PROPERTY), plist);
+    sync_visible_symbol_plist_entries(sym, plist);
 }
 
 fn set_symbol_raw_plist(eval: &mut super::eval::Evaluator, symbol: SymId, plist: Value) {
@@ -705,11 +773,11 @@ pub(crate) fn builtin_put(eval: &mut super::eval::Evaluator, args: Vec<Value>) -
     let sym = expect_symbol_id(&args[0])?;
     let prop = expect_symbol_id(&args[1])?;
     let value = args[2];
-    if let Some(raw) = symbol_raw_plist_value(eval, sym) {
-        let plist = builtin_plist_put(vec![raw, args[1], value])?;
-        set_symbol_raw_plist(eval, sym, plist);
-        return Ok(value);
-    }
+    let current_plist = symbol_raw_plist_value(eval, sym)
+        .unwrap_or_else(|| visible_symbol_plist_snapshot_in_obarray(eval.obarray(), sym));
+    let plist = builtin_plist_put(vec![current_plist, args[1], value])?;
+    set_symbol_raw_plist(eval, sym, plist);
+    // Keep direct property lookups in sync with the Lisp-visible plist.
     eval.obarray_mut().put_property_id(sym, prop, value);
     Ok(value)
 }
