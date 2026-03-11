@@ -414,34 +414,6 @@ pub(crate) fn builtin_extract_rectangle_line(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(""))
 }
 
-/// `(kill-rectangle START END)` -- save the rectangular region to the
-/// rectangle kill buffer, then delete it.
-///
-/// Compatibility behavior:
-/// - performs the same extraction/deletion as `delete-extract-rectangle`
-/// - updates `RectangleState.killed`
-/// - returns the extracted rectangle list
-pub(crate) fn builtin_kill_rectangle(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_args("kill-rectangle", &args, 2)?;
-    let start = expect_int(&args[0])?;
-    let end = expect_int(&args[1])?;
-    let extracted = delete_extract_rectangle_eval(eval, start, end)?;
-    let killed = list_to_vec(&extracted)
-        .unwrap_or_default()
-        .into_iter()
-        .filter_map(|value| value.as_str().map(ToString::to_string))
-        .collect();
-    eval.rectangle.killed = killed;
-    eval.obarray.set_symbol_value(
-        "killed-rectangle",
-        rectangle_strings_to_value(&eval.rectangle.killed),
-    );
-    Ok(extracted)
-}
-
 /// `(yank-rectangle)` -- insert the last killed rectangle at point.
 ///
 /// Compatibility behavior:

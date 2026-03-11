@@ -109,38 +109,30 @@ fn delete_rectangle_loads_from_gnu_rect_el() {
 }
 
 #[test]
-fn kill_rectangle_updates_state() {
-    let mut eval = super::super::eval::Evaluator::new();
-    {
-        let buf = eval
-            .buffers
-            .current_buffer_mut()
-            .expect("current buffer must exist");
-        buf.insert("abcdef\n123456\n");
-    }
-    let result = builtin_kill_rectangle(&mut eval, vec![Value::Int(1), Value::Int(9)])
-        .expect("kill-rectangle");
-    assert_eq!(
-        result,
-        Value::list(vec![Value::string("a"), Value::string("1")])
+fn kill_rectangle_startup_is_autoloaded() {
+    let eval = super::super::eval::Evaluator::new();
+    let function = eval
+        .obarray
+        .symbol_function("kill-rectangle")
+        .expect("missing kill-rectangle startup function cell");
+    assert!(is_autoload_value(&function));
+}
+
+#[test]
+fn kill_rectangle_loads_from_gnu_rect_el() {
+    let result = bootstrap_eval_all(
+        r#"(with-temp-buffer
+             (insert "abcdef\n123456\n")
+             (list (kill-rectangle 1 9)
+                   (replace-regexp-in-string "\n" "|" (buffer-string) nil t)
+                   (point)
+                   killed-rectangle
+                   (subrp (symbol-function 'kill-rectangle))))"#,
     );
     assert_eq!(
-        eval.rectangle.killed,
-        vec!["a".to_string(), "1".to_string()]
+        result[0],
+        r#"OK (("a" "1") "bcdef|23456|" 13 ("a" "1") nil)"#
     );
-    assert_eq!(
-        eval.obarray
-            .symbol_value("killed-rectangle")
-            .cloned()
-            .expect("killed-rectangle set"),
-        Value::list(vec![Value::string("a"), Value::string("1")])
-    );
-    let buffer_after = eval
-        .buffers
-        .current_buffer()
-        .expect("current buffer must exist")
-        .buffer_string();
-    assert_eq!(buffer_after, "bcdef\n23456\n");
 }
 
 #[test]
