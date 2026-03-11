@@ -258,33 +258,46 @@ fn number_predicates() {
 
 #[test]
 fn seq_uniq() {
-    let list = Value::list(vec![
-        Value::Int(1),
-        Value::Int(2),
-        Value::Int(1),
-        Value::Int(3),
-    ]);
-    let result = builtin_seq_uniq(vec![list]).unwrap();
-    let items = super::super::value::list_to_vec(&result).unwrap();
-    assert_eq!(items.len(), 3);
+    let results = bootstrap_eval(
+        r#"
+        (seq-uniq '(1 2 1 3))
+        (seq-uniq '("Hello" "hello" "HELLO") #'string-equal-ignore-case)
+        "#,
+    );
+    assert_eq!(results[0], "OK (1 2 3)");
+    assert_eq!(results[1], "OK (\"Hello\")");
 }
 
 #[test]
 fn seq_length_list_and_string() {
-    let list = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
-    let list_len = builtin_seq_length(vec![list]).unwrap();
-    assert_eq!(list_len.as_int(), Some(3));
-
-    let string_len = builtin_seq_length(vec![Value::string("hello")]).unwrap();
-    assert_eq!(string_len.as_int(), Some(5));
+    let results = bootstrap_eval(
+        r#"
+        (seq-length '(1 2 3))
+        (seq-length "hello")
+        (seq-into '(1 2 3) 'vector)
+        (seq-into [?h ?i] 'string)
+        "#,
+    );
+    assert_eq!(results[0], "OK 3");
+    assert_eq!(results[1], "OK 5");
+    assert_eq!(results[2], "OK [1 2 3]");
+    assert_eq!(results[3], "OK \"hi\"");
 }
 
 #[test]
 fn seq_length_wrong_type_errors() {
-    match builtin_seq_length(vec![Value::Int(42)]) {
-        Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
-        other => panic!("expected wrong-type-argument, got {other:?}"),
-    }
+    let results = bootstrap_eval(
+        r#"
+        (condition-case err
+            (seq-length 42)
+          (wrong-type-argument (car err)))
+        (condition-case err
+            (seq-into '(1 2 3) 'hash-table)
+          (error (car err)))
+        "#,
+    );
+    assert_eq!(results[0], "OK wrong-type-argument");
+    assert_eq!(results[1], "OK error");
 }
 
 #[test]

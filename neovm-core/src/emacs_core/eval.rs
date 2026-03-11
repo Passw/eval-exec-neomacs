@@ -1603,8 +1603,6 @@ impl Evaluator {
             "seq-do",
             "seq-empty-p",
             "seq-every-p",
-            "seq-into",
-            "seq-length",
             "seq-mapn",
             "seq-max",
             "seq-min",
@@ -1615,7 +1613,6 @@ impl Evaluator {
             "seq-sort",
             "seq-subseq",
             "seq-take",
-            "seq-uniq",
             "string-blank-p",
             "string-empty-p",
         ] {

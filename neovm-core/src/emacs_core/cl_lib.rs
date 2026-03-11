@@ -229,20 +229,6 @@ pub(crate) fn builtin_cl_minusp(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(n < 0.0))
 }
 
-/// `(cl-subseq SEQ START &optional END)` -- CL alias for `seq-subseq`.
-#[cfg(test)]
-pub(crate) fn builtin_cl_subseq(args: Vec<Value>) -> EvalResult {
-    expect_min_args("cl-subseq", &args, 2)?;
-    expect_max_args("cl-subseq", &args, 3)?;
-    builtin_seq_subseq(args)
-}
-
-/// `(cl-concatenate TYPE &rest SEQS)` -- CL alias for `seq-concatenate`.
-#[cfg(test)]
-pub(crate) fn builtin_cl_concatenate(args: Vec<Value>) -> EvalResult {
-    builtin_seq_concatenate(args)
-}
-
 /// `(cl-member ITEM LIST)` -- CL alias for `member`.
 #[cfg(test)]
 pub(crate) fn builtin_cl_member(args: Vec<Value>) -> EvalResult {
@@ -274,12 +260,6 @@ pub(crate) fn builtin_cl_adjoin(args: Vec<Value>) -> EvalResult {
 #[cfg(test)]
 pub(crate) fn builtin_cl_remove(args: Vec<Value>) -> EvalResult {
     super::builtins_extra::builtin_remove(args)
-}
-
-/// `(cl-remove-duplicates SEQ)` -- CL alias for `seq-uniq`.
-#[cfg(test)]
-pub(crate) fn builtin_cl_remove_duplicates(args: Vec<Value>) -> EvalResult {
-    super::builtins_extra::builtin_seq_uniq(args)
 }
 
 fn seq_position_list_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
@@ -766,39 +746,6 @@ pub(crate) fn builtin_cl_position(
     }
 
     builtin_seq_position(eval, forwarded)
-}
-
-/// `(cl-reduce FUNCTION SEQ &optional INITIAL-VALUE)` -- CL alias for `seq-reduce`.
-#[cfg(test)]
-pub(crate) fn builtin_cl_reduce(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    builtin_seq_reduce(eval, args)
-}
-
-/// `(cl-count PREDICATE SEQ)` -- CL alias for `seq-count`.
-#[cfg(test)]
-pub(crate) fn builtin_cl_count(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    builtin_seq_count(eval, args)
-}
-
-/// `(cl-count-if PREDICATE SEQ)` -- CL alias for `seq-count`.
-#[cfg(test)]
-pub(crate) fn builtin_cl_count_if(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    builtin_seq_count(eval, args)
-}
-
-/// `(cl-some PREDICATE SEQ)` -- CL alias for `seq-some`.
-#[cfg(test)]
-pub(crate) fn builtin_cl_some(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    builtin_seq_some(eval, args)
-}
-
-/// `(cl-every PREDICATE SEQ)` -- CL alias for `seq-every-p`.
-#[cfg(test)]
-pub(crate) fn builtin_cl_every(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    builtin_seq_every_p(eval, args)
 }
 
 /// `(cl-notany PREDICATE SEQ)` -- true when no element satisfies PREDICATE.

@@ -1,4 +1,16 @@
 use super::*;
+use crate::emacs_core::load::{apply_runtime_startup_state, create_bootstrap_evaluator};
+use crate::emacs_core::{format_eval_result, parse_forms};
+
+fn bootstrap_eval(src: &str) -> Vec<String> {
+    let mut ev = create_bootstrap_evaluator().expect("bootstrap");
+    apply_runtime_startup_state(&mut ev).expect("runtime startup state");
+    let forms = parse_forms(src).expect("parse");
+    ev.eval_forms(&forms)
+        .iter()
+        .map(format_eval_result)
+        .collect()
+}
 
 // --- Seq.el pure operations ---
 
@@ -352,53 +364,48 @@ fn cl_minusp_wrong_type() {
 
 #[test]
 fn cl_subseq_list() {
-    let result = builtin_cl_subseq(vec![
-        Value::list(vec![
-            Value::symbol("a"),
-            Value::symbol("b"),
-            Value::symbol("c"),
-        ]),
-        Value::Int(1),
-        Value::Int(3),
-    ])
-    .unwrap();
-    assert_eq!(
-        result,
-        Value::list(vec![Value::symbol("b"), Value::symbol("c")])
+    let results = bootstrap_eval(
+        r#"
+        (progn (require 'cl-lib) (cl-subseq '(a b c) 1 3))
+        (progn (require 'cl-lib) (cl-concatenate 'list '(a b) '(c)))
+        (progn (require 'cl-lib) (cl-remove-duplicates '(a b a c b)))
+        "#,
     );
+    assert_eq!(results[0], "OK (b c)");
+    assert_eq!(results[1], "OK (a b c)");
+    assert_eq!(results[2], "OK (a c b)");
 }
 
 #[test]
 fn cl_subseq_wrong_arity() {
-    assert!(builtin_cl_subseq(vec![Value::Int(0)]).is_err());
+    let results = bootstrap_eval(
+        r#"
+        (condition-case err
+            (progn (require 'cl-lib) (cl-subseq 0))
+          (wrong-number-of-arguments (car err)))
+        (condition-case err
+            (progn (require 'cl-lib) (cl-concatenate 0 nil))
+          (error (car err)))
+        (condition-case err
+            (progn (require 'cl-lib) (cl-remove-duplicates nil nil))
+          (error (car err)))
+        "#,
+    );
+    assert_eq!(results[0], "OK wrong-number-of-arguments");
+    assert_eq!(results[1], "OK error");
+    assert_eq!(results[2], "OK error");
 }
 
 #[test]
 fn cl_subseq_wrong_type() {
-    assert!(builtin_cl_subseq(vec![Value::Int(0), Value::Int(0)]).is_err());
-}
-
-#[test]
-fn cl_concatenate_list() {
-    let result = builtin_cl_concatenate(vec![
-        Value::symbol("list"),
-        Value::list(vec![Value::symbol("a"), Value::symbol("b")]),
-        Value::list(vec![Value::symbol("c")]),
-    ])
-    .unwrap();
-    assert_eq!(
-        result,
-        Value::list(vec![
-            Value::symbol("a"),
-            Value::symbol("b"),
-            Value::symbol("c")
-        ])
+    let results = bootstrap_eval(
+        r#"
+        (condition-case err
+            (progn (require 'cl-lib) (cl-subseq 0 0))
+          (wrong-type-argument (car err)))
+        "#,
     );
-}
-
-#[test]
-fn cl_concatenate_wrong_type_symbol() {
-    assert!(builtin_cl_concatenate(vec![Value::Int(0), Value::Nil]).is_err());
+    assert_eq!(results[0], "OK wrong-type-argument");
 }
 
 #[test]
@@ -497,31 +504,6 @@ fn cl_remove_filters_equal_items() {
 #[test]
 fn cl_remove_wrong_arity() {
     assert!(builtin_cl_remove(vec![Value::symbol("a")]).is_err());
-}
-
-#[test]
-fn cl_remove_duplicates_list() {
-    let result = builtin_cl_remove_duplicates(vec![Value::list(vec![
-        Value::symbol("a"),
-        Value::symbol("b"),
-        Value::symbol("a"),
-        Value::symbol("c"),
-        Value::symbol("b"),
-    ])])
-    .unwrap();
-    assert_eq!(
-        result,
-        Value::list(vec![
-            Value::symbol("a"),
-            Value::symbol("b"),
-            Value::symbol("c")
-        ])
-    );
-}
-
-#[test]
-fn cl_remove_duplicates_wrong_arity() {
-    assert!(builtin_cl_remove_duplicates(vec![Value::Nil, Value::Nil]).is_err());
 }
 
 #[test]
@@ -633,47 +615,48 @@ fn cl_position_wrong_arity() {
 
 #[test]
 fn cl_reduce_with_eval() {
-    let mut evaluator = super::super::eval::Evaluator::new();
-    let func = Value::Subr(intern("+"));
-    let seq = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
-    let result = builtin_cl_reduce(&mut evaluator, vec![func, seq, Value::Int(0)]).unwrap();
-    assert_eq!(result.as_int(), Some(6));
+    let results = bootstrap_eval(
+        r#"
+        (progn (require 'cl-lib) (cl-reduce #'+ '(1 2 3) :initial-value 0))
+        (progn (require 'cl-lib) (cl-count 1 '(1 "x" 1)))
+        (progn (require 'cl-lib) (cl-count-if #'numberp '(1 "x" 2)))
+        (progn (require 'cl-lib) (cl-some #'numberp '("x" 2)))
+        (progn (require 'cl-lib) (cl-every #'numberp '(1 2 3)))
+        "#,
+    );
+    assert_eq!(results[0], "OK 6");
+    assert_eq!(results[1], "OK 2");
+    assert_eq!(results[2], "OK 2");
+    assert_eq!(results[3], "OK t");
+    assert_eq!(results[4], "OK t");
 }
 
 #[test]
-fn cl_count_with_eval() {
-    let mut evaluator = super::super::eval::Evaluator::new();
-    let func = Value::Subr(intern("numberp"));
-    let seq = Value::list(vec![Value::Int(1), Value::string("x"), Value::Int(2)]);
-    let result = builtin_cl_count(&mut evaluator, vec![func, seq]).unwrap();
-    assert_eq!(result.as_int(), Some(2));
+fn cl_reduce_without_initial_value_bootstrap() {
+    let results = bootstrap_eval(
+        r#"
+        (progn (require 'cl-lib) (cl-reduce #'+ '(1 2 3)))
+        (progn (require 'cl-lib) (cl-reduce #'+ '(42)))
+        "#,
+    );
+    assert_eq!(results[0], "OK 6");
+    assert_eq!(results[1], "OK 42");
 }
 
 #[test]
-fn cl_count_if_with_eval() {
-    let mut evaluator = super::super::eval::Evaluator::new();
-    let func = Value::Subr(intern("numberp"));
-    let seq = Value::list(vec![Value::Int(1), Value::string("x"), Value::Int(2)]);
-    let result = builtin_cl_count_if(&mut evaluator, vec![func, seq]).unwrap();
-    assert_eq!(result.as_int(), Some(2));
-}
-
-#[test]
-fn cl_some_with_eval() {
-    let mut evaluator = super::super::eval::Evaluator::new();
-    let func = Value::Subr(intern("numberp"));
-    let seq = Value::list(vec![Value::string("x"), Value::Int(2)]);
-    let result = builtin_cl_some(&mut evaluator, vec![func, seq]).unwrap();
-    assert!(result.is_truthy());
-}
-
-#[test]
-fn cl_every_with_eval() {
-    let mut evaluator = super::super::eval::Evaluator::new();
-    let func = Value::Subr(intern("numberp"));
-    let seq = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
-    let result = builtin_cl_every(&mut evaluator, vec![func, seq]).unwrap();
-    assert!(result.is_truthy());
+fn cl_count_some_every_bootstrap() {
+    let results = bootstrap_eval(
+        r#"
+        (progn (require 'cl-lib) (cl-count 1 '(1 "x" 1)))
+        (progn (require 'cl-lib) (cl-count-if #'numberp '(1 "x" 2)))
+        (progn (require 'cl-lib) (cl-some #'numberp '("x" 2)))
+        (progn (require 'cl-lib) (cl-every #'numberp '(1 2 3)))
+        "#,
+    );
+    assert_eq!(results[0], "OK 2");
+    assert_eq!(results[1], "OK 2");
+    assert_eq!(results[2], "OK t");
+    assert_eq!(results[3], "OK t");
 }
 
 #[test]
