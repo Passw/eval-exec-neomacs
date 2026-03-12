@@ -1001,6 +1001,27 @@ fn bootstrap_help_fns_loads_and_preserves_hook_depth_metadata() {
     assert_eq!(rendered, "OK (t t t t (help-fns--compiler-macro))");
 }
 
+#[test]
+fn bootstrap_help_fns_describe_function_writes_help_buffer() {
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest.parent().expect("project root");
+    let help_fns = project_root.join("lisp/help-fns.el");
+
+    let rendered = fresh_bootstrap_eval_with_loaded_file(
+        &help_fns,
+        r#"
+(let ((result (funcall (symbol-function 'describe-function) 'car)))
+  (list
+   (stringp result)
+   (bufferp (get-buffer "*Help*"))
+   (with-current-buffer (get-buffer "*Help*")
+     (> (length (buffer-string)) 0))))
+"#,
+    );
+
+    assert_eq!(rendered, "OK (t t t)");
+}
+
 fn cached_bootstrap_eval_with_loaded_file(path: &std::path::Path, form: &str) -> String {
     let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
     apply_runtime_startup_state(&mut eval).expect("runtime startup state");
