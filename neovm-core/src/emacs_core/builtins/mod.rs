@@ -2795,7 +2795,6 @@ pub(crate) fn dispatch_builtin(
 
         // Documentation/help (evaluator-dependent)
         "documentation" => return Some(super::doc::builtin_documentation(eval, args)),
-        "describe-function" => return Some(super::doc::builtin_describe_function(eval, args)),
         "describe-variable" => return Some(super::doc::builtin_describe_variable(eval, args)),
         "documentation-stringp" => return Some(builtin_documentation_stringp(args)),
         "documentation-property" => {

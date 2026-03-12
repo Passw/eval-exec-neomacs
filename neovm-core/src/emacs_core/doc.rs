@@ -2,7 +2,6 @@
 //!
 //! Provides:
 //! - `documentation` — retrieve docstring from a function
-//! - `describe-function` — return description string for a function
 //! - `describe-variable` — return description string for a variable
 //! - `documentation-property` — retrieve documentation property
 //! - `Snarf-documentation` — internal DOC file loader compatibility shim
@@ -10452,113 +10451,6 @@ fn startup_doc_quote_style_raw(doc: &str) -> String {
             _ => ch,
         })
         .collect()
-}
-
-/// `(describe-function FUNCTION)` -- return a short description string.
-///
-/// This is a simplified stub that returns a type description of the function.
-/// In real Emacs, `describe-function` opens a *Help* buffer with detailed
-/// information.
-pub(crate) fn builtin_describe_function(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_args("describe-function", &args, 1)?;
-
-    let name = match args[0].as_symbol_name() {
-        Some(n) => n.to_string(),
-        None => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("symbolp"), args[0]],
-            ));
-        }
-    };
-
-    // Reuse symbol-function resolution so builtins and wrapper-backed callables
-    // are visible here even when not explicitly interned in the function cell.
-    let func_val =
-        super::builtins::builtin_symbol_function(eval, vec![Value::symbol(name.clone())])?;
-    if func_val.is_nil() {
-        return Err(signal("void-function", vec![Value::symbol(&name)]));
-    }
-
-    if let Some(alias_name) = func_val.as_symbol_name() {
-        if alias_name != name {
-            let indirect =
-                super::builtins::builtin_indirect_function(eval, vec![Value::symbol(alias_name)]);
-            let text = match indirect {
-                Ok(value) if !value.is_nil() => {
-                    format!("{name} is an alias for ‘{alias_name}’.")
-                }
-                _ => format!(
-                    "{name} is an alias for ‘{alias_name}’, which is not known to be defined."
-                ),
-            };
-            return Ok(Value::string(text));
-        }
-    }
-
-    let description = describe_function_first_line(&name, &func_val);
-
-    Ok(Value::string(description))
-}
-
-fn describe_function_first_line(name: &str, function: &Value) -> String {
-    match function {
-        Value::Lambda(_) => format!("{name} is a interpreted-function."),
-        Value::Macro(_) => format!("{name} is a Lisp macro."),
-        Value::Subr(subr_id) => {
-            if super::subr_info::is_special_form(resolve_sym(*subr_id)) {
-                format!("{name} is a special-form in ‘C source code’.")
-            } else {
-                format!("{name} is a primitive-function in ‘C source code’.")
-            }
-        }
-        Value::ByteCode(_) => format!("{name} is a compiled Lisp function."),
-        Value::Str(_) | Value::Vector(_) => format!("{name} is a keyboard macro."),
-        Value::Cons(cell) => {
-            if super::autoload::is_autoload_value(function) {
-                let items = list_to_vec(function).unwrap_or_default();
-                let kind = describe_function_autoload_kind(items.get(4));
-                let file_clause = items
-                    .get(1)
-                    .and_then(Value::as_str)
-                    .and_then(describe_function_autoload_file_clause);
-                return if let Some(file) = file_clause {
-                    format!("{name} is an autoloaded {kind} in ‘{file}’.")
-                } else {
-                    format!("{name} is an autoloaded {kind}.")
-                };
-            }
-
-            let pair = read_cons(*cell);
-            match pair.car.as_symbol_name() {
-                Some("macro") => format!("{name} is a Lisp macro."),
-                Some("lambda") => format!("{name} is a interpreted-function."),
-                _ => format!("{name} is a Lisp function."),
-            }
-        }
-        _ => format!("{name} is a Lisp function."),
-    }
-}
-
-fn describe_function_autoload_kind(autoload_type: Option<&Value>) -> &'static str {
-    match autoload_type {
-        Some(Value::Symbol(id)) if resolve_sym(*id) == "keymap" => "keymap",
-        None | Some(Value::Nil) => "Lisp function",
-        _ => "Lisp macro",
-    }
-}
-
-fn describe_function_autoload_file_clause(file: &str) -> Option<String> {
-    if file.is_empty() {
-        return None;
-    }
-    if file.contains('/') || file.contains('\\') || file.contains('.') {
-        return None;
-    }
-    Some(format!("{file}.el"))
 }
 
 /// `(describe-variable VARIABLE)` -- return the documentation string for a
