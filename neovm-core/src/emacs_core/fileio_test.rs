@@ -104,58 +104,6 @@ fn test_file_name_nondirectory() {
 }
 
 #[test]
-fn test_file_name_extension() {
-    assert_eq!(
-        file_name_extension("test.txt", false),
-        Some("txt".to_string())
-    );
-    assert_eq!(
-        file_name_extension("test.txt", true),
-        Some(".txt".to_string())
-    );
-    assert_eq!(
-        file_name_extension("/home/user/file.el", false),
-        Some("el".to_string())
-    );
-    assert_eq!(
-        file_name_extension("/home/user/file.el", true),
-        Some(".el".to_string())
-    );
-    assert_eq!(file_name_extension("no_ext", false), None);
-    assert_eq!(file_name_extension("no_ext", true), Some("".to_string()));
-    assert_eq!(file_name_extension(".bashrc", false), None);
-    assert_eq!(file_name_extension(".bashrc", true), Some("".to_string()));
-    assert_eq!(file_name_extension("..x", false), Some("x".to_string()));
-    assert_eq!(file_name_extension("..x", true), Some(".x".to_string()));
-    assert_eq!(file_name_extension("a.", false), Some("".to_string()));
-    assert_eq!(file_name_extension("a.", true), Some(".".to_string()));
-    assert_eq!(file_name_extension("foo.bar/", false), None);
-    assert_eq!(file_name_extension("foo.bar/", true), Some("".to_string()));
-    assert_eq!(
-        file_name_extension("archive.tar.gz", false),
-        Some("gz".to_string())
-    );
-    assert_eq!(
-        file_name_extension("archive.tar.gz", true),
-        Some(".gz".to_string())
-    );
-}
-
-#[test]
-fn test_file_name_sans_extension() {
-    assert_eq!(file_name_sans_extension("test.txt"), "test");
-    assert_eq!(
-        file_name_sans_extension("/home/user/file.el"),
-        "/home/user/file"
-    );
-    assert_eq!(file_name_sans_extension("no_ext"), "no_ext");
-    assert_eq!(file_name_sans_extension("archive.tar.gz"), "archive.tar");
-    assert_eq!(file_name_sans_extension("foo.bar/"), "foo.bar/");
-    assert_eq!(file_name_sans_extension("foo/"), "foo/");
-    assert_eq!(file_name_sans_extension("/tmp/foo.bar/"), "/tmp/foo.bar/");
-}
-
-#[test]
 fn test_file_name_as_directory() {
     assert_eq!(file_name_as_directory("/tmp"), "/tmp/");
     assert_eq!(file_name_as_directory("/tmp/"), "/tmp/");
@@ -1479,25 +1427,6 @@ fn test_builtin_file_name_ops() {
     let result = builtin_file_name_nondirectory(vec![Value::string("/home/user/test.el")]);
     assert_eq!(result.unwrap().as_str(), Some("test.el"));
 
-    let result = builtin_file_name_extension(vec![Value::string("/home/user/test.el")]);
-    assert_eq!(result.unwrap().as_str(), Some("el"));
-
-    let result =
-        builtin_file_name_extension(vec![Value::string("/home/user/test.el"), Value::True]);
-    assert_eq!(result.unwrap().as_str(), Some(".el"));
-
-    let result = builtin_file_name_extension(vec![Value::string("no_ext"), Value::True]);
-    assert_eq!(result.unwrap().as_str(), Some(""));
-
-    let result = builtin_file_name_sans_extension(vec![Value::string("/home/user/test.el")]);
-    assert_eq!(result.unwrap().as_str(), Some("/home/user/test"));
-
-    let result = builtin_file_name_base(vec![Value::string("/home/user/test.el")]);
-    assert_eq!(result.unwrap().as_str(), Some("test"));
-
-    let result = builtin_file_name_base(vec![Value::string("/tmp/dir/")]);
-    assert_eq!(result.unwrap().as_str(), Some(""));
-
     let result = builtin_file_name_sans_versions(vec![Value::string("foo.~12~")]);
     assert_eq!(result.unwrap().as_str(), Some("foo"));
 
@@ -1509,49 +1438,6 @@ fn test_builtin_file_name_ops() {
 
     let result = builtin_file_name_sans_versions(vec![Value::string("foo.~12~"), Value::True]);
     assert_eq!(result.unwrap().as_str(), Some("foo.~12~"));
-
-    let result = builtin_file_name_parent_directory(vec![Value::string("/foo/bar")]);
-    assert_eq!(result.unwrap().as_str(), Some("/foo/"));
-
-    let result = builtin_file_name_parent_directory(vec![Value::string("/foo/")]);
-    assert_eq!(result.unwrap().as_str(), Some("/"));
-
-    let result = builtin_file_name_parent_directory(vec![Value::string("/")]);
-    assert_eq!(result.unwrap(), Value::Nil);
-
-    let result = builtin_file_name_parent_directory(vec![Value::string("foo/bar")]);
-    assert_eq!(result.unwrap().as_str(), Some("foo/"));
-
-    let result = builtin_file_name_parent_directory(vec![Value::string("foo")]);
-    assert_eq!(result.unwrap().as_str(), Some("./"));
-
-    let result = builtin_file_name_parent_directory(vec![Value::string("//usr")]);
-    assert_eq!(result.unwrap().as_str(), Some("//"));
-
-    let split = builtin_file_name_split(vec![Value::string("/foo/bar")]).unwrap();
-    assert_eq!(
-        list_to_vec(&split).unwrap(),
-        vec![
-            Value::string(""),
-            Value::string("foo"),
-            Value::string("bar"),
-        ]
-    );
-
-    let split = builtin_file_name_split(vec![Value::string("/")]).unwrap();
-    assert_eq!(
-        list_to_vec(&split).unwrap(),
-        vec![Value::string(""), Value::string(""), Value::string("")]
-    );
-
-    let split = builtin_file_name_split(vec![Value::string("foo/")]).unwrap();
-    assert_eq!(
-        list_to_vec(&split).unwrap(),
-        vec![Value::string("foo"), Value::string("")]
-    );
-
-    let split = builtin_file_name_split(vec![Value::string("")]).unwrap();
-    assert_eq!(split, Value::Nil);
 
     let result = builtin_file_name_as_directory(vec![Value::string("/home/user")]);
     assert_eq!(result.unwrap().as_str(), Some("/home/user/"));
@@ -1605,22 +1491,11 @@ fn test_builtin_file_name_ops() {
 fn test_builtin_file_name_ops_strict_types() {
     assert!(builtin_file_name_directory(vec![Value::symbol("x")]).is_err());
     assert!(builtin_file_name_nondirectory(vec![Value::symbol("x")]).is_err());
-    assert!(builtin_file_name_extension(vec![Value::symbol("x")]).is_err());
-    assert!(builtin_file_name_extension(vec![Value::string("x"), Value::Nil, Value::Nil]).is_err());
-    assert!(builtin_file_name_sans_extension(vec![Value::symbol("x")]).is_err());
-    assert!(builtin_file_name_base(vec![Value::symbol("x")]).is_err());
-    assert!(builtin_file_name_base(vec![]).is_err());
     assert!(builtin_file_name_sans_versions(vec![Value::symbol("x")]).is_err());
     assert!(builtin_file_name_sans_versions(vec![]).is_err());
     assert!(
         builtin_file_name_sans_versions(vec![Value::string("x"), Value::Nil, Value::Nil]).is_err()
     );
-    assert!(builtin_file_name_parent_directory(vec![Value::symbol("x")]).is_err());
-    assert!(builtin_file_name_parent_directory(vec![]).is_err());
-    assert!(builtin_file_name_parent_directory(vec![Value::string("x"), Value::Nil]).is_err());
-    assert!(builtin_file_name_split(vec![Value::symbol("x")]).is_err());
-    assert!(builtin_file_name_split(vec![]).is_err());
-    assert!(builtin_file_name_split(vec![Value::string("x"), Value::Nil]).is_err());
     assert!(builtin_file_name_as_directory(vec![Value::symbol("x")]).is_err());
     assert!(builtin_directory_file_name(vec![Value::symbol("x")]).is_err());
     assert!(builtin_backup_file_name_p(vec![Value::symbol("x")]).is_err());
@@ -1650,6 +1525,70 @@ fn file_name_with_extension_bootstrap_matches_gnu_elisp() {
     assert_eq!(results[4], "OK error");
     assert_eq!(results[5], "OK wrong-type-argument");
     assert_eq!(results[6], "OK wrong-type-argument");
+}
+
+#[test]
+fn file_name_splitters_bootstrap_match_gnu_files_el() {
+    let results = bootstrap_eval(
+        r#"
+        (list (subrp (symbol-function 'file-name-extension))
+              (subrp (symbol-function 'file-name-sans-extension))
+              (subrp (symbol-function 'file-name-base))
+              (subrp (symbol-function 'file-name-parent-directory))
+              (subrp (symbol-function 'file-name-split)))
+        (file-name-extension "/home/user/test.el")
+        (file-name-extension "/home/user/test.el" t)
+        (file-name-extension "no_ext" t)
+        (file-name-sans-extension "/home/user/test.el")
+        (file-name-base "/home/user/test.el")
+        (file-name-parent-directory "/foo/bar")
+        (file-name-parent-directory "/foo/")
+        (file-name-parent-directory "/")
+        (file-name-parent-directory "foo/bar")
+        (file-name-parent-directory "foo")
+        (file-name-parent-directory "//usr")
+        (file-name-split "/foo/bar")
+        (file-name-split "/")
+        (file-name-split "foo/")
+        (file-name-split "")
+        "#,
+    );
+    assert_eq!(results[0], "OK (nil nil nil nil nil)");
+    assert_eq!(results[1], r#"OK "el""#);
+    assert_eq!(results[2], r#"OK ".el""#);
+    assert_eq!(results[3], r#"OK """#);
+    assert_eq!(results[4], r#"OK "/home/user/test""#);
+    assert_eq!(results[5], r#"OK "test""#);
+    assert_eq!(results[6], r#"OK "/foo/""#);
+    assert_eq!(results[7], r#"OK "/""#);
+    assert_eq!(results[8], "OK nil");
+    assert_eq!(results[9], r#"OK "foo/""#);
+    assert_eq!(results[10], r#"OK "./""#);
+    assert_eq!(results[11], r#"OK "/""#);
+    assert_eq!(results[12], r#"OK ("" "foo" "bar")"#);
+    assert_eq!(results[13], r#"OK ("" "" "")"#);
+    assert_eq!(results[14], r#"OK ("foo" "")"#);
+    assert_eq!(results[15], "OK nil");
+}
+
+#[test]
+fn file_name_splitters_bootstrap_error_shapes_match_gnu_files_el() {
+    let results = bootstrap_eval(
+        r#"
+        (condition-case err (file-name-extension 'x) (error (car err)))
+        (condition-case err (file-name-extension "x" nil nil) (error (car err)))
+        (condition-case err (file-name-sans-extension 'x) (error (car err)))
+        (condition-case err (file-name-base 'x) (error (car err)))
+        (condition-case err (file-name-parent-directory 'x) (error (car err)))
+        (condition-case err (file-name-split 'x) (error (car err)))
+        "#,
+    );
+    assert_eq!(results[0], "OK wrong-type-argument");
+    assert_eq!(results[1], "OK wrong-number-of-arguments");
+    assert_eq!(results[2], "OK wrong-type-argument");
+    assert_eq!(results[3], "OK wrong-type-argument");
+    assert_eq!(results[4], "OK wrong-type-argument");
+    assert_eq!(results[5], "OK wrong-type-argument");
 }
 
 #[test]

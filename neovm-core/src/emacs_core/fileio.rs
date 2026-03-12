@@ -167,49 +167,6 @@ pub fn file_name_nondirectory(filename: &str) -> String {
 
 /// Return the extension of FILENAME.
 /// When PERIOD is nil, returns extension without the leading dot, or nil if missing.
-/// When PERIOD is non-nil, returns extension with the leading dot, or an empty string if missing.
-pub fn file_name_extension(filename: &str, period: bool) -> Option<String> {
-    if filename.ends_with('/') {
-        return if period { Some(String::new()) } else { None };
-    }
-    let path = Path::new(filename);
-    let extension = path.extension().map(|e| e.to_string_lossy().into_owned());
-    if period {
-        Some(match extension {
-            Some(ext) => format!(".{ext}"),
-            None => String::new(),
-        })
-    } else {
-        extension
-    }
-}
-
-/// Return FILENAME without its extension.
-pub fn file_name_sans_extension(filename: &str) -> String {
-    // Emacs keeps directory-path forms unchanged.
-    if filename.ends_with('/') {
-        return filename.to_string();
-    }
-    let path = Path::new(filename);
-    let stem = path
-        .file_stem()
-        .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    match path.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => {
-            let parent_str = parent.to_string_lossy();
-            format!("{}/{}", parent_str, stem)
-        }
-        _ => stem,
-    }
-}
-
-/// Return the base name of FILENAME without directory or final extension.
-pub fn file_name_base(filename: &str) -> String {
-    let nondirectory = file_name_nondirectory(filename);
-    file_name_sans_extension(&nondirectory)
-}
-
 /// Return FILENAME without trailing backup version markers.
 ///
 /// With KEEP_BACKUP_VERSION non-nil, returns FILENAME unchanged.
@@ -232,101 +189,6 @@ pub fn file_name_sans_versions(filename: &str, keep_backup_version: bool) -> Str
 
     // Fall back to dropping a single trailing backup `~`.
     filename[..len - 1].to_string()
-}
-
-fn relative_directory_from_current_dir(target_dir: &str) -> String {
-    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
-    let cwd_norm = expand_file_name(&cwd.to_string_lossy(), None);
-    let target_norm = expand_file_name(target_dir, None);
-
-    if target_norm == cwd_norm {
-        return "./".to_string();
-    }
-
-    let cwd_parts: Vec<&str> = cwd_norm
-        .split('/')
-        .filter(|part| !part.is_empty())
-        .collect();
-    let target_parts: Vec<&str> = target_norm
-        .split('/')
-        .filter(|part| !part.is_empty())
-        .collect();
-
-    let mut shared_prefix = 0usize;
-    while shared_prefix < cwd_parts.len()
-        && shared_prefix < target_parts.len()
-        && cwd_parts[shared_prefix] == target_parts[shared_prefix]
-    {
-        shared_prefix += 1;
-    }
-
-    let mut rel_parts = Vec::new();
-    for _ in shared_prefix..cwd_parts.len() {
-        rel_parts.push("..");
-    }
-    rel_parts.extend_from_slice(&target_parts[shared_prefix..]);
-
-    if rel_parts.is_empty() {
-        "./".to_string()
-    } else {
-        format!("{}/", rel_parts.join("/"))
-    }
-}
-
-/// Return the parent directory name of FILENAME, or nil-like None at root.
-///
-/// Like Emacs `file-name-parent-directory`: relative names are interpreted
-/// relative to the current/default directory and the result stays relative.
-pub fn file_name_parent_directory(filename: &str) -> Option<String> {
-    let expanded_filename = if filename.starts_with("//") && !filename.starts_with("///") {
-        filename.to_string()
-    } else {
-        expand_file_name(filename, None)
-    };
-    let parent = file_name_directory(&directory_file_name(&expanded_filename))?;
-    if parent == expanded_filename {
-        return None;
-    }
-    if !file_name_absolute_p(filename) {
-        return Some(relative_directory_from_current_dir(&parent));
-    }
-    Some(parent)
-}
-
-/// Return all path components of FILENAME.
-///
-/// Mirrors Emacs `file-name-split` semantics, including root and trailing
-/// directory markers represented as empty-string components.
-pub fn file_name_split(filename: &str) -> Vec<String> {
-    let mut components = Vec::new();
-    let mut rest = filename.to_string();
-
-    if directory_name_p(&rest) {
-        components.insert(0, String::new());
-        rest = directory_file_name(&rest);
-    }
-
-    while !rest.is_empty() {
-        components.insert(0, file_name_nondirectory(&rest));
-        let Some(dir) = file_name_directory(&rest) else {
-            break;
-        };
-        rest = directory_file_name(&dir);
-
-        // At filesystem root (or // root marker), prepend root component
-        // and stop peeling.
-        if dir == rest {
-            let root_component = if dir.is_empty() {
-                String::new()
-            } else {
-                dir[..dir.len() - 1].to_string()
-            };
-            components.insert(0, root_component);
-            break;
-        }
-    }
-
-    components
 }
 
 /// Return FILENAME as a directory name (must end in `/`).
@@ -1699,41 +1561,6 @@ pub(crate) fn builtin_file_name_nondirectory(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(file_name_nondirectory(&filename)))
 }
 
-/// (file-name-extension FILENAME &optional PERIOD) -> string or nil
-pub(crate) fn builtin_file_name_extension(args: Vec<Value>) -> EvalResult {
-    expect_min_args("file-name-extension", &args, 1)?;
-    if args.len() > 2 {
-        return Err(signal(
-            "wrong-number-of-arguments",
-            vec![
-                Value::symbol("file-name-extension"),
-                Value::Int(args.len() as i64),
-            ],
-        ));
-    }
-    let filename = expect_string_strict(&args[0])?;
-    let period = args.get(1).is_some_and(|v| v.is_truthy());
-    match file_name_extension(&filename, period) {
-        Some(ext) => Ok(Value::string(ext)),
-        None => Ok(Value::Nil),
-    }
-}
-
-/// (file-name-sans-extension FILENAME) -> string
-pub(crate) fn builtin_file_name_sans_extension(args: Vec<Value>) -> EvalResult {
-    expect_args("file-name-sans-extension", &args, 1)?;
-    let filename = expect_string_strict(&args[0])?;
-    Ok(Value::string(file_name_sans_extension(&filename)))
-}
-
-/// (file-name-base &optional FILENAME) -> string
-pub(crate) fn builtin_file_name_base(args: Vec<Value>) -> EvalResult {
-    expect_max_args("file-name-base", &args, 1)?;
-    let filename = args.first().cloned().unwrap_or(Value::Nil);
-    let filename = expect_string_strict(&filename)?;
-    Ok(Value::string(file_name_base(&filename)))
-}
-
 /// (file-name-sans-versions FILENAME &optional KEEP-BACKUP-VERSION) -> string
 pub(crate) fn builtin_file_name_sans_versions(args: Vec<Value>) -> EvalResult {
     expect_min_args("file-name-sans-versions", &args, 1)?;
@@ -1744,28 +1571,6 @@ pub(crate) fn builtin_file_name_sans_versions(args: Vec<Value>) -> EvalResult {
         &filename,
         keep_backup,
     )))
-}
-
-/// (file-name-parent-directory FILENAME) -> string or nil
-pub(crate) fn builtin_file_name_parent_directory(args: Vec<Value>) -> EvalResult {
-    expect_args("file-name-parent-directory", &args, 1)?;
-    let filename = expect_string_strict(&args[0])?;
-    Ok(match file_name_parent_directory(&filename) {
-        Some(parent) => Value::string(parent),
-        None => Value::Nil,
-    })
-}
-
-/// (file-name-split FILENAME) -> list of string
-pub(crate) fn builtin_file_name_split(args: Vec<Value>) -> EvalResult {
-    expect_args("file-name-split", &args, 1)?;
-    let filename = expect_string_strict(&args[0])?;
-    Ok(Value::list(
-        file_name_split(&filename)
-            .into_iter()
-            .map(Value::string)
-            .collect(),
-    ))
 }
 
 /// (file-name-as-directory FILENAME) -> string
