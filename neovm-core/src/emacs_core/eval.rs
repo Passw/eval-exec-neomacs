@@ -1279,6 +1279,23 @@ impl Evaluator {
             "kmacro-name-last-macro",
             Value::Subr(intern("kmacro-name-last-macro")),
         );
+        // Bootstrap primitive function cells that GNU `simple.el` references
+        // before its own Elisp defs overwrite them. Without these placeholders,
+        // loaded GNU bytecode can capture `nil` for forward/runtime calls into
+        // NeoVM's Rust primitives.
+        for name in [
+            "activate-mark",
+            "deactivate-mark",
+            "mark",
+            "mark-marker",
+            "region-active-p",
+            "region-beginning",
+            "region-end",
+            "set-mark",
+            "use-region-p",
+        ] {
+            obarray.set_symbol_function(name, Value::Subr(intern(name)));
+        }
         obarray.set_symbol_function(
             "name-last-kbd-macro",
             Value::symbol("kmacro-name-last-macro"),
@@ -1405,6 +1422,11 @@ impl Evaluator {
             "Display the full documentation of VARIABLE (a symbol).",
         );
         seed_autoload(
+            "exchange-point-and-mark",
+            "simple",
+            "Put the mark where point is now, and point where the mark is now.",
+        );
+        seed_autoload(
             "extract-rectangle",
             "rect",
             "Return the contents of the rectangle with corners at START and END.",
@@ -1433,6 +1455,11 @@ impl Evaluator {
             "open-rectangle",
             "rect",
             "Blank out the region-rectangle, shifting text right.",
+        );
+        seed_autoload(
+            "set-mark-command",
+            "simple",
+            "Set the mark where point is, and activate it; or jump to the mark.",
         );
         seed_autoload(
             "string-pixel-width",
@@ -1509,6 +1536,16 @@ impl Evaluator {
             "insert-rectangle",
             "rect",
             "Insert text of RECTANGLE with upper left corner at point.",
+        );
+        seed_autoload_noninteractive(
+            "pop-mark",
+            "simple",
+            "Pop off mark ring into the buffer's actual mark.",
+        );
+        seed_autoload_noninteractive(
+            "push-mark",
+            "simple",
+            "Set mark at LOCATION and push old mark on mark ring.",
         );
         seed_autoload_noninteractive(
             "string-clean-whitespace",

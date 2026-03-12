@@ -1754,8 +1754,6 @@ pub(crate) fn dispatch_builtin(
         "skip-chars-backward" => {
             return Some(super::navigation::builtin_skip_chars_backward(eval, args));
         }
-        "push-mark" => return Some(super::navigation::builtin_push_mark(eval, args)),
-        "pop-mark" => return Some(super::navigation::builtin_pop_mark(eval, args)),
         "set-mark" => return Some(super::navigation::builtin_set_mark_nav(eval, args)),
         "mark" => return Some(super::navigation::builtin_mark_nav(eval, args)),
         "mark-marker" => return Some(super::marker::builtin_mark_marker(eval, args)),
@@ -1765,11 +1763,6 @@ pub(crate) fn dispatch_builtin(
         "use-region-p" => return Some(super::navigation::builtin_use_region_p(eval, args)),
         "deactivate-mark" => return Some(super::navigation::builtin_deactivate_mark(eval, args)),
         "activate-mark" => return Some(super::navigation::builtin_activate_mark(eval, args)),
-        "exchange-point-and-mark" => {
-            return Some(super::navigation::builtin_exchange_point_and_mark(
-                eval, args,
-            ));
-        }
         "transient-mark-mode" => {
             return Some(super::navigation::builtin_transient_mark_mode(eval, args));
         }
@@ -1859,7 +1852,6 @@ pub(crate) fn dispatch_builtin(
         "indent-rigidly" => return Some(super::kill_ring::builtin_indent_rigidly(eval, args)),
 
         // Rectangle operations (evaluator-dependent — buffer access)
-        "yank-rectangle" => return Some(super::rect::builtin_yank_rectangle(eval, args)),
         "insert-rectangle" => return Some(super::rect::builtin_insert_rectangle(eval, args)),
         "open-rectangle" => return Some(super::rect::builtin_open_rectangle(eval, args)),
         "string-rectangle" => return Some(super::rect::builtin_string_rectangle(eval, args)),
@@ -2457,9 +2449,6 @@ pub(crate) fn dispatch_builtin(
         "command-execute" => return Some(super::interactive::builtin_command_execute(eval, args)),
         "find-file" => return Some(super::interactive::builtin_find_file_command(eval, args)),
         "save-buffer" => return Some(super::interactive::builtin_save_buffer_command(eval, args)),
-        "set-mark-command" => {
-            return Some(super::interactive::builtin_set_mark_command(eval, args));
-        }
         "eval-expression" => return Some(super::interactive::builtin_eval_expression(eval, args)),
         "self-insert-command" => {
             return Some(super::interactive::builtin_self_insert_command(eval, args));

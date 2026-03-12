@@ -369,6 +369,10 @@ fn subr_arity_value(name: &str) -> Value {
         | "forward-line" => arity_cons(0, Some(1)),
         "current-buffer" | "buffer-string" | "point" | "point-max" | "point-min" | "bobp"
         | "eobp" | "bolp" | "eolp" | "erase-buffer" | "widen" => arity_cons(0, Some(0)),
+        "mark" => arity_cons(0, Some(1)),
+        "set-mark" => arity_cons(1, Some(1)),
+        "activate-mark" | "deactivate-mark" => arity_cons(0, Some(1)),
+        "region-active-p" | "use-region-p" => arity_cons(0, Some(0)),
         "barf-if-buffer-read-only" => arity_cons(0, Some(1)),
         "mark-marker" | "point-marker" | "point-max-marker" | "point-min-marker" => {
             arity_cons(0, Some(0))

@@ -1,5 +1,6 @@
 use super::super::eval::Evaluator;
 use super::super::value::Value;
+use crate::emacs_core::load::{apply_runtime_startup_state, create_bootstrap_evaluator_cached};
 
 /// Helper: create an evaluator, insert text, and position point.
 fn eval_with_text(text: &str) -> Evaluator {
@@ -8,6 +9,17 @@ fn eval_with_text(text: &str) -> Evaluator {
         let buf = ev.buffers.current_buffer_mut().unwrap();
         buf.insert(text);
         // Point is now at the end. Reset to beginning.
+        buf.goto_char(0);
+    }
+    ev
+}
+
+fn bootstrap_eval_with_text(text: &str) -> Evaluator {
+    let mut ev = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut ev).expect("runtime startup state");
+    {
+        let buf = ev.buffers.current_buffer_mut().unwrap();
+        buf.insert(text);
         buf.goto_char(0);
     }
     ev
@@ -385,7 +397,7 @@ fn test_skip_chars_forward_negate() {
 
 #[test]
 fn test_push_mark_and_mark() {
-    let mut ev = eval_with_text("hello world");
+    let mut ev = bootstrap_eval_with_text("hello world");
     eval_str(&mut ev, "(push-mark 3)");
     let m = eval_int(&mut ev, "(mark t)");
     assert_eq!(m, 3);
@@ -393,7 +405,7 @@ fn test_push_mark_and_mark() {
 
 #[test]
 fn test_push_mark_default_pos() {
-    let mut ev = eval_with_text("hello");
+    let mut ev = bootstrap_eval_with_text("hello");
     eval_str(&mut ev, "(goto-char 3)");
     eval_str(&mut ev, "(push-mark)");
     let m = eval_int(&mut ev, "(mark t)");
@@ -402,7 +414,7 @@ fn test_push_mark_default_pos() {
 
 #[test]
 fn test_pop_mark() {
-    let mut ev = eval_with_text("hello world");
+    let mut ev = bootstrap_eval_with_text("hello world");
     eval_str(&mut ev, "(push-mark 3)");
     eval_str(&mut ev, "(push-mark 5)");
     // Mark is now at 5, ring has [3]
@@ -415,7 +427,7 @@ fn test_pop_mark() {
 
 #[test]
 fn test_region_beginning_and_end() {
-    let mut ev = eval_with_text("hello world");
+    let mut ev = bootstrap_eval_with_text("hello world");
     eval_str(&mut ev, "(goto-char 8)");
     eval_str(&mut ev, "(push-mark 3 nil t)");
     let beg = eval_int(&mut ev, "(region-beginning)");
@@ -426,7 +438,7 @@ fn test_region_beginning_and_end() {
 
 #[test]
 fn test_use_region_p() {
-    let mut ev = eval_with_text("hello");
+    let mut ev = bootstrap_eval_with_text("hello");
     let active = eval_str(
         &mut ev,
         "(let ((transient-mark-mode t))
@@ -438,7 +450,7 @@ fn test_use_region_p() {
 
 #[test]
 fn test_use_region_p_inactive() {
-    let mut ev = eval_with_text("hello");
+    let mut ev = bootstrap_eval_with_text("hello");
     eval_str(&mut ev, "(push-mark 3)"); // not activated
     let active = eval_str(&mut ev, "(use-region-p)");
     assert!(active.is_nil());
@@ -446,7 +458,7 @@ fn test_use_region_p_inactive() {
 
 #[test]
 fn test_region_active_p_true_for_active_empty_region() {
-    let mut ev = eval_with_text("hello");
+    let mut ev = bootstrap_eval_with_text("hello");
     let active = eval_str(
         &mut ev,
         "(let ((transient-mark-mode t))
@@ -480,7 +492,7 @@ fn test_region_active_p_over_arity() {
 
 #[test]
 fn test_deactivate_mark() {
-    let mut ev = eval_with_text("hello");
+    let mut ev = bootstrap_eval_with_text("hello");
     eval_str(&mut ev, "(push-mark 3 nil t)");
     eval_str(&mut ev, "(deactivate-mark)");
     let active = eval_str(&mut ev, "(use-region-p)");
@@ -489,7 +501,7 @@ fn test_deactivate_mark() {
 
 #[test]
 fn test_exchange_point_and_mark() {
-    let mut ev = eval_with_text("hello world");
+    let mut ev = bootstrap_eval_with_text("hello world");
     eval_str(&mut ev, "(goto-char 3)");
     eval_str(&mut ev, "(push-mark 8 nil t)");
     eval_str(&mut ev, "(exchange-point-and-mark)");
@@ -533,7 +545,7 @@ fn test_transient_mark_mode_over_arity() {
 
 #[test]
 fn test_mark_marker() {
-    let mut ev = eval_with_text("hello");
+    let mut ev = bootstrap_eval_with_text("hello");
     eval_str(&mut ev, "(push-mark 4)");
     let pos = eval_int(&mut ev, "(marker-position (mark-marker))");
     assert_eq!(pos, 4);

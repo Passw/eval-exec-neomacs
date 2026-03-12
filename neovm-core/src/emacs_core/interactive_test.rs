@@ -2084,7 +2084,8 @@ fn command_execute_builtin_save_buffer_reads_stdin_in_batch() {
 
 #[test]
 fn command_execute_builtin_set_mark_command_returns_nil() {
-    let mut ev = Evaluator::new();
+    let mut ev = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut ev).expect("runtime startup state");
     let result = builtin_command_execute(&mut ev, vec![Value::symbol("set-mark-command")])
         .expect("set-mark-command should execute");
     assert!(result.is_nil());

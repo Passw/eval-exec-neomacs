@@ -722,82 +722,6 @@ pub(crate) fn builtin_skip_chars_backward(
 // Mark and region
 // ===========================================================================
 
-/// (push-mark &optional LOCATION NOMSG ACTIVATE)
-pub(crate) fn builtin_push_mark(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    let buf = eval.buffers.current_buffer_mut().ok_or_else(no_buffer)?;
-    let byte_pos = if args.is_empty() || args[0].is_nil() {
-        buf.pt
-    } else {
-        char_pos_to_byte(buf, expect_int(&args[0])?)
-    };
-    // Store current mark on the mark ring (buffer-local property "mark-ring")
-    if let Some(old_mark) = buf.mark {
-        let old_char = buf.text.byte_to_char(old_mark) as i64 + 1;
-        let ring = buf
-            .properties
-            .entry("mark-ring".to_string())
-            .or_insert(Value::Nil);
-        // Prepend old mark to the ring list
-        *ring = Value::cons(Value::Int(old_char), *ring);
-    }
-    buf.set_mark(byte_pos);
-    let _nomsg = args.get(1).is_some_and(|v| v.is_truthy());
-    let activate = args.get(2).is_some_and(|v| v.is_truthy());
-    if activate {
-        buf.properties
-            .insert("mark-active".to_string(), Value::True);
-    }
-    Ok(Value::Nil)
-}
-
-/// (pop-mark)
-pub(crate) fn builtin_pop_mark(eval: &mut super::eval::Evaluator, _args: Vec<Value>) -> EvalResult {
-    let buf = eval.buffers.current_buffer_mut().ok_or_else(no_buffer)?;
-    let ring = buf
-        .properties
-        .get("mark-ring")
-        .cloned()
-        .unwrap_or(Value::Nil);
-    match &ring {
-        Value::Cons(cell) => {
-            let pair = read_cons(*cell);
-            let pos_val = pair.car;
-            let rest = pair.cdr;
-            drop(pair);
-            buf.properties.insert("mark-ring".to_string(), rest);
-            if let Some(pos) = pos_val.as_int() {
-                let byte_pos = char_pos_to_byte(buf, pos);
-                buf.set_mark(byte_pos);
-            }
-            Ok(Value::Nil)
-        }
-        _ => {
-            // Empty mark ring — just clear the mark
-            buf.mark = None;
-            Ok(Value::Nil)
-        }
-    }
-}
-
-/// (set-mark POS) — set mark at pos and activate
-/// Note: this overrides the existing builtin_set_mark in builtins.rs with
-/// additional mark-active behavior.  We keep it here but the dispatch will
-/// point to the one in builtins.rs unless re-routed.
-pub(crate) fn builtin_set_mark_nav(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_args("set-mark", &args, 1)?;
-    let pos = expect_int(&args[0])? as usize;
-    let buf = eval.buffers.current_buffer_mut().ok_or_else(no_buffer)?;
-    let char_pos = if pos > 0 { pos - 1 } else { 0 };
-    let byte_pos = buf.text.char_to_byte(char_pos.min(buf.text.char_count()));
-    buf.set_mark(byte_pos);
-    buf.properties
-        .insert("mark-active".to_string(), Value::True);
-    Ok(args[0])
-}
-
 /// (mark &optional FORCE) -> integer or signal
 pub(crate) fn builtin_mark_nav(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     let _force = args.first().is_some_and(|v| v.is_truthy());
@@ -920,25 +844,20 @@ pub(crate) fn builtin_activate_mark(
     Ok(Value::Nil)
 }
 
-/// (exchange-point-and-mark &optional ARG)
-pub(crate) fn builtin_exchange_point_and_mark(
+/// (set-mark POS) — set mark at pos and activate
+pub(crate) fn builtin_set_mark_nav(
     eval: &mut super::eval::Evaluator,
-    _args: Vec<Value>,
+    args: Vec<Value>,
 ) -> EvalResult {
+    expect_args("set-mark", &args, 1)?;
+    let pos = expect_int(&args[0])? as usize;
     let buf = eval.buffers.current_buffer_mut().ok_or_else(no_buffer)?;
-    let mark = buf.mark().ok_or_else(|| {
-        signal(
-            "user-error",
-            vec![Value::string("No mark set in this buffer")],
-        )
-    })?;
-    let old_pt = buf.pt;
-    buf.pt = mark;
-    buf.mark = Some(old_pt);
-    // Activate the mark
+    let char_pos = if pos > 0 { pos - 1 } else { 0 };
+    let byte_pos = buf.text.char_to_byte(char_pos.min(buf.text.char_count()));
+    buf.set_mark(byte_pos);
     buf.properties
         .insert("mark-active".to_string(), Value::True);
-    Ok(Value::Nil)
+    Ok(args[0])
 }
 
 /// (transient-mark-mode &optional ARG) — toggle/query mode flag.
