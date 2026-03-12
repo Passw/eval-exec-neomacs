@@ -611,6 +611,51 @@ fn replace_buffer_contents(buf: &mut crate::buffer::Buffer, text: &str) {
     }
 }
 
+fn replace_region_contents_type_predicate() -> Value {
+    Value::list(vec![
+        Value::symbol("or"),
+        Value::symbol("stringp"),
+        Value::symbol("bufferp"),
+        Value::symbol("vectorp"),
+    ])
+}
+
+fn replace_region_source_text(
+    eval: &super::eval::Evaluator,
+    source: &Value,
+) -> Result<String, Flow> {
+    match source {
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
+        Value::Buffer(id) => Ok(eval
+            .buffers
+            .get(*id)
+            .map(|buf| buf.buffer_string())
+            .unwrap_or_default()),
+        Value::Vector(id) => {
+            let items = with_heap(|h| h.get_vector(*id).clone());
+            if items.len() != 3 {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![replace_region_contents_type_predicate(), *source],
+                ));
+            }
+            let buffer_id = expect_buffer_id(&items[0])?;
+            let start = expect_integer_or_marker(&items[1])?;
+            let end = expect_integer_or_marker(&items[2])?;
+            Ok(buffer_slice_for_char_region(
+                eval,
+                Some(buffer_id),
+                start,
+                end,
+            ))
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![replace_region_contents_type_predicate(), *other],
+        )),
+    }
+}
+
 /// `(buffer-swap-text OTHER-BUFFER)` -> nil
 pub(crate) fn builtin_buffer_swap_text(
     eval: &mut super::eval::Evaluator,
@@ -868,6 +913,47 @@ pub(crate) fn builtin_replace_buffer_contents_eval(
 
     if let Some(buf) = eval.buffers.get_mut(current_id) {
         replace_buffer_contents(buf, &source_text);
+    }
+
+    Ok(Value::True)
+}
+
+/// `(replace-region-contents BEG END SOURCE &optional MAX-SECS MAX-COSTS INHERIT)` -> t
+pub(crate) fn builtin_replace_region_contents_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("replace-region-contents", &args, 3, 6)?;
+    let start = expect_integer_or_marker(&args[0])?;
+    let end = expect_integer_or_marker(&args[1])?;
+    let source_text = replace_region_source_text(eval, &args[2])?;
+
+    let read_only_buffer_name = eval.buffers.current_buffer().and_then(|buf| {
+        if buffer_read_only_active(eval, buf) {
+            Some(buf.name.clone())
+        } else {
+            None
+        }
+    });
+    if let Some(name) = read_only_buffer_name {
+        return Err(signal("buffer-read-only", vec![Value::string(name)]));
+    }
+
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let start_byte = super::editfns::lisp_pos_to_byte(buf, start);
+    let end_byte = super::editfns::lisp_pos_to_byte(buf, end);
+    let (lo, hi) = if start_byte <= end_byte {
+        (start_byte, end_byte)
+    } else {
+        (end_byte, start_byte)
+    };
+    buf.delete_region(lo, hi);
+    buf.goto_char(lo);
+    if !source_text.is_empty() {
+        buf.insert(&source_text);
     }
 
     Ok(Value::True)

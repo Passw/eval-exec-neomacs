@@ -992,6 +992,7 @@ pub(crate) fn dispatch_builtin(
         "insert-char" => return Some(builtin_insert_char(eval, args)),
         "insert-byte" => return Some(builtin_insert_byte(eval, args)),
         "replace-buffer-contents" => return Some(builtin_replace_buffer_contents_eval(eval, args)),
+        "replace-region-contents" => return Some(builtin_replace_region_contents_eval(eval, args)),
         "set-buffer-multibyte" => return Some(builtin_set_buffer_multibyte_eval(eval, args)),
         "kill-all-local-variables" => return Some(builtin_kill_all_local_variables(eval, args)),
         "buffer-swap-text" => return Some(builtin_buffer_swap_text(eval, args)),

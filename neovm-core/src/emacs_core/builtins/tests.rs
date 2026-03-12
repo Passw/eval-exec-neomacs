@@ -1573,6 +1573,83 @@ fn replace_buffer_contents_and_set_buffer_multibyte_runtime_semantics() {
 }
 
 #[test]
+fn replace_region_contents_replaces_from_string_and_buffer_sources() {
+    let mut eval = super::super::eval::Evaluator::new();
+    builtin_insert(&mut eval, vec![Value::string("abXXef")]).unwrap();
+
+    assert_eq!(
+        builtin_replace_region_contents_eval(
+            &mut eval,
+            vec![
+                Value::Int(3),
+                Value::Int(5),
+                Value::string("cd"),
+                Value::Int(0)
+            ]
+        )
+        .unwrap(),
+        Value::True
+    );
+    assert_eq!(
+        eval.buffers.current_buffer().unwrap().buffer_string(),
+        "abcdef"
+    );
+
+    let source_id = eval.buffers.create_buffer("*rrc-source*");
+    eval.buffers.set_current(source_id);
+    builtin_insert(&mut eval, vec![Value::string("1234")]).unwrap();
+
+    let dest_id = eval.buffers.create_buffer("*rrc-dest*");
+    eval.buffers.set_current(dest_id);
+    builtin_insert(&mut eval, vec![Value::string("abYYef")]).unwrap();
+
+    assert_eq!(
+        builtin_replace_region_contents_eval(
+            &mut eval,
+            vec![Value::Int(3), Value::Int(5), Value::Buffer(source_id)]
+        )
+        .unwrap(),
+        Value::True
+    );
+    assert_eq!(
+        eval.buffers.current_buffer().unwrap().buffer_string(),
+        "ab1234ef"
+    );
+}
+
+#[test]
+fn replace_region_contents_accepts_vector_buffer_slices() {
+    let mut eval = super::super::eval::Evaluator::new();
+    let source_id = eval.buffers.create_buffer("*rrc-slice-source*");
+    eval.buffers.set_current(source_id);
+    builtin_insert(&mut eval, vec![Value::string("1234")]).unwrap();
+
+    let dest_id = eval.buffers.create_buffer("*rrc-slice-dest*");
+    eval.buffers.set_current(dest_id);
+    builtin_insert(&mut eval, vec![Value::string("abZZef")]).unwrap();
+
+    assert_eq!(
+        builtin_replace_region_contents_eval(
+            &mut eval,
+            vec![
+                Value::Int(3),
+                Value::Int(5),
+                Value::vector(vec![Value::Buffer(source_id), Value::Int(2), Value::Int(4)])
+            ]
+        )
+        .unwrap(),
+        Value::True
+    );
+    assert_eq!(
+        eval.buffers
+            .get(dest_id)
+            .expect("destination buffer should exist")
+            .buffer_string(),
+        "ab23ef"
+    );
+}
+
+#[test]
 fn split_window_internal_validates_core_argument_types() {
     let mut eval = super::super::eval::Evaluator::new();
     let split = builtin_split_window_internal(
