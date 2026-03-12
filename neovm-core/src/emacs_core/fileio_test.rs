@@ -1440,39 +1440,6 @@ fn test_builtin_file_name_ops() {
         Value::string("bar"),
     ]);
     assert_eq!(result.unwrap().as_str(), Some("foo/bar"));
-
-    let backup = builtin_backup_file_name_p(vec![Value::string("foo.~12~")]);
-    assert_eq!(backup.unwrap(), Value::Int(7));
-
-    let no_backup = builtin_backup_file_name_p(vec![Value::string("foo.txt")]);
-    assert_eq!(no_backup.unwrap(), Value::Nil);
-
-    let auto_save = builtin_auto_save_file_name_p(vec![Value::string("#foo#")]);
-    assert_eq!(auto_save.unwrap(), Value::Int(0));
-
-    let not_auto_save = builtin_auto_save_file_name_p(vec![Value::string("foo.txt")]);
-    assert_eq!(not_auto_save.unwrap(), Value::Nil);
-
-    let unchanged = builtin_abbreviate_file_name(vec![Value::string("/tmp/x")]);
-    assert_eq!(unchanged.unwrap(), Value::string("/tmp/x"));
-
-    if let Ok(home) = std::env::var("HOME") {
-        let home_only = builtin_abbreviate_file_name(vec![Value::string(&home)]);
-        assert_eq!(home_only.unwrap(), Value::string("~"));
-
-        let under_home =
-            builtin_abbreviate_file_name(vec![Value::string(format!("{home}/project"))]);
-        assert_eq!(under_home.unwrap(), Value::string("~/project"));
-    }
-
-    let converted = builtin_convert_standard_filename(vec![Value::string("/tmp/x")]);
-    assert_eq!(converted.unwrap(), Value::string("/tmp/x"));
-
-    let converted_symbol = builtin_convert_standard_filename(vec![Value::symbol("x")]);
-    assert_eq!(converted_symbol.unwrap(), Value::symbol("x"));
-
-    let converted_int = builtin_convert_standard_filename(vec![Value::Int(42)]);
-    assert_eq!(converted_int.unwrap(), Value::Int(42));
 }
 
 #[test]
@@ -1481,11 +1448,6 @@ fn test_builtin_file_name_ops_strict_types() {
     assert!(builtin_file_name_nondirectory(vec![Value::symbol("x")]).is_err());
     assert!(builtin_file_name_as_directory(vec![Value::symbol("x")]).is_err());
     assert!(builtin_directory_file_name(vec![Value::symbol("x")]).is_err());
-    assert!(builtin_backup_file_name_p(vec![Value::symbol("x")]).is_err());
-    assert!(builtin_auto_save_file_name_p(vec![Value::symbol("x")]).is_err());
-    assert!(builtin_abbreviate_file_name(vec![Value::symbol("x")]).is_err());
-    assert!(builtin_convert_standard_filename(vec![]).is_err());
-    assert!(builtin_convert_standard_filename(vec![Value::Nil, Value::Nil]).is_err());
 }
 
 #[test]
@@ -1602,6 +1564,57 @@ fn file_name_sans_versions_bootstrap_error_shapes_match_gnu_files_el() {
     );
     assert_eq!(results[0], "OK wrong-type-argument");
     assert_eq!(results[1], "OK wrong-number-of-arguments");
+}
+
+#[test]
+fn file_name_misc_bootstrap_matches_gnu_files_el() {
+    let results = bootstrap_eval(
+        r##"
+        (list (subrp (symbol-function 'convert-standard-filename))
+              (subrp (symbol-function 'backup-file-name-p))
+              (subrp (symbol-function 'auto-save-file-name-p))
+              (subrp (symbol-function 'abbreviate-file-name)))
+        (backup-file-name-p "foo.~12~")
+        (backup-file-name-p "foo.txt")
+        (auto-save-file-name-p "#foo#")
+        (auto-save-file-name-p "foo.txt")
+        (let* ((home (expand-file-name "~"))
+               (under (concat home "/project")))
+          (list (equal (abbreviate-file-name home) "~")
+                (equal (abbreviate-file-name under) "~/project")
+                (abbreviate-file-name "/tmp/x")))
+        (convert-standard-filename "/tmp/x")
+        (convert-standard-filename 'x)
+        (convert-standard-filename 42)
+        "##,
+    );
+    assert_eq!(results[0], "OK (nil nil nil nil)");
+    assert_eq!(results[1], "OK 7");
+    assert_eq!(results[2], "OK nil");
+    assert_eq!(results[3], "OK 0");
+    assert_eq!(results[4], "OK nil");
+    assert_eq!(results[5], r#"OK (t t "/tmp/x")"#);
+    assert_eq!(results[6], r#"OK "/tmp/x""#);
+    assert_eq!(results[7], "OK x");
+    assert_eq!(results[8], "OK 42");
+}
+
+#[test]
+fn file_name_misc_bootstrap_error_shapes_match_gnu_files_el() {
+    let results = bootstrap_eval(
+        r#"
+        (condition-case err (backup-file-name-p 'x) (error (car err)))
+        (condition-case err (auto-save-file-name-p 'x) (error (car err)))
+        (condition-case err (abbreviate-file-name 'x) (error (car err)))
+        (condition-case err (convert-standard-filename) (error (car err)))
+        (condition-case err (convert-standard-filename nil nil) (error (car err)))
+        "#,
+    );
+    assert_eq!(results[0], "OK wrong-type-argument");
+    assert_eq!(results[1], "OK wrong-type-argument");
+    assert_eq!(results[2], "OK wrong-type-argument");
+    assert_eq!(results[3], "OK wrong-number-of-arguments");
+    assert_eq!(results[4], "OK wrong-number-of-arguments");
 }
 
 #[test]

@@ -217,63 +217,10 @@ pub fn file_name_concat(parts: &[&str]) -> String {
     out
 }
 
-/// Convert FILENAME to system-standard form.
-///
-/// On Unix this is a no-op for strings. Non-strings are returned unchanged,
-/// matching GNU Emacs `convert-standard-filename`.
-pub fn convert_standard_filename(value: Value) -> Value {
-    match value {
-        Value::Str(id) => Value::string(with_heap(|h| h.get_string(id).clone())),
-        other => other,
-    }
-}
-
 /// Return true if FILENAME is an absolute file name.
 /// On Unix this means it starts with `/` or `~`.
 pub fn file_name_absolute_p(filename: &str) -> bool {
     filename.starts_with('/') || filename.starts_with('~')
-}
-
-/// Return the index of backup suffix marker, or nil-like None if not backup.
-///
-/// Emacs `backup-file-name-p` returns the char position of the final `~`
-/// in backup names, and nil otherwise.
-pub fn backup_file_name_p(filename: &str) -> Option<i64> {
-    if filename.ends_with('~') {
-        Some(filename.chars().count().saturating_sub(1) as i64)
-    } else {
-        None
-    }
-}
-
-/// Return 0 when FILENAME is an auto-save file name, else nil-like None.
-///
-/// Emacs `auto-save-file-name-p` returns 0 for names like `#foo#`.
-pub fn auto_save_file_name_p(filename: &str) -> Option<i64> {
-    if filename.len() > 1 && filename.starts_with('#') && filename.ends_with('#') {
-        Some(0)
-    } else {
-        None
-    }
-}
-
-/// Abbreviate FILENAME with `~` when it is under `$HOME`.
-pub fn abbreviate_file_name(filename: &str) -> String {
-    let Some(home) = std::env::var("HOME").ok() else {
-        return filename.to_string();
-    };
-
-    if filename == home {
-        return "~".to_string();
-    }
-
-    if let Some(rest) = filename.strip_prefix(&home) {
-        if rest.starts_with('/') {
-            return format!("~{rest}");
-        }
-    }
-
-    filename.to_string()
 }
 
 /// Return true if NAME is a directory name (ends with a directory separator).
@@ -1578,12 +1525,6 @@ pub(crate) fn builtin_file_name_concat(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(file_name_concat(&refs)))
 }
 
-/// (convert-standard-filename FILENAME) -> standardized filename
-pub(crate) fn builtin_convert_standard_filename(args: Vec<Value>) -> EvalResult {
-    expect_args("convert-standard-filename", &args, 1)?;
-    Ok(convert_standard_filename(args[0]))
-}
-
 /// (file-name-absolute-p FILENAME) -> t or nil
 pub(crate) fn builtin_file_name_absolute_p(args: Vec<Value>) -> EvalResult {
     expect_args("file-name-absolute-p", &args, 1)?;
@@ -1596,33 +1537,6 @@ pub(crate) fn builtin_directory_name_p(args: Vec<Value>) -> EvalResult {
     expect_args("directory-name-p", &args, 1)?;
     let name = expect_string_strict(&args[0])?;
     Ok(Value::bool(directory_name_p(&name)))
-}
-
-/// (backup-file-name-p FILE) -> integer index or nil
-pub(crate) fn builtin_backup_file_name_p(args: Vec<Value>) -> EvalResult {
-    expect_args("backup-file-name-p", &args, 1)?;
-    let file = expect_string_strict(&args[0])?;
-    Ok(match backup_file_name_p(&file) {
-        Some(idx) => Value::Int(idx),
-        None => Value::Nil,
-    })
-}
-
-/// (auto-save-file-name-p FILE) -> integer index or nil
-pub(crate) fn builtin_auto_save_file_name_p(args: Vec<Value>) -> EvalResult {
-    expect_args("auto-save-file-name-p", &args, 1)?;
-    let file = expect_string_strict(&args[0])?;
-    Ok(match auto_save_file_name_p(&file) {
-        Some(idx) => Value::Int(idx),
-        None => Value::Nil,
-    })
-}
-
-/// (abbreviate-file-name FILENAME) -> abbreviated string
-pub(crate) fn builtin_abbreviate_file_name(args: Vec<Value>) -> EvalResult {
-    expect_args("abbreviate-file-name", &args, 1)?;
-    let file = expect_string_strict(&args[0])?;
-    Ok(Value::string(abbreviate_file_name(&file)))
 }
 
 /// Compute FILENAME relative to DIRECTORY.
