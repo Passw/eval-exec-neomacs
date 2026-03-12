@@ -3306,8 +3306,6 @@ pub(crate) fn dispatch_builtin(
         "compiled-function-p" => super::builtins_extra::builtin_compiled_function_p(args),
         "closurep" => super::builtins_extra::builtin_closurep(args),
         "natnump" => super::builtins_extra::builtin_natnump(args),
-        "fixnump" => super::builtins_extra::builtin_fixnump(args),
-        "bignump" => super::builtins_extra::builtin_bignump(args),
         "wholenump" => super::builtins_extra::builtin_wholenump(args),
         "zerop" => super::builtins_extra::builtin_zerop(args),
         "user-login-name" => super::builtins_extra::builtin_user_login_name(args),

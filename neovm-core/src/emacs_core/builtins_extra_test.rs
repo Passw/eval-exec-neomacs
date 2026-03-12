@@ -262,6 +262,28 @@ fn number_predicates() {
 }
 
 #[test]
+fn fixnum_predicates_bootstrap_match_gnu_subr() {
+    let results = bootstrap_eval(
+        r#"
+        (subrp (symbol-function 'fixnump))
+        (subrp (symbol-function 'bignump))
+        (list (fixnump 0)
+              (fixnump most-positive-fixnum)
+              (fixnump 1.0)
+              (fixnump nil))
+        (list (bignump 0)
+              (bignump most-positive-fixnum)
+              (bignump 1.0)
+              (bignump nil))
+        "#,
+    );
+    assert_eq!(results[0], "OK nil");
+    assert_eq!(results[1], "OK nil");
+    assert_eq!(results[2], "OK (t t nil nil)");
+    assert_eq!(results[3], "OK (nil nil nil nil)");
+}
+
+#[test]
 fn seq_uniq() {
     let results = bootstrap_eval(
         r#"

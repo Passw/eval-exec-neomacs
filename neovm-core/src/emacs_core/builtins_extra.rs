@@ -444,18 +444,6 @@ pub(crate) fn builtin_natnump(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool(is_nat))
 }
 
-/// `(fixnump OBJ)` -> t if fixnum.
-pub(crate) fn builtin_fixnump(args: Vec<Value>) -> EvalResult {
-    expect_args("fixnump", &args, 1)?;
-    Ok(Value::bool(matches!(&args[0], Value::Int(_))))
-}
-
-/// `(bignump OBJ)` -> nil (we don't have bignums).
-pub(crate) fn builtin_bignump(args: Vec<Value>) -> EvalResult {
-    expect_args("bignump", &args, 1)?;
-    Ok(Value::Nil)
-}
-
 /// `(wholenump OBJ)` -> t if whole number.
 pub(crate) fn builtin_wholenump(args: Vec<Value>) -> EvalResult {
     expect_args("wholenump", &args, 1)?;
