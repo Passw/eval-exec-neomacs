@@ -1,5 +1,17 @@
 use super::*;
 use crate::emacs_core::builtins::builtin_documentation_stringp;
+use crate::emacs_core::load::{apply_runtime_startup_state, create_bootstrap_evaluator};
+use crate::emacs_core::{format_eval_result, parse_forms};
+
+fn bootstrap_eval_all(src: &str) -> Vec<String> {
+    let mut eval = create_bootstrap_evaluator().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let forms = parse_forms(src).expect("parse");
+    eval.eval_forms(&forms)
+        .iter()
+        .map(format_eval_result)
+        .collect()
+}
 
 // =======================================================================
 // substitute-command-keys
@@ -217,520 +229,48 @@ fn snarf_documentation_wrong_arity() {
 // help-function-arglist
 // =======================================================================
 
-fn arglist_names(v: &Value) -> Vec<String> {
-    list_to_vec(v)
-        .expect("arglist must be list")
-        .into_iter()
-        .map(|item| {
-            item.as_symbol_name()
-                .expect("arglist item must be symbol")
-                .to_string()
-        })
-        .collect()
-}
-
 #[test]
-fn help_function_arglist_returns_t_for_unknown() {
-    let result = builtin_help_function_arglist(vec![Value::symbol("foo")]);
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_truthy());
-}
-
-#[test]
-fn help_function_arglist_thread_join_matches_oracle_shape() {
-    let result = builtin_help_function_arglist(vec![Value::symbol("thread-join")]).unwrap();
-    assert_eq!(arglist_names(&result), vec!["arg1".to_string()]);
-}
-
-#[test]
-fn help_function_arglist_thread_join_preserve_names() {
-    let result =
-        builtin_help_function_arglist(vec![Value::symbol("thread-join"), Value::True]).unwrap();
-    assert_eq!(arglist_names(&result), vec!["thread".to_string()]);
-}
-
-#[test]
-fn help_function_arglist_sub_non_preserve_names_matches_oracle_shape() {
-    let result = builtin_help_function_arglist(vec![Value::symbol("-")]).unwrap();
-    assert_eq!(
-        arglist_names(&result),
-        vec!["&rest".to_string(), "rest".to_string()]
-    );
-}
-
-#[test]
-fn help_function_arglist_sub_preserve_names_matches_oracle_shape() {
-    let result = builtin_help_function_arglist(vec![Value::symbol("-"), Value::True]).unwrap();
-    assert_eq!(
-        arglist_names(&result),
-        vec![
-            "&optional".to_string(),
-            "number-or-marker".to_string(),
-            "&rest".to_string(),
-            "more-numbers-or-markers".to_string()
-        ]
-    );
-}
-
-#[test]
-fn help_function_arglist_event_apply_modifier_matches_oracle_shape() {
-    let result =
-        builtin_help_function_arglist(vec![Value::symbol("event-apply-modifier")]).unwrap();
-    assert_eq!(
-        arglist_names(&result),
-        vec![
-            "arg1".to_string(),
-            "arg2".to_string(),
-            "arg3".to_string(),
-            "arg4".to_string()
-        ]
-    );
-}
-
-#[test]
-fn help_function_arglist_event_apply_modifier_preserve_names() {
-    let result =
-        builtin_help_function_arglist(vec![Value::symbol("event-apply-modifier"), Value::True])
-            .unwrap();
-    assert_eq!(
-        arglist_names(&result),
-        vec![
-            "event".to_string(),
-            "symbol".to_string(),
-            "lshiftby".to_string(),
-            "prefix".to_string()
-        ]
-    );
-}
-
-#[test]
-fn help_function_arglist_condition_notify_optional_arg() {
-    let result = builtin_help_function_arglist(vec![Value::symbol("condition-notify")]).unwrap();
-    assert_eq!(
-        arglist_names(&result),
-        vec![
-            "arg1".to_string(),
-            "&optional".to_string(),
-            "arg2".to_string()
-        ]
-    );
-}
-
-#[test]
-fn help_function_arglist_lambda_params() {
-    let result = builtin_help_function_arglist(vec![Value::make_lambda(LambdaData {
-        params: LambdaParams {
-            required: vec![intern("x")],
-            optional: vec![intern("y")],
-            rest: Some(intern("rest")),
-        },
-        body: vec![].into(),
-        env: None,
-        docstring: None,
-        doc_form: None,
-    })])
-    .unwrap();
-    assert_eq!(
-        arglist_names(&result),
-        vec![
-            "x".to_string(),
-            "&optional".to_string(),
-            "y".to_string(),
-            "&rest".to_string(),
-            "rest".to_string()
-        ]
-    );
-}
-
-#[test]
-fn help_function_arglist_quoted_lambda_params() {
-    let quoted = Value::list(vec![
-        Value::symbol("lambda"),
-        Value::list(vec![Value::symbol("x"), Value::symbol("y")]),
-        Value::symbol("x"),
-    ]);
-    let result = builtin_help_function_arglist(vec![quoted]).unwrap();
-    assert_eq!(
-        arglist_names(&result),
-        vec!["x".to_string(), "y".to_string()]
-    );
-}
-
-#[test]
-fn help_function_arglist_quoted_lambda_symbol_params() {
-    let quoted = Value::list(vec![
-        Value::symbol("lambda"),
-        Value::symbol("x"),
-        Value::symbol("x"),
-    ]);
-    let result = builtin_help_function_arglist(vec![quoted]).unwrap();
-    assert_eq!(result.as_symbol_name(), Some("x"));
-}
-
-#[test]
-fn help_function_arglist_quoted_macro_returns_t() {
-    let quoted = Value::list(vec![
-        Value::symbol("macro"),
-        Value::list(vec![Value::symbol("x")]),
-        Value::symbol("x"),
-    ]);
-    let result = builtin_help_function_arglist(vec![quoted]).unwrap();
-    assert!(result.is_truthy());
-}
-
-#[test]
-fn help_function_arglist_macro_lambda_symbol_payload_returns_nil() {
-    let quoted = Value::list(vec![Value::symbol("macro"), Value::symbol("lambda")]);
-    let result = builtin_help_function_arglist(vec![quoted]).unwrap();
-    assert!(result.is_nil());
-}
-
-#[test]
-fn help_function_arglist_quoted_lambda_improper_tail_errors() {
-    let quoted = Value::cons(Value::symbol("lambda"), Value::Int(1));
-    let result = builtin_help_function_arglist(vec![quoted]);
-    match result {
-        Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
-        other => panic!("expected wrong-type-argument signal, got {other:?}"),
-    }
-}
-
-#[test]
-fn help_function_arglist_wrong_arity() {
-    let result = builtin_help_function_arglist(vec![]);
-    assert!(result.is_err());
-}
-
-#[test]
-fn help_function_arglist_eval_builtin_car() {
-    let mut evaluator = super::super::eval::Evaluator::new();
-    let result =
-        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("car")]).unwrap();
-    assert_eq!(arglist_names(&result), vec!["arg1".to_string()]);
-}
-
-#[test]
-fn help_function_arglist_eval_builtin_car_preserve_names() {
-    let mut evaluator = super::super::eval::Evaluator::new();
-    let result =
-        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("car"), Value::True])
-            .unwrap();
-    assert_eq!(arglist_names(&result), vec!["list".to_string()]);
-}
-
-#[test]
-fn help_function_arglist_eval_special_form_if() {
-    let mut evaluator = super::super::eval::Evaluator::new();
-    let result =
-        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("if")]).unwrap();
-    assert_eq!(
-        arglist_names(&result),
-        vec![
-            "arg1".to_string(),
-            "arg2".to_string(),
-            "&rest".to_string(),
-            "rest".to_string()
-        ]
-    );
-}
-
-#[test]
-fn help_function_arglist_eval_runtime_alias_builtin() {
-    let mut evaluator = super::super::eval::Evaluator::new();
-    evaluator
+fn help_function_arglist_startup_is_autoloaded() {
+    let eval = super::super::eval::Evaluator::new();
+    let function = eval
         .obarray
-        .set_symbol_function("vm-hfa-alias-builtin", Value::symbol("car"));
-
-    let result = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("vm-hfa-alias-builtin")],
-    )
-    .unwrap();
-    assert_eq!(arglist_names(&result), vec!["arg1".to_string()]);
+        .symbol_function("help-function-arglist")
+        .expect("missing help-function-arglist startup function cell");
+    assert!(crate::emacs_core::autoload::is_autoload_value(&function));
 }
 
 #[test]
-fn help_function_arglist_eval_autoload_placeholder() {
-    let mut evaluator = super::super::eval::Evaluator::new();
-    let result = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("describe-function")],
-    )
-    .unwrap();
+fn help_function_arglist_loads_from_gnu_help_el() {
+    let results = bootstrap_eval_all(
+        r#"(list (help-function-arglist 'car)
+                 (help-function-arglist 'car t)
+                 (help-function-arglist 'describe-function)
+                 (subrp (symbol-function 'help-function-arglist)))"#,
+    );
     assert_eq!(
-        result.as_str(),
-        Some("[Arg list not available until function definition is loaded.]")
+        results[0],
+        r#"OK ((arg1) (list) "[Arg list not available until function definition is loaded.]" nil)"#
     );
 }
 
 #[test]
-fn help_function_arglist_eval_subr_arity_fallback_shapes() {
-    let mut evaluator = super::super::eval::Evaluator::new();
-
-    let cdr =
-        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("cdr")]).unwrap();
-    assert_eq!(arglist_names(&cdr), vec!["arg1".to_string()]);
-
-    let list =
-        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("list")]).unwrap();
-    assert_eq!(
-        arglist_names(&list),
-        vec!["&rest".to_string(), "rest".to_string()]
+fn help_function_arglist_loaded_supports_lambda_forms() {
+    let results = bootstrap_eval_all(
+        r#"(list (help-function-arglist '(lambda (x y) x))
+                 (help-function-arglist '(lambda x x))
+                 (help-function-arglist '(macro lambda)))"#,
     );
-
-    let read =
-        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("read")]).unwrap();
-    assert_eq!(
-        arglist_names(&read),
-        vec!["&optional".to_string(), "arg1".to_string()]
-    );
-
-    let equal =
-        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("equal")]).unwrap();
-    assert_eq!(
-        arglist_names(&equal),
-        vec!["arg1".to_string(), "arg2".to_string()]
-    );
-
-    let substring =
-        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("substring")])
-            .unwrap();
-    assert_eq!(
-        arglist_names(&substring),
-        vec![
-            "arg1".to_string(),
-            "&optional".to_string(),
-            "arg2".to_string(),
-            "arg3".to_string()
-        ]
-    );
-
-    let funcall =
-        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("funcall")]).unwrap();
-    assert_eq!(
-        arglist_names(&funcall),
-        vec!["arg1".to_string(), "&rest".to_string(), "rest".to_string()]
-    );
+    assert_eq!(results[0], r#"OK ((x y) x nil)"#);
 }
 
 #[test]
-fn help_function_arglist_eval_preserve_names_core_subrs() {
-    let mut evaluator = super::super::eval::Evaluator::new();
-
-    let cdr =
-        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("cdr"), Value::True])
-            .unwrap();
-    assert_eq!(arglist_names(&cdr), vec!["list".to_string()]);
-
-    let cons = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("cons"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&cons),
-        vec!["car".to_string(), "cdr".to_string()]
+fn help_function_arglist_loaded_wrong_arity_matches_gnu() {
+    let results = bootstrap_eval_all(
+        r#"(condition-case err
+               (help-function-arglist)
+             (error (list 'err (car err))))"#,
     );
-
-    let list = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("list"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&list),
-        vec!["&rest".to_string(), "objects".to_string()]
-    );
-
-    let min =
-        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("min"), Value::True])
-            .unwrap();
-    assert_eq!(
-        arglist_names(&min),
-        vec![
-            "number-or-marker".to_string(),
-            "&rest".to_string(),
-            "numbers-or-markers".to_string()
-        ]
-    );
-
-    let max =
-        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("max"), Value::True])
-            .unwrap();
-    assert_eq!(
-        arglist_names(&max),
-        vec![
-            "number-or-marker".to_string(),
-            "&rest".to_string(),
-            "numbers-or-markers".to_string()
-        ]
-    );
-
-    let message = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("message"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&message),
-        vec![
-            "format-string".to_string(),
-            "&rest".to_string(),
-            "args".to_string()
-        ]
-    );
-
-    let concat = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("concat"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&concat),
-        vec!["&rest".to_string(), "sequences".to_string()]
-    );
-
-    let nconc = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("nconc"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&nconc),
-        vec!["&rest".to_string(), "lists".to_string()]
-    );
-
-    let format = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("format"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&format),
-        vec![
-            "string".to_string(),
-            "&rest".to_string(),
-            "objects".to_string()
-        ]
-    );
-
-    let apply = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("apply"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&apply),
-        vec![
-            "function".to_string(),
-            "&rest".to_string(),
-            "arguments".to_string()
-        ]
-    );
-
-    let assq = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("assq"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&assq),
-        vec!["key".to_string(), "alist".to_string()]
-    );
-
-    let string_match = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("string-match"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&string_match),
-        vec![
-            "regexp".to_string(),
-            "string".to_string(),
-            "&optional".to_string(),
-            "start".to_string(),
-            "inhibit-modify".to_string()
-        ]
-    );
-
-    let make_string = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("make-string"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&make_string),
-        vec![
-            "length".to_string(),
-            "init".to_string(),
-            "&optional".to_string(),
-            "multibyte".to_string()
-        ]
-    );
-
-    let read_from_string = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("read-from-string"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&read_from_string),
-        vec![
-            "string".to_string(),
-            "&optional".to_string(),
-            "start".to_string(),
-            "end".to_string()
-        ]
-    );
-
-    let funcall = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("funcall"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&funcall),
-        vec![
-            "function".to_string(),
-            "&rest".to_string(),
-            "arguments".to_string()
-        ]
-    );
-
-    let mapcar = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("mapcar"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&mapcar),
-        vec!["function".to_string(), "sequence".to_string()]
-    );
-
-    let read = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("read"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&read),
-        vec!["&optional".to_string(), "stream".to_string()]
-    );
-
-    let documentation = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("documentation"), Value::True],
-    )
-    .unwrap();
-    assert_eq!(
-        arglist_names(&documentation),
-        vec![
-            "function".to_string(),
-            "&optional".to_string(),
-            "raw".to_string()
-        ]
-    );
+    assert_eq!(results[0], r#"OK (err wrong-number-of-arguments)"#);
 }
 
 // =======================================================================

@@ -1416,6 +1416,11 @@ impl Evaluator {
             "Display a short description of the key sequence KEY-LIST.",
         );
         seed_autoload(
+            "help-function-arglist",
+            "help",
+            "Return a formal argument list for the function DEF.",
+        );
+        seed_autoload(
             "describe-function",
             "help-fns",
             "Display the full documentation of FUNCTION (a symbol).",
