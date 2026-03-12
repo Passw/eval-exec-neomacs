@@ -182,23 +182,6 @@ fn test_directory_name_p() {
 }
 
 #[test]
-fn test_directory_empty_p() {
-    let dir = std::env::temp_dir().join("neovm-directory-empty-p");
-    let _ = fs::remove_dir_all(&dir);
-    fs::create_dir_all(&dir).unwrap();
-
-    assert!(directory_empty_p(dir.to_string_lossy().as_ref()));
-
-    let file = dir.join("entry.txt");
-    fs::write(&file, "x").unwrap();
-    assert!(!directory_empty_p(dir.to_string_lossy().as_ref()));
-    assert!(!directory_empty_p(file.to_string_lossy().as_ref()));
-
-    fs::remove_file(file).unwrap();
-    fs::remove_dir_all(dir).unwrap();
-}
-
-#[test]
 fn test_parse_remote_file_name() {
     assert_eq!(parse_remote_file_name("/tmp/file"), None);
     assert_eq!(parse_remote_file_name("ssh:host:/tmp/file"), None);
@@ -1664,21 +1647,13 @@ fn test_builtin_path_predicates() {
     let file = base.join("entry");
     fs::write(&file, "x").unwrap();
 
-    let result = builtin_directory_empty_p(vec![Value::string(base.to_string_lossy())]);
-    assert_eq!(result.unwrap(), Value::Nil);
-    fs::remove_file(&file).unwrap();
-
-    let result = builtin_file_nlinks(vec![Value::string(file.to_string_lossy())]);
-    assert_eq!(result.unwrap(), Value::Nil);
-
-    let result = builtin_directory_empty_p(vec![Value::string(base.to_string_lossy())]);
-    assert_eq!(result.unwrap(), Value::True);
-
-    fs::write(&file, "x").unwrap();
     let result = builtin_file_nlinks(vec![Value::string(file.to_string_lossy())]);
     assert_eq!(result.unwrap(), Value::Int(1));
 
     fs::remove_file(&file).unwrap();
+    let result = builtin_file_nlinks(vec![Value::string(file.to_string_lossy())]);
+    assert_eq!(result.unwrap(), Value::Nil);
+
     fs::remove_dir_all(&base).unwrap();
 
     let result = builtin_file_remote_p(vec![Value::string("/tmp/local")]);
@@ -1731,9 +1706,6 @@ fn test_builtin_path_predicates_strict_types() {
     assert!(result.is_err());
 
     let result = builtin_directory_name_p(vec![Value::Nil]);
-    assert!(result.is_err());
-
-    let result = builtin_directory_empty_p(vec![Value::Nil]);
     assert!(result.is_err());
 
     let result = builtin_file_remote_p(vec![Value::Nil]);

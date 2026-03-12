@@ -228,14 +228,6 @@ pub fn directory_name_p(name: &str) -> bool {
     name.ends_with('/')
 }
 
-/// Return true if NAME exists, is a directory, and has no entries.
-pub fn directory_empty_p(name: &str) -> bool {
-    match fs::read_dir(name) {
-        Ok(mut entries) => entries.next().is_none(),
-        Err(_) => false,
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct RemoteFileNameParts<'a> {
     prefix: &'a str,
@@ -1462,13 +1454,6 @@ pub(crate) fn builtin_directory_name_p(args: Vec<Value>) -> EvalResult {
     expect_args("directory-name-p", &args, 1)?;
     let name = expect_string_strict(&args[0])?;
     Ok(Value::bool(directory_name_p(&name)))
-}
-
-/// (directory-empty-p NAME) -> t or nil
-pub(crate) fn builtin_directory_empty_p(args: Vec<Value>) -> EvalResult {
-    expect_args("directory-empty-p", &args, 1)?;
-    let name = expect_string_strict(&args[0])?;
-    Ok(Value::bool(directory_empty_p(&name)))
 }
 
 /// (file-nlinks FILE) -> integer or nil
