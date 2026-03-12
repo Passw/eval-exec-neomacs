@@ -210,90 +210,47 @@ fn yank_rectangle_loaded_function_is_simple_bytecode_call() {
 }
 
 #[test]
-fn insert_rectangle_validates_list() {
-    let mut eval = super::super::eval::Evaluator::new();
-    let result = builtin_insert_rectangle(&mut eval, vec![Value::Int(42)]);
-    assert!(result.is_err());
+fn insert_rectangle_startup_is_autoloaded() {
+    let eval = super::super::eval::Evaluator::new();
+    let function = eval
+        .obarray
+        .symbol_function("insert-rectangle")
+        .expect("missing insert-rectangle startup function cell");
+    assert!(is_autoload_value(&function));
 }
 
 #[test]
-fn insert_rectangle_validates_string_elements() {
-    let mut eval = super::super::eval::Evaluator::new();
-    let rect = Value::list(vec![Value::string("a"), Value::Int(42)]);
-    let result = builtin_insert_rectangle(&mut eval, vec![rect]);
-    assert!(result.is_err());
+fn insert_rectangle_loads_from_gnu_rect_el() {
+    let result = bootstrap_eval_all(
+        r#"(with-temp-buffer
+             (insert "abc\ndef\n")
+             (goto-char (point-min))
+             (list (insert-rectangle '("hello" "world"))
+                   (replace-regexp-in-string "\n" "|" (buffer-string) nil t)
+                   (point)
+                   (subrp (symbol-function 'insert-rectangle))))"#,
+    );
+    assert_eq!(result[0], r#"OK (nil "helloabc|worlddef|" 15 nil)"#);
 }
 
 #[test]
-fn insert_rectangle_valid() {
-    let mut eval = super::super::eval::Evaluator::new();
-    {
-        let buf = eval
-            .buffers
-            .current_buffer_mut()
-            .expect("current buffer must exist");
-        buf.insert("abc\ndef\n");
-        buf.goto_char(0);
-    }
-    let rect = Value::list(vec![Value::string("hello"), Value::string("world")]);
-    let result = builtin_insert_rectangle(&mut eval, vec![rect]);
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_nil());
-    let buf = eval
-        .buffers
-        .current_buffer()
-        .expect("current buffer must exist");
-    assert_eq!(buf.buffer_string(), "helloabc\nworlddef\n");
-    assert_eq!(buf.text.byte_to_char(buf.point()) as i64 + 1, 15);
+fn insert_rectangle_loaded_rejects_non_list_argument() {
+    let result = bootstrap_eval_all(
+        r#"(condition-case err
+               (insert-rectangle 42)
+             (error (list 'err (car err))))"#,
+    );
+    assert_eq!(result[0], r#"OK (err wrong-type-argument)"#);
 }
 
 #[test]
-fn insert_rectangle_extends_and_pads_lines() {
-    let mut eval = super::super::eval::Evaluator::new();
-    {
-        let buf = eval
-            .buffers
-            .current_buffer_mut()
-            .expect("current buffer must exist");
-        buf.insert("abc");
-        buf.goto_char(1);
-    }
-    let rect = Value::list(vec![
-        Value::string("X"),
-        Value::string("Y"),
-        Value::string("Z"),
-    ]);
-    let result = builtin_insert_rectangle(&mut eval, vec![rect]);
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_nil());
-    let buf = eval
-        .buffers
-        .current_buffer()
-        .expect("current buffer must exist");
-    assert_eq!(buf.buffer_string(), "aXbc\n Y\n Z");
-    assert_eq!(buf.text.byte_to_char(buf.point()) as i64 + 1, 11);
-}
-
-#[test]
-fn insert_rectangle_empty_keeps_point_and_text() {
-    let mut eval = super::super::eval::Evaluator::new();
-    {
-        let buf = eval
-            .buffers
-            .current_buffer_mut()
-            .expect("current buffer must exist");
-        buf.insert("abc");
-        buf.goto_char(1);
-    }
-    let result = builtin_insert_rectangle(&mut eval, vec![Value::Nil]);
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_nil());
-    let buf = eval
-        .buffers
-        .current_buffer()
-        .expect("current buffer must exist");
-    assert_eq!(buf.buffer_string(), "abc");
-    assert_eq!(buf.text.byte_to_char(buf.point()) as i64 + 1, 2);
+fn insert_rectangle_loaded_rejects_non_string_elements() {
+    let result = bootstrap_eval_all(
+        r#"(condition-case err
+               (insert-rectangle '("a" 42))
+             (error (list 'err (car err))))"#,
+    );
+    assert_eq!(result[0], r#"OK (err wrong-type-argument)"#);
 }
 
 #[test]

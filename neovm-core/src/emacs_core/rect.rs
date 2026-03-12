@@ -227,41 +227,6 @@ fn extract_rectangle_from_text(
     out
 }
 
-fn insert_rectangle_into_text(
-    text: &str,
-    start_line: usize,
-    start_col: usize,
-    rectangle: &[String],
-) -> (String, usize) {
-    if rectangle.is_empty() {
-        return (
-            text.to_string(),
-            line_col_to_char_index(text, start_line, start_col),
-        );
-    }
-
-    let mut lines: Vec<String> = text.split('\n').map(ToString::to_string).collect();
-    for (offset, segment) in rectangle.iter().enumerate() {
-        let line_index = start_line + offset;
-        while lines.len() <= line_index {
-            lines.push(String::new());
-        }
-        let line = &mut lines[line_index];
-        let line_len = line.chars().count();
-        if line_len < start_col {
-            line.push_str(&" ".repeat(start_col - line_len));
-        }
-        let insert_byte = char_index_to_byte(line, start_col);
-        line.insert_str(insert_byte, segment);
-    }
-
-    let rewritten = lines.join("\n");
-    let final_line = start_line + rectangle.len() - 1;
-    let final_col = start_col + rectangle.last().map(|s| s.chars().count()).unwrap_or(0);
-    let final_char = line_col_to_char_index(&rewritten, final_line, final_col);
-    (rewritten, final_char)
-}
-
 fn delete_extract_rectangle_from_text(
     text: &str,
     start_line: usize,
@@ -412,70 +377,6 @@ pub(crate) fn builtin_extract_rectangle_line(args: Vec<Value>) -> EvalResult {
         return Ok(Value::string(slice));
     }
     Ok(Value::string(""))
-}
-
-/// `(insert-rectangle RECTANGLE)` -- insert RECTANGLE (a list of strings)
-/// at point, one string per line.
-///
-/// Compatibility behavior:
-/// - inserts each rectangle row on subsequent lines, starting at point's
-///   current line/column
-/// - pads with spaces when insertion column is past EOL
-/// - creates missing lines as needed
-/// - moves point to end of the final inserted row
-pub(crate) fn builtin_insert_rectangle(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_args("insert-rectangle", &args, 1)?;
-    let items = list_to_vec(&args[0])
-        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), args[0]]))?;
-    let mut rectangle = Vec::with_capacity(items.len());
-    for item in &items {
-        match item {
-            Value::Str(_) => rectangle.push(item.as_str().unwrap().to_string()),
-            other => {
-                return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("buffer-or-string-p"), *other],
-                ));
-            }
-        }
-    }
-
-    if rectangle.is_empty() {
-        return Ok(Value::Nil);
-    }
-
-    let (text, pmin, pmax, start_line, start_col) = {
-        let buf = eval
-            .buffers
-            .current_buffer()
-            .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-        let pmin = buf.point_min();
-        let pmax = buf.point_max();
-        let point_min_char = buf.text.byte_to_char(pmin) as i64 + 1;
-        let point_max_char = buf.text.byte_to_char(pmax) as i64 + 1;
-        let point_char = buf.text.byte_to_char(buf.point()) as i64 + 1;
-        let clamped_point = point_char.clamp(point_min_char, point_max_char);
-        let text = buf.buffer_substring(pmin, pmax);
-        let rel_point = (clamped_point - point_min_char).max(0) as usize;
-        let (start_line, start_col) = line_col_for_char_index(&text, rel_point);
-        (text, pmin, pmax, start_line, start_col)
-    };
-
-    let (rewritten, final_rel_char) =
-        insert_rectangle_into_text(&text, start_line, start_col, &rectangle);
-
-    if let Some(buf) = eval.buffers.current_buffer_mut() {
-        buf.delete_region(pmin, pmax);
-        buf.goto_char(pmin);
-        buf.insert(&rewritten);
-        let final_byte = pmin + char_index_to_byte(&rewritten, final_rel_char);
-        buf.goto_char(final_byte);
-    }
-
-    Ok(Value::Nil)
 }
 
 /// `(open-rectangle START END)` -- insert blank space to fill the rectangle
