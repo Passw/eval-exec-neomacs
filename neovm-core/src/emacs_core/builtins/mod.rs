@@ -912,8 +912,6 @@ pub(crate) fn dispatch_builtin(
         "intern" => return Some(builtin_intern_fn(eval, args)),
         "intern-soft" => return Some(builtin_intern_soft(eval, args)),
         // Hooks
-        "add-hook" => return Some(builtin_add_hook(eval, args)),
-        "remove-hook" => return Some(builtin_remove_hook(eval, args)),
         "run-hooks" => return Some(builtin_run_hooks(eval, args)),
         "run-hook-with-args" => return Some(builtin_run_hook_with_args(eval, args)),
         "run-hook-with-args-until-success" => {
@@ -926,7 +924,6 @@ pub(crate) fn dispatch_builtin(
         "run-hook-query-error-with-timeout" => {
             return Some(builtin_run_hook_query_error_with_timeout(eval, args));
         }
-        "run-mode-hooks" => return Some(builtin_run_mode_hooks(eval, args)),
         "run-window-configuration-change-hook" => {
             return Some(builtin_run_window_configuration_change_hook(eval, args));
         }

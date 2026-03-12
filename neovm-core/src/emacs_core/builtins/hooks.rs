@@ -4,73 +4,6 @@ use super::*;
 // Hook system (need evaluator)
 // ===========================================================================
 
-pub(crate) fn builtin_add_hook(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_min_args("add-hook", &args, 2)?;
-    let hook_name = args[0]
-        .as_symbol_name()
-        .ok_or_else(|| {
-            signal(
-                "wrong-type-argument",
-                vec![Value::symbol("symbolp"), args[0]],
-            )
-        })?
-        .to_string();
-    let function = args[1];
-    let append = args.get(2).is_some_and(|v| v.is_truthy());
-
-    // Get current hook value
-    let current = eval
-        .obarray()
-        .symbol_value(&hook_name)
-        .cloned()
-        .unwrap_or(Value::Nil);
-    let mut items = list_to_vec(&current).unwrap_or_default();
-
-    // Don't add duplicates
-    if !items.iter().any(|v| eq_value(v, &function)) {
-        if append {
-            items.push(function);
-        } else {
-            items.insert(0, function);
-        }
-    }
-
-    eval.obarray_mut()
-        .set_symbol_value(&hook_name, Value::list(items));
-    Ok(Value::Nil)
-}
-
-pub(crate) fn builtin_remove_hook(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_args("remove-hook", &args, 2)?;
-    let hook_name = args[0]
-        .as_symbol_name()
-        .ok_or_else(|| {
-            signal(
-                "wrong-type-argument",
-                vec![Value::symbol("symbolp"), args[0]],
-            )
-        })?
-        .to_string();
-    let function = args[1];
-
-    let current = eval
-        .obarray()
-        .symbol_value(&hook_name)
-        .cloned()
-        .unwrap_or(Value::Nil);
-    let items = list_to_vec(&current).unwrap_or_default();
-    let filtered: Vec<Value> = items
-        .into_iter()
-        .filter(|v| !eq_value(v, &function))
-        .collect();
-    eval.obarray_mut()
-        .set_symbol_value(&hook_name, Value::list(filtered));
-    Ok(Value::Nil)
-}
-
 fn symbol_dynamic_buffer_or_global_value(
     eval: &super::eval::Evaluator,
     name: &str,
@@ -266,13 +199,6 @@ pub(crate) fn builtin_run_hook_wrapped(
     };
     let _ = walk_hook_value_with(eval, hook_name, hook_value, true, &mut callback)?;
     Ok(Value::Nil)
-}
-
-pub(crate) fn builtin_run_mode_hooks(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    builtin_run_hooks(eval, args)
 }
 
 pub(crate) fn builtin_run_hook_query_error_with_timeout(

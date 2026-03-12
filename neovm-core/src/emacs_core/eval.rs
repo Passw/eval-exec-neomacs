@@ -1501,6 +1501,11 @@ impl Evaluator {
         // Some helper autoloads are non-interactive in GNU Emacs startup
         // function-cells; override their startup metadata accordingly.
         seed_autoload_noninteractive(
+            "add-hook",
+            "subr",
+            "Add to the value of HOOK the function FUNCTION.",
+        );
+        seed_autoload_noninteractive(
             "bounds-of-thing-at-point",
             "thingatpt",
             "Determine the start and end buffer locations for the THING at point.",
@@ -1540,6 +1545,16 @@ impl Evaluator {
             "extract-rectangle",
             "rect",
             "Return the contents of the rectangle with corners at START and END.",
+        );
+        seed_autoload_noninteractive(
+            "remove-hook",
+            "subr",
+            "Remove FUNCTION from HOOK's functions.",
+        );
+        seed_autoload_noninteractive(
+            "run-mode-hooks",
+            "subr",
+            "Run mode hooks `delayed-mode-hooks' and HOOKS, or delay HOOKS.",
         );
         seed_autoload_noninteractive(
             "insert-rectangle",

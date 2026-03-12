@@ -2068,13 +2068,17 @@ fn math_functions() {
 
 #[test]
 fn hook_system() {
-    let results = eval_all(
+    let results = bootstrap_eval_all(
         "(defvar my-hook nil)
          (defun hook-fn () 42)
          (add-hook 'my-hook 'hook-fn)
-         (run-hooks 'my-hook)",
+         (list (run-hooks 'my-hook)
+               my-hook
+               (subrp (symbol-function 'add-hook))
+               (subrp (symbol-function 'remove-hook))
+               (subrp (symbol-function 'run-mode-hooks)))",
     );
-    assert_eq!(results[3], "OK nil"); // run-hooks returns nil
+    assert_eq!(results[3], "OK (nil (hook-fn) nil nil nil)");
 }
 
 #[test]
