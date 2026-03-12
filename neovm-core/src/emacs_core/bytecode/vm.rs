@@ -55,10 +55,25 @@ enum SavedRestriction {
 
 #[derive(Clone, Debug)]
 enum VmUnwindEntry {
-    DynamicBinding { name: String, restored_value: Value },
-    Cleanup { cleanup: Value },
-    CurrentBuffer { buffer_id: BufferId },
-    Excursion { buffer_id: BufferId, marker_id: u64 },
+    DynamicBinding {
+        name: String,
+        restored_value: Value,
+    },
+    LexicalBinding {
+        name: String,
+        restored_value: Value,
+        old_lexenv: Value,
+    },
+    Cleanup {
+        cleanup: Value,
+    },
+    CurrentBuffer {
+        buffer_id: BufferId,
+    },
+    Excursion {
+        buffer_id: BufferId,
+        marker_id: u64,
+    },
     Restriction(SavedRestriction),
 }
 
@@ -175,6 +190,14 @@ impl<'a> Vm<'a> {
         for entry in specpdl {
             match entry {
                 VmUnwindEntry::DynamicBinding { restored_value, .. } => out.push(*restored_value),
+                VmUnwindEntry::LexicalBinding {
+                    restored_value,
+                    old_lexenv,
+                    ..
+                } => {
+                    out.push(*restored_value);
+                    out.push(*old_lexenv);
+                }
                 VmUnwindEntry::Cleanup { cleanup } => out.push(*cleanup),
                 VmUnwindEntry::CurrentBuffer { .. }
                 | VmUnwindEntry::Excursion { .. }
@@ -328,9 +351,15 @@ impl<'a> Vm<'a> {
                 frame.insert(rest_name, Value::list(rest_args));
             }
 
-            if let Some(env) = func.env {
-                // Closure: prepend param bindings onto the captured lexenv
-                let saved_lexenv = std::mem::replace(self.lexenv, env);
+            if func.lexical || func.env.is_some() {
+                // Lexical bytecode functions prepend parameter bindings onto
+                // the current lexical environment, starting from the captured
+                // closure env when one exists.
+                let saved_lexenv = if let Some(env) = func.env {
+                    std::mem::replace(self.lexenv, env)
+                } else {
+                    *self.lexenv
+                };
                 for (sym_id, val) in frame.iter() {
                     *self.lexenv = lexenv_prepend(*self.lexenv, *sym_id, *val);
                 }
@@ -347,8 +376,14 @@ impl<'a> Vm<'a> {
             return merge_result_with_cleanup(result, cleanup);
         }
 
-        // No params: set up lexenv if closure, then run
-        let saved_lexenv = func.env.map(|env| std::mem::replace(self.lexenv, env));
+        // No params: set up lexenv for lexical closures/functions, then run.
+        let saved_lexenv = if let Some(env) = func.env {
+            Some(std::mem::replace(self.lexenv, env))
+        } else if func.lexical {
+            Some(*self.lexenv)
+        } else {
+            None
+        };
 
         let result = self.run_loop(func, &mut stack, &mut pc, &mut handlers, &mut specpdl);
 
@@ -461,13 +496,31 @@ impl<'a> Vm<'a> {
                     let name = sym_name(constants, *idx);
                     let val = stack.pop().unwrap_or(Value::Nil);
                     let old_value = self.lookup_var(&name).unwrap_or(Value::Nil);
-                    let mut frame = OrderedSymMap::new();
-                    frame.insert(intern(&name), val);
-                    self.dynamic.push(frame);
-                    specpdl.push(VmUnwindEntry::DynamicBinding {
-                        name: name.clone(),
-                        restored_value: old_value,
-                    });
+                    let name_id = intern(&name);
+                    let lexical_bind = func.lexical
+                        && !self.obarray.is_constant_id(name_id)
+                        && !self.obarray.is_special_id(name_id)
+                        && !crate::emacs_core::value::lexenv_declares_special(
+                            *self.lexenv,
+                            name_id,
+                        );
+                    if lexical_bind {
+                        let old_lexenv = *self.lexenv;
+                        *self.lexenv = lexenv_prepend(*self.lexenv, name_id, val);
+                        specpdl.push(VmUnwindEntry::LexicalBinding {
+                            name: name.clone(),
+                            restored_value: old_value,
+                            old_lexenv,
+                        });
+                    } else {
+                        let mut frame = OrderedSymMap::new();
+                        frame.insert(name_id, val);
+                        self.dynamic.push(frame);
+                        specpdl.push(VmUnwindEntry::DynamicBinding {
+                            name: name.clone(),
+                            restored_value: old_value,
+                        });
+                    }
                     let extra = [val];
                     vm_try!(
                         self.with_frame_roots(func, stack, handlers, specpdl, &extra, |vm| vm
@@ -1831,6 +1884,14 @@ impl<'a> Vm<'a> {
                 restored_value,
             } => {
                 self.dynamic.pop();
+                self.run_variable_watchers(&name, &restored_value, &Value::Nil, "unlet")?;
+            }
+            VmUnwindEntry::LexicalBinding {
+                name,
+                restored_value,
+                old_lexenv,
+            } => {
+                *self.lexenv = old_lexenv;
                 self.run_variable_watchers(&name, &restored_value, &Value::Nil, "unlet")?;
             }
             VmUnwindEntry::Cleanup { cleanup } => {

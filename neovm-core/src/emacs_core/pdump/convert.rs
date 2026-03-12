@@ -231,6 +231,7 @@ pub(crate) fn dump_bytecode(bc: &ByteCodeFunction) -> DumpByteCodeFunction {
         constants: bc.constants.iter().map(dump_value).collect(),
         max_stack: bc.max_stack,
         params: dump_lambda_params(&bc.params),
+        lexical: bc.lexical,
         env: dump_opt_value(&bc.env),
         gnu_byte_offset_map: bc.gnu_byte_offset_map.as_ref().map(|map| {
             map.iter()
@@ -1380,6 +1381,7 @@ pub(crate) fn load_bytecode(bc: &DumpByteCodeFunction) -> ByteCodeFunction {
         constants: bc.constants.iter().map(load_value).collect(),
         max_stack: bc.max_stack,
         params: load_lambda_params(&bc.params),
+        lexical: bc.lexical,
         env: load_opt_value(&bc.env),
         gnu_byte_offset_map: bc.gnu_byte_offset_map.as_ref().map(|pairs| {
             pairs

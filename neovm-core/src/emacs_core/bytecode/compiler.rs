@@ -74,6 +74,7 @@ impl Compiler {
     /// Compile a top-level expression (not a function body).
     pub fn compile_toplevel(&mut self, expr: &Expr) -> ByteCodeFunction {
         let mut func = ByteCodeFunction::new(LambdaParams::simple(vec![]));
+        func.lexical = self.lexical;
         self.stack_depth = 0;
         self.compile_expr(&mut func, expr, true);
         self.emit_tracked(&mut func, Op::Return);
@@ -84,6 +85,7 @@ impl Compiler {
     /// Compile a lambda expression into a ByteCodeFunction.
     pub fn compile_lambda(&mut self, params: &LambdaParams, body: &[Expr]) -> ByteCodeFunction {
         let mut func = ByteCodeFunction::new(params.clone());
+        func.lexical = self.lexical;
 
         // Save outer scope state (handles nested lambdas)
         let saved_lex_scope = self.lex_scope.take();

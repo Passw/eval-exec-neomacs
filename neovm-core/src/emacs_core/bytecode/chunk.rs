@@ -16,6 +16,8 @@ pub struct ByteCodeFunction {
     pub max_stack: u16,
     /// Parameter specification.
     pub params: LambdaParams,
+    /// Whether the function was compiled with lexical binding enabled.
+    pub lexical: bool,
     /// For closures: captured lexical environment as a cons alist.
     pub env: Option<Value>,
     /// GNU `.elc` bytecode stores branch targets as byte offsets.
@@ -35,6 +37,7 @@ impl ByteCodeFunction {
             constants: Vec::new(),
             max_stack: 0,
             params,
+            lexical: false,
             env: None,
             gnu_byte_offset_map: None,
             docstring: None,

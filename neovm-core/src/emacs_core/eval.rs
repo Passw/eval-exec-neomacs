@@ -4455,6 +4455,7 @@ impl Evaluator {
             params: LambdaParams::simple(vec![]),
             env: None,
             gnu_byte_offset_map: Some(gnu_byte_offset_map),
+            lexical: false,
             docstring: None,
             doc_form: None,
         };

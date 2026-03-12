@@ -106,6 +106,35 @@ fn vm_eval_lexical_str(src: &str) -> String {
     }
 }
 
+#[test]
+fn vm_lexical_let_closure_captures_bytecode_binding() {
+    assert_eq!(
+        vm_eval_lexical_str(
+            r#"
+(funcall
+ (let ((x 42))
+   (lambda () x)))
+"#,
+        ),
+        "OK 42"
+    );
+}
+
+#[test]
+fn vm_lexical_param_closure_captures_bytecode_binding() {
+    assert_eq!(
+        vm_eval_lexical_str(
+            r#"
+(funcall
+ ((lambda (x)
+    (lambda () x))
+  42))
+"#,
+        ),
+        "OK 42"
+    );
+}
+
 fn execute_manual_vm<T>(
     mut func: ByteCodeFunction,
     init: impl FnOnce(&mut ByteCodeFunction, &mut crate::buffer::BufferManager) -> T,
@@ -601,6 +630,7 @@ fn vm_switch_branches_using_hash_table_jump_table() {
         constants: vec![table, Value::symbol("foo"), Value::Int(10), Value::Int(20)],
         max_stack: 2,
         params: crate::emacs_core::value::LambdaParams::simple(vec![]),
+        lexical: false,
         env: None,
         gnu_byte_offset_map: Some(std::collections::HashMap::from([(8usize, 5usize)])),
         docstring: None,
@@ -751,6 +781,7 @@ fn vm_throw_restores_saved_stack_before_resuming_catch() {
         constants: vec![Value::Int(42), Value::symbol("done"), Value::Int(99)],
         max_stack: 3,
         params: crate::emacs_core::value::LambdaParams::simple(vec![]),
+        lexical: false,
         env: None,
         gnu_byte_offset_map: None,
         docstring: None,
@@ -1207,6 +1238,7 @@ fn vm_gnu_arg_descriptor_preserves_optional_and_rest_slots() {
         constants: vec![],
         max_stack: 10,
         params: crate::emacs_core::bytecode::decode::parse_arglist_descriptor(3 | (4 << 8) | 128),
+        lexical: false,
         env: None,
         gnu_byte_offset_map: None,
         docstring: None,

@@ -92,6 +92,8 @@ pub struct DumpByteCodeFunction {
     pub constants: Vec<DumpValue>,
     pub max_stack: u16,
     pub params: DumpLambdaParams,
+    #[serde(default)]
+    pub lexical: bool,
     pub env: Option<DumpValue>,
     pub gnu_byte_offset_map: Option<Vec<(u32, u32)>>,
     pub docstring: Option<String>,

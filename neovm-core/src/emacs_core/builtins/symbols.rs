@@ -4098,6 +4098,7 @@ pub(crate) fn make_byte_code_from_parts(
         params,
         env: None,
         gnu_byte_offset_map: Some(gnu_byte_offset_map),
+        lexical: false,
         docstring: doc,
         doc_form,
     };
