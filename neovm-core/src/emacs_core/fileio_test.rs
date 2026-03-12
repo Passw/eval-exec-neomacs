@@ -1705,12 +1705,6 @@ fn test_builtin_path_predicates() {
         Value::True,
     ]);
     assert_eq!(result.unwrap(), Value::Nil);
-
-    let result = builtin_file_local_name(vec![Value::string("/tmp/local")]);
-    assert_eq!(result.unwrap(), Value::string("/tmp/local"));
-
-    let result = builtin_file_local_name(vec![Value::string("/ssh:user@host#22:/tmp/file")]);
-    assert_eq!(result.unwrap(), Value::string("/tmp/file"));
 }
 
 #[test]
@@ -1725,9 +1719,6 @@ fn test_builtin_path_predicates_strict_types() {
     assert!(result.is_err());
 
     let result = builtin_file_remote_p(vec![Value::Nil]);
-    assert!(result.is_err());
-
-    let result = builtin_file_local_name(vec![Value::Nil]);
     assert!(result.is_err());
 
     let result = builtin_file_nlinks(vec![Value::Nil]);
@@ -2622,4 +2613,28 @@ fn test_find_file_noselect_nonexistent() {
         }
         other => panic!("Expected Buffer, got {:?}", other),
     }
+}
+
+#[test]
+fn file_local_name_bootstrap_matches_gnu_files_el() {
+    let results = bootstrap_eval(
+        r#"
+        (subrp (symbol-function 'file-local-name))
+        (file-local-name "/tmp/local")
+        (file-local-name "/ssh:user@host#22:/tmp/file")
+        "#,
+    );
+    assert_eq!(results[0], "OK nil");
+    assert_eq!(results[1], r#"OK "/tmp/local""#);
+    assert_eq!(results[2], r#"OK "/ssh:user@host#22:/tmp/file""#);
+}
+
+#[test]
+fn file_local_name_bootstrap_error_shapes_match_gnu_files_el() {
+    let results = bootstrap_eval(
+        r#"
+        (condition-case err (file-local-name nil) (error (car err)))
+        "#,
+    );
+    assert_eq!(results[0], "OK wrong-type-argument");
 }

@@ -289,16 +289,6 @@ fn parse_remote_file_name(filename: &str) -> Option<RemoteFileNameParts<'_>> {
     })
 }
 
-/// Return the local-name component of FILE.
-///
-/// Matches Emacs `file-local-name`: remote prefix is stripped for remote
-/// file names; local names are returned unchanged.
-pub fn file_local_name(filename: &str) -> String {
-    parse_remote_file_name(filename)
-        .map(|remote| remote.localname.to_string())
-        .unwrap_or_else(|| filename.to_string())
-}
-
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 static DEFAULT_FILE_MODE_MASK: AtomicU32 = AtomicU32::new(0o022);
 static DEFAULT_FILE_MODE_MASK_INIT: Once = Once::new();
@@ -1651,13 +1641,6 @@ pub(crate) fn builtin_directory_empty_p(args: Vec<Value>) -> EvalResult {
     expect_args("directory-empty-p", &args, 1)?;
     let name = expect_string_strict(&args[0])?;
     Ok(Value::bool(directory_empty_p(&name)))
-}
-
-/// (file-local-name FILE) -> local path component
-pub(crate) fn builtin_file_local_name(args: Vec<Value>) -> EvalResult {
-    expect_args("file-local-name", &args, 1)?;
-    let file = expect_string_strict(&args[0])?;
-    Ok(Value::string(file_local_name(&file)))
 }
 
 /// (file-nlinks FILE) -> integer or nil
