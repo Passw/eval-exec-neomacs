@@ -1124,7 +1124,6 @@ pub(crate) fn dispatch_builtin(
         "make-symbolic-link" => {
             return Some(super::fileio::builtin_make_symbolic_link_eval(eval, args));
         }
-        "make-directory" => return Some(super::fileio::builtin_make_directory_eval(eval, args)),
         "make-directory-internal" => {
             return Some(super::fileio::builtin_make_directory_internal_eval(
                 eval, args,
@@ -3045,7 +3044,6 @@ pub(crate) fn dispatch_builtin(
         "copy-file" => super::fileio::builtin_copy_file(args),
         "add-name-to-file" => super::fileio::builtin_add_name_to_file(args),
         "make-symbolic-link" => super::fileio::builtin_make_symbolic_link(args),
-        "make-directory" => super::fileio::builtin_make_directory(args),
         "make-directory-internal" => super::fileio::builtin_make_directory_internal(args),
         "make-temp-file" => super::fileio::builtin_make_temp_file(args),
         "make-temp-name" => super::fileio::builtin_make_temp_name(args),

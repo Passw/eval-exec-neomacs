@@ -2471,45 +2471,6 @@ pub(crate) fn builtin_add_name_to_file_eval(eval: &Evaluator, args: Vec<Value>) 
     Ok(Value::Nil)
 }
 
-/// (make-directory DIR &optional PARENTS) -> nil
-pub(crate) fn builtin_make_directory(args: Vec<Value>) -> EvalResult {
-    expect_min_args("make-directory", &args, 1)?;
-    if args.len() > 2 {
-        return Err(signal(
-            "wrong-number-of-arguments",
-            vec![
-                Value::symbol("make-directory"),
-                Value::Int(args.len() as i64),
-            ],
-        ));
-    }
-    let dir = expect_string_strict(&args[0])?;
-    let parents = args.get(1).is_some_and(|v| v.is_truthy());
-    make_directory(&dir, parents)
-        .map_err(|e| signal_file_io_path(e, "Creating directory", &dir))?;
-    Ok(Value::Nil)
-}
-
-/// Evaluator-aware variant of `make-directory` that resolves relative paths
-/// against dynamic/default `default-directory`.
-pub(crate) fn builtin_make_directory_eval(eval: &Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_min_args("make-directory", &args, 1)?;
-    if args.len() > 2 {
-        return Err(signal(
-            "wrong-number-of-arguments",
-            vec![
-                Value::symbol("make-directory"),
-                Value::Int(args.len() as i64),
-            ],
-        ));
-    }
-    let dir = resolve_filename_for_eval(eval, &expect_string_strict(&args[0])?);
-    let parents = args.get(1).is_some_and(|v| v.is_truthy());
-    make_directory(&dir, parents)
-        .map_err(|e| signal_file_io_path(e, "Creating directory", &dir))?;
-    Ok(Value::Nil)
-}
-
 /// (make-directory-internal DIR) -> nil
 pub(crate) fn builtin_make_directory_internal(args: Vec<Value>) -> EvalResult {
     expect_args("make-directory-internal", &args, 1)?;

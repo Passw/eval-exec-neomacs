@@ -503,36 +503,6 @@ fn test_make_directory_and_directory_files() {
     let _ = fs::remove_dir_all(&base);
 }
 
-#[test]
-fn test_builtin_make_directory_arity_and_parents_semantics() {
-    let base = std::env::temp_dir().join("neovm_builtin_mkdir_arity");
-    let _ = fs::remove_dir_all(&base);
-    fs::create_dir_all(&base).unwrap();
-    let nested = base.join("a/b");
-    let nested_s = nested.to_string_lossy().to_string();
-
-    let err = builtin_make_directory(vec![Value::string(&nested_s)]).unwrap_err();
-    match err {
-        Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "file-missing"),
-        other => panic!("expected file-missing, got {:?}", other),
-    }
-
-    assert_eq!(
-        builtin_make_directory(vec![Value::string(&nested_s), Value::True]).unwrap(),
-        Value::Nil
-    );
-    assert!(nested.is_dir());
-
-    let err =
-        builtin_make_directory(vec![Value::string(&nested_s), Value::Nil, Value::Nil]).unwrap_err();
-    match err {
-        Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
-        other => panic!("expected wrong-number-of-arguments, got {:?}", other),
-    }
-
-    let _ = fs::remove_dir_all(&base);
-}
-
 // -----------------------------------------------------------------------
 // File management: rename, copy
 // -----------------------------------------------------------------------
@@ -1379,23 +1349,6 @@ fn test_builtin_copy_file_eval_optional_arg_semantics() {
         .unwrap(),
         Value::Nil
     );
-
-    let _ = fs::remove_dir_all(&base);
-}
-
-#[test]
-fn test_builtin_make_directory_eval_respects_default_directory() {
-    let base = std::env::temp_dir().join("neovm_mkdir_eval_builtin");
-    let _ = fs::remove_dir_all(&base);
-    fs::create_dir_all(&base).unwrap();
-
-    let mut eval = Evaluator::new();
-    let base_str = format!("{}/", base.to_string_lossy());
-    eval.obarray
-        .set_symbol_value("default-directory", Value::string(&base_str));
-
-    builtin_make_directory_eval(&eval, vec![Value::string("child")]).unwrap();
-    assert!(base.join("child").is_dir());
 
     let _ = fs::remove_dir_all(&base);
 }
