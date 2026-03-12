@@ -1,4 +1,5 @@
 use super::*;
+use crate::emacs_core::autoload::is_autoload_value;
 use crate::emacs_core::load::{apply_runtime_startup_state, create_bootstrap_evaluator};
 use crate::emacs_core::{format_eval_result, parse_forms};
 
@@ -323,54 +324,45 @@ fn string_clean_whitespace_bootstrap_matches_gnu_elisp() {
 // ===================================================================
 
 #[test]
-fn string_pixel_width_basic() {
-    let result = builtin_string_pixel_width(vec![Value::string("hello")]);
-    assert_eq!(result.unwrap().as_int().unwrap(), 5);
+fn string_pixel_width_startup_is_autoloaded() {
+    let eval = super::super::eval::Evaluator::new();
+    let function = eval
+        .obarray
+        .symbol_function("string-pixel-width")
+        .expect("missing string-pixel-width startup function cell");
+    assert!(is_autoload_value(&function));
 }
 
 #[test]
-fn string_pixel_width_empty() {
-    let result = builtin_string_pixel_width(vec![Value::string("")]);
-    assert_eq!(result.unwrap().as_int().unwrap(), 0);
-}
-
-#[test]
-fn string_pixel_width_tabs_and_wide_chars() {
-    assert_eq!(
-        builtin_string_pixel_width(vec![Value::string("\t")])
-            .unwrap()
-            .as_int()
-            .unwrap(),
-        8
+fn string_pixel_width_bootstrap_matches_gnu_subr_x() {
+    let results = bootstrap_eval(
+        r#"
+        (string-pixel-width "hello")
+        (string-pixel-width "")
+        (string-pixel-width "\t")
+        (string-pixel-width "a\t")
+        (string-pixel-width "a\tb")
+        (string-pixel-width "漢字")
+        (string-pixel-width "é")
+        (with-temp-buffer
+          (insert "abc\ndef")
+          (buffer-text-pixel-size nil nil t))
+        (with-temp-buffer
+          (insert "abcdef\n123")
+          (buffer-text-pixel-size nil nil 4))
+        (subrp (symbol-function 'string-pixel-width))
+        "#,
     );
-    assert_eq!(
-        builtin_string_pixel_width(vec![Value::string("a\t")])
-            .unwrap()
-            .as_int()
-            .unwrap(),
-        8
-    );
-    assert_eq!(
-        builtin_string_pixel_width(vec![Value::string("a\tb")])
-            .unwrap()
-            .as_int()
-            .unwrap(),
-        9
-    );
-    assert_eq!(
-        builtin_string_pixel_width(vec![Value::string("漢字")])
-            .unwrap()
-            .as_int()
-            .unwrap(),
-        4
-    );
-    assert_eq!(
-        builtin_string_pixel_width(vec![Value::string("e\u{0301}")])
-            .unwrap()
-            .as_int()
-            .unwrap(),
-        1
-    );
+    assert_eq!(results[0], "OK 5");
+    assert_eq!(results[1], "OK 0");
+    assert_eq!(results[2], "OK 8");
+    assert_eq!(results[3], "OK 8");
+    assert_eq!(results[4], "OK 9");
+    assert_eq!(results[5], "OK 4");
+    assert_eq!(results[6], "OK 1");
+    assert_eq!(results[7], "OK (3 . 2)");
+    assert_eq!(results[8], "OK (4 . 2)");
+    assert_eq!(results[9], "OK nil");
 }
 
 // ===================================================================

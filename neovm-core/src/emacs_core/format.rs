@@ -570,34 +570,6 @@ pub(crate) fn builtin_string_lines(args: Vec<Value>) -> EvalResult {
 }
 
 // ---------------------------------------------------------------------------
-// string-pixel-width
-// ---------------------------------------------------------------------------
-
-fn string_pixel_width(s: &str) -> i64 {
-    let mut columns = 0usize;
-    for ch in s.chars() {
-        if ch == '\t' {
-            let tab_width = 8usize;
-            columns += tab_width - (columns % tab_width);
-        } else {
-            columns += crate::encoding::char_width(ch);
-        }
-    }
-    columns as i64
-}
-
-/// `(string-pixel-width STRING)` -- return the display-column width of STRING
-/// in batch mode.
-///
-/// Oracle behavior in batch is column-based (not GUI pixel metrics), including
-/// tab expansion to the next 8-column boundary.
-pub(crate) fn builtin_string_pixel_width(args: Vec<Value>) -> EvalResult {
-    expect_args("string-pixel-width", &args, 1)?;
-    let s = require_string("string-pixel-width", &args[0])?;
-    Ok(Value::Int(string_pixel_width(&s)))
-}
-
-// ---------------------------------------------------------------------------
 // string-glyph-split
 // ---------------------------------------------------------------------------
 

@@ -921,7 +921,7 @@ pub(crate) fn builtin_split_window_internal(
     super::window_cmds::split_window_internal_impl(eval, args[0], args[2])
 }
 
-/// `(buffer-text-pixel-size &optional BUFFER WINDOW FROM TO)` -> (WIDTH . HEIGHT)
+/// `(buffer-text-pixel-size &optional BUFFER WINDOW X-LIMIT Y-LIMIT)` -> (WIDTH . HEIGHT)
 pub(crate) fn builtin_buffer_text_pixel_size(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -944,13 +944,24 @@ pub(crate) fn builtin_buffer_text_pixel_size(
         }
     }
 
-    let from = if args.len() > 2 && !args[2].is_nil() {
-        Some(expect_integer_or_marker(&args[2])?)
+    let limit_from_value = |value: &Value| -> Result<Option<usize>, Flow> {
+        match value {
+            Value::Nil | Value::True => Ok(None),
+            Value::Int(n) if *n >= 0 => Ok(Some(*n as usize)),
+            _ => Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("natnump"), *value],
+            )),
+        }
+    };
+
+    let x_limit = if args.len() > 2 {
+        limit_from_value(&args[2])?
     } else {
         None
     };
-    let to = if args.len() > 3 && !args[3].is_nil() {
-        Some(expect_integer_or_marker(&args[3])?)
+    let y_limit = if args.len() > 3 {
+        limit_from_value(&args[3])?
     } else {
         None
     };
@@ -959,9 +970,7 @@ pub(crate) fn builtin_buffer_text_pixel_size(
         if let Some(buf) = eval.buffers.get(id) {
             let default_from = 1i64;
             let default_to = buf.text.char_count() as i64 + 1;
-            let from_pos = from.unwrap_or(default_from);
-            let to_pos = to.unwrap_or(default_to);
-            buffer_slice_for_char_region(eval, Some(id), from_pos, to_pos)
+            buffer_slice_for_char_region(eval, Some(id), default_from, default_to)
         } else {
             String::new()
         }
@@ -976,8 +985,29 @@ pub(crate) fn builtin_buffer_text_pixel_size(
     let mut height = 0usize;
     let mut width = 0usize;
     for line in text.lines() {
+        if y_limit.is_some_and(|limit| height >= limit) {
+            break;
+        }
+
+        let mut line_width = 0usize;
+        for ch in line.chars() {
+            if ch == '\t' {
+                let tab_width = 8usize;
+                line_width += tab_width - (line_width % tab_width);
+            } else {
+                line_width += crate::encoding::char_width(ch);
+            }
+
+            if let Some(limit) = x_limit {
+                if line_width >= limit {
+                    line_width = limit;
+                    break;
+                }
+            }
+        }
+
         height += 1;
-        width = width.max(line.chars().count());
+        width = width.max(line_width);
     }
 
     if height == 0 {

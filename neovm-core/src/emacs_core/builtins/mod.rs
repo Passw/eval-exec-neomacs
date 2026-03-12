@@ -3906,7 +3906,6 @@ pub(crate) fn dispatch_builtin(
         "string-limit" => super::format::builtin_string_limit(args),
         "string-chop-newline" => super::format::builtin_string_chop_newline(args),
         "string-lines" => super::format::builtin_string_lines(args),
-        "string-pixel-width" => super::format::builtin_string_pixel_width(args),
         "string-glyph-split" => super::format::builtin_string_glyph_split(args),
         // Marker (pure)
         "markerp" => super::marker::builtin_markerp(args),
