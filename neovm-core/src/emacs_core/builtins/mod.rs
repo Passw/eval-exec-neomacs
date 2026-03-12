@@ -1209,11 +1209,6 @@ pub(crate) fn dispatch_builtin(
             ));
         }
         "print--preprocess" => return Some(super::process::builtin_print_preprocess(eval, args)),
-        "tooltip-process-prompt-regexp" => {
-            return Some(super::process::builtin_tooltip_process_prompt_regexp(
-                eval, args,
-            ));
-        }
         "format-network-address" => {
             return Some(super::process::builtin_format_network_address(eval, args));
         }
@@ -1913,17 +1908,8 @@ pub(crate) fn dispatch_builtin(
             ));
         }
         "redraw-frame" => return Some(super::dispnew::pure::builtin_redraw_frame_eval(eval, args)),
-        "display-color-p" => return Some(super::display::builtin_display_color_p_eval(eval, args)),
-        "display-grayscale-p" => {
-            return Some(super::display::builtin_display_grayscale_p_eval(eval, args));
-        }
         "x-open-connection" => {
             return Some(super::display::builtin_x_open_connection_eval(eval, args));
-        }
-        "x-apply-session-resources" => {
-            return Some(super::display::builtin_x_apply_session_resources_eval(
-                eval, args,
-            ));
         }
         "x-get-resource" => return Some(super::display::builtin_x_get_resource_eval(eval, args)),
         "x-list-fonts" => return Some(super::display::builtin_x_list_fonts_eval(eval, args)),
@@ -2676,21 +2662,12 @@ pub(crate) fn dispatch_builtin(
         "internal-show-cursor-p" => super::dispnew::pure::builtin_internal_show_cursor_p(args),
         "frame--z-order-lessp" => super::dispnew::pure::builtin_frame_z_order_lessp(args),
         // Display/terminal (pure)
-        "display-color-p" => super::display::builtin_display_color_p(args),
-        "display-grayscale-p" => super::display::builtin_display_grayscale_p(args),
-        "gui-get-primary-selection" => super::display::builtin_gui_get_primary_selection(args),
-        "gui-get-selection" => super::display::builtin_gui_get_selection(args),
-        "gui-select-text" => super::display::builtin_gui_select_text(args),
-        "gui-selection-value" => super::display::builtin_gui_selection_value(args),
-        "gui-set-selection" => super::display::builtin_gui_set_selection(args),
-        "x-apply-session-resources" => super::display::builtin_x_apply_session_resources(args),
         "x-export-frames" => super::display::builtin_x_export_frames(args),
         "x-backspace-delete-keys-p" => super::display::builtin_x_backspace_delete_keys_p(args),
         "x-change-window-property" => super::display::builtin_x_change_window_property(args),
         "x-clear-preedit-text" => super::display::builtin_x_clear_preedit_text(args),
         "x-clipboard-yank" => super::display::builtin_x_clipboard_yank(args),
         "x-focus-frame" => super::display::builtin_x_focus_frame(args),
-        "x-get-clipboard" => super::display::builtin_x_get_clipboard(args),
         "x-get-input-coding-system" => super::display::builtin_x_get_input_coding_system(args),
         "x-get-local-selection" => super::display::builtin_x_get_local_selection(args),
         "x-get-modifier-masks" => super::display::builtin_x_get_modifier_masks(args),
@@ -2725,7 +2702,6 @@ pub(crate) fn dispatch_builtin(
         "x-preedit-text" => super::display::builtin_x_preedit_text(args),
         "x-send-client-message" => super::display::builtin_x_send_client_message(args),
         "x-show-tip" => super::display::builtin_x_show_tip(args),
-        "x-setup-function-keys" => super::display::builtin_x_setup_function_keys(args),
         "x-set-mouse-absolute-pixel-position" => {
             super::display::builtin_x_set_mouse_absolute_pixel_position(args)
         }
@@ -2783,19 +2759,13 @@ pub(crate) fn dispatch_builtin(
         "x-wm-set-size-hint" => super::display::builtin_x_wm_set_size_hint(args),
 
         // Image (pure)
-        "image-type-available-p" => super::image::builtin_image_type_available_p(args),
-        "create-image" => super::image::builtin_create_image(args),
         "image-size" => super::image::builtin_image_size(args),
         "image-mask-p" => super::image::builtin_image_mask_p(args),
-        "put-image" => super::image::builtin_put_image(args),
-        "insert-image" => super::image::builtin_insert_image(args),
-        "remove-images" => super::image::builtin_remove_images(args),
         "image-flush" => super::image::builtin_image_flush(args),
         "clear-image-cache" => super::image::builtin_clear_image_cache(args),
         "image-cache-size" => super::image::builtin_image_cache_size(args),
         "image-metadata" => super::image::builtin_image_metadata(args),
         "imagep" => super::image::builtin_imagep(args),
-        "image-type" => super::image::builtin_image_type(args),
         "image-transforms-p" => super::image::builtin_image_transforms_p(args),
 
         // Character encoding
@@ -2885,15 +2855,10 @@ pub(crate) fn dispatch_builtin(
         "internal-merge-in-global-face" => super::font::builtin_internal_merge_in_global_face(args),
         "face-attribute-relative-p" => super::font::builtin_face_attribute_relative_p(args),
         "merge-face-attribute" => super::font::builtin_merge_face_attribute(args),
-        "face-list" => super::font::builtin_face_list(args),
-        "color-defined-p" => super::font::builtin_color_defined_p(args),
         "color-gray-p" => super::font::builtin_color_gray_p(args),
         "color-supported-p" => super::font::builtin_color_supported_p(args),
         "color-distance" => super::font::builtin_color_distance(args),
-        "color-values" => super::font::builtin_color_values(args),
         "color-values-from-color-spec" => super::font::builtin_color_values_from_color_spec(args),
-        "defined-colors" => super::font::builtin_defined_colors(args),
-        "face-id" => super::font::builtin_face_id(args),
         "face-font" => super::font::builtin_face_font(args),
         "internal-face-x-get-resource" => super::font::builtin_internal_face_x_get_resource(args),
         "internal-set-font-selection-order" => {
