@@ -287,15 +287,6 @@ pub(crate) fn builtin_take(args: Vec<Value>) -> EvalResult {
 // String utilities (subr-x compatible)
 // ---------------------------------------------------------------------------
 
-/// `(string-replace FROM TO IN)` — replace all occurrences.
-pub(crate) fn builtin_string_replace(args: Vec<Value>) -> EvalResult {
-    expect_args("string-replace", &args, 3)?;
-    let from = expect_string(&args[0])?;
-    let to = expect_string(&args[1])?;
-    let input = expect_string(&args[2])?;
-    Ok(Value::string(input.replace(&from, &to)))
-}
-
 /// `(string-search NEEDLE HAYSTACK &optional START)`.
 pub(crate) fn builtin_string_search(args: Vec<Value>) -> EvalResult {
     expect_min_args("string-search", &args, 2)?;

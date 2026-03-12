@@ -3295,7 +3295,6 @@ pub(crate) fn dispatch_builtin(
         "flatten-tree" => super::builtins_extra::builtin_flatten_tree(args),
         "take" => super::builtins_extra::builtin_take(args),
         "assoc-string" => super::builtins_extra::builtin_assoc_string(args),
-        "string-replace" => super::builtins_extra::builtin_string_replace(args),
         "string-search" => super::builtins_extra::builtin_string_search(args),
         "bare-symbol" => super::builtins_extra::builtin_bare_symbol(args),
         "bare-symbol-p" => super::builtins_extra::builtin_bare_symbol_p(args),
@@ -3892,7 +3891,6 @@ pub(crate) fn dispatch_builtin(
         // Format/string utilities (pure)
         "format-time-string" => super::format::builtin_format_time_string(args),
         "string-chop-newline" => super::format::builtin_string_chop_newline(args),
-        "string-lines" => super::format::builtin_string_lines(args),
         // Marker (pure)
         "markerp" => super::marker::builtin_markerp(args),
         "marker-buffer" => super::marker::builtin_marker_buffer(args),

@@ -220,38 +220,25 @@ fn string_chop_newline_wrong_type() {
 // ===================================================================
 
 #[test]
-fn string_lines_basic() {
-    let result = builtin_string_lines(vec![Value::string("a\nb\nc")]);
-    let items = list_to_vec(&result.unwrap()).unwrap();
-    assert_eq!(items.len(), 3);
-    assert_eq!(items[0].as_str().unwrap(), "a");
-    assert_eq!(items[1].as_str().unwrap(), "b");
-    assert_eq!(items[2].as_str().unwrap(), "c");
-}
-
-#[test]
-fn string_lines_trailing_newline() {
-    let result = builtin_string_lines(vec![Value::string("a\nb\n")]);
-    let items = list_to_vec(&result.unwrap()).unwrap();
-    assert_eq!(items.len(), 3); // "a", "b", ""
-    assert_eq!(items[2].as_str().unwrap(), "");
-}
-
-#[test]
-fn string_lines_omit_nulls() {
-    let result = builtin_string_lines(vec![Value::string("a\n\nb\n"), Value::True]);
-    let items = list_to_vec(&result.unwrap()).unwrap();
-    assert_eq!(items.len(), 2);
-    assert_eq!(items[0].as_str().unwrap(), "a");
-    assert_eq!(items[1].as_str().unwrap(), "b");
-}
-
-#[test]
-fn string_lines_empty_string() {
-    let result = builtin_string_lines(vec![Value::string("")]);
-    let items = list_to_vec(&result.unwrap()).unwrap();
-    assert_eq!(items.len(), 1);
-    assert_eq!(items[0].as_str().unwrap(), "");
+fn string_lines_bootstrap_matches_gnu_subr() {
+    let results = bootstrap_eval(
+        r#"
+        (subrp (symbol-function 'string-lines))
+        (string-lines "a\nb\nc")
+        (string-lines "a\nb\n")
+        (string-lines "a\n\nb\n" t)
+        (string-lines "")
+        (string-lines "" t)
+        (string-lines "a\n\nb\n" nil t)
+        "#,
+    );
+    assert_eq!(results[0], "OK nil");
+    assert_eq!(results[1], r#"OK ("a" "b" "c")"#);
+    assert_eq!(results[2], r#"OK ("a" "b")"#);
+    assert_eq!(results[3], r#"OK ("a" "b")"#);
+    assert_eq!(results[4], r#"OK ("")"#);
+    assert_eq!(results[5], "OK nil");
+    assert_eq!(results[6], "OK (\"a\n\" \"\n\" \"b\n\")");
 }
 
 // ===================================================================

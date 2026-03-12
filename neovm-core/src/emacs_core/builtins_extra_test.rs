@@ -64,14 +64,19 @@ fn string_empty_blank() {
 }
 
 #[test]
-fn string_replace() {
-    let result = builtin_string_replace(vec![
-        Value::string("world"),
-        Value::string("rust"),
-        Value::string("hello world"),
-    ])
-    .unwrap();
-    assert_eq!(result.as_str(), Some("hello rust"));
+fn string_replace_bootstrap_matches_gnu_subr() {
+    let results = bootstrap_eval(
+        r#"
+        (subrp (symbol-function 'string-replace))
+        (string-replace "world" "rust" "hello world")
+        (string-replace "x" "y" "no match")
+        (condition-case err (string-replace "" "-" "abc") (error (car err)))
+        "#,
+    );
+    assert_eq!(results[0], "OK nil");
+    assert_eq!(results[1], r#"OK "hello rust""#);
+    assert_eq!(results[2], r#"OK "no match""#);
+    assert_eq!(results[3], "ERR (wrong-length-argument (0))");
 }
 
 #[test]

@@ -3,7 +3,6 @@
 //! Pure builtins (`Vec<Value> -> EvalResult`):
 //! - `format-time-string` — format time like strftime
 //! - `string-chop-newline` — remove trailing newline
-//! - `string-lines` — split string into lines
 //! - `string-clean-whitespace` — collapse whitespace and trim
 //! - `string-fill` — fill/wrap text at a given column width
 //! - `string-pixel-width` — batch-compatible display-column width
@@ -18,17 +17,6 @@ use super::value::*;
 
 fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
     if args.len() != n {
-        Err(signal(
-            "wrong-number-of-arguments",
-            vec![Value::symbol(name), Value::Int(args.len() as i64)],
-        ))
-    } else {
-        Ok(())
-    }
-}
-
-fn expect_min_max_args(name: &str, args: &[Value], min: usize, max: usize) -> Result<(), Flow> {
-    if args.len() < min || args.len() > max {
         Err(signal(
             "wrong-number-of-arguments",
             vec![Value::symbol(name), Value::Int(args.len() as i64)],
@@ -467,26 +455,6 @@ pub(crate) fn builtin_string_chop_newline(args: Vec<Value>) -> EvalResult {
     let s = require_string("string-chop-newline", &args[0])?;
     let trimmed = s.trim_end_matches(['\n', '\r']).to_string();
     Ok(Value::string(trimmed))
-}
-
-// ---------------------------------------------------------------------------
-// string-lines
-// ---------------------------------------------------------------------------
-
-/// `(string-lines STRING &optional OMIT-NULLS)` -- split STRING into a list
-/// of lines.  If OMIT-NULLS is non-nil, empty strings are omitted.
-pub(crate) fn builtin_string_lines(args: Vec<Value>) -> EvalResult {
-    expect_min_max_args("string-lines", &args, 1, 2)?;
-    let s = require_string("string-lines", &args[0])?;
-    let omit_nulls = args.len() >= 2 && args[1].is_truthy();
-
-    let lines: Vec<Value> = s
-        .split('\n')
-        .filter(|line| !omit_nulls || !line.is_empty())
-        .map(Value::string)
-        .collect();
-
-    Ok(Value::list(lines))
 }
 
 // ---------------------------------------------------------------------------
