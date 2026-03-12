@@ -1201,10 +1201,6 @@ pub(crate) fn dispatch_builtin(
         "keymapp" => return Some(builtin_keymapp(eval, args)),
         "accessible-keymaps" => return Some(builtin_accessible_keymaps(eval, args)),
         // Process operations (evaluator-dependent)
-        "backquote-delay-process" => {
-            return Some(super::process::builtin_backquote_delay_process(eval, args));
-        }
-        "backquote-process" => return Some(super::process::builtin_backquote_process(eval, args)),
         "internal-default-interrupt-process" => {
             return Some(super::process::builtin_internal_default_interrupt_process(
                 eval, args,
@@ -1235,17 +1231,7 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ));
         }
-        "minibuffer--sort-preprocess-history" => {
-            return Some(super::process::builtin_minibuffer_sort_preprocess_history(
-                eval, args,
-            ));
-        }
         "print--preprocess" => return Some(super::process::builtin_print_preprocess(eval, args)),
-        "syntax-propertize--in-process-p" => {
-            return Some(super::process::builtin_syntax_propertize_in_process_p(
-                eval, args,
-            ));
-        }
         "tooltip-process-prompt-regexp" => {
             return Some(super::process::builtin_tooltip_process_prompt_regexp(
                 eval, args,
@@ -1394,14 +1380,6 @@ pub(crate) fn dispatch_builtin(
         "process-name" => return Some(super::process::builtin_process_name(eval, args)),
         "process-buffer" => return Some(super::process::builtin_process_buffer(eval, args)),
         // Timer operations (evaluator-dependent)
-        "add-timeout" => return Some(super::timer::builtin_add_timeout(eval, args)),
-        "run-at-time" => return Some(super::timer::builtin_run_at_time(eval, args)),
-        "run-with-timer" => return Some(super::timer::builtin_run_with_timer(eval, args)),
-        "run-with-idle-timer" => {
-            return Some(super::timer::builtin_run_with_idle_timer(eval, args));
-        }
-        "cancel-timer" => return Some(super::timer::builtin_cancel_timer(eval, args)),
-        "timer-activate" => return Some(super::timer::builtin_timer_activate(eval, args)),
         "sleep-for" => return Some(super::timer::builtin_sleep_for(args)),
         // Variable watchers
         "add-variable-watcher" => {
@@ -1428,15 +1406,9 @@ pub(crate) fn dispatch_builtin(
             return Some(super::syntax::builtin_backward_prefix_chars(eval, args));
         }
         "forward-word" => return Some(super::syntax::builtin_forward_word(eval, args)),
-        "forward-sexp" => return Some(super::syntax::builtin_forward_sexp(eval, args)),
-        "backward-sexp" => return Some(super::syntax::builtin_backward_sexp(eval, args)),
         "scan-lists" => return Some(super::syntax::builtin_scan_lists(eval, args)),
         "scan-sexps" => return Some(super::syntax::builtin_scan_sexps(eval, args)),
         "parse-partial-sexp" => return Some(super::syntax::builtin_parse_partial_sexp(eval, args)),
-        "syntax-ppss" => return Some(super::syntax::builtin_syntax_ppss(eval, args)),
-        "syntax-ppss-flush-cache" => {
-            return Some(super::syntax::builtin_syntax_ppss_flush_cache(eval, args));
-        }
         "skip-syntax-forward" => {
             return Some(super::syntax::builtin_skip_syntax_forward(eval, args));
         }
@@ -1638,12 +1610,6 @@ pub(crate) fn dispatch_builtin(
         "downcase-word" => return Some(super::kill_ring::builtin_downcase_word(eval, args)),
         "upcase-word" => return Some(super::kill_ring::builtin_upcase_word(eval, args)),
         "capitalize-word" => return Some(super::kill_ring::builtin_capitalize_word(eval, args)),
-        "transpose-sentences" => {
-            return Some(super::kill_ring::builtin_transpose_sentences(eval, args));
-        }
-        "transpose-paragraphs" => {
-            return Some(super::kill_ring::builtin_transpose_paragraphs(eval, args));
-        }
         "indent-line-to" => return Some(super::kill_ring::builtin_indent_line_to(eval, args)),
         "indent-to" => return Some(super::kill_ring::builtin_indent_to(eval, args)),
         "tab-to-tab-stop" => return Some(super::kill_ring::builtin_tab_to_tab_stop(eval, args)),
@@ -2216,7 +2182,6 @@ pub(crate) fn dispatch_builtin(
         "minibuffer-contents-no-properties" => {
             return Some(super::minibuffer::builtin_minibuffer_contents_no_properties(eval, args));
         }
-        "exit-minibuffer" => return Some(super::minibuffer::builtin_exit_minibuffer(args)),
         "minibuffer-depth" => return Some(super::minibuffer::builtin_minibuffer_depth(args)),
         "princ" => return Some(builtin_princ_eval(eval, args)),
         "prin1" => return Some(builtin_prin1_eval(eval, args)),
@@ -2715,14 +2680,10 @@ pub(crate) fn dispatch_builtin(
         "text-char-description" => builtin_text_char_description(args),
 
         // Process (pure — no evaluator needed)
-        "getenv" => super::process::builtin_getenv(args),
         "getenv-internal" => super::process::builtin_getenv_internal(args),
-        "setenv" => super::process::builtin_setenv(args),
         "set-binary-mode" => super::process::builtin_set_binary_mode(args),
 
         // Timer (pure — no evaluator needed)
-        "timerp" => super::timer::builtin_timerp(args),
-
         // Undo system (pure — no evaluator needed)
         "undo-boundary" => super::undo::builtin_undo_boundary(args),
         // Keyboard macro (pure — no evaluator needed)
@@ -3878,9 +3839,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "event-convert-list" => builtin_event_convert_list(args),
         "text-char-description" => builtin_text_char_description(args),
         // Process (pure)
-        "getenv" => super::process::builtin_getenv(args),
         "getenv-internal" => super::process::builtin_getenv_internal(args),
-        "setenv" => super::process::builtin_setenv(args),
         "set-binary-mode" => super::process::builtin_set_binary_mode(args),
         // Editfns (pure)
         "group-name" => super::editfns::builtin_group_name(args),
@@ -3889,7 +3848,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "load-average" => super::editfns::builtin_load_average(args),
         "logcount" => super::editfns::builtin_logcount(args),
         // Timer (pure)
-        "timerp" => super::timer::builtin_timerp(args),
         // Undo system (pure)
         // Keyboard macro (pure)
         // Character encoding (pure)
