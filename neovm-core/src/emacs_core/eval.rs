@@ -661,6 +661,7 @@ impl Evaluator {
         obarray.set_symbol_value("print-charset-text-property", Value::Nil);
         obarray.set_symbol_value("print-integers-as-characters", Value::Nil);
         obarray.set_symbol_value("print-unreadable-function", Value::Nil);
+        obarray.set_symbol_value("text-quoting-style", Value::Nil);
         obarray.set_symbol_value("standard-output", Value::True);
         obarray.set_symbol_value("buffer-read-only", Value::Nil);
         obarray.set_symbol_value("kill-ring", Value::Nil);

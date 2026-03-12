@@ -1115,3 +1115,12 @@ fn text_quoting_and_conversion_style_basics() {
     );
     assert!(builtin_set_text_conversion_style(vec![]).is_err());
 }
+
+#[test]
+fn text_quoting_style_variable_defaults_to_nil() {
+    let eval = crate::emacs_core::eval::Evaluator::new();
+    assert_eq!(
+        eval.obarray.symbol_value("text-quoting-style"),
+        Some(&Value::Nil)
+    );
+}
