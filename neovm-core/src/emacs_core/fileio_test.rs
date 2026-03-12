@@ -1647,12 +1647,7 @@ fn test_builtin_path_predicates() {
     let file = base.join("entry");
     fs::write(&file, "x").unwrap();
 
-    let result = builtin_file_nlinks(vec![Value::string(file.to_string_lossy())]);
-    assert_eq!(result.unwrap(), Value::Int(1));
-
     fs::remove_file(&file).unwrap();
-    let result = builtin_file_nlinks(vec![Value::string(file.to_string_lossy())]);
-    assert_eq!(result.unwrap(), Value::Nil);
 
     fs::remove_dir_all(&base).unwrap();
 
@@ -1709,21 +1704,6 @@ fn test_builtin_path_predicates_strict_types() {
     assert!(result.is_err());
 
     let result = builtin_file_remote_p(vec![Value::Nil]);
-    assert!(result.is_err());
-
-    let result = builtin_file_nlinks(vec![Value::Nil]);
-    assert_eq!(result.unwrap(), Value::Nil);
-
-    let result = builtin_file_nlinks(vec![Value::Int(1)]);
-    assert_eq!(result.unwrap(), Value::Nil);
-
-    let result = builtin_file_nlinks(vec![Value::symbol("x")]);
-    assert_eq!(result.unwrap(), Value::Nil);
-
-    let result = builtin_file_nlinks(vec![]);
-    assert!(result.is_err());
-
-    let result = builtin_file_nlinks(vec![Value::string("/tmp"), Value::Nil]);
     assert!(result.is_err());
 }
 

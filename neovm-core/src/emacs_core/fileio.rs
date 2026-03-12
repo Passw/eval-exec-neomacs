@@ -825,11 +825,6 @@ pub fn file_attributes(filename: &str) -> Option<FileAttributes> {
     })
 }
 
-/// Return number of hard links for FILENAME, or nil-like None.
-pub fn file_nlinks(filename: &str) -> Option<i64> {
-    file_attributes(filename).map(|attrs| attrs.nlinks as i64)
-}
-
 fn file_modes(filename: &str) -> Option<u32> {
     let meta = fs::symlink_metadata(filename).ok()?;
     #[cfg(unix)]
@@ -1454,18 +1449,6 @@ pub(crate) fn builtin_directory_name_p(args: Vec<Value>) -> EvalResult {
     expect_args("directory-name-p", &args, 1)?;
     let name = expect_string_strict(&args[0])?;
     Ok(Value::bool(directory_name_p(&name)))
-}
-
-/// (file-nlinks FILE) -> integer or nil
-pub(crate) fn builtin_file_nlinks(args: Vec<Value>) -> EvalResult {
-    expect_args("file-nlinks", &args, 1)?;
-    let Some(file) = args[0].as_str_owned() else {
-        return Ok(Value::Nil);
-    };
-    Ok(match file_nlinks(&file) {
-        Some(links) => Value::Int(links),
-        None => Value::Nil,
-    })
 }
 
 /// (file-remote-p FILE &optional IDENTIFICATION CONNECTED) -> remote component or nil
