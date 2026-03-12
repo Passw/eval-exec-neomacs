@@ -500,27 +500,6 @@ pub(crate) fn builtin_insert_kbd_macro(
     Ok(Value::string(definition))
 }
 
-/// (kbd-macro-query FLAG) -> nil
-///
-/// Compatibility subset:
-/// - arity is exactly 1
-/// - when neither recording nor executing a keyboard macro, signal
-///   `(user-error "Not defining or executing kbd macro")`
-/// - otherwise return nil (interactive query flow is not implemented yet)
-pub(crate) fn builtin_kbd_macro_query(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_args("kbd-macro-query", &args, 1)?;
-    if !eval.kmacro.recording && !eval.kmacro.executing {
-        return Err(signal(
-            "user-error",
-            vec![Value::string("Not defining or executing kbd macro")],
-        ));
-    }
-    Ok(Value::Nil)
-}
-
 /// (defining-kbd-macro-p) -> non-nil when keyboard macro recording is active.
 #[cfg(test)]
 pub(crate) fn builtin_defining_kbd_macro_p(

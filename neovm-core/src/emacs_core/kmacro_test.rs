@@ -1,5 +1,18 @@
 use super::super::intern::intern;
 use super::*;
+use crate::emacs_core::autoload::is_autoload_value;
+use crate::emacs_core::load::{apply_runtime_startup_state, create_bootstrap_evaluator_cached};
+use crate::emacs_core::{format_eval_result, parse_forms};
+
+fn bootstrap_eval_all(src: &str) -> Vec<String> {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+    let forms = parse_forms(src).expect("parse");
+    eval.eval_forms(&forms)
+        .iter()
+        .map(format_eval_result)
+        .collect()
+}
 
 // -----------------------------------------------------------------------
 // KmacroManager unit tests
@@ -492,38 +505,37 @@ fn test_name_last_kbd_macro_wrong_type() {
 }
 
 #[test]
-fn test_kbd_macro_query_subset() {
-    use super::super::eval::Evaluator;
+fn test_kbd_macro_query_startup_is_autoloaded() {
+    let eval = super::super::eval::Evaluator::new();
+    let function = eval
+        .obarray
+        .symbol_function("kbd-macro-query")
+        .expect("missing kbd-macro-query startup function cell");
+    assert!(is_autoload_value(&function));
+}
 
-    let mut eval = Evaluator::new();
+#[test]
+fn test_kbd_macro_query_loads_from_gnu_macros_el() {
+    let result = bootstrap_eval_all(
+        r#"(list (condition-case err
+                     (kbd-macro-query nil)
+                   (error (list 'err (car err) (car (cdr err)))))
+                 (subrp (symbol-function 'kbd-macro-query)))"#,
+    );
+    assert_eq!(
+        result[0],
+        r#"OK ((err user-error "Not defining or executing kbd macro") nil)"#
+    );
+}
 
-    let wrong_arity = builtin_kbd_macro_query(&mut eval, vec![]).unwrap_err();
-    match wrong_arity {
-        Flow::Signal(sig) => {
-            assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
-            assert_eq!(
-                sig.data,
-                vec![Value::symbol("kbd-macro-query"), Value::Int(0)]
-            );
-        }
-        other => panic!("unexpected flow: {other:?}"),
-    }
-
-    let not_recording = builtin_kbd_macro_query(&mut eval, vec![Value::True]).unwrap_err();
-    match not_recording {
-        Flow::Signal(sig) => {
-            assert_eq!(sig.symbol_name(), "user-error");
-            assert_eq!(
-                sig.data,
-                vec![Value::string("Not defining or executing kbd macro")]
-            );
-        }
-        other => panic!("unexpected flow: {other:?}"),
-    }
-
-    eval.kmacro.start_recording(false);
-    let ok = builtin_kbd_macro_query(&mut eval, vec![Value::Nil]).unwrap();
-    assert!(ok.is_nil());
+#[test]
+fn test_kbd_macro_query_loaded_arity_matches_gnu() {
+    let result = bootstrap_eval_all(
+        r#"(condition-case err
+               (kbd-macro-query)
+             (error (list 'err (car err))))"#,
+    );
+    assert_eq!(result[0], r#"OK (err wrong-number-of-arguments)"#);
 }
 
 #[test]
