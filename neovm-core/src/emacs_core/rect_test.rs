@@ -254,32 +254,26 @@ fn insert_rectangle_loaded_rejects_non_string_elements() {
 }
 
 #[test]
-fn open_rectangle_returns_start() {
-    let mut eval = super::super::eval::Evaluator::new();
-    let result = builtin_open_rectangle(&mut eval, vec![Value::Int(1), Value::Int(10)]);
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap(), Value::Int(1));
+fn open_rectangle_startup_is_autoloaded() {
+    let eval = super::super::eval::Evaluator::new();
+    let function = eval
+        .obarray
+        .symbol_function("open-rectangle")
+        .expect("missing open-rectangle startup function cell");
+    assert!(is_autoload_value(&function));
 }
 
 #[test]
-fn open_rectangle_eval_mutates_buffer_and_point() {
-    let mut eval = super::super::eval::Evaluator::new();
-    {
-        let buf = eval
-            .buffers
-            .current_buffer_mut()
-            .expect("current buffer must exist");
-        buf.insert("abcdef\n123456\n");
-    }
-    let result = builtin_open_rectangle(&mut eval, vec![Value::Int(1), Value::Int(9)])
-        .expect("open-rectangle");
-    assert_eq!(result, Value::Int(1));
-    let buf = eval
-        .buffers
-        .current_buffer()
-        .expect("current buffer must exist");
-    assert_eq!(buf.buffer_string(), " abcdef\n 123456\n");
-    assert_eq!(buf.text.byte_to_char(buf.point()) as i64 + 1, 1);
+fn open_rectangle_loads_from_gnu_rect_el() {
+    let result = bootstrap_eval_all(
+        r#"(with-temp-buffer
+             (insert "abcdef\n123456\n")
+             (list (open-rectangle 1 9)
+                   (replace-regexp-in-string "\n" "|" (buffer-string) nil t)
+                   (point)
+                   (subrp (symbol-function 'open-rectangle))))"#,
+    );
+    assert_eq!(result[0], r#"OK (1 " abcdef| 123456|" 1 nil)"#);
 }
 
 #[test]

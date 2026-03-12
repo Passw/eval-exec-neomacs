@@ -379,58 +379,6 @@ pub(crate) fn builtin_extract_rectangle_line(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(""))
 }
 
-/// `(open-rectangle START END)` -- insert blank space to fill the rectangle
-/// defined by START and END, pushing existing text to the right.
-pub(crate) fn builtin_open_rectangle(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_args("open-rectangle", &args, 2)?;
-    let start = expect_int(&args[0])?;
-    let end = expect_int(&args[1])?;
-
-    let Some((text, pmin, pmax, start_line, _start_col, end_line, _end_col, left_col, right_col)) =
-        clamped_rect_inputs(eval, start, end)
-    else {
-        return Ok(args[0]);
-    };
-
-    let width = right_col.saturating_sub(left_col);
-    if width > 0 {
-        let mut lines: Vec<String> = text.split('\n').map(ToString::to_string).collect();
-        let spaces = " ".repeat(width);
-        for line_index in rectangle_lines_for_extract(start_line, end_line) {
-            while lines.len() <= line_index {
-                lines.push(String::new());
-            }
-            let line = &mut lines[line_index];
-            let line_len = line.chars().count();
-            if line_len < left_col {
-                line.push_str(&" ".repeat(left_col - line_len));
-            }
-            let insert_at = char_index_to_byte(line, left_col);
-            line.insert_str(insert_at, &spaces);
-        }
-
-        let rewritten = lines.join("\n");
-        if let Some(buf) = eval.buffers.current_buffer_mut() {
-            buf.delete_region(pmin, pmax);
-            buf.goto_char(pmin);
-            buf.insert(&rewritten);
-        }
-    }
-
-    if let Some(buf) = eval.buffers.current_buffer_mut() {
-        let target_char = if start > 0 { start as usize - 1 } else { 0 };
-        let target_byte = buf
-            .text
-            .char_to_byte(target_char.min(buf.text.char_count()));
-        buf.goto_char(target_byte);
-    }
-
-    Ok(args[0])
-}
-
 /// `(clear-rectangle START END &optional FILL)` -- replace the rectangle
 /// contents with spaces (or FILL character if given).
 ///
