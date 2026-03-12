@@ -66,6 +66,7 @@ fn expect_range_args(name: &str, args: &[Value], min: usize, max: usize) -> Resu
 
 /// The tag keyword used to identify marker vectors.
 const MARKER_TAG: &str = ":marker";
+const MARK_MARKER_ID: u64 = i64::MAX as u64;
 
 /// Check whether `v` is a marker (a 4 or 5-element vector whose first element is
 /// the keyword `:marker`).
@@ -182,6 +183,10 @@ fn marker_id_value(v: &Value) -> Option<u64> {
     }
 }
 
+fn is_mark_marker(v: &Value) -> bool {
+    marker_id_value(v) == Some(MARK_MARKER_ID)
+}
+
 /// Set the marker-id field in a marker vector (index 4).
 fn set_marker_id(v: &Value, mid: u64) {
     match v {
@@ -239,6 +244,22 @@ pub(crate) fn marker_position_as_int_with_buffers(
 ) -> Result<i64, Flow> {
     expect_marker("marker-position", v)?;
 
+    if is_mark_marker(v) {
+        let buf_name_val = marker_buffer_value(v);
+        if let Some(bname) = buf_name_val.as_str()
+            && let Some(buf_id) = buffers.find_buffer_by_name(bname)
+            && let Some(buf) = buffers.get(buf_id)
+        {
+            return match buf.mark() {
+                Some(byte_pos) => Ok(buf.text.byte_to_char(byte_pos) as i64 + 1),
+                None => Err(signal(
+                    "error",
+                    vec![Value::string("Marker does not point anywhere")],
+                )),
+            };
+        }
+    }
+
     if let Some(mid) = marker_id_value(v) {
         let buf_name_val = marker_buffer_value(v);
         if let Some(bname) = buf_name_val.as_str()
@@ -290,39 +311,8 @@ fn lisp_pos_to_byte(buf: &crate::buffer::Buffer, lisp_pos: i64) -> usize {
     byte.clamp(buf.begv, buf.zv)
 }
 
-fn marker_targets_current_mark(eval: &super::eval::Evaluator, marker: &Value) -> bool {
-    let buf = match eval.buffers.current_buffer() {
-        Some(buf) => buf,
-        None => return false,
-    };
-
-    let (m_buf, m_pos) = match marker {
-        Value::Vector(vec) => {
-            let elems = with_heap(|h| h.get_vector(*vec).clone());
-            if elems.len() != 4 {
-                return false;
-            }
-            let name = match &elems[1] {
-                Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
-                Value::Nil => None,
-                _ => return false,
-            };
-            let pos = match elems[2] {
-                Value::Int(n) => Some(n),
-                Value::Nil => None,
-                _ => return false,
-            };
-            (name, pos)
-        }
-        _ => return false,
-    };
-
-    if m_buf.as_deref() != Some(buf.name.as_str()) {
-        return false;
-    }
-
-    let current_mark_char = buf.mark.map(|byte| buf.text.byte_to_char(byte) as i64 + 1);
-    m_pos == current_mark_char
+fn marker_targets_current_mark(_eval: &super::eval::Evaluator, marker: &Value) -> bool {
+    is_mark_marker(marker)
 }
 
 // ---------------------------------------------------------------------------
@@ -460,8 +450,22 @@ pub(crate) fn builtin_copy_marker_eval(
             let buf = marker_buffer_value(v);
             let buffer_name = buf.as_str().map(|s| s.to_string());
 
-            // Read position from buffer-tracked marker if available
-            let position = if let Some(mid) = marker_id_value(v) {
+            // Read position from live mark markers and buffer-tracked markers.
+            let position = if is_mark_marker(v) {
+                if let Some(ref bname) = buffer_name {
+                    if let Some(buf_id) = eval.buffers.find_buffer_by_name(bname) {
+                        if let Some(buf) = eval.buffers.get(buf_id) {
+                            buf.mark().map(|m| buf.text.byte_to_char(m) as i64 + 1)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else if let Some(mid) = marker_id_value(v) {
                 if let Some(ref bname) = buffer_name {
                     if let Some(buf_id) = eval.buffers.find_buffer_by_name(bname) {
                         if let Some(buf) = eval.buffers.get(buf_id) {
@@ -579,7 +583,13 @@ pub(crate) fn builtin_set_marker(
     }
 
     if targets_current_mark {
-        if let Some(buf) = eval.buffers.current_buffer_mut() {
+        let target_buf_id = buffer_name
+            .as_ref()
+            .and_then(|name| eval.buffers.find_buffer_by_name(name))
+            .or_else(|| eval.buffers.current_buffer().map(|buf| buf.id));
+        if let Some(buf_id) = target_buf_id
+            && let Some(buf) = eval.buffers.get_mut(buf_id)
+        {
             match position {
                 Some(pos) => buf.set_mark(lisp_pos_to_byte(buf, pos)),
                 None => {
@@ -600,6 +610,10 @@ fn register_marker_in_buffer(
     buffer_name: &Option<String>,
     position: Option<i64>,
 ) {
+    if is_mark_marker(marker) {
+        return;
+    }
+
     // Read insertion type from marker vector
     let insertion_type_val = marker_insertion_type_value(marker);
     let ins_type = if insertion_type_val.is_truthy() {
@@ -703,11 +717,21 @@ pub(crate) fn builtin_mark_marker(
     match buf.mark() {
         Some(byte_pos) => {
             let pos = buf.text.byte_to_char(byte_pos) as i64 + 1; // 1-based
-            Ok(make_marker_value(Some(&name), Some(pos), false))
+            Ok(make_marker_value_with_id(
+                Some(&name),
+                Some(pos),
+                false,
+                Some(MARK_MARKER_ID),
+            ))
         }
         None => {
             // Return a marker with no position (mark not set)
-            Ok(make_marker_value(Some(&name), None, false))
+            Ok(make_marker_value_with_id(
+                Some(&name),
+                None,
+                false,
+                Some(MARK_MARKER_ID),
+            ))
         }
     }
 }
