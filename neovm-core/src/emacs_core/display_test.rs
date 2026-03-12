@@ -734,29 +734,6 @@ fn x_display_pixel_size_errors_match_batch_shapes() {
 }
 
 #[test]
-fn x_display_color_p_batch_and_arg_errors() {
-    let none = builtin_x_display_color_p(vec![]).unwrap();
-    let nil = builtin_x_display_color_p(vec![Value::Nil]).unwrap();
-    let term = builtin_x_display_color_p(vec![terminal_handle_value()]).unwrap();
-    let int_err = builtin_x_display_color_p(vec![Value::Int(1)]);
-    let str_err = builtin_x_display_color_p(vec![Value::string("")]);
-    assert!(none.is_nil());
-    assert!(nil.is_nil());
-    assert!(term.is_nil());
-    match int_err {
-        Err(Flow::Signal(sig)) => {
-            assert_eq!(sig.symbol_name(), "error");
-            assert_eq!(
-                sig.data,
-                vec![Value::string("Invalid argument 1 in ‘get-device-terminal’")]
-            );
-        }
-        other => panic!("expected error signal, got {other:?}"),
-    }
-    assert!(str_err.is_err());
-}
-
-#[test]
 fn x_missing_optional_display_queries_match_batch_no_x_shapes() {
     let term = terminal_handle_value();
     let mut eval = crate::emacs_core::Evaluator::new();
@@ -2528,11 +2505,8 @@ fn eval_x_display_queries_accept_live_frame_designator() {
 
     let width = builtin_x_display_pixel_width_eval(&mut eval, vec![Value::Int(frame_id)]);
     let height = builtin_x_display_pixel_height_eval(&mut eval, vec![Value::Int(frame_id)]);
-    let color = builtin_x_display_color_p_eval(&mut eval, vec![Value::Int(frame_id)]).unwrap();
-
     assert!(width.is_err());
     assert!(height.is_err());
-    assert!(color.is_nil());
 }
 
 #[test]
@@ -2677,11 +2651,6 @@ fn eval_display_queries_accept_live_frame_designator() {
             .unwrap()
             .is_nil()
     );
-    assert!(
-        builtin_display_color_p_eval(&mut eval, vec![Value::Int(frame_id)])
-            .unwrap()
-            .is_nil()
-    );
     assert_eq!(
         builtin_display_pixel_width_eval(&mut eval, vec![Value::Int(frame_id)]).unwrap(),
         Value::Int(80)
@@ -2769,10 +2738,6 @@ fn eval_display_queries_string_designator_reports_missing_display() {
 
     let mut eval = crate::emacs_core::Evaluator::new();
     assert_missing_display(builtin_display_graphic_p_eval(
-        &mut eval,
-        vec![Value::string("x")],
-    ));
-    assert_missing_display(builtin_display_color_p_eval(
         &mut eval,
         vec![Value::string("x")],
     ));

@@ -537,11 +537,6 @@ pub(crate) fn builtin_display_graphic_p(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// (display-color-p &optional DISPLAY) -> nil in batch-style vm context.
-pub(crate) fn builtin_display_color_p(args: Vec<Value>) -> EvalResult {
-    display_optional_capability_p("display-color-p", &args)
-}
-
 /// (display-grayscale-p &optional DISPLAY) -> nil in batch-style vm context.
 pub(crate) fn builtin_display_grayscale_p(args: Vec<Value>) -> EvalResult {
     display_optional_capability_p("display-grayscale-p", &args)
@@ -686,14 +681,6 @@ pub(crate) fn builtin_display_graphic_p_eval(
     Ok(Value::bool(
         frame_window_system_symbol(eval, args.first())?.is_some_and(|value| value.is_symbol()),
     ))
-}
-
-/// Evaluator-aware variant of `display-color-p`.
-pub(crate) fn builtin_display_color_p_eval(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    display_optional_capability_p_eval(eval, "display-color-p", &args)
 }
 
 /// Evaluator-aware variant of `display-grayscale-p`.
@@ -2056,42 +2043,6 @@ pub(crate) fn builtin_x_display_pixel_height_eval(
         }
     }
     builtin_x_display_pixel_height(args)
-}
-
-/// (x-display-color-p &optional TERMINAL)
-///
-/// Batch/no-X semantics: nil for current display, otherwise argument-shape
-/// specific errors.
-pub(crate) fn builtin_x_display_color_p(args: Vec<Value>) -> EvalResult {
-    expect_max_args("x-display-color-p", &args, 1)?;
-    match args.first() {
-        None | Some(Value::Nil) => Ok(Value::Nil),
-        Some(display) if is_terminal_handle(display) => Ok(Value::Nil),
-        Some(Value::Str(id)) => {
-            let display = with_heap(|h| h.get_string(*id).clone());
-            Err(signal(
-                "error",
-                vec![Value::string(format!("Display {display} does not exist"))],
-            ))
-        }
-        Some(other) => Err(invalid_get_device_terminal_error(other)),
-    }
-}
-
-/// Evaluator-aware variant of `x-display-color-p`.
-///
-/// Live frame designators are treated as current display queries in batch mode.
-pub(crate) fn builtin_x_display_color_p_eval(
-    eval: &mut super::eval::Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
-    expect_max_args("x-display-color-p", &args, 1)?;
-    if let Some(display) = args.first() {
-        if live_frame_designator_p(eval, display) {
-            return Ok(Value::Nil);
-        }
-    }
-    builtin_x_display_color_p(args)
 }
 
 // ---------------------------------------------------------------------------
