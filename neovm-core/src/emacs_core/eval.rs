@@ -1270,16 +1270,7 @@ impl Evaluator {
         // before its own Elisp defs overwrite them. Without these placeholders,
         // loaded GNU bytecode can capture `nil` for forward/runtime calls into
         // NeoVM's Rust primitives.
-        for name in [
-            "activate-mark",
-            "deactivate-mark",
-            "mark",
-            "mark-marker",
-            "region-active-p",
-            "region-beginning",
-            "region-end",
-            "set-mark",
-        ] {
+        for name in ["mark-marker", "region-beginning", "region-end"] {
             obarray.set_symbol_function(name, Value::Subr(intern(name)));
         }
         // GNU Emacs exposes this helper as a Lisp wrapper, not a primitive.
@@ -1424,6 +1415,11 @@ impl Evaluator {
             "Return the contents of the rectangle with corners at START and END.",
         );
         seed_autoload(
+            "transient-mark-mode",
+            "simple",
+            "Toggle Transient Mark mode.",
+        );
+        seed_autoload(
             "insert-kbd-macro",
             "macros",
             "Insert in buffer the definition of kbd macro MACRONAME, as Lisp code.",
@@ -1529,11 +1525,13 @@ impl Evaluator {
             "time-date",
             "Parse a string DATE that represents a date-time and return a time value.",
         );
+        seed_autoload_noninteractive("activate-mark", "simple", "Activate the mark.");
         seed_autoload_noninteractive(
             "count-matches",
             "replace",
             "Count matches for REGEXP following point.",
         );
+        seed_autoload_noninteractive("deactivate-mark", "simple", "Deactivate the mark.");
         seed_autoload_noninteractive(
             "search-forward-regexp",
             "subr",
@@ -1565,6 +1563,16 @@ impl Evaluator {
             "Return non-nil if OBJECT is native-compiled Elisp code.",
         );
         seed_autoload_noninteractive(
+            "substitute-command-keys",
+            "help",
+            "Replace key descriptions in STRING.",
+        );
+        seed_autoload_noninteractive(
+            "tooltip-process-prompt-regexp",
+            "tooltip",
+            "Return a regexp matching PROCESS prompts.",
+        );
+        seed_autoload_noninteractive(
             "run-mode-hooks",
             "subr",
             "Run mode hooks `delayed-mode-hooks' and HOOKS, or delay HOOKS.",
@@ -1590,6 +1598,16 @@ impl Evaluator {
             "Insert text of RECTANGLE with upper left corner at point.",
         );
         seed_autoload_noninteractive(
+            "list-processes--refresh",
+            "simple",
+            "Refresh the Process Menu buffer.",
+        );
+        seed_autoload_noninteractive(
+            "mark",
+            "simple",
+            "Return the mark's position as an integer.",
+        );
+        seed_autoload_noninteractive(
             "pop-mark",
             "simple",
             "Pop off mark ring into the buffer's actual mark.",
@@ -1599,6 +1617,12 @@ impl Evaluator {
             "simple",
             "Set mark at LOCATION and push old mark on mark ring.",
         );
+        seed_autoload_noninteractive(
+            "region-active-p",
+            "simple",
+            "Return non-nil if the region is active.",
+        );
+        seed_autoload_noninteractive("set-mark", "simple", "Set this buffer's mark to POS.");
         seed_autoload_noninteractive(
             "use-region-p",
             "simple",

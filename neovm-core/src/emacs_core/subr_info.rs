@@ -369,10 +369,6 @@ fn subr_arity_value(name: &str) -> Value {
         | "forward-line" => arity_cons(0, Some(1)),
         "current-buffer" | "buffer-string" | "point" | "point-max" | "point-min" | "bobp"
         | "eobp" | "bolp" | "eolp" | "erase-buffer" | "widen" => arity_cons(0, Some(0)),
-        "mark" => arity_cons(0, Some(1)),
-        "set-mark" => arity_cons(1, Some(1)),
-        "activate-mark" | "deactivate-mark" => arity_cons(0, Some(1)),
-        "region-active-p" => arity_cons(0, Some(0)),
         "barf-if-buffer-read-only" => arity_cons(0, Some(1)),
         "mark-marker" | "point-marker" | "point-max-marker" | "point-min-marker" => {
             arity_cons(0, Some(0))
@@ -869,7 +865,6 @@ fn subr_arity_value(name: &str) -> Value {
         "autoload" => arity_cons(2, Some(5)),
         "autoload-do-load" => arity_cons(1, Some(3)),
         "Snarf-documentation" => arity_cons(1, Some(1)),
-        "substitute-command-keys" => arity_cons(1, Some(3)),
         "documentation" => arity_cons(1, Some(2)),
         "documentation-stringp" => arity_cons(1, Some(1)),
         "documentation-property" => arity_cons(2, Some(3)),
@@ -1344,7 +1339,7 @@ fn subr_arity_value(name: &str) -> Value {
             arity_cons(2, Some(2))
         }
         "internal-default-signal-process" => arity_cons(2, Some(3)),
-        "list-processes--refresh" | "list-system-processes" => arity_cons(0, Some(0)),
+        "list-system-processes" => arity_cons(0, Some(0)),
         "make-process" => arity_cons(0, None),
         "make-network-process" | "make-pipe-process" | "make-serial-process" => arity_cons(0, None),
         "network-interface-info" => arity_cons(1, Some(1)),
@@ -1393,7 +1388,6 @@ fn subr_arity_value(name: &str) -> Value {
         "set-process-window-size" => arity_cons(3, Some(3)),
         "set-network-process-option" => arity_cons(3, Some(4)),
         "serial-process-configure" => arity_cons(0, None),
-        "tooltip-process-prompt-regexp" => arity_cons(1, Some(1)),
         "getenv-internal" => arity_cons(1, Some(2)),
         // Display/terminal query primitives
         "terminal-name"
