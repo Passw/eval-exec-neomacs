@@ -2062,53 +2062,6 @@ pub(crate) fn builtin_substitute_command_keys(
     Ok(Value::string(result))
 }
 
-/// `(describe-key-briefly KEY &optional INSERT UNTRANSLATED)`
-/// Print the command bound to KEY.
-pub(crate) fn builtin_describe_key_briefly(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_max_args("describe-key-briefly", &args, 3)?;
-    if args.is_empty() {
-        return Ok(Value::string(""));
-    }
-
-    let events = match super::kbd::key_events_from_designator(&args[0]) {
-        Ok(events) => events,
-        Err(super::kbd::KeyDesignatorError::WrongType(other)) => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("sequencep"), other],
-            ));
-        }
-        Err(super::kbd::KeyDesignatorError::Parse(_)) => return Ok(Value::Nil),
-    };
-    if events.is_empty() {
-        return Err(signal("args-out-of-range", vec![args[0], Value::Int(-1)]));
-    }
-
-    let key_desc = match args[0].as_str() {
-        Some(s) => s.to_string(),
-        None => format_key_sequence(&events),
-    };
-
-    // Look up the binding
-    let mut binding_val = builtin_key_binding(eval, vec![args[0]])?;
-    if binding_val.is_nil() && events.len() == 1 && is_plain_printable_char_event(&events[0]) {
-        binding_val = Value::symbol("self-insert-command");
-    }
-    let description = if binding_val.is_nil() {
-        format!("{} is undefined", key_desc)
-    } else if let Some(name) = binding_val.as_symbol_name() {
-        format!("{} runs the command {}", key_desc, name)
-    } else {
-        format!("{} is bound to {}", key_desc, binding_val)
-    };
-
-    if args.get(1).is_some_and(|v| !v.is_nil()) {
-        Ok(Value::Nil)
-    } else {
-        Ok(Value::string(description))
-    }
-}
-
 /// `(this-command-keys)` -> string of keys that invoked current command.
 pub(crate) fn builtin_this_command_keys(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("this-command-keys", &args, 0)?;

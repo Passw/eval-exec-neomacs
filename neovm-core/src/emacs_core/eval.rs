@@ -1411,6 +1411,11 @@ impl Evaluator {
             "Delete (don't save) text in the region-rectangle.",
         );
         seed_autoload(
+            "describe-key-briefly",
+            "help",
+            "Display a short description of the key sequence KEY-LIST.",
+        );
+        seed_autoload(
             "describe-function",
             "help-fns",
             "Display the full documentation of FUNCTION (a symbol).",

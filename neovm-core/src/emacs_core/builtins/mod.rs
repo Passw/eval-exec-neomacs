@@ -2483,9 +2483,6 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ));
         }
-        "describe-key-briefly" => {
-            return Some(super::interactive::builtin_describe_key_briefly(eval, args));
-        }
         "this-command-keys" => {
             return Some(super::interactive::builtin_this_command_keys(eval, args));
         }

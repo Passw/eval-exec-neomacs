@@ -1207,62 +1207,51 @@ fn substitute_command_keys_accepts_optional_args() {
 // -------------------------------------------------------------------
 
 #[test]
-fn describe_key_briefly_unbound() {
-    let mut ev = Evaluator::new();
-    let result = builtin_describe_key_briefly(&mut ev, vec![Value::string("\x1a")]).unwrap();
-    let s = result.as_str().unwrap();
-    assert!(s.contains("undefined"));
+fn describe_key_briefly_startup_is_autoloaded() {
+    let ev = Evaluator::new();
+    let function = ev
+        .obarray
+        .symbol_function("describe-key-briefly")
+        .expect("missing describe-key-briefly startup function cell");
+    assert!(crate::emacs_core::autoload::is_autoload_value(&function));
 }
 
 #[test]
-fn describe_key_briefly_bound() {
-    let mut ev = Evaluator::new();
-    let km = make_list_keymap();
-    ev.obarray.set_symbol_value("global-map", km);
-    // \C-f = char 6 (ctrl-f)
-    let ctrl_f = Value::Int(6);
-    crate::emacs_core::keymap::list_keymap_define(km, ctrl_f, Value::symbol("forward-char"));
-
-    let result = builtin_describe_key_briefly(&mut ev, vec![Value::string("\x06")]).unwrap();
-    let s = result.as_str().unwrap();
-    assert!(s.contains("forward-char"));
+fn describe_key_briefly_loads_from_gnu_help_el() {
+    let result = bootstrap_eval_all(
+        r#"(let ((g (make-sparse-keymap)))
+             (define-key g (kbd "C-f") #'forward-char)
+             (use-global-map g)
+             (describe-key-briefly (kbd "C-f")))"#,
+    );
+    assert_eq!(result[0], r#"OK "C-f runs the command forward-char""#);
 }
 
 #[test]
-fn describe_key_briefly_no_args_returns_empty_string() {
-    let mut ev = Evaluator::new();
-    let result = builtin_describe_key_briefly(&mut ev, vec![]).unwrap();
-    assert_eq!(result.as_str(), Some(""));
+fn describe_key_briefly_loaded_insert_writes_message() {
+    let result = bootstrap_eval_all(
+        r#"(with-temp-buffer
+             (let ((g (make-sparse-keymap)))
+               (define-key g (kbd "C-f") #'forward-char)
+               (use-global-map g)
+               (list (describe-key-briefly (kbd "C-f") t)
+                     (buffer-string)
+                     (subrp (symbol-function 'describe-key-briefly)))))"#,
+    );
+    assert_eq!(
+        result[0],
+        r#"OK (nil "C-f runs the command forward-char" nil)"#
+    );
 }
 
 #[test]
-fn describe_key_briefly_insert_non_nil_returns_nil() {
-    let mut ev = Evaluator::new();
-    let result =
-        builtin_describe_key_briefly(&mut ev, vec![Value::string("\x1a"), Value::True]).unwrap();
-    assert!(result.is_nil());
-}
-
-#[test]
-fn describe_key_briefly_non_sequence_errors() {
-    let mut ev = Evaluator::new();
-    let result = builtin_describe_key_briefly(&mut ev, vec![Value::Int(1)]);
-    assert!(result.is_err());
-}
-
-#[test]
-fn describe_key_briefly_empty_sequence_errors() {
-    let mut ev = Evaluator::new();
-    assert!(builtin_describe_key_briefly(&mut ev, vec![Value::string("")]).is_err());
-    assert!(builtin_describe_key_briefly(&mut ev, vec![Value::vector(vec![])]).is_err());
-}
-
-#[test]
-fn describe_key_briefly_default_plain_char_reports_self_insert() {
-    let mut ev = Evaluator::new();
-    let result = builtin_describe_key_briefly(&mut ev, vec![Value::string("a")]).unwrap();
-    let s = result.as_str().unwrap();
-    assert!(s.contains("self-insert-command"));
+fn describe_key_briefly_loaded_wrong_type_matches_gnu() {
+    let result = bootstrap_eval_all(
+        r#"(condition-case err
+               (describe-key-briefly 1)
+             (error (list 'err (car err))))"#,
+    );
+    assert_eq!(result[0], r#"OK (err wrong-type-argument)"#);
 }
 
 // -------------------------------------------------------------------
