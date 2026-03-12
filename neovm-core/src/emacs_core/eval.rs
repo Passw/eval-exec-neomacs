@@ -1246,9 +1246,6 @@ impl Evaluator {
             obarray.put_property(name, "variable-documentation", Value::string(doc));
         }
 
-        // GNU Emacs exposes `x-display-color-p` as an alias to
-        // `display-color-p` in startup state.
-        obarray.set_symbol_function("x-display-color-p", Value::symbol("display-color-p"));
         obarray.set_symbol_function("x-color-defined-p", Value::symbol("color-defined-p"));
         obarray.set_symbol_function("x-color-values", Value::symbol("color-values"));
         obarray.set_symbol_function("x-defined-colors", Value::symbol("defined-colors"));
@@ -1406,6 +1403,11 @@ impl Evaluator {
             "Display the full documentation of FUNCTION (a symbol).",
         );
         seed_autoload(
+            "display-color-p",
+            "faces",
+            "Return t if DISPLAY can display colors.",
+        );
+        seed_autoload(
             "describe-variable",
             "help-fns",
             "Display the full documentation of VARIABLE (a symbol).",
@@ -1479,6 +1481,11 @@ impl Evaluator {
             "string-rectangle",
             "rect",
             "Replace rectangle contents with STRING on each line.",
+        );
+        seed_autoload(
+            "x-display-color-p",
+            "faces",
+            "Obsolete alias for `display-color-p'.",
         );
         seed_autoload(
             "yank-rectangle",
@@ -1583,6 +1590,7 @@ impl Evaluator {
             "cl-preloaded",
             "Return non-nil if OBJECT is native-compiled Elisp code.",
         );
+        seed_autoload_noninteractive("purecopy", "subr", "Return OBJECT unchanged.");
         seed_autoload_noninteractive(
             "substitute-command-keys",
             "help",

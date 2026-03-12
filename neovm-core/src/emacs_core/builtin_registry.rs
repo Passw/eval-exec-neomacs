@@ -1326,7 +1326,6 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "x-export-frames",
     "x-display-backing-store",
     "x-display-color-cells",
-    "x-display-color-p",
     "x-display-grayscale-p",
     "x-display-list",
     "x-display-mm-height",

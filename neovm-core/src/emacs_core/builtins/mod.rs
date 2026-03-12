@@ -2005,9 +2005,6 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ));
         }
-        "x-display-color-p" => {
-            return Some(super::display::builtin_x_display_color_p_eval(eval, args));
-        }
         "x-clipboard-yank" => {
             return Some(super::display::builtin_x_clipboard_yank_eval(eval, args));
         }
@@ -2409,7 +2406,6 @@ pub(crate) fn dispatch_builtin(
         "memql" => builtin_memql(args),
         "assq" => builtin_assq(args),
         "copy-sequence" => builtin_copy_sequence(args),
-        "purecopy" => builtin_purecopy(args),
         "substring-no-properties" => builtin_substring_no_properties(args),
 
         // String (typed subset is dispatched above)
@@ -2619,7 +2615,6 @@ pub(crate) fn dispatch_builtin(
         "x-close-connection" => super::display::builtin_x_close_connection(args),
         "x-display-pixel-width" => super::display::builtin_x_display_pixel_width(args),
         "x-display-pixel-height" => super::display::builtin_x_display_pixel_height(args),
-        "x-display-color-p" => super::display::builtin_x_display_color_p(args),
         "x-window-property" => super::display::builtin_x_window_property(args),
         "x-window-property-attributes" => {
             super::display::builtin_x_window_property_attributes(args)
@@ -3465,7 +3460,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         | "copy-file"
         | "defvaralias"
         | "delete-file"
-        | "display-color-p"
         | "indirect-variable"
         | "insert-and-inherit"
         | "insert-before-markers-and-inherit"
@@ -3559,7 +3553,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "nconc" => builtin_nconc(args),
         // Output / misc
         "identity" => builtin_identity(args),
-        "purecopy" => builtin_purecopy(args),
         "current-message" => builtin_current_message(args),
         "format" => super::builtins::strings::builtin_format(args),
         "ngettext" => builtin_ngettext(args),
