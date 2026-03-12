@@ -1251,31 +1251,6 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ));
         }
-        "window--adjust-process-windows" => {
-            return Some(super::process::builtin_window_adjust_process_windows(
-                eval, args,
-            ));
-        }
-        "window--process-window-list" => {
-            return Some(super::process::builtin_window_process_window_list(
-                eval, args,
-            ));
-        }
-        "window-adjust-process-window-size" => {
-            return Some(super::process::builtin_window_adjust_process_window_size(
-                eval, args,
-            ));
-        }
-        "window-adjust-process-window-size-largest" => {
-            return Some(
-                super::process::builtin_window_adjust_process_window_size_largest(eval, args),
-            );
-        }
-        "window-adjust-process-window-size-smallest" => {
-            return Some(
-                super::process::builtin_window_adjust_process_window_size_smallest(eval, args),
-            );
-        }
         "format-network-address" => {
             return Some(super::process::builtin_format_network_address(eval, args));
         }
@@ -1751,9 +1726,6 @@ pub(crate) fn dispatch_builtin(
         }
         "window-buffer" => return Some(super::window_cmds::builtin_window_buffer(eval, args)),
         "window-start" => return Some(super::window_cmds::builtin_window_start(eval, args)),
-        "window-group-start" => {
-            return Some(super::window_cmds::builtin_window_group_start(eval, args));
-        }
         "window-end" => return Some(super::window_cmds::builtin_window_end(eval, args)),
         "window-point" => return Some(super::window_cmds::builtin_window_point(eval, args)),
         "window-height" => return Some(super::window_cmds::builtin_window_height(eval, args)),
@@ -1819,7 +1791,6 @@ pub(crate) fn dispatch_builtin(
         "window-text-width" => {
             return Some(super::window_cmds::builtin_window_text_width(eval, args));
         }
-        "window-edges" => return Some(super::window_cmds::builtin_window_edges(eval, args)),
         "window-total-height" => {
             return Some(super::window_cmds::builtin_window_total_height(eval, args));
         }
@@ -1841,11 +1812,6 @@ pub(crate) fn dispatch_builtin(
         "window-live-p" => return Some(super::window_cmds::builtin_window_live_p(eval, args)),
         "set-window-start" => {
             return Some(super::window_cmds::builtin_set_window_start(eval, args));
-        }
-        "set-window-group-start" => {
-            return Some(super::window_cmds::builtin_set_window_group_start(
-                eval, args,
-            ));
         }
         "set-window-hscroll" => {
             return Some(super::window_cmds::builtin_set_window_hscroll(eval, args));
@@ -1893,14 +1859,10 @@ pub(crate) fn dispatch_builtin(
             ));
         }
         "split-window-internal" => return Some(builtin_split_window_internal(eval, args)),
-        "delete-window" => return Some(super::window_cmds::builtin_delete_window(eval, args)),
         "delete-window-internal" => {
             return Some(super::window_cmds::builtin_delete_window_internal(
                 eval, args,
             ));
-        }
-        "delete-other-windows" => {
-            return Some(super::window_cmds::builtin_delete_other_windows(eval, args));
         }
         "delete-other-windows-internal" => {
             return Some(super::window_cmds::builtin_delete_other_windows_internal(
@@ -1908,20 +1870,10 @@ pub(crate) fn dispatch_builtin(
             ));
         }
         "select-window" => return Some(super::window_cmds::builtin_select_window(eval, args)),
-        "other-window" => return Some(super::window_cmds::builtin_other_window(eval, args)),
-        "scroll-up-command" => {
-            return Some(super::window_cmds::builtin_scroll_up_command(eval, args));
-        }
-        "scroll-down-command" => {
-            return Some(super::window_cmds::builtin_scroll_down_command(eval, args));
-        }
         "scroll-up" => return Some(super::window_cmds::builtin_scroll_up(eval, args)),
         "scroll-down" => return Some(super::window_cmds::builtin_scroll_down(eval, args)),
         "scroll-left" => return Some(super::window_cmds::builtin_scroll_left(eval, args)),
         "scroll-right" => return Some(super::window_cmds::builtin_scroll_right(eval, args)),
-        "recenter-top-bottom" => {
-            return Some(super::window_cmds::builtin_recenter_top_bottom(eval, args));
-        }
         "recenter" => return Some(super::window_cmds::builtin_recenter(eval, args)),
         "other-window-for-scrolling" => {
             return Some(super::window_cmds::builtin_other_window_for_scrolling(
@@ -1933,11 +1885,6 @@ pub(crate) fn dispatch_builtin(
         "set-window-buffer" => {
             return Some(super::window_cmds::builtin_set_window_buffer(eval, args));
         }
-        "switch-to-buffer" => {
-            return Some(super::window_cmds::builtin_switch_to_buffer(eval, args));
-        }
-        "display-buffer" => return Some(super::window_cmds::builtin_display_buffer(eval, args)),
-        "pop-to-buffer" => return Some(super::window_cmds::builtin_pop_to_buffer(eval, args)),
         "current-window-configuration" => {
             return Some(builtin_current_window_configuration(eval, args));
         }
@@ -3318,12 +3265,6 @@ pub(crate) fn dispatch_builtin(
         "internal--labeled-widen" => builtin_internal_labeled_widen(args),
         "internal--obarray-buckets" => builtin_internal_obarray_buckets(args),
         "internal--set-buffer-modified-tick" => builtin_internal_set_buffer_modified_tick(args),
-        "internal--before-save-selected-window" => {
-            builtin_internal_before_save_selected_window(eval, args)
-        }
-        "internal--after-save-selected-window" => {
-            builtin_internal_after_save_selected_window(eval, args)
-        }
         "internal--track-mouse" => builtin_internal_track_mouse(args),
         "internal-char-font" => builtin_internal_char_font(args),
         "internal-complete-buffer" => builtin_internal_complete_buffer(args),
