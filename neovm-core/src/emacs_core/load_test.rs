@@ -1061,6 +1061,24 @@ fn bootstrap_runtime_describe_function_autoloads_help_fns() {
     assert_eq!(rendered, "OK (t t nil t)");
 }
 
+#[test]
+fn bootstrap_runtime_describe_variable_autoloads_help_fns() {
+    let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap");
+    apply_runtime_startup_state(&mut eval).expect("runtime startup state");
+
+    let rendered = eval_rendered(
+        &mut eval,
+        r#"(let ((before (symbol-function 'describe-variable)))
+             (list
+              (autoloadp before)
+              (stringp (describe-variable 'load-path))
+              (autoloadp (symbol-function 'describe-variable))
+              (bufferp (get-buffer "*Help*"))))"#,
+    );
+
+    assert_eq!(rendered, "OK (t t nil t)");
+}
+
 fn cached_bootstrap_eval_with_loaded_file(path: &std::path::Path, form: &str) -> String {
     let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
     apply_runtime_startup_state(&mut eval).expect("runtime startup state");
