@@ -450,6 +450,26 @@ fn match_data_from_captures(caps: &regex::Captures<'_>, offset: usize) -> MatchD
     }
 }
 
+fn string_char_match_data(string: &str, byte_md: MatchData) -> MatchData {
+    let char_groups: Vec<Option<(usize, usize)>> = byte_md
+        .groups
+        .iter()
+        .map(|g| {
+            g.map(|(bs, be)| {
+                let cs = string.get(..bs).map_or(0, |s| s.chars().count());
+                let ce = string.get(..be).map_or(0, |s| s.chars().count());
+                (cs, ce)
+            })
+        })
+        .collect();
+
+    MatchData {
+        groups: char_groups,
+        searched_string: Some(string.to_string()),
+        searched_buffer: None,
+    }
+}
+
 fn next_search_char_boundary(text: &str, pos: usize) -> Option<usize> {
     if pos >= text.len() {
         return None;
@@ -751,6 +771,31 @@ pub fn looking_at(
     }
 }
 
+/// Test whether STRING matches PATTERN starting at byte offset 0.
+///
+/// Returns `true` if the regex matches at the beginning of STRING and updates
+/// match data using character positions, mirroring `looking-at` semantics on a
+/// string-backed source.
+pub fn looking_at_string(
+    pattern: &str,
+    string: &str,
+    case_fold: bool,
+    match_data: &mut Option<MatchData>,
+) -> Result<bool, String> {
+    let re = compile_emacs_regex_case_fold(pattern, case_fold)?;
+
+    if let Some(caps) = re.captures_at(string, 0) {
+        let byte_md = match_data_from_captures(&caps, 0);
+        if byte_md.groups[0].unwrap().0 != 0 {
+            return Ok(false);
+        }
+        *match_data = Some(string_char_match_data(string, byte_md));
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
 /// Match a regex against a string (not a buffer).
 ///
 /// `start` is the byte offset within `string` to begin matching.
@@ -772,28 +817,9 @@ pub fn string_match_full_with_case_fold(
     }
 
     if let Some(caps) = re.captures_at(string, start) {
-        let byte_md = match_data_from_captures(&caps, 0);
-        // Convert byte positions to character positions for string searches.
-        // This matches official Emacs behavior where string match data
-        // uses character positions, allowing match-data--translate to
-        // correctly adjust positions with character-based deltas.
-        let char_groups: Vec<Option<(usize, usize)>> = byte_md
-            .groups
-            .iter()
-            .map(|g| {
-                g.map(|(bs, be)| {
-                    let cs = string.get(..bs).map_or(0, |s| s.chars().count());
-                    let ce = string.get(..be).map_or(0, |s| s.chars().count());
-                    (cs, ce)
-                })
-            })
-            .collect();
-        let result_pos = char_groups[0].unwrap().0;
-        *match_data = Some(MatchData {
-            groups: char_groups,
-            searched_string: Some(string.to_string()),
-            searched_buffer: None,
-        });
+        let char_md = string_char_match_data(string, match_data_from_captures(&caps, 0));
+        let result_pos = char_md.groups[0].unwrap().0;
+        *match_data = Some(char_md);
         Ok(Some(result_pos))
     } else {
         Ok(None)

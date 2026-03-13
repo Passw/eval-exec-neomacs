@@ -239,19 +239,11 @@ pub(crate) fn builtin_string_match_p(args: Vec<Value>) -> EvalResult {
     let pattern = expect_string(&args[0])?;
     let s = expect_string(&args[1])?;
     let start = normalize_string_start_arg(&s, args.get(2))?;
-
-    // Emacs defaults `case-fold-search` to non-nil for string matching.
-    let rust_pattern = format!("(?mi:{})", super::regex::translate_emacs_regex(&pattern));
-    let re = regex::Regex::new(&rust_pattern)
-        .map_err(|e| signal("invalid-regexp", vec![Value::string(e.to_string())]))?;
-
-    let search_region = &s[start..];
-    match re.find(search_region) {
-        Some(m) => {
-            let match_start = m.start() + start;
-            Ok(Value::Int(s[..match_start].chars().count() as i64))
-        }
-        None => Ok(Value::Nil),
+    let mut throwaway = None;
+    match super::regex::string_match_full(&pattern, &s, start, &mut throwaway) {
+        Ok(Some(char_pos)) => Ok(Value::Int(char_pos as i64)),
+        Ok(None) => Ok(Value::Nil),
+        Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
     }
 }
 
@@ -406,31 +398,6 @@ pub(crate) fn builtin_set_match_data(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-fn anchored_looking_at_matches(
-    pattern: &str,
-    text: &str,
-) -> Result<Vec<Option<(usize, usize)>>, Flow> {
-    let translated = super::regex::translate_emacs_regex(pattern);
-    let anchored = if translated.starts_with("\\A") || translated.starts_with('^') {
-        translated
-    } else {
-        format!("\\A(?:{translated})")
-    };
-    let re = regex::Regex::new(&format!("(?mi:{anchored})"))
-        .map_err(|e| signal("invalid-regexp", vec![Value::string(e.to_string())]))?;
-
-    match re.captures(text) {
-        Some(caps) => {
-            let mut groups = Vec::with_capacity(caps.len());
-            for i in 0..caps.len() {
-                groups.push(caps.get(i).map(|m| (m.start(), m.end())));
-            }
-            Ok(groups)
-        }
-        None => Ok(Vec::new()),
-    }
-}
-
 /// `(looking-at REGEXP)` -- test whether text after point matches REGEXP.
 /// In batch mode we support an optional second argument as a sample string.
 /// When absent, this returns nil after validating REGEXP.
@@ -440,26 +407,29 @@ pub(crate) fn builtin_looking_at(args: Vec<Value>) -> EvalResult {
 
     let text = args.get(1).and_then(|value| value.as_str());
     match text {
-        Some(text) => match anchored_looking_at_matches(&pattern, text)? {
-            groups if groups.is_empty() => {
-                PURE_MATCH_DATA.with(|slot| *slot.borrow_mut() = None);
-                Ok(Value::Nil)
+        Some(text) => {
+            let mut md = None;
+            match super::regex::looking_at_string(&pattern, text, true, &mut md) {
+                Ok(false) => Ok({
+                    PURE_MATCH_DATA.with(|slot| *slot.borrow_mut() = None);
+                    Value::Nil
+                }),
+                Ok(true) => Ok({
+                    PURE_MATCH_DATA.with(|slot| *slot.borrow_mut() = md);
+                    Value::True
+                }),
+                Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
             }
-            groups => {
-                PURE_MATCH_DATA.with(|slot| {
-                    *slot.borrow_mut() = Some(super::regex::MatchData {
-                        groups,
-                        searched_string: Some(text.to_string()),
-                        searched_buffer: None,
-                    })
-                });
-                Ok(Value::True)
-            }
-        },
+        }
         None => {
-            let _ = anchored_looking_at_matches(&pattern, "")?;
-            PURE_MATCH_DATA.with(|slot| *slot.borrow_mut() = None);
-            Ok(Value::Nil)
+            let mut throwaway = None;
+            match super::regex::looking_at_string(&pattern, "", true, &mut throwaway) {
+                Ok(_) => {
+                    PURE_MATCH_DATA.with(|slot| *slot.borrow_mut() = None);
+                    Ok(Value::Nil)
+                }
+                Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
+            }
         }
     }
 }
@@ -470,7 +440,11 @@ pub(crate) fn builtin_looking_at_p(args: Vec<Value>) -> EvalResult {
     let pattern = expect_string(&args[0])?;
     PURE_MATCH_DATA.with(|slot| {
         let snapshot = slot.borrow().clone();
-        let _ = anchored_looking_at_matches(&pattern, "")?;
+        let mut throwaway = None;
+        match super::regex::looking_at_string(&pattern, "", true, &mut throwaway) {
+            Ok(_) => Ok(Value::Nil),
+            Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
+        }?;
         *slot.borrow_mut() = snapshot;
         Ok(Value::Nil)
     })
