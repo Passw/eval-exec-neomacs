@@ -4,15 +4,23 @@
 //! syntax to Rust regex syntax before compiling patterns.
 
 use regex::Regex;
+use std::cell::RefCell;
 
 use crate::buffer::{Buffer, BufferId};
 use crate::emacs_core::casefiddle::apply_replace_match_case;
 
 pub(crate) const REPLACE_MATCH_SUBEXP_MISSING: &str = "replace-match subexpression does not exist";
+const SEARCH_PATTERN_CACHE_SIZE: usize = 20;
 
+#[derive(Clone)]
 enum CompiledSearchPattern {
     Literal(String),
     Regex(Regex),
+}
+
+thread_local! {
+    static SEARCH_PATTERN_CACHE: RefCell<Vec<(bool, String, CompiledSearchPattern)>> =
+        const { RefCell::new(Vec::new()) };
 }
 
 // ---------------------------------------------------------------------------
@@ -483,15 +491,37 @@ fn compile_emacs_regex_case_fold(pattern: &str, case_fold: bool) -> Result<Regex
 }
 
 fn compile_search_pattern(pattern: &str, case_fold: bool) -> Result<CompiledSearchPattern, String> {
-    if let Some(literal) = literal_from_trivial_regexp(pattern)
-        && (!case_fold || literal.is_ascii())
-    {
-        return Ok(CompiledSearchPattern::Literal(literal));
+    if let Some(cached) = SEARCH_PATTERN_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        let index = cache
+            .iter()
+            .position(|(cached_case_fold, cached_pattern, _)| {
+                *cached_case_fold == case_fold && cached_pattern == pattern
+            })?;
+        let entry = cache.remove(index);
+        cache.insert(0, entry.clone());
+        Some(entry.2)
+    }) {
+        return Ok(cached);
     }
 
-    Ok(CompiledSearchPattern::Regex(compile_emacs_regex_case_fold(
-        pattern, case_fold,
-    )?))
+    let compiled = if let Some(literal) = literal_from_trivial_regexp(pattern)
+        && (!case_fold || literal.is_ascii())
+    {
+        CompiledSearchPattern::Literal(literal)
+    } else {
+        CompiledSearchPattern::Regex(compile_emacs_regex_case_fold(pattern, case_fold)?)
+    };
+
+    SEARCH_PATTERN_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        cache.insert(0, (case_fold, pattern.to_string(), compiled.clone()));
+        if cache.len() > SEARCH_PATTERN_CACHE_SIZE {
+            cache.truncate(SEARCH_PATTERN_CACHE_SIZE);
+        }
+    });
+
+    Ok(compiled)
 }
 
 fn match_data_from_captures(caps: &regex::Captures<'_>, offset: usize) -> MatchData {
