@@ -10,6 +10,11 @@ use crate::emacs_core::casefiddle::apply_replace_match_case;
 
 pub(crate) const REPLACE_MATCH_SUBEXP_MISSING: &str = "replace-match subexpression does not exist";
 
+enum CompiledSearchPattern {
+    Literal(String),
+    Regex(Regex),
+}
+
 // ---------------------------------------------------------------------------
 // MatchData
 // ---------------------------------------------------------------------------
@@ -426,6 +431,45 @@ pub fn translate_emacs_regex(pattern: &str) -> String {
     out
 }
 
+fn trivial_regexp_p(pattern: &str) -> bool {
+    let mut chars = pattern.chars();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '.' | '*' | '+' | '?' | '[' | '^' | '$' => return false,
+            '\\' => {
+                let Some(next) = chars.next() else {
+                    return false;
+                };
+                match next {
+                    '|' | '(' | ')' | '`' | '\'' | 'b' | 'B' | '<' | '>' | 'w' | 'W' | 's'
+                    | 'S' | '=' | '{' | '}' | '_' | 'c' | 'C' | '1' | '2' | '3' | '4' | '5'
+                    | '6' | '7' | '8' | '9' => return false,
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+    true
+}
+
+fn literal_from_trivial_regexp(pattern: &str) -> Option<String> {
+    if !trivial_regexp_p(pattern) {
+        return None;
+    }
+
+    let mut out = String::with_capacity(pattern.len());
+    let mut chars = pattern.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            out.push(chars.next()?);
+        } else {
+            out.push(ch);
+        }
+    }
+    Some(out)
+}
+
 fn compile_emacs_regex_case_fold(pattern: &str, case_fold: bool) -> Result<Regex, String> {
     let rust_pattern = translate_emacs_regex(pattern);
     // Emacs regexes always treat ^ and $ as matching at line boundaries,
@@ -436,6 +480,18 @@ fn compile_emacs_regex_case_fold(pattern: &str, case_fold: bool) -> Result<Regex
         format!("(?m:{})", rust_pattern)
     };
     Regex::new(&wrapped).map_err(|e| format!("Invalid regexp: {}", e))
+}
+
+fn compile_search_pattern(pattern: &str, case_fold: bool) -> Result<CompiledSearchPattern, String> {
+    if let Some(literal) = literal_from_trivial_regexp(pattern)
+        && (!case_fold || literal.is_ascii())
+    {
+        return Ok(CompiledSearchPattern::Literal(literal));
+    }
+
+    Ok(CompiledSearchPattern::Regex(compile_emacs_regex_case_fold(
+        pattern, case_fold,
+    )?))
 }
 
 fn match_data_from_captures(caps: &regex::Captures<'_>, offset: usize) -> MatchData {
@@ -468,6 +524,70 @@ fn string_char_match_data(string: &str, byte_md: MatchData) -> MatchData {
         searched_string: Some(string.to_string()),
         searched_buffer: None,
     }
+}
+
+fn single_group_match_data(start: usize, end: usize) -> MatchData {
+    MatchData {
+        groups: vec![Some((start, end))],
+        searched_string: None,
+        searched_buffer: None,
+    }
+}
+
+fn ascii_case_fold_find(haystack: &str, needle: &str) -> Option<usize> {
+    let needle_len = needle.len();
+    if needle_len == 0 {
+        return Some(0);
+    }
+    let haystack_bytes = haystack.as_bytes();
+    let needle_bytes = needle.as_bytes();
+    if needle_len > haystack_bytes.len() {
+        return None;
+    }
+
+    haystack_bytes.windows(needle_len).position(|window| {
+        window
+            .iter()
+            .zip(needle_bytes.iter())
+            .all(|(lhs, rhs)| lhs.eq_ignore_ascii_case(rhs))
+    })
+}
+
+fn ascii_case_fold_rfind(haystack: &str, needle: &str) -> Option<usize> {
+    let needle_len = needle.len();
+    if needle_len == 0 {
+        return Some(haystack.len());
+    }
+    let haystack_bytes = haystack.as_bytes();
+    let needle_bytes = needle.as_bytes();
+    if needle_len > haystack_bytes.len() {
+        return None;
+    }
+
+    haystack_bytes.windows(needle_len).rposition(|window| {
+        window
+            .iter()
+            .zip(needle_bytes.iter())
+            .all(|(lhs, rhs)| lhs.eq_ignore_ascii_case(rhs))
+    })
+}
+
+fn literal_find(text: &str, literal: &str, case_fold: bool) -> Option<(usize, usize)> {
+    let start = if case_fold {
+        ascii_case_fold_find(text, literal)?
+    } else {
+        text.find(literal)?
+    };
+    Some((start, start + literal.len()))
+}
+
+fn literal_rfind(text: &str, literal: &str, case_fold: bool) -> Option<(usize, usize)> {
+    let start = if case_fold {
+        ascii_case_fold_rfind(text, literal)?
+    } else {
+        text.rfind(literal)?
+    };
+    Some((start, start + literal.len()))
 }
 
 fn next_search_char_boundary(text: &str, pos: usize) -> Option<usize> {
@@ -572,13 +692,13 @@ pub fn search_forward(
 
     let text = buf.text.text_range(start, limit);
 
-    let found = if case_fold {
+    let found = if case_fold && !pattern.is_ascii() {
         let escaped = regex::escape(pattern);
         let re =
             Regex::new(&format!("(?i:{escaped})")).map_err(|e| format!("Invalid regexp: {}", e))?;
         re.find(&text).map(|m| (m.start(), m.end()))
     } else {
-        text.find(pattern).map(|pos| (pos, pos + pattern.len()))
+        literal_find(&text, pattern, case_fold)
     };
 
     if let Some((rel_start, rel_end)) = found {
@@ -624,13 +744,13 @@ pub fn search_backward(
 
     let text = buf.text.text_range(limit, end);
 
-    let found = if case_fold {
+    let found = if case_fold && !pattern.is_ascii() {
         let escaped = regex::escape(pattern);
         let re =
             Regex::new(&format!("(?i:{escaped})")).map_err(|e| format!("Invalid regexp: {}", e))?;
         re.find_iter(&text).last().map(|m| (m.start(), m.end()))
     } else {
-        text.rfind(pattern).map(|pos| (pos, pos + pattern.len()))
+        literal_rfind(&text, pattern, case_fold)
     };
 
     if let Some((rel_start, rel_end)) = found {
@@ -662,7 +782,6 @@ pub fn re_search_forward(
     case_fold: bool,
     match_data: &mut Option<MatchData>,
 ) -> Result<Option<usize>, String> {
-    let re = compile_emacs_regex_case_fold(pattern, case_fold)?;
     let start = buf.pt;
     let limit = bound.unwrap_or(buf.zv).min(buf.zv);
 
@@ -678,18 +797,41 @@ pub fn re_search_forward(
     let start_rel = start - region_start;
     let limit_rel = limit - region_start;
 
-    if let Some(mut md) = find_forward_match_data(&re, &text, start_rel, limit_rel, region_start) {
-        md.searched_string = None;
-        md.searched_buffer = Some(buf.id);
-        let full_match = md.groups[0].unwrap();
-        buf.pt = full_match.1;
-        *match_data = Some(md);
-        Ok(Some(full_match.1))
-    } else {
-        if noerror {
-            return Ok(None);
+    match compile_search_pattern(pattern, case_fold)? {
+        CompiledSearchPattern::Literal(literal) => {
+            if let Some((rel_start, rel_end)) =
+                literal_find(&text[start_rel..limit_rel], &literal, case_fold)
+            {
+                let full_match = (start + rel_start, start + rel_end);
+                buf.pt = full_match.1;
+                *match_data = Some(MatchData {
+                    groups: vec![Some(full_match)],
+                    searched_string: None,
+                    searched_buffer: Some(buf.id),
+                });
+                Ok(Some(full_match.1))
+            } else if noerror {
+                Ok(None)
+            } else {
+                Err(format!("Search failed: \"{}\"", pattern))
+            }
         }
-        Err(format!("Search failed: \"{}\"", pattern))
+        CompiledSearchPattern::Regex(re) => {
+            if let Some(mut md) =
+                find_forward_match_data(&re, &text, start_rel, limit_rel, region_start)
+            {
+                md.searched_string = None;
+                md.searched_buffer = Some(buf.id);
+                let full_match = md.groups[0].unwrap();
+                buf.pt = full_match.1;
+                *match_data = Some(md);
+                Ok(Some(full_match.1))
+            } else if noerror {
+                Ok(None)
+            } else {
+                Err(format!("Search failed: \"{}\"", pattern))
+            }
+        }
     }
 }
 
@@ -705,7 +847,6 @@ pub fn re_search_backward(
     case_fold: bool,
     match_data: &mut Option<MatchData>,
 ) -> Result<Option<usize>, String> {
-    let re = compile_emacs_regex_case_fold(pattern, case_fold)?;
     let end = buf.pt;
     let limit = bound.unwrap_or(buf.begv).max(buf.begv);
 
@@ -721,18 +862,41 @@ pub fn re_search_backward(
     let start_rel = end - region_start;
     let limit_rel = limit - region_start;
 
-    if let Some(mut md) = find_backward_match_data(&re, &text, start_rel, limit_rel, region_start) {
-        md.searched_string = None;
-        md.searched_buffer = Some(buf.id);
-        let full_match = md.groups[0].unwrap();
-        buf.pt = full_match.0;
-        *match_data = Some(md);
-        Ok(Some(full_match.0))
-    } else {
-        if noerror {
-            return Ok(None);
+    match compile_search_pattern(pattern, case_fold)? {
+        CompiledSearchPattern::Literal(literal) => {
+            if let Some((rel_start, rel_end)) =
+                literal_rfind(&text[limit_rel..start_rel], &literal, case_fold)
+            {
+                let full_match = (limit + rel_start, limit + rel_end);
+                buf.pt = full_match.0;
+                *match_data = Some(MatchData {
+                    groups: vec![Some(full_match)],
+                    searched_string: None,
+                    searched_buffer: Some(buf.id),
+                });
+                Ok(Some(full_match.0))
+            } else if noerror {
+                Ok(None)
+            } else {
+                Err(format!("Search failed: \"{}\"", pattern))
+            }
         }
-        Err(format!("Search failed: \"{}\"", pattern))
+        CompiledSearchPattern::Regex(re) => {
+            if let Some(mut md) =
+                find_backward_match_data(&re, &text, start_rel, limit_rel, region_start)
+            {
+                md.searched_string = None;
+                md.searched_buffer = Some(buf.id);
+                let full_match = md.groups[0].unwrap();
+                buf.pt = full_match.0;
+                *match_data = Some(md);
+                Ok(Some(full_match.0))
+            } else if noerror {
+                Ok(None)
+            } else {
+                Err(format!("Search failed: \"{}\"", pattern))
+            }
+        }
     }
 }
 
@@ -746,8 +910,6 @@ pub fn looking_at(
     case_fold: bool,
     match_data: &mut Option<MatchData>,
 ) -> Result<bool, String> {
-    let re = compile_emacs_regex_case_fold(pattern, case_fold)?;
-
     let start = buf.pt;
     if start > buf.zv {
         return Ok(false);
@@ -757,17 +919,36 @@ pub fn looking_at(
     let text = buf.text.text_range(region_start, buf.zv);
     let start_rel = start - region_start;
 
-    if let Some(caps) = re.captures_at(&text, start_rel) {
-        let mut md = match_data_from_captures(&caps, region_start);
-        if md.groups[0].unwrap().0 != start {
-            return Ok(false);
+    match compile_search_pattern(pattern, case_fold)? {
+        CompiledSearchPattern::Literal(literal) => {
+            let tail = &text[start_rel..];
+            let matched = literal_find(tail, &literal, case_fold)
+                .is_some_and(|(match_start, _)| match_start == 0);
+            if !matched {
+                return Ok(false);
+            }
+            let full_match = (start, start + literal.len());
+            *match_data = Some(MatchData {
+                groups: vec![Some(full_match)],
+                searched_string: None,
+                searched_buffer: Some(buf.id),
+            });
+            Ok(true)
         }
-        md.searched_string = None;
-        md.searched_buffer = Some(buf.id);
-        *match_data = Some(md);
-        Ok(true)
-    } else {
-        Ok(false)
+        CompiledSearchPattern::Regex(re) => {
+            if let Some(caps) = re.captures_at(&text, start_rel) {
+                let mut md = match_data_from_captures(&caps, region_start);
+                if md.groups[0].unwrap().0 != start {
+                    return Ok(false);
+                }
+                md.searched_string = None;
+                md.searched_buffer = Some(buf.id);
+                *match_data = Some(md);
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        }
     }
 }
 
@@ -782,17 +963,31 @@ pub fn looking_at_string(
     case_fold: bool,
     match_data: &mut Option<MatchData>,
 ) -> Result<bool, String> {
-    let re = compile_emacs_regex_case_fold(pattern, case_fold)?;
-
-    if let Some(caps) = re.captures_at(string, 0) {
-        let byte_md = match_data_from_captures(&caps, 0);
-        if byte_md.groups[0].unwrap().0 != 0 {
-            return Ok(false);
+    match compile_search_pattern(pattern, case_fold)? {
+        CompiledSearchPattern::Literal(literal) => {
+            let matched = literal_find(string, &literal, case_fold)
+                .is_some_and(|(match_start, _)| match_start == 0);
+            if !matched {
+                return Ok(false);
+            }
+            *match_data = Some(string_char_match_data(
+                string,
+                single_group_match_data(0, literal.len()),
+            ));
+            Ok(true)
         }
-        *match_data = Some(string_char_match_data(string, byte_md));
-        Ok(true)
-    } else {
-        Ok(false)
+        CompiledSearchPattern::Regex(re) => {
+            if let Some(caps) = re.captures_at(string, 0) {
+                let byte_md = match_data_from_captures(&caps, 0);
+                if byte_md.groups[0].unwrap().0 != 0 {
+                    return Ok(false);
+                }
+                *match_data = Some(string_char_match_data(string, byte_md));
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        }
     }
 }
 
@@ -810,19 +1005,34 @@ pub fn string_match_full_with_case_fold(
     case_fold: bool,
     match_data: &mut Option<MatchData>,
 ) -> Result<Option<usize>, String> {
-    let re = compile_emacs_regex_case_fold(pattern, case_fold)?;
-
     if start > string.len() {
         return Ok(None);
     }
 
-    if let Some(caps) = re.captures_at(string, start) {
-        let char_md = string_char_match_data(string, match_data_from_captures(&caps, 0));
-        let result_pos = char_md.groups[0].unwrap().0;
-        *match_data = Some(char_md);
-        Ok(Some(result_pos))
-    } else {
-        Ok(None)
+    match compile_search_pattern(pattern, case_fold)? {
+        CompiledSearchPattern::Literal(literal) => {
+            let byte_match = literal_find(&string[start..], &literal, case_fold)
+                .map(|(match_start, match_end)| (start + match_start, start + match_end));
+            if let Some((byte_start, byte_end)) = byte_match {
+                let char_md =
+                    string_char_match_data(string, single_group_match_data(byte_start, byte_end));
+                let result_pos = char_md.groups[0].unwrap().0;
+                *match_data = Some(char_md);
+                Ok(Some(result_pos))
+            } else {
+                Ok(None)
+            }
+        }
+        CompiledSearchPattern::Regex(re) => {
+            if let Some(caps) = re.captures_at(string, start) {
+                let char_md = string_char_match_data(string, match_data_from_captures(&caps, 0));
+                let result_pos = char_md.groups[0].unwrap().0;
+                *match_data = Some(char_md);
+                Ok(Some(result_pos))
+            } else {
+                Ok(None)
+            }
+        }
     }
 }
 

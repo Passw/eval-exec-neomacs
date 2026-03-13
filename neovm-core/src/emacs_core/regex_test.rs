@@ -142,6 +142,16 @@ fn translate_multibyte_literals() {
     assert_eq!(translate_emacs_regex("\\😀"), "😀");
 }
 
+#[test]
+fn trivial_regexp_matches_gnu_meta_rules() {
+    assert!(trivial_regexp_p("hello\\.txt"));
+    assert!(trivial_regexp_p("\\😀"));
+    assert!(!trivial_regexp_p("he.*o"));
+    assert!(!trivial_regexp_p("\\(group\\)"));
+    assert!(!trivial_regexp_p("\\1"));
+    assert!(!trivial_regexp_p("trailing\\"));
+}
+
 // -----------------------------------------------------------------------
 // string_match_full
 // -----------------------------------------------------------------------
@@ -188,6 +198,16 @@ fn string_match_with_escaped_multibyte_literal() {
     let result = string_match_full("\\é", "aéx", 0, &mut md);
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), Some(1));
+}
+
+#[test]
+fn string_match_trivial_escaped_literal_uses_character_positions() {
+    let mut md = None;
+    let result = string_match_full("\\.", "a.b", 0, &mut md);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), Some(1));
+    let md = md.unwrap();
+    assert_eq!(md.groups[0], Some((1, 2)));
 }
 
 #[test]
@@ -268,6 +288,17 @@ fn search_forward_case_fold_true() {
     let result = search_forward(&mut buf, "a", None, false, true, &mut md);
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), Some(1));
+}
+
+#[test]
+fn re_search_forward_trivial_regexp_follows_literal_case_fold_path() {
+    let mut buf = make_test_buffer("A.b");
+    let mut md = None;
+    let result = re_search_forward(&mut buf, "a\\.", None, false, true, &mut md);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), Some(2));
+    let md = md.unwrap();
+    assert_eq!(md.groups[0], Some((0, 2)));
 }
 
 #[test]
