@@ -234,6 +234,30 @@ fn scan_storage_units(s: &str) -> Vec<(usize, usize, u32, usize, usize)> {
     out
 }
 
+fn storage_has_special_units(s: &str) -> bool {
+    if s.is_ascii() {
+        return false;
+    }
+    s.chars().any(|ch| {
+        let code = ch as u32;
+        (RAW_BYTE_SENTINEL_MIN..=RAW_BYTE_SENTINEL_MAX).contains(&code)
+            || (UNIBYTE_BYTE_SENTINEL_MIN..=UNIBYTE_BYTE_SENTINEL_MAX).contains(&code)
+            || code == EXT_SEQ_PREFIX
+            || (EXT_SEQ_LEN_BASE + 1..=EXT_SEQ_LEN_BASE + EXT_SEQ_MAX_LEN).contains(&code)
+            || (EXT_SEQ_BYTE_BASE..=EXT_SEQ_BYTE_BASE + 0xFF).contains(&code)
+    })
+}
+
+fn plain_utf8_char_to_byte(s: &str, char_idx: usize) -> usize {
+    if s.is_ascii() {
+        return char_idx.min(s.len());
+    }
+    s.char_indices()
+        .nth(char_idx)
+        .map(|(byte_idx, _)| byte_idx)
+        .unwrap_or(s.len())
+}
+
 /// Losslessly encode potentially non-UTF-8 bytes into internal string storage.
 pub(crate) fn bytes_to_storage_string(bytes: &[u8]) -> String {
     if let Ok(utf8) = String::from_utf8(bytes.to_vec()) {
@@ -279,6 +303,12 @@ pub(crate) fn encode_char_code_for_string_storage(code: u32, multibyte: bool) ->
 }
 
 pub(crate) fn decode_storage_units(s: &str) -> Vec<(u32, usize)> {
+    if !storage_has_special_units(s) {
+        return s
+            .chars()
+            .map(|ch| (ch as u32, crate::encoding::char_width(ch)))
+            .collect();
+    }
     scan_storage_units(s)
         .into_iter()
         .map(|(_, _, cp, width, _)| (cp, width))
@@ -303,11 +333,21 @@ pub(crate) fn storage_string_display_width(s: &str) -> usize {
 
 /// Count logical Emacs characters in NeoVM string storage.
 pub(crate) fn storage_char_len(s: &str) -> usize {
+    if !storage_has_special_units(s) {
+        return if s.is_ascii() {
+            s.len()
+        } else {
+            s.chars().count()
+        };
+    }
     scan_storage_units(s).len()
 }
 
 /// Count Emacs string bytes represented by NeoVM string storage.
 pub(crate) fn storage_byte_len(s: &str) -> usize {
+    if !storage_has_special_units(s) {
+        return s.len();
+    }
     scan_storage_units(s)
         .into_iter()
         .map(|(_, _, _, _, byte_len)| byte_len)
@@ -317,6 +357,9 @@ pub(crate) fn storage_byte_len(s: &str) -> usize {
 /// Convert a 0-based Emacs character index to a byte offset in NeoVM string storage.
 /// Clamps to the string length if the index is out of bounds.
 pub(crate) fn storage_char_to_byte(s: &str, char_idx: usize) -> usize {
+    if !storage_has_special_units(s) {
+        return plain_utf8_char_to_byte(s, char_idx);
+    }
     let units = scan_storage_units(s);
     if char_idx >= units.len() {
         s.len()
@@ -327,6 +370,16 @@ pub(crate) fn storage_char_to_byte(s: &str, char_idx: usize) -> usize {
 
 /// Convert a byte offset in NeoVM string storage to a 0-based Emacs character index.
 pub(crate) fn storage_byte_to_char(s: &str, byte_pos: usize) -> usize {
+    if !storage_has_special_units(s) {
+        let clamped = byte_pos.min(s.len());
+        if s.is_ascii() {
+            return clamped;
+        }
+        return s
+            .char_indices()
+            .take_while(|(idx, _)| *idx < clamped)
+            .count();
+    }
     let units = scan_storage_units(s);
     for (i, unit) in units.iter().enumerate() {
         if byte_pos < unit.1 {
@@ -340,6 +393,20 @@ pub(crate) fn storage_byte_to_char(s: &str, byte_pos: usize) -> usize {
 pub(crate) fn storage_substring(s: &str, from: usize, to: usize) -> Option<String> {
     if from > to {
         return None;
+    }
+
+    if !storage_has_special_units(s) {
+        let char_len = if s.is_ascii() {
+            s.len()
+        } else {
+            s.chars().count()
+        };
+        if to > char_len {
+            return None;
+        }
+        let start_byte = plain_utf8_char_to_byte(s, from);
+        let end_byte = plain_utf8_char_to_byte(s, to);
+        return Some(s[start_byte..end_byte].to_string());
     }
 
     let units = scan_storage_units(s);

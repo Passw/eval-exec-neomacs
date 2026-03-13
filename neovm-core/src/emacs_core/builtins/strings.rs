@@ -30,72 +30,78 @@ fn substring_impl(name: &str, args: &[Value], preserve_props: bool) -> EvalResul
     expect_max_args(name, args, 3)?;
     match &args[0] {
         Value::Str(src_id) => {
-            let s = with_heap(|h| h.get_string(*src_id).clone());
-            let len = storage_char_len(&s) as i64;
+            let (result, sliced_props) = with_heap(|h| {
+                let s = h.get_string(*src_id);
+                let len = storage_char_len(s) as i64;
 
-            let normalize_index = |value: &Value, default: i64| -> Result<i64, Flow> {
-                let raw = if value.is_nil() {
-                    default
-                } else {
-                    expect_int(value)?
+                let normalize_index = |value: &Value, default: i64| -> Result<i64, Flow> {
+                    let raw = if value.is_nil() {
+                        default
+                    } else {
+                        expect_int(value)?
+                    };
+                    let idx = if raw < 0 { len + raw } else { raw };
+                    if idx < 0 || idx > len {
+                        return Err(signal(
+                            "args-out-of-range",
+                            vec![args[0], args[1], args.get(2).cloned().unwrap_or(Value::Nil)],
+                        ));
+                    }
+                    Ok(idx)
                 };
-                let idx = if raw < 0 { len + raw } else { raw };
-                if idx < 0 || idx > len {
+
+                let from = if args.len() > 1 {
+                    normalize_index(&args[1], 0)?
+                } else {
+                    0
+                } as usize;
+
+                let to = if args.len() > 2 {
+                    normalize_index(&args[2], len)?
+                } else {
+                    len
+                } as usize;
+
+                if from > to {
                     return Err(signal(
                         "args-out-of-range",
-                        vec![args[0], args[1], args.get(2).cloned().unwrap_or(Value::Nil)],
+                        vec![
+                            args[0],
+                            args.get(1).cloned().unwrap_or(Value::Int(0)),
+                            args.get(2).cloned().unwrap_or(Value::Nil),
+                        ],
                     ));
                 }
-                Ok(idx)
-            };
-
-            let from = if args.len() > 1 {
-                normalize_index(&args[1], 0)?
-            } else {
-                0
-            } as usize;
-
-            let to = if args.len() > 2 {
-                normalize_index(&args[2], len)?
-            } else {
-                len
-            } as usize;
-
-            if from > to {
-                return Err(signal(
-                    "args-out-of-range",
-                    vec![
-                        args[0],
-                        args.get(1).cloned().unwrap_or(Value::Int(0)),
-                        args.get(2).cloned().unwrap_or(Value::Nil),
-                    ],
-                ));
-            }
-            let result = storage_substring(&s, from, to).ok_or_else(|| {
-                signal(
-                    "args-out-of-range",
-                    vec![
-                        args[0],
-                        args.get(1).cloned().unwrap_or(Value::Int(0)),
-                        args.get(2).cloned().unwrap_or(Value::Nil),
-                    ],
-                )
+                let result = storage_substring(s, from, to).ok_or_else(|| {
+                    signal(
+                        "args-out-of-range",
+                        vec![
+                            args[0],
+                            args.get(1).cloned().unwrap_or(Value::Int(0)),
+                            args.get(2).cloned().unwrap_or(Value::Nil),
+                        ],
+                    )
+                })?;
+                let sliced_props = if preserve_props {
+                    get_string_text_properties_table(*src_id).and_then(|src_table| {
+                        use super::super::string_escape::storage_char_to_byte;
+                        let byte_from = storage_char_to_byte(s, from);
+                        let byte_to = storage_char_to_byte(s, to);
+                        let sliced = src_table.slice(byte_from, byte_to);
+                        (!sliced.is_empty()).then_some(sliced)
+                    })
+                } else {
+                    None
+                };
+                Ok::<_, Flow>((result, sliced_props))
             })?;
-            let new_val = Value::string(&result);
+            let new_val = Value::string(result);
 
             // Preserve text properties from source string
-            if preserve_props {
-                if let Value::Str(new_id) = &new_val {
-                    if let Some(src_table) = get_string_text_properties_table(*src_id) {
-                        use super::super::string_escape::storage_char_to_byte;
-                        let byte_from = storage_char_to_byte(&s, from);
-                        let byte_to = storage_char_to_byte(&s, to);
-                        let sliced = src_table.slice(byte_from, byte_to);
-                        if !sliced.is_empty() {
-                            set_string_text_properties_table(*new_id, sliced);
-                        }
-                    }
-                }
+            if let (true, Value::Str(new_id), Some(sliced)) =
+                (preserve_props, &new_val, sliced_props)
+            {
+                set_string_text_properties_table(*new_id, sliced);
             }
 
             Ok(new_val)
@@ -208,7 +214,11 @@ pub(crate) fn builtin_concat(args: Vec<Value>) -> EvalResult {
         }
     }
 
-    let mut result = String::new();
+    let preallocated_len = args.iter().fold(0usize, |acc, arg| match arg {
+        Value::Str(id) => acc + with_heap(|h| h.get_string(*id).len()),
+        _ => acc,
+    });
+    let mut result = String::with_capacity(preallocated_len);
     // Track string sources with their byte offsets for property preservation
     let mut string_sources: Vec<(crate::gc::types::ObjId, usize)> = Vec::new();
 
@@ -216,7 +226,7 @@ pub(crate) fn builtin_concat(args: Vec<Value>) -> EvalResult {
         match arg {
             Value::Str(id) => {
                 let offset = result.len();
-                result.push_str(&with_heap(|h| h.get_string(*id).clone()));
+                with_heap(|h| result.push_str(h.get_string(*id)));
                 string_sources.push((*id, offset));
             }
             Value::Nil => {}
