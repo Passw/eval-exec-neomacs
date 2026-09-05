@@ -1,34 +1,159 @@
 name: 'Set up GNU Emacs oracle'
 description: >-
-  Install the pinned GNU Emacs that every GNU-vs-Neomacs comparison runs
-  against. Replaces the old apt emacs-nox (29.3 on ubuntu-24.04), which
-  version-skewed against the local pinned reference and the lisp tree:
-  29.3's initial-scratch-message says "visit it with \[find-file]" while
-  Emacs 31 says "visit it with `\[find-file]'" — one row that sits on every
-  pair test's initial screen. The local pinned reference is the Emacs
-  31.0.90 pretest built 2026-06-10; nix-emacs-ci publishes no pretests, so
-  this installs 31.1, the fixed release cut from the same emacs-31 branch
-  (verified to carry the same startup.el scratch message). The build is
-  minimal (no window-system, no native compilation), which matches the
-  pinned reference's no-native-comp configuration for TUI/batch oracles;
-  GUI-frame comparisons against GNU need an X-capable build, which no CI
-  profile has ever provided (emacs-nox included).
+  Install the GNU Emacs that every GNU-vs-Neomacs comparison runs against:
+  the parity reference pinned in parity-reference.toml, built from that exact
+  emacs-mirror commit. Nothing else will do. The version string is NOT an
+  identity -- two builds of 31.1 with different configure flags are different
+  oracles -- so this compiles the pinned commit with the pinned configuration
+  and then asserts that configuration at the smoke step.
+
+  The window system is load-bearing, which is the failure this action was
+  rewritten for. A TTY-only build (--without-x) lacks 107 window-system mouse
+  bindings that the GTK3 reference has -- <header-line> <touchscreen-end>,
+  <left-fringe> <wheel-down>, <left-margin> <mouse-4> and the rest. Those are
+  long keys, so they push a describe-bindings block's max key end-column into
+  a wider bucket in describe-map--align-section, and every row in that block
+  is then padded one tab-width (8 columns) differently. That single difference
+  accounted for 706 differing rows in one test, and all 20 tui shards were red
+  on every run because of it.
+
+  nix-emacs-ci publishes no pretests and purcell/setup-emacs ships a minimal
+  no-window-system build, so the reference is compiled here from source and
+  cached by commit; a dedicated ci.yml job warms that cache before the shards
+  that spawn GNU start, and a cache hit costs one restore.
 
 runs:
   using: 'composite'
   steps:
-    - name: Install GNU Emacs 31.1
-      # master 2026-09-05. Self-installs Nix only when the runner has none
-      # (MELPA jobs install their own Nix first via install-nix-action).
-      uses: purcell/setup-emacs@34c6ded44899fd1bf74d2889558befd1750e61a7
-      with:
-        version: 31.1
-
-    - name: Record and smoke the oracle build
+    - name: Read the pinned GNU reference
+      id: pin
       shell: bash
       run: |
-        # A divergence is only meaningful against a known GNU version: record
-        # it in the log, then fail at this environment seam (the check that
-        # used to live in setup-linux.sh) instead of inside an oracle test.
-        emacs --version | head -n 1
-        emacs --batch --quick --eval '(kill-emacs 0)'
+        # The action names no version of its own: parity-reference.toml is
+        # the single record of which GNU the parity numbers are about, and a
+        # re-pin there (cargo run -p xtask -- pin-reference) moves CI with it.
+        set -euo pipefail
+        pin="$GITHUB_WORKSPACE/parity-reference.toml"
+        version="$(sed -n 's/^emacs_version = "\(.*\)"$/\1/p' "$pin")"
+        commit="$(sed -n 's/^mirror_commit = "\(.*\)"$/\1/p' "$pin")"
+        if [[ ! "$version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "parity-reference.toml does not pin emacs_version and mirror_commit" >&2
+          exit 1
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "commit=$commit" >> "$GITHUB_OUTPUT"
+        # actions/cache restores as the runner user, and /opt is root's.
+        sudo mkdir -p /opt/gnu-emacs-oracle
+        sudo chown "$(id -u):$(id -g)" /opt/gnu-emacs-oracle
+
+    - name: Install the oracle's build and runtime dependencies
+      shell: bash
+      run: |
+        # Unconditional, and before the cache step, because these are needed
+        # on a cache HIT too: the oracle links libgtk-3.so.0, so a job that
+        # restores it without GTK present has an Emacs that cannot start.
+        # The action owns this list rather than scripts/ci/setup-linux.sh
+        # because three of its callers use the `ecosystem` profile, which
+        # carries no GTK at all.
+        #
+        # The X/GTK development files are also load-bearing for the BUILD:
+        # configure enables X11/GTK3 only when pkg-config finds them, and
+        # without them it still SUCCEEDS -- producing a TTY-only Emacs, which
+        # is a different oracle (107 window-system mouse bindings short, and
+        # those long keys shift every describe-bindings block one tab-width
+        # wider). The smoke step below asserts the features.
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          autoconf texinfo make gcc pkg-config git \
+          libgtk-3-dev \
+          libx11-dev libxpm-dev libxext-dev libxinerama-dev libxi-dev libxrandr-dev \
+          libtree-sitter-dev \
+          libgnutls28-dev libxml2-dev libgmp-dev libncurses-dev \
+          libcairo2-dev libharfbuzz-dev libfreetype-dev libfontconfig-dev \
+          libpng-dev libjpeg-dev libgif-dev libtiff-dev libwebp-dev \
+          librsvg2-dev liblcms2-dev zlib1g-dev
+
+    - name: Restore the cached oracle build
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: /opt/gnu-emacs-oracle
+        # Keyed on the commit and on this file, so a re-pin or a configure
+        # change rebuilds instead of serving the previous oracle.
+        key: gnu-emacs-oracle-${{ runner.os }}-${{ steps.pin.outputs.commit }}-${{ hashFiles('.github/actions/setup-gnu-emacs/action.yml') }}
+
+    - name: Build GNU Emacs from the pinned commit
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        EMACS_COMMIT: ${{ steps.pin.outputs.commit }}
+        EMACS_VERSION: ${{ steps.pin.outputs.version }}
+      run: |
+        set -euo pipefail
+        # No apt here on purpose: every caller runs
+        # `scripts/ci/setup-linux.sh oracle` first, and that profile owns the
+        # package set -- including it here would only run on a cache miss,
+        # leaving cache-hit jobs to restore a GTK-linked Emacs with no GTK to
+        # run it against.
+        src="$(mktemp -d)"
+        git -C "$src" init -q
+        # Fetch the commit itself, not the tag: the tag is documentation, the
+        # commit is the identity the parity numbers were measured against.
+        git -C "$src" fetch -q --depth 1 https://github.com/emacs-mirror/emacs.git "$EMACS_COMMIT"
+        git -C "$src" checkout -q FETCH_HEAD
+        cd "$src"
+        ./autogen.sh
+        # Mirrors the pinned reference's configure:
+        #   --with-x-toolkit=gtk3, --with-tree-sitter, native compilation off.
+        # --without-pgtk holds the window system at X11+GTK3; the pin carries
+        # GTK3/X11 and no PGTK, and configure would otherwise prefer PGTK
+        # when the Wayland headers are present.
+        # The integration switches stay off deliberately: dbus, gsettings,
+        # libsystemd, sound and sqlite3 cannot reach TUI screen output, and
+        # each one is another way for the build to fail on a runner.
+        ./configure --prefix=/opt/gnu-emacs-oracle \
+          --with-x-toolkit=gtk3 --without-pgtk \
+          --with-tree-sitter \
+          --with-native-compilation=no \
+          --with-gnutls=ifavailable --with-xml2=ifavailable \
+          --with-libgmp=ifavailable \
+          --with-sound=no --without-dbus --without-gconf --without-gsettings \
+          --without-libsystemd --without-selinux --without-gpm \
+          --without-sqlite3
+        make -j"$(nproc)"
+        make install
+        rm -rf "$src"
+
+    - name: Put the oracle on PATH and prove it is the pinned build
+      shell: bash
+      env:
+        EMACS_VERSION: ${{ steps.pin.outputs.version }}
+      run: |
+        # A divergence is only meaningful against a known GNU *configuration*,
+        # so this fails at the environment seam rather than inside an oracle
+        # test. Checking emacs-version alone is not enough: a TTY-only 31.1
+        # reports the same version and still changes every describe-bindings
+        # block. The features below are the ones that reach screen output.
+        set -euo pipefail
+        emacs=/opt/gnu-emacs-oracle/bin/emacs
+        echo "/opt/gnu-emacs-oracle/bin" >> "$GITHUB_PATH"
+        got="$("$emacs" --batch --quick --eval '(princ emacs-version)')"
+        if [[ "$got" != "$EMACS_VERSION" ]]; then
+          echo "GNU oracle reports emacs-version $got, parity-reference.toml pins $EMACS_VERSION" >&2
+          exit 1
+        fi
+        features="$("$emacs" --batch --quick --eval '(princ system-configuration-features)')"
+        echo "oracle features: $features"
+        missing=""
+        for want in X11 GTK3 TREE_SITTER PDUMPER; do
+          case " $features " in *" $want "*) ;; *) missing="$missing $want" ;; esac
+        done
+        case " $features " in *" NATIVE_COMP "*) missing="$missing -NATIVE_COMP" ;; esac
+        if [[ -n "$missing" ]]; then
+          echo "GNU oracle configuration does not match the pinned reference; missing:$missing" >&2
+          echo "The window system is required: without X11/GTK3 the oracle lacks the" >&2
+          echo "window-system mouse bindings that keep describe-bindings aligned." >&2
+          exit 1
+        fi
+        "$emacs" --version | head -n 1

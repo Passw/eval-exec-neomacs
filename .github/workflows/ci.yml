@@ -40,7 +40,21 @@ jobs:
           go-version: stable
 
       - name: Run actionlint
-        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml
+        run: |
+          # Workflows only. actionlint is a workflow linter: handed a
+          # composite action.yml it parses it AS a workflow and reports a
+          # missing "jobs" section, so the action files cannot be added to
+          # this glob. They are covered by being exercised instead -- the GNU
+          # oracle action is how CI builds its reference, so a malformed one
+          # fails the job rather than passing quietly.
+          #
+          # This lint, plus CI itself running the workflows, is what replaced
+          # 19 xtask tests that asserted on the TEXT of .github/ files. Those
+          # failed when YAML legitimately re-wrapped a line and passed when a
+          # string merely appeared in a comment; one of them demanded
+          # "--without-x", i.e. it was enforcing the exact mis-configuration
+          # it was meant to catch.
+          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml
 
       - name: Lint release shell contracts
         run: |
@@ -552,6 +566,23 @@ jobs:
     with:
       suite: core
 
+  gnu-emacs-oracle:
+    name: GNU Emacs oracle (linux x86_64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - *checkout
+
+      # Warm the per-commit cache of the pinned GNU reference once, while the
+      # runtime and test archives build, so the tui shards and the MELPA and
+      # GUI parity jobs each restore one cached build instead of compiling
+      # Emacs twenty-odd times in parallel on a cache miss.
+      - name: Install Linux system dependencies
+        run: scripts/ci/setup-linux.sh oracle
+
+      - name: Set up GNU Emacs oracle
+        uses: ./.github/actions/setup-gnu-emacs
+
   neomacs-test-runtime:
     if: ${{ !inputs.terminal_only }}
     name: Packaged Neomacs Runtime (linux x86_64)
@@ -710,7 +741,7 @@ jobs:
 
   neomacs-tui-tests:
     if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
-    needs: [neomacs-test-runtime, neomacs-workspace-test-archive]
+    needs: [neomacs-test-runtime, neomacs-workspace-test-archive, gnu-emacs-oracle]
     uses: ./.github/workflows/nextest-shards.yml
     with:
       suite: tui
@@ -718,7 +749,7 @@ jobs:
   neomacs-melpa-tests:
     name: MELPA ${{ matrix.suite }} compatibility and GNU parity (linux x86_64)
     if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
-    needs: [neomacs-test-runtime, neomacs-workspace-test-archive]
+    needs: [neomacs-test-runtime, neomacs-workspace-test-archive, gnu-emacs-oracle]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -738,10 +769,10 @@ jobs:
       NEXTEST_FILTER: ${{ matrix.filter }}
       NEOMACS_BIN: ${{ github.workspace }}/target/release/neomacs
       NEOMACS_RUNTIME_ROOT: ${{ github.workspace }}
-      NEOMACS_MELPA_ORACLE_EMACS: emacs
+      NEOMACS_MELPA_ORACLE_EMACS: /opt/gnu-emacs-oracle/bin/emacs
       NEOMACS_GUI_TEST_BACKEND: x11
       NEOMACS_GUI_TEST_BINARY: ${{ github.workspace }}/target/release/neomacs
-      NEOMACS_GUI_TEST_GNU_EMACS: emacs
+      NEOMACS_GUI_TEST_GNU_EMACS: /opt/gnu-emacs-oracle/bin/emacs
     steps:
       - *checkout
       - *prepare_workspace_tmp
@@ -848,7 +879,7 @@ jobs:
   neomacs-prefix-face-tui-parity:
     name: GNU prefix face TUI parity (linux x86_64)
     if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
-    needs: [neomacs-test-runtime, neomacs-workspace-test-archive]
+    needs: [neomacs-test-runtime, neomacs-workspace-test-archive, gnu-emacs-oracle]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -895,7 +926,7 @@ jobs:
   neomacs-gui-tests:
     name: real GUI tests (linux x86_64, X11)
     if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
-    needs: [neomacs-test-runtime, neomacs-workspace-test-archive]
+    needs: [neomacs-test-runtime, neomacs-workspace-test-archive, gnu-emacs-oracle]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
@@ -904,7 +935,7 @@ jobs:
       TMPDIR: ${{ github.workspace }}/tmp
       NEOMACS_GUI_TEST_BACKEND: x11
       NEOMACS_GUI_TEST_BINARY: ${{ github.workspace }}/target/release/neomacs
-      NEOMACS_GUI_TEST_GNU_EMACS: emacs
+      NEOMACS_GUI_TEST_GNU_EMACS: /opt/gnu-emacs-oracle/bin/emacs
     steps:
       - *checkout
       - *prepare_workspace_tmp
@@ -952,7 +983,7 @@ jobs:
   neomacs-melpa-live-canary:
     name: MELPA live ecosystem canary (linux x86_64)
     if: ${{ !inputs.terminal_only && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
-    needs: [neomacs-test-runtime, neomacs-workspace-test-archive]
+    needs: [neomacs-test-runtime, neomacs-workspace-test-archive, gnu-emacs-oracle]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -961,7 +992,7 @@ jobs:
       TMPDIR: ${{ github.workspace }}/tmp
       NEOMACS_BIN: ${{ github.workspace }}/target/release/neomacs
       NEOMACS_RUNTIME_ROOT: ${{ github.workspace }}
-      NEOMACS_MELPA_ORACLE_EMACS: emacs
+      NEOMACS_MELPA_ORACLE_EMACS: /opt/gnu-emacs-oracle/bin/emacs
     steps:
       - *checkout
       - *prepare_workspace_tmp

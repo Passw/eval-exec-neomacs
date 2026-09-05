@@ -64,6 +64,12 @@ case "$profile" in
     # runs against the pinned build installed by
     # .github/actions/setup-gnu-emacs (the apt emacs-nox 29.3 version-skewed
     # against the Emacs 31 reference the lisp tree and local pin track).
+    #
+    # The GNU oracle's own packages live in .github/actions/setup-gnu-emacs,
+    # not here: three of that action's callers use `ecosystem` rather than
+    # `oracle`, so a profile-side list would leave them restoring a GTK-linked
+    # Emacs with no GTK to run it. The action installs what it needs on every
+    # run, hit or miss.
     oracle)
         profile_packages=(libfaketime)
         requires_libfaketime=true
