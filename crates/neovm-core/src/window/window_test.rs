@@ -1167,7 +1167,10 @@ fn gui_internal_border_width_insets_root_and_minibuffer_geometry() {
     }
 
     let frame = mgr.get(fid).expect("frame");
-    assert_eq!(*frame.root_window.bounds(), Rect::new(4.0, 4.0, 92.0, 56.0));
+    assert_eq!(
+        *frame.root_window().bounds(),
+        Rect::new(4.0, 4.0, 92.0, 56.0)
+    );
     assert_eq!(
         *frame.minibuffer_leaf.as_ref().expect("minibuffer").bounds(),
         Rect::new(4.0, 60.0, 92.0, 16.0)
@@ -1191,7 +1194,7 @@ fn tty_internal_border_width_parameters_do_not_inset_geometry() {
     assert_eq!(frame.internal_border_width(), 0);
     assert_eq!(frame.frame_child_frame_border_width(), 0);
     assert_eq!(
-        *frame.root_window.bounds(),
+        *frame.root_window().bounds(),
         Rect::new(0.0, 0.0, 100.0, 64.0)
     );
     assert_eq!(
@@ -1217,7 +1220,7 @@ fn nil_window_system_parameter_does_not_make_tty_frame_graphic() {
     assert_eq!(frame.effective_window_system(), None);
     assert_eq!(frame.internal_border_width(), 0);
     assert_eq!(
-        *frame.root_window.bounds(),
+        *frame.root_window().bounds(),
         Rect::new(0.0, 0.0, 100.0, 64.0)
     );
 }
@@ -1239,7 +1242,7 @@ fn nil_internal_window_system_does_not_make_tty_frame_graphic() {
     assert_eq!(frame.effective_window_system(), None);
     assert_eq!(frame.internal_border_width(), 0);
     assert_eq!(
-        *frame.root_window.bounds(),
+        *frame.root_window().bounds(),
         Rect::new(0.0, 0.0, 100.0, 64.0)
     );
 }
@@ -1273,7 +1276,10 @@ fn gui_child_frame_border_width_acts_as_child_internal_border() {
 
     let child = mgr.get(child_id).expect("child frame");
     assert_eq!(child.internal_border_width(), 2);
-    assert_eq!(*child.root_window.bounds(), Rect::new(2.0, 2.0, 36.0, 26.0));
+    assert_eq!(
+        *child.root_window().bounds(),
+        Rect::new(2.0, 2.0, 36.0, 26.0)
+    );
 }
 
 #[test]
@@ -1300,7 +1306,10 @@ fn tty_child_frame_border_width_parameters_do_not_inset_geometry() {
     let child = mgr.get(child_id).expect("child frame");
     assert_eq!(child.internal_border_width(), 0);
     assert_eq!(child.frame_child_frame_border_width(), 0);
-    assert_eq!(*child.root_window.bounds(), Rect::new(0.0, 0.0, 40.0, 30.0));
+    assert_eq!(
+        *child.root_window().bounds(),
+        Rect::new(0.0, 0.0, 40.0, 30.0)
+    );
 }
 
 #[test]
@@ -2333,7 +2342,7 @@ fn frame_resize_pixelwise_updates_window_tree_and_invalidates_display_state() {
     assert_eq!(frame.parameter("width"), Some(Value::fixnum(40)));
     assert_eq!(frame.parameter("height"), Some(Value::fixnum(13)));
 
-    let root_bounds = *frame.root_window.bounds();
+    let root_bounds = *frame.root_window().bounds();
     assert_eq!(root_bounds, Rect::new(0.0, 0.0, 400.0, 244.0));
 
     let mini_bounds = *frame.minibuffer_leaf.as_ref().unwrap().bounds();
@@ -2369,7 +2378,7 @@ fn resize_pixelwise_minibuffer_only_does_not_add_minibuffer_line() {
     let frame = mgr.get_mut(fid).expect("frame");
     frame.set_window_system(Some(Value::symbol("x")));
     frame.char_height = 15.0;
-    let root_window_id = frame.root_window.id();
+    let root_window_id = frame.root_window().id();
     frame.minibuffer_leaf = None;
     frame.minibuffer_window = Some(root_window_id);
 
@@ -3416,7 +3425,7 @@ fn frame_resize_pixelwise_reserves_tab_bar_height_above_root_window_tree() {
 
     assert_eq!(frame.tab_bar_height, 20);
     assert_eq!(
-        *frame.root_window.bounds(),
+        *frame.root_window().bounds(),
         Rect::new(0.0, 20.0, 400.0, 224.0)
     );
     assert_eq!(
@@ -3590,7 +3599,7 @@ fn grow_mini_window_lands_on_whole_rows_of_the_current_unit() {
         "mini-window ends at the frame bottom"
     );
     assert_eq!(
-        frame.root_window.bounds().y + frame.root_window.bounds().height,
+        frame.root_window().bounds().y + frame.root_window().bounds().height,
         mini.y,
         "root window ends where the mini-window starts"
     );

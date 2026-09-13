@@ -244,7 +244,7 @@ pub fn set_window_old_point_with_marker(
 /// reflect the auto-adjusted marker positions. Only windows whose buffer
 /// matches `edited_buffer_id` need updating.
 pub fn sync_window_positions_from_markers(frame: &mut Frame, edited_buffer_id: BufferId) {
-    sync_subtree(&mut frame.root_window, edited_buffer_id);
+    sync_subtree(&mut frame.root_window_mut(), edited_buffer_id);
     if let Some(ref mut mini) = frame.minibuffer_leaf {
         sync_leaf(mini, edited_buffer_id);
     }
@@ -382,7 +382,7 @@ fn attach_cloned_subtree_independent_markers(window: &mut Window, bm: &mut Buffe
 /// `make_window`, where a live window never escapes without all three marker
 /// objects.
 pub fn attach_frame_window_position_markers(bm: &mut BufferManager, frame: &mut Frame) {
-    attach_subtree(&mut frame.root_window, bm);
+    attach_subtree(&mut frame.root_window_mut(), bm);
     if let Some(minibuffer) = frame.minibuffer_leaf.as_mut() {
         attach_window_position_markers(bm, minibuffer);
     }

@@ -4753,7 +4753,7 @@ impl Context {
         frame_id: crate::window::FrameId,
         buffer_id: crate::buffer::BufferId,
     ) {
-        let root = &mut self.frames.get_mut(frame_id).unwrap().root_window;
+        let root = &mut self.frames.get_mut(frame_id).unwrap().root_window_mut();
         debug_assert_eq!(root.buffer_id(), Some(buffer_id));
         crate::window::window_markers::attach_window_position_markers(&mut self.buffers, root);
     }

@@ -3006,10 +3006,11 @@ fn retained_display_rows_reject_restored_window_parameter_state() {
     restored_window
         .parameters_mut()
         .push((Value::symbol("indent-bars-whr"), Value::symbol("left")));
-    eval.frames
+    *eval
+        .frames
         .selected_frame_mut()
         .expect("selected frame")
-        .root_window = restored_window;
+        .root_window_mut() = restored_window;
 
     assert!(
         eval.fresh_window_display_snapshot(frame_id, window_id, buf_id)

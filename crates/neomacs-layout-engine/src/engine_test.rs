@@ -34935,7 +34935,7 @@ fn inactive_echo_area_grows_a_sub_line_mini_window_to_one_line_of_the_font() {
             .as_ref()
             .expect("own minibuffer")
             .bounds();
-        let root_bounds = frame.root_window.bounds();
+        let root_bounds = frame.root_window().bounds();
         assert_eq!(
             mini.height, unit,
             "a sub-line mini-window grows to exactly one line of the font"

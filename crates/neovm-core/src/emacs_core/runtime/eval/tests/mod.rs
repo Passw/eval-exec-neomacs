@@ -2020,7 +2020,7 @@ fn redisplay_runs_resize_mini_frame_for_minibuffer_only_frame() {
         .frames
         .get(frame_id)
         .expect("created frame")
-        .root_window
+        .root_window()
         .id();
     {
         let frame = ev.frames.get_mut(frame_id).expect("created frame");

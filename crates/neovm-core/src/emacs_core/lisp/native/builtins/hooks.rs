@@ -1192,7 +1192,7 @@ fn collect_frame_window_parameters(
     frame: &crate::window::Frame,
 ) -> HashMap<crate::window::WindowId, Vec<(Value, Value)>> {
     let mut parameters = HashMap::new();
-    collect_window_parameters(&frame.root_window, &mut parameters);
+    collect_window_parameters(&frame.root_window(), &mut parameters);
     if let Some(minibuffer) = &frame.minibuffer_leaf {
         collect_window_parameters(minibuffer, &mut parameters);
     }
@@ -1464,7 +1464,7 @@ pub(crate) fn builtin_current_window_configuration(
             root_window:
                 crate::window::window_markers::clone_window_tree_with_independent_position_markers(
                     &mut eval.buffers,
-                    &frame_state.root_window,
+                    &frame_state.root_window(),
                 ),
             selected_window: frame_state.selected_window,
             current_buffer: eval.buffers.current_buffer_id(),
@@ -1695,7 +1695,7 @@ pub(crate) fn set_window_configuration_with_options(
         prepare_reused_window_histories(eval, &mut snapshot)?;
         unshow_frame_root_buffers(eval, snapshot.frame_id);
         if let Some(frame) = eval.frames.get_mut(snapshot.frame_id) {
-            frame.root_window = snapshot.root_window;
+            *frame.root_window_mut() = snapshot.root_window;
             // GNU `Fset_window_configuration` does NOT touch
             // `frame->old_selected_window` directly — that field
             // is updated by `window_change_record` from the next

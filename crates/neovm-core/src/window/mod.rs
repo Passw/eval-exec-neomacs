@@ -3363,6 +3363,63 @@ impl FrameDivider {
         }
     }
 }
+/// A window tree: its nodes, and which of them is the root.
+///
+/// This exists to be the ONE place that knows how a tree is stored.  Today it
+/// owns the root node and the children hang off it inline
+/// (`Window::Internal { children: Vec<Window> }`); the intended change is to
+/// hold the nodes in an arena keyed by `WindowId` and make `children` a list of
+/// ids, which is GNU's shape -- windows are heap structs in a pointer graph, so
+/// a lookup is a probe rather than a walk from the root, and a deleted window
+/// keeps its struct instead of needing a side table.
+///
+/// The reason this type comes first, before that change: `Frame` is not the
+/// only owner of a tree.  `WindowConfigurationSnapshot` holds a DETACHED copy
+/// taken by `current-window-configuration` and restored later, so once children
+/// are ids the snapshot has to carry its nodes too.  Putting an arena on
+/// `Frame` alone compiles and is wrong.  With both owners behind this type, the
+/// representation change is confined to its implementation.
+#[derive(Debug, Clone)]
+pub struct WindowTree {
+    root: Window,
+}
+
+impl WindowTree {
+    pub fn new(root: Window) -> Self {
+        Self { root }
+    }
+
+    /// The root window of this tree.
+    pub fn root(&self) -> &Window {
+        &self.root
+    }
+
+    pub fn root_mut(&mut self) -> &mut Window {
+        &mut self.root
+    }
+
+    /// Find a window anywhere in this tree.
+    ///
+    /// A walk from the root today; a hash probe once the nodes live in an
+    /// arena.  Callers get the same answer either way, which is the point of
+    /// routing them through here.
+    pub fn find(&self, id: WindowId) -> Option<&Window> {
+        self.root.find(id)
+    }
+
+    pub fn find_mut(&mut self, id: WindowId) -> Option<&mut Window> {
+        self.root.find_mut(id)
+    }
+
+    /// The leaf windows of this tree.
+    pub fn leaf_ids(&self) -> Vec<WindowId> {
+        self.root.leaf_ids()
+    }
+
+    pub fn leaf_count(&self) -> usize {
+        self.root.leaf_count()
+    }
+}
 
 /// A frame (top-level window/screen).
 pub struct Frame {
@@ -3391,8 +3448,12 @@ pub struct Frame {
     /// GNU `FRAME_INITIAL_P`: bootstrap placeholder frame that exists before
     /// a real terminal or window-system frame is installed.
     pub initial: bool,
-    /// Root of the window tree.
-    pub root_window: Window,
+    /// This frame's window tree.
+    ///
+    /// Private: reach the root through [`Frame::root_window`] and windows
+    /// through [`Frame::find_window`], so that how the tree is stored stays
+    /// inside [`WindowTree`].
+    tree: WindowTree,
     /// The selected (active) window.
     pub selected_window: WindowId,
     /// The previously-selected window. GNU stores this as
@@ -3585,7 +3646,7 @@ impl Frame {
             parent_frame: Value::NIL,
             terminal_id,
             initial: false,
-            root_window,
+            tree: WindowTree::new(root_window),
             selected_window: selected,
             // GNU `make_frame_without_minibuffer` leaves
             // `old_selected_window` as Qnil. The first
@@ -3764,7 +3825,7 @@ impl Frame {
 
     /// Replace all leaf window buffer bindings for `old_id` with `new_id`.
     pub fn replace_buffer_bindings(&mut self, old_id: BufferId, new_id: BufferId) {
-        self.root_window.replace_buffer_id(old_id, new_id);
+        self.root_window_mut().replace_buffer_id(old_id, new_id);
         if let Some(minibuffer_leaf) = self.minibuffer_leaf.as_mut() {
             minibuffer_leaf.replace_buffer_id(old_id, new_id);
         }
@@ -4131,12 +4192,12 @@ impl Frame {
 
     pub fn sync_window_area_bounds(&mut self) {
         let root_bounds = self.window_text_area_bounds();
-        resize_window_subtree(&mut self.root_window, root_bounds);
-        sync_window_character_edges_from_bounds(
-            &mut self.root_window,
-            self.char_width,
-            self.char_height,
-        );
+        // Copy the cell metrics out first: the calls below borrow the tree
+        // mutably, and reading `self.char_*` through that borrow is what the
+        // old direct field access did not have to worry about.
+        let (char_width, char_height) = (self.char_width, self.char_height);
+        resize_window_subtree(self.root_window_mut(), root_bounds);
+        sync_window_character_edges_from_bounds(self.root_window_mut(), char_width, char_height);
 
         self.reposition_minibuffer_below_root();
     }
@@ -4151,19 +4212,20 @@ impl Frame {
     /// retains its initial `(0, 0)` root until a reconciliation point occurs.
     pub fn reconcile_restored_window_configuration_geometry(&mut self) {
         let root_bounds = self.window_text_area_bounds_with_chrome(true);
-        resize_window_subtree(&mut self.root_window, root_bounds);
-        self.root_window.set_left_col(0);
-        self.root_window.set_top_line(self.frame_top_margin());
-        sync_window_character_edges_from_bounds(
-            &mut self.root_window,
-            self.char_width,
-            self.char_height,
-        );
+        // Everything read off `self` is gathered before the tree is borrowed
+        // mutably; each was previously a direct field read that could sit
+        // inside the same expression.
+        let top_margin = self.frame_top_margin();
+        let (char_width, char_height) = (self.char_width, self.char_height);
+        resize_window_subtree(self.root_window_mut(), root_bounds);
+        self.root_window_mut().set_left_col(0);
+        self.root_window_mut().set_top_line(top_margin);
+        sync_window_character_edges_from_bounds(self.root_window_mut(), char_width, char_height);
         self.reposition_minibuffer_below_root();
     }
 
     pub fn reposition_minibuffer_below_root(&mut self) {
-        let root_bounds = *self.root_window.bounds();
+        let root_bounds = *self.root_window().bounds();
         // GNU `resize_frame_windows` / `Fwindow_resize_apply_total` place the
         // minibuffer's character-line edge directly below the root:
         // `m->top_line = r->top_line + r->total_lines` (window.c:5127/5026).
@@ -4172,7 +4234,7 @@ impl Frame {
         // height in batch), that sum collapses to the root's *pixel* bottom --
         // the minibuffer sits below the margin and so carries no offset, its
         // character-line top equalling its pixel row.
-        let root_left_col = self.root_window.left_col();
+        let root_left_col = self.root_window().left_col();
         let char_h = self.char_height.max(1.0);
         let mini_top_line = ((root_bounds.y + root_bounds.height) / char_h).round() as i64;
         if let Some(mini) = self.minibuffer_leaf.as_mut() {
@@ -4192,7 +4254,7 @@ impl Frame {
             mini.invalidate_display_state();
         }
 
-        self.root_window.invalidate_display_state();
+        self.root_window_mut().invalidate_display_state();
         self.redisplay_cache.clear();
     }
 
@@ -4302,7 +4364,7 @@ impl Frame {
 
     /// Find a window by ID.
     pub fn find_window(&self, id: WindowId) -> Option<&Window> {
-        if let Some(window) = self.root_window.find(id) {
+        if let Some(window) = self.root_window().find(id) {
             return Some(window);
         }
         self.minibuffer_leaf.as_ref().and_then(|window| {
@@ -4321,7 +4383,7 @@ impl Frame {
     /// deliberately degenerate tree.
     fn leaf_window_paths(&self, generation: u64) -> Vec<(WindowId, WindowTreePath)> {
         let mut paths = Vec::new();
-        collect_leaf_window_paths(&self.root_window, generation, &mut Vec::new(), &mut paths);
+        collect_leaf_window_paths(&self.root_window(), generation, &mut Vec::new(), &mut paths);
         if let Some(minibuffer) = self.minibuffer_leaf.as_ref() {
             paths.push((
                 minibuffer.id(),
@@ -4340,7 +4402,7 @@ impl Frame {
         let window = match &path.route {
             WindowTreeRoute::Minibuffer => self.minibuffer_leaf.as_ref()?,
             WindowTreeRoute::Root(route) => {
-                let mut window = &self.root_window;
+                let mut window = self.root_window();
                 for index in route {
                     let Window::Internal { children, .. } = window else {
                         return None;
@@ -4354,6 +4416,15 @@ impl Frame {
     }
 
     /// Find a mutable window by ID.
+    /// The root of this frame's window tree.
+    pub fn root_window(&self) -> &Window {
+        self.tree.root()
+    }
+
+    pub fn root_window_mut(&mut self) -> &mut Window {
+        self.tree.root_mut()
+    }
+
     /// The leaf windows of the root subtree, WITHOUT the minibuffer.
     ///
     /// The companion to [`Frame::all_leaf_ids`], and the distinction is real:
@@ -4362,7 +4433,7 @@ impl Frame {
     /// keeps a caller from expressing the choice by reaching into
     /// `root_window` and thereby depending on how the tree is stored.
     pub fn root_leaf_ids(&self) -> Vec<WindowId> {
-        self.root_window.leaf_ids()
+        self.root_window().leaf_ids()
     }
 
     /// Every leaf window on this frame, the minibuffer included.
@@ -4372,7 +4443,7 @@ impl Frame {
     /// knowledge of where the minibuffer lives, and the same duplication
     /// `find_window` already absorbs for lookups.
     pub fn all_leaf_ids(&self) -> Vec<WindowId> {
-        let mut ids = self.root_window.leaf_ids();
+        let mut ids = self.root_window().leaf_ids();
         if let Some(mini) = &self.minibuffer_leaf {
             ids.push(mini.id());
         }
@@ -4380,7 +4451,11 @@ impl Frame {
     }
 
     pub fn find_window_mut(&mut self, id: WindowId) -> Option<&mut Window> {
-        if let Some(window) = self.root_window.find_mut(id) {
+        // `self.tree` rather than `self.root_window_mut()`: the accessor
+        // borrows all of `self`, which would keep the tree borrow alive across
+        // the `minibuffer_leaf` arm below.  Naming the field lets the borrow
+        // checker split the two, exactly as the old direct field access did.
+        if let Some(window) = self.tree.find_mut(id) {
             return Some(window);
         }
         self.minibuffer_leaf.as_mut().and_then(|window| {
@@ -4394,7 +4469,7 @@ impl Frame {
 
     /// All leaf window IDs.
     pub fn window_list(&self) -> Vec<WindowId> {
-        self.root_window.leaf_ids()
+        self.root_window().leaf_ids()
     }
 
     fn live_window_ids_with_minibuffer(&self) -> Vec<WindowId> {
@@ -4407,12 +4482,12 @@ impl Frame {
 
     /// Number of visible windows (leaves).
     pub fn window_count(&self) -> usize {
-        self.root_window.leaf_count()
+        self.root_window().leaf_count()
     }
 
     /// Find which window is at pixel coordinates.
     pub fn window_at(&self, px: f32, py: f32) -> Option<WindowId> {
-        self.root_window.window_at(px, py)
+        self.root_window().window_at(px, py)
     }
 
     /// Columns (based on default char width).
@@ -4831,7 +4906,7 @@ impl Frame {
         self.height = height;
         self.sync_window_area_bounds();
         if horizontal_geometry_changed {
-            self.root_window
+            self.root_window_mut()
                 .invalidate_automatic_hscroll_for_geometry_change();
             if let Some(minibuffer) = self.minibuffer_leaf.as_mut() {
                 minibuffer.invalidate_automatic_hscroll_for_geometry_change();
@@ -4874,7 +4949,7 @@ impl Frame {
                 Value::fixnum(text_lines),
             );
         } else {
-            let root_height = self.root_window.bounds().height;
+            let root_height = self.root_window().bounds().height;
             let text_lines = (root_height / char_height).floor().max(1.0) as i64;
             // GNU FRAME_LINES includes the entire minibuffer allocation. A
             // grown minibuffer redistributes the text area without losing rows.
@@ -4952,7 +5027,7 @@ impl Frame {
             }
         }
 
-        sync_window(&mut self.root_window, buffers, char_width, char_height);
+        sync_window(self.root_window_mut(), buffers, char_width, char_height);
         if let Some(minibuffer) = self.minibuffer_leaf.as_mut() {
             sync_window(minibuffer, buffers, char_width, char_height);
         }
@@ -5673,7 +5748,9 @@ impl FrameManager {
         self.frames
             .values()
             .map(|frame| {
-                frame.root_window.buffer_window_count(buffers, root_buffer)
+                frame
+                    .root_window()
+                    .buffer_window_count(buffers, root_buffer)
                     + frame
                         .minibuffer_leaf
                         .as_ref()
@@ -6239,11 +6316,11 @@ impl FrameManager {
         // GNU decides "interpose a new parent" vs "splice into the existing
         // combination" *before* touching the tree, from the dynamic variable
         // plus the target's position in it (`src/window.c:5423-5431`).
-        let parent = parent_combination_of(&frame.root_window, window_id)?;
+        let parent = parent_combination_of(&frame.root_window(), window_id)?;
         let attachment = SplitAttachment::decide(combination_limit, parent, direction);
 
         split_window_in_tree(
-            &mut frame.root_window,
+            &mut frame.root_window_mut(),
             window_id,
             direction,
             internal_id,
@@ -6303,7 +6380,7 @@ impl FrameManager {
                 window.set_new_normal(new_normal);
             }
         }
-        let parent_id = find_parent_in_tree(&frame.root_window, new_window_id)?;
+        let parent_id = find_parent_in_tree(&frame.root_window(), new_window_id)?;
         let horflag = matches!(direction, SplitDirection::Horizontal);
         let parent = frame.find_window_mut(parent_id)?;
         window_resize_apply(parent, horflag, 1.0, 1.0);
@@ -6333,7 +6410,7 @@ impl FrameManager {
         let Some(frame) = self.frames.get_mut(&frame_id) else {
             return false;
         };
-        if frame.root_window.leaf_count() <= 1 {
+        if frame.root_window().leaf_count() <= 1 {
             return false; // Can't delete last window
         }
 
@@ -6345,7 +6422,8 @@ impl FrameManager {
         let deletion_record = Self::deletion_record(frame.find_window(window_id));
         // A promotion at the very top has no grandparent to merge into, so the
         // outcome collapses to "was it removed" here.
-        let removed = delete_window_in_tree(&mut frame.root_window, window_id, resize).removed();
+        let removed =
+            delete_window_in_tree(&mut frame.root_window_mut(), window_id, resize).removed();
         if removed {
             self.deleted_windows.insert(window_id, deletion_record);
             self.deleted_window_parameters
@@ -6366,7 +6444,7 @@ impl FrameManager {
             // by `window_change_record` (GNU
             // `src/window.c:3954-3990`) at redisplay time, not
             // immediately on deletion.
-            if let Some(first) = frame.root_window.leaf_ids().first() {
+            if let Some(first) = frame.root_window().leaf_ids().first() {
                 frame.selected_window = *first;
             }
         }
@@ -6395,7 +6473,7 @@ impl FrameManager {
         let Some(frame) = self.frames.get_mut(&frame_id) else {
             return false;
         };
-        let Some(root) = frame.root_window.find(root_id) else {
+        let Some(root) = frame.root_window().find(root_id) else {
             return false;
         };
         let Some(mut replacement) = root.find(window_id).cloned() else {
@@ -6439,12 +6517,12 @@ impl FrameManager {
         }
         replacement.invalidate_display_state();
 
-        let Some(root) = frame.root_window.find_mut(root_id) else {
+        let Some(root) = frame.root_window_mut().find_mut(root_id) else {
             return false;
         };
         *root = replacement;
 
-        if let Some(kept_subtree) = frame.root_window.find(window_id)
+        if let Some(kept_subtree) = frame.root_window().find(window_id)
             && kept_subtree.find(frame.selected_window).is_none()
             && let Some(first) = kept_subtree.leaf_ids().first()
         {
@@ -7583,7 +7661,7 @@ pub fn window_parent_id(frame: &Frame, window_id: WindowId) -> Option<WindowId> 
     if frame.minibuffer_window == Some(window_id) {
         return None;
     }
-    find_parent_in_tree(&frame.root_window, window_id)
+    find_parent_in_tree(&frame.root_window(), window_id)
 }
 
 /// Return the first child of WINDOW-ID when it is combined in DIRECTION.
@@ -7595,7 +7673,7 @@ pub fn window_first_child_id(
     if frame.minibuffer_window == Some(window_id) {
         return None;
     }
-    find_first_child_in_tree(&frame.root_window, window_id, direction)
+    find_first_child_in_tree(&frame.root_window(), window_id, direction)
 }
 
 /// Return the next sibling of WINDOW-ID, if any.
@@ -7603,10 +7681,10 @@ pub fn window_next_sibling_id(frame: &Frame, window_id: WindowId) -> Option<Wind
     if frame.minibuffer_window == Some(window_id) {
         return None;
     }
-    if frame.root_window.id() == window_id && frame.minibuffer_leaf.is_some() {
+    if frame.root_window().id() == window_id && frame.minibuffer_leaf.is_some() {
         return frame.minibuffer_window;
     }
-    find_sibling_in_tree(&frame.root_window, window_id, true)
+    find_sibling_in_tree(&frame.root_window(), window_id, true)
 }
 
 /// Return the previous sibling of WINDOW-ID, if any.
@@ -7615,9 +7693,9 @@ pub fn window_prev_sibling_id(frame: &Frame, window_id: WindowId) -> Option<Wind
         return frame
             .minibuffer_leaf
             .as_ref()
-            .map(|_| frame.root_window.id());
+            .map(|_| frame.root_window().id());
     }
-    find_sibling_in_tree(&frame.root_window, window_id, false)
+    find_sibling_in_tree(&frame.root_window(), window_id, false)
 }
 
 /// Apply pixel-based resize values to a window tree.
@@ -8080,7 +8158,7 @@ impl GcTrace for FrameManager {
                     roots.extend(snapshot.chrome_strings.iter().map(|source| source.value()));
                 }
             }
-            frame.root_window.trace_roots(roots);
+            frame.root_window().trace_roots(roots);
             if let Some(mb) = &frame.minibuffer_leaf {
                 mb.trace_roots(roots);
             }

@@ -600,7 +600,7 @@ fn collect_live_window_layout_inputs(
             cursor_effect,
             font_sizing,
         )?;
-        let root_bounds = live_frame.root_window.bounds();
+        let root_bounds = live_frame.root_window().bounds();
         (
             super::neovm_bridge::frame_params_from_neovm(
                 live_frame,

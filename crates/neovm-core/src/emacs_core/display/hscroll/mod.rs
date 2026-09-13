@@ -387,7 +387,7 @@ pub(crate) fn update_auto_hscroll_before_redisplay(ctx: &mut Context) {
 
         for win_id in leaf_ids {
             let window = frame
-                .root_window
+                .root_window()
                 .find(win_id)
                 .or_else(|| frame.minibuffer_leaf.as_ref().filter(|m| m.id() == win_id));
             let Some(window) = window else {

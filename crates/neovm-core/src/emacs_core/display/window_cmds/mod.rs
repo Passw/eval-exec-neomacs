@@ -1209,7 +1209,7 @@ fn ensure_selected_frame_id_in_state_with_policy(
         // later in GNU.  DIVERGENCES.md 157.
         // The root window covers the 24-line text area (not the minibuffer).
         frame
-            .root_window
+            .root_window_mut()
             .set_bounds(Rect::new(0.0, 0.0, 80.0, 24.0));
         if let Some(Window::Leaf {
             window_start,
@@ -1335,7 +1335,7 @@ pub(crate) fn window_line_wrap(
     }
 
     let root_wid = match eval.frames.get(fid) {
-        Some(frame) => frame.root_window.id(),
+        Some(frame) => frame.root_window().id(),
         None => return wrapped,
     };
     let window_cols =
@@ -2003,7 +2003,7 @@ pub(crate) fn builtin_frame_root_window(
     let frame = frames
         .get(fid)
         .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
-    Ok(window_value(frame.root_window.id()))
+    Ok(window_value(frame.root_window().id()))
 }
 /// `(minibuffer-window &optional FRAME)` -> minibuffer window of FRAME.
 pub(crate) fn builtin_minibuffer_window(
@@ -4457,7 +4457,7 @@ pub(crate) fn builtin_delete_other_windows_internal(
         .get(fid)
         .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
     let root_wid = if args.get(1).is_none_or(|root| root.is_nil()) {
-        frame.root_window.id()
+        frame.root_window().id()
     } else {
         let root_wid = resolve_window_object_id_with_pred_in_state(
             frames,
@@ -6455,10 +6455,10 @@ pub(crate) fn make_frame_plain_on_terminal(
                 }
                 ChildMinibuffer::Only => {
                     frame.minibuffer_leaf = None;
-                    frame.minibuffer_window = Some(frame.root_window.id());
+                    frame.minibuffer_window = Some(frame.root_window().id());
                     frame.no_split = true;
                     if let Some(minibuffer_buffer_id) = minibuffer_buffer_id
-                        && let Window::Leaf { buffer_id, .. } = &mut frame.root_window
+                        && let Window::Leaf { buffer_id, .. } = frame.root_window_mut()
                     {
                         *buffer_id = minibuffer_buffer_id;
                     }
@@ -6967,7 +6967,7 @@ pub(crate) fn x_create_frame_impl(
             }
             ChildMinibuffer::Only => {
                 frame.minibuffer_leaf = None;
-                frame.minibuffer_window = Some(frame.root_window.id());
+                frame.minibuffer_window = Some(frame.root_window().id());
                 frame.no_split = true;
             }
             ChildMinibuffer::Own => {}
@@ -6977,7 +6977,7 @@ pub(crate) fn x_create_frame_impl(
         } else {
             current_buffer_id
         };
-        if let Window::Leaf { buffer_id, .. } = &mut frame.root_window {
+        if let Window::Leaf { buffer_id, .. } = frame.root_window_mut() {
             *buffer_id = root_buffer_id;
         }
         if let Some(minibuffer_leaf) = frame.minibuffer_leaf.as_mut() {
@@ -7509,13 +7509,13 @@ pub(crate) fn builtin_window_resize_apply(
     let ch = frame.char_height;
 
     // Validate: root's new_pixel must match the frame dimension.
-    if !crate::window::window_resize_check(&frame.root_window, horflag) {
+    if !crate::window::window_resize_check(&frame.root_window(), horflag) {
         return Ok(Value::NIL);
     }
 
     // Check root's new_pixel matches frame size.
-    let root_new = frame.root_window.new_pixel().unwrap_or_else(|| {
-        let b = frame.root_window.bounds();
+    let root_new = frame.root_window().new_pixel().unwrap_or_else(|| {
+        let b = frame.root_window().bounds();
         if horflag {
             b.width as i64
         } else {
@@ -7523,9 +7523,9 @@ pub(crate) fn builtin_window_resize_apply(
         }
     });
     let frame_dim = if horflag {
-        frame.root_window.bounds().width as i64
+        frame.root_window().bounds().width as i64
     } else {
-        frame.root_window.bounds().height as i64
+        frame.root_window().bounds().height as i64
     };
     if root_new != frame_dim {
         return Ok(Value::NIL);
@@ -7533,7 +7533,7 @@ pub(crate) fn builtin_window_resize_apply(
 
     // Apply. The recursive walk reads new_pixel directly from each
     // node now (audit Structural 1).
-    crate::window::window_resize_apply(&mut frame.root_window, horflag, cw, ch);
+    crate::window::window_resize_apply(&mut frame.root_window_mut(), horflag, cw, ch);
 
     // Recalculate minibuffer position after tree resize.
     frame.recalculate_minibuffer_bounds();
@@ -7572,18 +7572,20 @@ pub(crate) fn builtin_window_resize_apply_total(
     // pixel top stays 0. The recursive pass then flows the char edges to
     // children.
     let top_margin = frame.frame_top_margin();
-    frame.root_window.set_left_col(0);
-    frame.root_window.set_top_line(top_margin);
-    crate::window::window_resize_apply_total(&mut frame.root_window, horflag, cw, ch);
+    frame.root_window_mut().set_left_col(0);
+    frame.root_window_mut().set_top_line(top_margin);
+    crate::window::window_resize_apply_total(&mut frame.root_window_mut(), horflag, cw, ch);
 
     // Handle minibuffer window — its `new_total` lives on the
     // minibuffer leaf itself now.
+    // Read the root's bounds BEFORE the minibuffer arm takes its mutable
+    // borrow of the frame; it is a pure read, so hoisting it is free.
+    let root_bounds = *frame.root_window().bounds();
     if !horflag
         && frame.minibuffer_window.is_some()
         && let Some(mb) = frame.minibuffer_leaf.as_mut()
         && let Some(new_total) = mb.new_total()
     {
-        let root_bounds = *frame.root_window.bounds();
         let mb_top = root_bounds.y + root_bounds.height;
         let mb_bounds = *mb.bounds();
         let new_h = new_total.max(0) as f32 * ch;

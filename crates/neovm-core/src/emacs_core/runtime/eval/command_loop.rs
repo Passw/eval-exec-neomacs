@@ -1657,7 +1657,7 @@ impl Context {
             .filter_map(|frame_id| {
                 self.frames.get(frame_id).and_then(|frame| {
                     (frame.visibility.is_visible()
-                        && frame.minibuffer_window == Some(frame.root_window.id()))
+                        && frame.minibuffer_window == Some(frame.root_window().id()))
                     .then_some(Value::make_frame(frame_id.0))
                 })
             })

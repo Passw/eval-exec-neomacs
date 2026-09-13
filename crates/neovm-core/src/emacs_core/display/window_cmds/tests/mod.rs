@@ -6185,7 +6185,7 @@ fn tty_child_frame_accepts_text_pixel_size_parameters() {
     assert_eq!(child_frame.parameter("width"), Some(Value::fixnum(17)));
     assert_eq!(child_frame.parameter("height"), Some(Value::fixnum(4)));
     assert_eq!(
-        *child_frame.root_window.bounds(),
+        *child_frame.root_window().bounds(),
         crate::window::Rect::new(0.0, 0.0, 17.0, 4.0)
     );
 }
@@ -6237,7 +6237,7 @@ fn modify_frame_parameters_accepts_text_pixel_size_on_tty_child_frame() {
     assert_eq!(child_frame.parameter("width"), Some(Value::fixnum(91)));
     assert_eq!(child_frame.parameter("height"), Some(Value::fixnum(18)));
     assert_eq!(
-        *child_frame.root_window.bounds(),
+        *child_frame.root_window().bounds(),
         crate::window::Rect::new(0.0, 0.0, 91.0, 18.0)
     );
 }
@@ -6283,7 +6283,7 @@ fn window_text_pixel_size_uses_supplied_child_window_frame() {
     let child_id = crate::window::FrameId(child.as_frame_id().expect("child frame"));
     let child_window = {
         let frame = ev.frames.get_mut(child_id).expect("child frame");
-        let child_window = frame.root_window.id();
+        let child_window = frame.root_window().id();
         frame
             .find_window_mut(child_window)
             .expect("child root window")
@@ -6587,7 +6587,7 @@ fn x_create_frame_root_window_positions_follow_buffer_edits() {
         let child = ev.frames.get_mut(child_id).expect("child frame");
         crate::window::window_markers::set_window_point_with_marker(
             &mut ev.buffers,
-            &mut child.root_window,
+            &mut child.root_window_mut(),
             old_end,
         );
     }
@@ -6609,7 +6609,7 @@ fn x_create_frame_root_window_positions_follow_buffer_edits() {
         point,
         position_markers,
         ..
-    } = &child.root_window
+    } = &child.root_window()
     else {
         panic!("fresh frame root must be a live leaf window");
     };
@@ -6705,7 +6705,7 @@ fn x_create_frame_root_window_position_markers_survive_garbage_collection() {
     ev.sync_window_positions(minibuffer);
 
     let child = ev.frames.get(child_id).expect("child frame");
-    let crate::window::Window::Leaf { point, .. } = &child.root_window else {
+    let crate::window::Window::Leaf { point, .. } = &child.root_window() else {
         panic!("child root must remain a live leaf window");
     };
     assert_eq!(
@@ -6924,7 +6924,7 @@ fn x_create_frame_accepts_text_pixel_size_on_gui_child_frame() {
     assert_eq!(child.height, 82);
     assert_eq!(child.internal_border_width(), 2);
     assert_eq!(
-        *child.root_window.bounds(),
+        *child.root_window().bounds(),
         crate::window::Rect::new(2.0, 2.0, 216.0, 78.0)
     );
 }
@@ -6975,7 +6975,7 @@ fn modify_frame_parameters_resizes_gui_child_frame_text_pixels() {
     assert_eq!(child.height, 82);
     assert_eq!(child.internal_border_width(), 2);
     assert_eq!(
-        *child.root_window.bounds(),
+        *child.root_window().bounds(),
         crate::window::Rect::new(2.0, 2.0, 190.0, 78.0)
     );
 }
@@ -7310,7 +7310,7 @@ fn x_create_frame_reserves_tab_bar_space_above_root_window() {
 
     assert_eq!(frame.tab_bar_height, 16);
     assert_eq!(
-        *frame.root_window.bounds(),
+        *frame.root_window().bounds(),
         crate::window::Rect::new(0.0, 16.0, 640.0, 368.0)
     );
     assert_eq!(
@@ -8514,7 +8514,7 @@ fn modify_frame_parameters_tab_bar_lines_reflows_root_window_tree() {
     let frame = ev.frames.get(fid).expect("frame should exist");
     assert_eq!(frame.tab_bar_height, 20);
     assert_eq!(
-        *frame.root_window.bounds(),
+        *frame.root_window().bounds(),
         crate::window::Rect::new(0.0, 20.0, 800.0, 564.0)
     );
     assert_eq!(
@@ -8550,7 +8550,7 @@ fn modify_frame_parameters_tool_bar_lines_reflows_root_window_tree() {
     let frame = ev.frames.get(fid).expect("frame should exist");
     assert_eq!(frame.tool_bar_height, 40);
     assert_eq!(
-        *frame.root_window.bounds(),
+        *frame.root_window().bounds(),
         crate::window::Rect::new(0.0, 40.0, 800.0, 544.0)
     );
     assert_eq!(
@@ -8677,11 +8677,11 @@ fn x_create_frame_minibuffer_only_uses_root_as_minibuffer() {
     .expect("x-create-frame");
     let child_id = crate::window::FrameId(child.as_frame_id().expect("child frame"));
     let child_frame = ev.frames.get(child_id).expect("child frame");
-    let root_window_id = child_frame.root_window.id();
+    let root_window_id = child_frame.root_window().id();
 
     assert!(child_frame.minibuffer_leaf.is_none());
     assert_eq!(child_frame.minibuffer_window, Some(root_window_id));
-    let crate::window::Window::Leaf { buffer_id, .. } = &child_frame.root_window else {
+    let crate::window::Window::Leaf { buffer_id, .. } = &child_frame.root_window() else {
         panic!("child frame root must be a leaf window");
     };
     assert!(

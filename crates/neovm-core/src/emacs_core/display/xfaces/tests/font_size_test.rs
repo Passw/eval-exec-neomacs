@@ -303,7 +303,7 @@ fn default_face_font_change_resizes_mini_window_to_one_line_of_the_new_font() {
         .as_ref()
         .expect("own minibuffer")
         .bounds();
-    let root = frame.root_window.bounds();
+    let root = frame.root_window().bounds();
     assert_eq!(
         mini.height, 18.0,
         "minibuffer window is one line of the new font (was 11px)"
@@ -410,7 +410,7 @@ fn inhibited_font_resize_preserves_grown_minibuffer_pixel_height() {
         "inhibited font changes preserve allocated pixels"
     );
     assert_eq!(
-        frame.root_window.bounds().y + frame.root_window.bounds().height,
+        frame.root_window().bounds().y + frame.root_window().bounds().height,
         mini.y
     );
     assert_eq!(mini.y + mini.height, frame.height as f32);
@@ -448,7 +448,7 @@ fn default_face_font_change_resyncs_a_frame_without_its_own_mini_window() {
     let frame = eval.frames.get(frame_id).expect("selected frame");
     assert_eq!(frame.char_height, 18.0);
     assert!(frame.minibuffer_leaf.is_none());
-    let root = frame.root_window.bounds();
+    let root = frame.root_window().bounds();
     assert_eq!(
         root.y + root.height,
         430.0,

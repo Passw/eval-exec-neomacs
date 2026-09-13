@@ -5000,7 +5000,7 @@ fn bootstrap_buffers_with_font(
             window_start,
             point,
             ..
-        } = &mut frame.root_window
+        } = frame.root_window_mut()
         {
             *buffer_id = scratch_id;
             *window_start = LispCharPos1::ONE;
@@ -5045,7 +5045,7 @@ fn bootstrap_buffers_with_font(
     if let Some(frame) = eval.frame_manager_mut().get_mut(frame_id) {
         let mini_h = frame.char_height.max(1.0);
         let mini_y = height as f32 - mini_h;
-        if let Window::Leaf { bounds, .. } = &mut frame.root_window {
+        if let Window::Leaf { bounds, .. } = frame.root_window_mut() {
             bounds.height = mini_y;
         }
         if let Some(mini_leaf) = &mut frame.minibuffer_leaf

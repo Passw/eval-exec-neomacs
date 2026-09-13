@@ -2331,10 +2331,10 @@ pub fn collect_layout_params_with_font_sizing(
         tracing::debug!(
             "collect_layout_params: {} leaf windows, root bounds=({},{} {}x{})",
             window_params.len(),
-            frame.root_window.bounds().x,
-            frame.root_window.bounds().y,
-            frame.root_window.bounds().width,
-            frame.root_window.bounds().height,
+            frame.root_window().bounds().x,
+            frame.root_window().bounds().y,
+            frame.root_window().bounds().width,
+            frame.root_window().bounds().height,
         );
     }
 

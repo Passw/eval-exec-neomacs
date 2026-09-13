@@ -17,7 +17,7 @@ fn collect_layout_params_marks_minibuffer_only_root() {
             .frame_manager_mut()
             .get_mut(frame_id)
             .expect("frame");
-        let root_window_id = frame.root_window.id();
+        let root_window_id = frame.root_window().id();
         frame.minibuffer_leaf = None;
         frame.minibuffer_window = Some(root_window_id);
     }
