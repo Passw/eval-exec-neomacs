@@ -1131,6 +1131,15 @@ fn global_symbol_registry() -> &'static RwLock<SymbolRegistry> {
     GLOBAL_SYMBOL_REGISTRY.get_or_init(|| RwLock::new(SymbolRegistry::new()))
 }
 
+/// The epoch every thread-local symbol cache validates against: bumped
+/// whenever the canonical name -> symbol mapping can have changed (a new
+/// canonical symbol, an unintern, a symbol-table load). Exposed so caches
+/// outside this module — `TaggedValue::subr_from_sym_id`'s memo — can hang off
+/// the same invalidation.
+pub(crate) fn symbol_registry_epoch_value() -> u64 {
+    symbol_registry_epoch().load(Ordering::Acquire)
+}
+
 fn symbol_registry_epoch() -> &'static AtomicU64 {
     static SYMBOL_REGISTRY_EPOCH: AtomicU64 = AtomicU64::new(0);
     &SYMBOL_REGISTRY_EPOCH

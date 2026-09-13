@@ -10,9 +10,15 @@
 //! * `Op::CallBuiltin` -- see `vm_special_builtin_ids`
 //! * the arithmetic opcodes (`74ffad169`)
 //! * `aset_for_jit` and the JIT builtin entries (`30292177e`)
+//! * `Op::Aset`'s redefinition probe -- it passed the LITERAL "aset" to a
+//!   helper that resolved it, so the literal check below could not see it
 //!
 //! The first three were each fixed by someone who wrote down the lesson, and
 //! it came back anyway. This is that lesson as a test.
+//!
+//! The fifth got past the literal check because the name travelled through a
+//! `&str` PARAMETER, so the count pin below covers the other half: any new
+//! resolver call site in the VM has to be argued for.
 
 macro_rules! hot_dispatch_sources {
     ($($path:literal),+ $(,)?) => {
@@ -72,5 +78,30 @@ fn only_the_vm_special_fallback_round_trips_an_id_through_its_name() {
         "{path} has {round_trips} `SymId -> name -> SymId` round trips; exactly one \
          is sanctioned (the VM-special fallback in `dispatch_vm_builtin_id`).\n\
          Callers that already hold a `SymId` must use `dispatch_vm_builtin_id`."
+    );
+}
+
+#[test]
+fn the_vm_resolves_a_builtin_name_on_exactly_one_path() {
+    // The literal check above cannot see a name that reaches the resolver
+    // through a parameter -- which is how `Op::Aset` paid an interner lookup
+    // per opcode for years: it called
+    // `maybe_call_named_function_cell(func, "aset", ..)` and the helper did the
+    // `builtin_name_id`. So pin the number of CALL sites too; a new one is then
+    // a deliberate act with a test to update.
+    //
+    // Sanctioned: exactly one CALL, `call_named_builtin`'s by-name sibling,
+    // documented as the cold entry for callers that genuinely only have a name.
+    // Matched in the `Self::`-qualified form so the definition and the doc
+    // comments that name it do not count.
+    let (path, source) = hot_dispatch_files()[0];
+    let uses = source
+        .matches(concat!("Self::builtin_name", "_id("))
+        .count();
+    assert_eq!(
+        uses, 1,
+        "{path} has {uses} `Self::builtin_name_id(` call sites; exactly one is \
+         sanctioned (the documented by-name sibling of `call_named_builtin`).\n\
+         A hot path must take the `SymId` -- see `Vm::cached_builtin_id`."
     );
 }

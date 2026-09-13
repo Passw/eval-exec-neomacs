@@ -5292,9 +5292,12 @@ impl<'a> Vm<'a> {
                         call_args.push(vec_val);
                         call_args.push(idx_val);
                         call_args.push(val);
-                        let result = if let Some(result) = vm_try!(
-                            self.maybe_call_named_function_cell(func, "aset", call_args.clone(),)
-                        ) {
+                        let result = if let Some(result) =
+                            vm_try!(self.maybe_call_named_function_cell(
+                                func,
+                                Self::cached_builtin_id("aset", &ASET_ID),
+                                &call_args,
+                            )) {
                             result
                         } else {
                             vm_try!(builtins::builtin_aset_args(&call_args))
@@ -5609,19 +5612,27 @@ impl<'a> Vm<'a> {
         }
     }
 
+    /// `Some(result)` when `id`'s live function cell is NOT the plain builtin
+    /// the opcode would inline — a redefinition or advice — so the opcode must
+    /// dispatch through it; `None` to take the inline builtin.
+    ///
+    /// Takes the SymId, not a name: this used to resolve a `&str` through
+    /// `builtin_name_id` on EVERY call, which on `nbody` was an interner
+    /// lookup per `Op::Aset` (450K calls, 101 Ir each). The arguments come by
+    /// reference and are cloned only on the rare branch that actually calls,
+    /// instead of the caller cloning its vector for every opcode.
     fn maybe_call_named_function_cell(
         &mut self,
         func: &ByteCodeFunction,
-        name: &str,
-        args: LispArgVec,
+        id: SymId,
+        args: &LispArgVec,
     ) -> Result<Option<Value>, Flow> {
-        let id = Self::builtin_name_id(name);
         if self.named_builtin_fast_path_allowed_id(id) {
             return Ok(None);
         }
 
         let func_val = Value::from_sym_id(id);
-        self.with_frame_call_roots(func, func_val, args, |vm, args| {
+        self.with_frame_call_roots(func, func_val, args.clone(), |vm, args| {
             vm.call_function(func_val, args)
         })
         .map(Some)

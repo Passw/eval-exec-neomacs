@@ -28,6 +28,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::emacs_core::intern::{
     SymId, UNBOUND_SYM_ID, canonical_symbol_for_name, resolve_sym_lisp_string, symbol_name_id,
+    symbol_registry_epoch_value,
 };
 use crate::heap_types::LispString;
 
@@ -67,6 +68,25 @@ pub(crate) const FIXNUM_SHIFT: u32 = 2; // integer stored in bits 2..63
 
 thread_local! {
     static STATIC_SUBR_OBJECTS: RefCell<Vec<Option<TaggedValue>>> = const { RefCell::new(Vec::new()) };
+
+    /// [`TaggedValue::subr_from_sym_id`] keyed by the symbol it was ASKED
+    /// about, short-circuiting the canonicalization — see that function.
+    static SUBR_BY_SYM: RefCell<Vec<Option<TaggedValue>>> = const { RefCell::new(Vec::new()) };
+    static SUBR_BY_SYM_EPOCH: std::cell::Cell<u64> = const { std::cell::Cell::new(u64::MAX) };
+}
+
+/// Drop the `subr_from_sym_id` memo if the canonical name -> symbol mapping
+/// moved under it. Everything the memo holds is a leaked, never-moved static
+/// subr object, so only the MAPPING can go stale.
+#[inline]
+fn subr_by_sym_epoch_check() {
+    let current = symbol_registry_epoch_value();
+    SUBR_BY_SYM_EPOCH.with(|epoch| {
+        if epoch.get() != current {
+            epoch.set(current);
+            SUBR_BY_SYM.with(|cache| cache.borrow_mut().clear());
+        }
+    });
 }
 
 pub(crate) fn update_static_subr_object_entry(
@@ -335,9 +355,37 @@ impl TaggedValue {
     /// immediate values. Neomacs keeps the Rust entry point in the global subr
     /// table, while this value is the Lisp-visible `#<subr NAME>` object.
     #[inline]
+    /// The canonical subr object for `sym_id`.
+    ///
+    /// Memoized by the ASKED-ABOUT symbol, not just the canonical one. The
+    /// canonicalization behind it — `symbol_name_id` then
+    /// `canonical_symbol_for_name` — is two interner lookups, and this runs on
+    /// every arithmetic opcode the VM dispatches: on `nbody` it was 115
+    /// Ir/call over 1.74M calls, 8% of the row, to re-derive an answer that
+    /// changes only when a symbol is uninterned or renamed.
+    ///
+    /// Soundness: the memo holds static subr objects, which are leaked and
+    /// never moved, so the VALUE can never go stale; only the name -> canonical
+    /// mapping can, and that bumps `symbol_registry_epoch`, which is exactly
+    /// what the memo validates against.
     pub fn subr_from_sym_id(sym_id: crate::emacs_core::intern::SymId) -> Self {
+        subr_by_sym_epoch_check();
+        let idx = sym_id.0 as usize;
+        if let Some(value) =
+            SUBR_BY_SYM.with(|cache| cache.borrow().get(idx).and_then(|value| *value))
+        {
+            return value;
+        }
         let canonical = canonical_symbol_for_name(symbol_name_id(sym_id)).unwrap_or(sym_id);
-        canonical_subr_object(canonical)
+        let value = canonical_subr_object(canonical);
+        SUBR_BY_SYM.with(|cache| {
+            let mut cache = cache.borrow_mut();
+            if cache.len() <= idx {
+                cache.resize_with(idx + 1, || None);
+            }
+            cache[idx] = Some(value);
+        });
+        value
     }
 
     /// Create a subr (builtin function) value.
