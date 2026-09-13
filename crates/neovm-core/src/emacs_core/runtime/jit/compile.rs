@@ -829,6 +829,32 @@ pub(crate) fn profit_gate_bypassed_now() -> bool {
 }
 
 /// [`compile_bytecode_function_tiered`] with the full [`CompileRequest`].
+thread_local! {
+    /// Per-pc operand-type feedback for the body being compiled.
+    ///
+    /// A thread-local for the same reason `ACTIVE_CALL_HEAVY` is one: the
+    /// compile is synchronous on the eval thread, and the alternative is
+    /// threading a slice through four signatures (`compile_bytecode_function_inner`
+    /// -> the emit fn -> `build_leaf_fn` -> `lower_simple_op`) for a value the
+    /// whole lowering treats as ambient.
+    ///
+    /// Only the BASELINE lowering reads it. The MIR tier lowers its own IR and
+    /// can inline other functions' ops, whose pcs would index the wrong body.
+    static ACTIVE_NUMERIC_FEEDBACK: std::cell::RefCell<Vec<crate::emacs_core::jit::NumericFeedback>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Operand-type feedback recorded for the arithmetic site at `pc` of the body
+/// currently being compiled.
+pub(crate) fn active_numeric_feedback(pc: usize) -> crate::emacs_core::jit::NumericFeedback {
+    ACTIVE_NUMERIC_FEEDBACK.with(|v| {
+        v.borrow()
+            .get(pc)
+            .copied()
+            .unwrap_or(crate::emacs_core::jit::NumericFeedback::FixnumOnly)
+    })
+}
+
 pub fn compile_bytecode_function_requested(
     f: &ByteCodeFunction,
     obarray: Option<&Obarray>,
@@ -844,14 +870,30 @@ pub fn compile_bytecode_function_requested(
         BYPASS_PROFIT_GATE.with(|b| b.replace(request.bypass_profit_gate)),
         ACTIVE_CALL_HEAVY.with(|b| b.replace(call_heavy)),
     );
-    struct Restore((bool, bool));
+    // Publish this body's per-site operand types for the arithmetic lowering.
+    let outer_numeric = {
+        let rt = f.jit_runtime();
+        let seen: Vec<_> = (0..f.executable_ops().len())
+            .map(|pc| rt.numeric_feedback(pc))
+            .collect();
+        // Read once: from here the interpreter stops recording for this body.
+        rt.note_numeric_feedback_consumed();
+        ACTIVE_NUMERIC_FEEDBACK.with(|v| std::mem::replace(&mut *v.borrow_mut(), seen))
+    };
+    struct Restore(
+        (bool, bool),
+        Option<Vec<crate::emacs_core::jit::NumericFeedback>>,
+    );
     impl Drop for Restore {
         fn drop(&mut self) {
             BYPASS_PROFIT_GATE.with(|b| b.set(self.0.0));
             ACTIVE_CALL_HEAVY.with(|b| b.set(self.0.1));
+            if let Some(prev) = self.1.take() {
+                ACTIVE_NUMERIC_FEEDBACK.with(|v| *v.borrow_mut() = prev);
+            }
         }
     }
-    let _restore = Restore(outer);
+    let _restore = Restore(outer, Some(outer_numeric));
     let started = std::time::Instant::now();
     let result = compile_bytecode_function_inner(f, obarray);
     if jit_profile_path().is_some() {

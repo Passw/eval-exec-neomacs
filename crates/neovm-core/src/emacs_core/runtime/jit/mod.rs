@@ -190,6 +190,56 @@ impl CallFeedback {
     }
 }
 
+/// Operand types observed at one ARITHMETIC site — the input the lowering
+/// needs to stop emitting a fixnum guard for code that is never fixnum.
+///
+/// `lowering::stack_as_raw` guards fixnum and branches to a deopt block
+/// otherwise, so a float or bignum operand bails the whole compiled body.
+/// `nbody` gets **3.6%** from the JIT and `pidigits` gets **-6.5%** — the
+/// compiler needs to know which sites are worth lowering that way.
+///
+/// The default (`FixnumOnly`) is the zero slot, and it means exactly what the
+/// lowering already assumes, so a site that never runs or only ever sees
+/// fixnums needs no recording at all: the arithmetic opcodes record on their
+/// SLOW arm only, which they already branch to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NumericFeedback {
+    /// Never seen a non-fixnum operand pair (or never executed).
+    FixnumOnly,
+    /// Every non-fixnum pair so far was floats (fixnums alongside are fine —
+    /// they promote). Lowerable as `f64`.
+    Float,
+    /// Bignums, markers, non-numbers: nothing an unboxed lowering can take.
+    Other,
+}
+
+impl NumericFeedback {
+    /// Packed into the tag `CallFeedback` leaves reserved. A bytecode
+    /// instruction is either a call or an arithmetic op, never both, so the
+    /// two lattices never share a slot — and the encodings are chosen so that
+    /// reading one as the other still yields the SAFE answer either way
+    /// (`Megamorphic` / `Other`), rather than relying on that disjointness.
+    #[inline]
+    const fn pack(self) -> u64 {
+        match self {
+            NumericFeedback::FixnumOnly => 0b00,
+            NumericFeedback::Float => 0b0111,
+            NumericFeedback::Other => 0b1011,
+        }
+    }
+
+    #[inline]
+    fn unpack(bits: u64) -> Self {
+        match bits {
+            0b00 => NumericFeedback::FixnumOnly,
+            0b0111 => NumericFeedback::Float,
+            // Anything else in the slot is a call lattice value or an unknown
+            // encoding: the safe over-approximation, never a float guess.
+            _ => NumericFeedback::Other,
+        }
+    }
+}
+
 /// A per-function feedback vector — one slot per bytecode instruction, lazily
 /// allocated on first use (when the instruction count is known). Slots for
 /// non-call instructions stay [`CallFeedback::Uninit`]. Lock-free
@@ -231,6 +281,32 @@ impl FeedbackVec {
             CallFeedback::Megamorphic => return,
         };
         slot.store(next.pack(), Ordering::Relaxed);
+    }
+
+    /// Record the operand types observed at arithmetic site `pc`. Called only
+    /// from the opcodes' non-fixnum arm, so the fixnum fast path pays nothing.
+    /// Drives `FixnumOnly -> Float -> Other`, with `Other` sticky.
+    #[inline]
+    pub fn record_numeric(&self, pc: usize, ops_len: usize, seen: NumericFeedback) {
+        let slots = self.slots(ops_len);
+        let Some(slot) = slots.get(pc) else { return };
+        let next = match (NumericFeedback::unpack(slot.load(Ordering::Relaxed)), seen) {
+            (NumericFeedback::Other, _) => return,
+            (NumericFeedback::Float, NumericFeedback::Float) => return,
+            (_, seen) => seen,
+        };
+        slot.store(next.pack(), Ordering::Relaxed);
+    }
+
+    /// Operand-type feedback at arithmetic site `pc`.
+    #[inline]
+    pub fn numeric_at(&self, pc: usize) -> NumericFeedback {
+        match self.slots.get() {
+            None => NumericFeedback::FixnumOnly,
+            Some(slots) => slots.get(pc).map_or(NumericFeedback::FixnumOnly, |s| {
+                NumericFeedback::unpack(s.load(Ordering::Relaxed))
+            }),
+        }
     }
 
     /// Feedback at call-site `pc` (or `Uninit` if unallocated / out of range).
@@ -303,6 +379,17 @@ pub struct RuntimeState {
     /// `Bcall` arm enters DIRECTLY (no cache probe, no arg marshaling), as a
     /// raw `*const CompiledLeaf`, valid only while `leaf_slot_epoch` equals
     /// `cache::leaf_slot_epoch()` (bumped on every retire/clear). Zero = empty.
+    /// Set once this body has been compiled and its numeric feedback read.
+    ///
+    /// Feedback is an input to COMPILATION; once it has been consumed every
+    /// further record is dead weight. That is not a micro-optimization on a
+    /// body whose arithmetic is all non-fixnum: there the opcodes' "slow" arm
+    /// is the ONLY arm, so `pidigits` was paying the recording on every
+    /// arithmetic operation it performs — 1.4% of the row. Gating on `heat`
+    /// instead does NOT work: a body entered through the armed or speculated
+    /// paths barely bumps it (`pidigits` sat at heat 1332 after 333 calls).
+    #[cfg_attr(not(feature = "jit"), allow(dead_code))]
+    numeric_feedback_consumed: std::sync::atomic::AtomicBool,
     #[cfg_attr(not(feature = "jit"), allow(dead_code))]
     leaf_slot: AtomicU64,
     #[cfg_attr(not(feature = "jit"), allow(dead_code))]
@@ -599,6 +686,7 @@ impl RuntimeState {
             feedback: FeedbackVec::new(),
             compiled_id: AtomicU64::new(0),
             aot_prewarmed: std::sync::atomic::AtomicBool::new(false),
+            numeric_feedback_consumed: std::sync::atomic::AtomicBool::new(false),
             leaf_slot: AtomicU64::new(0),
             leaf_slot_epoch: AtomicU64::new(0),
             patched_prefix: AtomicU32::new(0),
@@ -997,6 +1085,35 @@ impl RuntimeState {
     #[inline]
     pub fn call_feedback(&self, pc: usize) -> CallFeedback {
         self.feedback.call_at(pc)
+    }
+
+    /// Record the operand types seen at the arithmetic site at instruction
+    /// `pc` — see [`NumericFeedback`].
+    #[inline]
+    pub fn record_numeric(&self, pc: usize, ops_len: usize, seen: NumericFeedback) {
+        self.feedback.record_numeric(pc, ops_len, seen);
+    }
+
+    /// Operand-type feedback observed at arithmetic site `pc`.
+    #[inline]
+    pub fn numeric_feedback(&self, pc: usize) -> NumericFeedback {
+        self.feedback.numeric_at(pc)
+    }
+
+    /// Whether this body's arithmetic sites still want their operand types
+    /// recorded — see `numeric_feedback_consumed`.
+    #[inline]
+    pub fn wants_numeric_feedback(&self) -> bool {
+        !self
+            .numeric_feedback_consumed
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Mark this body's numeric feedback as read by a compile.
+    #[inline]
+    pub fn note_numeric_feedback_consumed(&self) {
+        self.numeric_feedback_consumed
+            .store(true, std::sync::atomic::Ordering::Relaxed);
     }
 }
 

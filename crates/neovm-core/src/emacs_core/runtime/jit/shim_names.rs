@@ -49,6 +49,9 @@ const NEOVM_JIT_SHIM_NAMES: &[&str] = &[
     "neovm_jit_gc_save",
     "neovm_jit_integerp_slow",
     "neovm_jit_list",
+    // Boxes an f64 the compiled code computed in a register, for the
+    // float-feedback arithmetic lowering.
+    "neovm_jit_make_float",
     "neovm_jit_match_handler",
     "neovm_jit_named_builtin",
     "neovm_jit_numberp_slow",

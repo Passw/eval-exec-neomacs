@@ -253,6 +253,13 @@ pub struct FloatObj {
     pub value: f64,
 }
 
+/// Byte offset of [`FloatObj::value`] from the object pointer.
+///
+/// `pub(crate)` so the JIT lowering unboxes a float against the SAME layout
+/// the runtime boxes it with, rather than hardcoding a header size that a
+/// change to [`GcHeader`] would silently invalidate.
+pub(crate) const FLOAT_VALUE_OFFSET: i32 = std::mem::offset_of!(FloatObj, value) as i32;
+
 // ---------------------------------------------------------------------------
 // Vectorlike — catch-all for complex heap types
 // ---------------------------------------------------------------------------

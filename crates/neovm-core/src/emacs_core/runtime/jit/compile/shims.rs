@@ -83,6 +83,17 @@ pub extern "C" fn neovm_jit_cons(car: i64, cdr: i64) -> i64 {
     Value::cons(car, cdr).bits() as i64
 }
 
+/// Box an `f64` the compiled code computed in a register into a Lisp float.
+///
+/// No rooting and no vmctx, for exactly the reason [`neovm_jit_cons`] needs
+/// none: `alloc_float` is a pure arena slot write (allocate-black under a
+/// concurrent cycle) and never reaches a GC safe point, so nothing can collect
+/// while the caller's other values sit in native slots.
+#[unsafe(no_mangle)]
+pub extern "C" fn neovm_jit_make_float(value: f64) -> i64 {
+    Value::make_float(value).bits() as i64
+}
+
 /// Cold overflow path of the JIT residual-root window (see
 /// `emit_root_window_stores`): grow the ctx root stack to hold `need` slots
 /// and republish the ptr/cap mirrors baked field-offset loads read.
@@ -680,7 +691,7 @@ pub(crate) struct ShimAddr(*const ());
 unsafe impl Sync for ShimAddr {}
 
 #[used]
-pub(crate) static JIT_SHIM_ANCHOR: [ShimAddr; 43] = [
+pub(crate) static JIT_SHIM_ANCHOR: [ShimAddr; 44] = [
     ShimAddr(neovm_jit_apply as *const ()),
     // logand/logior/logxor intrinsic — AOT-importable, so it must survive
     // `--gc-sections` for `--export-dynamic-symbol` to promote it (see below).
@@ -701,6 +712,7 @@ pub(crate) static JIT_SHIM_ANCHOR: [ShimAddr; 43] = [
     ShimAddr(neovm_jit_cbsym_read as *const ()),
     ShimAddr(neovm_jit_cbsym_spec as *const ()),
     ShimAddr(neovm_jit_cons as *const ()),
+    ShimAddr(neovm_jit_make_float as *const ()),
     ShimAddr(neovm_jit_eq_incl_props_spec as *const ()),
     ShimAddr(neovm_jit_eq_slow as *const ()),
     ShimAddr(neovm_jit_gc_push as *const ()),

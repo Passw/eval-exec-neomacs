@@ -445,12 +445,40 @@ pub(crate) fn rejection_epoch() -> u64 {
 /// inline deps on success (so a later redefinition of an inlined callee evicts
 /// this leaf), and maps the outcome to a [`CacheEntry`]. Runs solely from the
 /// `or_insert_with` closures, never on the hot dispatch path.
+/// `NEOVM_JIT_NUMERIC_STATS=1`: what the arithmetic sites of a body being
+/// compiled have actually seen. The lowering guards fixnum and deopts on
+/// anything else, so a body whose sites are all `Float` or `Other` is being
+/// compiled into a guaranteed bail — this is how to tell which is which.
+#[cold]
+fn numeric_feedback_trace(id: u64, func: &ByteCodeFunction) {
+    use crate::emacs_core::jit::NumericFeedback;
+    use std::sync::OnceLock;
+    static ON: OnceLock<bool> = OnceLock::new();
+    if !*ON.get_or_init(|| std::env::var("NEOVM_JIT_NUMERIC_STATS").as_deref() == Ok("1")) {
+        return;
+    }
+    let rt = func.jit_runtime();
+    let ops_len = func.executable_ops().len();
+    let (mut fixnum, mut float, mut other) = (0u32, 0u32, 0u32);
+    for pc in 0..ops_len {
+        match rt.numeric_feedback(pc) {
+            NumericFeedback::FixnumOnly => fixnum += 1,
+            NumericFeedback::Float => float += 1,
+            NumericFeedback::Other => other += 1,
+        }
+    }
+    eprintln!(
+        "[neovm-jit-numeric] compiling id={id} ops={ops_len} fixnum-or-unrun={fixnum} float={float} other={other}"
+    );
+}
+
 fn compile_cache_entry(
     id: u64,
     func: &ByteCodeFunction,
     obarray: Option<&Obarray>,
     request: CompileRequest,
 ) -> CacheEntry {
+    numeric_feedback_trace(id, func);
     let started = Instant::now();
     let result = compile_bytecode_function_requested(func, obarray, request);
     stats::record_compile(started.elapsed(), func.executable_ops().len(), &result);

@@ -174,6 +174,61 @@ pub(crate) fn is_known_fixnum(fb: &FunctionBuilder, v: ClifValue) -> bool {
 }
 
 /// Guard that `v` is a fixnum (`(v & 0b11) == 0b10`), deopting otherwise.
+/// Branch to `deopt` unless `v` is a tagged float.
+///
+/// The float twin of [`guard_fixnum`], and the reason a float operand no
+/// longer has to bail the whole compiled body.
+pub(crate) fn guard_float(fb: &mut FunctionBuilder, deopt: Block, v: ClifValue) {
+    let tag = fb.ins().band_imm(v, TAG_MASK as i64);
+    let is_float = fb
+        .ins()
+        .icmp_imm(IntCC::Equal, tag, crate::tagged::value::TAG_FLOAT as i64);
+    let cont = fb.create_block();
+    fb.ins().brif(is_float, cont, &[], deopt, &[]);
+    fb.switch_to_block(cont);
+    fb.seal_block(cont);
+}
+
+/// The `f64` payload of a value already proved to be a float.
+///
+/// Reads at [`FLOAT_VALUE_OFFSET`], the same offset the runtime writes through
+/// `FloatObj`, so the two can never drift.
+pub(crate) fn unbox_float(fb: &mut FunctionBuilder, v: ClifValue) -> ClifValue {
+    let ptr = fb.ins().band_imm(v, !(TAG_MASK as i64));
+    fb.ins().load(
+        types::F64,
+        MemFlagsData::trusted(),
+        ptr,
+        crate::tagged::header::FLOAT_VALUE_OFFSET,
+    )
+}
+
+/// Model-stack slot `k` as an `f64`.
+///
+/// A slot the fixnum unboxing already proved raw is an integer, so it PROMOTES
+/// (GNU's arithmetic promotes a fixnum operand to double when the other side is
+/// a float); anything else is guarded as a float and unboxed.
+pub(crate) fn stack_as_f64(
+    fb: &mut FunctionBuilder,
+    deopt: Block,
+    stack: &[ClifValue],
+    stack_raw: &[bool],
+    k: usize,
+) -> ClifValue {
+    if stack_raw[k] {
+        fb.ins().fcvt_from_sint(types::F64, stack[k])
+    } else {
+        guard_float(fb, deopt, stack[k]);
+        unbox_float(fb, stack[k])
+    }
+}
+
+/// Box an `f64` result back into a tagged Lisp float.
+pub(crate) fn box_float(fb: &mut FunctionBuilder, rt: &RtCtx, v: ClifValue) -> ClifValue {
+    let call = fb.ins().call(rt.refs.make_float, &[v]);
+    fb.inst_results(call)[0]
+}
+
 pub(crate) fn guard_fixnum(
     fb: &mut FunctionBuilder,
     deopt: Block,
@@ -2156,6 +2211,8 @@ pub(crate) struct RtRefs {
     pub(crate) gc_push_many: FuncRef,
     pub(crate) gc_restore: FuncRef,
     pub(crate) cons: FuncRef,
+    /// Boxes an `f64` computed in a register (`neovm_jit_make_float`).
+    pub(crate) make_float: FuncRef,
     pub(crate) call: FuncRef,
     pub(crate) apply: FuncRef,
     pub(crate) eq_slow: FuncRef,
@@ -2284,6 +2341,10 @@ pub(crate) fn declare_rt_refs<M: Module>(
     // (vmctx, need) -> (): same param shape as push_many.
     let rootwin_grow_id = declare(module, "neovm_jit_rootwin_grow", &sig_push_many)?;
     let cons_id = declare(module, "neovm_jit_cons", &sig_cons)?;
+    let mut sig_make_float = Signature::new(call_conv); // (f64) -> i64
+    sig_make_float.params.push(AbiParam::new(types::F64));
+    sig_make_float.returns.push(AbiParam::new(i64t));
+    let make_float_id = declare(module, "neovm_jit_make_float", &sig_make_float)?;
     let call_id = declare(module, "neovm_jit_call", &sig_call)?;
     let apply_id = declare(module, "neovm_jit_apply", &sig_call)?;
     let eq_id = declare(module, "neovm_jit_eq_slow", &sig_eq)?;
@@ -2472,6 +2533,7 @@ pub(crate) fn declare_rt_refs<M: Module>(
         gc_push_many: module.declare_func_in_func(push_many_id, func),
         gc_restore: module.declare_func_in_func(restore_id, func),
         cons: module.declare_func_in_func(cons_id, func),
+        make_float: module.declare_func_in_func(make_float_id, func),
         call: module.declare_func_in_func(call_id, func),
         apply: module.declare_func_in_func(apply_id, func),
         eq_slow: module.declare_func_in_func(eq_id, func),
@@ -3058,21 +3120,68 @@ pub(crate) fn lower_simple_op(
                 stack_raw.truncate(len - n);
             }
         }
-        Op::Add | Op::Sub => {
+        Op::Add | Op::Sub | Op::Mul | Op::Div => {
             let n = stack.len();
             if n < 2 {
                 return Err(CompileError::StackUnderflow);
             }
             let dsite = deopt_site(fb, pc, handlers.len(), stack, stack_raw, deopt_sites);
+            // FLOAT SITE: the interpreter has only ever seen floats here, so
+            // the fixnum guard below would bail the whole body on every entry.
+            // `nbody` is 26 such sites in one 129-op body, and it deopted at
+            // instruction 6 of 129 every single call.
+            if let Some(rt) = rt
+                && matches!(
+                    super::active_numeric_feedback(pc),
+                    crate::emacs_core::jit::NumericFeedback::Float
+                )
+            {
+                let fb_val = stack_as_f64(fb, dsite, stack, stack_raw, n - 1);
+                let fa_val = stack_as_f64(fb, dsite, stack, stack_raw, n - 2);
+                stack.truncate(n - 2);
+                stack_raw.truncate(n - 2);
+                let res = match op {
+                    Op::Add => fb.ins().fadd(fa_val, fb_val),
+                    Op::Sub => fb.ins().fsub(fa_val, fb_val),
+                    Op::Mul => fb.ins().fmul(fa_val, fb_val),
+                    _ => {
+                        // `builtin_div` normalizes ANY NaN result to the
+                        // NEGATIVE NaN Emacs prints (`arithmetic.rs`, the
+                        // float divide arm), so a raw `fdiv` would diverge on
+                        // `(/ 0.0 0.0)` and `(/ inf inf)`. `fcmp ne` against
+                        // itself is true exactly for NaN.
+                        let q = fb.ins().fdiv(fa_val, fb_val);
+                        let is_nan = fb.ins().fcmp(
+                            cranelift_codegen::ir::condcodes::FloatCC::NotEqual,
+                            q,
+                            q,
+                        );
+                        let neg_nan = fb.ins().f64const(
+                            cranelift_codegen::ir::immediates::Ieee64::with_bits(
+                                f64::NAN.to_bits() | (1_u64 << 63),
+                            ),
+                        );
+                        fb.ins().select(is_nan, neg_nan, q)
+                    }
+                };
+                let boxed = box_float(fb, rt, res);
+                stack.push(boxed);
+                stack_raw.push(false);
+                return Ok(());
+            }
             let b = stack_as_raw(fb, dsite, stack, stack_raw, n - 1, known);
             let a = stack_as_raw(fb, dsite, stack, stack_raw, n - 2, known);
             stack.truncate(n - 2);
             stack_raw.truncate(n - 2);
-            let is_sub = matches!(op, Op::Sub);
-            stack.push(raw_fixnum_addsub(fb, dsite, is_sub, a, b));
+            let res = match op {
+                Op::Add | Op::Sub => raw_fixnum_addsub(fb, dsite, matches!(op, Op::Sub), a, b),
+                Op::Mul => raw_fixnum_mul(fb, dsite, a, b),
+                _ => raw_fixnum_divrem(fb, dsite, false, a, b),
+            };
+            stack.push(res);
             stack_raw.push(true);
         }
-        Op::Mul => {
+        Op::Rem => {
             let n = stack.len();
             if n < 2 {
                 return Err(CompileError::StackUnderflow);
@@ -3082,21 +3191,7 @@ pub(crate) fn lower_simple_op(
             let a = stack_as_raw(fb, dsite, stack, stack_raw, n - 2, known);
             stack.truncate(n - 2);
             stack_raw.truncate(n - 2);
-            stack.push(raw_fixnum_mul(fb, dsite, a, b));
-            stack_raw.push(true);
-        }
-        Op::Div | Op::Rem => {
-            let n = stack.len();
-            if n < 2 {
-                return Err(CompileError::StackUnderflow);
-            }
-            let dsite = deopt_site(fb, pc, handlers.len(), stack, stack_raw, deopt_sites);
-            let b = stack_as_raw(fb, dsite, stack, stack_raw, n - 1, known);
-            let a = stack_as_raw(fb, dsite, stack, stack_raw, n - 2, known);
-            stack.truncate(n - 2);
-            stack_raw.truncate(n - 2);
-            let is_rem = matches!(op, Op::Rem);
-            stack.push(raw_fixnum_divrem(fb, dsite, is_rem, a, b));
+            stack.push(raw_fixnum_divrem(fb, dsite, true, a, b));
             stack_raw.push(true);
         }
         Op::Eq => {

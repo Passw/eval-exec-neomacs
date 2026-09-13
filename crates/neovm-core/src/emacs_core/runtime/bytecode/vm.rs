@@ -4596,6 +4596,8 @@ impl<'a> Vm<'a> {
                         };
                         if let Some(args_start) = fallback {
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id("+", &PLUS_ID),
                                 args_start,
                                 2
@@ -4619,6 +4621,8 @@ impl<'a> Vm<'a> {
                                 stk!().pop();
                             } else {
                                 let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                    func,
+                                    pc_local - 1,
                                     Self::cached_builtin_id("-", &MINUS_ID),
                                     len - 2,
                                     2
@@ -4628,6 +4632,8 @@ impl<'a> Vm<'a> {
                             }
                         } else {
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id("-", &MINUS_ID),
                                 len - 2,
                                 2
@@ -4651,6 +4657,8 @@ impl<'a> Vm<'a> {
                                     stk!().pop();
                                 } else {
                                     let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                        func,
+                                        pc_local - 1,
                                         Self::cached_builtin_id("*", &TIMES_ID),
                                         len - 2,
                                         2
@@ -4660,6 +4668,8 @@ impl<'a> Vm<'a> {
                                 }
                             } else {
                                 let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                    func,
+                                    pc_local - 1,
                                     Self::cached_builtin_id("*", &TIMES_ID),
                                     len - 2,
                                     2
@@ -4669,6 +4679,8 @@ impl<'a> Vm<'a> {
                             }
                         } else {
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id("*", &TIMES_ID),
                                 len - 2,
                                 2
@@ -4694,6 +4706,8 @@ impl<'a> Vm<'a> {
                                 stk!().pop();
                             } else {
                                 let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                    func,
+                                    pc_local - 1,
                                     Self::cached_builtin_id("/", &DIVIDE_ID),
                                     len - 2,
                                     2
@@ -4703,6 +4717,8 @@ impl<'a> Vm<'a> {
                             }
                         } else {
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id("/", &DIVIDE_ID),
                                 len - 2,
                                 2
@@ -4723,6 +4739,8 @@ impl<'a> Vm<'a> {
                                 stk!().pop();
                             } else {
                                 let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                    func,
+                                    pc_local - 1,
                                     Self::cached_builtin_id("%", &MODULO_ID),
                                     len - 2,
                                     2
@@ -4732,6 +4750,8 @@ impl<'a> Vm<'a> {
                             }
                         } else {
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id("%", &MODULO_ID),
                                 len - 2,
                                 2
@@ -4764,6 +4784,8 @@ impl<'a> Vm<'a> {
                         };
                         if let Some(args_start) = fallback {
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id("1+", &ADD1_ID),
                                 args_start,
                                 1
@@ -4781,6 +4803,8 @@ impl<'a> Vm<'a> {
                             } else {
                                 let args_start = stk!().len() - 1;
                                 let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                    func,
+                                    pc_local - 1,
                                     Self::cached_builtin_id("1-", &SUB1_ID),
                                     args_start,
                                     1
@@ -4791,6 +4815,8 @@ impl<'a> Vm<'a> {
                         } else {
                             let args_start = stk!().len() - 1;
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id("1-", &SUB1_ID),
                                 args_start,
                                 1
@@ -4808,6 +4834,8 @@ impl<'a> Vm<'a> {
                             } else {
                                 let args_start = stk!().len() - 1;
                                 let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                    func,
+                                    pc_local - 1,
                                     Self::cached_builtin_id("-", &MINUS_ID),
                                     args_start,
                                     1
@@ -4818,6 +4846,8 @@ impl<'a> Vm<'a> {
                         } else {
                             let args_start = stk!().len() - 1;
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id("-", &MINUS_ID),
                                 args_start,
                                 1
@@ -4838,6 +4868,8 @@ impl<'a> Vm<'a> {
                             stk!().pop();
                         } else {
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id("=", &NUMEQ_ID),
                                 len - 2,
                                 2
@@ -4859,6 +4891,8 @@ impl<'a> Vm<'a> {
                             stk!().pop();
                         } else {
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id(">", &GT_ID),
                                 len - 2,
                                 2
@@ -4892,6 +4926,8 @@ impl<'a> Vm<'a> {
                         };
                         if let Some(args_start) = fallback {
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id("<", &LT_ID),
                                 args_start,
                                 2
@@ -4913,6 +4949,8 @@ impl<'a> Vm<'a> {
                             stk!().pop();
                         } else {
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id("<=", &LE_ID),
                                 len - 2,
                                 2
@@ -4934,6 +4972,8 @@ impl<'a> Vm<'a> {
                             stk!().pop();
                         } else {
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id(">=", &GE_ID),
                                 len - 2,
                                 2
@@ -4951,6 +4991,8 @@ impl<'a> Vm<'a> {
                             stk!().pop();
                         } else {
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id("max", &MAX_ID),
                                 len - 2,
                                 2
@@ -4968,6 +5010,8 @@ impl<'a> Vm<'a> {
                             stk!().pop();
                         } else {
                             let result = vm_try!(self.call_arith_builtin_from_stack_args(
+                                func,
+                                pc_local - 1,
                                 Self::cached_builtin_id("min", &MIN_ID),
                                 len - 2,
                                 2
@@ -7371,13 +7415,59 @@ impl<'a> Vm<'a> {
     /// Everything else matches the traced twin: the same resolved callee, the
     /// same arity signal, the same `ManySlice` fixnum fast values, the same
     /// signal dispatch on the way out.
+    /// Classify the operands this arithmetic site just took, for the
+    /// lowering's benefit — see [`NumericFeedback`].
+    ///
+    /// `Float` means every operand is a float or a fixnum and at least one is
+    /// a float: exactly what an `f64` lowering can take, promoting the
+    /// fixnums. Anything else (bignum, marker, non-number) is `Other`.
+    #[cfg(feature = "jit")]
+    #[inline]
+    fn classify_arith_operands(args: &[Value]) -> crate::emacs_core::jit::NumericFeedback {
+        use crate::emacs_core::jit::NumericFeedback;
+        let mut saw_float = false;
+        for arg in args {
+            if arg.is_float() {
+                saw_float = true;
+            } else if !arg.is_fixnum() {
+                return NumericFeedback::Other;
+            }
+        }
+        if saw_float {
+            NumericFeedback::Float
+        } else {
+            NumericFeedback::Other
+        }
+    }
+
     #[inline]
     fn call_arith_builtin_from_stack_args(
         &mut self,
+        func: &ByteCodeFunction,
+        pc: usize,
         sym_id: SymId,
         args_start: usize,
         nargs: usize,
     ) -> EvalResult {
+        // Every one of the arithmetic opcodes' slow arms funnels through here,
+        // and they reach it only when the operands were NOT both fixnums — so
+        // recording the observed types costs the fixnum fast path nothing at
+        // all, and `FixnumOnly` (the zero slot) already means what the
+        // lowering assumes.
+        #[cfg(feature = "jit")]
+        {
+            // Feedback is an input to COMPILATION, so collect it only until a
+            // compile has read it. That is not a micro-optimization: on a body
+            // whose arithmetic is ALL non-fixnum this "slow" arm is the only
+            // arm, so `pidigits` was paying the recording on every arithmetic
+            // operation it performs — 1.4% of the row.
+            let rt = func.jit_runtime();
+            if rt.wants_numeric_feedback() {
+                let seen =
+                    Self::classify_arith_operands(&self.ctx.bc_buf[args_start..args_start + nargs]);
+                rt.record_numeric(pc, func.executable_ops().len(), seen);
+            }
+        }
         let func_val = Value::subr_from_sym_id(sym_id);
         let Some(callee) = ResolvedBuiltinCallee::from_subr_value(func_val) else {
             // These are static subrs, so this is unreachable in practice; take
