@@ -4314,16 +4314,27 @@ impl Frame {
     pub fn reposition_minibuffer_below_root(&mut self) {
         let root_bounds = *self.root_window().bounds();
         // GNU `resize_frame_windows` / `Fwindow_resize_apply_total` place the
-        // minibuffer's character-line edge directly below the root:
-        // `m->top_line = r->top_line + r->total_lines` (window.c:5127/5026).
-        // Because the top margin adds a line to the root's `top_line` but
-        // removes one from its `total_lines` (the menu-bar row has 0 pixel
-        // height in batch), that sum collapses to the root's *pixel* bottom --
-        // the minibuffer sits below the margin and so carries no offset, its
-        // character-line top equalling its pixel row.
+        // minibuffer's character-line edge directly below the root by SUMMING
+        // the root's two fields:
+        //
+        //     m->top_line = r->top_line + r->total_lines;
+        //
+        // (`src/window.c:5030`, `:5131`, `:5874`.)  This used to convert the
+        // root's PIXEL bottom instead, on the reasoning that realizing the top
+        // margin adds a line to `top_line` while removing one from
+        // `total_lines`, so the two agree.  It does not: the menu-bar row has
+        // no pixel height in batch, so realizing the margin moves the root's
+        // `top_line` to 1 and leaves its 24 total lines alone.  GNU's sum is
+        // then 25 and the pixel conversion yields 24 -- the minibuffer keeping
+        // the row it had before the split, overlapping the root's last line.
+        //
+        // The two agree only while the root's `top_line` is 0, which is why
+        // this held until something realized the margin.  Take GNU's sum.
         let root_left_col = self.root_window().left_col();
+        let root_top_line = self.root_window().top_line();
         let char_h = self.char_height.max(1.0);
-        let mini_top_line = ((root_bounds.y + root_bounds.height) / char_h).round() as i64;
+        let root_total_lines = (root_bounds.height / char_h).round() as i64;
+        let mini_top_line = root_top_line + root_total_lines;
         if let Some(mini) = self.minibuffer_leaf.as_mut() {
             let mini_h = mini
                 .bounds()

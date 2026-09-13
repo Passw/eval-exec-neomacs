@@ -3436,6 +3436,66 @@ fn frame_resize_pixelwise_reserves_tab_bar_height_above_root_window_tree() {
 }
 
 #[test]
+fn a_realized_top_margin_moves_the_minibuffers_character_row_like_gnu() {
+    crate::test_utils::init_test_tracing();
+    // GNU puts the minibuffer's character row directly below the root by
+    // SUMMING the root's two fields -- `m->top_line = r->top_line +
+    // r->total_lines` (`src/window.c:5030`, `:5131`, `:5874`) -- and this used
+    // to convert the root's PIXEL bottom instead, on the reasoning that
+    // realizing the top margin adds a line to `top_line` while taking one from
+    // `total_lines`, leaving the two equal.
+    //
+    // They are only equal while the root's `top_line` is 0.  A margin row has
+    // no pixel height of its own here: realizing it moves the root's
+    // `top_line` down and leaves its line count alone, so the sum is one more
+    // than the pixel conversion and the minibuffer keeps the row it had
+    // before, overlapping the root's last line.
+    //
+    // Measured on GNU Emacs 31.0.50, `emacs -Q --batch`, after
+    // `(split-window (selected-window))` on the startup frame, against the
+    // shipped neomacs binary:
+    //
+    //   (window-edges (minibuffer-window))   GNU (0 25 80 26)  neo (0 24 80 25)
+    //   (window-pixel-edges ...)             GNU (0 24 80 25)  neo (0 24 80 25)
+    //
+    // Every window in the ROOT tree already agreed; the minibuffer was the one
+    // window the character-edge sync never reached, because it hangs off the
+    // frame rather than off the tree.
+    let mut mgr = FrameManager::new();
+    let fid = mgr.create_frame("F1", 80, 25, BufferId(1));
+    let frame = mgr.get_mut(fid).unwrap();
+    // A TTY-shaped frame: one pixel per character cell, so a character row and
+    // a pixel row are the same thing and the two derivations can be compared.
+    frame.char_width = 1.0;
+    frame.char_height = 1.0;
+    // The state the shipped binary reaches: a realized margin leaves the root's
+    // PIXEL origin at the top of the text area while moving its character row
+    // down, which is how GNU reports `window-pixel-top` 0 alongside
+    // `window-top-line` 1.  `reconcile_restored_window_configuration_geometry`
+    // is the production path that establishes it; set the field directly so
+    // this test pins the placement rule and nothing else.
+    frame.root_window_mut().set_top_line(1);
+    frame.reposition_minibuffer_below_root();
+
+    let root = frame.root_window();
+    let root_top_line = root.top_line();
+    let root_total_lines = (root.bounds().height / frame.char_height).round() as i64;
+    assert_eq!(
+        root_top_line, 1,
+        "the margin has to be realized for this to test anything"
+    );
+    assert_eq!(
+        frame
+            .minibuffer_leaf
+            .as_ref()
+            .expect("frame has a minibuffer")
+            .top_line(),
+        root_top_line + root_total_lines,
+        "GNU: m->top_line = r->top_line + r->total_lines"
+    );
+}
+
+#[test]
 fn grow_and_shrink_mini_window_adjusts_bounds() {
     crate::test_utils::init_test_tracing();
     let mut mgr = FrameManager::new();
