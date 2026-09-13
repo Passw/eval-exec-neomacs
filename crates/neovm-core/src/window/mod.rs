@@ -29,6 +29,7 @@ mod history;
 mod parameters;
 pub mod part;
 mod scroll_bar;
+mod sibling_layout;
 pub mod split;
 pub mod window_markers;
 
@@ -36,6 +37,7 @@ pub use part::{
     PosnArea, TextAreaCoordinate, WindowChromeLine, WindowCoordinate, WindowPart,
     WindowPartGeometry,
 };
+use sibling_layout::{ChildExtent, sibling_bounds};
 pub use split::{CombinationLimit, DeleteOutcome, DeleteResize, ParentSeal, SplitAttachment};
 
 pub use display::{
@@ -7949,126 +7951,25 @@ pub fn window_resize_apply_total(
     }
 }
 
-/// Redistribute bounds equally among children.
+/// Redistribute `parent`'s pixels among its children.
+///
+/// Gathers what [`sibling_layout`] needs from each child, computes the whole
+/// layout with the siblings only borrowed immutably, then writes the
+/// rectangles back. The arithmetic itself lives in [`sibling_layout`], where it
+/// is testable without a window tree.
 fn redistribute_bounds(children: &mut [Window], parent: Rect) {
-    if children.is_empty() {
-        return;
+    let extents: Vec<ChildExtent> = children.iter().map(child_extent).collect();
+    for (child, bounds) in children.iter_mut().zip(sibling_bounds(parent, &extents)) {
+        child.set_bounds(bounds);
     }
+}
 
-    fn distributed_sizes(total: f32, n: usize) -> Vec<f32> {
-        let total_px = total.round().max(0.0) as i64;
-        let n = n as i64;
-        let base = total_px / n;
-        let remainder = total_px % n;
-        (0..n)
-            .map(|idx| (base + if idx < remainder { 1 } else { 0 }) as f32)
-            .collect()
-    }
-
-    fn distributed_sizes_preserving_fixed(
-        total: f32,
-        children: &[Window],
-        horizontal: bool,
-    ) -> Vec<f32> {
-        let total_px = total.round().max(0.0);
-        let mut sizes = vec![0.0; children.len()];
-        let mut flexible = Vec::new();
-        let mut fixed_total = 0.0;
-        let mut flexible_current_total = 0.0;
-
-        for (idx, child) in children.iter().enumerate() {
-            let fixed_cells = if horizontal {
-                child.fixed_width_cols()
-            } else {
-                child.fixed_height_lines()
-            };
-            let current = if horizontal {
-                child.bounds().width
-            } else {
-                child.bounds().height
-            }
-            .round()
-            .max(0.0);
-            if fixed_cells > 0 {
-                sizes[idx] = current;
-                fixed_total += current;
-            } else {
-                flexible.push(idx);
-                flexible_current_total += current;
-            }
-        }
-
-        if flexible.is_empty() || fixed_total >= total_px {
-            return distributed_sizes(total, children.len());
-        }
-
-        let flexible_total = total_px - fixed_total;
-        if flexible_current_total <= 0.0 {
-            let flexible_sizes = distributed_sizes(flexible_total, flexible.len());
-            for (idx, size) in flexible.into_iter().zip(flexible_sizes) {
-                sizes[idx] = size;
-            }
-            return sizes;
-        }
-
-        let mut assigned = 0.0;
-        let last_flexible = flexible.len().saturating_sub(1);
-        for (flex_idx, idx) in flexible.into_iter().enumerate() {
-            let current = if horizontal {
-                children[idx].bounds().width
-            } else {
-                children[idx].bounds().height
-            }
-            .round()
-            .max(0.0);
-            let size = if flex_idx == last_flexible {
-                (flexible_total - assigned).max(0.0)
-            } else {
-                (flexible_total * (current / flexible_current_total))
-                    .round()
-                    .max(0.0)
-            };
-            sizes[idx] = size;
-            assigned += size;
-        }
-        sizes
-    }
-
-    // Detect direction from first two children if possible.
-    if children.len() >= 2 {
-        let first = children[0].bounds();
-        let second = children[1].bounds();
-
-        if (first.x - second.x).abs() > 0.1 {
-            // Horizontal split
-            let widths = distributed_sizes_preserving_fixed(parent.width, children, true);
-            let mut edge = parent.x.round();
-            for (child, width) in children.iter_mut().zip(widths) {
-                child.set_bounds(Rect::new(
-                    edge,
-                    parent.y.round(),
-                    width,
-                    parent.height.round(),
-                ));
-                edge += width;
-            }
-        } else {
-            // Vertical split
-            let heights = distributed_sizes_preserving_fixed(parent.height, children, false);
-            let mut edge = parent.y.round();
-            for (child, height) in children.iter_mut().zip(heights) {
-                child.set_bounds(Rect::new(
-                    parent.x.round(),
-                    edge,
-                    parent.width.round(),
-                    height,
-                ));
-                edge += height;
-            }
-        }
-    } else {
-        // Single child gets full bounds.
-        children[0].set_bounds(parent);
+/// The sibling-layout view of one child window.
+fn child_extent(child: &Window) -> ChildExtent {
+    ChildExtent {
+        bounds: *child.bounds(),
+        fixed_width_cols: child.fixed_width_cols(),
+        fixed_height_lines: child.fixed_height_lines(),
     }
 }
 
