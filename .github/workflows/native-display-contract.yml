@@ -37,7 +37,18 @@ jobs:
         run: cargo nextest run --locked -p neovm-core --lib -E 'test(resources_test)|test(frame_resize_test)'
       - name: Build matching executable and runtime image
         run: cargo xtask fresh-build --release
+      - name: Set resource font on ephemeral macOS runner
+        if: runner.os == 'macOS'
+        run: defaults write -g Font -string 'Menlo-16'
+      - name: Set resource font on ephemeral Windows runner
+        if: runner.os == 'Windows'
+        run: reg add 'HKCU\SOFTWARE\GNU\Emacs' /v Emacs.Font /t REG_SZ /d 'Consolas-16' /f
       - name: Native GUI startup, font and resize
+        # Preferences are changed only on this ephemeral hosted runner. The
+        # ordinary -Q smoke test remains a control for native-resource inhibition.
+        env:
+          NEOMACS_GUI_RESOURCE_FAMILY: ${{ runner.os == 'macOS' && 'Menlo' || 'Consolas' }}
+          NEOMACS_GUI_RESOURCE_FONT: ${{ runner.os == 'macOS' && 'Menlo-16' || 'Consolas-16' }}
         run: cargo nextest run --locked -p neomacs-gui-tests --test native_display --run-ignored all --test-threads 1
       - name: Upload native evidence
         if: always()

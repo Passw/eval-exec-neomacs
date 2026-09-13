@@ -648,6 +648,39 @@ pub(crate) static STANDARD_ARGS: &[StandardArg] = &[
     },
 ];
 
+pub(crate) struct StandardArgMatch {
+    pub(crate) option: &'static StandardArg,
+    pub(crate) operands: usize,
+}
+
+/// Shared GNU option classification for sorting and the forwarding pass.
+/// An option-looking operand must stay attached to its owning option.
+pub(crate) fn classify_standard_arg(arg: &str) -> Option<StandardArgMatch> {
+    if let Some(option) = STANDARD_ARGS.iter().find(|option| option.name == arg) {
+        return Some(StandardArgMatch {
+            option,
+            operands: option.nargs as usize,
+        });
+    }
+    if !arg.starts_with("--") || arg == "--" {
+        return None;
+    }
+    let (name, inline) = arg
+        .split_once('=')
+        .map_or((arg, false), |(name, _)| (name, true));
+    let mut matches = STANDARD_ARGS
+        .iter()
+        .filter(|option| option.longname.is_some_and(|long| long.starts_with(name)));
+    let option = matches.next()?;
+    if matches.next().is_some() {
+        return None;
+    }
+    Some(StandardArgMatch {
+        option,
+        operands: if inline { 0 } else { option.nargs as usize },
+    })
+}
+
 /// Reorder argv so that the highest priority options come first, mirroring
 /// GNU `sort_args` at `emacs.c:2796-2945`.
 ///
@@ -705,64 +738,14 @@ pub(crate) fn sort_args(argv: &mut Vec<String>) -> Result<(), String> {
             break;
         }
 
-        // GNU emacs.c:2836-2845 — exact match against the short
-        // (canonical) name of any STANDARD_ARGS row.
-        let mut matched = false;
-        for entry in STANDARD_ARGS {
-            if entry.name == arg {
-                options[from] = i32::from(entry.nargs);
-                priority[from] = entry.priority;
-                if from + entry.nargs as usize >= argc {
-                    return Err(format!("Option '{arg}' requires an argument"));
-                }
-                from += 1 + entry.nargs as usize;
-                matched = true;
-                break;
+        if let Some(matched) = classify_standard_arg(arg) {
+            options[from] = matched.operands as i32;
+            priority[from] = matched.option.priority;
+            if from + matched.operands >= argc {
+                return Err(format!("Option '{arg}' requires an argument"));
             }
-        }
-        if matched {
+            from += 1 + matched.operands;
             continue;
-        }
-
-        // GNU emacs.c:2850-2891 — long-prefix match against any
-        // STANDARD_ARGS row whose `longname` is set, with --opt=VAL
-        // collapsing to nargs=0 (the value rides on the same slot).
-        if arg.starts_with("--") {
-            let (this_arg_for_match, has_eq) = match arg.find('=') {
-                Some(eq_pos) => (&arg[..eq_pos], true),
-                None => (arg, false),
-            };
-
-            let mut match_idx: Option<usize> = None;
-            let mut multiple = false;
-            for (i, entry) in STANDARD_ARGS.iter().enumerate() {
-                let Some(longname) = entry.longname else {
-                    continue;
-                };
-                if longname.starts_with(this_arg_for_match) {
-                    if match_idx.is_none() {
-                        match_idx = Some(i);
-                    } else {
-                        multiple = true;
-                    }
-                }
-            }
-
-            if let Some(i) = match_idx
-                && !multiple
-            {
-                let entry = STANDARD_ARGS[i];
-                let nargs = if has_eq { 0 } else { i32::from(entry.nargs) };
-                options[from] = nargs;
-                priority[from] = entry.priority;
-                if from + nargs as usize >= argc {
-                    return Err(format!("Option '{arg}' requires an argument"));
-                }
-                from += 1 + nargs as usize;
-                continue;
-            }
-            // GNU just warns on ambiguous prefix; we silently leave it
-            // as a non-option (priority 0) — same effective behavior.
         }
 
         from += 1;

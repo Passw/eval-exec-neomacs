@@ -22,7 +22,7 @@ pub(super) enum BootstrapFont {
 impl BootstrapFont {
     pub(super) fn select(display: &BootstrapDisplayConfig) -> Option<Self> {
         match display.frontend() {
-            FrontendKind::Gui => StartupFont::select(display).map(Self::Gui),
+            FrontendKind::Gui => StartupFont::select(display, None).map(Self::Gui),
             FrontendKind::Tty => Some(Self::Tty),
         }
     }
@@ -47,9 +47,12 @@ impl StartupFont {
     /// Desktop settings are a suggestion when user configuration has not run.
     /// Explicit Lisp frame/default-face settings continue through normal font
     /// realization afterwards; no redisplay-time reapplication can erase them.
-    pub(super) fn select(display: &BootstrapDisplayConfig) -> Option<Self> {
+    pub(super) fn select(
+        display: &BootstrapDisplayConfig,
+        preferred_font: Option<&str>,
+    ) -> Option<Self> {
         let mut metrics = FontMetricsService::new();
-        let selected = display.font_defaults.select(|candidate| {
+        let mut open = |candidate: neomacs_display_runtime::font_defaults::InitialFontCandidate| {
             let request = FrameFontRequest::from_name(candidate.name())?;
             let requested_size = match request.size() {
                 FrameFontSize::Default => candidate.default_size().font_size(),
@@ -78,7 +81,18 @@ impl StartupFont {
                 request.face().slant.is_some_and(|slant| slant.is_italic()),
                 size.get(),
             )
-        })?;
+        };
+        let selected = if let Some(name) = preferred_font {
+            // Configured fonts use the same parser and native opener. Failure
+            // is an error, rather than permission to select a platform default.
+            open(
+                neomacs_display_runtime::font_defaults::InitialFontCandidate::Configured(
+                    neovm_core::emacs_core::display_host::SystemFontName::new(name.to_owned())?,
+                ),
+            )
+        } else {
+            display.font_defaults.select(open)
+        }?;
         let frame_metrics = BootstrapFrameMetrics {
             char_width: selected.metrics.average_width.max(1) as f32,
             char_height: selected.metrics.height.max(1) as f32,

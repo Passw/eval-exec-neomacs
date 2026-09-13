@@ -107,6 +107,7 @@ pub enum WindowsFontFallback {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InitialFontCandidate {
+    Configured(SystemFontName),
     Desktop(SystemFontName),
     Cocoa(SystemFontName),
     Windows(WindowsFontFallback),
@@ -125,7 +126,7 @@ impl InitialFontCandidate {
     pub fn family_match(&self) -> InitialFontFamilyMatch {
         match self {
             Self::Windows(_) => InitialFontFamilyMatch::RequireNamedFamily,
-            Self::Desktop(_) | Self::Cocoa(_) | Self::Monospace(_) => {
+            Self::Configured(_) | Self::Desktop(_) | Self::Cocoa(_) | Self::Monospace(_) => {
                 InitialFontFamilyMatch::NativeSubstitution
             }
         }
@@ -133,7 +134,7 @@ impl InitialFontCandidate {
 
     pub fn name(&self) -> &str {
         match self {
-            Self::Desktop(name) | Self::Cocoa(name) => name.as_str(),
+            Self::Configured(name) | Self::Desktop(name) | Self::Cocoa(name) => name.as_str(),
             Self::Windows(font) => font.as_ref(),
             Self::Monospace(_) => "monospace",
         }
@@ -141,7 +142,9 @@ impl InitialFontCandidate {
 
     pub fn default_size(&self) -> InitialFontSize {
         match self {
-            Self::Desktop(_) | Self::Windows(_) => InitialFontSize::NamedFontDefault,
+            Self::Configured(_) | Self::Desktop(_) | Self::Windows(_) => {
+                InitialFontSize::NamedFontDefault
+            }
             Self::Cocoa(_) => InitialFontSize::CocoaBackendDefault,
             Self::Monospace(size) => *size,
         }

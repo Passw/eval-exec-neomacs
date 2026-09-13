@@ -294,6 +294,21 @@ pub struct GuiResourceQuery {
     pub inhibit_native: bool,
 }
 
+impl GuiResourceQuery {
+    pub fn normalize_instance_name(name: &str) -> String {
+        let valid = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_';
+        if name.bytes().all(valid) {
+            return name.into();
+        }
+        if name.bytes().filter(|byte| valid(*byte)).count() < 2 {
+            return "emacs".into();
+        }
+        name.bytes()
+            .map(|byte| if valid(byte) { char::from(byte) } else { '_' })
+            .collect()
+    }
+}
+
 pub trait DisplayHost {
     #[cfg(target_os = "macos")]
     fn ns_resource(&self, _name: &str) -> Option<String> {

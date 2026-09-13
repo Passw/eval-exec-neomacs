@@ -1729,6 +1729,7 @@ fn bootstrap_gui_frame_uses_gnu_cursor_and_pointer_color_defaults() {
 
 fn gui_startup() -> StartupOptions {
     StartupOptions {
+        gui: Default::default(),
         frontend: FrontendKind::Gui,
         forwarded_args: vec!["neomacs".to_string(), "-Q".to_string()],
         terminal_device: None,
@@ -1741,10 +1742,70 @@ fn gui_startup() -> StartupOptions {
     }
 }
 
+#[test]
+fn gui_startup_font_keeps_lisp_arguments_and_ignores_option_looking_operands() {
+    for spelling in ["-fn", "-font", "--font", "--fon"] {
+        let startup = parse_startup_options(
+            [
+                "neomacs",
+                "-Q",
+                spelling,
+                "DejaVu Sans Mono 16",
+                "--eval",
+                "--font",
+            ]
+            .map(str::to_owned),
+        )
+        .unwrap();
+        let (_, font) = startup.gui.prepare("neomacs");
+        assert_eq!(font.as_deref(), Some("DejaVu Sans Mono 16"), "{spelling}");
+        assert!(
+            startup
+                .forwarded_args
+                .windows(2)
+                .any(|pair| pair == [spelling, "DejaVu Sans Mono 16"])
+        );
+        assert!(
+            startup
+                .forwarded_args
+                .windows(2)
+                .any(|pair| pair == ["--eval", "--font"])
+        );
+    }
+    let startup = parse_startup_options(
+        [
+            "neomacs",
+            "-Q",
+            "--font=DejaVu Sans Mono 12",
+            "-fn",
+            "DejaVu Sans Mono 16",
+            "--",
+            "--font=ignored",
+        ]
+        .map(str::to_owned),
+    )
+    .unwrap();
+    assert_eq!(
+        startup.gui.prepare("neomacs").1.as_deref(),
+        Some("DejaVu Sans Mono 16")
+    );
+    assert!(
+        startup
+            .forwarded_args
+            .iter()
+            .any(|arg| arg == "--font=DejaVu Sans Mono 12")
+    );
+    assert_eq!(
+        startup.forwarded_args.last().map(String::as_str),
+        Some("--font=ignored")
+    );
+}
+
 fn gui_startup_with_args(args: &[&str]) -> StartupOptions {
     let mut forwarded_args = vec!["neomacs".to_string()];
     forwarded_args.extend(args.iter().map(|arg| (*arg).to_string()));
     StartupOptions {
+        gui: Default::default(),
         frontend: FrontendKind::Gui,
         forwarded_args,
         terminal_device: None,
@@ -1761,6 +1822,7 @@ fn tty_batch_startup_with_args(args: &[&str]) -> StartupOptions {
     let mut forwarded_args = vec!["neomacs".to_string()];
     forwarded_args.extend(args.iter().map(|arg| (*arg).to_string()));
     StartupOptions {
+        gui: Default::default(),
         frontend: FrontendKind::Tty,
         forwarded_args,
         terminal_device: None,
@@ -4459,6 +4521,7 @@ fn configure_gnu_startup_state_clears_window_system_for_tty_boots() {
     let startup = StartupOptions {
         frontend: FrontendKind::Tty,
         forwarded_args: vec!["neomacs".to_string(), "-q".to_string()],
+        gui: Default::default(),
         terminal_device: Some("/dev/tty".to_string()),
         noninteractive: false,
         temacs_mode: None,
@@ -4561,6 +4624,7 @@ fn live_tty_defface_keeps_dark_color_parent_attributes_through_inverse_video() {
     let startup = StartupOptions {
         frontend: FrontendKind::Tty,
         forwarded_args: vec!["neomacs".to_string(), "-Q".to_string()],
+        gui: Default::default(),
         terminal_device: None,
         noninteractive: false,
         temacs_mode: None,
@@ -4642,6 +4706,7 @@ fn configure_gnu_startup_state_marks_batch_mode_noninteractive() {
             "--eval".to_string(),
             "(princ 1)".to_string(),
         ],
+        gui: Default::default(),
         terminal_device: None,
         noninteractive: true,
         temacs_mode: None,

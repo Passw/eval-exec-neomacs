@@ -23,12 +23,15 @@ pub(super) struct PreparedGuiFrame {
 }
 
 impl PreparedGuiFrame {
-    pub(super) fn prepare(display: BootstrapDisplayConfig) -> Result<Self, StartupFrameError> {
-        let BootstrapFont::Gui(font) =
-            BootstrapFont::select(&display).ok_or(StartupFrameError::NoUsableFont)?
-        else {
+    pub(super) fn prepare(
+        display: BootstrapDisplayConfig,
+        preferred_font: Option<&str>,
+    ) -> Result<Self, StartupFrameError> {
+        if display.frontend() != FrontendKind::Gui {
             return Err(StartupFrameError::NotGraphical);
-        };
+        }
+        let font =
+            StartupFont::select(&display, preferred_font).ok_or(StartupFrameError::NoUsableFont)?;
         let (width, height) = super::startup_dimensions(
             FrontendKind::Gui,
             font.metrics(),

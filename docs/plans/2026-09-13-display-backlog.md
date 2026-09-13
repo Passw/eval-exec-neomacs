@@ -15,24 +15,24 @@ a claim of completion.
   defaults, including initial font policy and public resource lookup.
   Public queries and later-frame font precedence are implemented with winreg
   and objc2-foundation; first-native-window resource font discovery remains open.
-- [ ] Weston cached subsurface scale/detach diagnostic: reproduce on stock
+- [x] Weston cached subsurface scale/detach diagnostic: reproduce on stock
   Weston, explain against official protocol/source, correct Neomacs only if
   the evidence identifies a client contract violation. Investigate independent
   unexplained peer resets separately.
 - [ ] Asynchronous initial GPU adapter/device acquisition: native dispatch must
   remain responsive while acquisition is pending; preserve main-thread window
   ownership and failure propagation.
-- [ ] macOS/Windows live-font behavior: establish GNU/platform capabilities.
+- [x] macOS/Windows live-font behavior: establish GNU/platform capabilities.
   A user question is pending because GNU has no Linux-style system-monospace
   subscription on these backends; a Neomacs-specific preference would be a
   separate interface decision, not inferred from nonexistent OS settings.
   Research established no corresponding GNU subscription. Preserve that behavior
   unless the user defines a Neomacs-specific preference source.
-- [ ] Grown-minibuffer frame-height accounting: GNU differential regression and
+- [x] Grown-minibuffer frame-height accounting: GNU differential regression and
   correction through public Lisp/native-host geometry observations.
-- [ ] Child-frame initial width with chrome: reproduce without suppressing
+- [x] Child-frame initial width with chrome: reproduce without suppressing
   chrome, compare GNU, correct initial geometry ownership.
-- [ ] GNU split-window minimum-size overrides: pin the actual font-change
+- [x] GNU split-window minimum-size overrides: pin the actual font-change
   contract and retain native presented geometry evidence.
 - [ ] Overlapping resize acknowledgements: exercise multiple outstanding
   requests and stale native observations without losing newest intent.
@@ -76,3 +76,56 @@ and resize tests passed (`geometry-reviewed-green.log`). LiveFontCase uses
 strum::AsRefStr with kebab-case names. Neomacs GUI validation awaits a fresh build;
 deliberately grown native minibuffer and child scrollbar/different-font controls
 still need coverage. No native-presentation claim follows from core tests.
+
+The fresh geometry build at `e54acbbd2` completed, including byte compilation
+and matching runtime images (fingerprint
+`73205D67B43468F5E5175587174D3C6DAC60FFDAB3775E5D2EDBC6E725296F1C`).
+The expanded core run passed 107 tests. The serial GUI run passed 55/57:
+GNU and Neomacs both passed deliberate three-row minibuffer, initial child
+fringe/border, and horizontal/vertical split-minimum cases. A child-scrollbar
+control exposed the still-zero `frame-scroll-bar-width` stub; the getter now
+uses the same scrollbar area calculation as allocation, and its core control
+passes. That fix awaits the next fresh binary. The other failure was a native
+smoke compositor peer reset; the unchanged test passed alone. Preserve the
+original failure evidence rather than describing the entire run as passing.
+
+Native CI run 34750377073 passed adapters on macOS and Windows. macOS also
+passed public Lisp contracts and entered its full build; Windows was compiling
+those contracts at this checkpoint. Native GUI completion is still pending.
+
+Asynchronous GPU acquisition is implemented but not yet native-verified.
+The public Vulkan-driver FIFO regression first reproduced blocked native
+dispatch after private-compositor loss. Review corrected pending zero-size,
+native geometry reconciliation, close status, and explicit surface teardown.
+Runtime nextest passed 966 tests (5 skipped); runtime/harness checks passed.
+
+The next fresh build, fingerprint
+`81CEBF4E7C3E6EC38B279ED8C8CA06A9B66F1930322C495ED816DB2E11BDA933`,
+passed six focused native checks (`initial-resource-gpu-native.log`): explicit
+command-line font at first allocation, both GNU and Neomacs child scrollbar
+geometry, blocked-GPU close, display loss, and resize/completion. The GPU exit
+fix was required because normal process finalizers re-entered Vulkan's blocked
+loader mutex after native cleanup. A persistent cancellation witness now also
+covers a successful retry after cancellation; final rebuild is still required.
+
+First-window font preparation now observes GUI options in the existing argv
+pass, shares option classification with GNU-style sorting, and forwards all
+original Lisp arguments. Explicit font wins over native resource font, then
+the ordinary platform candidates apply. The same native font opener supplies
+the first allocation and installed font. No Lisp startup/early-init ordering
+is moved: early-init frame alists still run after this architecture's initial
+native window. The 44 startup-argument tests passed. New ephemeral native CI
+checks verify the exact resource, realized size against an explicitly opened
+control, and both dimensions of the first allocation.
+
+macOS run 34750377073 completed successfully. Windows run 34749688492 also
+completed successfully, including native GUI startup/font/resize. The newer
+Windows job and updated resource-font CI validation remain pending.
+
+The overlapping-resize regression reproduced loss of 101-column intent after
+an earlier 91-column allocation. Separating requested intent from observations
+passed 81 selected core checks and 62 resize integration checks. GNU's native
+stress scenario passed. Review added queued input/focus/key/second-frame and
+position-only controls; Neomacs native validation awaits the final build.
+`RUST_LOG=warn cargo xtask fresh-build --release` is running for this slice.
+See [GPU startup design and evidence](../diagnostics/2026-09-13-async-gpu-startup.md).

@@ -2650,16 +2650,7 @@ pub(crate) fn builtin_x_get_resource(
     let mut name = dynamic_or_global_symbol_value(eval, "x-resource-name")
         .and_then(|value| display_string_text(&value))
         .unwrap_or_else(|| "emacs".into());
-    let valid = |byte: u8| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_';
-    if name.bytes().any(|byte| !valid(byte)) {
-        name = if name.bytes().filter(|byte| valid(*byte)).count() < 2 {
-            "emacs".into()
-        } else {
-            name.bytes()
-                .map(|byte| if valid(byte) { char::from(byte) } else { '_' })
-                .collect()
-        };
-    }
+    name = super::display_host::GuiResourceQuery::normalize_instance_name(&name);
     let mut class = dynamic_or_global_symbol_value(eval, "x-resource-class")
         .and_then(|value| display_string_text(&value))
         .unwrap_or_else(|| "Emacs".into());

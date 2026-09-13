@@ -108,6 +108,7 @@ mod input_bridge;
 mod secondary_tty;
 mod startup_font;
 mod startup_frame;
+mod startup_resources;
 mod termcap_input;
 pub(crate) mod terminal_capabilities;
 pub(crate) mod tty_frontend;
@@ -287,6 +288,7 @@ where
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StartupOptions {
+    gui: startup_resources::GuiStartupOptions,
     frontend: FrontendKind,
     forwarded_args: Vec<String>,
     terminal_device: Option<String>,
@@ -566,6 +568,7 @@ fn parse_startup_options(args: impl IntoIterator<Item = String>) -> Result<Start
     let mut no_site_lisp = false;
     let mut no_loadup = false;
     let mut no_build_details = false;
+    let mut gui = startup_resources::GuiStartupOptions::default();
     let mut idx = 0usize;
 
     while idx + 1 < parsed.len() {
@@ -814,7 +817,21 @@ fn parse_startup_options(args: impl IntoIterator<Item = String>) -> Result<Start
             ArgMatch::Bare => unreachable!(),
         }
 
-        // No flag matched at this position: forward verbatim.
+        // Retain GUI preparation options without consuming Lisp's arguments.
+        // Reuse the sorter's classification so an operand such as "--font"
+        // belonging to --eval cannot become a second option here.
+        if let Some(matched) = args::classify_standard_arg(&parsed[idx + 1]) {
+            let inline = parsed[idx + 1].split_once('=').map(|(_, value)| value);
+            if matched.option.nargs != 0 || inline.is_none() {
+                let value =
+                    inline.or_else(|| (matched.operands != 0).then(|| parsed[idx + 2].as_str()));
+                gui.observe(matched.option.name, value);
+            }
+            forwarded_args.extend_from_slice(&parsed[idx + 1..idx + 2 + matched.operands]);
+            idx += 1 + matched.operands;
+            continue;
+        }
+        // No standard option matched at this position: forward verbatim.
         forwarded_args.push(parsed[idx + 1].clone());
         idx += 1;
     }
@@ -865,6 +882,7 @@ fn parse_startup_options(args: impl IntoIterator<Item = String>) -> Result<Start
     }
 
     Ok(StartupOptions {
+        gui,
         frontend,
         forwarded_args,
         terminal_device,
@@ -3622,7 +3640,11 @@ fn run_gui_evaluator_worker(
     load_neomacs_gui_term_layer(&mut evaluator);
     tracing::info!("GUI evaluator context initialized");
 
-    let prepared = match startup_frame::PreparedGuiFrame::prepare(bootstrap_display.clone()) {
+    let (resources, preferred_font) = startup.gui.prepare(&invocation_name());
+    let prepared = match startup_frame::PreparedGuiFrame::prepare(
+        bootstrap_display.clone(),
+        preferred_font.as_deref(),
+    ) {
         Ok(frame) => frame,
         Err(error) => {
             startup_reply.failed(error.to_string());
@@ -3649,7 +3671,7 @@ fn run_gui_evaluator_worker(
     maybe_install_startup_phase_trace(&mut evaluator);
 
     evaluator.set_display_host(Box::new(PrimaryWindowDisplayHost {
-        resources: Default::default(),
+        resources,
         system_fonts: bootstrap_display.font_defaults.system_fonts(),
         tooltip_client: neomacs_display_protocol::tooltip::TooltipClient::new(
             emacs_comms.tooltip_context.clone(),
@@ -5042,6 +5064,16 @@ fn bootstrap_buffers_with_font(
     }
 }
 
+fn invocation_name() -> String {
+    std::env::current_exe()
+        .ok()
+        .and_then(|path| {
+            path.file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+        })
+        .unwrap_or_else(|| "neomacs".to_string())
+}
+
 fn configure_gnu_startup_state(eval: &mut Context, frame_id: FrameId, startup: &StartupOptions) {
     // Doom and similar configs deliberately raise `gc-cons-threshold` during
     // startup. Keep the measured arena-fragmentation ceiling active through
@@ -5080,13 +5112,7 @@ fn configure_gnu_startup_state(eval: &mut Context, frame_id: FrameId, startup: &
         .ok()
         .and_then(|path| path.parent().map(|parent| parent.to_path_buf()))
         .unwrap_or_else(|| PathBuf::from("/"));
-    let invocation_name = std::env::current_exe()
-        .ok()
-        .and_then(|path| {
-            path.file_name()
-                .map(|name| name.to_string_lossy().to_string())
-        })
-        .unwrap_or_else(|| "neomacs".to_string());
+    let invocation_name = invocation_name();
     let invocation_directory = ensure_dir_string(&invocation_directory);
 
     eval.set_variable("command-line-args", Value::list(argv));

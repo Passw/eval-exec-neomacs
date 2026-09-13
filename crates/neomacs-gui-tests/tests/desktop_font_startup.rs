@@ -5,6 +5,26 @@ use neomacs_gui_tests::{
 use std::{fs, path::PathBuf, process::Command, time::Duration};
 
 #[test]
+#[ignore = "requires release binary/pdump, Weston, glib-compile-schemas, Ubuntu Mono and DejaVu fonts"]
+fn command_line_font_drives_the_first_native_allocation() {
+    let result = check_fixture_with_font(
+        WaylandOutput::Standard,
+        "command-line-font-startup",
+        "startup-command-line-font.el",
+        WestonDesktop::Solid,
+        Some("DejaVu Sans Mono 16"),
+    );
+    let trace = fs::read_to_string(result.artifacts.stdout).unwrap();
+    let initial = trace
+        .lines()
+        .find(|line| line.contains("creating primary window: emacs_pixels="))
+        .expect("missing first native window allocation");
+    // Opened DejaVu 16 is 13px wide: 80 text columns, 16px fringes,
+    // and Neomacs's one-column default scrollbar allocation.
+    assert!(initial.contains("emacs_pixels=1069x"), "{initial}");
+}
+
+#[test]
 #[ignore = "requires release binary/pdump, Weston, glib-compile-schemas, Ubuntu Mono, DejaVu and SVG packages"]
 fn desktop_monospace_font_drives_initial_window_and_svg_metrics() {
     check_desktop_font_startup(WaylandOutput::Standard, "desktop-font-startup");
@@ -160,7 +180,17 @@ fn check_fixture_with_desktop(
     fixture: &str,
     desktop: WestonDesktop,
 ) -> GuiRunResult {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    check_fixture_with_font(output, scenario, fixture, desktop, None)
+}
+
+fn check_fixture_with_font(
+    output: WaylandOutput,
+    scenario: &str,
+    fixture: &str,
+    desktop: WestonDesktop,
+    font: Option<&str>,
+) -> GuiRunResult {
+    let root = PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
     let artifacts = root.join("target/neomacs-gui-tests").join(scenario);
     let receipt = artifacts.join("presentation.sexp");
     match fs::remove_file(&receipt) {
@@ -207,6 +237,17 @@ fn check_fixture_with_desktop(
     .with_env("RUST_LOG", "debug")
     .with_env("GSETTINGS_SCHEMA_DIR", schemas.to_string_lossy())
     .with_env("GSETTINGS_BACKEND", "memory");
+    if let Some(font) = font {
+        plan = plan.with_args([
+            "-Q".into(),
+            format!("--font={font}"),
+            "-l".into(),
+            root.join("crates/neomacs-gui-tests/fixtures")
+                .join(fixture)
+                .to_string_lossy()
+                .into_owned(),
+        ]);
+    }
     for (key, value) in session.env() {
         plan = plan.with_env(key.clone(), value.clone());
     }
