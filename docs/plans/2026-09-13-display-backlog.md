@@ -19,7 +19,7 @@ a claim of completion.
   Weston, explain against official protocol/source, correct Neomacs only if
   the evidence identifies a client contract violation. Investigate independent
   unexplained peer resets separately.
-- [ ] Asynchronous initial GPU adapter/device acquisition: native dispatch must
+- [x] Asynchronous initial GPU adapter/device acquisition: native dispatch must
   remain responsive while acquisition is pending; preserve main-thread window
   ownership and failure propagation.
 - [x] macOS/Windows live-font behavior: establish GNU/platform capabilities.
@@ -34,7 +34,7 @@ a claim of completion.
   chrome, compare GNU, correct initial geometry ownership.
 - [x] GNU split-window minimum-size overrides: pin the actual font-change
   contract and retain native presented geometry evidence.
-- [ ] Overlapping resize acknowledgements: exercise multiple outstanding
+- [x] Overlapping resize observations: exercise multiple outstanding
   requests and stale native observations without losing newest intent.
 
 ## Working constraints
@@ -127,5 +127,18 @@ an earlier 91-column allocation. Separating requested intent from observations
 passed 81 selected core checks and 62 resize integration checks. GNU's native
 stress scenario passed. Review added queued input/focus/key/second-frame and
 position-only controls; Neomacs native validation awaits the final build.
+
+The final fresh build completed with matching runtime image and byte compilation
+(fingerprint `B4260E90CA0EDF2B29B42B8D0CBA7D15A3C8F07500993E72E02CF80A0F0CF34F`).
+The complete selected GUI integration run passed **63/63, zero skipped** in
+71.544 seconds (`final-display-gui-integration.log`), including GNU and Neomacs
+overlap, scrollbar, grown-minibuffer and minimum cases, startup fonts, native
+smoke, and pending-GPU close/display-loss/resize controls. Final runtime nextest
+passed 966 tests with five existing skips. The reviewed input-queue/position
+fix passed 62 resize checks, and all 16 frame-parameter/position controls passed.
+
+Implementation is pushed through `eab4a24fe` in three reviewable commits. Updated
+native CI run 34753154974 verifies that source; its resource-font checks remain
+pending. No Linux success is being substituted for those native platform results.
 `RUST_LOG=warn cargo xtask fresh-build --release` is running for this slice.
 See [GPU startup design and evidence](../diagnostics/2026-09-13-async-gpu-startup.md).

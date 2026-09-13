@@ -55,9 +55,7 @@ Candidate deterministic seam: use `RecordingDisplayHost` and public Lisp font/si
 
 A public GNU/Neomacs GUI stress sequence can issue several sizes/font changes in one callback and assert final settled geometry; it does not deterministically control compositor acknowledgment order. Pair that end-to-end check with the existing host/event seam, and describe the latter as deterministic Neomacs lifecycle coverage rather than fabricated GNU protocol evidence.
 
-## Existing tools to extend
-
-### Implemented overlapping-request policy
+## Implemented overlapping-request policy
 
 `PendingGuiResize` now retains the requested grid and native target separately
 from actual frame allocation. Every native observation is applied, including a
@@ -75,7 +73,13 @@ avoids repeated waits on an unattained target. The existing wait timeout is
 unchanged. The old public test returned a 1456px request (91 columns) where the
 newest 101-column intent required 1616px. The new core control passes, as do
 81 selected font/frame tests and 62 resize integration tests. GNU passed the
-public overlapping resize/font scenario; Neomacs native validation is pending.
+public overlapping resize/font scenario. The final 63/63 GUI run also passed
+Neomacs's version. The input-channel control now includes focus, another frame,
+and a following keypress. A position-only parameter change reproduced a second
+loss of requested columns; only explicit width/height changes now replace size
+intent. The final 62 resize and 16 frame-parameter/position checks passed.
+
+## Existing tools to extend
 
 Use [desktop-font-live.el](../../crates/neomacs-gui-tests/fixtures/desktop-font-live.el) for isolated settings writes, observed predicates, frame-state capture, and native Presented receipts; extend its cases rather than copying another polling/settings harness. Its current state capture can add root/minibuffer and split-window measurements. [desktop_font_updates.rs](../../crates/neomacs-gui-tests/tests/desktop_font_updates.rs) already owns GNU X11 versus Neomacs Wayland dispatch and schema/config isolation. [frame-resize-oracle.el](../../crates/neomacs-gui-tests/fixtures/frame-resize-oracle.el) gives the width-only unchanged-height control, though it currently uses timed callbacks rather than presentation readiness.
 

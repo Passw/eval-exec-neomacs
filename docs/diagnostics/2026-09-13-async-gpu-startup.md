@@ -90,3 +90,11 @@ See `initial-resource-gpu-native.log`. The persistent retry witness was added
 after that build and awaits final integration. Zero-size, device-stage
 cancellation, and suspension/retry were source-reviewed, not native-tested.
 Runtime nextest previously passed 966 tests with 5 skipped.
+
+Final integration uses fresh fingerprint
+`B4260E90CA0EDF2B29B42B8D0CBA7D15A3C8F07500993E72E02CF80A0F0CF34F`,
+including the persistent cancellation witness. All 63 selected GUI tests passed
+with zero skips (`final-display-gui-integration.log`); pending-GPU close took
+0.395s, display loss 0.193s and resize/completion 0.859s. Final runtime nextest
+again passed 966 tests with five existing skips. The process tests retain emitted
+Lisp output: the public printer flushes stdout at its write boundary.
