@@ -98,3 +98,23 @@ with zero skips (`final-display-gui-integration.log`); pending-GPU close took
 0.395s, display loss 0.193s and resize/completion 0.859s. Final runtime nextest
 again passed 966 tests with five existing skips. The process tests retain emitted
 Lisp output: the public printer flushes stdout at its write boundary.
+
+The strengthened resize/completion control selects a hidden Lisp child before
+resizing the primary native window while GPU discovery remains blocked. It
+exposed a transport alias: native frame ID zero reached the evaluator, where
+zero means the selected frame. The exact failing observation was primary
+`664x646`, child `901x603`, expected child `344x170`
+(`gpu-primary-frame-exact-red.log`). The GUI input bridge now resolves this
+pre-adoption alias to the original primary Lisp frame before queueing the
+resize. Explicit frame IDs, native dimensions, event ordering, and wakeups are
+unchanged. The fixture waits for its child-selection marker before the native
+action; existing startup clipboard timeouts can delay that marker while GPU
+commands are pending. No production delay was introduced.
+
+The corrected control passed in 10.752 seconds against fresh fingerprint
+`74C099BA5F5155879D462B99C0540833F0760B0C0558E48C4EDBB3991460ED41`
+(`gpu-primary-frame-green.log`). The full selected GUI integration passed all
+63 tests with zero skips in 80.112 seconds against this executable
+(`primary-reviewed-gui-integration.log`), including the strengthened control
+in 10.832 seconds. This executable predates incoming VM/JIT commits
+`4372a5c45`, `c686f35fc`, and `8195d4b69`; it verifies the unchanged display patch.

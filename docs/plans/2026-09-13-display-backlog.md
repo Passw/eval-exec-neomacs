@@ -13,8 +13,9 @@ a claim of completion.
   Windows execution using repository CI runners; strengthen native GUI controls.
 - [ ] GNU platform resources: Windows registry precedence and Cocoa user
   defaults, including initial font policy and public resource lookup.
-  Public queries and later-frame font precedence are implemented with winreg
-  and objc2-foundation; first-native-window resource font discovery remains open.
+  Public queries, later-frame font precedence, and first-native-window resource
+  font discovery are implemented with winreg and objc2-foundation. Native CI
+  validation of the first allocation remains pending.
 - [x] Weston cached subsurface scale/detach diagnostic: reproduce on stock
   Weston, explain against official protocol/source, correct Neomacs only if
   the evidence identifies a client contract violation. Investigate independent
@@ -48,7 +49,10 @@ Use stock compositors, without production delays, patched Weston, or invented
 native presentation confirmations. Preserve exported log compatibility.
 Commit independently reviewable slices and perform final integration checks.
 
-## Investigations underway
+## Verification checkpoints
+
+The following entries preserve earlier checkpoints and failure evidence.
+The last entry records the latest result.
 
 The research skill runs independent primary-source investigations for native
 resources/settings and the stock Weston diagnostic. Existing macOS fresh-build
@@ -140,5 +144,15 @@ fix passed 62 resize checks, and all 16 frame-parameter/position controls passed
 Implementation is pushed through `eab4a24fe` in three reviewable commits. Updated
 native CI run 34753154974 verifies that source; its resource-font checks remain
 pending. No Linux success is being substituted for those native platform results.
-`RUST_LOG=warn cargo xtask fresh-build --release` is running for this slice.
+Both jobs in run 34753154974 passed native adapters and public Lisp contracts;
+their fresh release builds are running before the resource-font GUI checks.
+
+A strengthened pending-GPU regression found that selecting a hidden child
+before the initial primary resize caused frame ID zero to target that child.
+The input bridge now resolves zero to the primary Lisp frame before queueing.
+The exact red control and source review are complete. Fresh fingerprint
+`74C099BA5F5155879D462B99C0540833F0760B0C0558E48C4EDBB3991460ED41`
+passed the corrected control and all 63 selected GUI tests with zero skips
+(`primary-reviewed-gui-integration.log`, 80.112 seconds). This executable
+predates the three incoming VM/JIT commits through `8195d4b69`.
 See [GPU startup design and evidence](../diagnostics/2026-09-13-async-gpu-startup.md).

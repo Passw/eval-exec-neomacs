@@ -82,6 +82,7 @@ fn check_pending_gpu(action: GpuStartupAction) {
         )
         .env("WGPU_BACKEND", "vulkan")
         .env("VK_DRIVER_FILES", &manifest)
+        .env("NEOMACS_GUI_GPU_READY_FILE", artifacts.join("lisp-ready"))
         .env("RUST_LOG", "info")
         .stdout(fs::File::create(artifacts.join("stdout.log")).unwrap())
         .stderr(fs::File::create(artifacts.join("stderr.log")).unwrap())
@@ -146,6 +147,20 @@ fn check_pending_gpu(action: GpuStartupAction) {
         if matches!(action, GpuStartupAction::LoseDisplay) {
             drop(session);
         } else {
+            if matches!(action, GpuStartupAction::ResizeAndComplete) {
+                let deadline = Instant::now() + Duration::from_secs(25);
+                while !artifacts.join("lisp-ready").is_file() {
+                    if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
+                        return Err(format!(
+                            "Lisp exited before selecting its child frame: {status}"
+                        ));
+                    }
+                    if Instant::now() >= deadline {
+                        return Err("Lisp did not select its child during GPU discovery".into());
+                    }
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+            }
             let mut search = Command::new("xdotool");
             search.args(["search", "--pid", &child.id().to_string()]);
             for (key, value) in session.env() {

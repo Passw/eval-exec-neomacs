@@ -3751,7 +3751,16 @@ fn run_gui_evaluator_worker(
                 record_primary_window_resize(&primary_window_size_for_input, &event);
                 let mut queued_input = false;
                 let mut evaluator_disconnected = false;
-                for kb_event in input_bridge::convert_display_event(&event) {
+                for mut kb_event in input_bridge::convert_display_event(&event) {
+                    // Before renderer adoption, zero identifies the original
+                    // native window. Lisp may already have selected a child;
+                    // resolve that transport alias before queuing the resize.
+                    if let neovm_core::keyboard::InputEvent::Resize { emacs_frame_id, .. } =
+                        &mut kb_event
+                        && *emacs_frame_id == 0
+                    {
+                        *emacs_frame_id = frame_id.0;
+                    }
                     if should_log {
                         tracing::debug!(
                             "input-bridge: converted display event {:?} to keyboard event {:?}",
