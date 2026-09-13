@@ -1711,28 +1711,46 @@ impl Context {
                 let ctx_ptr = self as *mut Context;
                 let saved_roots = save_scratch_gc_roots();
                 push_scratch_gc_root(func_value);
-                // The leaf's premarshaled ABI, exactly as `call_consts` builds
-                // it: nil-padded for omitted `&optional`, the tail consed into
-                // the `&rest` slot. `args` is rooted by the caller that built
-                // it (the same contract `call_consts` documents), so the
-                // elements stay live across the cons below.
-                let nil = crate::emacs_core::value::Value::NIL.bits() as i64;
-                let fixed = nargs.min(nonrest);
-                let mut bits: smallvec::SmallVec<[i64; 8]> = args[..fixed]
-                    .iter()
-                    .map(|v| v.bits() as i64)
-                    .chain(std::iter::repeat_n(nil, nonrest - fixed))
-                    .collect();
-                if has_rest {
-                    let rest = if nargs > nonrest {
-                        self.tagged_heap.list_from_slice(&args[nonrest..nargs])
-                    } else {
-                        crate::emacs_core::value::Value::NIL
-                    };
-                    bits.push(rest.bits() as i64);
-                }
-                let native =
-                    cache::run_armed_leaf(ctx_ptr, bc_data, func_value, leaf, bits.as_ptr());
+                // `args` is rooted by the caller that built it (the same
+                // contract `call_consts` documents), so the elements stay live
+                // across the call.
+                let native = if !has_rest && nargs == nonrest {
+                    // PURE PASS-THROUGH. `Value` is `#[repr(transparent)]` over
+                    // `usize`, so a `LispArgVec` IS a contiguous array of
+                    // tagged words in exactly the leaf's ABI order — there is
+                    // nothing to marshal. Unlike the operand-stack twin, where
+                    // the premarshal exists because a nested call's shim can
+                    // reallocate `bc_buf` under a pointer into it, this vector
+                    // is a local that nothing appends to for the duration of
+                    // the call.
+                    cache::run_armed_leaf(
+                        ctx_ptr,
+                        bc_data,
+                        func_value,
+                        leaf,
+                        args.as_ptr().cast::<i64>(),
+                    )
+                } else {
+                    // Normalize to the leaf's ABI exactly as `call_consts`
+                    // does: nil-padded for omitted `&optional`, the tail
+                    // consed into the `&rest` slot.
+                    let nil = crate::emacs_core::value::Value::NIL.bits() as i64;
+                    let fixed = nargs.min(nonrest);
+                    let mut bits: smallvec::SmallVec<[i64; 8]> = args[..fixed]
+                        .iter()
+                        .map(|v| v.bits() as i64)
+                        .chain(std::iter::repeat_n(nil, nonrest - fixed))
+                        .collect();
+                    if has_rest {
+                        let rest = if nargs > nonrest {
+                            self.tagged_heap.list_from_slice(&args[nonrest..nargs])
+                        } else {
+                            crate::emacs_core::value::Value::NIL
+                        };
+                        bits.push(rest.bits() as i64);
+                    }
+                    cache::run_armed_leaf(ctx_ptr, bc_data, func_value, leaf, bits.as_ptr())
+                };
                 restore_scratch_gc_roots(saved_roots);
                 return match native {
                     Ok(Some(b)) => Ok(crate::emacs_core::value::Value::from_bits(b)),
