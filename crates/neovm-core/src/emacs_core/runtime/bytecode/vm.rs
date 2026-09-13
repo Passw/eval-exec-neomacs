@@ -5515,7 +5515,10 @@ impl<'a> Vm<'a> {
     /// string-compare symbol names on the hot path.
     #[inline(always)]
     fn mutates_first_arg_sym(id: SymId) -> bool {
-        id == fillarray_sym_id() || id == aset_sym_id()
+        // `aset` is NOT here: it mutates its array in place and returns the
+        // same object, so no reference to it can go stale. See
+        // `maybe_writeback_mutating_first_arg`.
+        id == fillarray_sym_id()
     }
 
     #[inline]
@@ -5602,6 +5605,25 @@ impl<'a> Vm<'a> {
         .map(Some)
     }
 
+    /// Patch every reference to a string that a mutating builtin REPLACED
+    /// rather than mutated.
+    ///
+    /// `aset` used to be one of those: it rebuilt the whole string, so the
+    /// caller's variable still pointed at the old object and every reference
+    /// had to be found and rewritten. It stopped doing that — rebuilding made
+    /// byte-at-a-time transforms quadratic, so it mutates the bytes in place
+    /// and returns the SAME object (both of `aset_string_replacement`'s `Ok`
+    /// arms are `Ok(*array)`). The `aset` arm here outlived that change: it
+    /// re-ran `aset_string_replacement` — applying the byte write a second
+    /// time — only to compare the result against the original and always find
+    /// them identical. On `dhrystone` that was a redundant string mutation for
+    /// every one of ~60M `aset`s, and it could not have been otherwise: the
+    /// arm called OUR builtin directly, so no redefinition could make it
+    /// return a different object.
+    ///
+    /// Only `fillarray` remains, and only because it is reached through a
+    /// function CELL a user could have redefined; our own `fillarray` mutates
+    /// in place and returns its argument too.
     fn maybe_writeback_mutating_first_arg(
         &mut self,
         called_name: &str,
@@ -5609,10 +5631,7 @@ impl<'a> Vm<'a> {
         call_args: &[Value],
         result: &Value,
     ) {
-        let mutates_fillarray =
-            called_name == "fillarray" || alias_target.is_some_and(|name| name == "fillarray");
-        let mutates_aset = called_name == "aset" || alias_target.is_some_and(|name| name == "aset");
-        if !mutates_fillarray && !mutates_aset {
+        if called_name != "fillarray" && alias_target != Some("fillarray") {
             return;
         }
 
@@ -5623,25 +5642,10 @@ impl<'a> Vm<'a> {
             return;
         }
 
-        let replacement = if mutates_fillarray {
-            if !result.is_string() || eq_value(first_arg, result) {
-                return;
-            }
-            *result
-        } else {
-            if call_args.len() < 3 {
-                return;
-            }
-            let Ok(updated) =
-                builtins::aset_string_replacement(first_arg, &call_args[1], &call_args[2])
-            else {
-                return;
-            };
-            if eq_value(first_arg, &updated) {
-                return;
-            }
-            updated
-        };
+        if !result.is_string() || eq_value(first_arg, result) {
+            return;
+        }
+        let replacement = *result;
 
         if crate::emacs_core::value::equal_value(first_arg, &replacement, 0) {
             return;
@@ -6420,31 +6424,15 @@ impl<'a> Vm<'a> {
         // that never changes. `dhrystone` is string-mutation heavy and spent
         // ~11% of its run in `lookup_interned` because of this.
         let id = Self::cached_builtin_id("aset", &ASET_ID);
-        // The mutating-first-arg writeback exists for `aset` on a STRING,
-        // which replaces the string object; `maybe_writeback_mutating_first_arg`
-        // returns immediately for anything else. Testing that here — as
-        // `callbuiltin_for_jit` already does — keeps the root scope, the four
-        // dynamic root pushes and the name resolution off every `aset` to a
-        // vector, record or char-table.
-        let needs_writeback = vec_val.is_string();
-        let result = if self.named_builtin_fast_path_allowed_id(id) {
-            builtins::builtin_aset_args(&call_args)?
+        // No writeback at all: `aset` mutates its array in place and returns
+        // the same object, so no reference to it can have gone stale. See
+        // `maybe_writeback_mutating_first_arg`.
+        if self.named_builtin_fast_path_allowed_id(id) {
+            builtins::builtin_aset_args(&call_args)
         } else {
             let func_val = Value::from_sym_id(id);
-            // `call_function` consumes the args; the writeback below re-reads
-            // them from the three `Copy` values still in scope.
-            self.call_function(func_val, LispArgVec::from_slice(&call_args))?
-        };
-        if needs_writeback {
-            let root_scope = self.ctx.save_vm_roots();
-            self.push_dynamic_vm_root(result);
-            for value in call_args.iter().copied() {
-                self.push_dynamic_vm_root(value);
-            }
-            self.maybe_writeback_mutating_first_arg(resolve_sym(id), None, &call_args, &result);
-            self.ctx.restore_vm_roots(root_scope);
+            self.call_function(func_val, LispArgVec::from_slice(&call_args))
         }
-        Ok(result)
     }
 
     /// `Op::CallBuiltin` for JIT code — the interpreter arm minus the
