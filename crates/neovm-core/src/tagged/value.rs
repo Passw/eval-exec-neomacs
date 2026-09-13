@@ -71,22 +71,12 @@ thread_local! {
 
     /// [`TaggedValue::subr_from_sym_id`] keyed by the symbol it was ASKED
     /// about, short-circuiting the canonicalization — see that function.
-    static SUBR_BY_SYM: RefCell<Vec<Option<TaggedValue>>> = const { RefCell::new(Vec::new()) };
-    static SUBR_BY_SYM_EPOCH: std::cell::Cell<u64> = const { std::cell::Cell::new(u64::MAX) };
-}
-
-/// Drop the `subr_from_sym_id` memo if the canonical name -> symbol mapping
-/// moved under it. Everything the memo holds is a leaked, never-moved static
-/// subr object, so only the MAPPING can go stale.
-#[inline]
-fn subr_by_sym_epoch_check() {
-    let current = symbol_registry_epoch_value();
-    SUBR_BY_SYM_EPOCH.with(|epoch| {
-        if epoch.get() != current {
-            epoch.set(current);
-            SUBR_BY_SYM.with(|cache| cache.borrow_mut().clear());
-        }
-    });
+    ///
+    /// The validating epoch lives INSIDE the cell so a hit costs ONE
+    /// thread-local access and one borrow: as two separate thread-locals the
+    /// hit was 43 Ir, most of it the second round trip.
+    static SUBR_BY_SYM: RefCell<(u64, Vec<Option<TaggedValue>>)> =
+        const { RefCell::new((u64::MAX, Vec::new())) };
 }
 
 pub(crate) fn update_static_subr_object_entry(
@@ -369,21 +359,30 @@ impl TaggedValue {
     /// mapping can, and that bumps `symbol_registry_epoch`, which is exactly
     /// what the memo validates against.
     pub fn subr_from_sym_id(sym_id: crate::emacs_core::intern::SymId) -> Self {
-        subr_by_sym_epoch_check();
         let idx = sym_id.0 as usize;
-        if let Some(value) =
-            SUBR_BY_SYM.with(|cache| cache.borrow().get(idx).and_then(|value| *value))
-        {
+        let epoch = symbol_registry_epoch_value();
+        let hit = SUBR_BY_SYM.with(|cache| {
+            let mut cache = cache.borrow_mut();
+            if cache.0 != epoch {
+                // The name -> canonical mapping moved; everything memoized
+                // under the old one has to be re-derived.
+                cache.0 = epoch;
+                cache.1.clear();
+                return None;
+            }
+            cache.1.get(idx).copied().flatten()
+        });
+        if let Some(value) = hit {
             return value;
         }
         let canonical = canonical_symbol_for_name(symbol_name_id(sym_id)).unwrap_or(sym_id);
         let value = canonical_subr_object(canonical);
         SUBR_BY_SYM.with(|cache| {
             let mut cache = cache.borrow_mut();
-            if cache.len() <= idx {
-                cache.resize_with(idx + 1, || None);
+            if cache.1.len() <= idx {
+                cache.1.resize_with(idx + 1, || None);
             }
-            cache[idx] = Some(value);
+            cache.1[idx] = Some(value);
         });
         value
     }

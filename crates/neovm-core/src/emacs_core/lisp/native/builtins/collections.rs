@@ -50,8 +50,11 @@ fn builtin_aref_values(array: Value, index: Value) -> EvalResult {
                 .as_vector_data()
                 .or_else(|| array.as_record_data())
                 .unwrap();
-            let is_bool_vector =
-                items.len() >= 2 && items[0].as_symbol_name() == Some("--bool-vector--");
+            // By SymId, not by name: this runs on every `aset` of a vector,
+            // and `as_symbol_name` resolves the symbol to a `&str` for a
+            // string compare.
+            let is_bool_vector = items.len() >= 2
+                && items[0].as_symbol_id() == Some(super::chartable::bool_vector_tag_sym_id());
             if is_bool_vector {
                 return super::chartable::bool_vector_ref_value(&array, idx)
                     .ok_or_else(|| signal(LispCondition::ArgsOutOfRange, vec![array, index]));

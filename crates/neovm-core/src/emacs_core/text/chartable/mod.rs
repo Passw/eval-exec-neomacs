@@ -88,7 +88,7 @@ pub fn is_bool_vector(v: &Value) -> bool {
         vec.len() >= 2
             && vec[0]
                 .as_symbol_id()
-                .is_some_and(|id| resolve_sym(id) == BOOL_VECTOR_TAG)
+                .is_some_and(|id| id == bool_vector_tag_sym_id())
     } else {
         false
     }
@@ -103,7 +103,7 @@ pub(crate) fn bool_vector_length(v: &Value) -> Option<i64> {
     if vec.len() < 2
         || vec[0]
             .as_symbol_id()
-            .is_none_or(|id| resolve_sym(id) != BOOL_VECTOR_TAG)
+            .is_none_or(|id| id != bool_vector_tag_sym_id())
     {
         return None;
     }
@@ -698,6 +698,15 @@ fn char_code_property_table_sym_id() -> SymId {
 /// Cached SymId of [`CHAR_TABLE_TAG`] — `is_char_table` runs per case-table
 /// probe on string/buffer search paths, and resolving + strcmp'ing the tag
 /// symbol's name there dominated the check.
+/// Cached `SymId` of [`BOOL_VECTOR_TAG`]. The bool-vector shape test runs on
+/// every `aset` and `aref` of a vector, and comparing NAMES there meant
+/// resolving a symbol to a `&str` and running a string compare per element
+/// access. Same rationale as [`char_table_tag_sym_id`].
+pub(crate) fn bool_vector_tag_sym_id() -> SymId {
+    static ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new();
+    *ID.get_or_init(|| intern(BOOL_VECTOR_TAG))
+}
+
 fn char_table_tag_sym_id() -> SymId {
     static ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new();
     *ID.get_or_init(|| intern(CHAR_TABLE_TAG))

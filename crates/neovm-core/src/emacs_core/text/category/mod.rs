@@ -560,8 +560,9 @@ pub(crate) fn builtin_category_set_mnemonics(args: Vec<Value>) -> EvalResult {
     };
 
     let bits = args[0].as_vector_data().unwrap();
-    let valid_shape =
-        bits.len() >= 130 && bits[0].is_symbol_named("--bool-vector--") && bits[1].is_fixnum();
+    let valid_shape = bits.len() >= 130
+        && bits[0].as_symbol_id() == Some(crate::emacs_core::chartable::bool_vector_tag_sym_id())
+        && bits[1].is_fixnum();
     if !valid_shape {
         return Err(signal(
             LispCondition::WrongTypeArgument,

@@ -7010,7 +7010,7 @@ pub(crate) fn register_subrs(ctx: &mut crate::emacs_core::eval::Context) {
     ctx.register_subr(SubrSpec::fixed2("aref", builtin_aref_2, FixedMin2::Two));
     ctx.register_subr(SubrSpec::new(
         "aset",
-        NativeFn::ContextVec(|_ctx, args| builtin_aset(args)),
+        NativeFn::ContextSlice(|_ctx, args| builtin_aset_args(args)),
         SubrArity::new(3, Some(3)),
     ));
     ctx.register_subr(SubrSpec::new(
