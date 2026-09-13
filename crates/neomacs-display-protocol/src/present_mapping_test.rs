@@ -111,6 +111,11 @@ fn mapping_types_keep_frame_device_and_root_surface_spaces_distinct() {
 
 #[test]
 fn native_titlebar_reserves_surface_space_without_scaling_editor_coordinates() {
+    let insets = crate::ContentInsets::new(0, 56, 0, 0);
+    let requested = insets.surface_size(1600, 1200);
+    assert_eq!(requested, (1600, 1256));
+    // Recreating from the observed content must not add the titlebar twice.
+    assert_eq!(insets.content_size(requested.0, requested.1), (1600, 1200));
     let surface =
         drawable(1600, 1200, 2.0).with_content_insets(crate::ContentInsets::new(0, 56, 0, 0));
     let mapping = PresentMapping::top_left_clip(surface, content(13, 800.0, 600.0));

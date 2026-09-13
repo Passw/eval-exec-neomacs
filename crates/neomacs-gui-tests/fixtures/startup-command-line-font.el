@@ -14,6 +14,9 @@
          ;; Exercise the same public font-info control as native resources.
          (let ((actual (font-info (face-attribute 'default :font)))
                (control (font-info "DejaVu Sans Mono 16")))
+           (message "STARTUP-FONT native=%sx%s cell=%sx%s actual=%S control=%S parameters=%S"
+                    (frame-native-width) (frame-native-height)
+                    (frame-char-width) (frame-char-height) actual control (frame-parameters))
            (unless (and (vectorp actual) (vectorp control)
                         (= (aref actual 2) (aref control 2)))
              (error "Startup font size differs from named control: %S vs %S" actual control)))

@@ -74,6 +74,14 @@ impl ContentInsets {
             height.saturating_sub(self.top).saturating_sub(self.bottom),
         )
     }
+
+    /// Full surface needed to hold an editor content size and native chrome.
+    pub fn surface_size(self, width: u32, height: u32) -> (u32, u32) {
+        (
+            width.saturating_add(self.left).saturating_add(self.right),
+            height.saturating_add(self.top).saturating_add(self.bottom),
+        )
+    }
 }
 
 impl DeviceSurfacePoint {

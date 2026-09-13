@@ -180,3 +180,23 @@ on its `1024x768` hosted screen. The macOS resource control now uses Menlo 13,
 so its non-default font fits without weakening either dimension assertion.
 The workflow accepts a platform choice to rerun this macOS-only fixture change
 without duplicating the pending Windows build. Actionlint passed.
+
+Run 34755106910's macOS GUI confirmed the corrected resource value, family,
+realized font size, and 80-column grid. Only the height equality failed:
+requested 723, observed 645 on that runner. The ordinary native GUI test
+passed. Logs and state are retained under `native-font-info-macos`. These
+observations are consistent with native screen constraints; the smaller-font
+run 34755829943 tests that inference without relaxing the allocation assertion.
+
+The smaller-font run disproved a screen-only explanation: the native surface
+was `664x574`, but Lisp reported `664x542`. Font/resource checks and ordinary
+GUI smoke passed. Source review identified the missing overlay safe area:
+creation treated editor dimensions as full surface dimensions, whereas later
+resize requests add native insets and Lisp observations subtract them.
+Initial and later window creation now reserve the measured native safe area
+before GPU setup, sharing the inverse conversion with active resize requests.
+Pending cancellation preserves the last usable editor size, including through
+zero-size observations, so retries do not add insets or scale twice.
+All 1,724 protocol/runtime tests passed with five existing skips
+(`native-content-insets-reviewed-core.log`); source review found no remaining
+blocking issue. A fresh build and macOS native validation are pending.

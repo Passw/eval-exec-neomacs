@@ -187,7 +187,13 @@ impl RenderApp {
                         effective_scale
                     );
 
-                    let phys = window.surface_size();
+                    let phys =
+                        crate::window_chrome::WindowChromeController::request_initial_content_size(
+                            window.as_ref(),
+                            decorations_enabled,
+                            window_size_from_emacs_pixels(width, height)
+                                .to_physical(raw_scale_factor),
+                        );
                     {
                         let primary = self.frame_windows.primary_window_mut().unwrap();
                         if let FrameLifecycle::Pending {
@@ -211,7 +217,10 @@ impl RenderApp {
                     );
                     let proxy = event_loop.create_proxy();
                     match super::gpu_startup::PendingGpu::start(window.clone(), descriptor, proxy) {
-                        Ok(pending) => self.gpu_startup = Some(pending),
+                        Ok(pending) => {
+                            self.gpu_startup = Some(pending);
+                            self.observe_pending_content(phys);
+                        }
                         Err(error) => self.startup_error = Some(error),
                     }
 
@@ -956,8 +965,39 @@ impl RenderApp {
         }
     }
 
+    pub(super) fn observe_pending_content(&mut self, surface: winit::dpi::PhysicalSize<u32>) {
+        if let Some(pending) = &self.gpu_startup {
+            let window = pending.window();
+            let decorated = self
+                .frame_windows
+                .primary_window()
+                .unwrap()
+                .chrome()
+                .decorations_enabled;
+            let insets = crate::window_chrome::WindowChromeController::insets(window, decorated);
+            let content = insets.content_size(surface.width, surface.height);
+            let (width, height) = super::state::emacs_pixels_from_window_size(
+                content.0,
+                content.1,
+                effective_window_scale_factor(window.scale_factor()),
+            );
+            self.pending_content_size.observe_content(width, height);
+        }
+    }
+
     pub(super) fn cancel_gpu_startup(&mut self) {
         if let Some(pending) = self.gpu_startup.take() {
+            // While a native window exists these fields track its observed
+            // surface. A new creation consumes editor dimensions instead;
+            // restore the last usable observation before dropping the window
+            // so retries add the next safe area only once. The native window
+            // may already be destroyed; do not query its size during teardown.
+            if let Some(primary) = self.frame_windows.primary_window_mut()
+                && let FrameLifecycle::Pending { width, height, .. } = &mut primary.lifecycle
+            {
+                *width = self.pending_content_size.width;
+                *height = self.pending_content_size.height;
+            }
             // A later successful attempt cannot prove this detached worker
             // finished. Keep the process-finalizer bypass for the whole run.
             self.gpu_startup_cancelled

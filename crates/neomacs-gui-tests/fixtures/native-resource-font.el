@@ -8,6 +8,9 @@
               (requested (getenv "NEOMACS_GUI_RESOURCE_FONT"))
               (control (font-info requested))
               (actual (font-info (face-attribute 'default :font))))
+         (message "STARTUP-FONT native=%sx%s cell=%sx%s actual=%S control=%S parameters=%S"
+                  (frame-native-width) (frame-native-height)
+                  (frame-char-width) (frame-char-height) actual control (frame-parameters))
          (unless (equal (x-get-resource "font" "Font") requested)
            (error "Native resource lookup did not return %S" requested))
          (unless (and (equal (face-attribute 'default :family) family)

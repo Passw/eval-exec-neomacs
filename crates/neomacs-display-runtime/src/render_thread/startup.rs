@@ -17,6 +17,16 @@ pub struct InitialWindowSize {
     pub height: u32,
 }
 
+impl InitialWindowSize {
+    pub(super) fn observe_content(&mut self, width: u32, height: u32) {
+        // A suspended or fully covered surface cannot replace the dimensions
+        // needed to recreate the editor when native surfaces become available.
+        if width != 0 && height != 0 {
+            *self = Self { width, height };
+        }
+    }
+}
+
 /// Consuming preparation reply. Success, failure and unwind all wake the native
 /// loop after publishing their outcome; an idle loop never needs a polling timer.
 pub struct InitialWindowReply {

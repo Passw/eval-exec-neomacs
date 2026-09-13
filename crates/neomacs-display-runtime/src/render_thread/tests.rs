@@ -33,6 +33,29 @@ pub(super) fn make_test_app() -> RenderApp {
 }
 
 #[test]
+fn pending_native_recreation_retains_last_usable_editor_size() {
+    let mut content = super::startup::InitialWindowSize {
+        width: 664,
+        height: 574,
+    };
+    content.observe_content(901, 603);
+    content.observe_content(0, 603);
+    content.observe_content(901, 0);
+    content.observe_content(0, 0);
+    assert_eq!((content.width, content.height), (901, 603));
+
+    let titlebar = neomacs_display_protocol::ContentInsets::new(0, 32, 0, 0);
+    let surface = titlebar.surface_size(content.width, content.height);
+    assert_eq!(surface, (901, 635));
+    let observed = titlebar.content_size(surface.0, surface.1);
+    content.observe_content(observed.0, observed.1);
+    assert_eq!(
+        titlebar.surface_size(content.width, content.height),
+        surface
+    );
+}
+
+#[test]
 fn child_frames_start_with_square_corners() {
     let app = make_test_app();
 

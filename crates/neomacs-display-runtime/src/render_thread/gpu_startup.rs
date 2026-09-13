@@ -87,9 +87,13 @@ impl PendingGpu {
     }
 
     pub(super) fn window_id(&self) -> WindowId {
+        self.window().id()
+    }
+
+    pub(super) fn window(&self) -> &dyn Window {
         match self {
-            Self::SurfaceSize(prepared) => prepared.window.id(),
-            Self::Adapters { window, .. } | Self::Device { window, .. } => window.id(),
+            Self::SurfaceSize(prepared) => prepared.window.as_ref(),
+            Self::Adapters { window, .. } | Self::Device { window, .. } => window.as_ref(),
         }
     }
 

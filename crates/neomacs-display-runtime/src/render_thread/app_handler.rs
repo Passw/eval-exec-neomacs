@@ -20,6 +20,9 @@ impl ApplicationHandler for RenderApp {
             .as_ref()
             .is_some_and(|pending| pending.window_id() == window_id)
         {
+            if let WindowEvent::SurfaceResized(size) = &event {
+                self.observe_pending_content(*size);
+            }
             if matches!(event, WindowEvent::CloseRequested | WindowEvent::Destroyed) {
                 self.comms
                     .send_input(crate::thread_comm::InputEvent::WindowClose { emacs_frame_id: 0 });

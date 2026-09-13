@@ -1,4 +1,5 @@
 use neomacs_display_protocol::{Color, ContentInsets, NativeTitlebarStyle, WindowChromePolicy};
+use winit::dpi::PhysicalSize;
 use winit::window::{Window, WindowAttributes};
 
 /// Native state is owned per window, never per renderer or process.
@@ -68,5 +69,30 @@ impl WindowChromeController {
             }
             _ => ContentInsets::default(),
         }
+    }
+
+    /// Native safe areas become available only after window creation. Reserve
+    /// them before GPU setup so they do not consume the requested editor area.
+    /// A pending native configure remains authoritative when it arrives.
+    pub fn request_initial_content_size(
+        window: &dyn Window,
+        decorated: bool,
+        content: PhysicalSize<u32>,
+    ) -> PhysicalSize<u32> {
+        let insets = Self::insets(window, decorated);
+        if insets == ContentInsets::default() {
+            return window.surface_size();
+        }
+        let (width, height) = insets.surface_size(content.width, content.height);
+        tracing::info!(
+            ?content,
+            ?insets,
+            width,
+            height,
+            "reserving initial native content area"
+        );
+        window
+            .request_surface_size(PhysicalSize::new(width, height).into())
+            .unwrap_or_else(|| window.surface_size())
     }
 }

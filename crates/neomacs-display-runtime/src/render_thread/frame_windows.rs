@@ -1469,16 +1469,8 @@ impl GuiFrameWindowState {
                 let content: PhysicalSize<u32> = window_size_from_emacs_pixels(width, height)
                     .to_physical(native.window.scale_factor());
                 let insets = native.content_insets();
-                let size = PhysicalSize::new(
-                    content
-                        .width
-                        .saturating_add(insets.left)
-                        .saturating_add(insets.right),
-                    content
-                        .height
-                        .saturating_add(insets.top)
-                        .saturating_add(insets.bottom),
-                );
+                let (width, height) = insets.surface_size(content.width, content.height);
+                let size = PhysicalSize::new(width, height);
                 match native.window.request_surface_size(size.into()) {
                     Some(size) => ResizeRequestOutcome::Applied {
                         window: native.window.id(),
@@ -1942,7 +1934,13 @@ impl GuiFrameWindowManager {
                     window_icon.apply(window.as_ref());
                     let raw_scale_factor = window.scale_factor();
                     let scale_factor = effective_window_scale_factor(raw_scale_factor);
-                    let phys = window.surface_size();
+                    let phys =
+                        crate::window_chrome::WindowChromeController::request_initial_content_size(
+                            window.as_ref(),
+                            self.chrome_defaults.decorations_enabled,
+                            window_size_from_emacs_pixels(req.width, req.height)
+                                .to_physical(raw_scale_factor),
+                        );
 
                     // Create surface for this window using the primary display-bound instance.
                     let surface = match instance.create_surface(window.clone()) {
