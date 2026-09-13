@@ -6592,12 +6592,12 @@ pub(crate) fn register_subrs(ctx: &mut crate::emacs_core::eval::Context) {
     ));
     ctx.register_subr(SubrSpec::new(
         "*",
-        NativeFn::ContextVec(|_ctx, args| builtin_mul(args)),
+        NativeFn::ContextSlice(|_ctx, args| builtin_mul(args)),
         SubrArity::new(0, None),
     ));
     ctx.register_subr(SubrSpec::new(
         "/",
-        NativeFn::ContextVec(|_ctx, args| builtin_div(args)),
+        NativeFn::ContextSlice(|_ctx, args| builtin_div(args)),
         SubrArity::new(1, None),
     ));
     ctx.register_subr(SubrSpec::fixed2("%", builtin_percent, FixedMin2::Two));

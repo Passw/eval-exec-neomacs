@@ -317,7 +317,10 @@ fn negate_value(eval: &super::super::eval::Context, value: &Value) -> EvalResult
 
 /// `*` with bignum promotion. Mirrors GNU `Ftimes` -> `arith_driver`
 /// (`src/data.c:3304`).
-pub(crate) fn builtin_mul(args: Vec<Value>) -> EvalResult {
+/// Takes a SLICE, not a `Vec`: it only reads its arguments, and the VM's
+/// stack dispatcher has to materialize an owned vector for a `Many` subr. On
+/// `nbody` that was a malloc and a free for a million multiplications.
+pub(crate) fn builtin_mul(args: &[Value]) -> EvalResult {
     let mut prod: i64 = 1;
     for (i, a) in args.iter().enumerate() {
         if let Some(n) = a.as_fixnum() {
@@ -391,13 +394,14 @@ fn continue_bignum_mul(rest: &[Value], mut acc: Integer) -> EvalResult {
 /// Truncation toward zero (`tdiv_q` semantics, matching `mpz_tdiv_q`),
 /// promoting `i64::MIN / -1` to bignum since `-i64::MIN` overflows i64.
 /// Float operands divert through float division as before.
-pub(crate) fn builtin_div(args: Vec<Value>) -> EvalResult {
-    expect_min_args("/", &args, 1)?;
+/// Slice-taking for the same reason as [`builtin_mul`].
+pub(crate) fn builtin_div(args: &[Value]) -> EvalResult {
+    expect_min_args("/", args, 1)?;
     // Single argument: return 1 / arg (reciprocal), matching GNU Emacs.
     if args.len() == 1 {
         return div_one_arg(&args[0]);
     }
-    if has_float(&args) {
+    if has_float(args) {
         let mut acc = expect_number_or_marker_f64(&args[0])?;
         for a in &args[1..] {
             let d = expect_number_or_marker_f64(a)?;
