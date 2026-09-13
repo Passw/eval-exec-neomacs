@@ -1,6 +1,95 @@
 use super::*;
 
 #[test]
+fn overlapping_native_observations_keep_the_latest_requested_grid_for_font_changes() {
+    let mut eval = Context::new();
+    let buffer = eval.buffers.create_buffer("*overlapping-resize*");
+    let fid = eval.frames.create_frame("overlapping", 800, 600, buffer);
+    let frame = eval.frames.get_mut(fid).unwrap();
+    frame.set_window_system(Some(Value::symbol("neo")));
+    frame.char_width = 8.0;
+    frame.char_height = 16.0;
+    for (key, value) in [
+        ("vertical-scroll-bars", Value::NIL),
+        ("left-fringe", Value::fixnum(0)),
+        ("right-fringe", Value::fixnum(0)),
+    ] {
+        frame.set_parameter(Value::symbol(key), value);
+    }
+    frame.resize_pixelwise(800, 600);
+    let host = RecordingDisplayHost::with_resolved_frame_font(remapped_mono_font_metrics());
+    let requests = host.resized.clone();
+    eval.set_display_host(Box::new(host));
+    eval.eval_str("(set-frame-width nil 91)").unwrap();
+    let a = requests.borrow().last().unwrap().clone();
+    eval.eval_str("(set-frame-width nil 101)").unwrap();
+    let b = requests.borrow().last().unwrap().clone();
+    let other = eval.frames.create_frame("other", 300, 200, buffer);
+    let (tx, rx) = crossbeam_channel::unbounded();
+    eval.input_rx = Some(rx);
+    for event in [
+        crate::keyboard::InputEvent::Focus {
+            focused: true,
+            emacs_frame_id: fid.0,
+        },
+        crate::keyboard::InputEvent::Resize {
+            width: a.width,
+            height: a.height,
+            scale_factor: 2.0,
+            emacs_frame_id: fid.0,
+        },
+        crate::keyboard::InputEvent::Resize {
+            width: 320,
+            height: 240,
+            scale_factor: 1.0,
+            emacs_frame_id: other.0,
+        },
+        crate::keyboard::InputEvent::key_press(crate::keyboard::KeyEvent::char('r')),
+    ] {
+        tx.send(event).unwrap();
+    }
+    assert_eq!(
+        eval.eval_str("(frame-native-width)").unwrap().as_int(),
+        Some(a.width as i64)
+    );
+    assert_eq!(
+        (
+            eval.frames.get(other).unwrap().width,
+            eval.frames.get(other).unwrap().height
+        ),
+        (320, 240)
+    );
+    assert_eq!(eval.read_char().unwrap(), Value::fixnum('r' as i64));
+    eval.eval_str("(modify-frame-parameters nil '((left . 10)))")
+        .unwrap();
+    eval.eval_str(r#"(internal-set-lisp-face-attribute 'default :font "Remapped Mono-24" nil)"#)
+        .unwrap();
+    let c = requests.borrow().last().unwrap().clone();
+    assert_eq!(
+        c.width,
+        101 * 16,
+        "the newest requested grid must survive an older allocation and a geometry query"
+    );
+    for observed in [&b, &b, &c] {
+        eval.apply_resize_input_event(observed.width, observed.height, 1.0, fid.0, false);
+        assert_eq!(
+            eval.eval_str("(frame-native-width)").unwrap().as_int(),
+            Some(observed.width as i64)
+        );
+    }
+    assert!(
+        eval.frames.get(fid).unwrap().pending_gui_resize.is_none(),
+        "attaining the target releases pending intent"
+    );
+    eval.apply_resize_input_event(84 * 16, c.height, 1.0, fid.0, false);
+    assert_eq!(
+        eval.eval_str("(frame-text-cols)").unwrap().as_int(),
+        Some(84),
+        "a later unsolicited allocation remains authoritative"
+    );
+}
+
+#[test]
 fn font_resize_propagates_nonlocal_exits_from_window_minimum_policy() {
     let mut eval = Context::new();
     let buffer = eval.buffers.create_buffer("*font-minimum-exit*");
@@ -85,6 +174,29 @@ fn native_resize_counts_the_entire_grown_minibuffer_in_frame_height() {
             .as_int(),
         Some(48)
     );
+}
+
+#[test]
+fn frame_scroll_bar_width_reports_only_the_allocated_scroll_bar_area() {
+    let mut eval = Context::new();
+    let buffer = eval.buffers.create_buffer("*scroll-bar-area*");
+    let fid = eval
+        .frames
+        .create_frame("scroll-bar-area", 640, 480, buffer);
+    eval.frames
+        .get_mut(fid)
+        .unwrap()
+        .set_window_system(Some(Value::symbol("neo")));
+    let result = eval
+        .eval_str(
+            r#"(progn
+      (modify-frame-parameters nil '((vertical-scroll-bars . right) (scroll-bar-width . 17)))
+      (let ((shown (frame-scroll-bar-width)))
+        (modify-frame-parameters nil '((vertical-scroll-bars . nil)))
+        (list shown (frame-scroll-bar-width))))"#,
+        )
+        .unwrap();
+    assert_eq!(result.to_string(), "(17 0)");
 }
 
 #[test]

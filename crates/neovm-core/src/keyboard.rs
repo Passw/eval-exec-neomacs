@@ -2707,7 +2707,10 @@ fn apply_resize_input_event_in_keyboard_runtime(
         } else {
             1.0
         };
+        let pending = frame.pending_gui_resize;
         frame.resize_pixelwise_with_buffer_constraints(buffers, width, height);
+        frame.pending_gui_resize =
+            pending.and_then(|pending| pending.after_native_observation(width, height));
     }
 }
 
@@ -2720,9 +2723,13 @@ fn pending_live_gui_resize_target(
     } else {
         Some(crate::window::FrameId(emacs_frame_id))
     }?;
-    frames
-        .get(target_fid)
-        .and_then(|frame| frame.pending_gui_resize.as_ref().map(|_| target_fid))
+    frames.get(target_fid).and_then(|frame| {
+        frame
+            .pending_gui_resize
+            .as_ref()
+            .filter(|pending| pending.is_queued())
+            .map(|_| target_fid)
+    })
 }
 
 fn sync_pending_resize_events_in_keyboard_runtime(

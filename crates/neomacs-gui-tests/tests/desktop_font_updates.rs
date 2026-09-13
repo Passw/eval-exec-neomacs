@@ -46,8 +46,52 @@ enum LiveFontCase {
     Inhibited,
     Child,
     ChildChrome,
+    ChildScrollbar,
     Minimum,
+    MinimumVertical,
+    GrownMinibuffer,
+    OverlappingResize,
     Fullscreen,
+}
+
+#[test]
+#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and fonts"]
+fn gnu_overlapping_resize_and_font_change_preserve_latest_grid() {
+    check_live_font(
+        GuiBackend::LinuxX11,
+        "gnu-live-overlapping",
+        LiveFontCase::OverlappingResize,
+    );
+}
+
+#[test]
+#[ignore = "requires release binary/pdump, Weston, GSettings and fonts"]
+fn overlapping_resize_and_font_change_preserve_latest_grid() {
+    check_live_font(
+        GuiBackend::LinuxWayland,
+        "live-overlapping",
+        LiveFontCase::OverlappingResize,
+    );
+}
+
+#[test]
+#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and fonts"]
+fn gnu_grown_minibuffer_retains_frame_height_across_resize_and_font_change() {
+    check_live_font(
+        GuiBackend::LinuxX11,
+        "gnu-live-grown-mini",
+        LiveFontCase::GrownMinibuffer,
+    );
+}
+
+#[test]
+#[ignore = "requires release binary/pdump, Weston, GSettings and fonts"]
+fn grown_minibuffer_retains_frame_height_across_resize_and_font_change() {
+    check_live_font(
+        GuiBackend::LinuxWayland,
+        "live-grown-mini",
+        LiveFontCase::GrownMinibuffer,
+    );
 }
 
 #[test]
@@ -89,6 +133,46 @@ fn child_chrome_preserves_initial_and_live_font_text_grid() {
         GuiBackend::LinuxWayland,
         "live-child-chrome",
         LiveFontCase::ChildChrome,
+    );
+}
+
+#[test]
+#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and fonts"]
+fn gnu_child_scrollbar_and_distinct_font_preserve_initial_text_grid() {
+    check_live_font(
+        GuiBackend::LinuxX11,
+        "gnu-live-child-scrollbar",
+        LiveFontCase::ChildScrollbar,
+    );
+}
+
+#[test]
+#[ignore = "requires release binary/pdump, Weston, GSettings and fonts"]
+fn child_scrollbar_and_distinct_font_preserve_initial_text_grid() {
+    check_live_font(
+        GuiBackend::LinuxWayland,
+        "live-child-scrollbar",
+        LiveFontCase::ChildScrollbar,
+    );
+}
+
+#[test]
+#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and fonts"]
+fn gnu_stacked_window_minimum_overrides_font_resize_inhibition() {
+    check_live_font(
+        GuiBackend::LinuxX11,
+        "gnu-live-minimum-vertical",
+        LiveFontCase::MinimumVertical,
+    );
+}
+
+#[test]
+#[ignore = "requires release binary/pdump, Weston, GSettings and fonts"]
+fn stacked_window_minimum_overrides_font_resize_inhibition() {
+    check_live_font(
+        GuiBackend::LinuxWayland,
+        "live-minimum-vertical",
+        LiveFontCase::MinimumVertical,
     );
 }
 

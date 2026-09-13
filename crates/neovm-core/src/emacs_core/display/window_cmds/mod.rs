@@ -5581,8 +5581,8 @@ pub(crate) fn flush_pending_live_gui_resize(
 ) -> Result<bool, Flow> {
     let pending = eval
         .frames
-        .get_mut(fid)
-        .and_then(|frame| frame.take_pending_gui_resize());
+        .get(fid)
+        .and_then(|frame| frame.pending_gui_resize);
     let Some(pending) = pending else {
         return Ok(false);
     };
@@ -5603,25 +5603,23 @@ pub(crate) fn flush_pending_live_gui_resize(
         text_height_px
     );
 
-    if pending.host_request_sent {
-        Ok(true)
-    } else {
-        let waits_for_host_ack = eval.display_host.is_some()
-            && eval
-                .frames
-                .get(fid)
-                .is_some_and(|frame| frame.parent_frame.as_frame_id().is_none());
-        request_live_gui_frame_resize(
+    if pending.is_queued() {
+        super::frame::request_live_gui_frame_resize_and_keep_pending(
             &mut eval.frames,
             &eval.buffers,
             &mut eval.display_host,
             fid,
-            text_width_px,
-            text_height_px,
-            false,
+            FrameResizeRequest::Cells {
+                cols: pending.width_cols,
+                total_lines: pending.total_lines,
+            },
         )?;
-        Ok(waits_for_host_ack)
     }
+    Ok(eval
+        .frames
+        .get_mut(fid)
+        .and_then(|frame| frame.pending_gui_resize.as_mut())
+        .is_some_and(|pending| pending.take_native_wait()))
 }
 
 // ===========================================================================

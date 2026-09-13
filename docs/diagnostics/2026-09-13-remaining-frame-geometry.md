@@ -57,6 +57,26 @@ A public GNU/Neomacs GUI stress sequence can issue several sizes/font changes in
 
 ## Existing tools to extend
 
+### Implemented overlapping-request policy
+
+`PendingGuiResize` now retains the requested grid and native target separately
+from actual frame allocation. Every native observation is applied, including a
+different size or a duplicate. Attaining the latest target releases its intent;
+an explicit later size request supersedes it. Until then, another font change
+preserves the requested grid. In particular, refusal can leave that intention
+pending. Without native request tokens, refusal and an intermediate allocation
+cannot reliably be distinguished. No observation is classified as stale or
+discarded based on its dimensions.
+
+Queued requests still defer query-time observation draining until dispatch.
+Sent requests permit observations immediately and each allows at most one
+geometry-query wait, consumed by any observation or by the query itself. This
+avoids repeated waits on an unattained target. The existing wait timeout is
+unchanged. The old public test returned a 1456px request (91 columns) where the
+newest 101-column intent required 1616px. The new core control passes, as do
+81 selected font/frame tests and 62 resize integration tests. GNU passed the
+public overlapping resize/font scenario; Neomacs native validation is pending.
+
 Use [desktop-font-live.el](../../crates/neomacs-gui-tests/fixtures/desktop-font-live.el) for isolated settings writes, observed predicates, frame-state capture, and native Presented receipts; extend its cases rather than copying another polling/settings harness. Its current state capture can add root/minibuffer and split-window measurements. [desktop_font_updates.rs](../../crates/neomacs-gui-tests/tests/desktop_font_updates.rs) already owns GNU X11 versus Neomacs Wayland dispatch and schema/config isolation. [frame-resize-oracle.el](../../crates/neomacs-gui-tests/fixtures/frame-resize-oracle.el) gives the width-only unchanged-height control, though it currently uses timed callbacks rather than presentation readiness.
 
 At the core seam, reuse `RecordingDisplayHost`, opened-font metrics fixtures, `InputEvent::Resize`, frame-local pending state, and the shared conversion helpers. Do not add renderer font metrics, a parallel window tree, a generic timing delay, or a test-only compositor implementation. Rebuild with `cargo xtask fresh-build` and use `cargo nextest` for subsequent implementation verification; this investigation ran neither builds nor tests.

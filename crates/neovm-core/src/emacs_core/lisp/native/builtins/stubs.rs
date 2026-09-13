@@ -1154,12 +1154,21 @@ pub(crate) fn builtin_frame_scroll_bar_height(args: Vec<Value>) -> EvalResult {
     Ok(Value::fixnum(0))
 }
 
-pub(crate) fn builtin_frame_scroll_bar_width(args: Vec<Value>) -> EvalResult {
+pub(crate) fn builtin_frame_scroll_bar_width(
+    eval: &mut super::eval::Context,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args_range("frame-scroll-bar-width", &args, 0, 1)?;
-    if let Some(frame) = args.first() {
-        expect_frame_in_domain(frame, FrameDomain::Any)?;
-    }
-    Ok(Value::fixnum(0))
+    let fid = super::window_cmds::resolve_frame_id_in_state(
+        &mut eval.frames,
+        &mut eval.buffers,
+        args.first(),
+        FrameDomain::Any,
+    )?;
+    Ok(Value::fixnum(eval.frames.get(fid).map_or(
+        0,
+        crate::window::Frame::vertical_scroll_bar_area_width,
+    )))
 }
 
 // --- frame.c missing builtins ---

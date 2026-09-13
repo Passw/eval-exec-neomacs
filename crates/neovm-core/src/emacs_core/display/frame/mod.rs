@@ -1766,11 +1766,9 @@ pub(crate) fn builtin_modify_frame_parameters(
     let requested_width = resolve_frame_size_parameter(&eval.frames, fid, requested_width, true);
     let requested_height = resolve_frame_size_parameter(&eval.frames, fid, requested_height, false);
 
-    if requested_width.is_some()
-        || requested_height.is_some()
-        || requested_left.is_some()
-        || requested_top.is_some()
-    {
+    // Position changes do not supersede outstanding size intent. Position is
+    // applied below independently of whether a new size was requested.
+    if requested_width.is_some() || requested_height.is_some() {
         let uses_window_system_pixels = eval
             .frames
             .get(fid)
@@ -1816,7 +1814,7 @@ pub(crate) fn builtin_modify_frame_parameters(
                     .frames
                     .get_mut(fid)
                     .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
-                frame.queue_pending_gui_resize(desired_cols, desired_total_lines, false);
+                frame.queue_pending_gui_resize(desired_cols, desired_total_lines, None);
             } else {
                 let (text_width_px, text_height_px) =
                     resize_request.text_pixels(&eval.frames, fid)?;
@@ -2186,7 +2184,11 @@ pub(crate) fn request_live_gui_frame_resize_and_keep_pending(
     let frame = frames
         .get_mut(fid)
         .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
-    frame.queue_pending_gui_resize(desired_cols, desired_total_lines, true);
+    frame.queue_pending_gui_resize(
+        desired_cols,
+        desired_total_lines,
+        Some((total_width_px, total_height_px)),
+    );
     Ok(())
 }
 

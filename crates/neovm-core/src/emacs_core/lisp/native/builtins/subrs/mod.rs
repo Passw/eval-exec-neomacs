@@ -4313,7 +4313,7 @@ pub(crate) fn register_subrs(ctx: &mut crate::emacs_core::eval::Context) {
     ));
     ctx.register_subr(SubrSpec::new(
         "frame-scroll-bar-width",
-        NativeFn::ContextVec(|_ctx, args| builtin_frame_scroll_bar_width(args)),
+        NativeFn::ContextVec(builtin_frame_scroll_bar_width),
         SubrArity::new(0, Some(1)),
     ));
     ctx.register_subr(SubrSpec::new(

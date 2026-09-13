@@ -3197,7 +3197,45 @@ pub struct FrameWindowHookRecord {
 pub struct PendingGuiResize {
     pub width_cols: i64,
     pub total_lines: i64,
-    pub host_request_sent: bool,
+    delivery: GuiResizeDelivery,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GuiResizeDelivery {
+    Queued,
+    Requested { width: u32, height: u32, wait: bool },
+}
+
+impl PendingGuiResize {
+    pub fn is_queued(&self) -> bool {
+        matches!(self.delivery, GuiResizeDelivery::Queued)
+    }
+
+    /// Geometry queries may wait once for a newly sent request. An observation
+    /// consumes that wait without implying which native request produced it.
+    pub fn take_native_wait(&mut self) -> bool {
+        match &mut self.delivery {
+            GuiResizeDelivery::Queued => false,
+            GuiResizeDelivery::Requested { wait, .. } => std::mem::take(wait),
+        }
+    }
+
+    pub fn after_native_observation(mut self, width: u32, height: u32) -> Option<Self> {
+        if let GuiResizeDelivery::Requested {
+            width: target_width,
+            height: target_height,
+            wait,
+        } = &mut self.delivery
+        {
+            if (width, height) == (*target_width, *target_height) {
+                return None;
+            }
+            *wait = false;
+        }
+        // Actual allocation is always installed independently. Until the latest
+        // target is attained, a later font change retains the requested grid.
+        Some(self)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -3904,19 +3942,20 @@ impl Frame {
         &mut self,
         width_cols: i64,
         total_lines: i64,
-        host_request_sent: bool,
+        host_target: Option<(u32, u32)>,
     ) {
         self.defer_next_gui_parameter_resize = false;
         self.pending_gui_resize = Some(PendingGuiResize {
             width_cols,
             total_lines,
-            host_request_sent,
+            delivery: host_target.map_or(GuiResizeDelivery::Queued, |(width, height)| {
+                GuiResizeDelivery::Requested {
+                    width,
+                    height,
+                    wait: true,
+                }
+            }),
         });
-    }
-
-    pub fn take_pending_gui_resize(&mut self) -> Option<PendingGuiResize> {
-        self.defer_next_gui_parameter_resize = false;
-        self.pending_gui_resize.take()
     }
 
     pub fn clear_pending_gui_resize(&mut self) {
@@ -3994,6 +4033,16 @@ impl Frame {
             .unwrap_or_else(|| self.char_width.max(1.0).round() as i64)
     }
 
+    pub(crate) fn vertical_scroll_bar_area_width(&self) -> i64 {
+        if self.effective_window_system().is_some()
+            && self.default_vertical_scroll_bar_side().is_some()
+        {
+            self.default_vertical_scroll_bar_width()
+        } else {
+            0
+        }
+    }
+
     pub(crate) fn horizontal_non_text_width(&self) -> i64 {
         if self.effective_window_system().is_none() {
             return 0;
@@ -4001,11 +4050,7 @@ impl Frame {
 
         let left_fringe = self.default_left_fringe_width();
         let right_fringe = self.default_right_fringe_width();
-        let scroll_bar_width = if self.default_vertical_scroll_bar_side().is_some() {
-            self.default_vertical_scroll_bar_width()
-        } else {
-            0
-        };
+        let scroll_bar_width = self.vertical_scroll_bar_area_width();
 
         left_fringe
             .saturating_add(right_fringe)
