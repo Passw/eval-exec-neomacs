@@ -539,7 +539,7 @@ impl crate::emacs_core::eval::Context {
             }
         };
 
-        if let Some(window) = frame.root_window_mut().find_mut(window_id) {
+        if let Some(window) = frame.tree_mut().find_mut(window_id) {
             update_window(window);
         } else if let Some(ref mut mini) = frame.minibuffer_leaf
             && mini.id() == window_id

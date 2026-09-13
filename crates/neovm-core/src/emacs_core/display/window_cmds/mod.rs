@@ -7509,7 +7509,7 @@ pub(crate) fn builtin_window_resize_apply(
     let ch = frame.char_height;
 
     // Validate: root's new_pixel must match the frame dimension.
-    if !crate::window::window_resize_check(&frame.root_window(), horflag) {
+    if !crate::window::window_resize_check(frame.tree(), frame.tree().root_id(), horflag) {
         return Ok(Value::NIL);
     }
 
@@ -7533,7 +7533,8 @@ pub(crate) fn builtin_window_resize_apply(
 
     // Apply. The recursive walk reads new_pixel directly from each
     // node now (audit Structural 1).
-    crate::window::window_resize_apply(&mut frame.root_window_mut(), horflag, cw, ch);
+    let root = frame.tree().root_id();
+    crate::window::window_resize_apply(frame.tree_mut(), root, horflag, cw, ch);
 
     // Recalculate minibuffer position after tree resize.
     frame.recalculate_minibuffer_bounds();
@@ -7574,7 +7575,8 @@ pub(crate) fn builtin_window_resize_apply_total(
     let top_margin = frame.frame_top_margin();
     frame.root_window_mut().set_left_col(0);
     frame.root_window_mut().set_top_line(top_margin);
-    crate::window::window_resize_apply_total(&mut frame.root_window_mut(), horflag, cw, ch);
+    let root = frame.tree().root_id();
+    crate::window::window_resize_apply_total(frame.tree_mut(), root, horflag, cw, ch);
 
     // Handle minibuffer window — its `new_total` lives on the
     // minibuffer leaf itself now.

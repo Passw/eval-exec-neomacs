@@ -685,6 +685,16 @@ struct CurrentWindowBuffer {
 }
 
 fn apply_saved_window_buffer_restoration(
+    tree: &mut crate::window::WindowTree,
+    current_buffers: &HashMap<crate::window::WindowId, CurrentWindowBuffer>,
+    buffers: &mut crate::buffer::BufferManager,
+) {
+    tree.for_each_leaf_mut(|window| {
+        apply_saved_leaf_buffer_restoration(window, current_buffers, buffers);
+    });
+}
+
+fn apply_saved_leaf_buffer_restoration(
     window: &mut crate::window::Window,
     current_buffers: &HashMap<crate::window::WindowId, CurrentWindowBuffer>,
     buffers: &mut crate::buffer::BufferManager,
@@ -726,11 +736,7 @@ fn apply_saved_window_buffer_restoration(
                 SavedWindowBufferRestoration::FindSubstituteBuffer => {}
             }
         }
-        _ => {
-            for child in window.children_mut() {
-                apply_saved_window_buffer_restoration(child, current_buffers, buffers);
-            }
-        }
+        crate::window::Window::Internal { .. } => {}
     }
 }
 
@@ -779,45 +785,31 @@ fn prepare_saved_window_buffer_restoration(
                 .collect::<HashMap<_, _>>()
         })
         .unwrap_or_default();
-    apply_saved_window_buffer_restoration(
-        snapshot.root_window_mut(),
-        &current_buffers,
-        &mut eval.buffers,
-    );
+    apply_saved_window_buffer_restoration(&mut snapshot.tree, &current_buffers, &mut eval.buffers);
 }
 
 fn collect_leaf_buffer_ids(
-    window: &crate::window::Window,
+    tree: &crate::window::WindowTree,
     buffers: &mut HashMap<crate::window::WindowId, crate::buffer::BufferId>,
 ) {
-    match window {
-        crate::window::Window::Leaf { id, buffer_id, .. } => {
-            buffers.insert(*id, *buffer_id);
-        }
-        _ => {
-            for child in window.children() {
-                collect_leaf_buffer_ids(child, buffers);
-            }
+    for id in tree.leaf_ids() {
+        if let Some(crate::window::Window::Leaf { buffer_id, .. }) = tree.find(id) {
+            buffers.insert(id, *buffer_id);
         }
     }
 }
 
 fn merge_live_window_histories(
-    window: &mut crate::window::Window,
+    tree: &mut crate::window::WindowTree,
     live_histories: &HashMap<crate::window::WindowId, crate::window::WindowHistoryState>,
 ) {
-    match window {
-        crate::window::Window::Leaf { id, history, .. } => {
-            if let Some(live_history) = live_histories.get(id) {
-                *history = live_history.clone();
-            }
+    tree.for_each_leaf_mut(|window| {
+        if let crate::window::Window::Leaf { id, history, .. } = window
+            && let Some(live_history) = live_histories.get(id)
+        {
+            *history = live_history.clone();
         }
-        _ => {
-            for child in window.children_mut() {
-                merge_live_window_histories(child, live_histories);
-            }
-        }
-    }
+    });
 }
 
 fn prepare_reused_window_histories(
@@ -825,7 +817,7 @@ fn prepare_reused_window_histories(
     snapshot: &mut WindowConfigurationSnapshot,
 ) -> Result<(), Flow> {
     let mut saved_buffers = HashMap::new();
-    collect_leaf_buffer_ids(snapshot.root_window(), &mut saved_buffers);
+    collect_leaf_buffer_ids(&snapshot.tree, &mut saved_buffers);
 
     let globally_selected_window = eval
         .frames
@@ -930,7 +922,7 @@ fn prepare_reused_window_histories(
                 .collect::<HashMap<_, _>>()
         })
         .unwrap_or_default();
-    merge_live_window_histories(snapshot.root_window_mut(), &live_histories);
+    merge_live_window_histories(&mut snapshot.tree, &live_histories);
     Ok(())
 }
 
@@ -1074,7 +1066,7 @@ impl WindowConfigurationSnapshot {
     }
 
     fn trace_roots(&self, roots: &mut Vec<Value>) {
-        self.root_window().trace_roots(roots);
+        self.tree.trace_roots(roots);
         if let Some(minibuffer) = &self.minibuffer_leaf {
             minibuffer.trace_roots(roots);
         }
@@ -1092,7 +1084,7 @@ fn normalize_selected_window_point_in_snapshot(
     buffers: &mut crate::buffer::BufferManager,
 ) {
     let selected_buffer_id = snapshot
-        .root_window()
+        .tree
         .find(snapshot.selected_window)
         .or_else(|| {
             snapshot
@@ -1112,7 +1104,7 @@ fn normalize_selected_window_point_in_snapshot(
     };
 
     let selected = snapshot.selected_window;
-    if let Some(window) = snapshot.root_window_mut().find_mut(selected) {
+    if let Some(window) = snapshot.tree.find_mut(selected) {
         crate::window::window_markers::set_window_point_with_marker(
             buffers,
             window,
@@ -1172,11 +1164,6 @@ fn save_persistent_window_parameters(
         })
         .collect();
     *window.parameters_mut() = saved;
-    {
-        for child in window.children_mut() {
-            save_persistent_window_parameters(child, persistent_keys);
-        }
-    }
 }
 
 fn save_snapshot_persistent_window_parameters(
@@ -1184,7 +1171,9 @@ fn save_snapshot_persistent_window_parameters(
     persistent_parameters: Value,
 ) -> Vec<Value> {
     let persistent_keys = persistent_window_parameter_keys(persistent_parameters);
-    save_persistent_window_parameters(snapshot.root_window_mut(), &persistent_keys);
+    snapshot
+        .tree
+        .for_each_node_mut(|window| save_persistent_window_parameters(window, &persistent_keys));
     if let Some(minibuffer) = &mut snapshot.minibuffer_leaf {
         save_persistent_window_parameters(minibuffer, &persistent_keys);
     }
@@ -1192,13 +1181,12 @@ fn save_snapshot_persistent_window_parameters(
 }
 
 fn collect_window_parameters(
-    window: &crate::window::Window,
+    tree: &crate::window::WindowTree,
     out: &mut HashMap<crate::window::WindowId, Vec<(Value, Value)>>,
 ) {
-    out.insert(window.id(), window.parameters().clone());
-    {
-        for child in window.children() {
-            collect_window_parameters(child, out);
+    for id in tree.subtree_ids(tree.root_id()) {
+        if let Some(window) = tree.find(id) {
+            out.insert(id, window.parameters().clone());
         }
     }
 }
@@ -1207,9 +1195,9 @@ fn collect_frame_window_parameters(
     frame: &crate::window::Frame,
 ) -> HashMap<crate::window::WindowId, Vec<(Value, Value)>> {
     let mut parameters = HashMap::new();
-    collect_window_parameters(&frame.root_window(), &mut parameters);
+    collect_window_parameters(frame.tree(), &mut parameters);
     if let Some(minibuffer) = &frame.minibuffer_leaf {
-        collect_window_parameters(minibuffer, &mut parameters);
+        parameters.insert(minibuffer.id(), minibuffer.parameters().clone());
     }
     parameters
 }
@@ -1245,18 +1233,15 @@ fn merge_restored_window_parameters(
     }
 
     *window.parameters_mut() = merged;
-    {
-        for child in window.children_mut() {
-            merge_restored_window_parameters(child, live_parameters);
-        }
-    }
 }
 
 fn merge_snapshot_window_parameters(
     snapshot: &mut WindowConfigurationSnapshot,
     live_parameters: &HashMap<crate::window::WindowId, Vec<(Value, Value)>>,
 ) {
-    merge_restored_window_parameters(snapshot.root_window_mut(), live_parameters);
+    snapshot
+        .tree
+        .for_each_node_mut(|window| merge_restored_window_parameters(window, live_parameters));
     if let Some(minibuffer) = &mut snapshot.minibuffer_leaf {
         merge_restored_window_parameters(minibuffer, live_parameters);
     }
@@ -1337,7 +1322,26 @@ pub(crate) fn builtin_window_configuration_frame(args: Vec<Value>) -> EvalResult
 /// serial, so a raw `equal' (the previous implementation) always returned nil
 /// for two distinct-but-identical configurations.  Compare the stored
 /// snapshots structurally instead.
-fn window_tree_layout_equal(a: &crate::window::Window, b: &crate::window::Window) -> bool {
+fn window_tree_layout_equal(
+    tree_a: &crate::window::WindowTree,
+    a: crate::window::WindowId,
+    tree_b: &crate::window::WindowTree,
+    b: crate::window::WindowId,
+) -> bool {
+    let (Some(a), Some(b)) = (tree_a.find(a), tree_b.find(b)) else {
+        return false;
+    };
+    window_node_layout_equal(a, b)
+        && a.children().len() == b.children().len()
+        && a.children()
+            .iter()
+            .zip(b.children().iter())
+            .all(|(x, y)| window_tree_layout_equal(tree_a, *x, tree_b, *y))
+}
+
+/// Whether two window nodes were laid out identically, ignoring their
+/// children.
+fn window_node_layout_equal(a: &crate::window::Window, b: &crate::window::Window) -> bool {
     use crate::window::Window;
     match (a, b) {
         (
@@ -1359,7 +1363,6 @@ fn window_tree_layout_equal(a: &crate::window::Window, b: &crate::window::Window
         (
             Window::Internal {
                 direction: da,
-                children: ca,
                 bounds: bounds_a,
                 top_line: tla,
                 left_col: lca,
@@ -1367,23 +1370,12 @@ fn window_tree_layout_equal(a: &crate::window::Window, b: &crate::window::Window
             },
             Window::Internal {
                 direction: db,
-                children: cb,
                 bounds: bounds_b,
                 top_line: tlb,
                 left_col: lcb,
                 ..
             },
-        ) => {
-            da == db
-                && bounds_a == bounds_b
-                && tla == tlb
-                && lca == lcb
-                && ca.len() == cb.len()
-                && ca
-                    .iter()
-                    .zip(cb.iter())
-                    .all(|(x, y)| window_tree_layout_equal(x, y))
-        }
+        ) => da == db && bounds_a == bounds_b && tla == tlb && lca == lcb,
         _ => false,
     }
 }
@@ -1397,9 +1389,9 @@ fn window_snapshots_layout_equal(
         // The "current"/selected window must correspond between configurations.
         && a.selected_window == b.selected_window
         && a.minibuffer_window == b.minibuffer_window
-        && window_tree_layout_equal(a.root_window(), b.root_window())
+        && window_tree_layout_equal(&a.tree, a.tree.root_id(), &b.tree, b.tree.root_id())
         && match (&a.minibuffer_leaf, &b.minibuffer_leaf) {
-            (Some(x), Some(y)) => window_tree_layout_equal(x, y),
+            (Some(x), Some(y)) => window_node_layout_equal(x, y),
             (None, None) => true,
             _ => false,
         }

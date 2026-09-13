@@ -1407,7 +1407,7 @@ pub enum Window {
     Internal {
         id: WindowId,
         direction: SplitDirection,
-        children: Vec<Window>,
+        children: Vec<WindowId>,
         bounds: Rect,
         /// Character-line top edge; GNU `w->top_line`. See `Leaf::top_line`.
         top_line: i64,
@@ -1487,29 +1487,26 @@ impl Window {
         }
     }
 
-    /// This window's child windows, or an empty slice for a leaf.
+    /// The ids of this window's children, in layout order; empty for a leaf.
     ///
-    /// Code outside `crate::window` should reach children through this rather
-    /// than matching `Window::Internal { children, .. }`, so that how the tree
-    /// stores them stays an implementation detail of this module.  That matters
-    /// for a specific pending change: the tree currently OWNS its children
-    /// (`children: Vec<Window>`), which is what forces `find_window` to walk
-    /// from the root, forces a deleted window into a side table, and makes
-    /// liveness a property of which lookup succeeded rather than a field --
-    /// see the notes on introducing an arena.  Every external site that
-    /// destructures the variant is a site that migration has to touch.
-    pub fn children(&self) -> &[Window] {
+    /// A window NAMES its children rather than owning them, so this answers
+    /// only who they are.  To reach one, ask the [`WindowTree`] that holds
+    /// them -- `tree.find(id)` -- which is also the only handle that can hand
+    /// out a node at all.
+    pub fn children(&self) -> &[WindowId] {
         match self {
             Window::Leaf { .. } => &[],
             Window::Internal { children, .. } => children,
         }
     }
 
-    /// Mutable counterpart of [`Window::children`].
-    pub fn children_mut(&mut self) -> &mut [Window] {
+    /// Mutable counterpart of [`Window::children`], for the structural edits
+    /// -- push, remove, reorder -- that [`WindowTree`] performs on behalf of
+    /// split and delete.  `None` for a leaf, which has no child list to edit.
+    pub fn children_mut(&mut self) -> Option<&mut Vec<WindowId>> {
         match self {
-            Window::Leaf { .. } => &mut [],
-            Window::Internal { children, .. } => children,
+            Window::Leaf { .. } => None,
+            Window::Internal { children, .. } => Some(children),
         }
     }
 
@@ -2057,131 +2054,25 @@ impl Window {
     /// This is used when a buffer is killed; any window still attached to the
     /// dead buffer is moved back to a replacement buffer (typically `*scratch*`).
     pub fn replace_buffer_id(&mut self, old_id: BufferId, new_id: BufferId) {
-        match self {
-            Window::Leaf { buffer_id, .. } => {
-                if *buffer_id == old_id {
-                    self.set_buffer(new_id);
-                }
-            }
-            Window::Internal { children, .. } => {
-                for child in children {
-                    child.replace_buffer_id(old_id, new_id);
-                }
+        if let Window::Leaf { buffer_id, .. } = self {
+            if *buffer_id == old_id {
+                self.set_buffer(new_id);
             }
         }
     }
 
-    /// Find a leaf window by ID in this subtree.
-    pub fn find(&self, target: WindowId) -> Option<&Window> {
-        if self.id() == target {
-            return Some(self);
-        }
-        if let Window::Internal { children, .. } = self {
-            for child in children {
-                if let Some(w) = child.find(target) {
-                    return Some(w);
-                }
-            }
-        }
-        None
-    }
-
-    /// Find a mutable leaf window by ID in this subtree.
-    pub fn find_mut(&mut self, target: WindowId) -> Option<&mut Window> {
-        if self.id() == target {
-            return Some(self);
-        }
-        if let Window::Internal { children, .. } = self {
-            for child in children {
-                if let Some(w) = child.find_mut(target) {
-                    return Some(w);
-                }
-            }
-        }
-        None
-    }
-
-    /// Collect all leaf window IDs.
-    pub fn leaf_ids(&self) -> Vec<WindowId> {
-        let mut result = Vec::new();
-        self.collect_leaves(&mut result);
-        result
-    }
-
-    fn collect_leaves(&self, out: &mut Vec<WindowId>) {
-        match self {
-            Window::Leaf { id, .. } => out.push(*id),
-            Window::Internal { children, .. } => {
-                for child in children {
-                    child.collect_leaves(out);
-                }
-            }
-        }
-    }
-
-    /// Find the window at pixel coordinates.
-    pub fn window_at(&self, px: f32, py: f32) -> Option<WindowId> {
-        match self {
-            Window::Leaf { id, bounds, .. } => {
-                if bounds.contains(px, py) {
-                    Some(*id)
-                } else {
-                    None
-                }
-            }
-            Window::Internal {
-                children, bounds, ..
-            } => {
-                if !bounds.contains(px, py) {
-                    return None;
-                }
-                for child in children {
-                    if let Some(id) = child.window_at(px, py) {
-                        return Some(id);
-                    }
-                }
-                None
-            }
-        }
-    }
-
-    /// Count leaf windows in this subtree.
-    pub fn leaf_count(&self) -> usize {
-        match self {
-            Window::Leaf { .. } => 1,
-            Window::Internal { children, .. } => children.iter().map(|c| c.leaf_count()).sum(),
-        }
-    }
-
-    fn buffer_window_count(&self, buffers: &BufferManager, root_buffer: BufferId) -> usize {
-        match self {
-            Self::Leaf { buffer_id, .. } => {
-                usize::from(buffers.shared_text_root_id(*buffer_id) == Some(root_buffer))
-            }
-            Self::Internal { children, .. } => children
-                .iter()
-                .map(|window| window.buffer_window_count(buffers, root_buffer))
-                .sum(),
-        }
-    }
-
-    /// Invalidate redisplay-derived window-end state for this subtree.
+    /// Invalidate redisplay-derived window-end state for this window.
     pub fn invalidate_display_state(&mut self) {
-        match self {
-            Window::Leaf {
-                window_end,
-                display,
-                ..
-            } => {
-                window_end.invalidate();
-                display.clear_physical_cursor_state();
-            }
-            Window::Internal { children, .. } => {
-                for child in children {
-                    child.invalidate_display_state();
-                }
-            }
-        }
+        let Window::Leaf {
+            window_end,
+            display,
+            ..
+        } = self
+        else {
+            return;
+        };
+        window_end.invalidate();
+        display.clear_physical_cursor_state();
     }
 
     /// Drop only horizontal scroll derived from the previous geometry.
@@ -2189,7 +2080,7 @@ impl Window {
     /// GNU distinguishes auto-hscroll state from an explicit
     /// `set-window-hscroll` with `suspend_auto_hscroll`. Geometry changes
     /// invalidate the former, while the latter remains user-owned.
-    fn invalidate_automatic_hscroll_for_geometry_change(&mut self) {
+    pub(crate) fn invalidate_automatic_hscroll_for_geometry_change(&mut self) {
         #[derive(Clone, Copy, Debug, PartialEq, Eq)]
         enum HorizontalScrollOwnership {
             Automatic,
@@ -2213,37 +2104,34 @@ impl Window {
                     HorizontalScrollOwnership::Explicit => {}
                 }
             }
-            Window::Internal { children, .. } => {
-                for child in children {
-                    child.invalidate_automatic_hscroll_for_geometry_change();
-                }
-            }
+            Window::Internal { .. } => {}
         }
     }
 }
 
 fn collect_leaf_window_paths(
-    window: &Window,
+    tree: &WindowTree,
+    window: WindowId,
     generation: u64,
     route: &mut Vec<usize>,
     paths: &mut Vec<(WindowId, WindowTreePath)>,
 ) {
-    match window {
-        Window::Leaf { id, .. } => paths.push((
-            *id,
+    let children = tree.child_ids(window);
+    if tree.find(window).is_some_and(Window::is_leaf) {
+        paths.push((
+            window,
             WindowTreePath {
                 generation,
-                target: *id,
+                target: window,
                 route: WindowTreeRoute::Root(route.clone()),
             },
-        )),
-        Window::Internal { children, .. } => {
-            for (index, child) in children.iter().enumerate() {
-                route.push(index);
-                collect_leaf_window_paths(child, generation, route, paths);
-                route.pop();
-            }
-        }
+        ));
+        return;
+    }
+    for (index, child) in children.iter().copied().enumerate() {
+        route.push(index);
+        collect_leaf_window_paths(tree, child, generation, route, paths);
+        route.pop();
     }
 }
 
@@ -3367,59 +3255,243 @@ impl FrameDivider {
 }
 /// A window tree: its nodes, and which of them is the root.
 ///
-/// This exists to be the ONE place that knows how a tree is stored.  Today it
-/// owns the root node and the children hang off it inline
-/// (`Window::Internal { children: Vec<Window> }`); the intended change is to
-/// hold the nodes in an arena keyed by `WindowId` and make `children` a list of
-/// ids, which is GNU's shape -- windows are heap structs in a pointer graph, so
-/// a lookup is a probe rather than a walk from the root, and a deleted window
-/// keeps its struct instead of needing a side table.
+/// This is the ONE place that knows how a tree is stored, and the only handle
+/// that can hand out a node.  Nodes live in an arena keyed by `WindowId` and
+/// name their children by id, which is GNU's shape: windows there are heap
+/// structs in a pointer graph (`w->parent`, `w->next`, `w->contents`), so
+/// reaching one is a dereference rather than a walk from the root.
 ///
-/// The reason this type comes first, before that change: `Frame` is not the
-/// only owner of a tree.  `WindowConfigurationSnapshot` holds a DETACHED copy
-/// taken by `current-window-configuration` and restored later, so once children
-/// are ids the snapshot has to carry its nodes too.  Putting an arena on
-/// `Frame` alone compiles and is wrong.  With both owners behind this type, the
-/// representation change is confined to its implementation.
+/// Two consequences shape every walk over a tree.  A node cannot reach its own
+/// children -- only the tree can -- so a walk is written as "gather ids, then
+/// visit one node at a time" ([`WindowTree::for_each_leaf_mut`],
+/// [`WindowTree::for_each_node_mut`]), never as recursion through
+/// `&mut Window`.  And moving a window is repointing one slot: the promotion
+/// in `delete_window_in_tree` and the interposition in `split_window_in_tree`
+/// each edit a child list instead of copying a subtree over another.
+///
+/// `Frame` is not the only owner of one.  `WindowConfigurationSnapshot` holds
+/// a tree taken by `current-window-configuration` and restored later, which is
+/// why the arena lives here and not on `Frame`: a detached tree has to carry
+/// its own nodes.
 #[derive(Debug, Clone)]
 pub struct WindowTree {
-    root: Window,
+    /// Every node of this tree, live or detached, keyed by its own id.
+    ///
+    /// GNU's windows are heap structs in a pointer graph (`w->parent`,
+    /// `w->next`, `w->contents`), so reaching one is a dereference and a
+    /// window that has been deleted still exists -- it just has `contents`
+    /// nil.  The map is that graph: a lookup is a probe rather than a walk
+    /// from the root, and a node removed from its parent's child list is
+    /// still here to answer `windowp`.
+    nodes: HashMap<WindowId, Window>,
+    /// The id of the node every walk starts from.
+    root: WindowId,
 }
 
 impl WindowTree {
+    /// A tree whose only node is `root`.
+    ///
+    /// A childless node is the only thing a tree can be seeded with: under ids
+    /// a detached `Window` carries no subtree, so a tree is grown through
+    /// [`WindowTree::insert`] and [`WindowTree::set_children`] rather than
+    /// handed one already built.
     pub fn new(root: Window) -> Self {
-        Self { root }
+        debug_assert!(
+            root.children().is_empty(),
+            "a tree is seeded with a childless root; its children's nodes would have nowhere to live"
+        );
+        let root_id = root.id();
+        let mut nodes = HashMap::default();
+        nodes.insert(root_id, root);
+        Self {
+            nodes,
+            root: root_id,
+        }
+    }
+
+    /// The id of this tree's root.
+    pub fn root_id(&self) -> WindowId {
+        self.root
     }
 
     /// The root window of this tree.
     pub fn root(&self) -> &Window {
-        &self.root
+        self.find(self.root)
+            .expect("a tree always holds the node its root id names")
     }
 
     pub fn root_mut(&mut self) -> &mut Window {
-        &mut self.root
+        let root = self.root;
+        self.find_mut(root)
+            .expect("a tree always holds the node its root id names")
     }
 
-    /// Find a window anywhere in this tree.
-    ///
-    /// A walk from the root today; a hash probe once the nodes live in an
-    /// arena.  Callers get the same answer either way, which is the point of
-    /// routing them through here.
+    /// Make `id` this tree's root.  The node must already be in the tree.
+    pub fn set_root(&mut self, id: WindowId) {
+        debug_assert!(self.nodes.contains_key(&id), "root must name a held node");
+        self.root = id;
+    }
+
+    /// Find a window anywhere in this tree, by a single probe.
     pub fn find(&self, id: WindowId) -> Option<&Window> {
-        self.root.find(id)
+        self.nodes.get(&id)
     }
 
     pub fn find_mut(&mut self, id: WindowId) -> Option<&mut Window> {
-        self.root.find_mut(id)
+        self.nodes.get_mut(&id)
+    }
+
+    /// Take ownership of `window`, which may then be named as someone's child.
+    pub fn insert(&mut self, window: Window) {
+        self.nodes.insert(window.id(), window);
+    }
+
+    /// Drop `id`'s node from the tree entirely.
+    ///
+    /// Unlinking a window from its parent is NOT this: GNU keeps a deleted
+    /// window's struct so `windowp` still answers for it.  This is for a node
+    /// that is genuinely going away, such as one absorbed into another tree.
+    pub fn remove(&mut self, id: WindowId) -> Option<Window> {
+        self.nodes.remove(&id)
+    }
+
+    /// Whether this tree holds a node called `id` at all, linked or not.
+    pub fn contains(&self, id: WindowId) -> bool {
+        self.nodes.contains_key(&id)
+    }
+
+    /// Every node this tree holds, in no particular order, including any that
+    /// no longer hang off the root.
+    pub fn nodes(&self) -> impl Iterator<Item = &Window> {
+        self.nodes.values()
+    }
+
+    pub fn nodes_mut(&mut self) -> impl Iterator<Item = &mut Window> {
+        self.nodes.values_mut()
+    }
+
+    /// `id`'s children, in layout order.
+    pub fn child_ids(&self, id: WindowId) -> &[WindowId] {
+        self.find(id).map_or(&[], Window::children)
+    }
+
+    /// Replace `id`'s children wholesale.
+    pub fn set_children(&mut self, id: WindowId, children: Vec<WindowId>) {
+        if let Some(Window::Internal { children: slot, .. }) = self.find_mut(id) {
+            *slot = children;
+        }
+    }
+
+    /// The parent of `id`, or `None` for the root and for any node not linked
+    /// into it.
+    pub fn parent_of(&self, id: WindowId) -> Option<WindowId> {
+        self.parent_of_in(self.root, id)
+    }
+
+    fn parent_of_in(&self, node: WindowId, target: WindowId) -> Option<WindowId> {
+        let children = self.child_ids(node);
+        if children.contains(&target) {
+            return Some(node);
+        }
+        children
+            .iter()
+            .find_map(|child| self.parent_of_in(*child, target))
+    }
+
+    /// The ids of the subtree rooted at `id`, parents before children.
+    pub fn subtree_ids(&self, id: WindowId) -> Vec<WindowId> {
+        let mut out = Vec::new();
+        self.collect_subtree(id, &mut out);
+        out
+    }
+
+    fn collect_subtree(&self, id: WindowId, out: &mut Vec<WindowId>) {
+        if !self.nodes.contains_key(&id) {
+            return;
+        }
+        out.push(id);
+        for child in self.child_ids(id) {
+            self.collect_subtree(*child, out);
+        }
     }
 
     /// The leaf windows of this tree.
     pub fn leaf_ids(&self) -> Vec<WindowId> {
-        self.root.leaf_ids()
+        self.leaf_ids_of(self.root)
+    }
+
+    /// The leaf windows of the subtree rooted at `id`.
+    pub fn leaf_ids_of(&self, id: WindowId) -> Vec<WindowId> {
+        let mut out = self.subtree_ids(id);
+        out.retain(|candidate| self.find(*candidate).is_some_and(Window::is_leaf));
+        out
     }
 
     pub fn leaf_count(&self) -> usize {
-        self.root.leaf_count()
+        self.leaf_ids().len()
+    }
+
+    /// Apply `visit` to every node linked under the root, parents first.
+    ///
+    /// The counterpart of [`WindowTree::for_each_leaf_mut`] for the walks that
+    /// touch internal windows too, such as window parameters.
+    pub fn for_each_node_mut(&mut self, mut visit: impl FnMut(&mut Window)) {
+        for id in self.subtree_ids(self.root) {
+            if let Some(node) = self.find_mut(id) {
+                visit(node);
+            }
+        }
+    }
+
+    /// The leaf window whose rectangle covers `(px, py)`.
+    ///
+    /// Descends only into internal windows whose own rectangle contains the
+    /// point, as the inline walk did: a child never sticks out of its parent,
+    /// so a parent that misses rules out its whole subtree.
+    pub fn window_at(&self, px: f32, py: f32) -> Option<WindowId> {
+        self.window_at_in(self.root, px, py)
+    }
+
+    fn window_at_in(&self, id: WindowId, px: f32, py: f32) -> Option<WindowId> {
+        let window = self.find(id)?;
+        if !window.bounds().contains(px, py) {
+            return None;
+        }
+        if window.is_leaf() {
+            return Some(id);
+        }
+        window
+            .children()
+            .iter()
+            .find_map(|child| self.window_at_in(*child, px, py))
+    }
+
+    /// How many leaves of this tree show text sharing `root_buffer`.
+    pub fn buffer_window_count(&self, buffers: &BufferManager, root_buffer: BufferId) -> usize {
+        self.leaf_ids()
+            .into_iter()
+            .filter(|id| {
+                self.find(*id)
+                    .and_then(Window::buffer_id)
+                    .and_then(|buffer| buffers.shared_text_root_id(buffer))
+                    == Some(root_buffer)
+            })
+            .count()
+    }
+
+    /// Point every leaf showing `old_id` at `new_id` instead.
+    pub fn replace_buffer_id(&mut self, old_id: BufferId, new_id: BufferId) {
+        self.for_each_leaf_mut(|leaf| leaf.replace_buffer_id(old_id, new_id));
+    }
+
+    /// Invalidate redisplay-derived window-end state across this tree.
+    pub fn invalidate_display_state(&mut self) {
+        self.for_each_leaf_mut(Window::invalidate_display_state);
+    }
+
+    /// Drop hscroll derived from the previous geometry across this tree.
+    pub fn invalidate_automatic_hscroll_for_geometry_change(&mut self) {
+        self.for_each_leaf_mut(Window::invalidate_automatic_hscroll_for_geometry_change);
     }
 
     /// Apply `visit` to every leaf of this tree, one leaf at a time.
@@ -3628,7 +3700,7 @@ impl Frame {
             width as f32,
             (height as f32 - minibuffer_height).max(0.0),
         );
-        resize_window_subtree(&mut root_window, root_bounds);
+        root_window.set_bounds(root_bounds);
         let mut minibuffer_leaf = Window::new_leaf(
             minibuffer_window,
             minibuffer_buffer_id,
@@ -3648,11 +3720,7 @@ impl Frame {
             *window_start = LispCharPos1::ONE;
             *point = LispCharPos1::ONE;
         }
-        let selected = root_window
-            .leaf_ids()
-            .first()
-            .copied()
-            .unwrap_or(WindowId(0));
+        let selected = root_window.id();
         Self {
             id,
             change_stamp: ChangeStamp::FIRST,
@@ -3842,7 +3910,7 @@ impl Frame {
 
     /// Replace all leaf window buffer bindings for `old_id` with `new_id`.
     pub fn replace_buffer_bindings(&mut self, old_id: BufferId, new_id: BufferId) {
-        self.root_window_mut().replace_buffer_id(old_id, new_id);
+        self.tree.replace_buffer_id(old_id, new_id);
         if let Some(minibuffer_leaf) = self.minibuffer_leaf.as_mut() {
             minibuffer_leaf.replace_buffer_id(old_id, new_id);
         }
@@ -4213,8 +4281,9 @@ impl Frame {
         // mutably, and reading `self.char_*` through that borrow is what the
         // old direct field access did not have to worry about.
         let (char_width, char_height) = (self.char_width, self.char_height);
-        resize_window_subtree(self.root_window_mut(), root_bounds);
-        sync_window_character_edges_from_bounds(self.root_window_mut(), char_width, char_height);
+        let root = self.tree.root_id();
+        resize_window_subtree(&mut self.tree, root, root_bounds);
+        sync_window_character_edges_from_bounds(&mut self.tree, root, char_width, char_height);
 
         self.reposition_minibuffer_below_root();
     }
@@ -4234,10 +4303,11 @@ impl Frame {
         // inside the same expression.
         let top_margin = self.frame_top_margin();
         let (char_width, char_height) = (self.char_width, self.char_height);
-        resize_window_subtree(self.root_window_mut(), root_bounds);
+        let root = self.tree.root_id();
+        resize_window_subtree(&mut self.tree, root, root_bounds);
         self.root_window_mut().set_left_col(0);
         self.root_window_mut().set_top_line(top_margin);
-        sync_window_character_edges_from_bounds(self.root_window_mut(), char_width, char_height);
+        sync_window_character_edges_from_bounds(&mut self.tree, root, char_width, char_height);
         self.reposition_minibuffer_below_root();
     }
 
@@ -4271,7 +4341,7 @@ impl Frame {
             mini.invalidate_display_state();
         }
 
-        self.root_window_mut().invalidate_display_state();
+        self.tree.invalidate_display_state();
         self.redisplay_cache.clear();
     }
 
@@ -4381,7 +4451,7 @@ impl Frame {
 
     /// Find a window by ID.
     pub fn find_window(&self, id: WindowId) -> Option<&Window> {
-        if let Some(window) = self.root_window().find(id) {
+        if let Some(window) = self.tree.find(id) {
             return Some(window);
         }
         self.minibuffer_leaf.as_ref().and_then(|window| {
@@ -4400,7 +4470,13 @@ impl Frame {
     /// deliberately degenerate tree.
     fn leaf_window_paths(&self, generation: u64) -> Vec<(WindowId, WindowTreePath)> {
         let mut paths = Vec::new();
-        collect_leaf_window_paths(&self.root_window(), generation, &mut Vec::new(), &mut paths);
+        collect_leaf_window_paths(
+            &self.tree,
+            self.tree.root_id(),
+            generation,
+            &mut Vec::new(),
+            &mut paths,
+        );
         if let Some(minibuffer) = self.minibuffer_leaf.as_ref() {
             paths.push((
                 minibuffer.id(),
@@ -4419,14 +4495,11 @@ impl Frame {
         let window = match &path.route {
             WindowTreeRoute::Minibuffer => self.minibuffer_leaf.as_ref()?,
             WindowTreeRoute::Root(route) => {
-                let mut window = self.root_window();
+                let mut id = self.tree.root_id();
                 for index in route {
-                    let Window::Internal { children, .. } = window else {
-                        return None;
-                    };
-                    window = children.get(*index)?;
+                    id = *self.tree.child_ids(id).get(*index)?;
                 }
-                window
+                self.tree.find(id)?
             }
         };
         (window.id() == path.target && window.is_leaf()).then_some(window)
@@ -4470,17 +4543,17 @@ impl Frame {
     /// keeps a caller from expressing the choice by reaching into
     /// `root_window` and thereby depending on how the tree is stored.
     pub fn root_leaf_ids(&self) -> Vec<WindowId> {
-        self.root_window().leaf_ids()
+        self.tree.leaf_ids()
     }
 
     /// Every leaf window on this frame, the minibuffer included.
     ///
-    /// `Window::leaf_ids` walks one subtree, so a caller that wants the frame's
-    /// leaves has to append the minibuffer leaf itself -- which is duplicated
-    /// knowledge of where the minibuffer lives, and the same duplication
-    /// `find_window` already absorbs for lookups.
+    /// `WindowTree::leaf_ids` walks the root tree, so a caller that wants the
+    /// frame's leaves has to append the minibuffer leaf itself -- which is
+    /// duplicated knowledge of where the minibuffer lives, and the same
+    /// duplication `find_window` already absorbs for lookups.
     pub fn all_leaf_ids(&self) -> Vec<WindowId> {
-        let mut ids = self.root_window().leaf_ids();
+        let mut ids = self.tree.leaf_ids();
         if let Some(mini) = &self.minibuffer_leaf {
             ids.push(mini.id());
         }
@@ -4506,7 +4579,7 @@ impl Frame {
 
     /// All leaf window IDs.
     pub fn window_list(&self) -> Vec<WindowId> {
-        self.root_window().leaf_ids()
+        self.tree.leaf_ids()
     }
 
     fn live_window_ids_with_minibuffer(&self) -> Vec<WindowId> {
@@ -4519,12 +4592,12 @@ impl Frame {
 
     /// Number of visible windows (leaves).
     pub fn window_count(&self) -> usize {
-        self.root_window().leaf_count()
+        self.tree.leaf_count()
     }
 
     /// Find which window is at pixel coordinates.
     pub fn window_at(&self, px: f32, py: f32) -> Option<WindowId> {
-        self.root_window().window_at(px, py)
+        self.tree.window_at(px, py)
     }
 
     /// Columns (based on default char width).
@@ -4943,8 +5016,7 @@ impl Frame {
         self.height = height;
         self.sync_window_area_bounds();
         if horizontal_geometry_changed {
-            self.root_window_mut()
-                .invalidate_automatic_hscroll_for_geometry_change();
+            self.tree.invalidate_automatic_hscroll_for_geometry_change();
             if let Some(minibuffer) = self.minibuffer_leaf.as_mut() {
                 minibuffer.invalidate_automatic_hscroll_for_geometry_change();
             }
@@ -5784,13 +5856,15 @@ impl FrameManager {
         self.frames
             .values()
             .map(|frame| {
-                frame
-                    .root_window()
-                    .buffer_window_count(buffers, root_buffer)
-                    + frame
-                        .minibuffer_leaf
-                        .as_ref()
-                        .map_or(0, |window| window.buffer_window_count(buffers, root_buffer))
+                frame.tree().buffer_window_count(buffers, root_buffer)
+                    + frame.minibuffer_leaf.as_ref().map_or(0, |window| {
+                        usize::from(
+                            window
+                                .buffer_id()
+                                .and_then(|buffer| buffers.shared_text_root_id(buffer))
+                                == Some(root_buffer),
+                        )
+                    })
             })
             .sum()
     }
@@ -6352,11 +6426,11 @@ impl FrameManager {
         // GNU decides "interpose a new parent" vs "splice into the existing
         // combination" *before* touching the tree, from the dynamic variable
         // plus the target's position in it (`src/window.c:5423-5431`).
-        let parent = parent_combination_of(&frame.root_window(), window_id)?;
+        let parent = parent_combination_of(frame.tree(), window_id)?;
         let attachment = SplitAttachment::decide(combination_limit, parent, direction);
 
         split_window_in_tree(
-            &mut frame.root_window_mut(),
+            frame.tree_mut(),
             window_id,
             direction,
             internal_id,
@@ -6416,10 +6490,9 @@ impl FrameManager {
                 window.set_new_normal(new_normal);
             }
         }
-        let parent_id = find_parent_in_tree(&frame.root_window(), new_window_id)?;
+        let parent_id = frame.tree().parent_of(new_window_id)?;
         let horflag = matches!(direction, SplitDirection::Horizontal);
-        let parent = frame.find_window_mut(parent_id)?;
-        window_resize_apply(parent, horflag, 1.0, 1.0);
+        window_resize_apply(frame.tree_mut(), parent_id, horflag, 1.0, 1.0);
         Some(())
     }
 
@@ -6446,7 +6519,7 @@ impl FrameManager {
         let Some(frame) = self.frames.get_mut(&frame_id) else {
             return false;
         };
-        if frame.root_window().leaf_count() <= 1 {
+        if frame.tree().leaf_count() <= 1 {
             return false; // Can't delete last window
         }
 
@@ -6458,8 +6531,7 @@ impl FrameManager {
         let deletion_record = Self::deletion_record(frame.find_window(window_id));
         // A promotion at the very top has no grandparent to merge into, so the
         // outcome collapses to "was it removed" here.
-        let removed =
-            delete_window_in_tree(&mut frame.root_window_mut(), window_id, resize).removed();
+        let removed = delete_window_in_tree(frame.tree_mut(), window_id, resize).removed();
         if removed {
             self.deleted_windows.insert(window_id, deletion_record);
             self.deleted_window_parameters
@@ -6480,7 +6552,7 @@ impl FrameManager {
             // by `window_change_record` (GNU
             // `src/window.c:3954-3990`) at redisplay time, not
             // immediately on deletion.
-            if let Some(first) = frame.root_window().leaf_ids().first() {
+            if let Some(first) = frame.tree().leaf_ids().first() {
                 frame.selected_window = *first;
             }
         }
@@ -6509,12 +6581,12 @@ impl FrameManager {
         let Some(frame) = self.frames.get_mut(&frame_id) else {
             return false;
         };
-        let Some(root) = frame.root_window().find(root_id) else {
+        let Some(root) = frame.tree().find(root_id) else {
             return false;
         };
-        let Some(mut replacement) = root.find(window_id).cloned() else {
+        if frame.tree().find(window_id).is_none() {
             return false;
-        };
+        }
 
         if window_id == root_id {
             return true;
@@ -6526,41 +6598,79 @@ impl FrameManager {
         let root_normal_lines = root.normal_lines();
         let root_normal_cols = root.normal_cols();
 
-        let mut kept_ids = HashSet::default();
-        collect_window_ids(&replacement, &mut kept_ids);
-        let mut removed_windows = Vec::new();
-        collect_window_metadata(root, &mut removed_windows);
-        removed_windows.retain(|(id, _)| !kept_ids.contains(id));
+        let kept_ids: HashSet<WindowId> = frame.tree().subtree_ids(window_id).into_iter().collect();
+        let removed_windows: Vec<(WindowId, WindowParameters)> = frame
+            .tree()
+            .subtree_ids(root_id)
+            .into_iter()
+            .filter(|id| !kept_ids.contains(id))
+            .filter_map(|id| {
+                frame
+                    .tree()
+                    .find(id)
+                    .map(|window| (id, window.parameters().clone()))
+            })
+            .collect();
 
-        resize_window_subtree(&mut replacement, root_bounds);
+        // WINDOW takes ROOT's place in the tree.  GNU's `replace_window` does
+        // exactly this relinking -- the kept window keeps its identity and
+        // window-local state and inherits ROOT's geometry -- which under ids is
+        // repointing one slot rather than copying a subtree over another.
+        let parent = frame.tree().parent_of(root_id);
+        match parent {
+            Some(parent_id) => {
+                let mut siblings = frame.tree().child_ids(parent_id).to_vec();
+                for slot in &mut siblings {
+                    if *slot == root_id {
+                        *slot = window_id;
+                    }
+                }
+                frame.tree_mut().set_children(parent_id, siblings);
+            }
+            None => frame.tree_mut().set_root(window_id),
+        }
+
+        resize_window_subtree(frame.tree_mut(), window_id, root_bounds);
+        let (char_width, char_height) = (frame.char_width, frame.char_height);
         sync_window_character_edges_from_bounds_at(
-            &mut replacement,
+            frame.tree_mut(),
+            window_id,
             root_left_col,
             root_top_line,
-            frame.char_width,
-            frame.char_height,
+            char_width,
+            char_height,
         );
-        replacement.set_normal_lines(root_normal_lines);
-        replacement.set_normal_cols(root_normal_cols);
-        if let Window::Leaf {
-            vscroll,
-            preserve_vscroll_p,
-            ..
-        } = &mut replacement
-        {
-            *vscroll = 0;
-            *preserve_vscroll_p = false;
+        if let Some(replacement) = frame.tree_mut().find_mut(window_id) {
+            replacement.set_normal_lines(root_normal_lines);
+            replacement.set_normal_cols(root_normal_cols);
+            if let Window::Leaf {
+                vscroll,
+                preserve_vscroll_p,
+                ..
+            } = replacement
+            {
+                *vscroll = 0;
+                *preserve_vscroll_p = false;
+            }
         }
-        replacement.invalidate_display_state();
+        // The whole kept subtree's redisplay state is stale, not just the node
+        // that took ROOT's slot.
+        for leaf in frame.tree().leaf_ids_of(window_id) {
+            if let Some(node) = frame.tree_mut().find_mut(leaf) {
+                node.invalidate_display_state();
+            }
+        }
 
-        let Some(root) = frame.root_window_mut().find_mut(root_id) else {
-            return false;
-        };
-        *root = replacement;
+        // The unlinked subtree's nodes go away with the windows they name.
+        for (id, _) in &removed_windows {
+            frame.tree_mut().remove(*id);
+        }
 
-        if let Some(kept_subtree) = frame.root_window().find(window_id)
-            && kept_subtree.find(frame.selected_window).is_none()
-            && let Some(first) = kept_subtree.leaf_ids().first()
+        if !frame
+            .tree()
+            .subtree_ids(window_id)
+            .contains(&frame.selected_window)
+            && let Some(first) = frame.tree().leaf_ids_of(window_id).first()
         {
             frame.selected_window = *first;
         }
@@ -6901,27 +7011,17 @@ fn make_split_sibling(
 /// The doubled `Option` is deliberate: "absent" and "has no parent" are
 /// different answers, and collapsing them would silently turn a lookup miss
 /// into a root split.
-fn parent_combination_of(tree: &Window, target: WindowId) -> Option<split::ParentCombination> {
-    if tree.id() == target {
-        return Some(None);
-    }
-    let Window::Internal {
-        children,
-        direction,
-        ..
-    } = tree
-    else {
+fn parent_combination_of(tree: &WindowTree, target: WindowId) -> Option<split::ParentCombination> {
+    if !tree.contains(target) {
         return None;
-    };
-    for child in children {
-        if child.id() == target {
-            return Some(Some(*direction));
-        }
-        if let Some(found) = parent_combination_of(child, target) {
-            return Some(found);
-        }
     }
-    None
+    let Some(parent) = tree.parent_of(target) else {
+        return Some(None);
+    };
+    match tree.find(parent) {
+        Some(Window::Internal { direction, .. }) => Some(Some(*direction)),
+        _ => Some(None),
+    }
 }
 
 /// Attach a new window next to `target`, per `attachment`.
@@ -6935,9 +7035,9 @@ fn parent_combination_of(tree: &Window, target: WindowId) -> Option<split::Paren
 /// - `None` / `Some(0)`: 50/50 split.
 /// - `Some(n)` (n > 0): the new window gets `n` units.
 /// - `Some(n)` (n < 0): the target window keeps `|n|` units.
-#[allow(clippy::too_many_arguments)] // recursive split carries the explicit IDs and requested geometry
+#[allow(clippy::too_many_arguments)] // the split carries the explicit IDs and requested geometry
 fn split_window_in_tree(
-    tree: &mut Window,
+    tree: &mut WindowTree,
     target: WindowId,
     direction: SplitDirection,
     internal_id: WindowId,
@@ -6958,515 +7058,232 @@ fn split_window_in_tree(
         (old_size_px as f32, new_size_px as f32)
     }
 
-    if tree.id() == target {
-        // Only `NewParent` reaches here: the target being this subtree's root
-        // means `parent_combination_of` reported no parent, and the child loop
-        // below never recurses for a `ReuseParent` target.
-        let new_parent_seal = attachment.new_parent_seal().as_stored_slot();
-        let new_before_target = placement.is_before_target();
-        let _old_id = tree.id();
-        let old_bounds = *tree.bounds();
-        let old_window = tree.clone();
-        // The new internal (parent) node takes the old window's slot, so it
-        // inherits the old window's character-line position (GNU
-        // `split_window`); the subsequent resize pass refines both children.
-        let old_top_line = old_window.top_line();
-        let old_left_col = old_window.left_col();
-
-        if let Window::Leaf { .. } = old_window {
-            let (first_bounds, second_bounds) = match direction {
-                SplitDirection::Horizontal => {
-                    let (old_size, new_size) = split_sizes(old_bounds.width, size);
-                    let first_width = if new_before_target {
-                        new_size
-                    } else {
-                        old_size
-                    };
-                    let second_width = if new_before_target {
-                        old_size
-                    } else {
-                        new_size
-                    };
-                    (
-                        Rect::new(old_bounds.x, old_bounds.y, first_width, old_bounds.height),
-                        Rect::new(
-                            old_bounds.x + first_width,
-                            old_bounds.y,
-                            second_width,
-                            old_bounds.height,
-                        ),
-                    )
-                }
-                SplitDirection::Vertical => {
-                    let (old_size, new_size) = split_sizes(old_bounds.height, size);
-                    let first_height = if new_before_target {
-                        new_size
-                    } else {
-                        old_size
-                    };
-                    let second_height = if new_before_target {
-                        old_size
-                    } else {
-                        new_size
-                    };
-                    (
-                        Rect::new(old_bounds.x, old_bounds.y, old_bounds.width, first_height),
-                        Rect::new(
-                            old_bounds.x,
-                            old_bounds.y + first_height,
-                            old_bounds.width,
-                            second_height,
-                        ),
-                    )
-                }
-            };
-            let (old_leaf_bounds, new_leaf_bounds) = if new_before_target {
-                (second_bounds, first_bounds)
-            } else {
-                (first_bounds, second_bounds)
-            };
-
-            let mut old_leaf = old_window;
-            old_leaf.set_bounds(old_leaf_bounds);
-
-            let mut new_leaf =
-                make_split_sibling(&old_leaf, new_id, new_buffer_id, new_leaf_bounds);
-
-            // Capture the old leaf's pre-split normal-size
-            // fractions before we mutate the children. The new
-            // internal node will inherit them because it occupies
-            // the slot the old leaf used to fill.
-            let inherited_normal_lines = old_leaf.normal_lines();
-            let inherited_normal_cols = old_leaf.normal_cols();
-
-            // Compute the new normal-size fractions for both
-            // children, mirroring GNU `Fsplit_window_internal`
-            // (`src/window.c:5517-5644`). Each sibling's fraction
-            // in the split direction is its bounds divided by the
-            // parent. The orthogonal fraction is always 1.0
-            // because both children fill the parent in that
-            // direction.
-            let parent_size = match direction {
-                SplitDirection::Horizontal => old_bounds.width,
-                SplitDirection::Vertical => old_bounds.height,
-            };
-            let (old_fraction, new_fraction) = if parent_size > 0.0 {
-                let old_frac = match direction {
-                    SplitDirection::Horizontal => old_leaf_bounds.width / parent_size,
-                    SplitDirection::Vertical => old_leaf_bounds.height / parent_size,
-                };
-                let new_frac = match direction {
-                    SplitDirection::Horizontal => new_leaf_bounds.width / parent_size,
-                    SplitDirection::Vertical => new_leaf_bounds.height / parent_size,
-                };
-                (old_frac as f64, new_frac as f64)
-            } else {
-                (0.5, 0.5)
-            };
-
-            match direction {
-                SplitDirection::Horizontal => {
-                    old_leaf.set_normal_cols(Value::make_float(old_fraction));
-                    old_leaf.set_normal_lines(Value::make_float(1.0));
-                    new_leaf.set_normal_cols(Value::make_float(new_fraction));
-                    new_leaf.set_normal_lines(Value::make_float(1.0));
-                }
-                SplitDirection::Vertical => {
-                    old_leaf.set_normal_lines(Value::make_float(old_fraction));
-                    old_leaf.set_normal_cols(Value::make_float(1.0));
-                    new_leaf.set_normal_lines(Value::make_float(new_fraction));
-                    new_leaf.set_normal_cols(Value::make_float(1.0));
-                }
-            }
-
-            *tree = Window::Internal {
-                id: internal_id,
-                direction,
-                children: if new_before_target {
-                    vec![new_leaf, old_leaf]
-                } else {
-                    vec![old_leaf, new_leaf]
-                },
-                bounds: old_bounds,
-                parameters: Vec::new(),
-                parameters_generation: 0,
-                combination_limit: new_parent_seal,
-                new_pixel: None,
-                new_total: None,
-                // GNU stages the new parent's `new_normal` from the OLD
-                // window's pre-split fraction, captured before
-                // `make_parent_window` corrupts it (`src/window.c:5543,5570`):
-                //
-                //     Lisp_Object new_normal = horflag ? o->normal_cols : o->normal_lines;
-                //     ...
-                //     wset_new_normal (p, new_normal);
-                //
-                // This is not optional once `new_normal` starts life as a
-                // NUMBER rather than nil: `window_resize_apply` copies it into
-                // `normal_lines`/`normal_cols` guarded by `NUMBERP`
-                // (`src/window.c:4829,4838`), so leaving it 0 here makes the
-                // apply overwrite the inherited fraction with 0.
-                new_normal: match direction {
-                    SplitDirection::Horizontal => inherited_normal_cols,
-                    SplitDirection::Vertical => inherited_normal_lines,
-                },
-                // The new internal node takes the slot that the
-                // old leaf used to fill, so it inherits the
-                // leaf's pre-split proportional fractions.
-                normal_lines: inherited_normal_lines,
-                normal_cols: inherited_normal_cols,
-                top_line: old_top_line,
-                left_col: old_left_col,
-            };
-
-            return Some(());
+    /// The two halves `old` splits into along `direction`, in layout order.
+    fn split_rects(
+        old: Rect,
+        direction: SplitDirection,
+        first_size: f32,
+        second_size: f32,
+    ) -> (Rect, Rect) {
+        match direction {
+            SplitDirection::Horizontal => (
+                Rect::new(old.x, old.y, first_size, old.height),
+                Rect::new(old.x + first_size, old.y, second_size, old.height),
+            ),
+            SplitDirection::Vertical => (
+                Rect::new(old.x, old.y, old.width, first_size),
+                Rect::new(old.x, old.y + first_size, old.width, second_size),
+            ),
         }
+    }
 
-        let (first_bounds, second_bounds) = match direction {
-            SplitDirection::Horizontal => {
-                let (old_size, new_size) = split_sizes(old_bounds.width, size);
-                let first_width = if new_before_target {
-                    new_size
-                } else {
-                    old_size
-                };
-                let second_width = if new_before_target {
-                    old_size
-                } else {
-                    new_size
-                };
-                (
-                    Rect::new(old_bounds.x, old_bounds.y, first_width, old_bounds.height),
-                    Rect::new(
-                        old_bounds.x + first_width,
-                        old_bounds.y,
-                        second_width,
-                        old_bounds.height,
-                    ),
-                )
-            }
-            SplitDirection::Vertical => {
-                let (old_size, new_size) = split_sizes(old_bounds.height, size);
-                let first_height = if new_before_target {
-                    new_size
-                } else {
-                    old_size
-                };
-                let second_height = if new_before_target {
-                    old_size
-                } else {
-                    new_size
-                };
-                (
-                    Rect::new(old_bounds.x, old_bounds.y, old_bounds.width, first_height),
-                    Rect::new(
-                        old_bounds.x,
-                        old_bounds.y + first_height,
-                        old_bounds.width,
-                        second_height,
-                    ),
-                )
-            }
-        };
-        let (old_subtree_bounds, new_leaf_bounds) = if new_before_target {
-            (second_bounds, first_bounds)
-        } else {
-            (first_bounds, second_bounds)
-        };
+    /// A window's extent along `direction`.
+    fn extent(bounds: Rect, direction: SplitDirection) -> f32 {
+        match direction {
+            SplitDirection::Horizontal => bounds.width,
+            SplitDirection::Vertical => bounds.height,
+        }
+    }
 
-        let inherited_normal_lines = old_window.normal_lines();
-        let inherited_normal_cols = old_window.normal_cols();
-
-        let mut old_subtree = old_window;
-        resize_window_subtree(&mut old_subtree, old_subtree_bounds);
-
-        let mut new_leaf = make_split_sibling(&old_subtree, new_id, new_buffer_id, new_leaf_bounds);
-
-        let parent_size = match direction {
-            SplitDirection::Horizontal => old_bounds.width,
-            SplitDirection::Vertical => old_bounds.height,
-        };
-        let (old_fraction, new_fraction) = if parent_size > 0.0 {
-            let old_frac = match direction {
-                SplitDirection::Horizontal => old_subtree_bounds.width / parent_size,
-                SplitDirection::Vertical => old_subtree_bounds.height / parent_size,
-            };
-            let new_frac = match direction {
-                SplitDirection::Horizontal => new_leaf_bounds.width / parent_size,
-                SplitDirection::Vertical => new_leaf_bounds.height / parent_size,
-            };
-            (old_frac as f64, new_frac as f64)
-        } else {
-            (0.5, 0.5)
-        };
-
+    /// Record `window`'s share of a `parent_size`-wide combination, mirroring
+    /// GNU `Fsplit_window_internal` (`src/window.c:5517-5644`): the fraction in
+    /// the split direction is the window's extent over the parent's, and the
+    /// orthogonal fraction is always 1.0 because every child fills the parent
+    /// across the combination.
+    fn set_normal_fraction(window: &mut Window, direction: SplitDirection, fraction: f64) {
         match direction {
             SplitDirection::Horizontal => {
-                old_subtree.set_normal_cols(Value::make_float(old_fraction));
-                old_subtree.set_normal_lines(Value::make_float(1.0));
-                new_leaf.set_normal_cols(Value::make_float(new_fraction));
-                new_leaf.set_normal_lines(Value::make_float(1.0));
+                window.set_normal_cols(Value::make_float(fraction));
+                window.set_normal_lines(Value::make_float(1.0));
             }
             SplitDirection::Vertical => {
-                old_subtree.set_normal_lines(Value::make_float(old_fraction));
-                old_subtree.set_normal_cols(Value::make_float(1.0));
-                new_leaf.set_normal_lines(Value::make_float(new_fraction));
-                new_leaf.set_normal_cols(Value::make_float(1.0));
+                window.set_normal_lines(Value::make_float(fraction));
+                window.set_normal_cols(Value::make_float(1.0));
             }
         }
+    }
 
-        *tree = Window::Internal {
-            id: internal_id,
-            direction,
-            children: if new_before_target {
-                vec![new_leaf, old_subtree]
-            } else {
-                vec![old_subtree, new_leaf]
-            },
-            bounds: old_bounds,
-            parameters: Vec::new(),
-            parameters_generation: 0,
-            combination_limit: new_parent_seal,
-            new_pixel: None,
-            new_total: None,
-            // Same staging as the sibling construction above -- GNU
-            // `wset_new_normal (p, horflag ? o->normal_cols : o->normal_lines)`
-            // (`src/window.c:5543,5570`).  Leaving it 0 would make
-            // `window_resize_apply`'s `NUMBERP` copy clobber the inherited
-            // fraction.
-            new_normal: match direction {
-                SplitDirection::Horizontal => inherited_normal_cols,
-                SplitDirection::Vertical => inherited_normal_lines,
-            },
-            normal_lines: inherited_normal_lines,
-            normal_cols: inherited_normal_cols,
-            top_line: old_top_line,
-            left_col: old_left_col,
-        };
+    let old = tree.find(target)?;
+    let old_bounds = *old.bounds();
+    // The new internal (parent) node takes the old window's slot, so it
+    // inherits the old window's character-line position (GNU `split_window`);
+    // the subsequent resize pass refines both children.
+    let old_top_line = old.top_line();
+    let old_left_col = old.left_col();
+    let inherited_normal_lines = old.normal_lines();
+    let inherited_normal_cols = old.normal_cols();
 
+    let new_before_target = placement.is_before_target();
+    let (old_size_px, new_size_px) = split_sizes(extent(old_bounds, direction), size);
+    let (first_bounds, second_bounds) = if new_before_target {
+        split_rects(old_bounds, direction, new_size_px, old_size_px)
+    } else {
+        split_rects(old_bounds, direction, old_size_px, new_size_px)
+    };
+    let (old_slot_bounds, new_leaf_bounds) = if new_before_target {
+        (second_bounds, first_bounds)
+    } else {
+        (first_bounds, second_bounds)
+    };
+
+    // The target need NOT be a leaf in either case: GNU splices a sibling next
+    // to an internal node just the same, which is how a side window is
+    // attached beside the frame's main-window group, and interposes a parent
+    // above one just the same.  Its whole subtree follows its new rectangle.
+    resize_window_subtree(tree, target, old_slot_bounds);
+    // A split always introduces a live LEAF (GNU `make_window`), so an internal
+    // target seeds a fresh one rather than being cloned.
+    let mut new_leaf =
+        make_split_sibling(tree.find(target)?, new_id, new_buffer_id, new_leaf_bounds);
+
+    if attachment.reuses_parent() {
+        // The target's own parent combination absorbs the new window as a
+        // plain sibling (GNU `p = XWINDOW (o->parent)` -- no
+        // `make_parent_window`), so every child's share of it is restated.
+        let parent = tree.parent_of(target)?;
+        let parent_size = extent(*tree.find(parent)?.bounds(), direction);
+        if parent_size > 0.0 {
+            for child in tree.child_ids(parent).to_vec() {
+                let Some(child_bounds) = tree.find(child).map(|node| *node.bounds()) else {
+                    continue;
+                };
+                let fraction = (extent(child_bounds, direction) / parent_size) as f64;
+                if let Some(node) = tree.find_mut(child) {
+                    set_normal_fraction(node, direction, fraction);
+                }
+            }
+            let fraction = (extent(new_leaf_bounds, direction) / parent_size) as f64;
+            set_normal_fraction(&mut new_leaf, direction, fraction);
+        }
+
+        tree.insert(new_leaf);
+        let mut siblings = tree.child_ids(parent).to_vec();
+        let idx = siblings.iter().position(|child| *child == target)?;
+        siblings.insert(if new_before_target { idx } else { idx + 1 }, new_id);
+        tree.set_children(parent, siblings);
         return Some(());
     }
 
-    // Recurse into children.
-    //
-    // When `attachment` is `ReuseParent`, the target's own parent combination
-    // absorbs the new window as a plain sibling (GNU `p = XWINDOW (o->parent)`
-    // — no `make_parent_window`).  The target need NOT be a leaf: GNU splices a
-    // sibling next to an internal node just the same, which is how a side
-    // window is attached beside the frame's main-window group.
-    //
-    // For `NewParent` we fall through to the recursive descent, which re-enters
-    // this function with the target as its root and interposes the parent there.
-    if let Window::Internal {
-        children, bounds, ..
-    } = tree
-    {
-        let parent_bounds = *bounds;
-        let child_count = children.len();
-        for i in 0..child_count {
-            if children[i].id() == target && attachment.reuses_parent() {
-                // Reuse parent: insert new sibling into children.
-                {
-                    let old_bounds = *children[i].bounds();
-
-                    let (old_size_px, new_size_px) = split_sizes(
-                        match direction {
-                            SplitDirection::Horizontal => old_bounds.width,
-                            SplitDirection::Vertical => old_bounds.height,
-                        },
-                        size,
-                    );
-
-                    let new_before_target = placement.is_before_target();
-                    let (first_bounds, second_bounds) = match direction {
-                        SplitDirection::Horizontal => {
-                            let first_w = if new_before_target {
-                                new_size_px
-                            } else {
-                                old_size_px
-                            };
-                            let second_w = if new_before_target {
-                                old_size_px
-                            } else {
-                                new_size_px
-                            };
-                            (
-                                Rect::new(old_bounds.x, old_bounds.y, first_w, old_bounds.height),
-                                Rect::new(
-                                    old_bounds.x + first_w,
-                                    old_bounds.y,
-                                    second_w,
-                                    old_bounds.height,
-                                ),
-                            )
-                        }
-                        SplitDirection::Vertical => {
-                            let first_h = if new_before_target {
-                                new_size_px
-                            } else {
-                                old_size_px
-                            };
-                            let second_h = if new_before_target {
-                                old_size_px
-                            } else {
-                                new_size_px
-                            };
-                            (
-                                Rect::new(old_bounds.x, old_bounds.y, old_bounds.width, first_h),
-                                Rect::new(
-                                    old_bounds.x,
-                                    old_bounds.y + first_h,
-                                    old_bounds.width,
-                                    second_h,
-                                ),
-                            )
-                        }
-                    };
-
-                    let (old_leaf_bounds, new_leaf_bounds) = if new_before_target {
-                        (second_bounds, first_bounds)
-                    } else {
-                        (first_bounds, second_bounds)
-                    };
-
-                    // Resize the target child in-place.  When the target is an
-                    // internal node its whole subtree has to follow, exactly as
-                    // in the `NewParent` path.
-                    resize_window_subtree(&mut children[i], old_leaf_bounds);
-
-                    // Build the new sibling.  A split always introduces a live
-                    // LEAF (GNU `make_window`), so an internal target seeds a
-                    // fresh one rather than being cloned.
-                    let mut new_leaf =
-                        make_split_sibling(&children[i], new_id, new_buffer_id, new_leaf_bounds);
-
-                    // Compute normal fractions for all children in parent.
-                    let parent_size = match direction {
-                        SplitDirection::Horizontal => parent_bounds.width,
-                        SplitDirection::Vertical => parent_bounds.height,
-                    };
-                    if parent_size > 0.0 {
-                        for child_w in children.iter_mut() {
-                            let frac = match direction {
-                                SplitDirection::Horizontal => child_w.bounds().width / parent_size,
-                                SplitDirection::Vertical => child_w.bounds().height / parent_size,
-                            } as f64;
-                            match direction {
-                                SplitDirection::Horizontal => {
-                                    child_w.set_normal_cols(Value::make_float(frac));
-                                    child_w.set_normal_lines(Value::make_float(1.0));
-                                }
-                                SplitDirection::Vertical => {
-                                    child_w.set_normal_lines(Value::make_float(frac));
-                                    child_w.set_normal_cols(Value::make_float(1.0));
-                                }
-                            }
-                        }
-                        let new_frac = match direction {
-                            SplitDirection::Horizontal => new_leaf_bounds.width / parent_size,
-                            SplitDirection::Vertical => new_leaf_bounds.height / parent_size,
-                        } as f64;
-                        match direction {
-                            SplitDirection::Horizontal => {
-                                new_leaf.set_normal_cols(Value::make_float(new_frac));
-                                new_leaf.set_normal_lines(Value::make_float(1.0));
-                            }
-                            SplitDirection::Vertical => {
-                                new_leaf.set_normal_lines(Value::make_float(new_frac));
-                                new_leaf.set_normal_cols(Value::make_float(1.0));
-                            }
-                        }
-                    }
-
-                    // Insert new leaf at correct position.
-                    if new_before_target {
-                        children.insert(i, new_leaf);
-                    } else {
-                        children.insert(i + 1, new_leaf);
-                    }
-
-                    return Some(());
-                }
-            }
-        }
-
-        // Recursive calls: iterate again for &mut access.
-        for child in children.iter_mut() {
-            if split_window_in_tree(
-                child,
-                target,
-                direction,
-                internal_id,
-                new_id,
-                new_buffer_id,
-                size,
-                placement,
-                attachment,
-            )
-            .is_some()
-            {
-                return Some(());
-            }
-        }
+    // A fresh internal node takes the target's slot and holds both windows.
+    let parent_size = extent(old_bounds, direction);
+    let (old_fraction, new_fraction) = if parent_size > 0.0 {
+        (
+            (extent(old_slot_bounds, direction) / parent_size) as f64,
+            (extent(new_leaf_bounds, direction) / parent_size) as f64,
+        )
+    } else {
+        (0.5, 0.5)
+    };
+    set_normal_fraction(&mut new_leaf, direction, new_fraction);
+    if let Some(node) = tree.find_mut(target) {
+        set_normal_fraction(node, direction, old_fraction);
     }
 
-    None
+    // Asked before the new parent is inserted, which would itself name the
+    // target as a child.
+    let grandparent = tree.parent_of(target);
+    tree.insert(new_leaf);
+    tree.insert(Window::Internal {
+        id: internal_id,
+        direction,
+        children: if new_before_target {
+            vec![new_id, target]
+        } else {
+            vec![target, new_id]
+        },
+        bounds: old_bounds,
+        parameters: Vec::new(),
+        parameters_generation: 0,
+        combination_limit: attachment.new_parent_seal().as_stored_slot(),
+        new_pixel: None,
+        new_total: None,
+        // GNU stages the new parent's `new_normal` from the OLD window's
+        // pre-split fraction, captured before `make_parent_window` corrupts it
+        // (`src/window.c:5543,5570`):
+        //
+        //     Lisp_Object new_normal = horflag ? o->normal_cols : o->normal_lines;
+        //     ...
+        //     wset_new_normal (p, new_normal);
+        //
+        // This is not optional once `new_normal` starts life as a NUMBER rather
+        // than nil: `window_resize_apply` copies it into
+        // `normal_lines`/`normal_cols` guarded by `NUMBERP`
+        // (`src/window.c:4829,4838`), so leaving it 0 here makes the apply
+        // overwrite the inherited fraction with 0.
+        new_normal: match direction {
+            SplitDirection::Horizontal => inherited_normal_cols,
+            SplitDirection::Vertical => inherited_normal_lines,
+        },
+        // The new internal node takes the slot that the old window used to
+        // fill, so it inherits that window's pre-split proportional fractions.
+        normal_lines: inherited_normal_lines,
+        normal_cols: inherited_normal_cols,
+        top_line: old_top_line,
+        left_col: old_left_col,
+    });
+
+    match grandparent {
+        Some(grandparent) => {
+            let mut slots = tree.child_ids(grandparent).to_vec();
+            let idx = slots.iter().position(|child| *child == target)?;
+            slots[idx] = internal_id;
+            tree.set_children(grandparent, slots);
+        }
+        None => tree.set_root(internal_id),
+    }
+    Some(())
 }
 
-/// Delete a window from the tree. Returns true if found and removed.
+/// Delete a window from the tree. Returns how the tree absorbed the removal.
 fn delete_window_in_tree(
-    tree: &mut Window,
+    tree: &mut WindowTree,
     target: WindowId,
     resize: DeleteResize,
 ) -> DeleteOutcome {
-    let is_direct_child = matches!(
-        tree,
-        Window::Internal { children, .. } if children.iter().any(|c| c.id() == target)
-    );
+    let Some(parent) = tree.parent_of(target) else {
+        return DeleteOutcome::NotFound;
+    };
+    let Some(Window::Internal {
+        bounds, direction, ..
+    }) = tree.find(parent)
+    else {
+        return DeleteOutcome::NotFound;
+    };
+    let parent_bounds = *bounds;
+    let horflag = matches!(*direction, SplitDirection::Horizontal);
 
-    if is_direct_child {
-        // Unlink the target, keeping the parent's geometry and axis. Done in
-        // its own scope so the borrow ends before the re-layout, which needs
-        // `tree` itself.
-        let (parent_bounds, horflag, remaining) = {
-            let Window::Internal {
-                children,
-                bounds,
-                direction,
-                ..
-            } = tree
-            else {
-                unreachable!("checked above")
-            };
-            let horflag = matches!(*direction, SplitDirection::Horizontal);
-            let parent_bounds = *bounds;
-            let idx = children
-                .iter()
-                .position(|c| c.id() == target)
-                .expect("checked above");
-            children.remove(idx);
-            (parent_bounds, horflag, children.len())
-        };
+    // Unlink the target, keeping the parent's geometry and axis, and drop the
+    // nodes it took with it.  Owning children inline made that automatic --
+    // removing the child dropped its whole subtree -- and it has to stay true:
+    // a window that answers a lookup is a window `window-live-p` reports live.
+    let discarded = tree.subtree_ids(target);
+    let mut siblings = tree.child_ids(parent).to_vec();
+    siblings.retain(|child| *child != target);
+    let remaining = siblings.len();
+    tree.set_children(parent, siblings);
+    for id in discarded {
+        tree.remove(id);
+    }
 
-        // GNU `Fdelete_window_internal` commits the staged sizes for the whole
-        // parent combination FIRST -- `window_resize_apply (p, horflag)` runs
-        // before the matryoshka `replace_window` (`src/window.c`), so it applies
-        // whether or not one sibling is about to be promoted.  Doing it only in
-        // the multi-child case left a promoted subtree laid out by proportional
-        // redistribution instead of by the plan `window.el` computed.
-        if let DeleteResize::ApplyStaged = resize {
-            window_resize_apply(tree, horflag, 1.0, 1.0);
-        }
+    // GNU `Fdelete_window_internal` commits the staged sizes for the whole
+    // parent combination FIRST -- `window_resize_apply (p, horflag)` runs
+    // before the matryoshka `replace_window` (`src/window.c`), so it applies
+    // whether or not one sibling is about to be promoted.  Doing it only in
+    // the multi-child case left a promoted subtree laid out by proportional
+    // redistribution instead of by the plan `window.el` computed.
+    if let DeleteResize::ApplyStaged = resize {
+        window_resize_apply(tree, parent, horflag, 1.0, 1.0);
+    }
 
-        if remaining == 1 {
-            // GNU's matryoshka case: the sole surviving sibling replaces the
-            // parent and inherits its geometry (`replace_window`).
-            let (parent_normal_cols, parent_normal_lines) =
-                (tree.normal_cols(), tree.normal_lines());
-            let Window::Internal { children, .. } = tree else {
-                unreachable!("checked above")
-            };
-            let mut promoted = children.pop().expect("one child remains");
+    if remaining == 1 {
+        // GNU's matryoshka case: the sole surviving sibling replaces the
+        // parent and inherits its geometry (`replace_window`).
+        let promoted = tree.child_ids(parent)[0];
+        let (parent_normal_cols, parent_normal_lines) = tree
+            .find(parent)
+            .map(|node| (node.normal_cols(), node.normal_lines()))
+            .expect("the parent is still held");
+        if let Some(node) = tree.find_mut(promoted) {
             // GNU `Fdelete_window_internal` (`src/window.c:5793-5796`):
             //
             //     wset_normal_cols (s, p->normal_cols);
@@ -7476,71 +7293,68 @@ fn delete_window_in_tree(
             // grandparent, not the share it had of the parent it replaced.
             // Leaving it at its own (typically 1.0, being an only child) makes
             // every later proportional resize of the grandparent misweight it.
-            promoted.set_normal_cols(parent_normal_cols);
-            promoted.set_normal_lines(parent_normal_lines);
-            match resize {
-                // The sizes were just committed above, and the sole child was
-                // re-packed to fill its parent; re-laying it out here would
-                // discard exactly that.  Only its own rect needs to take the
-                // parent's slot.
-                DeleteResize::ApplyStaged => promoted.set_bounds(parent_bounds),
-                // Nothing was staged, so the promoted child keeps its own
-                // subtree at the old, smaller geometry unless it is re-laid-out
-                // -- visible as windows that fail to reclaim a deleted
-                // sibling's space.
-                DeleteResize::Redistribute => {
-                    resize_window_subtree(&mut promoted, parent_bounds);
+            node.set_normal_cols(parent_normal_cols);
+            node.set_normal_lines(parent_normal_lines);
+        }
+        match resize {
+            // The sizes were just committed above, and the sole child was
+            // re-packed to fill its parent; re-laying it out here would
+            // discard exactly that.  Only its own rect needs to take the
+            // parent's slot.
+            DeleteResize::ApplyStaged => {
+                if let Some(node) = tree.find_mut(promoted) {
+                    node.set_bounds(parent_bounds);
                 }
             }
-            *tree = promoted;
-            // GNU: "Have SIBLING inherit the following three slot values from
-            // PARENT (the combination_limit slot is not inherited)"
-            // (`src/window.c:5793-5796`) -- so the promoted node keeps its own
-            // seal, which is what decides recombination at the level above.
-            return DeleteOutcome::RemovedAndPromoted;
+            // Nothing was staged, so the promoted child keeps its own
+            // subtree at the old, smaller geometry unless it is re-laid-out
+            // -- visible as windows that fail to reclaim a deleted
+            // sibling's space.
+            DeleteResize::Redistribute => {
+                resize_window_subtree(tree, promoted, parent_bounds);
+            }
         }
 
-        if let DeleteResize::Redistribute = resize {
-            // No staged sizes to honor: spread the freed space over the
-            // remaining children, then push each child's new rect down through
-            // its own subtree.
-            let Window::Internal { children, .. } = tree else {
-                unreachable!("checked above")
-            };
-            redistribute_bounds(children, parent_bounds);
-            for child in children.iter_mut() {
-                let child_bounds = *child.bounds();
-                resize_window_subtree(child, child_bounds);
+        // The promoted window takes the parent's slot.  GNU: "Have SIBLING
+        // inherit the following three slot values from PARENT (the
+        // combination_limit slot is not inherited)" (`src/window.c:5793-5796`)
+        // -- so the promoted node keeps its own seal, which is what decides
+        // recombination at the level above.
+        let grandparent = tree.parent_of(parent);
+        match grandparent {
+            Some(grandparent) => {
+                let mut slots = tree.child_ids(grandparent).to_vec();
+                let Some(idx) = slots.iter().position(|child| *child == parent) else {
+                    return DeleteOutcome::Removed;
+                };
+                slots[idx] = promoted;
+                tree.set_children(grandparent, slots);
+                tree.remove(parent);
+                // GNU calls `recombine_windows` on the promoted sibling, and
+                // only there (`src/window.c:5801`).
+                recombine_child_into_parent(tree, grandparent, idx);
+            }
+            None => {
+                tree.set_root(promoted);
+                tree.remove(parent);
             }
         }
         return DeleteOutcome::Removed;
     }
 
-    // Recurse.
-    let child_count = match tree {
-        Window::Internal { children, .. } => children.len(),
-        Window::Leaf { .. } => 0,
-    };
-    for i in 0..child_count {
-        let outcome = {
-            let Window::Internal { children, .. } = tree else {
-                unreachable!("child_count is 0 for a leaf")
+    if let DeleteResize::Redistribute = resize {
+        // No staged sizes to honor: spread the freed space over the
+        // remaining children, then push each child's new rect down through
+        // its own subtree.
+        tree.redistribute_bounds(parent, parent_bounds);
+        for child in tree.child_ids(parent).to_vec() {
+            let Some(child_bounds) = tree.find(child).map(|node| *node.bounds()) else {
+                continue;
             };
-            delete_window_in_tree(&mut children[i], target, resize)
-        };
-        match outcome {
-            DeleteOutcome::NotFound => continue,
-            // GNU calls `recombine_windows` on the promoted sibling, and only
-            // there (`src/window.c:5801`).
-            DeleteOutcome::RemovedAndPromoted => {
-                recombine_child_into_parent(tree, i);
-                return DeleteOutcome::Removed;
-            }
-            DeleteOutcome::Removed => return DeleteOutcome::Removed,
+            resize_window_subtree(tree, child, child_bounds);
         }
     }
-
-    DeleteOutcome::NotFound
+    DeleteOutcome::Removed
 }
 
 /// Merge `parent`'s `idx`th child into `parent` when the two are iso-combined
@@ -7559,21 +7373,25 @@ fn delete_window_in_tree(
 /// exactly what `set-window-combination-limit` is for, and what
 /// `window--make-major-side-window` relies on to keep the main-window group
 /// from dissolving into the root (Bug#80665).
-fn recombine_child_into_parent(parent: &mut Window, idx: usize) {
-    let Window::Internal {
-        children,
+fn recombine_child_into_parent(tree: &mut WindowTree, parent: WindowId, idx: usize) {
+    let Some(Window::Internal {
         direction: parent_direction,
         bounds: parent_bounds,
+        children,
         ..
-    } = parent
+    }) = tree.find(parent)
     else {
         return;
     };
     let parent_direction = *parent_direction;
     let parent_bounds = *parent_bounds;
+    let mut siblings = children.clone();
+    let Some(&merged) = siblings.get(idx) else {
+        return;
+    };
 
     // Only an unsealed combination along the same axis merges upward.
-    match children.get(idx) {
+    match tree.find(merged) {
         Some(Window::Internal {
             direction,
             combination_limit,
@@ -7582,114 +7400,69 @@ fn recombine_child_into_parent(parent: &mut Window, idx: usize) {
         _ => return,
     }
 
-    let Window::Internal {
-        children: inner, ..
-    } = children.remove(idx)
-    else {
-        unreachable!("matched as Internal just above")
-    };
+    let inner = tree.child_ids(merged).to_vec();
+    siblings.remove(idx);
+    // The merged node is gone from the tree, not merely unlinked: its children
+    // take its place in the parent's list.
+    tree.remove(merged);
 
     let parent_size = match parent_direction {
         SplitDirection::Horizontal => parent_bounds.width,
         SplitDirection::Vertical => parent_bounds.height,
     };
-    for (offset, mut child) in inner.into_iter().enumerate() {
-        if parent_size > 0.0 {
-            let child_bounds = *child.bounds();
+    for (offset, child) in inner.into_iter().enumerate() {
+        if parent_size > 0.0
+            && let Some(node) = tree.find_mut(child)
+        {
+            let child_bounds = *node.bounds();
             let fraction = match parent_direction {
                 SplitDirection::Horizontal => child_bounds.width / parent_size,
                 SplitDirection::Vertical => child_bounds.height / parent_size,
             } as f64;
             match parent_direction {
                 SplitDirection::Horizontal => {
-                    child.set_normal_cols(Value::make_float(fraction));
+                    node.set_normal_cols(Value::make_float(fraction));
                 }
                 SplitDirection::Vertical => {
-                    child.set_normal_lines(Value::make_float(fraction));
+                    node.set_normal_lines(Value::make_float(fraction));
                 }
             }
         }
-        children.insert(idx + offset, child);
+        siblings.insert(idx + offset, child);
     }
+    tree.set_children(parent, siblings);
 }
 
-fn collect_window_ids(window: &Window, ids: &mut HashSet<WindowId>) {
-    ids.insert(window.id());
-    if let Window::Internal { children, .. } = window {
-        for child in children {
-            collect_window_ids(child, ids);
-        }
+fn find_sibling_in_tree(tree: &WindowTree, target: WindowId, next: bool) -> Option<WindowId> {
+    let parent = tree.parent_of(target)?;
+    let siblings = tree.child_ids(parent);
+    let index = siblings.iter().position(|child| *child == target)?;
+    if next {
+        siblings.get(index + 1).copied()
+    } else {
+        index
+            .checked_sub(1)
+            .and_then(|index| siblings.get(index))
+            .copied()
     }
-}
-
-fn collect_window_metadata(window: &Window, windows: &mut Vec<(WindowId, WindowParameters)>) {
-    windows.push((window.id(), window.parameters().clone()));
-    if let Window::Internal { children, .. } = window {
-        for child in children {
-            collect_window_metadata(child, windows);
-        }
-    }
-}
-
-fn find_parent_in_tree(node: &Window, target: WindowId) -> Option<WindowId> {
-    let Window::Internal { children, .. } = node else {
-        return None;
-    };
-
-    for child in children {
-        if child.id() == target {
-            return Some(node.id());
-        }
-        if let Some(parent) = find_parent_in_tree(child, target) {
-            return Some(parent);
-        }
-    }
-
-    None
-}
-
-fn find_sibling_in_tree(node: &Window, target: WindowId, next: bool) -> Option<WindowId> {
-    let Window::Internal { children, .. } = node else {
-        return None;
-    };
-
-    if let Some(index) = children.iter().position(|child| child.id() == target) {
-        let sibling = if next {
-            children.get(index + 1)
-        } else {
-            index.checked_sub(1).and_then(|idx| children.get(idx))
-        };
-        return sibling.map(Window::id);
-    }
-
-    children
-        .iter()
-        .find_map(|child| find_sibling_in_tree(child, target, next))
 }
 
 fn find_first_child_in_tree(
-    node: &Window,
+    tree: &WindowTree,
     target: WindowId,
     direction: SplitDirection,
 ) -> Option<WindowId> {
-    match node {
-        Window::Leaf { .. } => None,
-        Window::Internal {
-            id,
-            direction: node_direction,
-            children,
-            ..
-        } => {
-            if *id == target {
-                return (*node_direction == direction)
-                    .then(|| children.first().map(Window::id))
-                    .flatten();
-            }
-            children
-                .iter()
-                .find_map(|child| find_first_child_in_tree(child, target, direction))
-        }
-    }
+    let Some(Window::Internal {
+        direction: node_direction,
+        children,
+        ..
+    }) = tree.find(target)
+    else {
+        return None;
+    };
+    (*node_direction == direction)
+        .then(|| children.first().copied())
+        .flatten()
 }
 
 /// Return the parent of WINDOW-ID inside FRAME, if any.
@@ -7697,7 +7470,7 @@ pub fn window_parent_id(frame: &Frame, window_id: WindowId) -> Option<WindowId> 
     if frame.minibuffer_window == Some(window_id) {
         return None;
     }
-    find_parent_in_tree(&frame.root_window(), window_id)
+    frame.tree().parent_of(window_id)
 }
 
 /// Return the first child of WINDOW-ID when it is combined in DIRECTION.
@@ -7709,7 +7482,7 @@ pub fn window_first_child_id(
     if frame.minibuffer_window == Some(window_id) {
         return None;
     }
-    find_first_child_in_tree(&frame.root_window(), window_id, direction)
+    find_first_child_in_tree(frame.tree(), window_id, direction)
 }
 
 /// Return the next sibling of WINDOW-ID, if any.
@@ -7720,7 +7493,7 @@ pub fn window_next_sibling_id(frame: &Frame, window_id: WindowId) -> Option<Wind
     if frame.root_window().id() == window_id && frame.minibuffer_leaf.is_some() {
         return frame.minibuffer_window;
     }
-    find_sibling_in_tree(&frame.root_window(), window_id, true)
+    find_sibling_in_tree(frame.tree(), window_id, true)
 }
 
 /// Return the previous sibling of WINDOW-ID, if any.
@@ -7731,7 +7504,7 @@ pub fn window_prev_sibling_id(frame: &Frame, window_id: WindowId) -> Option<Wind
             .as_ref()
             .map(|_| frame.root_window().id());
     }
-    find_sibling_in_tree(&frame.root_window(), window_id, false)
+    find_sibling_in_tree(frame.tree(), window_id, false)
 }
 
 /// Apply pixel-based resize values to a window tree.
@@ -7753,11 +7526,15 @@ pub fn window_prev_sibling_id(frame: &Frame, window_id: WindowId) -> Option<Wind
 /// `Window::Leaf` / `Window::Internal` directly so the resize
 /// function no longer needs a side-table HashMap.
 pub fn window_resize_apply(
-    window: &mut Window,
+    tree: &mut WindowTree,
+    id: WindowId,
     horflag: bool,
     _char_width: f32,
     _char_height: f32,
 ) {
+    let Some(window) = tree.find_mut(id) else {
+        return;
+    };
     // Apply new_pixel to this window's bounds.
     let new_px = window.new_pixel();
     let bounds = *window.bounds();
@@ -7809,35 +7586,41 @@ pub fn window_resize_apply(
 
     // Get updated bounds after applying new_pixel.
     let bounds = *window.bounds();
-    let edge = if horflag { bounds.x } else { bounds.y };
-
-    if let Window::Internal {
+    let Window::Internal {
         direction,
         children,
         ..
     } = window
-    {
-        let mut edge = edge;
-        let dir = *direction;
-        for child in children.iter_mut() {
-            // Position child at current edge.
-            let cb = *child.bounds();
-            if horflag {
-                child.set_bounds(Rect::new(edge, cb.y, cb.width, cb.height));
-            } else {
-                child.set_bounds(Rect::new(cb.x, edge, cb.width, cb.height));
-            }
+    else {
+        return;
+    };
+    let dir = *direction;
+    let children = children.clone();
+    let mut edge = if horflag { bounds.x } else { bounds.y };
 
-            // Recurse.
-            window_resize_apply(child, horflag, _char_width, _char_height);
+    for child in children {
+        // Position child at current edge.
+        let Some(node) = tree.find_mut(child) else {
+            continue;
+        };
+        let cb = *node.bounds();
+        if horflag {
+            node.set_bounds(Rect::new(edge, cb.y, cb.width, cb.height));
+        } else {
+            node.set_bounds(Rect::new(cb.x, edge, cb.width, cb.height));
+        }
 
-            // Accumulate edge in the combination direction.
-            let child_bounds = *child.bounds();
-            match (dir, horflag) {
-                (SplitDirection::Horizontal, true) => edge += child_bounds.width,
-                (SplitDirection::Vertical, false) => edge += child_bounds.height,
-                _ => {}
-            }
+        // Recurse.
+        window_resize_apply(tree, child, horflag, _char_width, _char_height);
+
+        // Accumulate edge in the combination direction.
+        let Some(child_bounds) = tree.find(child).map(|node| *node.bounds()) else {
+            continue;
+        };
+        match (dir, horflag) {
+            (SplitDirection::Horizontal, true) => edge += child_bounds.width,
+            (SplitDirection::Vertical, false) => edge += child_bounds.height,
+            _ => {}
         }
     }
 }
@@ -7847,47 +7630,50 @@ pub fn window_resize_apply(
 ///
 /// Reads each window's own `new_pixel` slot, mirroring GNU's
 /// recursive walk in `window_resize_check`.
-pub fn window_resize_check(window: &Window, horflag: bool) -> bool {
-    let my_new = window.new_pixel().unwrap_or_else(|| {
-        let b = window.bounds();
-        if horflag {
-            b.width as i64
-        } else {
-            b.height as i64
-        }
-    });
-
-    match window {
-        Window::Leaf { .. } => true,
-        Window::Internal {
-            direction,
-            children,
-            ..
-        } => {
-            // In the combination direction, sum of children must equal parent.
-            let combines = (*direction == SplitDirection::Horizontal) == horflag;
-            if combines {
-                let child_sum: i64 = children
-                    .iter()
-                    .map(|c| {
-                        c.new_pixel().unwrap_or_else(|| {
-                            let b = c.bounds();
-                            if horflag {
-                                b.width as i64
-                            } else {
-                                b.height as i64
-                            }
-                        })
-                    })
-                    .sum();
-                if child_sum != my_new {
-                    return false;
-                }
+pub fn window_resize_check(tree: &WindowTree, id: WindowId, horflag: bool) -> bool {
+    /// A window's staged extent along the checked axis, falling back to the
+    /// extent it already has when nothing is staged.
+    fn staged_extent(window: &Window, horflag: bool) -> i64 {
+        window.new_pixel().unwrap_or_else(|| {
+            let bounds = window.bounds();
+            if horflag {
+                bounds.width as i64
+            } else {
+                bounds.height as i64
             }
-            // All children must also pass the check.
-            children.iter().all(|c| window_resize_check(c, horflag))
+        })
+    }
+
+    let Some(window) = tree.find(id) else {
+        return true;
+    };
+    let my_new = staged_extent(window, horflag);
+
+    let Window::Internal {
+        direction,
+        children,
+        ..
+    } = window
+    else {
+        return true;
+    };
+
+    // In the combination direction, sum of children must equal parent.
+    let combines = (*direction == SplitDirection::Horizontal) == horflag;
+    if combines {
+        let child_sum: i64 = children
+            .iter()
+            .filter_map(|child| tree.find(*child))
+            .map(|child| staged_extent(child, horflag))
+            .sum();
+        if child_sum != my_new {
+            return false;
         }
     }
+    // All children must also pass the check.
+    children
+        .iter()
+        .all(|child| window_resize_check(tree, *child, horflag))
 }
 
 /// Apply character-cell-based resize values to a window tree.
@@ -7905,11 +7691,15 @@ pub fn window_resize_check(window: &Window, horflag: bool) -> bool {
 /// The pending size for each window is read from `w->new_total`
 /// (now stored on the Window enum after audit Structural 1).
 pub fn window_resize_apply_total(
-    window: &mut Window,
+    tree: &mut WindowTree,
+    id: WindowId,
     horflag: bool,
     char_width: f32,
     char_height: f32,
 ) {
+    let Some(window) = tree.find_mut(id) else {
+        return;
+    };
     let new_total = window.new_total();
 
     // Apply new_total converted to pixels.
@@ -7938,115 +7728,162 @@ pub fn window_resize_apply_total(
         window.top_line()
     };
 
-    if let Window::Internal {
+    let Window::Internal {
         direction,
         children,
         ..
     } = window
+    else {
+        return;
+    };
+    let dir = *direction;
+    let children = children.clone();
+    let mut edge = edge;
+    let mut char_edge = char_edge_start;
+
+    for child in children {
+        // Position child at current pixel edge.
+        let Some(node) = tree.find_mut(child) else {
+            continue;
+        };
+        let cb = *node.bounds();
+        if horflag {
+            node.set_bounds(Rect::new(edge, cb.y, cb.width, cb.height));
+            node.set_left_col(char_edge);
+        } else {
+            node.set_bounds(Rect::new(cb.x, edge, cb.width, cb.height));
+            node.set_top_line(char_edge);
+        }
+
+        // Recurse.
+        window_resize_apply_total(tree, child, horflag, char_width, char_height);
+
+        // Accumulate the pixel edge and, in the same axis, the char edge
+        // by the child's total lines/cols (GNU `edge += c->total_lines`).
+        let Some(child_bounds) = tree.find(child).map(|node| *node.bounds()) else {
+            continue;
+        };
+        match (dir, horflag) {
+            (SplitDirection::Horizontal, true) => {
+                edge += child_bounds.width;
+                char_edge += (child_bounds.width / char_width).round() as i64;
+            }
+            (SplitDirection::Vertical, false) => {
+                edge += child_bounds.height;
+                char_edge += (child_bounds.height / char_height).round() as i64;
+            }
+            _ => {}
+        }
+    }
+}
+
+impl WindowTree {
+    /// The rectangles `parent`'s children should occupy inside `bounds`, in
+    /// child order.
+    ///
+    /// Reading each child's extent finishes before any of them is written, so
+    /// no two nodes are borrowed at once.  The arithmetic itself lives in
+    /// [`sibling_layout`], where it is testable without a window tree.
+    fn sibling_bounds_of(&self, parent: WindowId, bounds: Rect) -> Vec<Rect> {
+        let extents: Vec<ChildExtent> = self
+            .child_ids(parent)
+            .iter()
+            .filter_map(|child| self.find(*child))
+            .map(|child| ChildExtent {
+                bounds: *child.bounds(),
+                fixed_width_cols: child.fixed_width_cols(),
+                fixed_height_lines: child.fixed_height_lines(),
+            })
+            .collect();
+        sibling_bounds(bounds, &extents)
+    }
+
+    /// Give `parent`'s children their share of `bounds`, without descending.
+    fn redistribute_bounds(&mut self, parent: WindowId, bounds: Rect) {
+        let children = self.child_ids(parent).to_vec();
+        for (child, rect) in children
+            .into_iter()
+            .zip(self.sibling_bounds_of(parent, bounds))
+        {
+            if let Some(node) = self.find_mut(child) {
+                node.set_bounds(rect);
+            }
+        }
+    }
+}
+
+fn resize_window_subtree(tree: &mut WindowTree, window: WindowId, bounds: Rect) {
+    let Some(node) = tree.find_mut(window) else {
+        return;
+    };
+    node.set_bounds(bounds);
+    let children = node.children().to_vec();
+    if children.is_empty() {
+        return;
+    }
+    for (child, child_bounds) in children
+        .into_iter()
+        .zip(tree.sibling_bounds_of(window, bounds))
     {
-        let mut edge = edge;
-        let mut char_edge = char_edge_start;
-        let dir = *direction;
-        for child in children.iter_mut() {
-            // Position child at current pixel edge.
-            let cb = *child.bounds();
-            if horflag {
-                child.set_bounds(Rect::new(edge, cb.y, cb.width, cb.height));
-                child.set_left_col(char_edge);
-            } else {
-                child.set_bounds(Rect::new(cb.x, edge, cb.width, cb.height));
-                child.set_top_line(char_edge);
-            }
-
-            // Recurse.
-            window_resize_apply_total(child, horflag, char_width, char_height);
-
-            // Accumulate the pixel edge and, in the same axis, the char edge
-            // by the child's total lines/cols (GNU `edge += c->total_lines`).
-            let child_bounds = *child.bounds();
-            match (dir, horflag) {
-                (SplitDirection::Horizontal, true) => {
-                    edge += child_bounds.width;
-                    char_edge += (child_bounds.width / char_width).round() as i64;
-                }
-                (SplitDirection::Vertical, false) => {
-                    edge += child_bounds.height;
-                    char_edge += (child_bounds.height / char_height).round() as i64;
-                }
-                _ => {}
-            }
-        }
+        resize_window_subtree(tree, child, child_bounds);
     }
 }
 
-/// Redistribute `parent`'s pixels among its children.
-///
-/// Gathers what [`sibling_layout`] needs from each child, computes the whole
-/// layout with the siblings only borrowed immutably, then writes the
-/// rectangles back. The arithmetic itself lives in [`sibling_layout`], where it
-/// is testable without a window tree.
-fn redistribute_bounds(children: &mut [Window], parent: Rect) {
-    let extents: Vec<ChildExtent> = children.iter().map(child_extent).collect();
-    for (child, bounds) in children.iter_mut().zip(sibling_bounds(parent, &extents)) {
-        child.set_bounds(bounds);
-    }
-}
-
-/// The sibling-layout view of one child window.
-fn child_extent(child: &Window) -> ChildExtent {
-    ChildExtent {
-        bounds: *child.bounds(),
-        fixed_width_cols: child.fixed_width_cols(),
-        fixed_height_lines: child.fixed_height_lines(),
-    }
-}
-
-fn resize_window_subtree(window: &mut Window, bounds: Rect) {
-    window.set_bounds(bounds);
-    if let Window::Internal { children, .. } = window {
-        redistribute_bounds(children, bounds);
-        for child in children {
-            let child_bounds = *child.bounds();
-            resize_window_subtree(child, child_bounds);
-        }
-    }
-}
-
-fn sync_window_character_edges_from_bounds(window: &mut Window, char_width: f32, char_height: f32) {
-    let left_col = window.left_col();
-    let top_line = window.top_line();
-    sync_window_character_edges_from_bounds_at(window, left_col, top_line, char_width, char_height);
+fn sync_window_character_edges_from_bounds(
+    tree: &mut WindowTree,
+    window: WindowId,
+    char_width: f32,
+    char_height: f32,
+) {
+    let Some(node) = tree.find(window) else {
+        return;
+    };
+    let (left_col, top_line) = (node.left_col(), node.top_line());
+    sync_window_character_edges_from_bounds_at(
+        tree,
+        window,
+        left_col,
+        top_line,
+        char_width,
+        char_height,
+    );
 }
 
 fn sync_window_character_edges_from_bounds_at(
-    window: &mut Window,
+    tree: &mut WindowTree,
+    window: WindowId,
     left_col: i64,
     top_line: i64,
     char_width: f32,
     char_height: f32,
 ) {
-    window.set_left_col(left_col);
-    window.set_top_line(top_line);
+    let Some(node) = tree.find_mut(window) else {
+        return;
+    };
+    node.set_left_col(left_col);
+    node.set_top_line(top_line);
 
-    let parent_bounds = *window.bounds();
+    let parent_bounds = *node.bounds();
+    let children = node.children().to_vec();
     let char_width = char_width.max(1.0);
     let char_height = char_height.max(1.0);
 
-    if let Window::Internal { children, .. } = window {
-        for child in children {
-            let child_bounds = *child.bounds();
-            let child_left_col =
-                left_col + ((child_bounds.x - parent_bounds.x) / char_width).round() as i64;
-            let child_top_line =
-                top_line + ((child_bounds.y - parent_bounds.y) / char_height).round() as i64;
-            sync_window_character_edges_from_bounds_at(
-                child,
-                child_left_col,
-                child_top_line,
-                char_width,
-                char_height,
-            );
-        }
+    for child in children {
+        let Some(child_bounds) = tree.find(child).map(|node| *node.bounds()) else {
+            continue;
+        };
+        let child_left_col =
+            left_col + ((child_bounds.x - parent_bounds.x) / char_width).round() as i64;
+        let child_top_line =
+            top_line + ((child_bounds.y - parent_bounds.y) / char_height).round() as i64;
+        sync_window_character_edges_from_bounds_at(
+            tree,
+            child,
+            child_left_col,
+            child_top_line,
+            char_width,
+            char_height,
+        );
     }
 }
 
@@ -8093,7 +7930,7 @@ impl GcTrace for FrameManager {
                     roots.extend(snapshot.chrome_strings.iter().map(|source| source.value()));
                 }
             }
-            frame.root_window().trace_roots(roots);
+            frame.tree().trace_roots(roots);
             if let Some(mb) = &frame.minibuffer_leaf {
                 mb.trace_roots(roots);
             }
@@ -8140,15 +7977,28 @@ impl GcTrace for Window {
                 roots.push(display.vertical_scroll_bar_type);
                 roots.push(display.horizontal_scroll_bar_type);
             }
-            Window::Internal { children, .. } => {
+            Window::Internal { .. } => {
                 for (key, value) in self.parameters() {
                     roots.push(*key);
                     roots.push(*value);
                 }
-                for child in children {
-                    child.trace_roots(roots);
-                }
             }
+        }
+    }
+}
+
+impl GcTrace for WindowTree {
+    /// Trace EVERY node the tree holds, not just those reachable from the
+    /// root.
+    ///
+    /// A node that has been unlinked -- mid-surgery, or on its way out of the
+    /// tree -- still owns Lisp values in its window parameters and markers.
+    /// Walking from the root would stop rooting them the instant they were
+    /// spliced out, which is precisely when they are most likely to be read
+    /// again.
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for node in self.nodes() {
+            node.trace_roots(roots);
         }
     }
 }

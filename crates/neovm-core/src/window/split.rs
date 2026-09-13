@@ -69,18 +69,16 @@ pub enum DeleteResize {
 /// The `Promoted` case is what drives recombination: GNU calls
 /// `recombine_windows` on the surviving sibling *only* in the matryoshka branch
 /// of `Fdelete_window_internal` (`src/window.c:5801`), i.e. only when the
-/// deleted window's parent collapsed and the sibling took its place. Reporting
-/// it as a distinct outcome keeps that "only then" from decaying into "whenever
-/// the shape happens to look right".
+/// deleted window's parent collapsed and the sibling took its place.  The
+/// deletion used to report that upward as a third outcome so the caller could
+/// recombine; addressing windows by id means the promotion knows its own
+/// grandparent and recombines there, which is where the "only then" now lives.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DeleteOutcome {
-    /// The target is not in this subtree.
+    /// The target is not in this tree.
     NotFound,
-    /// The target was removed; this subtree's root still stands.
+    /// The target was removed.
     Removed,
-    /// The target was removed and this subtree's root was replaced by the sole
-    /// surviving sibling, which may now be iso-combined with its new parent.
-    RemovedAndPromoted,
 }
 
 impl DeleteOutcome {
