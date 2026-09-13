@@ -4354,6 +4354,31 @@ impl Frame {
     }
 
     /// Find a mutable window by ID.
+    /// The leaf windows of the root subtree, WITHOUT the minibuffer.
+    ///
+    /// The companion to [`Frame::all_leaf_ids`], and the distinction is real:
+    /// layout collects the root's leaves because the minibuffer is positioned
+    /// separately, while hscroll wants every leaf including it.  Naming both
+    /// keeps a caller from expressing the choice by reaching into
+    /// `root_window` and thereby depending on how the tree is stored.
+    pub fn root_leaf_ids(&self) -> Vec<WindowId> {
+        self.root_window.leaf_ids()
+    }
+
+    /// Every leaf window on this frame, the minibuffer included.
+    ///
+    /// `Window::leaf_ids` walks one subtree, so a caller that wants the frame's
+    /// leaves has to append the minibuffer leaf itself -- which is duplicated
+    /// knowledge of where the minibuffer lives, and the same duplication
+    /// `find_window` already absorbs for lookups.
+    pub fn all_leaf_ids(&self) -> Vec<WindowId> {
+        let mut ids = self.root_window.leaf_ids();
+        if let Some(mini) = &self.minibuffer_leaf {
+            ids.push(mini.id());
+        }
+        ids
+    }
+
     pub fn find_window_mut(&mut self, id: WindowId) -> Option<&mut Window> {
         if let Some(window) = self.root_window.find_mut(id) {
             return Some(window);

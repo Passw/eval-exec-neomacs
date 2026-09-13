@@ -309,7 +309,7 @@ fn window_params_resolve_special_display_face_colors() {
 
     let frame = evaluator.frame_manager().get(frame_id).unwrap();
     let buffer = evaluator.buffer_manager().get(buf_id).unwrap();
-    let window = frame.root_window.find(frame.selected_window).unwrap();
+    let window = frame.find_window(frame.selected_window).unwrap();
 
     let params = window_params_from_neovm(
         window,
@@ -474,7 +474,7 @@ fn window_params_default_colors_follow_buffer_default_face_remap() {
 
     let frame = evaluator.frame_manager().get(frame_id).unwrap();
     let buffer = evaluator.buffer_manager().get(buf_id).unwrap();
-    let window = frame.root_window.find(frame.selected_window).unwrap();
+    let window = frame.find_window(frame.selected_window).unwrap();
 
     let params = window_params_from_neovm(
         window,
@@ -567,7 +567,7 @@ fn window_params_from_neovm_uses_default_header_line_and_tab_line_values() {
 
     let frame = evaluator.frame_manager().get(frame_id).unwrap();
     let buffer = evaluator.buffer_manager().get(buf_id).unwrap();
-    let window = frame.root_window.find(frame.selected_window).unwrap();
+    let window = frame.find_window(frame.selected_window).unwrap();
 
     let params = window_params_from_neovm(
         window,

@@ -383,10 +383,7 @@ pub(crate) fn update_auto_hscroll_before_redisplay(ctx: &mut Context) {
         }
         let selected_window_id = frame.selected_window;
 
-        let mut leaf_ids = frame.root_window.leaf_ids();
-        if let Some(mini) = &frame.minibuffer_leaf {
-            leaf_ids.push(mini.id());
-        }
+        let mut leaf_ids = frame.all_leaf_ids();
 
         for win_id in leaf_ids {
             let window = frame
@@ -513,12 +510,11 @@ pub(crate) fn update_auto_hscroll_before_redisplay(ctx: &mut Context) {
             || snap.old_point_lisp != snap.point_lisp)
             && let Some(frame) = ctx.frames.get_mut(snap.frame_id)
         {
-            let window = frame.root_window.find_mut(snap.window_id).or_else(|| {
-                frame
-                    .minibuffer_leaf
-                    .as_mut()
-                    .filter(|m| m.id() == snap.window_id)
-            });
+            // `Frame::find_window_mut` IS this: the root subtree, then the
+            // minibuffer leaf filtered by id.  Reaching through `root_window`
+            // and re-deriving the minibuffer arm duplicated it, and duplicating
+            // a lookup is how the two come to disagree.
+            let window = frame.find_window_mut(snap.window_id);
             if let Some(Window::Leaf {
                 old_point,
                 suspend_auto_hscroll,
@@ -561,12 +557,11 @@ pub(crate) fn update_auto_hscroll_before_redisplay(ctx: &mut Context) {
         };
 
         if let Some(frame) = ctx.frames.get_mut(snap.frame_id) {
-            let window = frame.root_window.find_mut(snap.window_id).or_else(|| {
-                frame
-                    .minibuffer_leaf
-                    .as_mut()
-                    .filter(|m| m.id() == snap.window_id)
-            });
+            // `Frame::find_window_mut` IS this: the root subtree, then the
+            // minibuffer leaf filtered by id.  Reaching through `root_window`
+            // and re-deriving the minibuffer arm duplicated it, and duplicating
+            // a lookup is how the two come to disagree.
+            let window = frame.find_window_mut(snap.window_id);
             if let Some(Window::Leaf { hscroll, .. }) = window {
                 tracing::debug!(
                     "auto-hscroll: win={:?} point_col={} text_cols={} {} -> {}",

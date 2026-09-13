@@ -10742,7 +10742,7 @@ fn split_window_below_keeps_frame_selected_window_on_top_leaf() {
 
     let frame = ev.frames.get(frame_id).expect("frame still exists");
     let selected_after = frame.selected_window;
-    let leaves: Vec<_> = frame.root_window.leaf_ids();
+    let leaves: Vec<_> = frame.root_leaf_ids();
 
     assert_eq!(
         leaves.len(),

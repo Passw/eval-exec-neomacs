@@ -2274,10 +2274,12 @@ pub fn collect_layout_params_with_font_sizing(
 
     let mut window_params = Vec::new();
 
-    // Collect leaf windows from the root window tree.
-    let leaf_ids = frame.root_window.leaf_ids();
+    // Collect leaf windows from the root window tree.  Root leaves only --
+    // the minibuffer is positioned separately below -- so this is
+    // `root_leaf_ids`, not `all_leaf_ids`.
+    let leaf_ids = frame.root_leaf_ids();
     for win_id in &leaf_ids {
-        let Some(window) = frame.root_window.find(*win_id) else {
+        let Some(window) = frame.find_window(*win_id) else {
             continue;
         };
         let Some(buf_id) = window.buffer_id() else {
