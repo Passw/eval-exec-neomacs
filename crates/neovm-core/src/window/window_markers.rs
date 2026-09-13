@@ -245,24 +245,11 @@ pub fn set_window_old_point_with_marker(
 /// reflect the auto-adjusted marker positions. Only windows whose buffer
 /// matches `edited_buffer_id` need updating.
 pub fn sync_window_positions_from_markers(frame: &mut Frame, edited_buffer_id: BufferId) {
-    for_each_leaf_mut(frame.tree_mut(), |leaf| sync_leaf(leaf, edited_buffer_id));
+    frame
+        .tree_mut()
+        .for_each_leaf_mut(|leaf| sync_leaf(leaf, edited_buffer_id));
     if let Some(ref mut mini) = frame.minibuffer_leaf {
         sync_leaf(mini, edited_buffer_id);
-    }
-}
-
-/// Apply `visit` to every leaf of `tree`, one leaf at a time.
-///
-/// The leaves are enumerated before any of them is handed out, so no two
-/// nodes of the tree are borrowed at once.  That is what lets these walks
-/// stay flat rather than recursing through `&mut Window`, and it is the shape
-/// that survives children becoming ids: a node is then reached by a lookup,
-/// and a lookup cannot be taken while a sibling is still borrowed.
-fn for_each_leaf_mut(tree: &mut WindowTree, mut visit: impl FnMut(&mut Window)) {
-    for id in tree.leaf_ids() {
-        if let Some(leaf) = tree.find_mut(id) {
-            visit(leaf);
-        }
     }
 }
 
@@ -309,11 +296,11 @@ pub fn clone_window_tree_with_independent_position_markers(
     source: &WindowTree,
 ) -> WindowTree {
     let mut cloned = source.clone();
-    for_each_leaf_mut(&mut cloned, |leaf| {
+    cloned.for_each_leaf_mut(|leaf| {
         refresh_cloned_leaf_from_shared_markers(leaf);
         detach_cloned_leaf_marker_handles(leaf);
     });
-    for_each_leaf_mut(&mut cloned, |leaf| {
+    cloned.for_each_leaf_mut(|leaf| {
         attach_cloned_leaf_independent_markers(leaf, bm);
     });
     cloned
@@ -390,7 +377,7 @@ fn attach_cloned_leaf_independent_markers(window: &mut Window, bm: &mut BufferMa
 /// `make_window`, where a live window never escapes without all three marker
 /// objects.
 pub fn attach_frame_window_position_markers(bm: &mut BufferManager, frame: &mut Frame) {
-    for_each_leaf_mut(frame.tree_mut(), |leaf| {
+    frame.tree_mut().for_each_leaf_mut(|leaf| {
         attach_window_position_markers(bm, leaf);
     });
     if let Some(minibuffer) = frame.minibuffer_leaf.as_mut() {

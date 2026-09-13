@@ -3421,6 +3421,21 @@ impl WindowTree {
     pub fn leaf_count(&self) -> usize {
         self.root.leaf_count()
     }
+
+    /// Apply `visit` to every leaf of this tree, one leaf at a time.
+    ///
+    /// The leaves are enumerated before any of them is handed out, so no two
+    /// nodes are borrowed at once.  That is what lets a walk over the tree
+    /// stay flat rather than recursing through `&mut Window`, and it is the
+    /// shape that survives children becoming ids: a node is then reached by a
+    /// lookup, and a lookup cannot be taken while a sibling is still borrowed.
+    pub fn for_each_leaf_mut(&mut self, mut visit: impl FnMut(&mut Window)) {
+        for id in self.leaf_ids() {
+            if let Some(leaf) = self.find_mut(id) {
+                visit(leaf);
+            }
+        }
+    }
 }
 
 /// A frame (top-level window/screen).
@@ -5017,41 +5032,40 @@ impl Frame {
             }
         }
 
-        fn sync_window(
+        // Only leaves show a buffer, so only leaves can be fixed; an internal
+        // window's fixed size is a property of what it contains, computed by
+        // layout rather than stored here.
+        fn sync_leaf(
             window: &mut Window,
             buffers: &BufferManager,
             char_width: f32,
             char_height: f32,
         ) {
-            match window {
-                Window::Leaf {
-                    buffer_id, bounds, ..
-                } => {
-                    let (fixed_width, fixed_height) = fixed_axes(buffers, *buffer_id);
-                    let fixed_cols = if fixed_width {
-                        (bounds.width / char_width).round().max(1.0) as usize
-                    } else {
-                        0
-                    };
-                    let fixed_lines = if fixed_height {
-                        (bounds.height / char_height).round().max(1.0) as usize
-                    } else {
-                        0
-                    };
-                    window.set_fixed_width_cols(fixed_cols);
-                    window.set_fixed_height_lines(fixed_lines);
-                }
-                Window::Internal { children, .. } => {
-                    for child in children {
-                        sync_window(child, buffers, char_width, char_height);
-                    }
-                }
-            }
+            let Window::Leaf {
+                buffer_id, bounds, ..
+            } = window
+            else {
+                return;
+            };
+            let (fixed_width, fixed_height) = fixed_axes(buffers, *buffer_id);
+            let fixed_cols = if fixed_width {
+                (bounds.width / char_width).round().max(1.0) as usize
+            } else {
+                0
+            };
+            let fixed_lines = if fixed_height {
+                (bounds.height / char_height).round().max(1.0) as usize
+            } else {
+                0
+            };
+            window.set_fixed_width_cols(fixed_cols);
+            window.set_fixed_height_lines(fixed_lines);
         }
 
-        sync_window(self.root_window_mut(), buffers, char_width, char_height);
+        self.tree
+            .for_each_leaf_mut(|leaf| sync_leaf(leaf, buffers, char_width, char_height));
         if let Some(minibuffer) = self.minibuffer_leaf.as_mut() {
-            sync_window(minibuffer, buffers, char_width, char_height);
+            sync_leaf(minibuffer, buffers, char_width, char_height);
         }
     }
 
