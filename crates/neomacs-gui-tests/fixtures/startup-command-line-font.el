@@ -20,5 +20,8 @@
            (unless (and (vectorp actual) (vectorp control)
                         (= (aref actual 2) (aref control 2)))
              (error "Startup font size differs from named control: %S vs %S" actual control)))
+         (with-temp-file (getenv "NEOMACS_GUI_STATE_JSON")
+           (insert (json-serialize `((native_width . ,(frame-native-width))
+                                     (native_height . ,(frame-native-height))))))
          (kill-emacs 0))
      (error (message "Command-line startup font: %S" err) (kill-emacs 1)))))

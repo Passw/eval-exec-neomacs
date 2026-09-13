@@ -22,6 +22,13 @@ fn command_line_font_drives_the_first_native_allocation() {
     // Opened DejaVu 16 is 13px wide: 80 text columns, 16px fringes,
     // and Neomacs's one-column default scrollbar allocation.
     assert!(initial.contains("emacs_pixels=1069x"), "{initial}");
+    let state: serde_json::Value =
+        serde_json::from_slice(&fs::read(result.artifacts.gui_state).unwrap()).unwrap();
+    // Native CSD must not shift the base used to snap inner dimensions.
+    // This font requests 35 text rows plus menu/tool bars: 952 pixels.
+    assert!(initial.contains("emacs_pixels=1069x952"), "{initial}");
+    assert_eq!(state["native_width"], 1069);
+    assert_eq!(state["native_height"], 952);
 }
 
 #[test]

@@ -228,9 +228,9 @@ malachite = "0.9"
 itoa = "1.0"
 
 # GPU / windowing
-# Upstream a98b2b2 plus queued-event retirement for destroyed Wayland popups.
+# Upstream a98b2b2 plus destroyed-popup event retirement and inner size hints.
 # Keep immutable until upstream contains the fix; see the fork's NEOMACS_FORK.md.
-winit = { git = "https://github.com/eval-exec/winit", rev = "dc7af19d15de375f980687f650174989f4b668a8" }
+winit = { git = "https://github.com/eval-exec/winit", rev = "f24b33399b870c3632788b885a51b8c21f0f1b5d" }
 # "glsl" gates ShaderSource::Glsl, which the render thread needs to compile
 # composed Shadertoy-dialect surface shaders (shader_surface.rs).
 wgpu = { version = "30", features = ["glsl"] }
