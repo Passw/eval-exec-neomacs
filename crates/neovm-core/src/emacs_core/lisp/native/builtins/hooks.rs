@@ -630,7 +630,14 @@ impl WindowConfigurationRestoreOptions {
 
 struct WindowConfigurationSnapshot {
     frame_id: crate::window::FrameId,
-    root_window: crate::window::Window,
+    /// This configuration's window tree.
+    ///
+    /// A DETACHED copy: `current-window-configuration` clones the frame's tree
+    /// and `set-window-configuration` installs it back.  It is a `WindowTree`
+    /// rather than a bare `Window` for the same reason `Frame` holds one --
+    /// when the tree stores its nodes in an arena, a snapshot has to carry its
+    /// own nodes or its child ids refer to windows that are not there.
+    tree: crate::window::WindowTree,
     selected_window: crate::window::WindowId,
     current_buffer: Option<crate::buffer::BufferId>,
     minibuffer_window: Option<crate::window::WindowId>,
@@ -773,7 +780,7 @@ fn prepare_saved_window_buffer_restoration(
         })
         .unwrap_or_default();
     apply_saved_window_buffer_restoration(
-        &mut snapshot.root_window,
+        snapshot.root_window_mut(),
         &current_buffers,
         &mut eval.buffers,
     );
@@ -818,7 +825,7 @@ fn prepare_reused_window_histories(
     snapshot: &mut WindowConfigurationSnapshot,
 ) -> Result<(), Flow> {
     let mut saved_buffers = HashMap::new();
-    collect_leaf_buffer_ids(&snapshot.root_window, &mut saved_buffers);
+    collect_leaf_buffer_ids(snapshot.root_window(), &mut saved_buffers);
 
     let globally_selected_window = eval
         .frames
@@ -923,7 +930,7 @@ fn prepare_reused_window_histories(
                 .collect::<HashMap<_, _>>()
         })
         .unwrap_or_default();
-    merge_live_window_histories(&mut snapshot.root_window, &live_histories);
+    merge_live_window_histories(snapshot.root_window_mut(), &live_histories);
     Ok(())
 }
 
@@ -1040,14 +1047,23 @@ fn unshow_frame_root_buffers(eval: &mut super::eval::Context, frame_id: crate::w
 }
 
 impl WindowConfigurationSnapshot {
+    fn root_window(&self) -> &crate::window::Window {
+        self.tree.root()
+    }
+
+    fn root_window_mut(&mut self) -> &mut crate::window::Window {
+        self.tree.root_mut()
+    }
+
     fn clone_for_restore(&self, buffers: &mut crate::buffer::BufferManager) -> Self {
         Self {
             frame_id: self.frame_id,
-            root_window:
+            tree: crate::window::WindowTree::new(
                 crate::window::window_markers::clone_window_tree_with_independent_position_markers(
                     buffers,
-                    &self.root_window,
+                    self.root_window(),
                 ),
+            ),
             selected_window: self.selected_window,
             current_buffer: self.current_buffer,
             minibuffer_window: self.minibuffer_window,
@@ -1060,7 +1076,7 @@ impl WindowConfigurationSnapshot {
     }
 
     fn trace_roots(&self, roots: &mut Vec<Value>) {
-        self.root_window.trace_roots(roots);
+        self.root_window().trace_roots(roots);
         if let Some(minibuffer) = &self.minibuffer_leaf {
             minibuffer.trace_roots(roots);
         }
@@ -1078,7 +1094,7 @@ fn normalize_selected_window_point_in_snapshot(
     buffers: &mut crate::buffer::BufferManager,
 ) {
     let selected_buffer_id = snapshot
-        .root_window
+        .root_window()
         .find(snapshot.selected_window)
         .or_else(|| {
             snapshot
@@ -1097,7 +1113,8 @@ fn normalize_selected_window_point_in_snapshot(
         return;
     };
 
-    if let Some(window) = snapshot.root_window.find_mut(snapshot.selected_window) {
+    let selected = snapshot.selected_window;
+    if let Some(window) = snapshot.root_window_mut().find_mut(selected) {
         crate::window::window_markers::set_window_point_with_marker(
             buffers,
             window,
@@ -1169,7 +1186,7 @@ fn save_snapshot_persistent_window_parameters(
     persistent_parameters: Value,
 ) -> Vec<Value> {
     let persistent_keys = persistent_window_parameter_keys(persistent_parameters);
-    save_persistent_window_parameters(&mut snapshot.root_window, &persistent_keys);
+    save_persistent_window_parameters(snapshot.root_window_mut(), &persistent_keys);
     if let Some(minibuffer) = &mut snapshot.minibuffer_leaf {
         save_persistent_window_parameters(minibuffer, &persistent_keys);
     }
@@ -1241,7 +1258,7 @@ fn merge_snapshot_window_parameters(
     snapshot: &mut WindowConfigurationSnapshot,
     live_parameters: &HashMap<crate::window::WindowId, Vec<(Value, Value)>>,
 ) {
-    merge_restored_window_parameters(&mut snapshot.root_window, live_parameters);
+    merge_restored_window_parameters(snapshot.root_window_mut(), live_parameters);
     if let Some(minibuffer) = &mut snapshot.minibuffer_leaf {
         merge_restored_window_parameters(minibuffer, live_parameters);
     }
@@ -1382,7 +1399,7 @@ fn window_snapshots_layout_equal(
         // The "current"/selected window must correspond between configurations.
         && a.selected_window == b.selected_window
         && a.minibuffer_window == b.minibuffer_window
-        && window_tree_layout_equal(&a.root_window, &b.root_window)
+        && window_tree_layout_equal(a.root_window(), b.root_window())
         && match (&a.minibuffer_leaf, &b.minibuffer_leaf) {
             (Some(x), Some(y)) => window_tree_layout_equal(x, y),
             (None, None) => true,
@@ -1461,11 +1478,12 @@ pub(crate) fn builtin_current_window_configuration(
     if let Some(frame_state) = eval.frames.get(frame_id) {
         let mut snapshot = WindowConfigurationSnapshot {
             frame_id,
-            root_window:
+            tree: crate::window::WindowTree::new(
                 crate::window::window_markers::clone_window_tree_with_independent_position_markers(
                     &mut eval.buffers,
-                    &frame_state.root_window(),
+                    frame_state.root_window(),
                 ),
+            ),
             selected_window: frame_state.selected_window,
             current_buffer: eval.buffers.current_buffer_id(),
             minibuffer_window: frame_state.minibuffer_window,
@@ -1695,7 +1713,7 @@ pub(crate) fn set_window_configuration_with_options(
         prepare_reused_window_histories(eval, &mut snapshot)?;
         unshow_frame_root_buffers(eval, snapshot.frame_id);
         if let Some(frame) = eval.frames.get_mut(snapshot.frame_id) {
-            *frame.root_window_mut() = snapshot.root_window;
+            frame.set_tree(snapshot.tree);
             // GNU `Fset_window_configuration` does NOT touch
             // `frame->old_selected_window` directly — that field
             // is updated by `window_change_record` from the next

@@ -4421,6 +4421,12 @@ impl Frame {
         self.tree.root()
     }
 
+    /// Replace this frame's window tree wholesale, as
+    /// `set-window-configuration` does.
+    pub fn set_tree(&mut self, tree: WindowTree) {
+        self.tree = tree;
+    }
+
     pub fn root_window_mut(&mut self) -> &mut Window {
         self.tree.root_mut()
     }
