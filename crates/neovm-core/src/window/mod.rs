@@ -1485,6 +1485,32 @@ impl Window {
         }
     }
 
+    /// This window's child windows, or an empty slice for a leaf.
+    ///
+    /// Code outside `crate::window` should reach children through this rather
+    /// than matching `Window::Internal { children, .. }`, so that how the tree
+    /// stores them stays an implementation detail of this module.  That matters
+    /// for a specific pending change: the tree currently OWNS its children
+    /// (`children: Vec<Window>`), which is what forces `find_window` to walk
+    /// from the root, forces a deleted window into a side table, and makes
+    /// liveness a property of which lookup succeeded rather than a field --
+    /// see the notes on introducing an arena.  Every external site that
+    /// destructures the variant is a site that migration has to touch.
+    pub fn children(&self) -> &[Window] {
+        match self {
+            Window::Leaf { .. } => &[],
+            Window::Internal { children, .. } => children,
+        }
+    }
+
+    /// Mutable counterpart of [`Window::children`].
+    pub fn children_mut(&mut self) -> &mut [Window] {
+        match self {
+            Window::Leaf { .. } => &mut [],
+            Window::Internal { children, .. } => children,
+        }
+    }
+
     /// Character-line top edge. GNU `w->top_line` (`WINDOW_TOP_EDGE_LINE`).
     pub fn top_line(&self) -> i64 {
         match self {

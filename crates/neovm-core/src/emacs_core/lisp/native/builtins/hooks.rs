@@ -719,8 +719,8 @@ fn apply_saved_window_buffer_restoration(
                 SavedWindowBufferRestoration::FindSubstituteBuffer => {}
             }
         }
-        crate::window::Window::Internal { children, .. } => {
-            for child in children {
+        _ => {
+            for child in window.children_mut() {
                 apply_saved_window_buffer_restoration(child, current_buffers, buffers);
             }
         }
@@ -787,8 +787,8 @@ fn collect_leaf_buffer_ids(
         crate::window::Window::Leaf { id, buffer_id, .. } => {
             buffers.insert(*id, *buffer_id);
         }
-        crate::window::Window::Internal { children, .. } => {
-            for child in children {
+        _ => {
+            for child in window.children() {
                 collect_leaf_buffer_ids(child, buffers);
             }
         }
@@ -805,8 +805,8 @@ fn merge_live_window_histories(
                 *history = live_history.clone();
             }
         }
-        crate::window::Window::Internal { children, .. } => {
-            for child in children {
+        _ => {
+            for child in window.children_mut() {
                 merge_live_window_histories(child, live_histories);
             }
         }
@@ -1157,8 +1157,8 @@ fn save_persistent_window_parameters(
         })
         .collect();
     *window.parameters_mut() = saved;
-    if let crate::window::Window::Internal { children, .. } = window {
-        for child in children {
+    {
+        for child in window.children_mut() {
             save_persistent_window_parameters(child, persistent_keys);
         }
     }
@@ -1181,8 +1181,8 @@ fn collect_window_parameters(
     out: &mut HashMap<crate::window::WindowId, Vec<(Value, Value)>>,
 ) {
     out.insert(window.id(), window.parameters().clone());
-    if let crate::window::Window::Internal { children, .. } = window {
-        for child in children {
+    {
+        for child in window.children() {
             collect_window_parameters(child, out);
         }
     }
@@ -1230,8 +1230,8 @@ fn merge_restored_window_parameters(
     }
 
     *window.parameters_mut() = merged;
-    if let crate::window::Window::Internal { children, .. } = window {
-        for child in children {
+    {
+        for child in window.children_mut() {
             merge_restored_window_parameters(child, live_parameters);
         }
     }
