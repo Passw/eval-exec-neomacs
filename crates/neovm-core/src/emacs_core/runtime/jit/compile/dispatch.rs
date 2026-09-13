@@ -261,10 +261,47 @@ pub extern "C" fn neovm_jit_named_builtin(
     jit_shim_contain!(ctx, STATUS_SIGNAL, {
         let nargs = nargs as usize;
         let saved = save_scratch_gc_roots();
+        // SAFETY (all three reads below): the generated code stored exactly
+        // `nargs` words at `args_ptr` (its call-args stack slot) immediately
+        // before this call.
+        //
+        // `Op::Aset` takes its three arguments POSITIONALLY and everything it
+        // reaches wants a slice, so it gets no argument vector: on `dhrystone`
+        // — which is essentially all `Op::Aset` from compiled code — building
+        // one here and a second one inside `aset_for_jit` was 141 Ir of this
+        // shim's 481 Ir/call. The values still need scratch rooting: nothing
+        // between reading them off the native slot and the callee's own root
+        // scope keeps them alive.
+        if variant == 2 {
+            // The lowering only emits variant 2 for `Op::Aset`, which is
+            // exactly three arguments; pad defensively but catch a codegen
+            // change in debug builds rather than silently asetting nil.
+            debug_assert_eq!(nargs, 3, "Op::Aset shim expects three arguments");
+            let mut a = [Value::NIL; 3];
+            for (i, slot) in a.iter_mut().enumerate().take(nargs.min(3)) {
+                *slot = Value::from_bits(unsafe { *args_ptr.add(i) } as usize);
+                push_scratch_gc_root(*slot);
+            }
+            // SAFETY: see neovm_jit_call's function-level contract.
+            let ctx = unsafe { &mut *(ctx as *mut Context) };
+            let mut vm = Vm::from_context(ctx);
+            let result = vm.aset_for_jit(a[0], a[1], a[2]);
+            let status = match result {
+                Ok(value) => {
+                    // SAFETY: `out` is the generated code's result stack slot.
+                    unsafe { *out = value.bits() as i64 };
+                    STATUS_OK
+                }
+                Err(flow) => {
+                    stash_pending_flow(flow);
+                    STATUS_SIGNAL
+                }
+            };
+            restore_scratch_gc_roots(saved);
+            return status;
+        }
         let mut args = LispArgVec::new();
         for i in 0..nargs {
-            // SAFETY: the generated code stored exactly `nargs` words at
-            // `args_ptr` (its call-args stack slot) immediately before this call.
             let v = Value::from_bits(unsafe { *args_ptr.add(i) } as usize);
             push_scratch_gc_root(v);
             args.push(v);
@@ -274,8 +311,7 @@ pub extern "C" fn neovm_jit_named_builtin(
         let mut vm = Vm::from_context(ctx);
         let result = match variant {
             0 => vm.callbuiltin_for_jit(SymId(sym as u32), args),
-            1 => vm.callbuiltinsym_for_jit(SymId(sym as u32), args),
-            _ => vm.aset_for_jit(args[0], args[1], args[2]),
+            _ => vm.callbuiltinsym_for_jit(SymId(sym as u32), args),
         };
         let status = match result {
             Ok(value) => {

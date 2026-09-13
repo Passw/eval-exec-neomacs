@@ -6408,32 +6408,42 @@ impl<'a> Vm<'a> {
         idx_val: Value,
         val: Value,
     ) -> EvalResult {
-        let mut call_args = LispArgVec::new();
-        call_args.push(vec_val);
-        call_args.push(idx_val);
-        call_args.push(val);
+        // A plain array, not a `LispArgVec`: `builtin_aset_args` and the
+        // writeback both read a SLICE, and the smallvec was most of this
+        // shim's cost — `dhrystone` is essentially all `Op::Aset` from JIT'd
+        // code, and building one here (on top of the one the shim already
+        // built) came to 141 Ir/call of the 481.
+        let call_args = [vec_val, idx_val, val];
         // `builtin_name_id` is `lookup_interned(name).unwrap_or_else(|| intern(name))`
         // -- a global-interner `RwLock` and a string hash. The name here is a
         // LITERAL, so that was paid on every `aset` from JIT'd code for an id
         // that never changes. `dhrystone` is string-mutation heavy and spent
         // ~11% of its run in `lookup_interned` because of this.
         let id = Self::cached_builtin_id("aset", &ASET_ID);
+        // The mutating-first-arg writeback exists for `aset` on a STRING,
+        // which replaces the string object; `maybe_writeback_mutating_first_arg`
+        // returns immediately for anything else. Testing that here — as
+        // `callbuiltin_for_jit` already does — keeps the root scope, the four
+        // dynamic root pushes and the name resolution off every `aset` to a
+        // vector, record or char-table.
+        let needs_writeback = vec_val.is_string();
         let result = if self.named_builtin_fast_path_allowed_id(id) {
             builtins::builtin_aset_args(&call_args)?
         } else {
             let func_val = Value::from_sym_id(id);
             // `call_function` consumes the args; the writeback below re-reads
-            // them from the three `Copy` values still in scope, so this clone
-            // is the only one that is actually needed.
-            self.call_function(func_val, call_args.clone())?
+            // them from the three `Copy` values still in scope.
+            self.call_function(func_val, LispArgVec::from_slice(&call_args))?
         };
-        let root_scope = self.ctx.save_vm_roots();
-        self.push_dynamic_vm_root(result);
-        for value in call_args.iter().copied() {
-            self.push_dynamic_vm_root(value);
+        if needs_writeback {
+            let root_scope = self.ctx.save_vm_roots();
+            self.push_dynamic_vm_root(result);
+            for value in call_args.iter().copied() {
+                self.push_dynamic_vm_root(value);
+            }
+            self.maybe_writeback_mutating_first_arg(resolve_sym(id), None, &call_args, &result);
+            self.ctx.restore_vm_roots(root_scope);
         }
-        self.maybe_writeback_mutating_first_arg("aset", None, &call_args, &result);
-        self.ctx.restore_vm_roots(root_scope);
         Ok(result)
     }
 
