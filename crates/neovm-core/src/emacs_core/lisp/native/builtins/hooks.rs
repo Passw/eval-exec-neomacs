@@ -1058,17 +1058,15 @@ impl WindowConfigurationSnapshot {
     fn clone_for_restore(&self, buffers: &mut crate::buffer::BufferManager) -> Self {
         Self {
             frame_id: self.frame_id,
-            tree: crate::window::WindowTree::new(
+            tree:
                 crate::window::window_markers::clone_window_tree_with_independent_position_markers(
-                    buffers,
-                    self.root_window(),
+                    buffers, &self.tree,
                 ),
-            ),
             selected_window: self.selected_window,
             current_buffer: self.current_buffer,
             minibuffer_window: self.minibuffer_window,
             minibuffer_leaf: self.minibuffer_leaf.as_ref().map(|window| {
-                crate::window::window_markers::clone_window_tree_with_independent_position_markers(
+                crate::window::window_markers::clone_window_leaf_with_independent_position_markers(
                     buffers, window,
                 )
             }),
@@ -1478,17 +1476,16 @@ pub(crate) fn builtin_current_window_configuration(
     if let Some(frame_state) = eval.frames.get(frame_id) {
         let mut snapshot = WindowConfigurationSnapshot {
             frame_id,
-            tree: crate::window::WindowTree::new(
+            tree:
                 crate::window::window_markers::clone_window_tree_with_independent_position_markers(
                     &mut eval.buffers,
-                    frame_state.root_window(),
+                    frame_state.tree(),
                 ),
-            ),
             selected_window: frame_state.selected_window,
             current_buffer: eval.buffers.current_buffer_id(),
             minibuffer_window: frame_state.minibuffer_window,
             minibuffer_leaf: frame_state.minibuffer_leaf.as_ref().map(|window| {
-                crate::window::window_markers::clone_window_tree_with_independent_position_markers(
+                crate::window::window_markers::clone_window_leaf_with_independent_position_markers(
                     &mut eval.buffers,
                     window,
                 )

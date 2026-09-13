@@ -18,6 +18,7 @@ use crate::buffer::{
 use crate::emacs_core::value::Value;
 use crate::window::{
     AttachedWindowPositionMarkers, Frame, FrameManager, Window, WindowPositionMarkerState,
+    WindowTree,
 };
 
 /// Window-start markers use `InsertionType::Before` so the marker stays
@@ -244,19 +245,23 @@ pub fn set_window_old_point_with_marker(
 /// reflect the auto-adjusted marker positions. Only windows whose buffer
 /// matches `edited_buffer_id` need updating.
 pub fn sync_window_positions_from_markers(frame: &mut Frame, edited_buffer_id: BufferId) {
-    sync_subtree(&mut frame.root_window_mut(), edited_buffer_id);
+    for_each_leaf_mut(frame.tree_mut(), |leaf| sync_leaf(leaf, edited_buffer_id));
     if let Some(ref mut mini) = frame.minibuffer_leaf {
         sync_leaf(mini, edited_buffer_id);
     }
 }
 
-fn sync_subtree(window: &mut Window, edited_buffer_id: BufferId) {
-    match window {
-        Window::Leaf { .. } => sync_leaf(window, edited_buffer_id),
-        Window::Internal { children, .. } => {
-            for child in children {
-                sync_subtree(child, edited_buffer_id);
-            }
+/// Apply `visit` to every leaf of `tree`, one leaf at a time.
+///
+/// The leaves are enumerated before any of them is handed out, so no two
+/// nodes of the tree are borrowed at once.  That is what lets these walks
+/// stay flat rather than recursing through `&mut Window`, and it is the shape
+/// that survives children becoming ids: a node is then reached by a lookup,
+/// and a lookup cannot be taken while a sibling is still borrowed.
+fn for_each_leaf_mut(tree: &mut WindowTree, mut visit: impl FnMut(&mut Window)) {
+    for id in tree.leaf_ids() {
+        if let Some(leaf) = tree.find_mut(id) {
+            visit(leaf);
         }
     }
 }
@@ -301,77 +306,80 @@ fn sync_leaf(window: &mut Window, edited_buffer_id: BufferId) {
 /// must cross this boundary instead of retaining copied marker handles.
 pub fn clone_window_tree_with_independent_position_markers(
     bm: &mut BufferManager,
-    source: &Window,
-) -> Window {
+    source: &WindowTree,
+) -> WindowTree {
     let mut cloned = source.clone();
-    refresh_cloned_subtree_from_shared_markers(&mut cloned, bm);
-    detach_cloned_subtree_marker_handles(&mut cloned);
-    attach_cloned_subtree_independent_markers(&mut cloned, bm);
+    for_each_leaf_mut(&mut cloned, |leaf| {
+        refresh_cloned_leaf_from_shared_markers(leaf);
+        detach_cloned_leaf_marker_handles(leaf);
+    });
+    for_each_leaf_mut(&mut cloned, |leaf| {
+        attach_cloned_leaf_independent_markers(leaf, bm);
+    });
     cloned
 }
 
-fn refresh_cloned_subtree_from_shared_markers(window: &mut Window, bm: &BufferManager) {
-    match window {
-        Window::Leaf {
-            buffer_id,
-            window_start,
-            position_markers,
-            point,
-            old_point,
-            ..
-        } => {
-            let Some(markers) = position_markers.attached() else {
-                return;
-            };
-            if let Some(position) = marker_lisp_position(markers.start.root(), *buffer_id) {
-                *window_start = position;
-            }
-            if let Some(position) = marker_lisp_position(markers.point.root(), *buffer_id) {
-                *point = position;
-            }
-            if let Some(position) = marker_lisp_position(markers.old_point.root(), *buffer_id) {
-                *old_point = position;
-            }
-        }
-        Window::Internal { children, .. } => {
-            for child in children {
-                refresh_cloned_subtree_from_shared_markers(child, bm);
-            }
-        }
+/// The single-leaf counterpart of
+/// [`clone_window_tree_with_independent_position_markers`], for the minibuffer
+/// window, which GNU keeps in the frame's tree but neomacs still holds beside
+/// it as a lone leaf.
+pub fn clone_window_leaf_with_independent_position_markers(
+    bm: &mut BufferManager,
+    source: &Window,
+) -> Window {
+    let mut cloned = source.clone();
+    refresh_cloned_leaf_from_shared_markers(&mut cloned);
+    detach_cloned_leaf_marker_handles(&mut cloned);
+    attach_cloned_leaf_independent_markers(&mut cloned, bm);
+    cloned
+}
+
+fn refresh_cloned_leaf_from_shared_markers(window: &mut Window) {
+    let Window::Leaf {
+        buffer_id,
+        window_start,
+        position_markers,
+        point,
+        old_point,
+        ..
+    } = window
+    else {
+        return;
+    };
+    let Some(markers) = position_markers.attached() else {
+        return;
+    };
+    if let Some(position) = marker_lisp_position(markers.start.root(), *buffer_id) {
+        *window_start = position;
+    }
+    if let Some(position) = marker_lisp_position(markers.point.root(), *buffer_id) {
+        *point = position;
+    }
+    if let Some(position) = marker_lisp_position(markers.old_point.root(), *buffer_id) {
+        *old_point = position;
     }
 }
 
-fn detach_cloned_subtree_marker_handles(window: &mut Window) {
-    match window {
-        Window::Leaf {
-            position_markers, ..
-        } => {
-            // These handles are shared with SOURCE.  Dropping this copied
-            // ownership state must not unchain SOURCE's markers.
-            *position_markers = WindowPositionMarkerState::Detached;
-        }
-        Window::Internal { children, .. } => {
-            for child in children {
-                detach_cloned_subtree_marker_handles(child);
-            }
-        }
-    }
+fn detach_cloned_leaf_marker_handles(window: &mut Window) {
+    let Window::Leaf {
+        position_markers, ..
+    } = window
+    else {
+        return;
+    };
+    // These handles are shared with SOURCE.  Dropping this copied ownership
+    // state must not unchain SOURCE's markers.
+    *position_markers = WindowPositionMarkerState::Detached;
 }
 
-fn attach_cloned_subtree_independent_markers(window: &mut Window, bm: &mut BufferManager) {
-    match window {
-        Window::Leaf { buffer_id, .. } => {
-            // A configuration may outlive its saved buffer.  Such leaves stay
-            // detached until restoration chooses a live replacement buffer.
-            if bm.get(*buffer_id).is_some() {
-                attach_window_position_markers(bm, window);
-            }
-        }
-        Window::Internal { children, .. } => {
-            for child in children {
-                attach_cloned_subtree_independent_markers(child, bm);
-            }
-        }
+fn attach_cloned_leaf_independent_markers(window: &mut Window, bm: &mut BufferManager) {
+    let Window::Leaf { buffer_id, .. } = window else {
+        return;
+    };
+    // A configuration may outlive its saved buffer.  Such leaves stay detached
+    // until restoration chooses a live replacement buffer.
+    if bm.get(*buffer_id).is_some() {
+        attach_window_position_markers(bm, window);
     }
 }
 
@@ -382,20 +390,11 @@ fn attach_cloned_subtree_independent_markers(window: &mut Window, bm: &mut Buffe
 /// `make_window`, where a live window never escapes without all three marker
 /// objects.
 pub fn attach_frame_window_position_markers(bm: &mut BufferManager, frame: &mut Frame) {
-    attach_subtree(&mut frame.root_window_mut(), bm);
+    for_each_leaf_mut(frame.tree_mut(), |leaf| {
+        attach_window_position_markers(bm, leaf);
+    });
     if let Some(minibuffer) = frame.minibuffer_leaf.as_mut() {
         attach_window_position_markers(bm, minibuffer);
-    }
-}
-
-fn attach_subtree(window: &mut Window, bm: &mut BufferManager) {
-    match window {
-        Window::Leaf { .. } => attach_window_position_markers(bm, window),
-        Window::Internal { children, .. } => {
-            for child in children {
-                attach_subtree(child, bm);
-            }
-        }
     }
 }
 

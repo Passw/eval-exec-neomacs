@@ -4423,6 +4423,20 @@ impl Frame {
         self.tree.root()
     }
 
+    /// This frame's window tree.
+    ///
+    /// Prefer this over [`Frame::root_window`] for anything that walks or
+    /// edits more than one node: the tree is what owns the nodes, and is the
+    /// only handle that can hand out one node at a time.
+    pub fn tree(&self) -> &WindowTree {
+        &self.tree
+    }
+
+    /// Mutable counterpart of [`Frame::tree`].
+    pub fn tree_mut(&mut self) -> &mut WindowTree {
+        &mut self.tree
+    }
+
     /// Replace this frame's window tree wholesale, as
     /// `set-window-configuration` does.
     pub fn set_tree(&mut self, tree: WindowTree) {
