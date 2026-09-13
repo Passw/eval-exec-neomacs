@@ -2,6 +2,15 @@ name: Native display contract
 
 on:
   workflow_dispatch:
+    inputs:
+      platform:
+        description: Native platform to validate
+        type: choice
+        default: all
+        options:
+          - all
+          - macos
+          - windows
 
 permissions:
   contents: read
@@ -11,11 +20,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - runner: macos-latest
-            target: aarch64-apple-darwin
-          - runner: windows-latest
-            target: x86_64-pc-windows-msvc
+        include: >-
+          ${{ fromJSON(
+            inputs.platform == 'macos' && '[{"runner":"macos-latest","target":"aarch64-apple-darwin"}]' ||
+            inputs.platform == 'windows' && '[{"runner":"windows-latest","target":"x86_64-pc-windows-msvc"}]' ||
+            '[{"runner":"macos-latest","target":"aarch64-apple-darwin"},{"runner":"windows-latest","target":"x86_64-pc-windows-msvc"}]'
+          ) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 150
     env:
@@ -39,7 +49,9 @@ jobs:
         run: cargo xtask fresh-build --release
       - name: Set resource font on ephemeral macOS runner
         if: runner.os == 'macOS'
-        run: defaults write -g Font -string 'Menlo-16'
+        # Menlo 16 produces a 723px window, which AppKit constrains to 674px
+        # on the hosted 1024x768 screen. Keep a non-default size that fits.
+        run: defaults write -g Font -string 'Menlo-13'
       - name: Set resource font on ephemeral Windows runner
         if: runner.os == 'Windows'
         run: reg add 'HKCU\SOFTWARE\GNU\Emacs' /v Emacs.Font /t REG_SZ /d 'Consolas-16' /f
@@ -48,7 +60,7 @@ jobs:
         # ordinary -Q smoke test remains a control for native-resource inhibition.
         env:
           NEOMACS_GUI_RESOURCE_FAMILY: ${{ runner.os == 'macOS' && 'Menlo' || 'Consolas' }}
-          NEOMACS_GUI_RESOURCE_FONT: ${{ runner.os == 'macOS' && 'Menlo-16' || 'Consolas-16' }}
+          NEOMACS_GUI_RESOURCE_FONT: ${{ runner.os == 'macOS' && 'Menlo-13' || 'Consolas-16' }}
         run: cargo nextest run --locked -p neomacs-gui-tests --test native_display --run-ignored all --test-threads 1 --no-fail-fast
       - name: Upload native evidence
         if: always()

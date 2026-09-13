@@ -171,3 +171,12 @@ uses the existing opener. Standalone `open-font` remains a separate stub. The
 same public control passed in the Linux command-line font fixture
 (`native-resource-font-info-control.log`). Original macOS logs and artifacts
 are retained under `native-resource-macos`; a corrected native run is required.
+
+The Windows job failed on the same invalid fixture call; its evidence is under
+`native-resource-windows`. The corrected fixture is pushed as `2ebd14c82` and
+run 34755106910 is validating it. Inspection of the original macOS readback
+also found that the requested `826x723` window was constrained to `826x674`
+on its `1024x768` hosted screen. The macOS resource control now uses Menlo 13,
+so its non-default font fits without weakening either dimension assertion.
+The workflow accepts a platform choice to rerun this macOS-only fixture change
+without duplicating the pending Windows build. Actionlint passed.
