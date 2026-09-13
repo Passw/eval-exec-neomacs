@@ -49,7 +49,7 @@ jobs:
         env:
           NEOMACS_GUI_RESOURCE_FAMILY: ${{ runner.os == 'macOS' && 'Menlo' || 'Consolas' }}
           NEOMACS_GUI_RESOURCE_FONT: ${{ runner.os == 'macOS' && 'Menlo-16' || 'Consolas-16' }}
-        run: cargo nextest run --locked -p neomacs-gui-tests --test native_display --run-ignored all --test-threads 1
+        run: cargo nextest run --locked -p neomacs-gui-tests --test native_display --run-ignored all --test-threads 1 --no-fail-fast
       - name: Upload native evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

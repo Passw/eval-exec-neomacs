@@ -156,3 +156,18 @@ passed the corrected control and all 63 selected GUI tests with zero skips
 (`primary-reviewed-gui-integration.log`, 80.112 seconds). This executable
 predates the three incoming VM/JIT commits through `8195d4b69`.
 See [GPU startup design and evidence](../diagnostics/2026-09-13-async-gpu-startup.md).
+
+The primary-routing fix is pushed as `b0a3da856` after a conflict-free rebase.
+All 425 selected resize/bytecode tests passed. A new full fresh build at that
+commit produced fingerprint
+`7CED3E6481FA9383CA3895CE7BCD63F34C22174C65A31B9BE6A0B9138690E8E0`;
+all 63 GUI tests passed with zero skips in 81.796 seconds
+(`primary-rebase-gui-integration.log`).
+
+Native run 34753154974 completed its macOS build but exposed an invalid fixture
+call: `open-font` requires a font entity, not a font specification. The fixture
+now compares realized pixel sizes through `font-info`, whose named-font path
+uses the existing opener. Standalone `open-font` remains a separate stub. The
+same public control passed in the Linux command-line font fixture
+(`native-resource-font-info-control.log`). Original macOS logs and artifacts
+are retained under `native-resource-macos`; a corrected native run is required.

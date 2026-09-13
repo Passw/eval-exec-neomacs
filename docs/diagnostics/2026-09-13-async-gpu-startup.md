@@ -118,3 +118,9 @@ The corrected control passed in 10.752 seconds against fresh fingerprint
 (`primary-reviewed-gui-integration.log`), including the strengthened control
 in 10.832 seconds. This executable predates incoming VM/JIT commits
 `4372a5c45`, `c686f35fc`, and `8195d4b69`; it verifies the unchanged display patch.
+
+The conflict-free rebase is pushed as `b0a3da856`. All 425 selected resize and
+bytecode checks passed, followed by a full fresh build at that commit
+(fingerprint `7CED3E6481FA9383CA3895CE7BCD63F34C22174C65A31B9BE6A0B9138690E8E0`).
+All 63 selected GUI checks passed with zero skips in 81.796 seconds
+(`primary-rebase-gui-integration.log`).

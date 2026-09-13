@@ -6,17 +6,16 @@
    (condition-case err
        (let* ((family (getenv "NEOMACS_GUI_RESOURCE_FAMILY"))
               (requested (getenv "NEOMACS_GUI_RESOURCE_FONT"))
-              (control (open-font (font-spec :name requested)))
-              (actual (face-attribute 'default :font)))
+              (control (font-info requested))
+              (actual (font-info (face-attribute 'default :font))))
          (unless (equal (x-get-resource "font" "Font") requested)
            (error "Native resource lookup did not return %S" requested))
          (unless (and (equal (face-attribute 'default :family) family)
                       (= (frame-width) 80)
-                      (fontp actual) (fontp control)
-                      (numberp (font-get actual :size))
-                      (= (font-get actual :size) (font-get control :size)))
-           (error "Resource startup mismatch: family=%S wanted=%S columns=%S"
-                  (face-attribute 'default :family) family (frame-width)))
+                      (vectorp actual) (vectorp control)
+                      (= (aref actual 2) (aref control 2)))
+           (error "Resource startup mismatch: family=%S wanted=%S columns=%S actual=%S control=%S"
+                  (face-attribute 'default :family) family (frame-width) actual control))
          (with-temp-file (getenv "NEOMACS_GUI_STATE_JSON")
            (insert (json-serialize
                     `((native_width . ,(frame-native-width))
