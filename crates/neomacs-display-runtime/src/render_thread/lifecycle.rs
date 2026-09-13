@@ -136,7 +136,7 @@ impl RenderApp {
             .frame_windows
             .primary_window()
             .is_some_and(|ws| !ws.lifecycle.is_active());
-        if needs_native {
+        if needs_native && self.gpu_startup.is_none() {
             let (width, height, title, decorations_enabled) = {
                 let primary = self.frame_windows.primary_window().unwrap();
                 let (w, h) = primary.lifecycle.native_size();
@@ -206,7 +206,14 @@ impl RenderApp {
                         phys.height
                     );
 
-                    self.init_wgpu(event_loop, window.clone());
+                    let descriptor = crate::wgpu_instance_descriptor_with_display(
+                        event_loop.owned_display_handle(),
+                    );
+                    let proxy = event_loop.create_proxy();
+                    match super::gpu_startup::PendingGpu::start(window.clone(), descriptor, proxy) {
+                        Ok(pending) => self.gpu_startup = Some(pending),
+                        Err(error) => self.startup_error = Some(error),
+                    }
 
                     if let Some(geometry_hints) = self
                         .frame_windows
@@ -222,6 +229,7 @@ impl RenderApp {
                 }
                 Err(e) => {
                     tracing::error!("Failed to create window: {:?}", e);
+                    self.startup_error = Some(e.to_string());
                 }
             }
         }
@@ -251,6 +259,44 @@ impl RenderApp {
         if self.lifecycle_flags.shutdown_requested {
             self.handle_exiting();
             event_loop.exit();
+            return;
+        }
+        if let Some(pending) = self.gpu_startup.take() {
+            match pending.poll(&event_loop.create_proxy()) {
+                Ok(super::gpu_startup::GpuPoll::Pending(pending)) => {
+                    self.gpu_startup = Some(pending)
+                }
+                Ok(super::gpu_startup::GpuPoll::Ready(prepared)) => self.install_wgpu(prepared),
+                Err(error) => {
+                    self.startup_error = Some(error);
+                    event_loop.exit();
+                    return;
+                }
+            }
+        }
+        if self.gpu.is_none()
+            && self
+                .frame_windows
+                .primary_window()
+                .is_some_and(|primary| !primary.lifecycle.is_active())
+        {
+            // Keep GPU-dependent commands in their original order. Shutdown
+            // must remain observable even for the legacy render-loop caller
+            // that has no evaluator preparation lifetime to monitor.
+            while let Ok(command) = self.comms.cmd_rx.try_recv() {
+                if matches!(
+                    command,
+                    crate::thread_comm::RenderCommand::Lifecycle(
+                        crate::thread_comm::LifecycleCommand::Shutdown
+                    )
+                ) {
+                    self.lifecycle_flags.shutdown_requested = true;
+                    event_loop.exit();
+                    return;
+                }
+                self.startup_commands.push_back(command);
+            }
+            event_loop.set_control_flow(ControlFlow::Wait);
             return;
         }
         // Device-loss recovery (SHADER_SURFACES.md: user shader hang → TDR):
@@ -910,7 +956,22 @@ impl RenderApp {
         }
     }
 
+    pub(super) fn cancel_gpu_startup(&mut self) {
+        if let Some(pending) = self.gpu_startup.take() {
+            // A later successful attempt cannot prove this detached worker
+            // finished. Keep the process-finalizer bypass for the whole run.
+            self.gpu_startup_cancelled
+                .store(true, std::sync::atomic::Ordering::Relaxed);
+            drop(pending);
+        }
+    }
+
     pub(super) fn handle_exiting(&mut self) {
+        // Release pending native surfaces before any display teardown. Workers
+        // retain only GPU objects; wgpu-core owns the descriptor's independent
+        // OwnedDisplayHandle until its backend instances have been destroyed.
+        self.cancel_gpu_startup();
+        self.startup_commands.clear();
         self.menus.shutdown();
         self.tooltips.shutdown();
         // Explicitly drop wgpu resources while the Wayland connection is still alive.

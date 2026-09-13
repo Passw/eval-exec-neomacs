@@ -3402,13 +3402,22 @@ fn run_gui_main_thread(
     ) {
         // Native display loss can happen while the evaluator is inside an
         // external font/image read. Joining it would reintroduce the startup
-        // hang. No native frame was installed; terminate the failed process.
-        std::process::exit(1);
+        // hang. Main-thread native cleanup has completed; remaining preparation
+        // workers must not delay termination of the failed process.
+        exit_cancelled_gui_startup(1);
     }
 
     let evaluator_exit = match evaluator_handle.join() {
         Ok(exit) => exit,
         Err(payload) => {
+            if matches!(
+                render_result,
+                Ok(neomacs_display_runtime::render_thread::RenderLoopExit::GpuStartupCancelled)
+            ) {
+                // The panic hook already reported the failure. Unwinding the
+                // process would enter the same blocked foreign finalizers.
+                exit_cancelled_gui_startup(101);
+            }
             std::panic::resume_unwind(payload);
         }
     };
@@ -3416,12 +3425,46 @@ fn run_gui_main_thread(
     if evaluator_exit.restart {
         tracing::warn!("restart requested via kill-emacs, but restart is not implemented yet");
     }
+    if matches!(
+        render_result,
+        Ok(neomacs_display_runtime::render_thread::RenderLoopExit::GpuStartupCancelled)
+    ) {
+        exit_cancelled_gui_startup(evaluator_exit.exit_code);
+    }
     if evaluator_exit.exit_code != 0 {
         std::process::exit(evaluator_exit.exit_code);
     }
     if render_result.is_err() {
         std::process::exit(1);
     }
+}
+
+fn exit_cancelled_gui_startup(status: i32) -> ! {
+    // Normal exit runs foreign-library finalizers. Vulkan's loader_release
+    // locks the same mutex as driver discovery, so a cancelled, blocked worker
+    // can deadlock exit itself. Native cleanup has already run on its owner
+    // thread. Do not acquire stdio locks here: a still-running preparation
+    // worker could hold one. Diagnostics already emitted remain available.
+    #[cfg(unix)]
+    // SAFETY: _exit terminates this process without calling library finalizers.
+    unsafe {
+        libc::_exit(status)
+    }
+    #[cfg(windows)]
+    {
+        // CRT _exit can still enter DLL detach callbacks through ExitProcess.
+        // TerminateProcess avoids a loader-lock deadlock in an abandoned driver.
+        // SAFETY: the handle names this process; termination closes its handles.
+        unsafe {
+            windows_sys::Win32::System::Threading::TerminateProcess(
+                windows_sys::Win32::System::Threading::GetCurrentProcess(),
+                status as u32,
+            );
+        }
+        std::process::abort();
+    }
+    #[cfg(not(any(unix, windows)))]
+    std::process::exit(status)
 }
 
 fn spawn_gui_evaluator_worker(

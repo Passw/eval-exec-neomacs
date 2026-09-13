@@ -5,6 +5,245 @@ use std::{fs, path::PathBuf, time::Duration};
 
 #[cfg(target_os = "linux")]
 #[test]
+#[ignore = "requires release binary/pdump, Vulkan loader, readable procfs wait channels, and Weston"]
+fn display_loss_exits_while_gpu_driver_discovery_is_pending() {
+    check_pending_gpu(GpuStartupAction::LoseDisplay);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore = "requires release binary/pdump, Vulkan loader, procfs wait channels, Xvfb and xdotool"]
+fn closing_window_exits_successfully_while_gpu_discovery_is_pending() {
+    check_pending_gpu(GpuStartupAction::CloseWindow);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore = "requires release binary/pdump, Vulkan ICD, procfs wait channels, Xvfb and xdotool"]
+fn resize_during_gpu_discovery_reaches_lisp_after_completion() {
+    check_pending_gpu(GpuStartupAction::ResizeAndComplete);
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Clone, Copy, strum::AsRefStr)]
+#[strum(serialize_all = "kebab-case")]
+enum GpuStartupAction {
+    LoseDisplay,
+    CloseWindow,
+    ResizeAndComplete,
+}
+
+#[cfg(target_os = "linux")]
+fn check_pending_gpu(action: GpuStartupAction) {
+    use std::{
+        os::unix::fs::OpenOptionsExt,
+        process::{Command, Stdio},
+        time::Instant,
+    };
+
+    let root = PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
+    let artifacts = root.join("target/neomacs-gui-tests").join(format!(
+        "startup-pending-gpu-{}-{}",
+        action.as_ref(),
+        std::process::id()
+    ));
+    fs::create_dir_all(&artifacts).unwrap();
+    // The Vulkan loader classifies paths without .json as directories. Its
+    // manifest reader blocks in fopen before checking the file's size.
+    let manifest = artifacts.join("pending-driver.json");
+    assert!(
+        Command::new("mkfifo")
+            .arg(&manifest)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let backend = match action {
+        GpuStartupAction::LoseDisplay => GuiBackend::LinuxWayland,
+        GpuStartupAction::CloseWindow | GpuStartupAction::ResizeAndComplete => GuiBackend::LinuxX11,
+    };
+    let session = DisplayHarness::for_backend(backend)
+        .start_session(&artifacts)
+        .unwrap();
+    let binary = std::env::var_os("NEOMACS_GUI_TEST_BINARY")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| root.join("target/release/neomacs"));
+    let mut command = Command::new(binary);
+    command
+        .current_dir(&root)
+        .arg("-Q")
+        .env(
+            "WINIT_UNIX_BACKEND",
+            if matches!(action, GpuStartupAction::LoseDisplay) {
+                "wayland"
+            } else {
+                "x11"
+            },
+        )
+        .env("WGPU_BACKEND", "vulkan")
+        .env("VK_DRIVER_FILES", &manifest)
+        .env("RUST_LOG", "info")
+        .stdout(fs::File::create(artifacts.join("stdout.log")).unwrap())
+        .stderr(fs::File::create(artifacts.join("stderr.log")).unwrap())
+        .stdin(Stdio::null());
+    let driver = if matches!(action, GpuStartupAction::ResizeAndComplete) {
+        let driver = std::env::var_os("NEOMACS_GUI_VULKAN_ICD")
+            .map(PathBuf::from)
+            .or_else(|| {
+                [
+                    "/run/opengl-driver/share/vulkan/icd.d/lvp_icd.x86_64.json",
+                    "/usr/share/vulkan/icd.d/lvp_icd.x86_64.json",
+                ]
+                .into_iter()
+                .map(PathBuf::from)
+                .find(|path| path.is_file())
+            })
+            .expect("set NEOMACS_GUI_VULKAN_ICD to a usable native driver manifest");
+        command
+            .env(
+                "VK_DRIVER_FILES",
+                std::env::join_paths([&manifest, &driver]).unwrap(),
+            )
+            .arg("-l")
+            .arg(root.join("crates/neomacs-gui-tests/fixtures/startup-gpu-resize.el"));
+        Some(driver)
+    } else {
+        if matches!(action, GpuStartupAction::LoseDisplay) {
+            command.args(["--eval", r#"(while t (sleep-for 1))"#]);
+        }
+        None
+    };
+    for (key, value) in session.env() {
+        command.env(key, value);
+    }
+    let mut child = command.spawn().unwrap();
+    let result = (|| -> Result<(), String> {
+        let tasks = PathBuf::from(format!("/proc/{}/task", child.id()));
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            // Unlike opening a FIFO writer, reading wchan cannot release the
+            // loader's blocked open. This process has only our GPU FIFO.
+            let waiting = fs::read_dir(&tasks)
+                .map_err(|error| error.to_string())?
+                .filter_map(Result::ok)
+                .any(|task| {
+                    fs::read_to_string(task.path().join("wchan"))
+                        .is_ok_and(|channel| channel.trim() == "wait_for_partner")
+                });
+            if waiting {
+                break;
+            }
+            if Instant::now() >= deadline {
+                return Err("GPU manifest open was not observed in procfs".into());
+            }
+            if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
+                return Err(format!(
+                    "process exited before GPU discovery blocked: {status}"
+                ));
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        if matches!(action, GpuStartupAction::LoseDisplay) {
+            drop(session);
+        } else {
+            let mut search = Command::new("xdotool");
+            search.args(["search", "--pid", &child.id().to_string()]);
+            for (key, value) in session.env() {
+                search.env(key, value);
+            }
+            let found = search.output().map_err(|error| error.to_string())?;
+            let found = String::from_utf8_lossy(&found.stdout);
+            let window = found
+                .lines()
+                .next()
+                .ok_or("no native window owned by test child")?;
+            let mut change = Command::new("xdotool");
+            match action {
+                GpuStartupAction::CloseWindow => {
+                    change.args(["windowclose", window]);
+                }
+                GpuStartupAction::ResizeAndComplete => {
+                    change.args(["windowsize", window, "901", "603"]);
+                }
+                GpuStartupAction::LoseDisplay => unreachable!(),
+            }
+            for (key, value) in session.env() {
+                change.env(key, value);
+            }
+            if !change
+                .status()
+                .map_err(|error| error.to_string())?
+                .success()
+            {
+                return Err("xdotool could not change the owned native window".into());
+            }
+            if let Some(driver) = &driver {
+                // Release the deliberately invalid first manifest, then let
+                // the loader continue to the real ICD. Future discovery sees
+                // a regular manifest at both paths.
+                let writer = fs::OpenOptions::new()
+                    .write(true)
+                    .custom_flags(libc::O_NONBLOCK)
+                    .open(&manifest)
+                    .map_err(|error| error.to_string())?;
+                let replacement = manifest.with_extension("replacement");
+                fs::copy(driver, &replacement).map_err(|error| error.to_string())?;
+                fs::rename(replacement, &manifest).map_err(|error| error.to_string())?;
+                drop(writer);
+            }
+            // Keep this private X server alive until the process has exited.
+            let _session = session;
+            let deadline = Instant::now() + Duration::from_secs(10);
+            loop {
+                if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
+                    return if status.success() {
+                        Ok(())
+                    } else {
+                        Err(format!("native startup action exited with {status}"))
+                    };
+                }
+                if Instant::now() >= deadline {
+                    return Err("native startup action did not finish".into());
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
+                return if status.success() {
+                    Err("display loss during GPU startup incorrectly succeeded".into())
+                } else {
+                    Ok(())
+                };
+            }
+            if Instant::now() >= deadline {
+                return Err("display loss left native dispatch blocked in GPU discovery".into());
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    })();
+    // Always reap this child, including failures to observe its wait channel.
+    let _ = child.kill();
+    let _ = child.wait();
+    fs::remove_file(manifest).unwrap();
+    if result.is_ok() && matches!(action, GpuStartupAction::ResizeAndComplete) {
+        assert!(
+            fs::read_to_string(artifacts.join("stderr.log"))
+                .unwrap()
+                .contains("GPU-RESIZE-PASS")
+        );
+    }
+    assert!(
+        result.is_ok(),
+        "{}; evidence: {}",
+        result.unwrap_err(),
+        artifacts.display()
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
 #[ignore = "requires release binary/pdump, Fontconfig, and Weston"]
 fn display_loss_exits_while_initial_font_loading_is_pending() {
     let result = run_with_pending_font(PendingFontAction::LoseDisplay);

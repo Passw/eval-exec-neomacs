@@ -50,18 +50,6 @@ impl RenderApp {
                 }
             };
 
-        let adapter_info = adapter.get_info();
-        let backend_profile =
-            super::render_quality::RenderBackendProfile::from_device_type(adapter_info.device_type);
-        tracing::info!(
-            "wgpu adapter: {} (vendor={:04x}, device={:04x}, type={:?}, backend={:?})",
-            adapter_info.name,
-            adapter_info.vendor,
-            adapter_info.device,
-            adapter_info.device_type,
-            adapter_info.backend
-        );
-
         let (device, queue) =
             match pollster::block_on(neomacs_renderer_wgpu::request_renderer_device(
                 &adapter,
@@ -74,6 +62,36 @@ impl RenderApp {
                 }
             };
 
+        self.install_wgpu(super::gpu_startup::PreparedGpu {
+            window,
+            instance,
+            surface,
+            adapter,
+            device,
+            queue,
+        });
+    }
+
+    pub(super) fn install_wgpu(&mut self, prepared: super::gpu_startup::PreparedGpu) {
+        let super::gpu_startup::PreparedGpu {
+            window,
+            instance,
+            surface,
+            adapter,
+            device,
+            queue,
+        } = prepared;
+        let adapter_info = adapter.get_info();
+        let backend_profile =
+            super::render_quality::RenderBackendProfile::from_device_type(adapter_info.device_type);
+        tracing::info!(
+            "wgpu adapter: {} (vendor={:04x}, device={:04x}, type={:?}, backend={:?})",
+            adapter_info.name,
+            adapter_info.vendor,
+            adapter_info.device,
+            adapter_info.device_type,
+            adapter_info.backend
+        );
         let device = Arc::new(device);
         let queue = Arc::new(queue);
 
@@ -226,8 +244,9 @@ impl RenderApp {
 
         if let Some(state) = self.frame_windows.primary_window()
             && let FrameLifecycle::Active { native, .. } = &state.lifecycle
-            && native.content_insets() != Default::default()
         {
+            // Reconcile native resize/scale changes received while adapter or
+            // device acquisition was pending, including default-inset windows.
             let (width, height) = native.content_size();
             let (width, height) =
                 super::state::emacs_pixels_from_window_size(width, height, native.scale_factor);
@@ -487,6 +506,7 @@ pub(crate) fn run_render_loop_with_event_loop(
         #[cfg(feature = "neo-term")]
         shared_terminals,
     )
+    .map(|_| ())
     .map_err(|error| error.to_string())
 }
 
@@ -499,7 +519,7 @@ fn run_render_loop_with_startup(
     shared_monitors: SharedMonitorInfo,
     poll_when_idle: bool,
     #[cfg(feature = "neo-term")] shared_terminals: crate::terminal::SharedTerminals,
-) -> Result<(), RenderLoopError> {
+) -> Result<super::RenderLoopExit, RenderLoopError> {
     tracing::info!("Render thread starting");
 
     #[cfg(feature = "video")]
@@ -566,7 +586,7 @@ pub fn run_render_loop_current_thread(
     title: String,
     image_metadata: SharedImageRenderState,
     shared_monitors: SharedMonitorInfo,
-) -> Result<(), RenderLoopError> {
+) -> Result<super::RenderLoopExit, RenderLoopError> {
     #[cfg(feature = "neo-term")]
     let shared_terminals = crate::terminal::new_shared_terminals();
     #[cfg(feature = "neo-term")]
@@ -605,7 +625,7 @@ pub fn run_render_loop_current_thread_with_terminals(
     image_metadata: SharedImageRenderState,
     shared_monitors: SharedMonitorInfo,
     shared_terminals: crate::terminal::SharedTerminals,
-) -> Result<(), RenderLoopError> {
+) -> Result<super::RenderLoopExit, RenderLoopError> {
     run_render_loop_with_startup(
         event_loop,
         comms,

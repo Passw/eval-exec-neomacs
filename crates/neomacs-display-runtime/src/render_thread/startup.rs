@@ -77,6 +77,13 @@ pub enum RenderLoopError {
     EventLoop(String),
 }
 
+pub enum RenderLoopExit {
+    Finished,
+    /// Native resources have been released, but a driver worker may still be
+    /// inside foreign code. Process exit must bypass library exit callbacks.
+    GpuStartupCancelled,
+}
+
 pub(super) enum InitialWindow {
     Waiting(InitialWindowReceiver),
     Ready {
@@ -98,12 +105,15 @@ enum Outcome {
     Running,
     EvaluatorExited,
     Failed(String),
+    GpuFailed(String),
 }
 
 struct StartingApp<F> {
     phase: Phase<F>,
     can_create_surfaces: bool,
     outcome: Rc<RefCell<Outcome>>,
+    evaluator: Option<Receiver<Result<InitialWindowSize, String>>>,
+    gpu_cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl<F: FnOnce(InitialWindowSize) -> RenderApp> ApplicationHandler for StartingApp<F> {
@@ -123,6 +133,16 @@ impl<F: FnOnce(InitialWindowSize) -> RenderApp> ApplicationHandler for StartingA
 
     fn window_event(&mut self, event_loop: &dyn ActiveEventLoop, id: WindowId, event: WindowEvent) {
         if let Phase::Running(app) = &mut self.phase {
+            if app
+                .gpu_startup
+                .as_ref()
+                .is_some_and(|pending| pending.window_id() == id)
+                && matches!(event, WindowEvent::CloseRequested | WindowEvent::Destroyed)
+            {
+                // A user close follows the ordinary WindowClose/evaluator exit
+                // path. It is not an unexpected native-display interruption.
+                *self.outcome.borrow_mut() = Outcome::Running;
+            }
             app.window_event(event_loop, id, event);
         }
     }
@@ -173,18 +193,35 @@ impl<F: FnOnce(InitialWindowSize) -> RenderApp> ApplicationHandler for StartingA
                 return;
             }
             if let Phase::Preparing {
-                initial: InitialWindow::Ready { size, .. },
+                initial: InitialWindow::Ready { size, evaluator },
                 create,
             } = std::mem::replace(&mut self.phase, Phase::Stopped)
             {
                 let mut app = Box::new(create(size));
+                app.gpu_startup_cancelled = self.gpu_cancelled.clone();
                 app.can_create_surfaces(event_loop);
+                self.evaluator = evaluator;
                 self.phase = Phase::Running(app);
-                *self.outcome.borrow_mut() = Outcome::Running;
             }
+        }
+        if self.evaluator.as_ref().is_some_and(|evaluator| {
+            matches!(evaluator.try_recv(), Err(TryRecvError::Disconnected))
+        }) {
+            *self.outcome.borrow_mut() = Outcome::EvaluatorExited;
+            self.phase = Phase::Stopped;
+            event_loop.exit();
+            return;
         }
         if let Phase::Running(app) = &mut self.phase {
             app.about_to_wait(event_loop);
+            if let Some(error) = app.startup_error.take() {
+                *self.outcome.borrow_mut() = Outcome::GpuFailed(error);
+                self.phase = Phase::Stopped;
+                event_loop.exit();
+            } else if app.gpu.is_some() {
+                self.evaluator = None;
+                *self.outcome.borrow_mut() = Outcome::Running;
+            }
         }
     }
 
@@ -197,14 +234,24 @@ pub(super) fn run(
     event_loop: EventLoop,
     initial: InitialWindow,
     create: impl FnOnce(InitialWindowSize) -> RenderApp + 'static,
-) -> Result<(), RenderLoopError> {
+) -> Result<RenderLoopExit, RenderLoopError> {
     event_loop.set_control_flow(ControlFlow::Wait);
     let outcome = Rc::new(RefCell::new(Outcome::Preparing));
+    let gpu_cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let result = event_loop.run_app(StartingApp {
         phase: Phase::Preparing { initial, create },
         can_create_surfaces: false,
         outcome: Rc::clone(&outcome),
+        evaluator: None,
+        gpu_cancelled: gpu_cancelled.clone(),
     });
+    let successful_exit = || {
+        if gpu_cancelled.load(std::sync::atomic::Ordering::Relaxed) {
+            RenderLoopExit::GpuStartupCancelled
+        } else {
+            RenderLoopExit::Finished
+        }
+    };
     match &mut *outcome.borrow_mut() {
         Outcome::Preparing => Err(RenderLoopError::StartupInterrupted(
             result
@@ -212,7 +259,16 @@ pub(super) fn run(
                 .map_or_else(|| "event loop exited".into(), |error| error.to_string()),
         )),
         Outcome::Failed(error) => Err(RenderLoopError::Preparation(std::mem::take(error))),
-        Outcome::EvaluatorExited => Ok(()),
-        Outcome::Running => result.map_err(|error| RenderLoopError::EventLoop(error.to_string())),
+        Outcome::GpuFailed(error) => {
+            Err(RenderLoopError::StartupInterrupted(std::mem::take(error)))
+        }
+        Outcome::EvaluatorExited => Ok(successful_exit()),
+        Outcome::Running => result.map(|()| successful_exit()).map_err(|error| {
+            if gpu_cancelled.load(std::sync::atomic::Ordering::Relaxed) {
+                RenderLoopError::StartupInterrupted(error.to_string())
+            } else {
+                RenderLoopError::EventLoop(error.to_string())
+            }
+        }),
     }
 }

@@ -800,6 +800,10 @@ pub(super) struct RenderApp {
     pub(super) clipboard: Result<ClipboardService, String>,
 
     pub(super) gpu: Option<RenderGpuContext>,
+    pub(super) gpu_startup: Option<super::gpu_startup::PendingGpu>,
+    pub(super) gpu_startup_cancelled: Arc<std::sync::atomic::AtomicBool>,
+    pub(super) startup_error: Option<String>,
+    pub(super) startup_commands: std::collections::VecDeque<crate::thread_comm::RenderCommand>,
     pub(super) renderer: Option<WgpuRenderer>,
     /// Native decoder workers signal this callback after replacing a latest
     /// frame or publishing control state. Production installs a winit proxy;
@@ -1002,6 +1006,10 @@ impl RenderApp {
             presentation_observer: crate::presentation_feedback::PresentationObserver::new(),
             clipboard: Err("clipboard is unavailable before display initialization".to_owned()),
             gpu: None,
+            gpu_startup: None,
+            gpu_startup_cancelled: Default::default(),
+            startup_error: None,
+            startup_commands: Default::default(),
             menus: crate::menus::MenuPresentation::default(),
             tooltips: crate::tooltips::Tooltips::default(),
             renderer: None,

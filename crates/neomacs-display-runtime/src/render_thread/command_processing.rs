@@ -6,7 +6,11 @@ impl RenderApp {
     pub(super) fn process_commands(&mut self) -> bool {
         let mut should_exit = false;
 
-        while let Ok(cmd) = self.comms.cmd_rx.try_recv() {
+        while let Some(cmd) = self
+            .startup_commands
+            .pop_front()
+            .or_else(|| self.comms.cmd_rx.try_recv().ok())
+        {
             match cmd {
                 RenderCommand::Lifecycle(c) => {
                     if let LifecycleCommand::Shutdown = c {

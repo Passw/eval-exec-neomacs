@@ -16,6 +16,7 @@ mod frame_sched;
 mod frame_state;
 pub(crate) mod frame_stats;
 pub(crate) mod frame_windows;
+mod gpu_startup;
 mod input;
 mod lifecycle;
 mod media;
@@ -52,7 +53,7 @@ pub use bootstrap::{build_render_event_loop, run_render_loop, run_render_loop_cu
 pub(crate) use lifecycle::PopupCommit;
 pub use startup::{
     InitialWindowLifetime, InitialWindowReceiver, InitialWindowReply, InitialWindowSize,
-    RenderLoopError,
+    RenderLoopError, RenderLoopExit,
 };
 use state::{FpsCounter, ImeCursorArea, RenderApp};
 pub use state::{

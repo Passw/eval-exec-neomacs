@@ -15,7 +15,29 @@ impl ApplicationHandler for RenderApp {
         window_id: WindowId,
         event: WindowEvent,
     ) {
+        if self
+            .gpu_startup
+            .as_ref()
+            .is_some_and(|pending| pending.window_id() == window_id)
+        {
+            if matches!(event, WindowEvent::CloseRequested | WindowEvent::Destroyed) {
+                self.comms
+                    .send_input(crate::thread_comm::InputEvent::WindowClose { emacs_frame_id: 0 });
+                self.lifecycle_flags.shutdown_requested = true;
+                self.handle_exiting();
+                event_loop.exit();
+            }
+            // Read current size/scale from the native window upon completion.
+            return;
+        }
         self.handle_window_event(event_loop, window_id, event);
+    }
+
+    fn destroy_surfaces(&mut self, _event_loop: &dyn ActiveEventLoop) {
+        // Workers own no native surface. Dropping a pending attempt destroys
+        // its surface synchronously and rejects every later worker result.
+        // A subsequent can_create_surfaces starts a fresh attempt.
+        self.cancel_gpu_startup();
     }
 
     fn about_to_wait(&mut self, event_loop: &dyn ActiveEventLoop) {
