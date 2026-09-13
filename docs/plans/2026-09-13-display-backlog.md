@@ -9,13 +9,14 @@ a claim of completion.
 
 - [x] Submission terminology: popup state, video surface evidence, internal
   frame counters; retain existing exported diagnostic/log fields.
-- [ ] Platform validation: portable compile/policy checks and actual macOS and
+- [x] Platform validation: portable compile/policy checks and actual macOS and
   Windows execution using repository CI runners; strengthen native GUI controls.
-- [ ] GNU platform resources: Windows registry precedence and Cocoa user
+- [x] GNU platform resources: Windows registry precedence and Cocoa user
   defaults, including initial font policy and public resource lookup.
   Public queries, later-frame font precedence, and first-native-window resource
   font discovery are implemented with winreg and objc2-foundation. Native CI
-  validation of the first allocation remains pending.
+  validation of the first allocation passed on both platforms; tested revisions
+  and exact dimensions are recorded below.
 - [x] Weston cached subsurface scale/detach diagnostic: reproduce on stock
   Weston, explain against official protocol/source, correct Neomacs only if
   the evidence identifies a client contract violation. Investigate independent
@@ -24,9 +25,8 @@ a claim of completion.
   remain responsive while acquisition is pending; preserve main-thread window
   ownership and failure propagation.
 - [x] macOS/Windows live-font behavior: establish GNU/platform capabilities.
-  A user question is pending because GNU has no Linux-style system-monospace
-  subscription on these backends; a Neomacs-specific preference would be a
-  separate interface decision, not inferred from nonexistent OS settings.
+  GNU has no Linux-style system-monospace subscription on these backends;
+  a Neomacs-specific preference would be a separate interface decision.
   Research established no corresponding GNU subscription. Preserve that behavior
   unless the user defines a Neomacs-specific preference source.
 - [x] Grown-minibuffer frame-height accounting: GNU differential regression and
@@ -200,3 +200,44 @@ zero-size observations, so retries do not add insets or scale twice.
 All 1,724 protocol/runtime tests passed with five existing skips
 (`native-content-insets-reviewed-core.log`); source review found no remaining
 blocking issue. A fresh build and macOS native validation are pending.
+
+Windows job 103718047986 in run 34755106910 completed successfully at
+`2ebd14c82`: native adapter, 14 public Lisp contracts, full fresh release build,
+and both GUI tests passed. Its resource control verified Consolas 16 and exact
+first/native dimensions `988x916`, including the 80-column grid. The overall
+run failed because its macOS job exposed the separate height defect above.
+
+The cancellation follow-up reproduced an X11 teardown panic when querying an
+already destroyed window. It now uses cached native observations and performs
+no teardown geometry query. The Linux CLI font control also exposed a winit
+constraint bug: stored minimum sizes included CSD while configure snapping used
+inner dimensions. The pinned fork now retains inner sizes and converts only at
+the compositor boundary. The strengthened regression failed on the old pin
+with height 937 instead of 952. Integrated core checks passed 2,149 tests.
+
+Both fixes are pushed through `202aa91e5`, following a conflict-free rebase onto
+the incoming child-window accessor refactor. A full local fresh build and
+macOS-only native run 34758601668 are validating that revision. See
+[initial native content evidence](../diagnostics/2026-09-13-initial-native-content.md).
+
+The fresh build at `202aa91e5` completed with fingerprint
+`383AB771ABDFD8BC5FA7D2C6A0C9345C5028A498D01E0BD372B228404EDF79F8`.
+All 63 selected GUI tests passed with zero skips in 83.866 seconds
+(`native-content-final-gui.log`), including the strict first-height assertion
+and pending-GPU destruction regression. The 24 window-configuration/resize
+checks passed after the incoming refactor. macOS native safe-area validation
+is the remaining check.
+
+macOS run [34758601668](https://github.com/eval-exec/neomacs/actions/runs/34758601668)
+completed successfully at `202aa91e5`: native adapter, 14 public Lisp contracts,
+full fresh release build, and both native GUI tests passed. The resource-font
+control requested `664x574` editor content, measured a 32-pixel top inset,
+reserved a `664x606` surface, and read back exactly `664x574` with Menlo 13 and
+80 columns. The strict height assertion passed without relaxation. Evidence is
+under `native-insets-macos` and `native-insets-macos-job.log`.
+
+All listed backlog tasks are complete. Windows's successful native resource
+run tested `2ebd14c82`; Linux and macOS tested `202aa91e5`, including the later
+Wayland constraint and AppKit inset fixes. These platform-specific fixes do not
+alter Windows's zero-inset path. Research limits, including unsupported native
+system-monospace subscriptions and early-init ordering, remain documented.

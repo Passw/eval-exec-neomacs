@@ -80,9 +80,10 @@ Redraws do not reapply desktop preferences.
   GNU Windows instead errors when its entire fallback list fails. In
   particular, DirectWrite need not expose legacy GDI bitmap families such as
   Fixedsys. This is a documented Neomacs policy, not claimed full GNU parity.
-- This does not implement GNU Windows's Emacs registry-resource lookup or
-  Cocoa's resource database. Existing explicit Lisp configuration remains in
-  its existing startup path.
+- The follow-up resource adapters implement Windows registry lookup and Cocoa
+  defaults for public queries, frame creation, and first-window font selection.
+  Existing Lisp initialization remains in its existing startup path; early-init
+  frame alists still run after the initial native window is created.
 - Linux live changes use the owned subscription described below, separate
   from installed-font catalog changes. Other native subscription adapters,
   GConf, and XSettings remain unsupported.
@@ -90,8 +91,9 @@ Redraws do not reapply desktop preferences.
   readiness protocol below. Explicit font changes made later by Lisp remain
   in the existing frame-update path; this is not a rewrite of every startup
   resource or user-init precedence rule.
-- No native macOS or Windows GUI verification is possible on this machine.
-  A source-level adapter check is not a native launch or a full cross-build.
+- Native macOS and Windows GUI verification runs on repository CI runners.
+  Platform results and remaining validation are recorded in the
+  [display backlog](2026-09-13-display-backlog.md).
 
 ## Verification
 
