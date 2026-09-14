@@ -1005,10 +1005,27 @@ fn compile_bytecode_function_inner(
     } else {
         &f.constants
     };
-    if !has_rest
-        && f.params.optional.is_empty()
-        && dynamic_prefix == 0
-        && let Ok(mut mir) = mir::build_mir(ops, constants, native_arity)
+    // MIR funnel instrumentation (`NEOVM_JIT_COMPILE_STATS=1`): the MIR tier is
+    // the ONLY place inlining, cross-boundary unboxing and guard elision happen,
+    // so a body that never reaches it gets none of them. Count each gate
+    // independently — a body can trip more than one — so that widening a gate is
+    // a decision about where bodies ACTUALLY pile up rather than a guess.
+    if has_rest {
+        super::stats::record_mir(super::stats::MirFunnel::GateRest);
+    }
+    if !f.params.optional.is_empty() {
+        super::stats::record_mir(super::stats::MirFunnel::GateOptional);
+    }
+    if dynamic_prefix > 0 {
+        super::stats::record_mir(super::stats::MirFunnel::GatePrefix);
+    }
+    let mir_built = (!has_rest && f.params.optional.is_empty() && dynamic_prefix == 0)
+        .then(|| mir::build_mir(ops, constants, native_arity));
+    if let Some(built) = mir_built
+        && let Ok(mut mir) = built.inspect_err(|e| {
+            super::stats::record_mir(super::stats::MirFunnel::BuildFailed);
+            super::stats::record_mir_bail(format!("build:{e:?}"));
+        })
     {
         // Inline pure single-block callees (resolved through the obarray). When
         // a call is inlined the body can become pure (no Opaque), so
@@ -1025,9 +1042,15 @@ fn compile_bytecode_function_inner(
                 MAX_INLINE_INSTS,
                 &mut inlined_syms,
             );
+            if n > 0 {
+                super::stats::record_mir(super::stats::MirFunnel::InlinedCallees(n as u64));
+            }
             (n > 0).then_some(armed)
         });
-        if let Ok(mut leaf) = lower_mir_pure(&mir) {
+        if let Ok(mut leaf) = lower_mir_pure(&mir).inspect_err(|e| {
+            super::stats::record_mir(super::stats::MirFunnel::LowerFailed);
+            super::stats::record_mir_bail(format!("lower:{e:?}"));
+        }) {
             // Tier gate: a call-bearing MIR leaf (has_side_effects) only earns
             // the MIR tier when it INLINED something — that's the one case the
             // MIR tier beats the baseline (cross-boundary unboxing/elision).
@@ -1035,6 +1058,7 @@ fn compile_bytecode_function_inner(
             // (spec-call native-to-native speculation + battle-tested), so let
             // it fall through. Pure (call-free) leaves always take the MIR tier.
             if !leaf.has_side_effects || inline_epoch.is_some() {
+                super::stats::record_mir(super::stats::MirFunnel::Taken);
                 leaf.required = required;
                 leaf.has_rest = has_rest;
                 leaf.inline_epoch = inline_epoch;
@@ -1044,6 +1068,7 @@ fn compile_bytecode_function_inner(
                 leaf.inline_deps = inlined_syms.into();
                 return Ok(leaf);
             }
+            super::stats::record_mir(super::stats::MirFunnel::TierRejected);
         }
     }
     // The MIR tier above already claimed any body its inlining/unboxing makes

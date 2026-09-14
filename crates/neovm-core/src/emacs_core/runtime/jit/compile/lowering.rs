@@ -1819,7 +1819,19 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
                     // slow-path shim (vmctx) so plain tagged-bits comparison would
                     // diverge when symbols-with-pos-enabled; other `opaque`
                     // (VarRef/builtins/...) not yet ported.
-                    MirOp::Eq(..) | MirOp::Opaque { .. } => {
+                    MirOp::Eq(..) => {
+                        super::super::stats::record_mir_bail("opaque:Eq".to_string());
+                        return Err(CompileError::UnsupportedOp("mir-pure-shim-op"));
+                    }
+                    MirOp::Opaque { op, .. } => {
+                        // Variant name only (`VarRef(3)` -> `VarRef`) so the
+                        // summary groups by OP, not by operand.
+                        let name = format!("{op:?}");
+                        let name = name
+                            .split(|c: char| c == '(' || c == '{' || c == ' ')
+                            .next()
+                            .unwrap_or("?");
+                        super::super::stats::record_mir_bail(format!("opaque:{name}"));
                         return Err(CompileError::UnsupportedOp("mir-pure-shim-op"));
                     }
                 }

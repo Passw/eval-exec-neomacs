@@ -58,6 +58,90 @@ pub(crate) struct CompileStats {
     pub retiers: u64,
     /// Stall distribution: `<100µs, <250µs, <500µs, <1ms, <2.5ms, <5ms, <10ms, >=10ms`.
     pub histogram_us: [u64; 8],
+    /// MIR-tier funnel: where bodies are lost on the way to the ONLY tier that
+    /// inlines, unboxes across op boundaries and elides redundant guards. A
+    /// body that does not reach it gets none of those, so knowing which gate
+    /// sheds the most is the difference between widening the right one and
+    /// widening a gate nothing was waiting behind.
+    ///
+    /// The three `gate_*` counters are independent (a body can trip several).
+    pub mir_gate_optional: u64,
+    pub mir_gate_rest: u64,
+    pub mir_gate_prefix: u64,
+    /// Passed the gates but `build_mir` bailed (unmodelled op, odd CFG).
+    pub mir_build_failed: u64,
+    /// Built, but `lower_mir_pure` bailed.
+    pub mir_lower_failed: u64,
+    /// Lowered, but call-bearing and inlined nothing — baseline is better.
+    pub mir_tier_rejected: u64,
+    /// Actually took the MIR tier.
+    pub mir_taken: u64,
+    /// Callees successfully spliced in by `inline_pure_single_block_callees`.
+    pub mir_inlined_callees: u64,
+}
+
+thread_local! {
+    /// `NEOVM_JIT_COMPILE_STATS=1`: WHY the MIR tier bailed, keyed by the
+    /// `CompileError::UnsupportedOp` reason — and for the catch-all
+    /// `mir-pure-shim-op` (any `Opaque` bytecode op), by the OP itself. This
+    /// is the prioritisation data for porting per-op lowerings into the MIR
+    /// tier: the ops that bail hot bodies most often go first.
+    static MIR_BAIL_REASONS: std::cell::RefCell<std::collections::HashMap<String, u64>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// Record one MIR-tier bail reason (compile-time only; never on a hot path).
+pub(crate) fn record_mir_bail(reason: String) {
+    if !summary_enabled() {
+        return;
+    }
+    MIR_BAIL_REASONS.with(|m| *m.borrow_mut().entry(reason).or_insert(0) += 1);
+}
+
+/// Top-N MIR bail reasons, most frequent first, for the summary line.
+pub(crate) fn mir_bail_summary(n: usize) -> String {
+    MIR_BAIL_REASONS.with(|m| {
+        let m = m.borrow();
+        let mut v: Vec<(&String, &u64)> = m.iter().collect();
+        v.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+        v.iter()
+            .take(n)
+            .map(|(k, c)| format!("{k}={c}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    })
+}
+
+/// Stage at which a body left the MIR funnel (see [`CompileStats`]).
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum MirFunnel {
+    GateOptional,
+    GateRest,
+    GatePrefix,
+    BuildFailed,
+    LowerFailed,
+    TierRejected,
+    Taken,
+    InlinedCallees(u64),
+}
+
+/// Record one MIR-funnel event. Compile-time only (once per compile attempt),
+/// so this is never on a hot path.
+pub(crate) fn record_mir(stage: MirFunnel) {
+    STATS.with(|c| {
+        let mut s = c.get();
+        match stage {
+            MirFunnel::GateOptional => s.mir_gate_optional += 1,
+            MirFunnel::GateRest => s.mir_gate_rest += 1,
+            MirFunnel::GatePrefix => s.mir_gate_prefix += 1,
+            MirFunnel::BuildFailed => s.mir_build_failed += 1,
+            MirFunnel::LowerFailed => s.mir_lower_failed += 1,
+            MirFunnel::TierRejected => s.mir_tier_rejected += 1,
+            MirFunnel::Taken => s.mir_taken += 1,
+            MirFunnel::InlinedCallees(n) => s.mir_inlined_callees += n,
+        }
+        c.set(s);
+    });
 }
 
 thread_local! {
@@ -159,6 +243,7 @@ pub(crate) fn format_summary(s: &CompileStats) -> String {
     format!(
         "compiles={} ok={} native_entries={} dispatch={}/{} not_profitable={} not_compilable={} aot_loads={} retiers={} \
          total_us={} mean_us={mean_us} max_us={} max_fn_len={} \
+         mir[taken={} tier_rej={} lower_fail={} build_fail={} gate_opt={} gate_rest={} gate_prefix={} inlined={}] \
          hist[<100us,<250us,<500us,<1ms,<2.5ms,<5ms,<10ms,>=10ms]={:?}",
         s.total_compiles,
         s.compiled_ok,
@@ -172,6 +257,14 @@ pub(crate) fn format_summary(s: &CompileStats) -> String {
         s.total_us,
         s.max_us,
         s.max_fn_len,
+        s.mir_taken,
+        s.mir_tier_rejected,
+        s.mir_lower_failed,
+        s.mir_build_failed,
+        s.mir_gate_optional,
+        s.mir_gate_rest,
+        s.mir_gate_prefix,
+        s.mir_inlined_callees,
         s.histogram_us,
     )
 }
@@ -205,6 +298,7 @@ fn record_dispatch_enabled(said_compiled: bool) {
         // coverage question rather than a codegen one.
         if stats.dispatch_consulted.is_multiple_of(50_000) {
             eprintln!("[neovm-jit-dispatch] {}", format_summary(&stats));
+            eprintln!("[neovm-jit-mir-bails] {}", mir_bail_summary(16));
         }
     });
 }
