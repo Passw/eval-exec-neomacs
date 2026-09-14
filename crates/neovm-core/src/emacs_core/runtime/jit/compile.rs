@@ -838,8 +838,10 @@ thread_local! {
     /// -> the emit fn -> `build_leaf_fn` -> `lower_simple_op`) for a value the
     /// whole lowering treats as ambient.
     ///
-    /// Only the BASELINE lowering reads it. The MIR tier lowers its own IR and
-    /// can inline other functions' ops, whose pcs would index the wrong body.
+    /// Read by the baseline lowering and by `build_mir_with_feedback` at MIR
+    /// BUILD time — the only point where a MIR inst's pc indexes this body.
+    /// The MIR LOWERING never reads it: after inlining, a spliced callee inst
+    /// carries the call site's pc, which would index the wrong body.
     static ACTIVE_NUMERIC_FEEDBACK: std::cell::RefCell<Vec<crate::emacs_core::jit::NumericFeedback>> =
         const { std::cell::RefCell::new(Vec::new()) };
 }
@@ -1036,8 +1038,9 @@ fn compile_bytecode_function_inner(
     if dynamic_prefix > 0 {
         super::stats::record_mir(super::stats::MirFunnel::GatePrefix);
     }
-    let mir_built = (!has_rest && f.params.optional.is_empty() && dynamic_prefix == 0)
-        .then(|| mir::build_mir(ops, constants, native_arity));
+    let mir_built = (!has_rest && f.params.optional.is_empty() && dynamic_prefix == 0).then(|| {
+        mir::build_mir_with_feedback(ops, constants, native_arity, &active_numeric_feedback)
+    });
     if let Some(built) = mir_built
         && let Ok(mut mir) = built.inspect_err(|e| {
             super::stats::record_mir(super::stats::MirFunnel::BuildFailed);

@@ -32,6 +32,7 @@ use std::fmt;
 
 use super::compile::{CompileError, analyze_cfg, simple_effect};
 use crate::emacs_core::bytecode::opcode::Op;
+use crate::emacs_core::jit::NumericFeedback;
 use crate::emacs_core::value::Value;
 
 /// An SSA value handle — an index into [`MirFunction`]'s value table. Each MIR
@@ -360,10 +361,37 @@ impl Builder {
 ///
 /// Deliberately mirrors [`super::compile::analyze_cfg`]'s block + terminator
 /// model so the two agree on structure (a later phase will assert this).
+///
+/// Feedback-blind: every arithmetic site is typed as if `FixnumOnly`. Exact
+/// for a callee resolved for inlining and for the AOT path, because every MIR
+/// `Bin` guards both operands and range-checks its result — the value IS a
+/// fixnum or the body deopts. The tier-up path passes the body's real
+/// feedback through [`build_mir_with_feedback`].
 pub fn build_mir(
     ops: &[Op],
     constants: &[Value],
     arity: usize,
+) -> Result<MirFunction, CompileError> {
+    build_mir_with_feedback(ops, constants, arity, &|_| NumericFeedback::FixnumOnly)
+}
+
+/// [`build_mir`] with the body's per-site numeric feedback.
+///
+/// `feedback(pc)` is read HERE, at build time, where `pc` still indexes this
+/// body's ops — after [`inline_pure_single_block_callees`] a spliced callee
+/// inst carries the CALL SITE's pc, so a consumer that re-derived it from
+/// `inst.pc` would index the wrong body. The one rule it applies is the
+/// baseline analysis's (`apply_known_fixnum_op`): `+ - * /` at a `Float` site
+/// have an f64 lowering whose result is a boxed float on the float path and a
+/// fixnum on the both-fixnum path, so the result is typed `Any`, not `Fixnum`,
+/// and the block-parameter inference never proves a float a fixnum.
+/// `% max min` and `1+ 1- -` have no float lowering (both operands guarded,
+/// result range-checked) and stay `Fixnum`.
+pub fn build_mir_with_feedback(
+    ops: &[Op],
+    constants: &[Value],
+    arity: usize,
+    feedback: &dyn Fn(usize) -> NumericFeedback,
 ) -> Result<MirFunction, CompileError> {
     // Reuse the baseline CFG analysis (block leaders + entry stack depths).
     // No GNU byte-offset map: a `Switch` here bails anyway (unmodelled in 4a).
@@ -505,9 +533,23 @@ pub fn build_mir(
                     let pre = stack.clone();
                     let before = insts.len();
                     lower_value_op(&mut b, op, constants, &mut stack, &mut insts)?;
+                    let float_site = feedback(i) == NumericFeedback::Float;
                     for inst in &mut insts[before..] {
                         inst.pc = i;
                         inst.pre_stack = pre.clone();
+                        // The Float rule (see `build_mir_with_feedback`).
+                        if float_site
+                            && matches!(
+                                inst.op,
+                                MirOp::Bin(
+                                    BinKind::Add | BinKind::Sub | BinKind::Mul | BinKind::Div,
+                                    ..
+                                )
+                            )
+                        {
+                            inst.ty = LispType::Any;
+                            b.value_types[inst.result.0 as usize] = LispType::Any;
+                        }
                     }
                 }
             }
@@ -849,6 +891,88 @@ fn map_term_operands(term: &mut MirTerm, mut f: impl FnMut(MirValue) -> MirValue
     }
 }
 
+/// The successor edges of a terminator: each target block with the argument
+/// list that feeds its parameters (one-for-one, see [`MirTerm`]).
+fn successor_edges(term: &MirTerm) -> impl Iterator<Item = (MirBlockId, &[MirValue])> {
+    let (a, b): (Option<_>, Option<_>) = match term {
+        MirTerm::Return(_) => (None, None),
+        MirTerm::Goto { target, args } => (Some((*target, args.as_slice())), None),
+        MirTerm::Branch {
+            taken,
+            taken_args,
+            fallthrough,
+            fallthrough_args,
+            ..
+        } => (
+            Some((*taken, taken_args.as_slice())),
+            Some((*fallthrough, fallthrough_args.as_slice())),
+        ),
+    };
+    a.into_iter().chain(b)
+}
+
+/// Infer the type of every value, resolving the `Unknown` block parameters
+/// the builder leaves behind: the MIR twin of the baseline's
+/// `compute_known_fixnum_slots`.
+///
+/// A forward JOIN fixpoint over the CFG's edges: a parameter's type is the
+/// join of every argument that reaches it. Instruction results keep the type
+/// the builder stamped (an op's result type does not depend on its operands
+/// — a `Bin` at a non-`Float` site is a fixnum or deopts, whatever it was
+/// fed). The baseline's MUST analysis seeds its entry block all-false and
+/// every other leader TOP and narrows with AND; here block-0 params are `Any`
+/// (the entry jump passes untyped argument loads, and `join(Any, _) == Any`
+/// keeps them so even when block 0 is a loop header) and every other param
+/// starts `Unknown`, the join's identity, so its first incoming edge decides
+/// it and any disagreement widens it to `Any`.
+///
+/// Terminates: a param moves at most `Unknown -> concrete -> Any`. Sound for
+/// guard elision (a `Fixnum`-typed value IS a fixnum at run time) because
+/// every non-entry leader has a real incoming edge (`build_mir` bails on an
+/// unreachable block), so no reachable param ends `Unknown`, and because the
+/// builder types a `Bin` result `Fixnum` only where the lowering guards it
+/// (the `Float` rule, [`build_mir_with_feedback`]). Runs on the INLINED
+/// function: it reads no pc, and a `Fixnum` flows through an inlined callee's
+/// substituted return value.
+pub fn infer_value_types(m: &MirFunction) -> Vec<LispType> {
+    let mut ty = m.value_types.clone();
+    loop {
+        let mut changed = false;
+        for blk in &m.blocks {
+            for (t, args) in successor_edges(&blk.term) {
+                let params = &m.blocks[t.0 as usize].params;
+                debug_assert_eq!(params.len(), args.len(), "edge args match target params");
+                for (p, a) in params.iter().zip(args) {
+                    let old = ty[p.0 as usize];
+                    let new = old.join(ty[a.0 as usize]);
+                    if new != old {
+                        ty[p.0 as usize] = new;
+                        changed = true;
+                    }
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    debug_assert!(
+        m.blocks[0]
+            .params
+            .iter()
+            .all(|p| ty[p.0 as usize] == LispType::Any),
+        "block-0 params are the untyped arguments"
+    );
+    debug_assert!(
+        m.blocks
+            .iter()
+            .flat_map(|b| b.params.iter())
+            .all(|p| ty[p.0 as usize] != LispType::Unknown),
+        "every reachable block param has an incoming edge"
+    );
+    ty
+}
+
 /// A callee is inlinable into a pure MIR iff it is a single block ending in
 /// `Return`, contains no opaque/allocating/identity ops (so the splice keeps the
 /// caller in `lower_mir_pure`'s pure subset), and is within the size budget.
@@ -948,14 +1072,16 @@ pub fn inline_pure_single_block_callees(
                     ty: cinst.ty,
                     effect: cinst.effect,
                     // The inlined body inherits the CALL SITE's framestate anchor
-                    // (pc + pre-call stack). This is sound only because the pure
-                    // MIR tier deopts via rerun-from-start (STATUS_DEOPT), which
-                    // needs no framestate. BEFORE wiring precise deopt (DeoptAt)
-                    // into the MIR tier (task #16), reconstruct each inlined inst's
-                    // pre_stack from the inlined region's own model stack — the
-                    // call-site snapshot would resume the interpreter at the wrong
-                    // point. (The substitution pass below does fix up the VALUES in
-                    // these snapshots, so they reference no dead SSA values.)
+                    // (pc + pre-call stack). A pure body deopts by rerun-from-
+                    // start, which needs no framestate; a call-bearing body
+                    // deopts PRECISELY at this anchor, which re-executes the
+                    // call in the interpreter — sound only because the callee is
+                    // pure (`callee_inlinable`), so re-running it is
+                    // unobservable. (The substitution pass below fixes up the
+                    // VALUES in these snapshots, so they reference no dead SSA
+                    // values.) Anything reading `pc` as an index into THIS
+                    // body's ops must run before this pass (see
+                    // `build_mir_with_feedback`).
                     pc: inst.pc,
                     pre_stack: inst.pre_stack.clone(),
                 });
@@ -1349,6 +1475,315 @@ mod tests {
     /// `neovm_jit_gc_push` skips at runtime) and root everything heap or
     /// unknown. A wrong `true` here would drop a live heap root under GC =
     /// use-after-free, so this pins the whole table.
+    /// GNU 31.1's byte-compile of `probe-a` (tmp/eb/probe-loop.el):
+    /// `(let ((i 0) (acc 0)) (while (< i n) (setq acc (+ acc i)) (setq i (1+ i))) (if v acc acc))`.
+    /// Leaders {0, 2, 6, 14}; the stack at every non-entry leader is [n v i acc];
+    /// the `+` is at pc 8.
+    fn probe_a_ops() -> Vec<Op> {
+        vec![
+            Op::Constant(0), // 0: i = 0
+            Op::Dup,         // 1: acc = 0
+            Op::StackRef(1), // 2: i          (loop header)
+            Op::StackRef(4), // 3: n
+            Op::Lss,         // 4
+            Op::GotoIfNil(14),
+            Op::Dup,         // 6: acc       (body)
+            Op::StackRef(2), // 7: i
+            Op::Add,         // 8
+            Op::StackSet(1), // 9: acc = ...
+            Op::StackRef(1), // 10: i
+            Op::Add1,        // 11
+            Op::StackSet(2), // 12: i = ...
+            Op::Goto(2),
+            Op::Return, // 14
+        ]
+    }
+
+    fn bin_insts(m: &MirFunction) -> Vec<&MirInst> {
+        m.blocks
+            .iter()
+            .flat_map(|b| b.insts.iter())
+            .filter(|i| matches!(i.op, MirOp::Bin(..)))
+            .collect()
+    }
+
+    /// The Float rule: `+` at a `Float` site is typed `Any` (a boxed float or a
+    /// fixnum), everything else keeps its fixnum typing, and the feedback-blind
+    /// `build_mir` still types the same `+` `Fixnum`.
+    #[test]
+    fn float_feedback_bin_result_is_typed_any() {
+        let ops = probe_a_ops();
+        let constants = vec![Value::make_int(0)];
+        let fb = |pc: usize| {
+            if pc == 8 {
+                NumericFeedback::Float
+            } else {
+                NumericFeedback::FixnumOnly
+            }
+        };
+        let m = build_mir_with_feedback(&ops, &constants, 2, &fb).expect("builds");
+        let adds = bin_insts(&m);
+        assert_eq!(adds.len(), 1);
+        assert_eq!(adds[0].pc, 8);
+        assert_eq!(
+            adds[0].ty,
+            LispType::Any,
+            "a Float-site `+` is not a known fixnum"
+        );
+        assert_eq!(m.value_type(adds[0].result), LispType::Any);
+        let add1 = m
+            .blocks
+            .iter()
+            .flat_map(|b| b.insts.iter())
+            .find(|i| matches!(i.op, MirOp::Unary(UnaryKind::Add1, _)))
+            .expect("the 1+");
+        assert_eq!(add1.ty, LispType::Fixnum, "1+ has no float lowering");
+        let blind = build_mir(&ops, &constants, 2).expect("builds");
+        assert_eq!(bin_insts(&blind)[0].ty, LispType::Fixnum);
+    }
+
+    /// All four float-lowered ops take the rule, and only at their own pc.
+    #[test]
+    fn float_rule_covers_add_sub_mul_div_per_site() {
+        // (a b): [a b a a] + -> [a b r1]; [a b r1 b] - -> r2; [.. r2 a] * -> r3;
+        // [.. r3 b] / -> r4.
+        let ops = vec![
+            Op::StackRef(1),
+            Op::StackRef(1),
+            Op::Add, // pc 2
+            Op::StackRef(1),
+            Op::Sub, // pc 4
+            Op::StackRef(2),
+            Op::Mul, // pc 6
+            Op::StackRef(1),
+            Op::Div, // pc 8
+            Op::Return,
+        ];
+        let all =
+            build_mir_with_feedback(&ops, &[], 2, &|_| NumericFeedback::Float).expect("builds");
+        let tys: Vec<LispType> = bin_insts(&all).iter().map(|i| i.ty).collect();
+        assert_eq!(tys, vec![LispType::Any; 4]);
+        for float_pc in [2usize, 4, 6, 8] {
+            let m = build_mir_with_feedback(&ops, &[], 2, &|pc| {
+                if pc == float_pc {
+                    NumericFeedback::Float
+                } else {
+                    NumericFeedback::FixnumOnly
+                }
+            })
+            .expect("builds");
+            for inst in bin_insts(&m) {
+                let want = if inst.pc == float_pc {
+                    LispType::Any
+                } else {
+                    LispType::Fixnum
+                };
+                assert_eq!(
+                    inst.ty, want,
+                    "Float at pc {float_pc}: inst at pc {}",
+                    inst.pc
+                );
+            }
+        }
+    }
+
+    /// `% max min` and the unary ops have no float lowering: both operands are
+    /// guarded and the result range-checked, so they stay `Fixnum` whatever the
+    /// feedback says.
+    #[test]
+    fn rem_max_min_unary_ignore_float_feedback() {
+        let ops = vec![
+            Op::StackRef(1),
+            Op::StackRef(1),
+            Op::Rem,
+            Op::StackRef(2),
+            Op::Max,
+            Op::StackRef(2),
+            Op::Min,
+            Op::Add1,
+            Op::Sub1,
+            Op::Negate,
+            Op::Return,
+        ];
+        let m = build_mir_with_feedback(&ops, &[], 2, &|_| NumericFeedback::Float).expect("builds");
+        for inst in &m.blocks[0].insts {
+            if matches!(inst.op, MirOp::Bin(..) | MirOp::Unary(..)) {
+                assert_eq!(inst.ty, LispType::Fixnum, "{:?}", inst.op);
+            }
+        }
+    }
+
+    /// The probe-a loop: `i` and `acc` are `Fixnum` at every non-entry leader
+    /// (a fixnum constant on the entry edge, a `Bin`/`Unary` result on the back
+    /// edge); `n` and `v` are the untyped arguments.
+    #[test]
+    fn infers_probe_a_loop_params() {
+        let ops = probe_a_ops();
+        let constants = vec![Value::make_int(0)];
+        let m = build_mir(&ops, &constants, 2).expect("builds");
+        let ty = infer_value_types(&m);
+        assert_eq!(m.blocks.len(), 4);
+        for blk in &m.blocks[1..] {
+            let got: Vec<LispType> = blk.params.iter().map(|p| ty[p.0 as usize]).collect();
+            assert_eq!(
+                got,
+                vec![
+                    LispType::Any,
+                    LispType::Any,
+                    LispType::Fixnum,
+                    LispType::Fixnum
+                ],
+                "leader pc {}",
+                blk.bytecode_pc
+            );
+        }
+        assert_eq!(
+            m.blocks[0]
+                .params
+                .iter()
+                .map(|p| ty[p.0 as usize])
+                .collect::<Vec<_>>(),
+            vec![LispType::Any, LispType::Any]
+        );
+    }
+
+    /// A diamond that merges a fixnum with nil: the merge param is `Any`.
+    #[test]
+    fn merge_of_fixnum_and_nil_is_any() {
+        // 0 Constant(0)=0; 1 GotoIfNil(4); 2 Constant(1)=9; 3 Goto(5);
+        // 4 Constant(2)=nil; 5 Return
+        let ops = vec![
+            Op::Constant(0),
+            Op::GotoIfNil(4),
+            Op::Constant(1),
+            Op::Goto(5),
+            Op::Constant(2),
+            Op::Return,
+        ];
+        let constants = vec![Value::make_int(0), Value::make_int(9), Value::NIL];
+        let m = build_mir(&ops, &constants, 0).expect("builds");
+        let ty = infer_value_types(&m);
+        let merge = m
+            .blocks
+            .iter()
+            .find(|b| b.bytecode_pc == 5)
+            .expect("the merge block");
+        assert_eq!(merge.params.len(), 1);
+        assert_eq!(ty[merge.params[0].0 as usize], LispType::Any);
+    }
+
+    /// Block 0 as a loop header: its param is the untyped argument and stays
+    /// `Any` even though the back edge feeds it a `Sub1` result.
+    #[test]
+    fn block_zero_loop_header_param_stays_any() {
+        let ops = vec![
+            Op::StackRef(0),
+            Op::Constant(0),
+            Op::Gtr,
+            Op::GotoIfNil(8),
+            Op::StackRef(0),
+            Op::Sub1,
+            Op::StackSet(1),
+            Op::Goto(0),
+            Op::StackRef(0),
+            Op::Return,
+        ];
+        let constants = vec![Value::make_int(0)];
+        let m = build_mir(&ops, &constants, 1).expect("builds");
+        let ty = infer_value_types(&m);
+        assert_eq!(ty[m.blocks[0].params[0].0 as usize], LispType::Any);
+        // The exit block's param is fed only by block 0's param: Any too.
+        let exit = m.blocks.iter().find(|b| b.bytecode_pc == 8).expect("exit");
+        assert_eq!(ty[exit.params[0].0 as usize], LispType::Any);
+    }
+
+    /// The Float rule end-to-end: with `+` at a Float site, `acc` is `Any` at
+    /// every leader (so a lowering would keep its guard) while `i` stays
+    /// `Fixnum`.
+    #[test]
+    fn float_feedback_keeps_header_param_any() {
+        let ops = probe_a_ops();
+        let constants = vec![Value::make_int(0)];
+        let fb = |pc: usize| {
+            if pc == 8 {
+                NumericFeedback::Float
+            } else {
+                NumericFeedback::FixnumOnly
+            }
+        };
+        let m = build_mir_with_feedback(&ops, &constants, 2, &fb).expect("builds");
+        let ty = infer_value_types(&m);
+        for blk in &m.blocks[1..] {
+            let got: Vec<LispType> = blk.params.iter().map(|p| ty[p.0 as usize]).collect();
+            assert_eq!(
+                got,
+                vec![
+                    LispType::Any,
+                    LispType::Any,
+                    LispType::Fixnum,
+                    LispType::Any
+                ],
+                "leader pc {}",
+                blk.bytecode_pc
+            );
+        }
+    }
+
+    /// A loop whose back-edge value is an inlined callee's result: after the
+    /// inline pass the header param is `Fixnum` — the analysis runs on the
+    /// inlined function and reads no pc.
+    #[test]
+    fn inlined_callee_result_flows_fixnum_into_header() {
+        // sq = (lambda (x) (* x x));
+        // caller = (lambda (n) (let ((m 1)) (while (> m 0) (setq m (sq m))) m)),
+        // whose loop header (pc 1) is a NON-entry block:
+        //  0 Constant(0)=1; 1 StackRef(0); 2 Constant(1)=0; 3 Gtr; 4 GotoIfNil(10);
+        //  5 Constant(2)=sq; 6 StackRef(1); 7 Call(1); 8 StackSet(1); 9 Goto(1);
+        //  10 Return
+        let sq_sym = Value::symbol("jit-inline-sq");
+        let sq_ops = vec![Op::StackRef(0), Op::StackRef(1), Op::Mul, Op::Return];
+        let caller_ops = vec![
+            Op::Constant(0),
+            Op::StackRef(0),
+            Op::Constant(1),
+            Op::Gtr,
+            Op::GotoIfNil(10),
+            Op::Constant(2),
+            Op::StackRef(1),
+            Op::Call(1),
+            Op::StackSet(1),
+            Op::Goto(1),
+            Op::Return,
+        ];
+        let constants = vec![Value::make_int(1), Value::make_int(0), sq_sym];
+        let mut m = build_mir(&caller_ops, &constants, 1).expect("caller builds");
+        let header = m
+            .blocks
+            .iter()
+            .position(|b| b.bytecode_pc == 1)
+            .expect("header at pc 1");
+        let m_param = m.blocks[header].params[1];
+        assert_eq!(
+            infer_value_types(&m)[m_param.0 as usize],
+            LispType::Any,
+            "before inlining the back edge carries an opaque Call result"
+        );
+        let n = inline_pure_single_block_callees(
+            &mut m,
+            &|v| {
+                (v.bits() == sq_sym.bits()).then(|| build_mir(&sq_ops, &[], 1).expect("sq builds"))
+            },
+            8,
+            &mut Vec::new(),
+        );
+        assert_eq!(n, 1);
+        assert_eq!(
+            infer_value_types(&m)[m_param.0 as usize],
+            LispType::Fixnum,
+            "the inlined `*` result reaches the header"
+        );
+    }
+
     #[test]
     fn never_needs_gc_root_matches_runtime_skip_set() {
         use LispType::*;

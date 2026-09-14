@@ -12,6 +12,7 @@ use super::*;
 /// sealed continuation block. On return, the builder is positioned in the
 /// continuation so lowering continues on the success path.
 pub(crate) fn emit_guard(fb: &mut FunctionBuilder, deopt: Block, cond: ClifValue) {
+    GUARD_COUNT.with(|c| c.set(c.get() + 1));
     // J0 verification harness: force every guard to fail so the deopt path is
     // always taken (see `jit_force_deopt`). A constant-false condition makes
     // `brif` unconditionally branch to `deopt`.
@@ -26,6 +27,40 @@ pub(crate) fn emit_guard(fb: &mut FunctionBuilder, deopt: Block, cond: ClifValue
     fb.switch_to_block(cont);
     // `cont`'s only predecessor is the guard branch just emitted.
     fb.seal_block(cont);
+}
+
+thread_local! {
+    /// Guards emitted by the function being lowered (every `emit_guard`,
+    /// tag and range alike): the MIR tier's guard census, printed in its
+    /// `NEOVM_JIT_DUMP_CLIF` header and asserted by its tests.
+    static GUARD_COUNT: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    /// Untags (`mir_as_raw`'s `sshr`) and retags (`retag_fixnum`) emitted by
+    /// the function being lowered — the other two halves of what the MIR
+    /// tier's unboxing claims, pinned by the same tests as the guards.
+    static UNTAG_COUNT: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    static RETAG_COUNT: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// Start the guard/untag/retag census for a new function.
+pub(crate) fn guards_emitted_reset() {
+    GUARD_COUNT.with(|c| c.set(0));
+    UNTAG_COUNT.with(|c| c.set(0));
+    RETAG_COUNT.with(|c| c.set(0));
+}
+
+/// Guards emitted since the last [`guards_emitted_reset`].
+pub(crate) fn guards_emitted() -> u32 {
+    GUARD_COUNT.with(|c| c.get())
+}
+
+/// MIR untags emitted since the last [`guards_emitted_reset`].
+pub(crate) fn untags_emitted() -> u32 {
+    UNTAG_COUNT.with(|c| c.get())
+}
+
+/// Retags emitted since the last [`guards_emitted_reset`].
+pub(crate) fn retags_emitted() -> u32 {
+    RETAG_COUNT.with(|c| c.get())
 }
 
 /// Return the bits of `v` when it is a Cranelift integer constant.
@@ -445,6 +480,7 @@ pub(crate) fn guard_fixnum(
 
 /// Retag an untagged i64 `n` as a fixnum `Value`: `(n << 2) | 2`.
 pub(crate) fn retag_fixnum(fb: &mut FunctionBuilder, n: ClifValue) -> ClifValue {
+    RETAG_COUNT.with(|c| c.set(c.get() + 1));
     let shifted = ishl_imm_p(fb, n, FIXNUM_SHIFT as i64);
     bor_imm_p(fb, shifted, FIXNUM_CHECK_VALUE as i64)
 }
@@ -1545,7 +1581,20 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
     aot: bool,
 ) -> Result<cranelift_module::FuncId, CompileError> {
     imm_pool_reset();
+    guards_emitted_reset();
     use mir::{BinKind, CmpKind, MirOp, MirTerm, PredKind as MP, UnaryKind as MU};
+
+    // The block-parameter type fixpoint (the MIR twin of the baseline's
+    // `compute_known_fixnum_slots`): `types[v]` is what `v` provably is at
+    // run time. A `Fixnum`-typed value skips its tag guard in `mir_as_raw`
+    // and its GC root at a call — so this ONE table must feed both.
+    let types = mir::infer_value_types(m);
+    let n_fixnum_params = m
+        .blocks
+        .iter()
+        .flat_map(|b| b.params.iter())
+        .filter(|p| types[p.0 as usize] == mir::LispType::Fixnum)
+        .count();
 
     // Phase-0 fix: this reset + the post-finalize set below used to exist only
     // in the baseline `build_leaf_fn`, so a Tier-2 compile's trace line
@@ -2139,6 +2188,16 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
             slots,
         ));
     });
+    dump_clif(
+        &func,
+        &format!(
+            "mir blocks={} fixnum_params={n_fixnum_params} guards={} untags={} retags={}",
+            m.blocks.len(),
+            guards_emitted(),
+            untags_emitted(),
+            retags_emitted()
+        ),
+    );
 
     let fid = module
         .declare_function(entry_name, entry_linkage, &sig)

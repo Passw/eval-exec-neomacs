@@ -7871,6 +7871,9 @@ mod jit_leaf_slot_tests;
 #[cfg(test)]
 #[path = "tests/jit_known_fixnum_float.rs"]
 mod jit_known_fixnum_float_tests;
+#[cfg(test)]
+#[path = "tests/jit_mir_known_fixnum_float.rs"]
+mod jit_mir_known_fixnum_float_tests;
 
 /// Allocator for [`Context::context_instance_id`].
 fn next_context_instance_id() -> u64 {
