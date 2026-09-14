@@ -188,16 +188,37 @@ pub(crate) fn builtin_coordinates_in_window_p(
 
     // A live window is a valid one; widening is the allowed direction.
     let window: ValidWindow = live.into();
+    // GNU works this out in PIXELS.  It converts COORDINATES from canonical
+    // character units with `FRAME_PIXEL_X_FROM_CANON_X` /
+    // `FRAME_PIXEL_Y_FROM_CANON_Y` and compares against `WINDOW_LEFT_EDGE_X` /
+    // `WINDOW_TOP_EDGE_Y`, which are the internal border plus the window's
+    // PIXEL edge (`src/window.h:758,797`) -- `pixel_top`, not `top_line`.
+    //
+    // The two are not the same origin: the frame's top margin sits above the
+    // pixel origin but is counted in character rows, so after a split the
+    // upper window has `top_line` 1 and `pixel_top` 0.  Measuring from
+    // `top_line`, as this did, shifted every answer down one row -- `(0 . 0)`
+    // reported nil and `(0 . 11)` reported text where GNU says `mode-line`.
+    //
+    // Pixels also settle the chrome comparisons below, which come from
+    // `chrome_height_pixels` and were being compared against a character-unit
+    // `y`: that agrees only while a character cell is one pixel tall, which is
+    // true on a terminal and false on a GUI frame.
+    let (char_width, char_height) = frames
+        .get(window.frame())
+        .map(|frame| {
+            (
+                frame.char_width.max(1.0) as f64,
+                frame.char_height.max(1.0) as f64,
+            )
+        })
+        .unwrap_or((1.0, 1.0));
     let w = get_window(frames, window)?;
-    let (left, top) = (w.left_col() as f64, w.top_line() as f64);
-    let width = match window_total_width_impl(frames, buffers, vec![args[1]])?.kind() {
-        ValueKind::Fixnum(n) => n as f64,
-        _ => 0.0,
-    };
-    let height = match window_total_height_impl(frames, buffers, vec![args[1]])?.kind() {
-        ValueKind::Fixnum(n) => n as f64,
-        _ => 0.0,
-    };
+    let bounds = *w.bounds();
+    let (left, top) = (bounds.x as f64, bounds.y as f64);
+    let (width, height) = (bounds.width as f64, bounds.height as f64);
+    let x = x * char_width;
+    let y = y * char_height;
 
     // ON_NOTHING: outside the window's frame-relative box.
     if x < left || x >= left + width || y < top || y >= top + height {
@@ -224,7 +245,7 @@ pub(crate) fn builtin_coordinates_in_window_p(
     // ON_VERTICAL_BORDER: the last column of a window that is not rightmost.
     if let Some(frame) = frames.get(window.frame())
         && !window_is_rightmost(frame, window.window())
-        && x >= left + width - 1.0
+        && x >= left + width - char_width
     {
         return Ok(Value::symbol("vertical-line"));
     }
@@ -233,8 +254,8 @@ pub(crate) fn builtin_coordinates_in_window_p(
     // are whole characters whatever the input was -- `(5.5 . 3.0)` answers
     // `(5 . 3)`.
     Ok(Value::cons(
-        Value::fixnum((x - left) as i64),
-        Value::fixnum((y - top) as i64),
+        Value::fixnum(((x - left) / char_width) as i64),
+        Value::fixnum(((y - top) / char_height) as i64),
     ))
 }
 

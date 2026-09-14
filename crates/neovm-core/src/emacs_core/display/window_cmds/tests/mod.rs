@@ -3996,6 +3996,75 @@ fn window_size_queries_match_batch_defaults_and_invalid_window_predicates() {
 /// stays at the text area's top, which is how GNU reports `window-pixel-top` 0
 /// alongside `window-top-line` 1, and the minibuffer follows by the sum rule
 /// `m->top_line = r->top_line + r->total_lines` (`src/window.c:5030`).
+/// `coordinates-in-window-p` measures from the window's PIXEL edge.
+///
+/// GNU converts the canonical-character COORDINATES to pixels
+/// (`FRAME_PIXEL_Y_FROM_CANON_Y`) and compares them against
+/// `WINDOW_TOP_EDGE_Y`, which is the internal border plus
+/// `WINDOW_TOP_PIXEL_EDGE` (`src/window.h:797`) -- the window's `pixel_top`,
+/// not its `top_line`.
+///
+/// The two are different origins whenever the frame has a top margin whose
+/// rows cost no pixels, which is a terminal menu bar: the shipped binary and
+/// GNU both report `top_line` 1 beside `pixel_top` 0 for the upper window
+/// after `(split-window-below)` on the startup frame (verified against both).
+/// Measuring from `top_line`, as this did, shifted every answer down a row.
+/// Measured on GNU Emacs 31.0.50, `emacs -Q --batch`, against neomacs before
+/// this fix:
+///
+///     (0 . 0)   GNU (0 . 0)     neomacs nil
+///     (2 . 2)   GNU (2 . 2)     neomacs (2 . 1)
+///     (0 . 11)  GNU mode-line   neomacs (0 . 10)
+///     (0 . 12)  GNU nil         neomacs mode-line
+///
+/// The chrome comparisons had the same unit confusion from the other side:
+/// `chrome_height_pixels` returns PIXELS and was compared against a
+/// character-unit `y`, which agrees only while a character cell is one pixel
+/// tall -- true on the terminal this was measured on, false on a GUI frame.
+/// Working in pixels throughout settles both.
+///
+/// The state has to be built here rather than reached through `split-window`:
+/// this harness's frame carries `menu-bar-lines` nil, so its margin is 0 and
+/// the two origins coincide, which is why the bug is invisible to it.  That
+/// gap between the harness frame and the shipped binary's is recorded
+/// separately.
+#[test]
+fn coordinates_in_window_p_measures_from_the_pixel_edge_like_gnu() {
+    crate::test_utils::init_test_tracing();
+    let mut ev = crate::test_utils::runtime_startup_context();
+
+    // Realize the margin the way a terminal frame does: the character row
+    // moves down, the pixel origin does not.
+    let fid = ev.frames.selected_frame().expect("a selected frame").id;
+    {
+        let frame = ev.frames.get_mut(fid).expect("the selected frame");
+        frame.set_parameter(Value::symbol("menu-bar-lines"), Value::fixnum(1));
+        frame.root_window_mut().set_top_line(1);
+    }
+
+    let out = ev.eval_str_each(
+        "(progn
+           (split-window-below)
+           (let ((w (selected-window)))
+             (prin1-to-string
+              (list (window-top-line w) (window-pixel-top w)
+                    (coordinates-in-window-p '(0 . 0) w)
+                    (coordinates-in-window-p '(2 . 2) w)))))",
+    );
+    let text = out
+        .into_iter()
+        .next()
+        .expect("one form")
+        .expect("the form evaluates")
+        .as_str_owned()
+        .expect("prin1-to-string returns a string");
+    assert_eq!(
+        text, "(1 0 (0 . 0) (2 . 2))",
+        "the split must inherit top_line 1 with pixel_top 0, and both answers \
+         must be measured from the pixel edge"
+    );
+}
+
 #[test]
 fn set_frame_size_lays_out_a_tty_frames_windows_like_gnu() {
     crate::test_utils::init_test_tracing();
