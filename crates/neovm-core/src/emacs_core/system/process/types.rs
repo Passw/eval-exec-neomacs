@@ -750,17 +750,6 @@ pub struct Process {
     /// `status_notify`'s membership test (:7892) and NOT the same bit as
     /// `status_notify_pending` (GNU's `raw_status_new`).
     pub(crate) status_ticks: StatusChangeTicks,
-    /// Start of the bounded grace period for observing an owner exit before
-    /// notifying an implicit stderr pipe whose EOF arrived first.
-    ///
-    /// GNU needs no such timer: `status_notify` walks `Vprocess_alist` in ONE
-    /// pass (src/process.c:7873), and the owner is prepended AFTER its pipe
-    /// (`Fmake_process` creates the pipe at :1883 and the process at :1892,
-    /// `make_process` conses onto the front at :953), so the owner's sentinel
-    /// always runs before the pipe is reached and removed.  This port services
-    /// whichever descriptor the poller reports, so it has to wait for the
-    /// owner's exit to become observable instead.
-    pub(super) stderr_pipe_owner_status_deferred_at: Option<Instant>,
     /// Kernel child-status transition delivered by the wait backend but not
     /// yet published to the process sentinel.  This includes stop/continue as
     /// well as exit/signal, mirroring GNU's `raw_status_new`.
@@ -5318,7 +5307,6 @@ impl ProcessManager {
     pub(super) fn deactivate_process_io(poller: Option<&polling::Poller>, proc: &mut Process) {
         Self::unregister_process_poll_sources(poller, proc);
         drop(std::mem::take(&mut proc.live_io));
-        proc.stderr_pipe_owner_status_deferred_at = None;
         proc.gnutls_initstage = GnutlsInitStage::Empty;
         proc.gnutls_boot_parameters = Value::NIL;
     }
@@ -5559,7 +5547,6 @@ impl ProcessManager {
             status: process_status_run_value(),
             status_notify_pending: false,
             status_ticks: StatusChangeTicks::default(),
-            stderr_pipe_owner_status_deferred_at: None,
             pending_status: Value::NIL,
             buffer,
             childp,
@@ -5852,9 +5839,7 @@ impl ProcessManager {
             .and_then(|stderr_id| self.processes.get_mut(&stderr_id))
             .and_then(|stderr_proc| {
                 #[cfg(windows)]
-                {
-                    stderr_proc.stderr_pipe_owner_status_deferred_at = None;
-                }
+                {}
                 stderr_proc.live_io.module_pipe_writer.take()
             });
         let transferred_id = writer.as_ref().and(transferable_id);
@@ -6200,9 +6185,7 @@ impl ProcessManager {
             proc.status_notify_pending = false;
             proc.pending_status = Value::NIL;
             #[cfg(windows)]
-            {
-                proc.stderr_pipe_owner_status_deferred_at = None;
-            }
+            {}
         }
     }
 
@@ -8196,9 +8179,28 @@ impl super::super::eval::Context {
                         .get(owner_id)
                         .is_some_and(|owner| owner.status_notify_pending));
         }
+        // The owner has status work pending: run it FIRST, then let the pipe
+        // notify in this same pass.
+        //
+        // GNU's guarantee is ORDER, not delay.  `status_notify`
+        // (`src/process.c:7873`) makes ONE pass over `Vprocess_alist` and the
+        // owner sits ahead of its pipe, so the owner's sentinel runs while the
+        // pipe is still attached and the pipe's runs immediately after -- both
+        // before control returns to Lisp.
+        //
+        // Returning `false` here instead deferred the pipe to a LATER service
+        // pass, and for a child that has already exited there may be no later
+        // pass: its fd is at EOF, so nothing makes it ready again.  The pipe
+        // then stayed in the process list with its sentinel unrun, and its
+        // buffer never received the `"\n\nProcess NAME stderr finished"` line
+        // GNU writes.  Measured against GNU 31.0.50: for
+        // `echo 'to stderr' >&2` with a separate `:stderr` buffer, GNU ends
+        // with `(process-list)` nil and the sentinel text in the buffer, while
+        // this port listed `"NAME stderr"` still alive and the buffer holding
+        // only `"to stderr"`.
         if owner_pending {
             outcome.absorb(self.run_process_status_notification(owner_id, target_process)?);
-            return Ok(false);
+            return Ok(true);
         }
         #[cfg(windows)]
         {
@@ -8209,39 +8211,39 @@ impl super::super::eval::Context {
                     .is_some_and(|owner| owner.status_notify_pending);
             if owner_pending {
                 outcome.absorb(self.run_process_status_notification(owner_id, target_process)?);
-                return Ok(false);
+                return Ok(true);
             }
         }
 
-        // The owner has not exited YET.  Give it a bounded grace period rather
-        // than publishing the pipe's death now.
+        // The owner has not exited yet.  Let the pipe notify anyway -- GNU does.
         //
-        // This used to be Windows-only, and the asymmetry was the bug: on every
-        // other platform the pipe was notified the instant its EOF was
-        // serviced, so a child that wrote to stderr and exited immediately
-        // afterwards could have its pipe removed from the alist in the window
-        // between the two -- and its own sentinel then found
-        // `get-buffer-process' nil where GNU still has the pipe attached and
-        // `closed'.  Reproduced at 1 run in 10 of the process suite.
+        // This used to hold the pipe back for a bounded grace period, waiting
+        // for the owner to catch up.  That was compensating for the deferral
+        // above, which sent the pipe to a later pass; with the owner notified
+        // FIRST and the pipe let through in the same pass, the ordering
+        // guarantee no longer needs a timer, and the timer was costing
+        // correctness.  Measured against GNU 31.0.50 with a child that writes
+        // stderr and exits, reading the buffer after `(sit-for 0.05)`:
         //
-        // The grace has to be bounded, and expiring it is CORRECT rather than a
-        // fallback: when the owner really does outlive its stderr by a long
-        // way, GNU removes the pipe too.  Verified with
-        // `sh -c "printf boom 1>&2; exec 2>&-; sleep 0.3; printf x"`, where GNU
-        // and this port both answer `GONE'.  What GNU guarantees is only the
-        // tie-break when both events are pending together, which is exactly
-        // what the wait restores.
-        let deferred_at = self
-            .processes
-            .get(pid)
-            .and_then(|pipe| pipe.stderr_pipe_owner_status_deferred_at);
-        if deferred_at.is_none_or(|at| at.elapsed() < Duration::from_millis(100)) {
-            if let Some(pipe) = self.processes.get_mut(pid) {
-                pipe.stderr_pipe_owner_status_deferred_at
-                    .get_or_insert_with(Instant::now);
-            }
-            return Ok(false);
-        }
+        //     GNU      "to stderr\n\nProcess NAME stderr finished", pipe gone
+        //     with 100ms grace  "to stderr", pipe still in `process-list`
+        //
+        // -- the observation window was shorter than the grace, so Lisp saw a
+        // pipe that GNU had already reaped and sentinel text that GNU had
+        // already written.  At 0.3s and 1.0s the two agreed, which is the
+        // signature of a delay rather than a disagreement.
+        //
+        // Waiting is not what GNU guarantees here in any case: when the owner
+        // genuinely outlives its stderr, GNU removes the pipe too.  Verified
+        // with `sh -c "printf boom 1>&2; exec 2>&-; sleep 0.3; printf x"`,
+        // where GNU and this port both answer `GONE`.  What GNU guarantees is
+        // the TIE-BREAK when both events are pending together, and that is the
+        // owner-first branch above, not a timer.
+        //
+        // Re-measured after removing it: the guard test that motivated the
+        // grace (`the_stderr_pipe_is_closed_and_attached_when_the_owner_sentinel_runs`,
+        // 12 iterations, and formerly ~1 run in 10) passed 10 runs of 10 of the
+        // whole process slice.
         Ok(true)
     }
 

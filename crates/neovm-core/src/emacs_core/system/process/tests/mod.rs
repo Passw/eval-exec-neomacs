@@ -2295,10 +2295,30 @@ fn stderr_pipe_wait_notifies_a_pending_owner_stop_first() {
         .notify_stderr_pipe_owner_first(stderr_id, None, &mut outcome)
         .expect("notify pending owner status");
 
-    assert!(!pipe_may_notify, "the pipe waits for the newer owner");
+    // The guarantee is ORDER, not delay.  GNU's `status_notify`
+    // (`src/process.c:7873`) makes ONE pass over `Vprocess_alist` with the
+    // owner ahead of its pipe, so the owner's sentinel runs first and the
+    // pipe's runs immediately after -- in the same pass, before control
+    // returns to Lisp.  A `stop` is not one of the terminal statuses that
+    // removes a process, so the owner stays and the pipe still proceeds.
+    //
+    // This used to assert the opposite, pinning a deferral that sent the pipe
+    // to a LATER service pass.  For a child that has already exited there may
+    // be no later pass -- its fd sits at EOF -- so the pipe stayed in the
+    // process list with its sentinel unrun and its buffer never received the
+    // `"Process NAME stderr finished"` line.  Four oracle cases caught that
+    // (cx117/cx148/cx337/cx389); this test did not, because it was written
+    // against the implementation rather than against GNU.
+    assert!(
+        pipe_may_notify,
+        "the pipe notifies in the same pass, after the owner"
+    );
     let owner = eval.processes.get(owner_id).expect("owner remains live");
     assert_eq!(owner.status, process_status_stop_value(19));
-    assert!(!owner.status_notify_pending);
+    assert!(
+        !owner.status_notify_pending,
+        "the owner's pending status was published BEFORE the pipe was let through"
+    );
 }
 
 #[cfg(windows)]

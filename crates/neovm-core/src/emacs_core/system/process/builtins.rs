@@ -4335,9 +4335,7 @@ pub(super) fn builtin_make_process_impl_with_environment(
     #[cfg(windows)]
     if let Some(stderr_id) = stderrproc.as_process_id()
         && let Some(stderr_proc) = processes.get_mut(stderr_id)
-    {
-        stderr_proc.stderr_pipe_owner_status_deferred_at = None;
-    }
+    {}
     if let Some(proc) = processes.get_mut(id) {
         proc.default_directory = subprocess_cwd;
         if noquery {
