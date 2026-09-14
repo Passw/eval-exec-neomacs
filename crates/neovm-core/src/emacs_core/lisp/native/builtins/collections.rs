@@ -40,29 +40,32 @@ fn builtin_aref_values(array: Value, index: Value) -> EvalResult {
             let ch = expect_char_table_index(&index)?;
             super::chartable::ct_lookup(&array, ch)
         }
-        ValueKind::Veclike(VecLikeType::Vector) if super::chartable::is_char_table(&array) => {
-            let ch = expect_char_table_index(&index)?;
-            super::chartable::ct_lookup(&array, ch)
-        }
-        ValueKind::Veclike(VecLikeType::Vector) | ValueKind::Veclike(VecLikeType::Record) => {
+        ValueKind::Veclike(kind @ (VecLikeType::Vector | VecLikeType::Record)) => {
+            // ONE slot fetch and ONE slot-0 read decide all three shapes. The
+            // char-table arm used to ask `is_char_table`, which fetched the
+            // slots a SECOND time (an enum-discriminant match plus a slice
+            // build) and read slot 0 again — on every indexed read in the
+            // language.
             let idx = idx_fixnum as usize;
             let items = array
                 .as_vector_data()
                 .or_else(|| array.as_record_data())
                 .unwrap();
-            // By SymId, not by name: this runs on every `aset` of a vector,
-            // and `as_symbol_name` resolves the symbol to a `&str` for a
-            // string compare.
-            let is_bool_vector = items.len() >= 2
-                && items[0].as_symbol_id() == Some(super::chartable::bool_vector_tag_sym_id());
-            if is_bool_vector {
-                return super::chartable::bool_vector_ref_value(&array, idx)
-                    .ok_or_else(|| signal(LispCondition::ArgsOutOfRange, vec![array, index]));
+            let record = matches!(kind, VecLikeType::Record);
+            match super::chartable::classify_vector_slots(items, record) {
+                super::chartable::VectorTag::CharTable => {
+                    let ch = expect_char_table_index(&index)?;
+                    super::chartable::ct_lookup(&array, ch)
+                }
+                super::chartable::VectorTag::BoolVector => {
+                    super::chartable::bool_vector_ref_value(&array, idx)
+                        .ok_or_else(|| signal(LispCondition::ArgsOutOfRange, vec![array, index]))
+                }
+                super::chartable::VectorTag::Plain => items
+                    .get(idx)
+                    .copied()
+                    .ok_or_else(|| signal(LispCondition::ArgsOutOfRange, vec![array, index])),
             }
-            items
-                .get(idx)
-                .copied()
-                .ok_or_else(|| signal(LispCondition::ArgsOutOfRange, vec![array, index]))
         }
         ValueKind::String => {
             let idx = idx_fixnum as usize;
@@ -192,21 +195,26 @@ pub(crate) fn builtin_aset_args(args: &[Value]) -> EvalResult {
                 None,
             )
         }
-        ValueKind::Veclike(VecLikeType::Vector) if super::chartable::is_char_table(&args[0]) => {
-            let ch = expect_char_table_index(&args[1])?;
-            super::chartable::builtin_set_char_table_range(
-                vec![args[0], Value::fixnum(ch), args[2]],
-                None,
-            )
-        }
-        ValueKind::Veclike(VecLikeType::Vector) | ValueKind::Veclike(VecLikeType::Record) => {
+        ValueKind::Veclike(kind @ (VecLikeType::Vector | VecLikeType::Record)) => {
+            // One slot fetch and one slot-0 read for all three shapes, and the
+            // markers compared by SymId — this used to resolve slot 0 to a
+            // `&str` and run a string compare on every `aset`, and ask
+            // `is_char_table` for a second fetch of the same slots.
             let idx = idx_fixnum as usize;
             let items = args[0]
                 .as_vector_data()
                 .or_else(|| args[0].as_record_data())
                 .unwrap();
-            let is_bool_vector =
-                items.len() >= 2 && items[0].as_symbol_name() == Some("--bool-vector--");
+            let tag =
+                super::chartable::classify_vector_slots(items, matches!(kind, VecLikeType::Record));
+            if tag == super::chartable::VectorTag::CharTable {
+                let ch = expect_char_table_index(&args[1])?;
+                return super::chartable::builtin_set_char_table_range(
+                    vec![args[0], Value::fixnum(ch), args[2]],
+                    None,
+                );
+            }
+            let is_bool_vector = tag == super::chartable::VectorTag::BoolVector;
             let bool_len = if is_bool_vector {
                 match items.get(1).map(|v| v.kind()) {
                     Some(ValueKind::Fixnum(n)) if n >= 0 => Some(n as usize),

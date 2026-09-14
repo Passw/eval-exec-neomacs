@@ -61,17 +61,61 @@ const BV_SIZE: usize = 1; // logical length
 // Predicates
 // ---------------------------------------------------------------------------
 
+/// What a vectorlike's slot-0 tag says it really is.
+///
+/// A char-table and a bool-vector are both encoded as an ordinary vector with
+/// a marker SYMBOL in slot 0, so every element access has to look. Classifying
+/// from slots the caller ALREADY fetched is the point of this: `aref` used to
+/// fetch them twice (once through [`is_char_table`], once for the access) and
+/// read slot 0 twice, for every indexed read in the language.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum VectorTag {
+    Plain,
+    CharTable,
+    BoolVector,
+}
+
+/// Classify already-fetched vector slots. `record` suppresses the char-table
+/// test, which applies to vectors only — a record's slot 0 is its struct type.
+///
+/// `#[inline]` because this sits on every `aref`/`aset` and lives in a
+/// different module from both: left as a cross-module call it cost `smie`
+/// 0.8%, more than the fetch it saves.
+#[inline]
+pub(crate) fn classify_vector_slots(slots: &[Value], record: bool) -> VectorTag {
+    // LENGTH first, slot 0 second: both tagged shapes need at least two slots,
+    // and a length compare is cheaper than a slot load plus a symbol-id
+    // extraction. The predicates this replaced tested length first for that
+    // reason, and reading slot 0 up front cost `smie` 0.6% on the short
+    // vectors it asks about.
+    if slots.len() < 2 {
+        return VectorTag::Plain;
+    }
+    let Some(tag) = slots[0].as_symbol_id() else {
+        return VectorTag::Plain;
+    };
+    if !record && slots.len() >= CT_EXTRA_START && tag == char_table_tag_sym_id() {
+        return VectorTag::CharTable;
+    }
+    if tag == bool_vector_tag_sym_id() {
+        return VectorTag::BoolVector;
+    }
+    VectorTag::Plain
+}
+
 /// Return `true` if `v` is a char-table (tagged vector).
+///
+/// `#[inline]`, and measured: this used to be small enough that LLVM inlined
+/// it at every call site (zero frames in a profile). Folding the shape test
+/// into `classify_vector_slots` made it just big enough to stop, and `smie`
+/// — which asks 2.67M times — paid 35.6M for the calls alone.
+#[inline]
 pub fn is_char_table(v: &Value) -> bool {
     if v.is_char_table() {
         return true;
     }
     if v.is_vector() {
-        let vec = v.as_vector_data().unwrap();
-        vec.len() >= CT_EXTRA_START
-            && vec[0]
-                .as_symbol_id()
-                .is_some_and(|id| id == char_table_tag_sym_id())
+        classify_vector_slots(v.as_vector_data().unwrap(), false) == VectorTag::CharTable
     } else {
         false
     }
@@ -82,13 +126,10 @@ fn is_sub_char_table(v: Value) -> bool {
 }
 
 /// Return `true` if `v` is a bool-vector (tagged vector).
+#[inline]
 pub fn is_bool_vector(v: &Value) -> bool {
     if v.is_vector() {
-        let vec = v.as_vector_data().unwrap();
-        vec.len() >= 2
-            && vec[0]
-                .as_symbol_id()
-                .is_some_and(|id| id == bool_vector_tag_sym_id())
+        classify_vector_slots(v.as_vector_data().unwrap(), false) == VectorTag::BoolVector
     } else {
         false
     }
