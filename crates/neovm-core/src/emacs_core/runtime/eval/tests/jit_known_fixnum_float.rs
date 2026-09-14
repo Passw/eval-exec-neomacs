@@ -113,3 +113,63 @@ fn a_float_crossing_a_block_edge_into_a_cold_add1_is_not_treated_as_a_fixnum() {
          was shifted as a fixnum (known-fixnum analysis ignoring Float feedback)"
     );
 }
+
+/// An OSR-entered float loop must be lowered WITH the body's numeric
+/// feedback. `compile_osr_leaf` used to call `lower_leaf_full_osr` outside
+/// the publish scope, so every Float site read FixnumOnly, the fixnum guards
+/// failed on the first iteration, `OSR_TRIED_FLAG` blocked a retry, and the
+/// loop stayed interpreted: a fixnum loop OSR'd 2.8x faster, the same loop
+/// on floats gained nothing. The observable is the consumed flag the publish
+/// sets — the result is identical either way (deopt reruns the interpreter).
+///
+///     (lambda (n) (let ((x 1.0) (acc 0.0)) (dotimes (_ n) (setq x (* x 1.0000001)) (setq acc (+ acc x))) acc))
+/// GNU 31.1 byte-compile; constants [1.0 0.0 0 nil 1.0000001].
+#[test]
+fn an_osr_entered_float_loop_is_compiled_with_its_numeric_feedback() {
+    let bytes: [u8; 27] = [
+        192, 193, 194, 137, 4, 87, 131, 25, 0, 195, 3, 196, 95, 178, 4, 2, 4, 92, 178, 3, 136, 84,
+        130, 3, 0, 136, 135,
+    ];
+    let mut constants = vec![
+        Value::make_float(1.0),
+        Value::make_float(0.0),
+        Value::make_int(0),
+        Value::NIL,
+        Value::make_float(1.0000001),
+    ];
+    let ops = decode_gnu_bytecode(&bytes, &mut constants).expect("GNU bytecode decodes");
+    let mut f = ByteCodeFunction::new(parse_arglist_descriptor(257));
+    f.lexical = true;
+    f.ops = ops;
+    f.constants = constants.into();
+    f.max_stack = 7;
+    let mut ev = Context::new();
+    let f = Value::make_bytecode(f);
+    let ValueKind::Symbol(id) = Value::symbol("osr-float-loop-probe").kind() else {
+        panic!("symbol")
+    };
+    ev.obarray.set_symbol_function_id(id, f);
+    let bc = f.get_bytecode_data().expect("bytecode");
+    assert!(
+        bc.jit_runtime().wants_numeric_feedback(),
+        "fresh body still records"
+    );
+    // One call, long enough for the back-edge poll to OSR the loop. The
+    // interpreter records Float at the `*` and `+` sites on the way.
+    let n = 400_000;
+    let acc = ev
+        .funcall_general_untraced(f, vec![Value::make_int(n)])
+        .expect("call completes");
+    // Reference: the same recurrence in Rust.
+    let (mut x, mut expect) = (1.0_f64, 0.0_f64);
+    for _ in 0..n {
+        x *= 1.0000001;
+        expect += x;
+    }
+    assert_eq!(as_f64(acc), expect);
+    assert!(
+        !bc.jit_runtime().wants_numeric_feedback(),
+        "the OSR compile must have PUBLISHED (and thereby consumed) the body's feedback; \
+         an OSR lowering outside the publish scope reads FixnumOnly everywhere"
+    );
+}

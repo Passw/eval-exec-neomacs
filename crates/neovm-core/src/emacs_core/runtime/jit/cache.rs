@@ -312,6 +312,9 @@ fn compile_osr_leaf(
         ops,
         &func.constants,
     ));
+    // Same feedback the tier-up compile sees: without it every Float site
+    // read FixnumOnly and an OSR'd float loop deopted straight back.
+    let _numeric = super::compile::publish_numeric_feedback(func);
     let leaf = match super::compile::lower_leaf_full_osr(
         ops,
         &func.constants,
