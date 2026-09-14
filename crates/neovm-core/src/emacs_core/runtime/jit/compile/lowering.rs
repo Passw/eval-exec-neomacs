@@ -1042,6 +1042,191 @@ pub(crate) fn emit_cond_residual_roots_post(fb: &mut FunctionBuilder, rt: &RtCtx
 /// which would re-execute a call's side effect (the loop-back-edge hole the
 /// adversarial critique caught). In a pure body it is the shared rerun-from-start
 /// block (STATUS_DEOPT), created lazily.
+/// `NEOVM_JIT_MIR_OPAQUE=0`/`off`: refuse every shim-lowered op in the MIR
+/// tier (the pre-adapter behaviour — the single-build A/B for the port).
+pub(crate) fn mir_opaque_enabled() -> bool {
+    use std::sync::OnceLock;
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| {
+        !matches!(
+            std::env::var("NEOVM_JIT_MIR_OPAQUE").as_deref(),
+            Ok("0") | Ok("off")
+        )
+    })
+}
+
+/// The variant name of a bytecode op (`VarRef(3)` -> `VarRef`), the key the
+/// MIR bail census groups by.
+fn op_variant_name(op: &Op) -> String {
+    let name = format!("{op:?}");
+    name.split(|c: char| c == '(' || c == '{' || c == ' ')
+        .next()
+        .unwrap_or("?")
+        .to_string()
+}
+
+/// Lower one shim-using MIR instruction through the BASELINE's per-op emitter
+/// (`lower_simple_op`): the adapter that lets an `Opaque` op — a variable
+/// read/write, a builtin, a list op — stay in the MIR tier instead of bailing
+/// the whole body to the baseline.
+///
+/// The emitters work on an ad-hoc operand stack of tagged CLIF values:
+///
+/// * A SAFEPOINT op (`MirOp::Opaque`) sees the full pre-op stack
+///   (`inst.pre_stack`, the accurate framestate), force-tagged with write-back
+///   so no raw alias survives the shim call; the emitter pops its operands off
+///   the top (which `build_mir` guarantees are the op's `args`, checked here),
+///   roots the residual below them across the call, and its status branch
+///   lands in the shared `signal_exit`. `precise` is on for such a body, so a
+///   later guard deopts at its own pc — never rerun-from-start past the op's
+///   side effect.
+/// * A NON-safepoint op (`Eq`, `symbolp`/`integerp`/`numberp`: context-free
+///   shims that never allocate, GC or signal) sees ONLY its operands, as
+///   tagged copies without write-back, so a raw accumulator stays raw and an
+///   INLINED predicate (whose `pre_stack` is the call site's) reads the right
+///   operand.
+///
+/// No adapter-reachable arm queues a deopt or a handler dispatch (asserted):
+/// `spec` is `None` and a MIR leaf has no handlers.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn lower_mir_inst_via_baseline(
+    fb: &mut FunctionBuilder,
+    inst: &mir::MirInst,
+    op: &Op,
+    m: &mir::MirFunction,
+    cval: &mut [Option<ClifValue>],
+    cval_raw: &mut [bool],
+    cons_repl: &[Option<(mir::MirValue, mir::MirValue)>],
+    rt: &RtCtx,
+    pending: &mut Vec<PendingDeopt>,
+    signal_exit: &mut Option<Block>,
+    reloc_base: Option<ClifValue>,
+    reloc_index: &std::collections::HashMap<usize, u32>,
+    aot: bool,
+) -> Result<(), CompileError> {
+    use mir::MirOp;
+    let bail = |key: String| {
+        super::super::stats::record_mir_bail(key);
+        Err(CompileError::UnsupportedOp("mir-pure-shim-op"))
+    };
+    if !mir_opaque_enabled() {
+        return bail(format!("opaque:{}", op_variant_name(op)));
+    }
+    // A bind/unwind frame needs `has_binds` on the leaf and the native entry's
+    // bind-frame arming (`invoke_native`); the MIR leaf has neither.
+    if matches!(
+        op,
+        Op::VarBind(_)
+            | Op::Unbind(_)
+            | Op::SaveCurrentBuffer
+            | Op::SaveExcursion
+            | Op::SaveRestriction
+            | Op::UnwindProtectPop
+    ) {
+        return bail(format!("opaque-bind:{}", op_variant_name(op)));
+    }
+    // An op-symbol operand bakes a session SymId; the AOT reloc collector walks
+    // only `MirOp::Const`, so such a body is not cross-session portable.
+    if aot
+        && matches!(
+            op,
+            Op::VarRef(_)
+                | Op::VarSet(_)
+                | Op::VarBind(_)
+                | Op::CallBuiltin(..)
+                | Op::CallBuiltinSym(..)
+        )
+    {
+        return bail(format!("aot-opsym:{}", op_variant_name(op)));
+    }
+    let (needs, delta) = super::simple_effect(op)?;
+    let produces = needs as i64 + delta;
+    debug_assert!((0..=1).contains(&produces), "one result at most: {op:?}");
+    let args: Vec<mir::MirValue> = match &inst.op {
+        MirOp::Opaque { args, .. } => args.clone(),
+        MirOp::Eq(a, b) => vec![*a, *b],
+        MirOp::Pred(_, a) => vec![*a],
+        other => unreachable!("not an adapter op: {other:?}"),
+    };
+    debug_assert_eq!(
+        args.len(),
+        needs,
+        "operand count follows simple_effect: {op:?}"
+    );
+    let safepoint = matches!(inst.op, MirOp::Opaque { .. });
+    let mut stack: Vec<ClifValue> = if safepoint {
+        let base = inst.pre_stack.len();
+        if base < needs || inst.pre_stack[base - needs..] != args[..] {
+            // Only an inlined Opaque could reach here (its pre_stack is the
+            // call site's), and `callee_inlinable` admits none: a tripwire.
+            return bail("adapter:operand-mismatch".to_string());
+        }
+        let mut v = Vec::with_capacity(base);
+        for &pv in &inst.pre_stack {
+            debug_assert!(
+                cons_repl[pv.0 as usize].is_none(),
+                "no elided cons in an Opaque body's framestate"
+            );
+            v.push(mir_force_tagged(fb, cval, cval_raw, pv)?);
+        }
+        v
+    } else {
+        let mut v = Vec::with_capacity(needs);
+        for &a in &args {
+            v.push(mir_as_tagged(fb, cval, cval_raw, a)?);
+        }
+        v
+    };
+    let base_len = stack.len();
+    // Everything is tagged already, so the emitter's own retag pass is a no-op.
+    let mut stack_raw: Vec<bool> = vec![false; base_len];
+    let mut dispatch: Vec<PendingDispatch> = Vec::new();
+    let deopts_before = pending.len();
+    lower_simple_op(
+        fb,
+        inst.pc,
+        pending,
+        signal_exit,
+        &m.constants,
+        &mut stack,
+        &mut stack_raw,
+        Some(rt),
+        &[],
+        &mut dispatch,
+        None,
+        op,
+        &HashSet::new(),
+        reloc_base,
+        reloc_index,
+        aot,
+        None,
+        None,
+        0,
+        None,
+    )?;
+    debug_assert!(
+        dispatch.is_empty(),
+        "a MIR leaf has no handlers to dispatch to"
+    );
+    debug_assert_eq!(
+        pending.len(),
+        deopts_before,
+        "no adapter-reachable arm queues a deopt"
+    );
+    debug_assert_eq!(
+        stack.len() as i64,
+        base_len as i64 - needs as i64 + produces,
+        "the emitter's stack effect is simple_effect's: {op:?}"
+    );
+    let r = inst.result.0 as usize;
+    if produces == 1 {
+        cval[r] = stack.pop();
+        cval_raw[r] = false;
+        debug_assert!(!stack_raw.pop().unwrap_or(false), "results are tagged");
+    }
+    Ok(())
+}
+
 pub(crate) fn mir_deopt_block(
     fb: &mut FunctionBuilder,
     precise: bool,
@@ -2040,8 +2225,34 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
                             MP::Consp => PredKind::Consp,
                             MP::Stringp => PredKind::Stringp,
                             MP::Listp => PredKind::Listp,
-                            // Symbolp/Integerp/Numberp use shims; deferred.
-                            _ => return Err(CompileError::UnsupportedOp("mir-pure-pred")),
+                            // The symbols-with-position / bignum slow paths
+                            // are shims: the baseline's arm, via the adapter.
+                            MP::Symbolp | MP::Integerp | MP::Numberp => {
+                                let bop = match kind {
+                                    MP::Symbolp => Op::Symbolp,
+                                    MP::Integerp => Op::Integerp,
+                                    _ => Op::Numberp,
+                                };
+                                let rt = rt
+                                    .as_ref()
+                                    .ok_or(CompileError::UnsupportedOp("mir-adapter-no-rt"))?;
+                                lower_mir_inst_via_baseline(
+                                    &mut fb,
+                                    inst,
+                                    &bop,
+                                    m,
+                                    &mut cval,
+                                    &mut cval_raw,
+                                    cons_repl,
+                                    rt,
+                                    &mut pending,
+                                    &mut signal_exit,
+                                    reloc_base,
+                                    reloc_index,
+                                    aot,
+                                )?;
+                                continue;
+                            }
                         };
                         let a = mir_as_tagged(&mut fb, &cval, &cval_raw, *a)?;
                         cval[r] = Some(lower_predicate(&mut fb, k, a));
@@ -2215,24 +2426,32 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
                         cval[r] = Some(result);
                         cval_raw[r] = false;
                     }
-                    // Shim-using ops, deferred: `eq` needs the symbols-with-position
-                    // slow-path shim (vmctx) so plain tagged-bits comparison would
-                    // diverge when symbols-with-pos-enabled; other `opaque`
-                    // (VarRef/builtins/...) not yet ported.
-                    MirOp::Eq(..) => {
-                        super::super::stats::record_mir_bail("opaque:Eq".to_string());
-                        return Err(CompileError::UnsupportedOp("mir-pure-shim-op"));
-                    }
-                    MirOp::Opaque { op, .. } => {
-                        // Variant name only (`VarRef(3)` -> `VarRef`) so the
-                        // summary groups by OP, not by operand.
-                        let name = format!("{op:?}");
-                        let name = name
-                            .split(|c: char| c == '(' || c == '{' || c == ' ')
-                            .next()
-                            .unwrap_or("?");
-                        super::super::stats::record_mir_bail(format!("opaque:{name}"));
-                        return Err(CompileError::UnsupportedOp("mir-pure-shim-op"));
+                    // Every other shim-using op — `eq` (the symbols-with-
+                    // position slow path), a variable op, a builtin, a list
+                    // op — is the baseline's arm, through the adapter.
+                    MirOp::Eq(..) | MirOp::Opaque { .. } => {
+                        let bop = match &inst.op {
+                            MirOp::Opaque { op, .. } => op,
+                            _ => &Op::Eq,
+                        };
+                        let rt = rt
+                            .as_ref()
+                            .ok_or(CompileError::UnsupportedOp("mir-adapter-no-rt"))?;
+                        lower_mir_inst_via_baseline(
+                            &mut fb,
+                            inst,
+                            bop,
+                            m,
+                            &mut cval,
+                            &mut cval_raw,
+                            cons_repl,
+                            rt,
+                            &mut pending,
+                            &mut signal_exit,
+                            reloc_base,
+                            reloc_index,
+                            aot,
+                        )?;
                     }
                 }
             }

@@ -826,17 +826,19 @@ fn mir_known_boolean_keeps_its_guard() {
 }
 
 /// The other consumer of the inferred table — the GC-root skip at a call —
-/// on a loop-carried param the fixpoint proved `Fixnum`, live across an
-/// ALLOCATING residual call under GC stress:
+/// on a merge param the fixpoint proved `Fixnum`, live across an ALLOCATING
+/// residual call under GC stress:
 ///
-///     F = (let ((i 0)) (while (< i n) (g (sq i)) (setq i (1+ i))) i)
+///     F = (let ((i (if c 1 2))) (g (sq i)) i)
 ///     sq = (* x x)   [inlined, so the tier gate takes the MIR leaf]
 ///     g  = (cons y y) [a residual call: not inlinable, allocates]
 ///
-/// At `(g ..)` the residual stack is `[n i]`: `n` is an untyped argument and
-/// stays conditionally rooted; `i` is skipped by type, and debug builds trap
-/// if the skipped value's tag is not the fixnum tag. With every allocation
-/// collecting, a wrongly skipped heap value would be freed under the callee.
+/// At `(g ..)` the residual stack is `[c i]`: `c` is an untyped argument and
+/// stays conditionally rooted; `i` (a non-entry block param, a fixnum on both
+/// edges) is skipped by type, and debug builds trap if the skipped value's
+/// tag is not the fixnum tag. With every allocation collecting, a wrongly
+/// skipped heap value would be freed under the callee. (Loop-free: a loop
+/// with a shim site is gated out of the tier until it has a back-edge poll.)
 #[test]
 fn mir_rooting_skip_on_an_inferred_fixnum_param_across_an_allocating_call() {
     use crate::emacs_core::eval::Context;
@@ -880,35 +882,42 @@ fn mir_rooting_skip_on_an_inferred_fixnum_param_across_an_allocating_call() {
     });
     f.lexical = true;
     f.ops = vec![
-        Op::Constant(0),   // 0: i = 0            [n i]
-        Op::StackRef(0),   // 1: i (loop header) [n i i]
-        Op::StackRef(2),   // 2: n                [n i i n]
-        Op::Lss,           // 3                   [n i c]
-        Op::GotoIfNil(15), // 4                   [n i]
-        Op::Constant(1),   // 5: g                [n i g]
-        Op::Constant(2),   // 6: sq               [n i g sq]
-        Op::StackRef(2),   // 7: i                [n i g sq i]
-        Op::Call(1),       // 8: (sq i)           [n i g r]
-        Op::Call(1),       // 9: (g r)  residual = [n i]
-        Op::Pop,           // 10                  [n i]
-        Op::StackRef(0),   // 11: i               [n i i]
-        Op::Add1,          // 12                  [n i i+1]
-        Op::StackSet(1),   // 13: i = i+1         [n i+1]
-        Op::Goto(1),       // 14
-        Op::Return,        // 15: i
+        Op::StackRef(0),  // 0: c               [c c]
+        Op::GotoIfNil(4), // 1                  [c]
+        Op::Constant(0),  // 2: 1               [c 1]
+        Op::Goto(5),      // 3
+        Op::Constant(1),  // 4: 2               [c 2]
+        Op::Constant(2),  // 5: g  (merge: i)   [c i g]
+        Op::Constant(3),  // 6: sq              [c i g sq]
+        Op::StackRef(2),  // 7: i               [c i g sq i]
+        Op::Call(1),      // 8: (sq i)          [c i g r]
+        Op::Call(1),      // 9: (g r) residual = [c i]
+        Op::Pop,          // 10                 [c i]
+        Op::Return,       // 11: i
     ];
-    f.constants = vec![Value::make_int(0), g_sym, sq_sym].into();
+    f.constants = vec![Value::make_int(1), Value::make_int(2), g_sym, sq_sym].into();
     f.max_stack = 16;
+    let mir = mir::build_mir(&f.ops, &f.constants, 1).expect("MIR builds F");
+    let merge = mir
+        .blocks
+        .iter()
+        .find(|b| b.bytecode_pc == 5)
+        .expect("merge");
+    assert_eq!(
+        mir::infer_value_types(&mir)[merge.params[1].0 as usize],
+        mir::LispType::Fixnum,
+        "i is a fixnum on both edges"
+    );
     let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("F compiles");
     assert!(
         leaf.inline_epoch().is_some(),
         "F inlined sq -> took the MIR tier (not the baseline)"
     );
     assert!(leaf.has_side_effects, "F keeps the residual call to g");
-    for n in [0i64, 3, 50] {
-        match leaf.call(ctx as *mut u8, &[Value::make_int(n)]) {
-            NativeRun::Ok(bits) => assert_eq!(bits, Value::make_int(n).bits(), "F({n}) = {n}"),
-            other => panic!("F({n}): expected Ok({n}), got {other:?}"),
+    for (c, want) in [(Value::T, 1i64), (Value::NIL, 2)] {
+        match leaf.call(ctx as *mut u8, &[c]) {
+            NativeRun::Ok(bits) => assert_eq!(bits, Value::make_int(want).bits(), "F({c:?})"),
+            other => panic!("F({c:?}): expected Ok({want}), got {other:?}"),
         }
     }
 }
@@ -2225,26 +2234,241 @@ fn mir_pure_lowering_deopts_on_nonfixnum() {
     );
 }
 
-/// A CALL now LOWERS in the MIR tier (the calls-slice handles it via precise
-/// deopt + the generic shim) where it previously bailed to the baseline. Other
-/// shim ops (Eq) remain out of scope and still bail.
+/// A CALL LOWERS in the MIR tier (the calls-slice handles it via precise
+/// deopt + the generic shim), and so does `eq` (through the adapter, via the
+/// symbols-with-position shim) — an `eq`-only body is context-free, so it
+/// keeps rerun-from-start.
 #[test]
 fn mir_pure_lowering_handles_a_call() {
-    // (lambda () (foo)) — has a Call (opaque) -> now lowered (was a bail).
+    use crate::emacs_core::eval::Context;
+    // (lambda () (foo)) — has a Call (opaque) -> lowered.
     let ops = vec![Op::Constant(0), Op::Call(0), Op::Return];
     let mir = mir::build_mir(&ops, &[Value::symbol("foo")], 0).expect("MIR builds");
-    let leaf = lower_mir_pure(&mir).expect("a call now lowers via the calls-slice");
+    let leaf = lower_mir_pure(&mir).expect("a call lowers via the calls-slice");
     assert!(
         leaf.has_side_effects,
         "a call-bearing leaf is side-effecting (no rerun-from-start)"
     );
-    // (lambda (a b) (eq a b)) — Eq still bails (needs the symbols-with-pos shim).
+    // (lambda (a b) (eq a b)) — Eq lowers through the adapter.
     let eq_ops = vec![Op::StackRef(1), Op::StackRef(1), Op::Eq, Op::Return];
     let eq_mir = mir::build_mir(&eq_ops, &[], 2).expect("eq MIR builds");
-    assert!(matches!(
-        lower_mir_pure(&eq_mir),
-        Err(CompileError::UnsupportedOp("mir-pure-shim-op"))
-    ));
+    let eq_leaf = lower_mir_pure(&eq_mir).expect("eq lowers via the adapter");
+    assert!(
+        !eq_leaf.has_side_effects,
+        "an eq-only body has no Opaque: it still reruns from the start"
+    );
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    let sym = Value::symbol("jit-mir-eq-probe");
+    for (a, b, want) in [
+        (Value::make_int(3), Value::make_int(3), Value::T),
+        (Value::make_int(3), Value::make_int(4), Value::NIL),
+        (sym, sym, Value::T),
+        (sym, Value::NIL, Value::NIL),
+    ] {
+        match eq_leaf.call(ctx, &[a, b]) {
+            NativeRun::Ok(bits) => assert_eq!(bits, want.bits(), "(eq {a:?} {b:?})"),
+            other => panic!("(eq {a:?} {b:?}): {other:?}"),
+        }
+    }
+}
+
+/// The adapter: a variable read stays in the MIR tier, through the baseline's
+/// `VarRef` arm — a bound special reads its value, an unbound one signals
+/// `void-variable` through the shared signal exit, and the body is precise
+/// (side-effecting) like any shim-bearing body.
+#[test]
+fn mir_adapter_lowers_a_variable_read() {
+    use crate::emacs_core::error::Flow;
+    use crate::emacs_core::eval::Context;
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    let sym = Value::symbol("jit-mir-adapter-var");
+    let ops = vec![Op::VarRef(0), Op::Return];
+    let mir = mir::build_mir(&ops, &[sym], 0).expect("MIR builds");
+    let leaf = lower_mir_pure(&mir).expect("VarRef lowers via the adapter");
+    assert!(leaf.has_side_effects, "an Opaque body is precise");
+    assert_eq!(leaf.call(ctx, &[]), NativeRun::Signal, "unbound: signals");
+    match take_pending_flow().expect("the signal is stashed") {
+        Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "void-variable"),
+        other => panic!("expected void-variable, got {other:?}"),
+    }
+    ev.eval_str("(setq jit-mir-adapter-var 41)").expect("bind");
+    match leaf.call(ctx, &[]) {
+        NativeRun::Ok(bits) => assert_eq!(bits, Value::make_int(41).bits()),
+        other => panic!("bound read: {other:?}"),
+    }
+}
+
+/// A precise deopt AFTER a side-effecting Opaque resumes the interpreter past
+/// it: `(setq special 7)` then `(1+ x)` — every guard fails under the forced-
+/// deopt harness, and the resume must land at the `1+` (the assignment done
+/// once), never rerun from the start.
+#[test]
+fn mir_adapter_deopt_after_a_varset_resumes_past_it() {
+    use crate::emacs_core::eval::Context;
+    // The harness reads the knob once per process; nextest runs each test in
+    // its own process, so set it before the first compile.
+    // SAFETY: single-threaded test process, set before any reader.
+    unsafe { std::env::set_var("NEOVM_JIT_FORCE_DEOPT", "1") };
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    let sym = Value::symbol("jit-mir-adapter-set");
+    ev.eval_str("(setq jit-mir-adapter-set 0)").expect("init");
+    // (lambda (x) (setq special 7) (1+ x)):
+    //  0 Constant(0)=7; 1 VarSet(1); 2 StackRef(0); 3 Add1; 4 Return
+    let ops = vec![
+        Op::Constant(0),
+        Op::VarSet(1),
+        Op::StackRef(0),
+        Op::Add1,
+        Op::Return,
+    ];
+    let mir = mir::build_mir(&ops, &[Value::make_int(7), sym], 1).expect("MIR builds");
+    let leaf = lower_mir_pure(&mir).expect("VarSet lowers via the adapter");
+    match leaf.call(ctx, &[Value::make_int(5)]) {
+        NativeRun::DeoptAt(resume) => {
+            assert_eq!(resume.pc, 3, "resume AT the 1+, after the assignment");
+            assert_eq!(
+                resume.stack.iter().map(|v| v.bits()).collect::<Vec<_>>(),
+                vec![Value::make_int(5).bits(), Value::make_int(5).bits()],
+                "the framestate before the 1+: [x x]"
+            );
+        }
+        other => panic!("expected a precise deopt at the 1+, got {other:?}"),
+    }
+    let v = ev.eval_str("jit-mir-adapter-set").expect("read");
+    assert_eq!(
+        v.bits(),
+        Value::make_int(7).bits(),
+        "the assignment ran once"
+    );
+}
+
+/// The call-args scratch slot is sized to the widest operand set any Opaque
+/// marshals, not to Call/Apply arity: a `List(5)` in a call-free body used to
+/// store five words into a one-word slot.
+#[test]
+fn mir_adapter_sizes_the_args_slot_for_a_wide_list() {
+    use crate::emacs_core::eval::Context;
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    let ops = vec![
+        Op::StackRef(0),
+        Op::StackRef(1),
+        Op::StackRef(2),
+        Op::StackRef(3),
+        Op::StackRef(4),
+        Op::List(5),
+        Op::Return,
+    ];
+    let mir = mir::build_mir(&ops, &[], 1).expect("MIR builds");
+    assert_eq!(super::lowering::plan_mir_leaf(&mir).max_call_args, 5);
+    let leaf = lower_mir_pure(&mir).expect("List lowers via the adapter");
+    let NativeRun::Ok(bits) = leaf.call(ctx, &[Value::make_int(9)]) else {
+        panic!("(list a a a a a) must run natively");
+    };
+    let mut l = Value::from_bits(bits);
+    for _ in 0..5 {
+        assert!(l.is_cons(), "a 5-list");
+        assert_eq!(l.cons_car().bits(), Value::make_int(9).bits());
+        l = l.cons_cdr();
+    }
+    assert!(l.is_nil());
+}
+
+/// No cons scalar replacement in an Opaque-bearing body: the framestate and
+/// the residual roots must hold REAL values. `(let ((p (cons (list a) b)))
+/// (length b) (car p))` keeps `p` live across the `length` shim, and under GC
+/// stress the fresh list must survive it.
+#[test]
+fn mir_adapter_keeps_conses_real_across_a_shim() {
+    use crate::emacs_core::eval::Context;
+    let mut ev = Context::new();
+    ev.gc_stress = true;
+    let ctx = &mut ev as *mut Context as *mut u8;
+    // (lambda (a b)): 0 StackRef(1)=a; 1 List(1); 2 StackRef(1)=b; 3 Cons;
+    //  4 StackRef(1)=b; 5 Length; 6 Pop; 7 Car; 8 Return
+    let ops = vec![
+        Op::StackRef(1),
+        Op::List(1),
+        Op::StackRef(1),
+        Op::Cons,
+        Op::StackRef(1),
+        Op::Length,
+        Op::Pop,
+        Op::Car,
+        Op::Return,
+    ];
+    let mir = mir::build_mir(&ops, &[], 2).expect("MIR builds");
+    let plan = super::lowering::plan_mir_leaf(&mir);
+    assert!(plan.has_opaque && plan.precise);
+    assert!(
+        plan.cons_repl.iter().all(|c| c.is_none()),
+        "no elided cons in an Opaque body"
+    );
+    let leaf = lower_mir_pure(&mir).expect("lowers via the adapter");
+    let b = ev.eval_str("(list 1 2 3)").expect("b");
+    let NativeRun::Ok(bits) = leaf.call(ctx, &[Value::make_int(42), b]) else {
+        panic!("must run natively");
+    };
+    let l = Value::from_bits(bits);
+    assert!(
+        l.is_cons() && l.cons_car().bits() == Value::make_int(42).bits() && l.cons_cdr().is_nil()
+    );
+}
+
+/// An INLINED predicate reads its own operand, not the call site's stack
+/// tail: `(defun f (a b) (integerp a))` inlined at `(f s 5)` answers by `s`.
+/// Through the production compile path (the inliner + the tier gate).
+#[test]
+fn mir_adapter_inlined_predicate_reads_its_own_operand() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::intern::SymId;
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    let f_sym = Value::symbol("jit-mir-adapter-f");
+    let crate::emacs_core::value::ValueKind::Symbol(f_id) = f_sym.kind() else {
+        panic!("symbol");
+    };
+    let mut f = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(1), SymId(2)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    f.lexical = true;
+    f.ops = vec![Op::StackRef(1), Op::Integerp, Op::Return];
+    f.max_stack = 16;
+    ev.obarray
+        .set_symbol_function_id(f_id, Value::make_bytecode(f));
+    let mut g = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(3)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    g.lexical = true;
+    // (lambda (s) (f s 5))
+    g.ops = vec![
+        Op::Constant(0),
+        Op::StackRef(1),
+        Op::Constant(1),
+        Op::Call(2),
+        Op::Return,
+    ];
+    g.constants = vec![f_sym, Value::make_int(5)].into();
+    g.max_stack = 16;
+    let leaf = compile_bytecode_function_with(&g, Some(&ev.obarray)).expect("g compiles");
+    assert!(leaf.inline_epoch().is_some(), "f was inlined -> MIR tier");
+    for (arg, want) in [
+        (Value::symbol("jit-mir-not-an-int"), Value::NIL),
+        (Value::make_int(3), Value::T),
+        (Value::make_float(2.5), Value::NIL),
+    ] {
+        match leaf.call(ctx, &[arg]) {
+            NativeRun::Ok(bits) => assert_eq!(bits, want.bits(), "(integerp {arg:?})"),
+            other => panic!("(f {arg:?} 5): {other:?}"),
+        }
+    }
 }
 
 #[test]
