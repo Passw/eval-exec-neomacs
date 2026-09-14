@@ -7624,6 +7624,25 @@ pub(crate) fn builtin_window_resize_apply_total(
     // Ensure root + minibuffer fit in frame after total resize.
     frame.recalculate_minibuffer_bounds();
 
+    // GNU finishes by placing the minibuffer's CHARACTER row directly below
+    // the root, by summing the root's two fields (`src/window.c:5030`):
+    //
+    //     m->top_line = r->top_line + r->total_lines;
+    //
+    // This is where that sum belongs -- it is a resize-time assignment, one of
+    // only three sites in GNU, not an invariant re-established on every tree
+    // mutation.  It runs last because `recalculate_minibuffer_bounds` derives
+    // the row from the minibuffer's pixel origin, which is the right answer
+    // everywhere except right here, where the root's character row has just
+    // been moved to the frame's top margin while its pixel origin stayed put.
+    if !horflag && frame.minibuffer_window.is_some() {
+        let root_top_line = frame.root_window().top_line();
+        let root_total_lines = (frame.root_window().bounds().height / ch.max(1.0)).round() as i64;
+        if let Some(mb) = frame.minibuffer_leaf.as_mut() {
+            mb.set_top_line(root_top_line + root_total_lines);
+        }
+    }
+
     Ok(Value::T)
 }
 

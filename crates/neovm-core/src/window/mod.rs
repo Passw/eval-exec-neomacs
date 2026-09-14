@@ -4349,28 +4349,24 @@ impl Frame {
 
     pub fn reposition_minibuffer_below_root(&mut self) {
         let root_bounds = *self.root_window().bounds();
-        // GNU `resize_frame_windows` / `Fwindow_resize_apply_total` place the
-        // minibuffer's character-line edge directly below the root by SUMMING
-        // the root's two fields:
+        // The minibuffer's character row follows its PIXEL row here.
         //
-        //     m->top_line = r->top_line + r->total_lines;
+        // GNU's `m->top_line = r->top_line + r->total_lines` is NOT this
+        // function's job: GNU applies that sum in exactly three places --
+        // `Fwindow_resize_apply_total` (`src/window.c:5030`),
+        // `resize_frame_windows` (`:5131`) and `resize_mini_window_apply`
+        // (`:5874`) -- and nowhere else.  It is a resize-time assignment, not
+        // an invariant maintained on every tree mutation.
         //
-        // (`src/window.c:5030`, `:5131`, `:5874`.)  This used to convert the
-        // root's PIXEL bottom instead, on the reasoning that realizing the top
-        // margin adds a line to `top_line` while removing one from
-        // `total_lines`, so the two agree.  It does not: the menu-bar row has
-        // no pixel height in batch, so realizing the margin moves the root's
-        // `top_line` to 1 and leaves its 24 total lines alone.  GNU's sum is
-        // then 25 and the pixel conversion yields 24 -- the minibuffer keeping
-        // the row it had before the split, overlapping the root's last line.
-        //
-        // The two agree only while the root's `top_line` is 0, which is why
-        // this held until something realized the margin.  Take GNU's sum.
+        // Putting the sum here instead was measurably wrong: this runs after
+        // every split and delete, and GNU leaves the minibuffer's row alone
+        // across those.  Creating a side window moves GNU's root to `top_line`
+        // 1 while its minibuffer stays at 24, so a sum applied here reported
+        // 25 where GNU says 24.  `builtin_window_resize_apply_total` carries
+        // the sum, as GNU does.
         let root_left_col = self.root_window().left_col();
-        let root_top_line = self.root_window().top_line();
         let char_h = self.char_height.max(1.0);
-        let root_total_lines = (root_bounds.height / char_h).round() as i64;
-        let mini_top_line = root_top_line + root_total_lines;
+        let mini_top_line = ((root_bounds.y + root_bounds.height) / char_h).round() as i64;
         if let Some(mini) = self.minibuffer_leaf.as_mut() {
             // The minibuffer keeps its own height.  This used to also clamp it
             // to what was left of the frame below the root, which reads as a
@@ -6492,19 +6488,19 @@ impl FrameManager {
             attachment,
         )?;
 
-        // Character edges follow the pixels the split just assigned.
+        // Character edges are NOT re-derived here, and that is deliberate.
         //
-        // NOT `sync_window_area_bounds`: that recomputes the root's BOUNDS from
-        // the frame's text area, which realizes the top margin and pulls
-        // side-window leaves down a line in batch.  This leaves every rectangle
-        // alone and only re-derives `top_line`/`left_col` from the pixel
-        // offsets, keeping the root's own values as they were -- so a window
-        // spliced in beside its sibling stops reporting the character row the
-        // sibling has.
-        let (char_width, char_height) = (frame.char_width, frame.char_height);
-        let root = frame.tree().root_id();
-        sync_window_character_edges_from_bounds(frame.tree_mut(), root, char_width, char_height);
-
+        // GNU assigns them at resize-apply points -- `Fwindow_resize_apply_total`
+        // sets `r->top_line = FRAME_TOP_MARGIN (f)` and the recursive pass flows
+        // rows to children (`src/window.c:5020`) -- rather than maintaining them
+        // as an invariant over the pixel bounds.  They are therefore legitimately
+        // path-dependent in GNU: with two side windows GNU reports the ROOT at
+        // character row 1 and its CHILD at row 0, both with pixel top 0.
+        //
+        // Syncing here looks more coherent and is measurably wrong: it pulls
+        // side-window leaves down a line, which is what the earlier warning
+        // about `sync_window_area_bounds` was describing, and a
+        // character-edge-only sync does it just the same.
         frame.recalculate_minibuffer_bounds();
         self.mark_window_topology_changed();
         Some(new_id)
@@ -6595,19 +6591,11 @@ impl FrameManager {
             self.deleted_windows.insert(window_id, deletion_record);
             self.deleted_window_parameters
                 .insert(window_id, deleted_parameters.unwrap_or_default());
-            // Character edges follow the pixels the deletion left behind, the
-            // same way the split path re-derives them: a survivor that moved
-            // up into the freed space otherwise keeps the character row it had
-            // while the deleted window was still above it, which reads back as
-            // a gap in the frame even though the rectangles tile exactly.
-            let (char_width, char_height) = (frame.char_width, frame.char_height);
-            let root = frame.tree().root_id();
-            sync_window_character_edges_from_bounds(
-                frame.tree_mut(),
-                root,
-                char_width,
-                char_height,
-            );
+            // No character-edge resync here either; see the note in
+            // `split_window_with_combination_limit`.  GNU assigns those rows at
+            // resize-apply points, so a survivor keeps its old row until
+            // `window-resize-apply-total` runs -- which is what `window.el`
+            // does on the paths GNU allows into this code at all.
             frame.recalculate_minibuffer_bounds();
         }
 
