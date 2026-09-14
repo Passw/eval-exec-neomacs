@@ -905,6 +905,53 @@ fn buffer_local_variables_include_default_entries() {
     assert_eq!(results[2], "OK (buffer-read-only)");
 }
 
+/// A killed buffer still answers `buffer-local-variables`, with its locals
+/// RESET -- it does not signal.
+///
+/// GNU's `Fbuffer_local_variables` decodes through `decode_buffer`
+/// (`src/buffer.h`), which does `CHECK_BUFFER` and nothing more: nothing in
+/// that path rejects a killed buffer.  `Fkill_buffer` has already run
+/// `reset_buffer_local_variables (b, 1)` and `bset_name (b, Qnil)`, so what
+/// remains to report is the built-in per-buffer slots at their defaults.
+///
+/// Measured on GNU Emacs 31.0.50, `emacs -Q --batch`, for a buffer killed
+/// after `(setq-local victim-var 42)` and `(setq-local major-mode 'text-mode)`:
+///
+///     (length (buffer-local-variables DEAD))            => 19
+///     (assq 'victim-var (buffer-local-variables DEAD))  => nil   ; reset
+///     (cdr (assq 'major-mode ...))                      => fundamental-mode
+///
+/// and that alist is EQUAL, keys and values, to a freshly created buffer's --
+/// which is what makes "report the defaults" the specified answer here rather
+/// than a stand-in for one.  neomacs deletes the buffer on kill, so the lookup
+/// found nothing and signalled `error "No such live buffer"`.
+///
+/// Returning nil instead would be the wrong repair: GNU's answer is a
+/// non-empty alist, and nil would turn a loud divergence into a quiet one.
+#[test]
+fn buffer_local_variables_answers_for_a_killed_buffer_like_gnu() {
+    crate::test_utils::init_test_tracing();
+    let results = eval_all(
+        // `with-current-buffer' and `setq-local' are `subr.el' macros, which
+        // this bare harness is deliberately below; the subrs they expand to
+        // say the same thing.
+        r#"(progn
+             (setq victim (get-buffer-create "victim-buf"))
+             (set-buffer victim)
+             (make-local-variable 'victim-var)
+             (set 'victim-var 42)
+             (set 'major-mode 'text-mode)
+             (kill-buffer victim)
+             (let ((dead (buffer-local-variables victim))
+                   (fresh (buffer-local-variables (get-buffer-create "fresh-buf"))))
+               (list (listp dead)
+                     (null (assq 'victim-var dead))
+                     (cdr (assq 'major-mode dead))
+                     (= (length dead) (length fresh)))))"#,
+    );
+    assert_eq!(results[0], "OK (t t fundamental-mode t)");
+}
+
 #[test]
 fn buffer_local_variables_argument_validation() {
     crate::test_utils::init_test_tracing();

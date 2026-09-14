@@ -331,10 +331,34 @@ pub(crate) fn builtin_buffer_local_variables(
         }
     };
 
-    let buf = ctx
-        .buffers
-        .get(id)
-        .ok_or_else(|| signal("error", vec![Value::string("No such live buffer")]))?;
+    // GNU's `Fbuffer_local_variables` decodes through `decode_buffer`
+    // (`src/buffer.h`), which does `CHECK_BUFFER` and nothing else -- nothing
+    // in that path rejects a KILLED buffer, and `Fkill_buffer` has already run
+    // `reset_buffer_local_variables (b, 1)` before `bset_name (b, Qnil)`.  So
+    // a killed buffer reports its built-in per-buffer slots at their defaults,
+    // an alist measurably EQUAL (keys and values) to a freshly created
+    // buffer's -- GNU 31.0.50, `emacs -Q --batch`, 19 entries either way.
+    //
+    // neomacs drops the buffer on kill, so there is no struct left to read
+    // those defaults off.  Build them from a default buffer rather than
+    // restating the slot list here: one code path produces the live answer and
+    // the dead one, so the two cannot drift.
+    //
+    // Returning nil would be the wrong repair.  GNU's answer is a non-empty
+    // alist; nil would convert a loud divergence into a quiet one.
+    let killed_buffer_defaults;
+    let buf = match ctx.buffers.get(id) {
+        Some(buf) => buf,
+        None => {
+            // The name is not part of the answer -- `buffer-local-variables`
+            // reports slots, and none of GNU's 19 entries is name-derived --
+            // and GNU's killed buffer carries `name` nil regardless; the
+            // constructor requires a string, so the empty one stands in for a
+            // field this value is never read for.
+            killed_buffer_defaults = crate::buffer::Buffer::new_standalone(id, Value::string(""));
+            &killed_buffer_defaults
+        }
+    };
 
     // Build in GNU prepend order: start with slots (forward iter,
     // appended to a Vec, later reversed), then alist (same pattern).
