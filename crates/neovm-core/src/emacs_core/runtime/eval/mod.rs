@@ -7867,6 +7867,11 @@ mod jit_crash_repro_tests;
 #[path = "tests/jit_leaf_slot.rs"]
 mod jit_leaf_slot_tests;
 
+// Baseline known-fixnum analysis must honour Float feedback (silent-miscompile regression).
+#[cfg(test)]
+#[path = "tests/jit_known_fixnum_float.rs"]
+mod jit_known_fixnum_float_tests;
+
 /// Allocator for [`Context::context_instance_id`].
 fn next_context_instance_id() -> u64 {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);

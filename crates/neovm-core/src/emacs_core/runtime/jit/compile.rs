@@ -2294,7 +2294,12 @@ pub(crate) fn analyze_cfg(
 /// precisely, so the caller bails the whole function (conservative — no guard is
 /// elided). Fixnum constants and fixnum arithmetic results are `true`;
 /// StackRef/Dup/StackSet/DiscardN move bits; everything else is `false`.
-fn apply_known_fixnum_op(op: &Op, constants: &[Value], k: &mut Vec<bool>) -> Result<(), ()> {
+fn apply_known_fixnum_op(
+    pc: usize,
+    op: &Op,
+    constants: &[Value],
+    k: &mut Vec<bool>,
+) -> Result<(), ()> {
     match op {
         Op::Constant(idx) => {
             let is_fix = constants
@@ -2337,8 +2342,25 @@ fn apply_known_fixnum_op(op: &Op, constants: &[Value], k: &mut Vec<bool>) -> Res
                 k.truncate(keep);
             }
         }
-        // Fixnum arithmetic: the result is range-checked + retagged -> fixnum.
-        Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Rem | Op::Max | Op::Min => {
+        // `+ - * /` have a FLOAT lowering (lowering.rs `Op::Add | Op::Sub |
+        // Op::Mul | Op::Div`): at a site whose `NumericFeedback` is `Float`
+        // the result is a BOXED FLOAT, not a fixnum. This analysis was
+        // feedback-blind and labelled every arithmetic result a known fixnum,
+        // so a float that crossed a block edge into a `1+` reached
+        // `stack_as_raw` with its `guard_fixnum` ELIDED and was `sshr`'d as a
+        // pointer — a silent wrong value (`(1+ 203.0)` -> 35184269711586),
+        // live since the float lowering landed. Read the same snapshot the
+        // lowering reads: only a non-Float site yields a fixnum here.
+        // `FixnumOnly` and `Other` sites still guard both operands and
+        // range-check, so their result IS a fixnum (or deopts).
+        Op::Add | Op::Sub | Op::Mul | Op::Div => {
+            k.pop().ok_or(())?;
+            k.pop().ok_or(())?;
+            k.push(active_numeric_feedback(pc) != crate::emacs_core::jit::NumericFeedback::Float);
+        }
+        // No float lowering: `guard_fixnum` on both operands, range-checked,
+        // retagged -> fixnum.
+        Op::Rem | Op::Max | Op::Min => {
             k.pop().ok_or(())?;
             k.pop().ok_or(())?;
             k.push(true);
@@ -2465,7 +2487,7 @@ fn compute_known_fixnum_slots(
             let end = next_leader(l);
             let mut edges: Vec<(usize, Vec<bool>)> = Vec::new();
             let mut terminated = false;
-            for op in &ops[l..end] {
+            for (off, op) in ops[l..end].iter().enumerate() {
                 match op {
                     Op::Return | Op::Throw => {
                         terminated = true;
@@ -2497,7 +2519,7 @@ fn compute_known_fixnum_slots(
                         break;
                     }
                     other => {
-                        if apply_known_fixnum_op(other, constants, &mut k).is_err() {
+                        if apply_known_fixnum_op(l + off, other, constants, &mut k).is_err() {
                             // Unmodeled op (Switch / handler / ...): bail entirely.
                             return empty;
                         }
