@@ -1197,6 +1197,95 @@ pub(crate) fn raw_fixnum_maxmin(
     fb.ins().select(cond, av, bv)
 }
 
+/// What a MIR leaf needs from the lowering, decided once from the MIR and
+/// shared by the JIT wrapper ([`lower_mir_pure`]), the AOT wrapper
+/// (`aot::define_leaf_into_module`) and the tier gate — one set of facts, so
+/// the descriptor a `.so` carries, the deopt buffers a leaf is given and the
+/// code emitted for it can never disagree.
+pub(crate) struct MirLeafPlan {
+    /// Any [`mir::MirOp::Opaque`] — an op lowered through the baseline's
+    /// shim-calling emitters (a call, a variable op, a builtin, ...).
+    pub(crate) has_opaque: bool,
+    /// An `Opaque` `Call`/`Apply`/`CallBuiltinSym`: a generic call the
+    /// baseline lowers BETTER (speculated native-to-native, CBSym intrinsics).
+    pub(crate) has_generic_call: bool,
+    /// Any op that goes through a runtime shim: an `Opaque`, an `Eq` (the
+    /// symbols-with-position slow path), a `symbolp`/`integerp`/`numberp`.
+    pub(crate) has_adapter_site: bool,
+    /// A loop (an edge to a block at or before its source).
+    pub(crate) has_backedge: bool,
+    /// Every guard deopts PRECISELY (`STATUS_DEOPT_AT`), never rerun-from-
+    /// start: the baseline's own rule for any body with a status-shim site.
+    /// `= has_opaque` — an `Eq`/predicate shim is context-free and never
+    /// signals, so a body with only those still reruns from the start.
+    pub(crate) precise: bool,
+    /// The body needs vmctx + the shim scaffolding (`RtCtx`).
+    pub(crate) needs_rt: bool,
+    /// Cons scalar replacement (`cons_scalar_repl_targets`): all-`None` in
+    /// any `Opaque`-bearing body, whose framestates and residual roots must
+    /// hold real values.
+    pub(crate) cons_repl: Vec<Option<(mir::MirValue, mir::MirValue)>>,
+    /// Words the call-args scratch slot must hold: the widest operand set any
+    /// `Opaque` marshals (the baseline's arms store `needs` words at `i*8`).
+    pub(crate) max_call_args: usize,
+    /// The deepest pre-op operand stack: the precise-deopt spill size.
+    pub(crate) max_depth: usize,
+}
+
+/// Decide a MIR leaf's [`MirLeafPlan`].
+pub(crate) fn plan_mir_leaf(m: &mir::MirFunction) -> MirLeafPlan {
+    use mir::{MirOp, PredKind as MP};
+    let insts = || m.blocks.iter().flat_map(|b| b.insts.iter());
+    let has_opaque = insts().any(|i| matches!(i.op, MirOp::Opaque { .. }));
+    let has_generic_call = insts().any(|i| {
+        matches!(
+            &i.op,
+            MirOp::Opaque {
+                op: Op::Call(_) | Op::Apply(_) | Op::CallBuiltinSym(..),
+                ..
+            }
+        )
+    });
+    let has_adapter_site = insts().any(|i| {
+        matches!(
+            i.op,
+            MirOp::Opaque { .. }
+                | MirOp::Eq(..)
+                | MirOp::Pred(MP::Symbolp | MP::Integerp | MP::Numberp, _)
+        )
+    });
+    let has_backedge = m.blocks.iter().any(|b| {
+        mir::successor_edges(&b.term)
+            .any(|(t, _)| m.blocks[t.0 as usize].bytecode_pc <= b.bytecode_pc)
+    });
+    let cons_repl = if has_opaque {
+        vec![None; m.value_types.len()]
+    } else {
+        mir::cons_scalar_repl_targets(m)
+    };
+    let has_escaping_cons = insts()
+        .any(|i| matches!(i.op, MirOp::Cons(..)) && cons_repl[i.result.0 as usize].is_none());
+    let max_call_args = insts()
+        .filter_map(|i| match &i.op {
+            MirOp::Opaque { op, .. } => super::simple_effect(op).ok().map(|(needs, _)| needs),
+            _ => None,
+        })
+        .max()
+        .unwrap_or(0);
+    let max_depth = insts().map(|i| i.pre_stack.len()).max().unwrap_or(0);
+    MirLeafPlan {
+        has_opaque,
+        has_generic_call,
+        has_adapter_site,
+        has_backedge,
+        precise: has_opaque,
+        needs_rt: has_adapter_site || has_escaping_cons,
+        cons_repl,
+        max_call_args,
+        max_depth,
+    }
+}
+
 /// **MIR Tier-2 lowering.** Lower a [`mir::MirFunction`] to a [`CompiledLeaf`] by
 /// driving CLIF emission from the MIR instead of a bytecode walk. Wired into
 /// `compile_bytecode_function_inner` as the live optimizing tier. A *pure* body
@@ -1213,40 +1302,14 @@ pub(crate) fn raw_fixnum_maxmin(
 pub(crate) fn lower_mir_pure(m: &mir::MirFunction) -> Result<CompiledLeaf, CompileError> {
     use mir::MirOp;
 
-    // The MIR tier handles a CALL (MirOp::Opaque{Call/Apply}) via PRECISE deopt:
-    // such a body threads vmctx + the runtime shims and routes EVERY guard to a
-    // per-site STATUS_DEOPT_AT (all-precise — a call-bearing body must never
-    // rerun-from-start, which would re-execute the call's side effect).
-    let has_call = m.blocks.iter().any(|b| {
-        b.insts.iter().any(|i| {
-            matches!(
-                &i.op,
-                MirOp::Opaque {
-                    op: Op::Call(_) | Op::Apply(_),
-                    ..
-                }
-            )
-        })
-    });
-
-    // Escape analysis (hoisted — depends only on `m`). A NON-escaping cons is elided
-    // (scalar-replaced, no allocation); an ESCAPING cons is heap-allocated via the
-    // neovm_jit_cons shim so the body stays in the MIR tier. Both the calls-slice and
-    // cons allocation need the runtime scaffolding (needs_rt: vmctx + shims), but a
-    // cons allocation is a GC SAFEPOINT, NOT an observable side effect — so it does
-    // NOT force precise deopt. precise (+ has_side_effects) stay = has_call:
-    // rerun-from-start re-allocates a fresh (never-escaped) cons, which is sound.
-    let cons_repl: Vec<Option<(mir::MirValue, mir::MirValue)>> = if has_call {
-        vec![None; m.value_types.len()]
-    } else {
-        mir::cons_scalar_repl_targets(m)
-    };
-    let has_escaping_cons = m
-        .blocks
-        .iter()
-        .flat_map(|b| b.insts.iter())
-        .any(|i| matches!(&i.op, MirOp::Cons(..)) && cons_repl[i.result.0 as usize].is_none());
-    let needs_rt = has_call || has_escaping_cons;
+    // A body with a shim-lowered op (`MirLeafPlan::has_opaque`) threads vmctx +
+    // the runtime shims and routes EVERY guard to a per-site STATUS_DEOPT_AT
+    // (all-precise — it must never rerun-from-start, which would re-execute the
+    // op's side effect). A NON-escaping cons is elided (scalar-replaced, no
+    // allocation); an ESCAPING cons is heap-allocated via the neovm_jit_cons
+    // shim — a GC SAFEPOINT, NOT an observable side effect, so it does not
+    // force precise deopt: rerun-from-start re-allocates a fresh cons.
+    let plan = plan_mir_leaf(m);
 
     // --- JIT-only module prologue (the wrapper). ----------------------------
     // The three ObjectModule-incompatible seams that stay here (and out of the
@@ -1255,7 +1318,7 @@ pub(crate) fn lower_mir_pure(m: &mir::MirFunction) -> Result<CompiledLeaf, Compi
     // `JITModule::new` (AOT: `ObjectModule::new`); `finalize_definitions` +
     // `get_finalized_function` below (AOT: `ObjectModule::finish()` + `dlsym`).
     let mut builder = JITBuilder::with_isa(jit_isa()?, default_libcall_names());
-    if needs_rt {
+    if plan.needs_rt {
         // The shims the calls-slice + cons allocation reference; declare_rt_refs
         // declares the full import set but Cranelift resolves only referenced ones.
         // Every shim, from the one table (see `super::shims::JIT_SHIM_TABLE`).
@@ -1266,15 +1329,10 @@ pub(crate) fn lower_mir_pure(m: &mir::MirFunction) -> Result<CompiledLeaf, Compi
     // Precise-deopt spill buffer + cells, sized to the deepest pre-op operand stack
     // (the framestate a post-call guard spills). Empty/inert for pure bodies (which
     // keep the rerun-from-start STATUS_DEOPT path).
-    let max_depth = m
-        .blocks
-        .iter()
-        .flat_map(|b| b.insts.iter())
-        .map(|i| i.pre_stack.len())
-        .max()
-        .unwrap_or(0);
-    let deopt_spill: Box<[core::cell::Cell<i64>]> = if has_call {
-        (0..max_depth).map(|_| core::cell::Cell::new(0)).collect()
+    let deopt_spill: Box<[core::cell::Cell<i64>]> = if plan.precise {
+        (0..plan.max_depth)
+            .map(|_| core::cell::Cell::new(0))
+            .collect()
     } else {
         Box::from([])
     };
@@ -1319,9 +1377,7 @@ pub(crate) fn lower_mir_pure(m: &mir::MirFunction) -> Result<CompiledLeaf, Compi
         &deopt_meta,
         &reloc_data,
         &reloc_index,
-        has_call,
-        &cons_repl,
-        needs_rt,
+        &plan,
         "__neovm_mir_leaf",
         Linkage::Local,
         /*aot=*/ false,
@@ -1347,9 +1403,9 @@ pub(crate) fn lower_mir_pure(m: &mir::MirFunction) -> Result<CompiledLeaf, Compi
         has_handlers: false,
         // Set by compile_bytecode_function_inner after a successful inline pass.
         inline_epoch: None,
-        // A call-bearing body runs a side effect ahead of its (precise) deopts, so
+        // A shim-bearing body runs a side effect ahead of its (precise) deopts, so
         // it must never rerun-from-start (the refuse-to-rerun guard).
-        has_side_effects: has_call,
+        has_side_effects: plan.precise,
         // Baseline default; compile_bytecode_function_inner overrides with the
         // actual inlined-callee SymIds after the inline pass.
         inline_deps: Box::from([]),
@@ -1590,9 +1646,7 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
     deopt_meta: &DeoptCells,
     reloc_data: &[Value],
     reloc_index: &std::collections::HashMap<usize, u32>,
-    has_call: bool,
-    cons_repl: &[Option<(mir::MirValue, mir::MirValue)>],
-    needs_rt: bool,
+    plan: &MirLeafPlan,
     entry_name: &str,
     entry_linkage: Linkage,
     // R1c-sidecar: false → JIT (bases baked as `iconst` from the passed-in buffer
@@ -1658,28 +1712,15 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
         // Runtime context for calls (vmctx + shims + arg/result slots), built only
         // when the body has a call. declare_rt_refs declares the full import set;
         // only the referenced shims (call/apply/gc_*) are resolved at finalize.
-        let rt = if needs_rt {
+        let rt = if plan.needs_rt {
             // `module` is already `&mut M`; reborrow it for the call. The MIR
             // tier never emits subr-speculated or CBSym-intrinsic calls
             // (subr_spec=false, cbsym_spec=false).
             let refs = declare_rt_refs(&mut *module, fb.func, call_conv, ptr_ty, false, false)?;
             let vmctx_var = fb.declare_var(ptr_ty);
-            let max_call_args = m
-                .blocks
-                .iter()
-                .flat_map(|b| b.insts.iter())
-                .filter_map(|i| match &i.op {
-                    MirOp::Opaque {
-                        op: Op::Call(n) | Op::Apply(n),
-                        ..
-                    } => Some(*n as usize),
-                    _ => None,
-                })
-                .max()
-                .unwrap_or(0);
             let call_args_slot = fb.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
-                (max_call_args.max(1) * 8) as u32,
+                (plan.max_call_args.max(1) * 8) as u32,
                 3,
             ));
             let call_result_slot =
@@ -1720,10 +1761,15 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
         let meta_pc_addr = &deopt_meta.pc as *const core::cell::Cell<i64> as i64;
         let meta_depth_addr = &deopt_meta.depth as *const core::cell::Cell<i64> as i64;
         let meta_handlers_addr = &deopt_meta.handlers as *const core::cell::Cell<i64> as i64;
-        // ALL-PRECISE deopt for call-bearing bodies (see mir_deopt_block): never
-        // rerun-from-start after a call. Pure bodies keep the shared rerun block.
-        let precise = has_call;
-        // (cons_repl + needs_rt computed by the wrapper, threaded in as params.)
+        // ALL-PRECISE deopt for shim-bearing bodies (see mir_deopt_block): never
+        // rerun-from-start after a side effect. Pure bodies keep the shared
+        // rerun block.
+        let precise = plan.precise;
+        debug_assert!(
+            !precise || deopt_spill.len() >= plan.max_depth,
+            "the precise-deopt spill buffer holds the deepest framestate"
+        );
+        let cons_repl = &plan.cons_repl;
         let mut pending: Vec<PendingDeopt> = Vec::new();
         // Shared signal-propagation block (returns STATUS_SIGNAL), created lazily by
         // the first call lowering.

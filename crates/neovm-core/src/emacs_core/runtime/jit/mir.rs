@@ -302,6 +302,11 @@ pub struct MirFunction {
     pub value_types: Vec<LispType>,
     /// Map from a bytecode leader index to its [`MirBlockId`].
     pub block_for: HashMap<usize, MirBlockId>,
+    /// The body's constant pool: an [`MirOp::Opaque`] keeps its bytecode `op`
+    /// verbatim, and a `VarRef(idx)`/`CallBuiltinSym(idx, ..)` indexes THIS
+    /// pool when the baseline's emitter lowers it. (An inlined callee never
+    /// carries an `Opaque`, so no spliced op indexes the wrong pool.)
+    pub constants: Box<[Value]>,
 }
 
 impl MirFunction {
@@ -584,6 +589,7 @@ pub fn build_mir_with_feedback(
         blocks,
         value_types: b.value_types,
         block_for,
+        constants: constants.into(),
     })
 }
 
@@ -919,7 +925,7 @@ fn map_term_operands(term: &mut MirTerm, mut f: impl FnMut(MirValue) -> MirValue
 
 /// The successor edges of a terminator: each target block with the argument
 /// list that feeds its parameters (one-for-one, see [`MirTerm`]).
-fn successor_edges(term: &MirTerm) -> impl Iterator<Item = (MirBlockId, &[MirValue])> {
+pub(crate) fn successor_edges(term: &MirTerm) -> impl Iterator<Item = (MirBlockId, &[MirValue])> {
     let (a, b): (Option<_>, Option<_>) = match term {
         MirTerm::Return(_) => (None, None),
         MirTerm::Goto { target, args } => (Some((*target, args.as_slice())), None),
@@ -1087,6 +1093,10 @@ pub fn inline_pure_single_block_callees(
                 if matches!(cinst.op, MirOp::Arg(_)) {
                     continue; // params already mapped to the call's args
                 }
+                debug_assert!(
+                    !matches!(cinst.op, MirOp::Opaque { .. }),
+                    "callee_inlinable admits no Opaque (its operands would index the caller's pool)"
+                );
                 let new_v = MirValue(m.value_types.len() as u32);
                 m.value_types.push(cinst.ty);
                 remap.insert(cinst.result, new_v);

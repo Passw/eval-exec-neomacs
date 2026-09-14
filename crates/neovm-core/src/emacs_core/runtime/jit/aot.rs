@@ -869,23 +869,6 @@ fn mir_is_aot_runnable(m: &mir::MirFunction) -> bool {
     // carries the per-thread reloc + deopt bases.
 }
 
-/// Whether the MIR body makes a runtime CALL/APPLY — the same predicate
-/// `lower_mir_pure` uses for `has_call` (→ all-precise deopt + side effect).
-fn mir_has_call(m: &mir::MirFunction) -> bool {
-    use mir::MirOp;
-    m.blocks.iter().any(|b| {
-        b.insts.iter().any(|i| {
-            matches!(
-                &i.op,
-                MirOp::Opaque {
-                    op: Op::Call(_) | Op::Apply(_),
-                    ..
-                }
-            )
-        })
-    })
-}
-
 /// Collect the reloc constants of a MIR leaf (the DISTINCT heap-object consts, in
 /// first-seen order — same dedup as the lowering). Returns the ordered Values;
 /// the recipe is emitted in this order and rebuilt into the same order at load.
@@ -1041,25 +1024,19 @@ fn prepare_leaf_emit(
         }
     }
     // Frame metadata from the MIR EXACTLY as lower_mir_pure does (so the loader
-    // sizes the per-thread deopt buffers + side-effect flag identically). A
-    // call-bearing body is ALL-PRECISE deopt + side-effecting → sized deopt_spill.
-    let has_call = mir_has_call(&m);
-    let max_depth = m
-        .blocks
-        .iter()
-        .flat_map(|b| b.insts.iter())
-        .map(|i| i.pre_stack.len())
-        .max()
-        .unwrap_or(0);
+    // sizes the per-thread deopt buffers + side-effect flag identically): the
+    // same `MirLeafPlan`. A shim-bearing body is ALL-PRECISE deopt +
+    // side-effecting → sized deopt_spill.
+    let plan = super::compile::lowering::plan_mir_leaf(&m);
     let meta = super::compile::AotLeafMeta {
         arity: m.arity,
         required: m.arity,
         has_rest: false,
         has_binds: false,
         has_handlers: false,
-        has_side_effects: has_call,
-        max_depth: if has_call { max_depth } else { 0 },
-        has_precise_deopt: has_call,
+        has_side_effects: plan.precise,
+        max_depth: if plan.precise { plan.max_depth } else { 0 },
+        has_precise_deopt: plan.precise,
     };
     // The MIR tier never bakes `Op::Call` subr/bytecode spec sites (that pass runs
     // only under `Some(obarray)` at the baseline tier — increment B2), so it always
@@ -4399,47 +4376,16 @@ fn define_leaf_into_module(
     entry_name: &str,
     descriptor: Option<(&str, &[u8])>,
 ) -> Result<(), CompileError> {
-    use mir::MirOp;
-
-    // ----- Analysis prologue, identical to lower_mir_pure (compile.rs). --------
-    // A CALL forces all-precise deopt + the runtime scaffolding; an escaping cons
-    // needs the cons shim. Both set needs_rt (vmctx + shims).
-    let has_call = m.blocks.iter().any(|b| {
-        b.insts.iter().any(|i| {
-            matches!(
-                &i.op,
-                MirOp::Opaque {
-                    op: crate::emacs_core::bytecode::opcode::Op::Call(_)
-                        | crate::emacs_core::bytecode::opcode::Op::Apply(_),
-                    ..
-                }
-            )
-        })
-    });
-    let cons_repl: Vec<Option<(mir::MirValue, mir::MirValue)>> = if has_call {
-        vec![None; m.value_types.len()]
-    } else {
-        mir::cons_scalar_repl_targets(m)
-    };
-    let has_escaping_cons = m
-        .blocks
-        .iter()
-        .flat_map(|b| b.insts.iter())
-        .any(|i| matches!(&i.op, MirOp::Cons(..)) && cons_repl[i.result.0 as usize].is_none());
-    let needs_rt = has_call || has_escaping_cons;
+    // ----- Analysis prologue: the ONE plan lower_mir_leaf_fn uses. -----------
+    let plan = super::compile::lowering::plan_mir_leaf(m);
 
     // Precise-deopt spill buffer + cells (sized exactly as the JIT does). These
     // are this-session throwaway buffers in R1c-1 — their *addresses* get baked,
     // which is fine for the parse gate (load-time rebuild is R1c-3/5).
-    let max_depth = m
-        .blocks
-        .iter()
-        .flat_map(|b| b.insts.iter())
-        .map(|i| i.pre_stack.len())
-        .max()
-        .unwrap_or(0);
-    let deopt_spill: Box<[core::cell::Cell<i64>]> = if has_call {
-        (0..max_depth).map(|_| core::cell::Cell::new(0)).collect()
+    let deopt_spill: Box<[core::cell::Cell<i64>]> = if plan.precise {
+        (0..plan.max_depth)
+            .map(|_| core::cell::Cell::new(0))
+            .collect()
     } else {
         Box::from([])
     };
@@ -4476,9 +4422,7 @@ fn define_leaf_into_module(
         &deopt_meta,
         &reloc_data,
         &reloc_index,
-        has_call,
-        &cons_repl,
-        needs_rt,
+        &plan,
         entry_name,
         Linkage::Export,
         /*aot=*/ true,
