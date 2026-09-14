@@ -6492,11 +6492,19 @@ impl FrameManager {
             attachment,
         )?;
 
-        // GNU's split path leaves frame chrome/top-margin realization to
-        // `window--pixel-to-total` / `window-resize-apply-total`.  Resyncing the
-        // whole frame area here would recompute child character edges from the
-        // root's menu-bar top margin and incorrectly pull side-window leaves down
-        // by one line in batch.
+        // Character edges follow the pixels the split just assigned.
+        //
+        // NOT `sync_window_area_bounds`: that recomputes the root's BOUNDS from
+        // the frame's text area, which realizes the top margin and pulls
+        // side-window leaves down a line in batch.  This leaves every rectangle
+        // alone and only re-derives `top_line`/`left_col` from the pixel
+        // offsets, keeping the root's own values as they were -- so a window
+        // spliced in beside its sibling stops reporting the character row the
+        // sibling has.
+        let (char_width, char_height) = (frame.char_width, frame.char_height);
+        let root = frame.tree().root_id();
+        sync_window_character_edges_from_bounds(frame.tree_mut(), root, char_width, char_height);
+
         frame.recalculate_minibuffer_bounds();
         self.mark_window_topology_changed();
         Some(new_id)
@@ -6587,6 +6595,19 @@ impl FrameManager {
             self.deleted_windows.insert(window_id, deletion_record);
             self.deleted_window_parameters
                 .insert(window_id, deleted_parameters.unwrap_or_default());
+            // Character edges follow the pixels the deletion left behind, the
+            // same way the split path re-derives them: a survivor that moved
+            // up into the freed space otherwise keeps the character row it had
+            // while the deleted window was still above it, which reads back as
+            // a gap in the frame even though the rectangles tile exactly.
+            let (char_width, char_height) = (frame.char_width, frame.char_height);
+            let root = frame.tree().root_id();
+            sync_window_character_edges_from_bounds(
+                frame.tree_mut(),
+                root,
+                char_width,
+                char_height,
+            );
             frame.recalculate_minibuffer_bounds();
         }
 

@@ -3996,6 +3996,60 @@ fn window_size_queries_match_batch_defaults_and_invalid_window_predicates() {
 /// stays at the text area's top, which is how GNU reports `window-pixel-top` 0
 /// alongside `window-top-line` 1, and the minibuffer follows by the sum rule
 /// `m->top_line = r->top_line + r->total_lines` (`src/window.c:5030`).
+/// Splitting and deleting keep every window's CHARACTER edges on its pixels.
+///
+/// `split_window_in_tree` and `delete_window_in_tree` set pixel bounds and
+/// never re-derived `top_line`/`left_col` from them, so the two drifted apart
+/// the moment either ran outside the `window.el` path that syncs them.  The
+/// pixel geometry was right both times; only the character edges lied, which
+/// is what `window-edges`, `window-top-line` and everything built on them
+/// report.  Measured on the shipped binary before this fix:
+///
+///     after (split-window-internal W half nil nil)
+///       window 1  pixel-top  0   top-line  0
+///       window 2  pixel-top 12   top-line  0   <- should be 12
+///
+///     after deleting the middle of three windows
+///       window 1  pixel-top  0   top-line  1
+///       window 2  pixel-top  6   top-line 13   <- stale, should be 7
+///
+/// The second reads as a hole in the frame -- `window-edges` said rows 1-7 and
+/// 13-25, with 7-13 belonging to no window -- while the pixels tiled perfectly.
+///
+/// That distinction decided how to fix it.  GNU refuses both of these calls
+/// outright (`"Resizing old window failed"` / `"Deletion failed"`) because its
+/// `-internal` subrs commit a plan `window.el` staged and it will not commit
+/// one that does not add up.  Porting those guards was the obvious move and
+/// the wrong one: neomacs computes the layout itself rather than committing a
+/// staged plan, and its pixels were already correct, so a guard would have
+/// rejected sound trees to avoid a stale integer.  Sync the integer instead.
+///
+/// The invariant is asserted rather than the numbers: a character row equals a
+/// pixel row plus the frame's top margin, which is 0 on this harness's frame.
+#[test]
+fn splitting_and_deleting_keep_character_edges_on_the_pixels() {
+    crate::test_utils::init_test_tracing();
+    let coherent = "(lambda (w) (= (window-top-line w) (window-pixel-top w)))";
+
+    let split = bootstrap_eval_with_frame(&format!(
+        "(progn
+           (split-window-internal (selected-window)
+                                  (/ (window-pixel-height (selected-window)) 2)
+                                  nil nil)
+           (mapcar {coherent} (window-list)))"
+    ));
+    assert_eq!(split[0], "OK (t t)", "after split-window-internal");
+
+    let deleted = bootstrap_eval_with_frame(&format!(
+        "(progn
+           (split-window-below)
+           (split-window-below)
+           (delete-window-internal (nth 1 (window-list)))
+           (mapcar {coherent} (window-list)))"
+    ));
+    assert_eq!(deleted[0], "OK (t t)", "after delete-window-internal");
+}
+
 /// `tool-bar-pixel-width` decodes FRAME before it answers.
 ///
 /// It was a bare stub returning 0 without looking at its argument, so
