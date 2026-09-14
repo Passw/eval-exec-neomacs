@@ -3280,6 +3280,33 @@ pub(crate) fn lower_simple_op(
                 return Err(CompileError::StackUnderflow);
             }
             let dsite = deopt_site(fb, pc, handlers.len(), stack, stack_raw, deopt_sites);
+            // FLOAT SITE — same reasoning as the arithmetic ops: a fixnum
+            // guard here bails the whole body, and a body that mixes float
+            // arithmetic with a float comparison would be lowered for nothing.
+            if matches!(
+                super::active_numeric_feedback(pc),
+                crate::emacs_core::jit::NumericFeedback::Float
+            ) {
+                let fb_val = stack_as_f64(fb, dsite, stack, stack_raw, n - 1);
+                let fa_val = stack_as_f64(fb, dsite, stack, stack_raw, n - 2);
+                stack.truncate(n - 2);
+                stack_raw.truncate(n - 2);
+                // IEEE ordered comparisons: every one is false against NaN,
+                // which is what the `<`/`>`/`=` builtins do on floats.
+                let fcc: cranelift_codegen::ir::condcodes::FloatCC = match op {
+                    Op::Eqlsign => cranelift_codegen::ir::condcodes::FloatCC::Equal,
+                    Op::Lss => cranelift_codegen::ir::condcodes::FloatCC::LessThan,
+                    Op::Gtr => cranelift_codegen::ir::condcodes::FloatCC::GreaterThan,
+                    Op::Leq => cranelift_codegen::ir::condcodes::FloatCC::LessThanOrEqual,
+                    _ => cranelift_codegen::ir::condcodes::FloatCC::GreaterThanOrEqual,
+                };
+                let cond = fb.ins().fcmp(fcc, fa_val, fb_val);
+                let t = fb.ins().iconst(types::I64, Value::T.bits() as i64);
+                let nil = fb.ins().iconst(types::I64, Value::NIL.bits() as i64);
+                stack.push(fb.ins().select(cond, t, nil));
+                stack_raw.push(false);
+                return Ok(());
+            }
             let b = stack_as_raw(fb, dsite, stack, stack_raw, n - 1, known);
             let a = stack_as_raw(fb, dsite, stack, stack_raw, n - 2, known);
             stack.truncate(n - 2);
