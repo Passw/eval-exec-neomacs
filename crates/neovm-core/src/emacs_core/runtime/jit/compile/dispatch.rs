@@ -1795,7 +1795,8 @@ pub(crate) const JIT_SWITCH_STALE: i64 = -2;
 
 /// `Op::Switch`: look the dispatch value up in the (statically verified
 /// compile-time constant) hash-table jump table, with the interpreter's exact
-/// key semantics (`to_hash_key_swp` under the table's own test). Returns the
+/// key semantics: an in-place `ValueKeyProbe` under the table's own test,
+/// which falls back to a materialized key for the shapes it declines. Returns the
 /// raw fixnum target address on a hit ([`JIT_SWITCH_MISS`]/[`JIT_SWITCH_STALE`]
 /// otherwise); the generated code maps raw addresses onto the statically
 /// resolved target blocks. Pure lookup — no allocation, no lisp.
@@ -1817,8 +1818,15 @@ pub extern "C" fn neovm_jit_switch(ctx: *mut u8, dispatch: i64, table: i64) -> i
             ));
             return JIT_SWITCH_STALE;
         };
-        let key = dispatch.to_hash_key_swp(&ht.test, ctx.symbols_with_pos_enabled);
-        match ht.data.get(&key).copied() {
+        // Probe the index in place (GNU `hash_lookup` runs hashfn/cmpfn over the
+        // object) instead of materializing a `HashKey` — which cost a classify,
+        // a build and a drop on every dispatch. `neovm_jit_switch` is 215K calls
+        // per org edit iteration.
+        match ht
+            .data
+            .get_by_value(dispatch, ht.test, ctx.symbols_with_pos_enabled)
+            .copied()
+        {
             Some(v) => match v.kind() {
                 ValueKind::Fixnum(addr) if addr >= 0 => addr,
                 _ => {

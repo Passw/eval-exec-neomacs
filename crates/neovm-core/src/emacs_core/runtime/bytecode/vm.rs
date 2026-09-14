@@ -4449,9 +4449,12 @@ impl<'a> Vm<'a> {
                         }
 
                         let ht = jump_table.as_hash_table().unwrap();
-                        let key =
-                            dispatch.to_hash_key_swp(&ht.test, self.ctx.symbols_with_pos_enabled);
-                        let target = ht.data.get(&key).copied();
+                        // In-place probe rather than a materialized `HashKey`;
+                        // see `neovm_jit_switch` for the same lookup compiled.
+                        let target = ht
+                            .data
+                            .get_by_value(dispatch, ht.test, self.ctx.symbols_with_pos_enabled)
+                            .copied();
 
                         if let Some(target_val) = target {
                             match target_val.kind() {
@@ -7008,8 +7011,9 @@ impl<'a> Vm<'a> {
         // this native-to-native fast path must too, or `backtrace-frame` walks a
         // stack missing this activation — cc-bytecomp-compiling-or-loading then
         // fails to detect the compiling file and raises "c-lang-defconst can only
-        // be used in a file". Args are read from the caller's call-args slot
-        // (small-arity inline via SmallVec — no heap for the common ≤4-arg case).
+        // be used in a file". Args are read from the caller's call-args slot:
+        // arity 1 and 2 are stored inline in the entry, 3+ as a pointer into
+        // that slot plus a count (GNU's shape) — no copy either way.
         let bt_count = ctx.specpdl.len();
         // SAFETY: args_ptr addresses `nargs` valid tagged words (the caller's
         // call-args slot), same contract the native run below relies on. This
