@@ -915,6 +915,30 @@ pub(crate) fn builtin_set_frame_size(
             text_lines
         );
         set_frame_text_size(frame, cols, text_lines);
+    } else {
+        // A top-level terminal frame.  This used to fall through and do
+        // nothing at all, so `set-frame-size` was a no-op on every TTY frame.
+        // GNU runs `adjust_frame_size` here too: the terminal keeps its size,
+        // and `frame-width`/`frame-height` go on reporting it, but the window
+        // tree is laid out to the requested text size -- unclamped, so asking
+        // an 80x25 batch frame for 100x40 really does give a 100-column root.
+        let cols = ((text_width_px as f32) / char_width.max(1.0))
+            .floor()
+            .max(1.0) as i64;
+        let text_lines = ((text_height_px as f32) / char_height.max(1.0))
+            .floor()
+            .max(1.0) as i64;
+        let frame = ctx
+            .frames
+            .get_mut(fid)
+            .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
+        tracing::debug!(
+            "set-frame-size: tty fid={:?} cols={} text_lines={}",
+            fid,
+            cols,
+            text_lines
+        );
+        frame.set_window_layout_text_size(cols, text_lines);
     }
     Ok(Value::NIL)
 }

@@ -3971,6 +3971,46 @@ fn window_size_queries_match_batch_defaults_and_invalid_window_predicates() {
     assert_eq!(out[7], "OK (wrong-type-argument window-live-p 999999)");
 }
 
+/// `set-frame-size` resizes a top-level TTY frame's WINDOW TREE.
+///
+/// `builtin_set_frame_size` had a GUI branch and a child-frame branch and
+/// nothing else: a top-level terminal frame fell through to `Ok(Value::NIL)`,
+/// so the call did nothing at all.
+///
+/// GNU's `Fset_frame_size` calls `adjust_frame_size` for every frame.  On a
+/// terminal frame that does not resize the terminal -- `frame-width` and
+/// `frame-height` keep reporting it -- but the windows are laid out to the
+/// requested TEXT size, which includes the minibuffer and excludes the top
+/// margin.  Measured on GNU Emacs 31.0.50, `emacs -Q --batch`, from the 80x25
+/// startup frame with `menu-bar-lines` 1:
+///
+///     request  frame     root top/h/w   mini top
+///     100x40   80x25     1 / 39 / 100   40
+///     60x10    80x25     1 /  9 /  60   10
+///     80x24    80x25     1 / 23 /  80   24
+///
+/// neomacs answered `0 / 24 / 80`, mini 24, for all three -- the startup
+/// layout, untouched.
+///
+/// The root's character row is the frame's top margin while its pixel origin
+/// stays at the text area's top, which is how GNU reports `window-pixel-top` 0
+/// alongside `window-top-line` 1, and the minibuffer follows by the sum rule
+/// `m->top_line = r->top_line + r->total_lines` (`src/window.c:5030`).
+#[test]
+fn set_frame_size_lays_out_a_tty_frames_windows_like_gnu() {
+    crate::test_utils::init_test_tracing();
+    let out = bootstrap_eval_with_frame(
+        "(progn
+           (set-frame-parameter nil 'menu-bar-lines 1)
+           (set-frame-size (selected-frame) 60 10)
+           (list (window-top-line (frame-root-window))
+                 (window-total-height (frame-root-window))
+                 (window-total-width (frame-root-window))
+                 (window-top-line (minibuffer-window))))",
+    );
+    assert_eq!(out[0], "OK (1 9 60 10)");
+}
+
 #[test]
 fn window_geometry_helper_queries_match_batch_defaults_and_error_predicates() {
     crate::test_utils::init_test_tracing();

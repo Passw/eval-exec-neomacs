@@ -4288,6 +4288,42 @@ impl Frame {
         self.reposition_minibuffer_below_root();
     }
 
+    /// Lay this frame's windows out to an explicit TEXT size in characters.
+    ///
+    /// GNU `Fset_frame_size` calls `adjust_frame_size` for every frame.  On a
+    /// terminal frame that does not resize the terminal -- `frame-width` and
+    /// `frame-height` go on reporting it -- but the windows are laid out to
+    /// the size asked for, and GNU does not clamp them to the terminal: asking
+    /// a 80x25 batch frame for 100x40 gives a root window 39 lines tall and
+    /// 100 columns wide.
+    ///
+    /// TEXT size follows GNU's meaning: it INCLUDES the minibuffer and
+    /// EXCLUDES the top margin.  So the root takes the requested lines less
+    /// the minibuffer's, sits at the margin's character row while keeping its
+    /// pixel origin at the text area's top -- GNU reports `window-pixel-top` 0
+    /// beside `window-top-line` 1 for exactly that reason -- and the
+    /// minibuffer follows by the sum rule in
+    /// [`Frame::reposition_minibuffer_below_root`].
+    pub fn set_window_layout_text_size(&mut self, cols: i64, text_lines: i64) {
+        let char_width = self.char_width.max(1.0);
+        let char_height = self.char_height.max(1.0);
+        let top_margin = self.frame_top_margin();
+        let minibuffer_lines = i64::from(self.minibuffer_leaf.is_some());
+        let root_lines = (text_lines - minibuffer_lines).max(1);
+        let root_bounds = Rect::new(
+            0.0,
+            top_margin as f32 * char_height,
+            cols.max(1) as f32 * char_width,
+            root_lines as f32 * char_height,
+        );
+        let root = self.tree.root_id();
+        resize_window_subtree(&mut self.tree, root, root_bounds);
+        self.root_window_mut().set_left_col(0);
+        self.root_window_mut().set_top_line(top_margin);
+        sync_window_character_edges_from_bounds(&mut self.tree, root, char_width, char_height);
+        self.reposition_minibuffer_below_root();
+    }
+
     /// Reconcile a restored window tree with the frame's current geometry.
     ///
     /// GNU `Fset_window_configuration` restores the saved window fields and
@@ -4336,11 +4372,15 @@ impl Frame {
         let root_total_lines = (root_bounds.height / char_h).round() as i64;
         let mini_top_line = root_top_line + root_total_lines;
         if let Some(mini) = self.minibuffer_leaf.as_mut() {
-            let mini_h = mini
-                .bounds()
-                .height
-                .max(0.0)
-                .min((self.height as f32 - (root_bounds.y + root_bounds.height)).max(0.0));
+            // The minibuffer keeps its own height.  This used to also clamp it
+            // to what was left of the frame below the root, which reads as a
+            // safety net and is really a divergence: GNU lets a window tree be
+            // laid out larger than its terminal -- `(set-frame-size f 100 40)`
+            // on an 80x25 batch frame gives a 39-line root and STILL a 1-line
+            // minibuffer -- and under that clamp the minibuffer silently
+            // collapsed to zero height.  GNU's own paths size the root to
+            // leave room, so the clamp never fired for them either.
+            let mini_h = mini.bounds().height.max(0.0);
             mini.set_bounds(Rect::new(
                 root_bounds.x,
                 root_bounds.y + root_bounds.height,
