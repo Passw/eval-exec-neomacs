@@ -1879,14 +1879,28 @@ pub(crate) fn expect_args_range(
 }
 
 /// Extract a fixnum or signal wrong-type-argument (fixnump).
+///
+/// The success arm is a tag test, but building the signal (a `vec!` plus an
+/// interned symbol) made the whole body too big for LLVM to inline at any of
+/// its call sites — so `aref` paid an out-of-line call at 18 Ir for what GNU's
+/// `CHECK_FIXNUM` does in a compare and a branch, 243K times per org edit
+/// iteration. Splitting the cold arm out is the same shape the JIT already
+/// uses for `retier_heat_init` and `direct_call_cold`.
+#[inline]
 pub(crate) fn expect_fixnum(val: &Value) -> Result<i64, Flow> {
     match val.kind() {
         ValueKind::Fixnum(n) => Ok(n),
-        _other => Err(signal(
-            LispCondition::WrongTypeArgument,
-            vec![Value::symbol("fixnump"), *val],
-        )),
+        _other => Err(expect_fixnum_failed(val)),
     }
+}
+
+#[cold]
+#[inline(never)]
+fn expect_fixnum_failed(val: &Value) -> Flow {
+    signal(
+        LispCondition::WrongTypeArgument,
+        vec![Value::symbol("fixnump"), *val],
+    )
 }
 
 /// GNU's `cmd_error_internal` / `command-error-default-function` (keyboard.c:
