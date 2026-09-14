@@ -12,7 +12,7 @@
 //      binary, so the dump-time preload `.so`'s imports resolve at runtime.
 //
 // MUST stay in sync with the shim DEFINITIONS in `compile.rs` (`#[no_mangle] pub
-// extern "C" fn neovm_jit_*`) and the `JIT_SHIM_ANCHOR` array. `include!`-ing a
+// extern "C" fn neovm_jit_*`) and the `JIT_SHIM_TABLE` array. `include!`-ing a
 // bare `const` keeps this usable both as a crate item (aot.rs) and as a local
 // const inside each build.rs `main` (no module/use context required).
 const NEOVM_JIT_SHIM_NAMES: &[&str] = &[

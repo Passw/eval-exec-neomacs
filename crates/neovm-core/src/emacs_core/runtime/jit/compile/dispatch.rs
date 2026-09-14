@@ -775,7 +775,7 @@ fn call_fixed_builtin_from_native(
 /// by the AOT baseline tier too (`build_baseline_leaf_object` with `Some(obarray)`),
 /// so an AOT `.so` may import this symbol. It is therefore host-exported
 /// (`#[unsafe(no_mangle)] pub`) + in `shim_names.rs`/`MIR_SHIM_NAMES` (salted into
-/// `ABI_TAG`) + anchored by `JIT_SHIM_ANCHOR`. Cross-session soundness rides on the
+/// `ABI_TAG`) + anchored by `JIT_SHIM_TABLE`. Cross-session soundness rides on the
 /// per-site epoch guard + the loader's DISARM sentinel (`SPEC_EPOCH_DISARMED`), not
 /// on any baked address — the shim re-reads the live entry every call.
 #[allow(clippy::not_unsafe_ptr_arg_deref)] // C-ABI shim: raw ptrs per documented SAFETY contract; only ever called from generated code.
@@ -1148,7 +1148,7 @@ pub extern "C" fn neovm_jit_arith_spec(
 /// SAFETY: same vmctx contract as [`neovm_jit_call`].
 ///
 /// R2 increment A (CBSym-in-AOT): EXPORTED (`#[unsafe(no_mangle)] pub` + listed
-/// in `shim_names.rs`/`MIR_SHIM_NAMES` + anchored by `JIT_SHIM_ANCHOR`). The
+/// in `shim_names.rs`/`MIR_SHIM_NAMES` + anchored by `JIT_SHIM_TABLE`). The
 /// CBSym classification (`cbsym_spec_kind`) is name-canonical + obarray-free
 /// (static subr table + name resolution only), so the AOT baseline emit
 /// (`build_baseline_leaf_object`, `obarray=None`) now classifies CBSym sites too —
@@ -1275,7 +1275,7 @@ pub(crate) fn cbsym_read_expected_nargs(which: u8) -> usize {
 /// SAFETY: same vmctx contract as [`neovm_jit_call`].
 ///
 /// R2 increment A (CBSym-in-AOT): EXPORTED (`#[unsafe(no_mangle)] pub` + listed
-/// in `shim_names.rs`/`MIR_SHIM_NAMES` + anchored by `JIT_SHIM_ANCHOR`). Tier-A
+/// in `shim_names.rs`/`MIR_SHIM_NAMES` + anchored by `JIT_SHIM_TABLE`). Tier-A
 /// classification is name-canonical + obarray-free, so the AOT baseline emit
 /// (`obarray=None`) now emits Tier-A sites too — an AOT `.so` may import this shim
 /// and binds it against the host at `dlopen`.

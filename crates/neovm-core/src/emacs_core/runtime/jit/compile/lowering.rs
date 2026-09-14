@@ -1008,20 +1008,8 @@ pub(crate) fn lower_mir_pure(m: &mir::MirFunction) -> Result<CompiledLeaf, Compi
     if needs_rt {
         // The shims the calls-slice + cons allocation reference; declare_rt_refs
         // declares the full import set but Cranelift resolves only referenced ones.
-        builder.symbol("neovm_jit_gc_save", neovm_jit_gc_save as *const u8);
-        builder.symbol("neovm_jit_gc_push", neovm_jit_gc_push as *const u8);
-        builder.symbol(
-            "neovm_jit_gc_push_many",
-            neovm_jit_gc_push_many as *const u8,
-        );
-        builder.symbol("neovm_jit_gc_restore", neovm_jit_gc_restore as *const u8);
-        builder.symbol(
-            "neovm_jit_rootwin_grow",
-            neovm_jit_rootwin_grow as *const u8,
-        );
-        builder.symbol("neovm_jit_call", neovm_jit_call as *const u8);
-        builder.symbol("neovm_jit_apply", neovm_jit_apply as *const u8);
-        builder.symbol("neovm_jit_cons", neovm_jit_cons as *const u8);
+        // Every shim, from the one table (see `super::shims::JIT_SHIM_TABLE`).
+        super::shims::register_shims(&mut builder);
     }
     let mut module = JITModule::new(builder);
 

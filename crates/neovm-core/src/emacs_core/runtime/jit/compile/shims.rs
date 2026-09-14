@@ -673,17 +673,28 @@ pub extern "C" fn neovm_jit_apply(
     })
 }
 
-/// `#[used]` anchor for the AOT shim table (audit #3 / R1c call-bearing). The 6
-/// `#[unsafe(no_mangle)]` shims the MIR tier emits ([`MIR_SHIM_NAMES`](super::super::aot::MIR_SHIM_NAMES))
-/// are referenced only by ADDRESS through `builder.symbol(...)` in the JIT and by
-/// NAME (undefined import) from an AOT `.so` — neither is a static call the
-/// linker sees, so `--gc-sections` could drop them and `-rdynamic` would then
-/// have nothing to export. This `#[used]` array of their addresses pins all 6 so
-/// they survive DCE and are present for `--export-dynamic-symbol` to promote into
-/// the host's dynamic symbol table (where `dlopen` binds the `.so`'s imports).
-/// Fn-pointer addresses, in a `Sync` newtype so they can live in a `static`
-/// (raw pointers aren't `Sync`). Never read at runtime — the array exists only
-/// to anchor the symbols against DCE.
+/// THE runtime-shim table: every `#[unsafe(no_mangle)] extern "C"` shim
+/// generated code may call, paired with its address. It serves two jobs that
+/// used to be three drifting copies:
+///
+/// 1. `#[used]` DCE anchor. These functions are referenced only by ADDRESS
+///    (`builder.symbol`) from the JIT and by NAME (undefined import) from an
+///    AOT `.so` — neither is a static call the linker sees, so
+///    `--gc-sections` could drop them and `-rdynamic` would then have nothing
+///    to export. Holding their addresses here pins them.
+/// 2. The JIT module's symbol table, via [`register_shims`]. Before this
+///    table the JIT builder hand-listed 27 of the 44 shims; the other 17
+///    resolved only through cranelift-jit's `dlsym` fallback — which works in
+///    the exported `neomacs` binary and FAILS in a unit-test binary
+///    ("can't resolve symbol neovm_jit_make_float"). That is why the float
+///    lowering had never been exercised by a unit test.
+///
+/// The NAME list an AOT `.so` may import stays in `shim_names.rs` (it is
+/// `include!`d by two build scripts, which cannot see this table);
+/// `shim_table_tests` pins the two sets equal.
+///
+/// Fn-pointer addresses live in a `Sync` newtype so they can sit in a
+/// `static` (raw pointers aren't `Sync`).
 #[repr(transparent)]
 pub(crate) struct ShimAddr(*const ());
 // SAFETY: `ShimAddr` holds a code address that is never dereferenced or mutated
@@ -691,59 +702,196 @@ pub(crate) struct ShimAddr(*const ());
 unsafe impl Sync for ShimAddr {}
 
 #[used]
-pub(crate) static JIT_SHIM_ANCHOR: [ShimAddr; 44] = [
-    ShimAddr(neovm_jit_apply as *const ()),
-    // logand/logior/logxor intrinsic — AOT-importable, so it must survive
-    // `--gc-sections` for `--export-dynamic-symbol` to promote it (see below).
-    ShimAddr(neovm_jit_arith_spec as *const ()),
-    ShimAddr(neovm_jit_backedge as *const ()),
-    ShimAddr(neovm_jit_builtin1 as *const ()),
-    ShimAddr(neovm_jit_builtin2 as *const ()),
-    ShimAddr(neovm_jit_builtin3 as *const ()),
-    ShimAddr(neovm_jit_builtin_slice as *const ()),
-    ShimAddr(neovm_jit_call as *const ()),
-    ShimAddr(neovm_jit_call_spec as *const ()),
-    // R2 increment B2 (Op::Call spec-in-AOT): the three round-1 subr-speculation
-    // shims are now AOT-importable, so they must survive `--gc-sections` for
-    // `--export-dynamic-symbol` to promote them into the host's dynamic table.
-    ShimAddr(neovm_jit_call_subr_spec as *const ()),
-    // R2 increment A: the two CBSym intrinsic shims are now AOT-importable, so
-    // they must survive `--gc-sections` for `--export-dynamic-symbol` to promote.
-    ShimAddr(neovm_jit_cbsym_read as *const ()),
-    ShimAddr(neovm_jit_cbsym_spec as *const ()),
-    ShimAddr(neovm_jit_cons as *const ()),
-    ShimAddr(neovm_jit_make_float as *const ()),
-    ShimAddr(neovm_jit_eq_incl_props_spec as *const ()),
-    ShimAddr(neovm_jit_eq_slow as *const ()),
-    ShimAddr(neovm_jit_gc_push as *const ()),
-    ShimAddr(neovm_jit_gc_push_many as *const ()),
-    ShimAddr(neovm_jit_gc_restore as *const ()),
-    ShimAddr(neovm_jit_gc_save as *const ()),
-    ShimAddr(neovm_jit_rootwin_grow as *const ()),
-    ShimAddr(neovm_jit_integerp_slow as *const ()),
-    ShimAddr(neovm_jit_list as *const ()),
-    ShimAddr(neovm_jit_match_handler as *const ()),
-    ShimAddr(neovm_jit_named_builtin as *const ()),
-    ShimAddr(neovm_jit_numberp_slow as *const ()),
-    ShimAddr(neovm_jit_pop_handler as *const ()),
-    ShimAddr(neovm_jit_pred_spec as *const ()),
-    ShimAddr(neovm_jit_push_catch as *const ()),
-    ShimAddr(neovm_jit_push_cc as *const ()),
-    ShimAddr(neovm_jit_push_cc_raw as *const ()),
-    ShimAddr(neovm_jit_save_current_buffer as *const ()),
-    ShimAddr(neovm_jit_save_excursion as *const ()),
-    ShimAddr(neovm_jit_save_restriction as *const ()),
-    ShimAddr(neovm_jit_save_window_excursion as *const ()),
-    ShimAddr(neovm_jit_switch as *const ()),
-    ShimAddr(neovm_jit_switch_stale as *const ()),
-    ShimAddr(neovm_jit_symbolp_slow as *const ()),
-    ShimAddr(neovm_jit_throw as *const ()),
-    ShimAddr(neovm_jit_unbind as *const ()),
-    ShimAddr(neovm_jit_unwind_protect as *const ()),
-    ShimAddr(neovm_jit_varbind as *const ()),
-    ShimAddr(neovm_jit_varref as *const ()),
-    ShimAddr(neovm_jit_varset as *const ()),
+pub(crate) static JIT_SHIM_TABLE: [(&str, ShimAddr); 44] = [
+    ("neovm_jit_apply", ShimAddr(neovm_jit_apply as *const ())),
+    (
+        "neovm_jit_arith_spec",
+        ShimAddr(neovm_jit_arith_spec as *const ()),
+    ),
+    (
+        "neovm_jit_backedge",
+        ShimAddr(neovm_jit_backedge as *const ()),
+    ),
+    (
+        "neovm_jit_builtin1",
+        ShimAddr(neovm_jit_builtin1 as *const ()),
+    ),
+    (
+        "neovm_jit_builtin2",
+        ShimAddr(neovm_jit_builtin2 as *const ()),
+    ),
+    (
+        "neovm_jit_builtin3",
+        ShimAddr(neovm_jit_builtin3 as *const ()),
+    ),
+    (
+        "neovm_jit_builtin_slice",
+        ShimAddr(neovm_jit_builtin_slice as *const ()),
+    ),
+    ("neovm_jit_call", ShimAddr(neovm_jit_call as *const ())),
+    (
+        "neovm_jit_call_spec",
+        ShimAddr(neovm_jit_call_spec as *const ()),
+    ),
+    (
+        "neovm_jit_call_subr_spec",
+        ShimAddr(neovm_jit_call_subr_spec as *const ()),
+    ),
+    (
+        "neovm_jit_cbsym_read",
+        ShimAddr(neovm_jit_cbsym_read as *const ()),
+    ),
+    (
+        "neovm_jit_cbsym_spec",
+        ShimAddr(neovm_jit_cbsym_spec as *const ()),
+    ),
+    ("neovm_jit_cons", ShimAddr(neovm_jit_cons as *const ())),
+    (
+        "neovm_jit_make_float",
+        ShimAddr(neovm_jit_make_float as *const ()),
+    ),
+    (
+        "neovm_jit_eq_incl_props_spec",
+        ShimAddr(neovm_jit_eq_incl_props_spec as *const ()),
+    ),
+    (
+        "neovm_jit_eq_slow",
+        ShimAddr(neovm_jit_eq_slow as *const ()),
+    ),
+    (
+        "neovm_jit_gc_push",
+        ShimAddr(neovm_jit_gc_push as *const ()),
+    ),
+    (
+        "neovm_jit_gc_push_many",
+        ShimAddr(neovm_jit_gc_push_many as *const ()),
+    ),
+    (
+        "neovm_jit_gc_restore",
+        ShimAddr(neovm_jit_gc_restore as *const ()),
+    ),
+    (
+        "neovm_jit_gc_save",
+        ShimAddr(neovm_jit_gc_save as *const ()),
+    ),
+    (
+        "neovm_jit_rootwin_grow",
+        ShimAddr(neovm_jit_rootwin_grow as *const ()),
+    ),
+    (
+        "neovm_jit_integerp_slow",
+        ShimAddr(neovm_jit_integerp_slow as *const ()),
+    ),
+    ("neovm_jit_list", ShimAddr(neovm_jit_list as *const ())),
+    (
+        "neovm_jit_match_handler",
+        ShimAddr(neovm_jit_match_handler as *const ()),
+    ),
+    (
+        "neovm_jit_named_builtin",
+        ShimAddr(neovm_jit_named_builtin as *const ()),
+    ),
+    (
+        "neovm_jit_numberp_slow",
+        ShimAddr(neovm_jit_numberp_slow as *const ()),
+    ),
+    (
+        "neovm_jit_pop_handler",
+        ShimAddr(neovm_jit_pop_handler as *const ()),
+    ),
+    (
+        "neovm_jit_pred_spec",
+        ShimAddr(neovm_jit_pred_spec as *const ()),
+    ),
+    (
+        "neovm_jit_push_catch",
+        ShimAddr(neovm_jit_push_catch as *const ()),
+    ),
+    (
+        "neovm_jit_push_cc",
+        ShimAddr(neovm_jit_push_cc as *const ()),
+    ),
+    (
+        "neovm_jit_push_cc_raw",
+        ShimAddr(neovm_jit_push_cc_raw as *const ()),
+    ),
+    (
+        "neovm_jit_save_current_buffer",
+        ShimAddr(neovm_jit_save_current_buffer as *const ()),
+    ),
+    (
+        "neovm_jit_save_excursion",
+        ShimAddr(neovm_jit_save_excursion as *const ()),
+    ),
+    (
+        "neovm_jit_save_restriction",
+        ShimAddr(neovm_jit_save_restriction as *const ()),
+    ),
+    (
+        "neovm_jit_save_window_excursion",
+        ShimAddr(neovm_jit_save_window_excursion as *const ()),
+    ),
+    ("neovm_jit_switch", ShimAddr(neovm_jit_switch as *const ())),
+    (
+        "neovm_jit_switch_stale",
+        ShimAddr(neovm_jit_switch_stale as *const ()),
+    ),
+    (
+        "neovm_jit_symbolp_slow",
+        ShimAddr(neovm_jit_symbolp_slow as *const ()),
+    ),
+    ("neovm_jit_throw", ShimAddr(neovm_jit_throw as *const ())),
+    ("neovm_jit_unbind", ShimAddr(neovm_jit_unbind as *const ())),
+    (
+        "neovm_jit_unwind_protect",
+        ShimAddr(neovm_jit_unwind_protect as *const ()),
+    ),
+    (
+        "neovm_jit_varbind",
+        ShimAddr(neovm_jit_varbind as *const ()),
+    ),
+    ("neovm_jit_varref", ShimAddr(neovm_jit_varref as *const ())),
+    ("neovm_jit_varset", ShimAddr(neovm_jit_varset as *const ())),
 ];
+
+/// Register every shim in [`JIT_SHIM_TABLE`] with a JIT module builder. Both
+/// tiers' builders call this, so a shim that exists is a shim the JIT can
+/// resolve — in the production binary and in a test binary alike.
+pub(crate) fn register_shims(builder: &mut cranelift_jit::JITBuilder) {
+    for (name, addr) in &JIT_SHIM_TABLE {
+        builder.symbol(*name, addr.0 as *const u8);
+    }
+}
+
+#[cfg(test)]
+mod shim_table_tests {
+    use super::JIT_SHIM_TABLE;
+
+    /// `shim_names.rs` (what an AOT `.so` may import; exported by the build
+    /// scripts) and [`JIT_SHIM_TABLE`] (what the JIT can resolve) must name
+    /// exactly the same shims, or a shim is exported that the JIT cannot
+    /// call — or callable by the JIT but silently unexported for AOT.
+    #[test]
+    fn the_shim_table_and_the_exported_name_list_are_the_same_set() {
+        let names: std::collections::BTreeSet<&str> = crate::emacs_core::jit::aot::MIR_SHIM_NAMES
+            .iter()
+            .copied()
+            .collect();
+        let table: std::collections::BTreeSet<&str> =
+            JIT_SHIM_TABLE.iter().map(|(n, _)| *n).collect();
+        assert_eq!(
+            table.len(),
+            JIT_SHIM_TABLE.len(),
+            "duplicate name in JIT_SHIM_TABLE"
+        );
+        let only_names: Vec<_> = names.difference(&table).collect();
+        let only_table: Vec<_> = table.difference(&names).collect();
+        assert!(
+            only_names.is_empty() && only_table.is_empty(),
+            "shim sets drifted: in shim_names.rs only {only_names:?}; in JIT_SHIM_TABLE only {only_table:?}"
+        );
+    }
+}
 
 /// Slow path for `eq` when the raw bits differ: only `symbols-with-pos` can
 /// still make two differing values `eq`. Read-only on the Context; never

@@ -93,7 +93,7 @@ const SPEC_ENCODING_VERSION: u32 = 1;
 // is `include!`-ed here AND by both `build.rs` files, so the emit/salt set, the
 // neovm-core lib export set, and the neomacs-bin export set can never drift.
 // `MIR_SHIM_NAMES` is an alias for the included `NEOVM_JIT_SHIM_NAMES`. Still
-// MUST match the shim DEFINITIONS in `compile.rs` + the `JIT_SHIM_ANCHOR` array.
+// MUST match the shim DEFINITIONS in `compile.rs` + the `JIT_SHIM_TABLE` array.
 include!("shim_names.rs");
 
 /// The exported `neovm_jit_*` shim name set (alias of the single-source
