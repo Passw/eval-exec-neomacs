@@ -5126,7 +5126,7 @@ pub(crate) fn register_subrs(ctx: &mut crate::emacs_core::eval::Context) {
     ));
     ctx.register_subr(SubrSpec::new(
         "tool-bar-pixel-width",
-        NativeFn::ContextVec(|_ctx, args| builtin_tool_bar_pixel_width(args)),
+        NativeFn::ContextVec(builtin_tool_bar_pixel_width),
         SubrArity::new(0, Some(1)),
     ));
     ctx.register_subr(

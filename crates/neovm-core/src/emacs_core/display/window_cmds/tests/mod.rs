@@ -3996,6 +3996,46 @@ fn window_size_queries_match_batch_defaults_and_invalid_window_predicates() {
 /// stays at the text area's top, which is how GNU reports `window-pixel-top` 0
 /// alongside `window-top-line` 1, and the minibuffer follows by the sum rule
 /// `m->top_line = r->top_line + r->total_lines` (`src/window.c:5030`).
+/// `tool-bar-pixel-width` decodes FRAME before it answers.
+///
+/// It was a bare stub returning 0 without looking at its argument, so
+/// `(tool-bar-pixel-width SOME-WINDOW)` answered 0.  GNU decodes
+/// (`src/frame.c:4439`):
+///
+///     #ifdef FRAME_TOOLBAR_WIDTH
+///       struct frame *f = decode_any_frame (frame);
+///       if (FRAME_WINDOW_P (f)) return make_fixnum (FRAME_TOOLBAR_WIDTH (f));
+///     #endif
+///       return make_fixnum (0);
+///
+/// so a non-frame signals `framep` before the constant is ever reached.
+///
+/// This sat in the audit beside `tool-bar-height`, whose lax GNU answers ARE a
+/// `#ifndef HAVE_EXT_TOOL_BAR` artifact of the GTK reference binary -- there
+/// the decode is compiled OUT, which is why GNU returns a number for a window
+/// and neomacs correctly signals.  The two guards are not the same: GTK
+/// DEFINES `FRAME_TOOLBAR_WIDTH`, so this decode is compiled IN and GNU
+/// signals.  The pair diverging in OPPOSITE directions is what separates the
+/// artifact from the bug, and neomacs was internally inconsistent too --
+/// `tool-bar-height` decoded, this did not.
+///
+/// Measured on GNU Emacs 31.0.50, `emacs -Q --batch`, five probe rows each:
+/// live, internal, minibuffer and deleted windows and a plain symbol all
+/// signal `wrong-type-argument framep` in GNU and answered 0 here.
+#[test]
+fn tool_bar_pixel_width_decodes_any_frame_like_gnu() {
+    crate::test_utils::init_test_tracing();
+    let out = bootstrap_eval_with_frame(
+        "(list (tool-bar-pixel-width)
+               (tool-bar-pixel-width (selected-frame))
+               (condition-case e (tool-bar-pixel-width (selected-window))
+                 (wrong-type-argument (car (cdr e))))
+               (condition-case e (tool-bar-pixel-width 'foo)
+                 (wrong-type-argument (car (cdr e)))))",
+    );
+    assert_eq!(out[0], "OK (0 0 framep framep)");
+}
+
 /// `coordinates-in-window-p` measures from the window's PIXEL edge.
 ///
 /// GNU converts the canonical-character COORDINATES to pixels

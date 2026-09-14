@@ -3302,8 +3302,44 @@ pub(crate) fn builtin_tool_bar_get_system_style(args: Vec<Value>) -> EvalResult 
     Ok(Value::NIL)
 }
 
-pub(crate) fn builtin_tool_bar_pixel_width(args: Vec<Value>) -> EvalResult {
+/// `(tool-bar-pixel-width &optional FRAME)`; GNU `decode_any_frame`.
+///
+/// GNU decodes before it answers (`src/frame.c:4439`):
+///
+///     #ifdef FRAME_TOOLBAR_WIDTH
+///       struct frame *f = decode_any_frame (frame);
+///       if (FRAME_WINDOW_P (f)) return make_fixnum (FRAME_TOOLBAR_WIDTH (f));
+///     #endif
+///       return make_fixnum (0);
+///
+/// so a non-frame signals `framep` and never reaches the constant.  The width
+/// is 0 until a side-mounted tool bar exists to measure, but the DECODE is not
+/// a placeholder -- it is the whole Lisp-visible contract of the argument, and
+/// dropping it is what let `(tool-bar-pixel-width SOME-WINDOW)` answer 0.
+///
+/// `decode_any_frame`, not the live decoder: GNU's is a bare `CHECK_FRAME`, so
+/// a dead frame is accepted here just as `framep` accepts one.
+pub(crate) fn builtin_tool_bar_pixel_width(
+    eval: &mut crate::emacs_core::eval::Context,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args_range("tool-bar-pixel-width", &args, 0, 1)?;
+    match args.first().filter(|frame| !frame.is_nil()) {
+        Some(frame) => {
+            crate::emacs_core::window_cmds::resolve_frame_id_in_state(
+                &mut eval.frames,
+                &mut eval.buffers,
+                Some(frame),
+                crate::emacs_core::window_cmds::FrameDomain::Any,
+            )?;
+        }
+        None => {
+            crate::emacs_core::window_cmds::ensure_selected_frame_id_in_state(
+                &mut eval.frames,
+                &mut eval.buffers,
+            );
+        }
+    }
     Ok(Value::fixnum(0))
 }
 
