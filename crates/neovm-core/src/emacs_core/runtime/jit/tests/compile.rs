@@ -2273,6 +2273,112 @@ fn mir_pure_lowering_handles_a_call() {
     }
 }
 
+/// Rooting sites in one MIR body share ONE hoisted root window: the prologue
+/// loads the frame base and checks capacity once, the first `length` site
+/// stores the residual `[l h]`, and the next two sites (a call, a second
+/// `length`) find the same values already in the window and elide their
+/// stores. The elision is only sound if the slots really still hold them, so
+/// the middle site is a call to a function that runs an EXACT collection
+/// (which ignores the native stack) and then reallocates 4096 conses: a
+/// dropped root for `h` would be swept and its slot reused, reading back
+/// `(0 . 0)`-shaped garbage instead of `(1 . 2)`.
+///
+///     (lambda (l) (let ((h (cons 1 2))) (length l) (gcchurn) (length l) h))
+#[test]
+fn mir_hoists_the_root_window_across_shim_sites() {
+    use crate::emacs_core::eval::Context;
+    let mut ev = Context::new();
+    ev.gc_stress = true;
+    let ctx = &mut ev as *mut Context as *mut u8;
+    let churn_sym = Value::symbol("jit-mir-hoist-gcchurn");
+    let crate::emacs_core::value::ValueKind::Symbol(churn_id) = churn_sym.kind() else {
+        panic!("symbol");
+    };
+    let mut churn = ByteCodeFunction::new(LambdaParams {
+        required: Vec::new(),
+        optional: Vec::new(),
+        rest: None,
+    });
+    churn.lexical = true;
+    churn.ops = vec![
+        Op::Constant(0), // 'garbage-collect
+        Op::Call(0),     // exact collection
+        Op::Pop,
+        Op::Constant(1), // 'make-list
+        Op::Constant(2), // 4096
+        Op::Constant(3), // 0
+        Op::Call(2),     // reuses freed slots
+        Op::Return,
+    ];
+    churn.constants = vec![
+        Value::symbol("garbage-collect"),
+        Value::symbol("make-list"),
+        Value::make_int(4096),
+        Value::make_int(0),
+    ]
+    .into();
+    churn.max_stack = 16;
+    ev.obarray
+        .set_symbol_function_id(churn_id, Value::make_bytecode(churn));
+    let ops = vec![
+        Op::Constant(0), // 1                 [l 1]
+        Op::Constant(1), // 2                 [l 1 2]
+        Op::Cons,        // h = (1 . 2)       [l h]
+        Op::StackRef(1), // l                 [l h l]
+        Op::Length,      // residual [l h]    stores 2
+        Op::Pop,         //                   [l h]
+        Op::Constant(2), // 'gcchurn          [l h g]
+        Op::Call(0),     // residual [l h]    elides 2
+        Op::Pop,         //                   [l h]
+        Op::StackRef(1), // l                 [l h l]
+        Op::Length,      // residual [l h]    elides 2
+        Op::Pop,         //                   [l h]
+        Op::Return,      // h
+    ];
+    let constants = [Value::make_int(1), Value::make_int(2), churn_sym];
+    let mir = mir::build_mir(&ops, &constants, 1).expect("MIR builds");
+    let plan = super::lowering::plan_mir_leaf(&mir);
+    assert_eq!(plan.rooting_sites, 3);
+    let leaf = lower_mir_pure(&mir).expect("lowers");
+    assert_eq!(
+        super::lowering::rootwin_counters(),
+        (2, 4),
+        "the first site stores l and h; the call and the second length elide both"
+    );
+    for _ in 0..3 {
+        let l = ev.eval_str("(list 1 2 3)").expect("l");
+        let NativeRun::Ok(bits) = leaf.call(ctx, &[l]) else {
+            panic!("must run natively");
+        };
+        let h = Value::from_bits(bits);
+        assert!(h.is_cons(), "h survived the exact collection (got {h:?})");
+        assert_eq!(h.cons_car(), Value::make_int(1), "car intact");
+        assert_eq!(h.cons_cdr(), Value::make_int(2), "cdr intact");
+    }
+}
+
+/// A cons-only body has no rooting site (the cons shim is context-free), so
+/// nothing is hoisted and it still runs with a null vmctx.
+#[test]
+fn mir_cons_only_body_does_not_hoist() {
+    let ops = vec![Op::StackRef(1), Op::StackRef(1), Op::Cons, Op::Return];
+    let mir = mir::build_mir(&ops, &[], 2).expect("MIR builds");
+    let plan = super::lowering::plan_mir_leaf(&mir);
+    assert!(plan.needs_rt && plan.rooting_sites == 0 && !plan.precise);
+    let leaf = lower_mir_pure(&mir).expect("lowers");
+    assert_eq!(
+        super::lowering::rootwin_counters(),
+        (0, 0),
+        "no window, no stores"
+    );
+    let bits = leaf
+        .call_for_test(&[Value::make_int(1), Value::make_int(2)])
+        .expect("runs with a null vmctx");
+    let c = Value::from_bits(bits);
+    assert_eq!(c.cons_car().bits(), Value::make_int(1).bits());
+    assert_eq!(c.cons_cdr().bits(), Value::make_int(2).bits());
+}
+
 /// The adapter: a variable read stays in the MIR tier, through the baseline's
 /// `VarRef` arm — a bound special reads its value, an unbound one signals
 /// `void-variable` through the shared signal exit, and the body is precise

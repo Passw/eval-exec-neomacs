@@ -1413,8 +1413,14 @@ pub(crate) struct MirLeafPlan {
     /// Words the call-args scratch slot must hold: the widest operand set any
     /// `Opaque` marshals (the baseline's arms store `needs` words at `i*8`).
     pub(crate) max_call_args: usize,
-    /// The deepest pre-op operand stack: the precise-deopt spill size.
+    /// The deepest pre-op operand stack: the precise-deopt spill size, and
+    /// the widest residual any rooting site can need.
     pub(crate) max_depth: usize,
+    /// `Opaque` ops whose emitter roots a residual in the Context root window
+    /// (the baseline's `is_rooting_site_op`): calls, variable ops, builtins,
+    /// list ops. A `Cons` is not one (its shim is context-free), so a
+    /// cons-only body may still run with a null vmctx.
+    pub(crate) rooting_sites: usize,
 }
 
 /// Decide a MIR leaf's [`MirLeafPlan`].
@@ -1458,6 +1464,9 @@ pub(crate) fn plan_mir_leaf(m: &mir::MirFunction) -> MirLeafPlan {
         .max()
         .unwrap_or(0);
     let max_depth = insts().map(|i| i.pre_stack.len()).max().unwrap_or(0);
+    let rooting_sites = insts()
+        .filter(|i| matches!(&i.op, MirOp::Opaque { op, .. } if super::is_rooting_site_op(op)))
+        .count();
     MirLeafPlan {
         has_opaque,
         has_generic_call,
@@ -1468,6 +1477,7 @@ pub(crate) fn plan_mir_leaf(m: &mir::MirFunction) -> MirLeafPlan {
         cons_repl,
         max_call_args,
         max_depth,
+        rooting_sites,
     }
 }
 
@@ -1842,6 +1852,7 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
 ) -> Result<cranelift_module::FuncId, CompileError> {
     imm_pool_reset();
     guards_emitted_reset();
+    rootwin_counters_reset();
     use mir::{BinKind, CmpKind, MirOp, MirTerm, PredKind as MP, UnaryKind as MU};
 
     // The block-parameter type fixpoint (the MIR twin of the baseline's
@@ -1897,7 +1908,7 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
         // Runtime context for calls (vmctx + shims + arg/result slots), built only
         // when the body has a call. declare_rt_refs declares the full import set;
         // only the referenced shims (call/apply/gc_*) are resolved at finalize.
-        let rt = if plan.needs_rt {
+        let mut rt = if plan.needs_rt {
             // `module` is already `&mut M`; reborrow it for the call. The MIR
             // tier never emits subr-speculated or CBSym-intrinsic calls
             // (subr_spec=false, cbsym_spec=false).
@@ -2003,8 +2014,21 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
         fb.append_block_params_for_function_params(entry);
         fb.switch_to_block(entry);
         let vmctx_param = fb.block_params(entry)[0];
-        if let Some(rt) = &rt {
+        if let Some(rt) = rt.as_mut() {
             fb.def_var(rt.vmctx_var, vmctx_param);
+            // Root-window base + capacity check once per activation instead
+            // of once per site (`HoistedRootWin`), on the baseline's rule:
+            // only a body with rooting sites (those dereference the vmctx
+            // anyway, so it is a real Context — a site-free body may be
+            // entered with a null one), and only when a site can run more
+            // than once per activation (two sites, or one in a loop). The
+            // un-hoisted per-site sequence was the whole MIR-vs-baseline
+            // gap on shim-heavy bodies: a 47-op dhrystone body lowered to
+            // 593 CLIF instructions here against the baseline's 382.
+            let sites = plan.rooting_sites;
+            if plan.max_depth > 0 && (sites >= 2 || (sites == 1 && plan.has_backedge)) {
+                emit_hoisted_root_window_prologue(&mut fb, rt, vmctx_param, plan.max_depth);
+            }
         }
         let args_ptr = fb.block_params(entry)[1];
         let out_ptr = fb.block_params(entry)[2];
@@ -2058,6 +2082,10 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
         for (bi, blk) in m.blocks.iter().enumerate() {
             let cb = clif_blocks[bi];
             fb.switch_to_block(cb);
+            // A block head can be reached from more than one predecessor, so
+            // the record of which root-window slots already hold their value
+            // (`RootWinCarry`) is dropped here, as at a bytecode leader.
+            rootwin_carry_reset();
             // Bind this block's params to the CLIF block params.
             let bp = fb.block_params(cb).to_vec();
             for (p, &cv) in blk.params.iter().zip(bp.iter()) {
@@ -2569,10 +2597,11 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
             slots,
         ));
     });
+    let (rw_stores, rw_elided) = rootwin_counters();
     dump_clif(
         &func,
         &format!(
-            "mir blocks={} fixnum_params={n_fixnum_params} guards={} untags={} retags={}",
+            "mir blocks={} fixnum_params={n_fixnum_params} guards={} untags={} retags={} rw_stores={rw_stores} rw_elided={rw_elided}",
             m.blocks.len(),
             guards_emitted(),
             untags_emitted(),

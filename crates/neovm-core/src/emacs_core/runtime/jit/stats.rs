@@ -70,9 +70,12 @@ pub(crate) struct CompileStats {
     pub mir_gate_prefix: u64,
     /// Passed the gates but `build_mir` bailed (unmodelled op, odd CFG).
     pub mir_build_failed: u64,
-    /// Built, but `lower_mir_pure` bailed.
+    /// Passed the tier gate, but `lower_mir_pure` bailed.
     pub mir_lower_failed: u64,
-    /// Lowered, but call-bearing and inlined nothing — baseline is better.
+    /// Built (and inlined), but the tier gate sent it to the baseline before
+    /// lowering — keyed `gate:*` in the bail census: a Float-feedback site, a
+    /// loop with a shim-lowered op, or a generic call in a body that inlined
+    /// nothing.
     pub mir_tier_rejected: u64,
     /// Actually took the MIR tier.
     pub mir_taken: u64,

@@ -1081,51 +1081,46 @@ fn compile_bytecode_function_inner(
             }
             (n > 0).then_some(armed)
         });
-        // The gate reads the INLINED body's plan (what gets lowered), and is
-        // decided AFTER the lowering so `tier_rej` keeps meaning "lowered,
-        // then dropped".
+        // The tier gate reads the INLINED body's plan (what would be lowered)
+        // and is decided BEFORE the lowering: a rejected body goes to the
+        // baseline, so lowering it first would be a wasted compile (75 of
+        // 233 bodies on the org editing row — a measurable share of a
+        // compile-heavy run). One key per reason:
+        //  * float-site: the baseline has the f64 path; MIR would deopt on
+        //    every entry (see above).
+        //  * loop-opaque: a loop with a shim-lowered op. The MIR tier has no
+        //    back-edge poll (quit + GC safepoint), so such a loop would be
+        //    uninterruptible. Pure loops keep the tier.
+        //  * generic-call: a `Call`/`Apply`/`CallBuiltinSym` the baseline
+        //    lowers BETTER (speculated native-to-native, CBSym intrinsics)
+        //    — unless the body INLINED something, the one case the MIR
+        //    tier wins across a call (cross-boundary unboxing/elision).
         let plan = lowering::plan_mir_leaf(&mir);
-        if let Ok(mut leaf) = lower_mir_pure(&mir).inspect_err(|e| {
+        let reject = if has_float_site {
+            Some("gate:float-site")
+        } else if plan.has_backedge && plan.has_adapter_site {
+            Some("gate:loop-opaque")
+        } else if plan.has_generic_call && inline_epoch.is_none() {
+            Some("gate:generic-call")
+        } else {
+            None
+        };
+        if let Some(key) = reject {
+            super::stats::record_mir_bail(key.to_string());
+            super::stats::record_mir(super::stats::MirFunnel::TierRejected);
+        } else if let Ok(mut leaf) = lower_mir_pure(&mir).inspect_err(|e| {
             super::stats::record_mir(super::stats::MirFunnel::LowerFailed);
             super::stats::record_mir_bail(format!("lower:{e:?}"));
         }) {
-            // Tier gate, one key per reason:
-            //  * float-site: the baseline has the f64 path; MIR would deopt on
-            //    every entry (see above).
-            //  * loop-opaque: a loop with a shim-lowered op. The MIR tier has
-            //    no back-edge poll (quit + GC safepoint) and no hoisted root
-            //    window, so such a loop is both uninterruptible and slower
-            //    than the baseline's. Pure loops keep the tier.
-            //  * generic-call: a `Call`/`Apply`/`CallBuiltinSym` the baseline
-            //    lowers BETTER (speculated native-to-native, CBSym intrinsics)
-            //    — unless the body INLINED something, the one case the MIR
-            //    tier wins across a call (cross-boundary unboxing/elision).
-            let reject = if has_float_site {
-                Some("gate:float-site")
-            } else if plan.has_backedge && plan.has_adapter_site {
-                Some("gate:loop-opaque")
-            } else if plan.has_generic_call && inline_epoch.is_none() {
-                Some("gate:generic-call")
-            } else {
-                None
-            };
-            match reject {
-                None => {
-                    super::stats::record_mir(super::stats::MirFunnel::Taken);
-                    leaf.required = required;
-                    leaf.has_rest = has_rest;
-                    leaf.inline_epoch = inline_epoch;
-                    // The precise dependency set (registered into INLINE_DEPS at the
-                    // cache compile-miss site so a redefinition of any inlined callee
-                    // evicts exactly this leaf).
-                    leaf.inline_deps = inlined_syms.into();
-                    return Ok(leaf);
-                }
-                Some(key) => {
-                    super::stats::record_mir_bail(key.to_string());
-                    super::stats::record_mir(super::stats::MirFunnel::TierRejected);
-                }
-            }
+            super::stats::record_mir(super::stats::MirFunnel::Taken);
+            leaf.required = required;
+            leaf.has_rest = has_rest;
+            leaf.inline_epoch = inline_epoch;
+            // The precise dependency set (registered into INLINE_DEPS at the
+            // cache compile-miss site so a redefinition of any inlined callee
+            // evicts exactly this leaf).
+            leaf.inline_deps = inlined_syms.into();
+            return Ok(leaf);
         }
     }
     // The MIR tier above already claimed any body its inlining/unboxing makes
@@ -2729,7 +2724,7 @@ pub(crate) fn count_rooting_sites(ops: &[Op]) -> usize {
     ops.iter().filter(|o| is_rooting_site_op(o)).count()
 }
 
-fn is_rooting_site_op(o: &Op) -> bool {
+pub(crate) fn is_rooting_site_op(o: &Op) -> bool {
     {
         direct_builtin_spec(o).is_some()
             || slice_builtin_spec(o).is_some()
