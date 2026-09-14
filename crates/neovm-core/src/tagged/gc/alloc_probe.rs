@@ -52,6 +52,7 @@ allocation_kinds! {
     Timer => ("Timer", super::TimerObj),
     SurfaceHandle => ("SurfaceHandle", super::SurfaceObj),
     VideoHandle => ("VideoHandle", super::VideoObj),
+    ThreadingHandle => ("ThreadingHandle", super::ThreadingHandleObj),
 }
 /// Histogram bucket upper bounds (bytes).
 pub(crate) const BUCKET_LABELS: [&str; N_BUCKETS] = [
@@ -91,6 +92,9 @@ fn kind_index(header: *const GcHeader) -> usize {
             VecLikeType::XwidgetView => AllocKind::XwidgetView,
             VecLikeType::ModuleFunction => AllocKind::ModuleFunction,
             VecLikeType::Sqlite => AllocKind::Sqlite,
+            VecLikeType::Thread | VecLikeType::Mutex | VecLikeType::CondVar => {
+                AllocKind::ThreadingHandle
+            }
             VecLikeType::Lambda => AllocKind::Lambda,
             VecLikeType::CharTable => AllocKind::CharTable,
             VecLikeType::SubCharTable => AllocKind::SubCharTable,

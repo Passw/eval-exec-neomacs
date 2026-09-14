@@ -1180,6 +1180,17 @@ fn write_value_stateful_inner(
             // GNU `print_vectorlike_unreadable` prints finalizers opaquely.
             out.push_str("#<finalizer>");
         }
+        ValueKind::Veclike(
+            kind @ (VecLikeType::Thread | VecLikeType::Mutex | VecLikeType::CondVar),
+        ) => {
+            write!(
+                out,
+                "#<{} {}>",
+                threading_handle_print_name(kind),
+                value.threading_handle_id().unwrap_or(0)
+            )
+            .unwrap();
+        }
         ValueKind::Veclike(VecLikeType::Sqlite) => {
             let obj = value.as_sqlite().unwrap();
             if obj.is_statement {
@@ -2139,6 +2150,18 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>, options: PrintOpti
         ValueKind::Veclike(VecLikeType::Finalizer) => {
             out.extend_from_slice(b"#<finalizer>");
         }
+        ValueKind::Veclike(
+            kind @ (VecLikeType::Thread | VecLikeType::Mutex | VecLikeType::CondVar),
+        ) => {
+            out.extend_from_slice(
+                format!(
+                    "#<{} {}>",
+                    threading_handle_print_name(kind),
+                    value.threading_handle_id().unwrap_or(0)
+                )
+                .as_bytes(),
+            );
+        }
         ValueKind::Veclike(VecLikeType::Sqlite) => {
             let obj = value.as_sqlite().unwrap();
             if obj.is_statement {
@@ -2798,6 +2821,19 @@ fn append_hash_table_bytes(value: &Value, out: &mut Vec<u8>, options: PrintOptio
     }
 
     out.push(b')');
+}
+
+/// The name GNU prints a threading handle under.
+///
+/// GNU's `print_vectorlike_unreadable` writes `#<thread ...>`, `#<mutex ...>`
+/// and `#<condvar ...>` -- note the last is `condvar`, not the
+/// `condition-variable` that `type-of` answers.
+fn threading_handle_print_name(kind: crate::tagged::header::VecLikeType) -> &'static str {
+    match kind {
+        crate::tagged::header::VecLikeType::Thread => "thread",
+        crate::tagged::header::VecLikeType::Mutex => "mutex",
+        _ => "condvar",
+    }
 }
 
 #[cfg(test)]

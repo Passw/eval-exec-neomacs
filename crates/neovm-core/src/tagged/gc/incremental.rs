@@ -1040,7 +1040,10 @@ impl TaggedHeap {
             | VecLikeType::Sqlite
             | VecLikeType::UserPtr
             | VecLikeType::SurfaceHandle
-            | VecLikeType::VideoHandle => {
+            | VecLikeType::VideoHandle
+            | VecLikeType::Thread
+            | VecLikeType::Mutex
+            | VecLikeType::CondVar => {
                 // These have no Value children to trace.
                 //
                 // Bignums own a `malachite::Integer`, which manages
@@ -1050,7 +1053,9 @@ impl TaggedHeap {
                 // UserPtr has only a raw C pointer and finalizer, no
                 // Lisp children.
                 //
-                // SurfaceHandle and VideoHandle contain only typed ids.
+                // SurfaceHandle, VideoHandle and the threading handles
+                // contain only typed ids; the state they name lives in the
+                // ThreadManager, which roots its own canonical handles.
             }
         }
     }
@@ -1432,6 +1437,9 @@ impl TaggedHeap {
                         drop(Box::from_raw(ptr as *mut FinalizerObj))
                     },
                     VecLikeType::Sqlite => unsafe { drop(Box::from_raw(ptr as *mut SqliteObj)) },
+                    VecLikeType::Thread | VecLikeType::Mutex | VecLikeType::CondVar => unsafe {
+                        drop(Box::from_raw(ptr as *mut ThreadingHandleObj))
+                    },
                     VecLikeType::UserPtr => {
                         // Call the finalizer if present before dropping.
                         let up = ptr as *mut UserPtrObj;

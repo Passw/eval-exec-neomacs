@@ -245,7 +245,7 @@ fn test_builtin_make_thread_runs_function() {
     );
     assert!(result.is_ok());
     let tid = result.unwrap();
-    assert_eq!(tagged_object_id(&tid, "thread"), Some(1));
+    assert_eq!(tagged_object_id(&tid, ThreadingKind::Thread), Some(1));
 }
 
 #[test]
@@ -269,7 +269,7 @@ fn test_builtin_make_thread_accepts_buffer_disposition_arg() {
     );
     assert!(result.is_ok());
     let thread = result.unwrap();
-    let thread_id = tagged_object_id(&thread, "thread").unwrap();
+    let thread_id = tagged_object_id(&thread, ThreadingKind::Thread).unwrap();
     assert_eq!(thread_id, 1);
     assert_eq!(
         eval.threads.thread_buffer_disposition(thread_id),
@@ -338,7 +338,10 @@ fn test_builtin_current_thread() {
     let mut eval = Context::new();
     let result = builtin_current_thread(&mut eval, vec![]);
     assert!(result.is_ok());
-    assert_eq!(tagged_object_id(&result.unwrap(), "thread"), Some(0));
+    assert_eq!(
+        tagged_object_id(&result.unwrap(), ThreadingKind::Thread),
+        Some(0)
+    );
 }
 
 #[test]
@@ -576,7 +579,7 @@ fn test_builtin_all_threads_includes_main() {
     assert!(!list.is_empty());
     assert!(
         list.iter()
-            .any(|v| tagged_object_id(v, "thread") == Some(0))
+            .any(|v| tagged_object_id(v, ThreadingKind::Thread) == Some(0))
     );
 }
 
@@ -864,7 +867,7 @@ fn test_builtin_make_thread_preserves_caller_current_buffer() {
 
     let thread = builtin_make_thread(&mut eval, vec![Value::symbol("thread-switch-buffer")])
         .expect("make-thread");
-    let thread_id = tagged_object_id(&thread, "thread").expect("thread id");
+    let thread_id = tagged_object_id(&thread, ThreadingKind::Thread).expect("thread id");
     let joined = builtin_thread_join(&mut eval, vec![thread]).expect("thread-join");
 
     assert_eq!(joined, Value::make_buffer(worker_buffer));
@@ -885,7 +888,7 @@ fn test_builtin_make_mutex() {
     let result = builtin_make_mutex(&mut eval, vec![Value::string("my-mutex")]);
     assert!(result.is_ok());
     let mx = result.unwrap();
-    assert_eq!(tagged_object_id(&mx, "mutex"), Some(1));
+    assert_eq!(tagged_object_id(&mx, ThreadingKind::Mutex), Some(1));
 }
 
 #[test]
@@ -942,7 +945,7 @@ fn test_builtin_make_condition_variable() {
     let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
     let result = builtin_make_condition_variable(&mut eval, vec![mx, Value::string("my-cv")]);
     assert!(result.is_ok());
-    assert!(tagged_object_id(&result.unwrap(), "condition-variable").is_some());
+    assert!(tagged_object_id(&result.unwrap(), ThreadingKind::CondVar).is_some());
 }
 
 #[test]
@@ -1111,7 +1114,7 @@ fn test_sf_with_mutex_executes_body() {
 
     let mut eval = Context::new();
     let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
-    let mx_id = tagged_object_id(&mx, "mutex").unwrap();
+    let mx_id = tagged_object_id(&mx, ThreadingKind::Mutex).unwrap();
 
     // Store the mutex id in a variable so the special form can look it up
     eval.set_variable("test-mx", mx);
@@ -1133,7 +1136,7 @@ fn test_sf_with_mutex_unlocks_on_error() {
 
     let mut eval = Context::new();
     let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
-    let mx_id = tagged_object_id(&mx, "mutex").unwrap();
+    let mx_id = tagged_object_id(&mx, ThreadingKind::Mutex).unwrap();
     eval.set_variable("test-mx2", mx);
 
     // (with-mutex test-mx2 (/ 1 0))  -- will signal arith-error
@@ -1308,4 +1311,54 @@ fn test_condition_wait_nonexistent() {
     let fake = Value::cons(Value::symbol("condition-variable"), Value::fixnum(999));
     let result = builtin_condition_wait(&mut eval, vec![fake]);
     assert!(result.is_err());
+}
+
+/// A thread, a mutex and a condition variable are OPAQUE objects, not conses.
+///
+/// GNU gives each its own `PVEC_` tag -- `PVEC_THREAD`, `PVEC_MUTEX`,
+/// `PVEC_CONDVAR` (`src/lisp.h`) -- so `consp`, `listp`, `car` and `cdr` all
+/// refuse them and `type-of` names them.  neomacs represented all three as a
+/// tagged cons `(thread . ID)`, which `threadp` then recognised by IDENTITY
+/// against a canonical handle.  That made the PREDICATE right and left the
+/// OBJECT wrong: the internals were readable with `car`, the shape leaked
+/// through `consp`/`listp`, and `type-of` answered `cons`.
+///
+/// Measured on GNU Emacs 31.0.50, `emacs -Q --batch`, against the neomacs
+/// binary before this fix -- eleven divergences over the three types:
+///
+///     (consp (current-thread))        GNU nil    neomacs t
+///     (listp (current-thread))        GNU nil    neomacs t
+///     (car (current-thread))          GNU error  neomacs thread
+///     (cdr (current-thread))          GNU error  neomacs 0
+///     (type-of (current-thread))      GNU thread neomacs cons
+///     ... and the same for `make-mutex' and `make-condition-variable'.
+///
+/// It is the same shape as the fixnum-as-window-designator confusion: an
+/// identity that is really opaque, spelled as a value Lisp can take apart.
+#[test]
+fn threads_mutexes_and_condition_variables_are_opaque_objects_not_conses() {
+    crate::test_utils::init_test_tracing();
+    let mut eval = Context::new();
+    let results = eval.eval_str_each(
+        "(let ((th (current-thread))
+               (mx (make-mutex \"m\"))
+               (cv (make-condition-variable (make-mutex \"m2\") \"c\")))
+           (prin1-to-string
+            (list (consp th) (listp th) (type-of th)
+                  (consp mx) (listp mx) (type-of mx)
+                  (consp cv) (listp cv) (type-of cv)
+                  (condition-case e (car th) (error (car e)))
+                  (condition-case e (cdr th) (error (car e))))))",
+    );
+    let value = results
+        .into_iter()
+        .next()
+        .expect("one form")
+        .expect("the form evaluates");
+    assert_eq!(
+        value
+            .as_str_owned()
+            .expect("prin1-to-string returns a string"),
+        "(nil nil thread nil nil mutex nil nil condition-variable wrong-type-argument wrong-type-argument)"
+    );
 }

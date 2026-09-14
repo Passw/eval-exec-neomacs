@@ -1616,6 +1616,9 @@ impl TaggedHeap {
                         VecLikeType::SymbolWithPos => size_of::<SymbolWithPosObj>(),
                         VecLikeType::Finalizer => size_of::<FinalizerObj>(),
                         VecLikeType::Sqlite => size_of::<SqliteObj>(),
+                        VecLikeType::Thread | VecLikeType::Mutex | VecLikeType::CondVar => {
+                            size_of::<ThreadingHandleObj>()
+                        }
                         VecLikeType::UserPtr => size_of::<UserPtrObj>(),
                         VecLikeType::ModuleFunction => size_of::<ModuleFunctionObj>(),
                     }
@@ -1789,6 +1792,9 @@ impl TaggedHeap {
                     VecLikeType::XwidgetView => "xwidget-view",
                     VecLikeType::ModuleFunction => "module-function",
                     VecLikeType::Sqlite => "sqlite",
+                    VecLikeType::Thread => "thread",
+                    VecLikeType::Mutex => "mutex",
+                    VecLikeType::CondVar => "condvar",
                     VecLikeType::Lambda => "lambda",
                     VecLikeType::CharTable => "char-table",
                     VecLikeType::SubCharTable => "sub-char-table",

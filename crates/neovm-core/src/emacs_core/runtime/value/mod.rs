@@ -2216,6 +2216,25 @@ impl TaggedValue {
         with_tagged_heap(|h| h.alloc_video_handle(video_id))
     }
 
+    /// Allocate an opaque thread, mutex or condition-variable handle.
+    ///
+    /// `kind` must be one of `VecLikeType::{Thread, Mutex, CondVar}`.
+    pub(crate) fn make_threading_handle(kind: crate::tagged::header::VecLikeType, id: u64) -> Self {
+        with_tagged_heap(|h| h.alloc_threading_handle(kind, id))
+    }
+
+    /// The id inside a thread, mutex or condition-variable handle, or `None`
+    /// for any other value.
+    pub(crate) fn threading_handle_id(self) -> Option<u64> {
+        use crate::tagged::header::VecLikeType;
+        match self.veclike_type()? {
+            VecLikeType::Thread | VecLikeType::Mutex | VecLikeType::CondVar => {}
+            _ => return None,
+        }
+        let ptr = self.as_veclike_ptr()? as *const crate::tagged::header::ThreadingHandleObj;
+        Some(unsafe { (*ptr).id })
+    }
+
     /// Allocate an opaque SQLite database or statement object.
     pub(crate) fn make_sqlite(is_statement: bool, id: i64) -> Self {
         with_tagged_heap(|h| h.alloc_sqlite(is_statement, id))

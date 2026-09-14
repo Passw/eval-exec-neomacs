@@ -306,6 +306,12 @@ pub enum VecLikeType {
     Xwidget = 20,
     /// Embedded widget view object (GNU `PVEC_XWIDGET_VIEW`).
     XwidgetView = 21,
+    /// Lisp thread object (GNU `PVEC_THREAD`).
+    Thread = 22,
+    /// Mutex object (GNU `PVEC_MUTEX`).
+    Mutex = 23,
+    /// Condition-variable object (GNU `PVEC_CONDVAR`).
+    CondVar = 24,
     /// Dynamic module function (GNU `PVEC_MODULE_FUNCTION`).
     ModuleFunction = 25,
     /// SQLite database or statement object (like GNU's PVEC_SQLITE).
@@ -355,6 +361,9 @@ impl VecLikeType {
             Self::Subr => GnuPvecType::Subr,
             Self::Xwidget => GnuPvecType::Xwidget,
             Self::XwidgetView => GnuPvecType::XwidgetView,
+            Self::Thread => GnuPvecType::Thread,
+            Self::Mutex => GnuPvecType::Mutex,
+            Self::CondVar => GnuPvecType::Condvar,
             Self::ModuleFunction => GnuPvecType::ModuleFunction,
             Self::Sqlite => GnuPvecType::Sqlite,
             Self::Lambda => GnuPvecType::Closure,
@@ -1149,6 +1158,20 @@ pub struct TimerObj {
 pub struct SurfaceObj {
     pub header: VecLikeHeader,
     pub surface_id: u32,
+}
+
+/// Heap-allocated handle for one thread, mutex or condition variable.
+///
+/// GNU gives each of the three its own struct; here they differ only in the
+/// header tag, because all three are an identity -- the state itself lives in
+/// the `ThreadManager`, keyed by `id`.  What matters, and what a tagged cons
+/// could not give, is that the tag makes them OPAQUE: `consp`, `listp`, `car`
+/// and `cdr` refuse them and `type-of` names them, exactly as GNU's
+/// `PVEC_THREAD` / `PVEC_MUTEX` / `PVEC_CONDVAR` do.
+#[repr(C)]
+pub struct ThreadingHandleObj {
+    pub header: VecLikeHeader,
+    pub id: u64,
 }
 
 /// Heap-allocated handle for one host-owned video session.

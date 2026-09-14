@@ -347,6 +347,9 @@ pub(crate) fn builtin_cl_type_of(args: &[Value]) -> EvalResult {
         ValueKind::Veclike(VecLikeType::SymbolWithPos) => "symbol-with-pos",
         ValueKind::Veclike(VecLikeType::Finalizer) => "finalizer",
         ValueKind::Veclike(VecLikeType::Sqlite) => "sqlite",
+        ValueKind::Veclike(VecLikeType::Thread) => "thread",
+        ValueKind::Veclike(VecLikeType::Mutex) => "mutex",
+        ValueKind::Veclike(VecLikeType::CondVar) => "condition-variable",
         ValueKind::Veclike(VecLikeType::UserPtr) => "user-ptr",
         ValueKind::Veclike(VecLikeType::ModuleFunction) => "module-function",
         // `Qunbound` is internal and should never reach `type-of`

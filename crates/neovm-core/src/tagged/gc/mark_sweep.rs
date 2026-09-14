@@ -1182,8 +1182,9 @@ impl TaggedHeap {
                     out.extend([o.model, o.window]);
                 }
                 // Buffer/Window/Frame/Timer/Process/Terminal/Marker/Subr/
-                // Bignum/Sqlite/UserPtr/SurfaceHandle/VideoHandle have no Value children
-                // to trace (mirrors trace_veclike).
+                // Bignum/Sqlite/UserPtr/SurfaceHandle/VideoHandle and the three
+                // threading handles have no Value children to trace (mirrors
+                // trace_veclike).
                 VecLikeType::Buffer
                 | VecLikeType::Window
                 | VecLikeType::Frame
@@ -1196,7 +1197,10 @@ impl TaggedHeap {
                 | VecLikeType::Sqlite
                 | VecLikeType::UserPtr
                 | VecLikeType::SurfaceHandle
-                | VecLikeType::VideoHandle => {}
+                | VecLikeType::VideoHandle
+                | VecLikeType::Thread
+                | VecLikeType::Mutex
+                | VecLikeType::CondVar => {}
             }
         }
         out

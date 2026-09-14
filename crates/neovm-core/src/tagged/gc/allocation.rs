@@ -536,6 +536,31 @@ impl TaggedHeap {
         unsafe { TaggedValue::from_veclike_ptr(ptr as *const VecLikeHeader) }
     }
 
+    /// Allocate a thread, mutex or condition-variable handle.
+    ///
+    /// `kind` must be one of `VecLikeType::{Thread, Mutex, CondVar}`; the id
+    /// names the entry the `ThreadManager` holds.  Not registry-rooted: the
+    /// manager owns the canonical handle and roots it, so a copy Lisp drops is
+    /// just a reference going away.
+    pub fn alloc_threading_handle(&mut self, kind: VecLikeType, id: u64) -> TaggedValue {
+        debug_assert!(
+            matches!(
+                kind,
+                VecLikeType::Thread | VecLikeType::Mutex | VecLikeType::CondVar
+            ),
+            "threading handles carry one of the three concurrency tags"
+        );
+        let obj = Box::new(ThreadingHandleObj {
+            header: VecLikeHeader::new(kind),
+            id,
+        });
+        let ptr = Box::into_raw(obj);
+        self.link_veclike(ptr as *mut VecLikeHeader);
+        self.allocated_count += 1;
+        self.note_allocation_bytes(size_of::<ThreadingHandleObj>());
+        unsafe { TaggedValue::from_veclike_ptr(ptr as *const VecLikeHeader) }
+    }
+
     /// Allocate a GC-managed video-session handle.
     pub fn alloc_video_handle(
         &mut self,

@@ -311,6 +311,19 @@ impl DumpEncoder {
             ValueKind::Veclike(VecLikeType::Sqlite) => {
                 panic!("pdump: sqlite objects are not portable")
             }
+            ValueKind::Veclike(VecLikeType::Thread | VecLikeType::Mutex | VecLikeType::CondVar) => {
+                // A handle names a live entry in the running `ThreadManager`,
+                // and identity IS the heap object, so nothing it refers to can
+                // survive into another process.  `main-thread` is the one that
+                // reaches this walk, and it is among the names an image cannot
+                // carry: `finish_runtime_activation` re-defines it from the
+                // restored evaluator's own `ThreadManager`, which is why
+                // `(eq main-thread (current-thread))` holds after a restore.
+                // Writing nil here records the only thing that is true of the
+                // dumped value -- it names nothing -- and activation replaces
+                // it before Lisp can observe it.
+                DumpValue::Nil
+            }
             ValueKind::Veclike(VecLikeType::UserPtr) => {
                 panic!("pdump: user-ptr objects are not portable")
             }

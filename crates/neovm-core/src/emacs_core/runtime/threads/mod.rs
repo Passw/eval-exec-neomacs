@@ -202,7 +202,7 @@ impl ThreadManager {
             },
         );
         let mut thread_handles = HashMap::new();
-        thread_handles.insert(0, tagged_object_value("thread", 0));
+        thread_handles.insert(0, tagged_object_value(ThreadingKind::Thread, 0));
         Self {
             threads,
             next_id: 1,
@@ -243,7 +243,7 @@ impl ThreadManager {
             },
         );
         self.thread_handles
-            .insert(id, tagged_object_value("thread", id));
+            .insert(id, tagged_object_value(ThreadingKind::Thread, id));
         id
     }
 
@@ -386,7 +386,7 @@ impl ThreadManager {
 
     /// Return the thread id iff VALUE is the canonical thread handle object.
     pub fn thread_id_from_handle(&self, value: &Value) -> Option<u64> {
-        canonical_handle_id(&self.thread_handles, value, "thread")
+        canonical_handle_id(&self.thread_handles, value, ThreadingKind::Thread)
     }
 
     /// Return all thread ids.
@@ -540,7 +540,7 @@ impl ThreadManager {
             },
         );
         self.mutex_handles
-            .insert(id, tagged_object_value("mutex", id));
+            .insert(id, tagged_object_value(ThreadingKind::Mutex, id));
         id
     }
 
@@ -601,7 +601,7 @@ impl ThreadManager {
 
     /// Return the mutex id iff VALUE is the canonical mutex handle object.
     pub fn mutex_id_from_handle(&self, value: &Value) -> Option<u64> {
-        canonical_handle_id(&self.mutex_handles, value, "mutex")
+        canonical_handle_id(&self.mutex_handles, value, ThreadingKind::Mutex)
     }
 
     /// Get mutex name.
@@ -632,7 +632,7 @@ impl ThreadManager {
         self.condition_vars
             .insert(id, ConditionVarState { id, name, mutex_id });
         self.condition_var_handles
-            .insert(id, tagged_object_value("condition-variable", id));
+            .insert(id, tagged_object_value(ThreadingKind::CondVar, id));
         Some(id)
     }
 
@@ -648,7 +648,7 @@ impl ThreadManager {
 
     /// Return the condition variable id iff VALUE is the canonical handle.
     pub fn condition_variable_id_from_handle(&self, value: &Value) -> Option<u64> {
-        canonical_handle_id(&self.condition_var_handles, value, "condition-variable")
+        canonical_handle_id(&self.condition_var_handles, value, ThreadingKind::CondVar)
     }
 
     /// Get condition variable name.
@@ -704,27 +704,59 @@ impl GcTrace for ThreadManager {
 // Argument helpers
 // ===========================================================================
 
-fn tagged_object_value(tag: &str, id: u64) -> Value {
-    Value::cons(Value::symbol(tag), Value::fixnum(id as i64))
+/// Which concurrency object a handle names.
+///
+/// GNU gives each of the three its own pseudovector tag -- `PVEC_THREAD`,
+/// `PVEC_MUTEX`, `PVEC_CONDVAR` (`src/lisp.h`) -- so spelling the choice as a
+/// type here makes a handle with a tag no decoder accepts unrepresentable.
+/// The `&str` tag this replaces did not: `tagged_object_value("thraed", id)`
+/// compiled, and produced a handle every predicate silently rejected.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ThreadingKind {
+    Thread,
+    Mutex,
+    CondVar,
 }
 
-fn tagged_object_id(value: &Value, expected_tag: &str) -> Option<u64> {
-    if !value.is_cons() {
-        return None;
-    };
-    let pair_car = value.cons_car();
-    let pair_cdr = value.cons_cdr();
-    if pair_car.as_symbol_name() != Some(expected_tag) {
-        return None;
-    }
-    match pair_cdr.kind() {
-        ValueKind::Fixnum(n) if n >= 0 => Some(n as u64),
-        _ => None,
+impl ThreadingKind {
+    /// The heap tag that makes this object opaque to Lisp.
+    fn veclike(self) -> crate::tagged::header::VecLikeType {
+        match self {
+            Self::Thread => crate::tagged::header::VecLikeType::Thread,
+            Self::Mutex => crate::tagged::header::VecLikeType::Mutex,
+            Self::CondVar => crate::tagged::header::VecLikeType::CondVar,
+        }
     }
 }
 
-fn canonical_handle_id(handles: &HashMap<u64, Value>, value: &Value, tag: &str) -> Option<u64> {
-    let id = tagged_object_id(value, tag)?;
+/// Allocate a fresh handle naming `id`.
+///
+/// Each call allocates a DISTINCT object, which is what makes the canonical
+/// check below meaningful: identity is the heap object, as it is in GNU, not
+/// the id printed inside it.
+fn tagged_object_value(kind: ThreadingKind, id: u64) -> Value {
+    Value::make_threading_handle(kind.veclike(), id)
+}
+
+/// The id inside `value`, if it is a handle of exactly `expected`'s kind.
+fn tagged_object_id(value: &Value, expected: ThreadingKind) -> Option<u64> {
+    if value.veclike_type() != Some(expected.veclike()) {
+        return None;
+    }
+    value.threading_handle_id()
+}
+
+/// The id inside `value`, if it is THE handle the manager holds for that id.
+///
+/// A handle built for an id the manager has since forgotten still carries the
+/// right tag, so the tag alone is not enough: the object must also be the one
+/// registered, which is `eq` identity.
+fn canonical_handle_id(
+    handles: &HashMap<u64, Value>,
+    value: &Value,
+    kind: ThreadingKind,
+) -> Option<u64> {
+    let id = tagged_object_id(value, kind)?;
     let canonical = handles.get(&id)?;
     if eq_value(canonical, value) {
         Some(id)
@@ -925,7 +957,7 @@ pub(crate) fn finish_make_thread_result(
 
     Ok(threads
         .thread_handle(thread_id)
-        .unwrap_or_else(|| tagged_object_value("thread", thread_id)))
+        .unwrap_or_else(|| tagged_object_value(ThreadingKind::Thread, thread_id)))
 }
 
 /// `(thread-join THREAD)` -- wait for thread completion.
@@ -1105,7 +1137,7 @@ pub(crate) fn builtin_current_thread(
     Ok(ctx
         .threads
         .thread_handle(id)
-        .unwrap_or_else(|| tagged_object_value("thread", id)))
+        .unwrap_or_else(|| tagged_object_value(ThreadingKind::Thread, id)))
 }
 
 /// `(all-threads)` -- return a list of all thread objects.
@@ -1121,7 +1153,7 @@ pub(crate) fn builtin_all_threads(
         .map(|id| {
             ctx.threads
                 .thread_handle(id)
-                .unwrap_or_else(|| tagged_object_value("thread", id))
+                .unwrap_or_else(|| tagged_object_value(ThreadingKind::Thread, id))
         })
         .collect();
     Ok(Value::list(objects))
@@ -1224,7 +1256,7 @@ pub(crate) fn builtin_make_mutex(
     Ok(ctx
         .threads
         .mutex_handle(id)
-        .unwrap_or_else(|| tagged_object_value("mutex", id)))
+        .unwrap_or_else(|| tagged_object_value(ThreadingKind::Mutex, id)))
 }
 
 /// `(mutexp OBJ)` -- type predicate for mutexes.
@@ -1349,7 +1381,7 @@ pub(crate) fn builtin_make_condition_variable(
         Some(id) => Ok(ctx
             .threads
             .condition_variable_handle(id)
-            .unwrap_or_else(|| tagged_object_value("condition-variable", id))),
+            .unwrap_or_else(|| tagged_object_value(ThreadingKind::CondVar, id))),
         None => Err(signal(
             LispCondition::WrongTypeArgument,
             vec![Value::symbol("mutexp"), args[0]],
