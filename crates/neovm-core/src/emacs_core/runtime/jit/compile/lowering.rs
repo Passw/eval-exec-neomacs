@@ -203,12 +203,14 @@ pub(crate) fn unbox_float(fb: &mut FunctionBuilder, v: ClifValue) -> ClifValue {
     )
 }
 
-/// Model-stack slot `k` as an `f64`.
-///
-/// A slot the fixnum unboxing already proved raw is an integer, so it PROMOTES
-/// (GNU's arithmetic promotes a fixnum operand to double when the other side is
-/// a float); anything else is guarded as a float and unboxed.
-pub(crate) fn stack_as_f64(
+/// Model-stack slot `k` as an `f64` at a FLOAT site, accepting a fixnum too:
+/// a raw slot is a proven fixnum and PROMOTES (GNU promotes a fixnum operand
+/// against a float); a tagged slot is tag-tested at run time — fixnum ->
+/// untag + promote, float -> unbox, anything else -> deopt. Its own
+/// diamond defining ONLY the f64 view: the compare helper below also
+/// converts the float to an integer for GNU's tie-break, and that
+/// `fcvt_to_sint_sat` would be dead here (~6 x86 instructions per site).
+pub(crate) fn stack_as_f64_or_promote(
     fb: &mut FunctionBuilder,
     deopt: Block,
     stack: &[ClifValue],
@@ -216,11 +218,202 @@ pub(crate) fn stack_as_f64(
     k: usize,
 ) -> ClifValue {
     if stack_raw[k] {
-        fb.ins().fcvt_from_sint(types::F64, stack[k])
-    } else {
-        guard_float(fb, deopt, stack[k]);
-        unbox_float(fb, stack[k])
+        return fb.ins().fcvt_from_sint(types::F64, stack[k]);
     }
+    let v = stack[k];
+    let out = fb.declare_var(types::F64);
+    let fix_b = fb.create_block();
+    let flt_b = fb.create_block();
+    let merge = fb.create_block();
+    let is_fix = fixnum_tag_test(fb, v);
+    fb.ins().brif(is_fix, fix_b, &[], flt_b, &[]);
+
+    fb.switch_to_block(fix_b);
+    fb.seal_block(fix_b);
+    let n = sshr_imm_p(fb, v, FIXNUM_SHIFT as i64);
+    let promoted = fb.ins().fcvt_from_sint(types::F64, n);
+    fb.def_var(out, promoted);
+    fb.ins().jump(merge, &[]);
+
+    fb.switch_to_block(flt_b);
+    fb.seal_block(flt_b);
+    guard_float(fb, deopt, v);
+    let unboxed = unbox_float(fb, v);
+    fb.def_var(out, unboxed);
+    fb.ins().jump(merge, &[]);
+
+    fb.switch_to_block(merge);
+    fb.seal_block(merge);
+    fb.use_var(out)
+}
+
+/// [`stack_as_f64_or_promote`] that ALSO returns an exact integer view of the
+/// slot: the fixnum itself when it is one, else the float's value converted
+/// with `fcvt_to_sint_sat` (saturating, NaN -> 0, so it is safe to evaluate
+/// unconditionally). GNU's `arithcompare` needs it: when a fixnum and a float
+/// tie as doubles it re-decides on integers, because promoting a fixnum
+/// above 2^53 rounds — `(> 9007199254740993 9007199254740992.0)` is t and
+/// `(= most-positive-fixnum (float most-positive-fixnum))` is nil.
+pub(crate) fn stack_as_f64_and_int(
+    fb: &mut FunctionBuilder,
+    deopt: Block,
+    stack: &[ClifValue],
+    stack_raw: &[bool],
+    k: usize,
+) -> (ClifValue, ClifValue) {
+    if stack_raw[k] {
+        let f = fb.ins().fcvt_from_sint(types::F64, stack[k]);
+        return (f, stack[k]);
+    }
+    let v = stack[k];
+    let out_f = fb.declare_var(types::F64);
+    let out_i = fb.declare_var(types::I64);
+    let fix_b = fb.create_block();
+    let flt_b = fb.create_block();
+    let merge = fb.create_block();
+    let is_fix = fixnum_tag_test(fb, v);
+    fb.ins().brif(is_fix, fix_b, &[], flt_b, &[]);
+
+    fb.switch_to_block(fix_b);
+    fb.seal_block(fix_b);
+    let n = sshr_imm_p(fb, v, FIXNUM_SHIFT as i64);
+    let promoted = fb.ins().fcvt_from_sint(types::F64, n);
+    fb.def_var(out_f, promoted);
+    fb.def_var(out_i, n);
+    fb.ins().jump(merge, &[]);
+
+    fb.switch_to_block(flt_b);
+    fb.seal_block(flt_b);
+    guard_float(fb, deopt, v);
+    let unboxed = unbox_float(fb, v);
+    let as_int = fb.ins().fcvt_to_sint_sat(types::I64, unboxed);
+    fb.def_var(out_f, unboxed);
+    fb.def_var(out_i, as_int);
+    fb.ins().jump(merge, &[]);
+
+    fb.switch_to_block(merge);
+    fb.seal_block(merge);
+    (fb.use_var(out_f), fb.use_var(out_i))
+}
+
+/// `(v & FIXNUM_CHECK_MASK) == FIXNUM_CHECK_VALUE` as an i8 condition.
+pub(crate) fn fixnum_tag_test(fb: &mut FunctionBuilder, v: ClifValue) -> ClifValue {
+    let tag = band_imm_p(fb, v, FIXNUM_CHECK_MASK as i64);
+    fb.ins()
+        .icmp_imm_u(IntCC::Equal, tag, FIXNUM_CHECK_VALUE as i64)
+}
+
+/// The f64 `+ - * /` for a Float site. `/` gets the negative default NaN
+/// only for an INVALID op (`0.0/0.0`, `inf/inf`) — a NaN INPUT propagates
+/// with its own sign, as GNU's `(/ 0.0e+NaN 1)` = `0.0e+NaN` shows
+/// (`builtin_div` applies the same rule).
+pub(crate) fn emit_float_arith(
+    fb: &mut FunctionBuilder,
+    op: &Op,
+    fa_val: ClifValue,
+    fb_val: ClifValue,
+) -> ClifValue {
+    match op {
+        Op::Add => fb.ins().fadd(fa_val, fb_val),
+        Op::Sub => fb.ins().fsub(fa_val, fb_val),
+        Op::Mul => fb.ins().fmul(fa_val, fb_val),
+        _ => {
+            let q = fb.ins().fdiv(fa_val, fb_val);
+            let q_nan = fb
+                .ins()
+                .fcmp(cranelift_codegen::ir::condcodes::FloatCC::NotEqual, q, q);
+            let a_ord = fb.ins().fcmp(
+                cranelift_codegen::ir::condcodes::FloatCC::Equal,
+                fa_val,
+                fa_val,
+            );
+            let b_ord = fb.ins().fcmp(
+                cranelift_codegen::ir::condcodes::FloatCC::Equal,
+                fb_val,
+                fb_val,
+            );
+            let ordered = fb.ins().band(a_ord, b_ord);
+            let invalid = fb.ins().band(q_nan, ordered);
+            let neg_nan = fb
+                .ins()
+                .f64const(cranelift_codegen::ir::immediates::Ieee64::with_bits(
+                    f64::NAN.to_bits() | (1_u64 << 63),
+                ));
+            fb.ins().select(invalid, neg_nan, q)
+        }
+    }
+}
+
+/// `v` carries the FLOAT tag, as an i8 condition (the test `guard_float`
+/// emits, without the deopt edge).
+pub(crate) fn float_tag_test(fb: &mut FunctionBuilder, v: ClifValue) -> ClifValue {
+    let tag = band_imm_p(fb, v, TAG_MASK as i64);
+    fb.ins()
+        .icmp_imm_u(IntCC::Equal, tag, crate::tagged::value::TAG_FLOAT as i64)
+}
+
+/// Run-time "both operands are floats" for model-stack slots `i` and `j`; a
+/// raw slot is a proven fixnum, so the test is constant false. Fused like
+/// [`both_fixnum_test`].
+fn both_float_test(
+    fb: &mut FunctionBuilder,
+    stack: &[ClifValue],
+    stack_raw: &[bool],
+    i: usize,
+    j: usize,
+) -> ClifValue {
+    if stack_raw[i] || stack_raw[j] {
+        return fb.ins().iconst(types::I8, 0);
+    }
+    both_tag_test(
+        fb,
+        stack[i],
+        stack[j],
+        TAG_MASK as i64,
+        crate::tagged::value::TAG_FLOAT as i64,
+    )
+}
+
+/// Run-time "both operands are fixnums" for model-stack slots `i` and `j`;
+/// a raw slot is a proven fixnum and contributes no test. Two tagged slots
+/// use ONE fused test, `((a ^ 2) | (b ^ 2)) & 3 == 0`, which lowers to
+/// xor/xor/or/test/jz — a `band` of two `icmp` results materialises both
+/// through `setcc` first (11 instructions instead of 5).
+fn both_fixnum_test(
+    fb: &mut FunctionBuilder,
+    stack: &[ClifValue],
+    stack_raw: &[bool],
+    i: usize,
+    j: usize,
+) -> ClifValue {
+    match (stack_raw[i], stack_raw[j]) {
+        (true, true) => fb.ins().iconst(types::I8, 1),
+        (true, false) => fixnum_tag_test(fb, stack[j]),
+        (false, true) => fixnum_tag_test(fb, stack[i]),
+        (false, false) => both_tag_test(
+            fb,
+            stack[i],
+            stack[j],
+            FIXNUM_CHECK_MASK as i64,
+            FIXNUM_CHECK_VALUE as i64,
+        ),
+    }
+}
+
+/// `((a ^ tag) | (b ^ tag)) & mask == 0`: both values carry `tag` under
+/// `mask`, as one branch-fusable i8 condition.
+fn both_tag_test(
+    fb: &mut FunctionBuilder,
+    a: ClifValue,
+    b: ClifValue,
+    mask: i64,
+    tag: i64,
+) -> ClifValue {
+    let xa = fb.ins().bxor_imm(a, tag);
+    let xb = fb.ins().bxor_imm(b, tag);
+    let either = fb.ins().bor(xa, xb);
+    let masked = band_imm_p(fb, either, mask);
+    fb.ins().icmp_imm(IntCC::Equal, masked, 0)
 }
 
 /// Box an `f64` result back into a tagged Lisp float.
@@ -3126,46 +3319,84 @@ pub(crate) fn lower_simple_op(
                 return Err(CompileError::StackUnderflow);
             }
             let dsite = deopt_site(fb, pc, handlers.len(), stack, stack_raw, deopt_sites);
-            // FLOAT SITE: the interpreter has only ever seen floats here, so
-            // the fixnum guard below would bail the whole body on every entry.
-            // `nbody` is 26 such sites in one 129-op body, and it deopted at
-            // instruction 6 of 129 every single call.
+            // FLOAT SITE: the interpreter has seen floats here, so predict
+            // floats — ONE combined tag test and branch, then unbox and
+            // compute; that is no more than the old float-only arm paid, and
+            // `nbody` (26 such sites in one body) is the benchmark that
+            // measures it. But feedback is sticky from one float pair and the
+            // fixnum fast arm records nothing, so the site may be fixnum-hot:
+            // on the not-both-floats path dispatch again — both fixnums -> the
+            // fixnum arm (GNU: fixnum op fixnum is a FIXNUM, `(+ 2 3)` is 5
+            // not 5.0); one of each -> promote the fixnum and compute in f64;
+            // a non-number -> deopt. Both PROVEN fixnums skip all of it.
             if let Some(rt) = rt
                 && matches!(
                     super::active_numeric_feedback(pc),
                     crate::emacs_core::jit::NumericFeedback::Float
                 )
+                && !(stack_raw[n - 1] && stack_raw[n - 2])
             {
-                let fb_val = stack_as_f64(fb, dsite, stack, stack_raw, n - 1);
-                let fa_val = stack_as_f64(fb, dsite, stack, stack_raw, n - 2);
+                let res_var = fb.declare_var(types::I64);
+                let ff_b = fb.create_block();
+                let slow_b = fb.create_block();
+                let fix_b = fb.create_block();
+                let mix_b = fb.create_block();
+                let merge = fb.create_block();
+                let both_float = both_float_test(fb, stack, stack_raw, n - 2, n - 1);
+                fb.ins().brif(both_float, ff_b, &[], slow_b, &[]);
+
+                // Both floats (the predicted case): unbox and compute.
+                fb.switch_to_block(ff_b);
+                fb.seal_block(ff_b);
+                let fa_val = unbox_float(fb, stack[n - 2]);
+                let fb_val = unbox_float(fb, stack[n - 1]);
+                let res = emit_float_arith(fb, op, fa_val, fb_val);
+                let boxed = box_float(fb, rt, res);
+                fb.def_var(res_var, boxed);
+                fb.ins().jump(merge, &[]);
+
+                // Not both floats: both fixnums, or a mix, or a non-number.
+                fb.switch_to_block(slow_b);
+                fb.seal_block(slow_b);
+                let both_fix = both_fixnum_test(fb, stack, stack_raw, n - 2, n - 1);
+                fb.ins().brif(both_fix, fix_b, &[], mix_b, &[]);
+
+                fb.switch_to_block(fix_b);
+                fb.seal_block(fix_b);
+                let a = if stack_raw[n - 2] {
+                    stack[n - 2]
+                } else {
+                    sshr_imm_p(fb, stack[n - 2], FIXNUM_SHIFT as i64)
+                };
+                let b = if stack_raw[n - 1] {
+                    stack[n - 1]
+                } else {
+                    sshr_imm_p(fb, stack[n - 1], FIXNUM_SHIFT as i64)
+                };
+                let raw = match op {
+                    Op::Add | Op::Sub => raw_fixnum_addsub(fb, dsite, matches!(op, Op::Sub), a, b),
+                    Op::Mul => raw_fixnum_mul(fb, dsite, a, b),
+                    _ => raw_fixnum_divrem(fb, dsite, false, a, b),
+                };
+                let tagged = retag_fixnum(fb, raw);
+                fb.def_var(res_var, tagged);
+                fb.ins().jump(merge, &[]);
+
+                fb.switch_to_block(mix_b);
+                fb.seal_block(mix_b);
+                let fb_val = stack_as_f64_or_promote(fb, dsite, stack, stack_raw, n - 1);
+                let fa_val = stack_as_f64_or_promote(fb, dsite, stack, stack_raw, n - 2);
+                let res = emit_float_arith(fb, op, fa_val, fb_val);
+                let boxed = box_float(fb, rt, res);
+                fb.def_var(res_var, boxed);
+                fb.ins().jump(merge, &[]);
+
+                fb.switch_to_block(merge);
+                fb.seal_block(merge);
+                let out = fb.use_var(res_var);
                 stack.truncate(n - 2);
                 stack_raw.truncate(n - 2);
-                let res = match op {
-                    Op::Add => fb.ins().fadd(fa_val, fb_val),
-                    Op::Sub => fb.ins().fsub(fa_val, fb_val),
-                    Op::Mul => fb.ins().fmul(fa_val, fb_val),
-                    _ => {
-                        // `builtin_div` normalizes ANY NaN result to the
-                        // NEGATIVE NaN Emacs prints (`arithmetic.rs`, the
-                        // float divide arm), so a raw `fdiv` would diverge on
-                        // `(/ 0.0 0.0)` and `(/ inf inf)`. `fcmp ne` against
-                        // itself is true exactly for NaN.
-                        let q = fb.ins().fdiv(fa_val, fb_val);
-                        let is_nan = fb.ins().fcmp(
-                            cranelift_codegen::ir::condcodes::FloatCC::NotEqual,
-                            q,
-                            q,
-                        );
-                        let neg_nan = fb.ins().f64const(
-                            cranelift_codegen::ir::immediates::Ieee64::with_bits(
-                                f64::NAN.to_bits() | (1_u64 << 63),
-                            ),
-                        );
-                        fb.ins().select(is_nan, neg_nan, q)
-                    }
-                };
-                let boxed = box_float(fb, rt, res);
-                stack.push(boxed);
+                stack.push(out);
                 stack_raw.push(false);
                 return Ok(());
             }
@@ -3280,19 +3511,32 @@ pub(crate) fn lower_simple_op(
                 return Err(CompileError::StackUnderflow);
             }
             let dsite = deopt_site(fb, pc, handlers.len(), stack, stack_raw, deopt_sites);
-            // FLOAT SITE — same reasoning as the arithmetic ops: a fixnum
-            // guard here bails the whole body, and a body that mixes float
-            // arithmetic with a float comparison would be lowered for nothing.
+            // FLOAT SITE — same float-first dispatch as the arithmetic ops.
+            // Both floats: a plain IEEE `fcmp` (ordered: every relation is
+            // false against NaN, as the builtins are). Both fixnums: integer
+            // compare. One of each: GNU `arithcompare` — promote, and if the
+            // doubles TIE re-decide on the exact integers, because a fixnum
+            // above 2^53 rounds when promoted. Result is t/nil either way.
             if matches!(
                 super::active_numeric_feedback(pc),
                 crate::emacs_core::jit::NumericFeedback::Float
-            ) {
-                let fb_val = stack_as_f64(fb, dsite, stack, stack_raw, n - 1);
-                let fa_val = stack_as_f64(fb, dsite, stack, stack_raw, n - 2);
-                stack.truncate(n - 2);
-                stack_raw.truncate(n - 2);
-                // IEEE ordered comparisons: every one is false against NaN,
-                // which is what the `<`/`>`/`=` builtins do on floats.
+            ) && !(stack_raw[n - 1] && stack_raw[n - 2])
+            {
+                let res_var = fb.declare_var(types::I64);
+                let ff_b = fb.create_block();
+                let slow_b = fb.create_block();
+                let fix_b = fb.create_block();
+                let mix_b = fb.create_block();
+                let merge = fb.create_block();
+                let t = fb.ins().iconst(types::I64, Value::T.bits() as i64);
+                let nil = fb.ins().iconst(types::I64, Value::NIL.bits() as i64);
+                let cc = match op {
+                    Op::Eqlsign => IntCC::Equal,
+                    Op::Lss => IntCC::SignedLessThan,
+                    Op::Gtr => IntCC::SignedGreaterThan,
+                    Op::Leq => IntCC::SignedLessThanOrEqual,
+                    _ => IntCC::SignedGreaterThanOrEqual,
+                };
                 let fcc: cranelift_codegen::ir::condcodes::FloatCC = match op {
                     Op::Eqlsign => cranelift_codegen::ir::condcodes::FloatCC::Equal,
                     Op::Lss => cranelift_codegen::ir::condcodes::FloatCC::LessThan,
@@ -3300,10 +3544,62 @@ pub(crate) fn lower_simple_op(
                     Op::Leq => cranelift_codegen::ir::condcodes::FloatCC::LessThanOrEqual,
                     _ => cranelift_codegen::ir::condcodes::FloatCC::GreaterThanOrEqual,
                 };
+                let both_float = both_float_test(fb, stack, stack_raw, n - 2, n - 1);
+                fb.ins().brif(both_float, ff_b, &[], slow_b, &[]);
+
+                fb.switch_to_block(ff_b);
+                fb.seal_block(ff_b);
+                let fa_val = unbox_float(fb, stack[n - 2]);
+                let fb_val = unbox_float(fb, stack[n - 1]);
                 let cond = fb.ins().fcmp(fcc, fa_val, fb_val);
-                let t = fb.ins().iconst(types::I64, Value::T.bits() as i64);
-                let nil = fb.ins().iconst(types::I64, Value::NIL.bits() as i64);
-                stack.push(fb.ins().select(cond, t, nil));
+                let r = fb.ins().select(cond, t, nil);
+                fb.def_var(res_var, r);
+                fb.ins().jump(merge, &[]);
+
+                fb.switch_to_block(slow_b);
+                fb.seal_block(slow_b);
+                let both_fix = both_fixnum_test(fb, stack, stack_raw, n - 2, n - 1);
+                fb.ins().brif(both_fix, fix_b, &[], mix_b, &[]);
+
+                fb.switch_to_block(fix_b);
+                fb.seal_block(fix_b);
+                let a = if stack_raw[n - 2] {
+                    stack[n - 2]
+                } else {
+                    sshr_imm_p(fb, stack[n - 2], FIXNUM_SHIFT as i64)
+                };
+                let b = if stack_raw[n - 1] {
+                    stack[n - 1]
+                } else {
+                    sshr_imm_p(fb, stack[n - 1], FIXNUM_SHIFT as i64)
+                };
+                let cond = fb.ins().icmp(cc, a, b);
+                let r = fb.ins().select(cond, t, nil);
+                fb.def_var(res_var, r);
+                fb.ins().jump(merge, &[]);
+
+                fb.switch_to_block(mix_b);
+                fb.seal_block(mix_b);
+                let (fb_val, ib) = stack_as_f64_and_int(fb, dsite, stack, stack_raw, n - 1);
+                let (fa_val, ia) = stack_as_f64_and_int(fb, dsite, stack, stack_raw, n - 2);
+                let cf = fb.ins().fcmp(fcc, fa_val, fb_val);
+                let tie = fb.ins().fcmp(
+                    cranelift_codegen::ir::condcodes::FloatCC::Equal,
+                    fa_val,
+                    fb_val,
+                );
+                let ci = fb.ins().icmp(cc, ia, ib);
+                let cond = fb.ins().select(tie, ci, cf);
+                let r = fb.ins().select(cond, t, nil);
+                fb.def_var(res_var, r);
+                fb.ins().jump(merge, &[]);
+
+                fb.switch_to_block(merge);
+                fb.seal_block(merge);
+                let out = fb.use_var(res_var);
+                stack.truncate(n - 2);
+                stack_raw.truncate(n - 2);
+                stack.push(out);
                 stack_raw.push(false);
                 return Ok(());
             }

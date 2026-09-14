@@ -1033,6 +1033,20 @@ fn compile_bytecode_function_inner(
         // former call boundary. Record the armed function_epoch so the dispatch
         // re-JITs if any inlined callee is later redefined (see CompiledLeaf
         // ::inline_epoch).
+        // A `Float`-feedback arithmetic/comparison site has an f64 lowering in
+        // the BASELINE only; the MIR tier guards fixnum and would deopt
+        // (rerun-from-start) on every entry. Decide BEFORE the inline pass:
+        // afterwards a spliced callee inst carries the CALL SITE's pc, so
+        // `active_numeric_feedback(pc)` would index the wrong body.
+        let has_float_site = mir.blocks.iter().flat_map(|b| b.insts.iter()).any(|i| {
+            matches!(
+                i.op,
+                mir::MirOp::Bin(
+                    mir::BinKind::Add | mir::BinKind::Sub | mir::BinKind::Mul | mir::BinKind::Div,
+                    ..
+                ) | mir::MirOp::Cmp(..)
+            ) && active_numeric_feedback(i.pc) == crate::emacs_core::jit::NumericFeedback::Float
+        });
         let mut inlined_syms: Vec<crate::emacs_core::intern::SymId> = Vec::new();
         let inline_epoch = obarray.and_then(|ob| {
             let armed = ob.function_epoch();
@@ -1057,7 +1071,12 @@ fn compile_bytecode_function_inner(
             // For a plain non-inlined call the baseline is strictly better
             // (spec-call native-to-native speculation + battle-tested), so let
             // it fall through. Pure (call-free) leaves always take the MIR tier.
-            if !leaf.has_side_effects || inline_epoch.is_some() {
+            if has_float_site {
+                // See above: the baseline has the f64 path; MIR would deopt
+                // on every entry. Falls through to the TierRejected record
+                // below; keyed so the funnel shows how often it fires.
+                super::stats::record_mir_bail("gate:float-site".to_string());
+            } else if !leaf.has_side_effects || inline_epoch.is_some() {
                 super::stats::record_mir(super::stats::MirFunnel::Taken);
                 leaf.required = required;
                 leaf.has_rest = has_rest;
@@ -2695,6 +2714,17 @@ fn is_rooting_site_op(o: &Op) -> bool {
 
 pub(crate) fn baseline_needs_rt(ops: &[Op], has_backedge: bool) -> bool {
     has_backedge
+        // A `Float`-feedback arithmetic site boxes its result through the
+        // `neovm_jit_make_float` shim, so it needs the runtime refs. Without
+        // this clause a shim-free body such as `(lambda (a b) (+ a b))` got
+        // `rt = None`, the f64 arm (`if let Some(rt) = rt && feedback == Float`)
+        // was skipped, and the site fell back to the fixnum guard — deopting
+        // on every float call. nbody never showed it: its bodies call `sqrt`.
+        // AOT publishes no feedback (-> FixnumOnly), so its output is unchanged.
+        || ops.iter().enumerate().any(|(pc, o)| {
+            matches!(o, Op::Add | Op::Sub | Op::Mul | Op::Div)
+                && active_numeric_feedback(pc) == crate::emacs_core::jit::NumericFeedback::Float
+        })
         || ops.iter().any(|o| {
             direct_builtin_spec(o).is_some()
                 || slice_builtin_spec(o).is_some()

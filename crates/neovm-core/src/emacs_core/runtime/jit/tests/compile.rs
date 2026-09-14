@@ -5320,3 +5320,191 @@ fn unreachable_block_after_an_exit_lowers_without_panicking() {
         );
     }
 }
+
+/// Commit 0 of the MIR-port plan: a PURE body with a `Float`-feedback
+/// arithmetic site must NOT take the MIR tier. The MIR tier guards fixnum
+/// and would deopt (rerun-from-start) on EVERY entry; the baseline has the
+/// f64 lowering. The funnel records it as `TierRejected` under
+/// `gate:float-site`.
+#[test]
+fn a_pure_body_with_a_float_feedback_site_is_rejected_from_the_mir_tier() {
+    // (lambda (a b) (+ a b)) — pure, required-only: MIR-eligible.
+    fn adder() -> ByteCodeFunction {
+        let mut f = nullary();
+        f.lexical = true;
+        f.params.required = vec![
+            crate::emacs_core::intern::SymId(1),
+            crate::emacs_core::intern::SymId(2),
+        ];
+        f.ops = vec![Op::StackRef(1), Op::StackRef(1), Op::Add, Op::Return];
+        f
+    }
+    use crate::emacs_core::jit::NumericFeedback as NF;
+
+    // 1. Control — no feedback recorded: the pure body takes the MIR tier.
+    let control = adder();
+    let before = crate::emacs_core::jit::stats::compile_stats_snapshot();
+    let leaf = compile_bytecode_function(&control).expect("compiles");
+    let mid = crate::emacs_core::jit::stats::compile_stats_snapshot();
+    assert_eq!(
+        mid.mir_taken,
+        before.mir_taken + 1,
+        "control: pure fixnum body takes MIR"
+    );
+    assert_eq!(
+        leaf.call_for_test(&[Value::make_int(2), Value::make_int(3)]),
+        Some(Value::make_int(5).bits())
+    );
+
+    // 2. A SEPARATE function with Float recorded at the `+` site (pc 2) on its
+    //    own feedback vector BEFORE its first compile — the compile publishes
+    //    that snapshot and then marks the body's feedback CONSUMED, so
+    //    recording after a compile (or reusing `control`) reaches nothing.
+    //    Rejected to the baseline, which computes the float sum natively
+    //    instead of deopting on every entry.
+    let floaty = adder();
+    floaty
+        .jit_runtime()
+        .record_numeric(2, floaty.ops.len(), NF::Float);
+    assert_eq!(
+        floaty.jit_runtime().numeric_feedback(2),
+        NF::Float,
+        "precondition: the Float record must be visible before compiling"
+    );
+    let leaf = compile_bytecode_function(&floaty).expect("compiles");
+    let after = crate::emacs_core::jit::stats::compile_stats_snapshot();
+    assert_eq!(
+        after.mir_taken, mid.mir_taken,
+        "a Float-site body must NOT take the MIR tier"
+    );
+    assert_eq!(
+        after.mir_tier_rejected,
+        mid.mir_tier_rejected + 1,
+        "…and is counted as TierRejected"
+    );
+    // Drive the baseline leaf with a REAL Context: `call_for_test` passes a
+    // null vmctx, which a runtime-needing baseline body refuses (Deopt) before
+    // the float path ever runs.
+    let mut eval = Context::new();
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    let got = match leaf.call(ctx_ptr, &[Value::make_float(1.5), Value::make_float(2.5)]) {
+        NativeRun::Ok(bits) => Value::from_bits(bits),
+        other => panic!("the baseline leaf must run the float path natively, got {other:?}"),
+    };
+    assert!(
+        matches!(got.kind(), crate::emacs_core::value::ValueKind::Float),
+        "expected a float, got {got:?}"
+    );
+    assert_eq!(got.xfloat(), 4.0);
+
+    // The site is sticky-Float from one float pair, but GNU's `(+ 2 3)` is the
+    // FIXNUM 5 — and it must run natively (no deopt) or every fixnum call
+    // after a single float pair pays a rerun. Mixed operands promote.
+    let fix = match leaf.call(ctx_ptr, &[Value::make_int(2), Value::make_int(3)]) {
+        NativeRun::Ok(bits) => Value::from_bits(bits),
+        other => panic!("fixnum operands at a Float site must run natively, got {other:?}"),
+    };
+    assert_eq!(
+        fix.bits(),
+        Value::make_int(5).bits(),
+        "(+ 2 3) is the fixnum 5, not 5.0"
+    );
+    let mixed = match leaf.call(ctx_ptr, &[Value::make_int(2), Value::make_float(0.5)]) {
+        NativeRun::Ok(bits) => Value::from_bits(bits),
+        other => panic!("mixed operands at a Float site must promote natively, got {other:?}"),
+    };
+    assert!(matches!(
+        mixed.kind(),
+        crate::emacs_core::value::ValueKind::Float
+    ));
+    assert_eq!(mixed.xfloat(), 2.5);
+    // A non-number still deopts (the interpreter signals wrong-type-argument).
+    assert!(matches!(
+        leaf.call(ctx_ptr, &[Value::symbol("x"), Value::make_int(1)]),
+        NativeRun::Deopt | NativeRun::DeoptAt(_)
+    ));
+}
+
+/// GNU's `arithcompare` re-decides a fixnum/float DOUBLE tie on exact
+/// integers, because promoting a fixnum above 2^53 rounds. The polymorphic
+/// compare arm must do the same or `(> 9007199254740993 9007199254740992.0)`
+/// comes out nil and `(= most-positive-fixnum (float most-positive-fixnum))`
+/// comes out t — natively, with no deopt to save it.
+#[test]
+fn a_float_site_compare_breaks_a_double_tie_on_exact_integers_like_gnu() {
+    fn cmp_fn(op: Op) -> ByteCodeFunction {
+        let mut f = nullary();
+        f.lexical = true;
+        f.params.required = vec![
+            crate::emacs_core::intern::SymId(1),
+            crate::emacs_core::intern::SymId(2),
+        ];
+        f.ops = vec![Op::StackRef(1), Op::StackRef(1), op, Op::Return];
+        f
+    }
+    use crate::emacs_core::jit::NumericFeedback as NF;
+    let mut eval = Context::new();
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    let t = Value::T.bits();
+    let nil = Value::NIL.bits();
+    let big = 9_007_199_254_740_993_i64; // 2^53 + 1
+    let bigf = 9_007_199_254_740_992.0_f64; // 2^53
+    let mpf = Value::MOST_POSITIVE_FIXNUM;
+
+    let gtr = cmp_fn(Op::Gtr);
+    gtr.jit_runtime()
+        .record_numeric(2, gtr.ops.len(), NF::Float);
+    let leaf = compile_bytecode_function(&gtr).expect("compiles");
+    let run = |leaf: &CompiledLeaf, a: Value, b: Value| match leaf.call(ctx_ptr, &[a, b]) {
+        NativeRun::Ok(bits) => bits,
+        other => panic!("must run natively at a Float site, got {other:?}"),
+    };
+    assert_eq!(
+        run(&leaf, Value::make_int(big), Value::make_float(bigf)),
+        t,
+        "(> 2^53+1 2^53.0) is t"
+    );
+    assert_eq!(
+        run(&leaf, Value::make_float(bigf), Value::make_int(big)),
+        nil,
+        "(> 2^53.0 2^53+1) is nil"
+    );
+    assert_eq!(run(&leaf, Value::make_int(3), Value::make_float(2.5)), t);
+    assert_eq!(
+        run(&leaf, Value::make_int(3), Value::make_float(f64::NAN)),
+        nil,
+        "NaN compares false"
+    );
+    assert_eq!(
+        run(&leaf, Value::make_int(5), Value::make_int(4)),
+        t,
+        "fixnum pair stays native"
+    );
+
+    let eq = cmp_fn(Op::Eqlsign);
+    eq.jit_runtime().record_numeric(2, eq.ops.len(), NF::Float);
+    let leaf = compile_bytecode_function(&eq).expect("compiles");
+    assert_eq!(
+        run(&leaf, Value::make_int(mpf), Value::make_float(mpf as f64)),
+        nil,
+        "(= most-positive-fixnum (float most-positive-fixnum)) is nil"
+    );
+    assert_eq!(
+        run(&leaf, Value::make_int(3), Value::make_float(3.0)),
+        t,
+        "(= 3 3.0) is t"
+    );
+    assert_eq!(
+        run(&leaf, Value::make_float(-0.0), Value::make_int(0)),
+        t,
+        "(= -0.0 0) is t"
+    );
+    assert_eq!(
+        run(
+            &leaf,
+            Value::make_float(f64::NAN),
+            Value::make_float(f64::NAN)
+        ),
+        nil
+    );
+}
