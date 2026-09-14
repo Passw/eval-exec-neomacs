@@ -117,7 +117,18 @@ pub(crate) fn builtin_add_slice(
             }
         }
         if a.is_float() {
-            return continue_float_add(eval, &args[i + 1..], sum as f64 + a.xfloat());
+            // GNU's `arith_driver` seeds the accumulator with `args[0]`, not
+            // with the identity, and for a SIGNED ZERO that is observable:
+            // `0.0 + -0.0` is `+0.0`, so seeding with 0 turned
+            // `(+ -0.0 -0.0)` into `0.0` where GNU gives `-0.0`. When this is
+            // the first operand there is nothing accumulated yet, so start
+            // from it directly.
+            let acc = if i == 0 {
+                a.xfloat()
+            } else {
+                sum as f64 + a.xfloat()
+            };
+            return continue_float_add(eval, &args[i + 1..], acc);
         }
         if let Some(big) = a.as_bignum() {
             let mut acc = Integer::from(sum);
