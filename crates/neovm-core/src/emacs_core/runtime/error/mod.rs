@@ -1826,42 +1826,53 @@ pub fn format_eval_result_bytes_with_eval(
 mod tests;
 
 /// Signal wrong-number-of-arguments unless `args` has exactly `n` items.
+/// The shared cold arm of the four `expect_*_args` checks below. Each check
+/// is a length compare, but with the signal built inline — a `vec!`, an
+/// interned symbol, a boxed fixnum — the body was too big for LLVM to inline,
+/// so every `Many`-arity builtin paid a real call frame (17 Ir, ~280K times
+/// per org edit iteration across the three) to compare two integers. Same
+/// split as [`expect_fixnum`].
+#[cold]
+#[inline(never)]
+fn wrong_number_of_arguments(name: &str, nargs: usize) -> Flow {
+    signal(
+        LispCondition::WrongNumberOfArguments,
+        vec![Value::symbol(name), Value::fixnum(nargs as i64)],
+    )
+}
+
+/// Signal wrong-number-of-arguments unless `args` has exactly `n` items.
+#[inline]
 pub(crate) fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
     if args.len() != n {
-        Err(signal(
-            LispCondition::WrongNumberOfArguments,
-            vec![Value::symbol(name), Value::fixnum(args.len() as i64)],
-        ))
+        Err(wrong_number_of_arguments(name, args.len()))
     } else {
         Ok(())
     }
 }
 
 /// Signal wrong-number-of-arguments unless `args` has at least `min` items.
+#[inline]
 pub(crate) fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
     if args.len() < min {
-        Err(signal(
-            LispCondition::WrongNumberOfArguments,
-            vec![Value::symbol(name), Value::fixnum(args.len() as i64)],
-        ))
+        Err(wrong_number_of_arguments(name, args.len()))
     } else {
         Ok(())
     }
 }
 
 /// Signal wrong-number-of-arguments unless `args` has at most `max` items.
+#[inline]
 pub(crate) fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
     if args.len() > max {
-        Err(signal(
-            LispCondition::WrongNumberOfArguments,
-            vec![Value::symbol(name), Value::fixnum(args.len() as i64)],
-        ))
+        Err(wrong_number_of_arguments(name, args.len()))
     } else {
         Ok(())
     }
 }
 
 /// Signal wrong-number-of-arguments unless `min <= args.len() <= max`.
+#[inline]
 pub(crate) fn expect_args_range(
     name: &str,
     args: &[Value],
@@ -1869,10 +1880,7 @@ pub(crate) fn expect_args_range(
     max: usize,
 ) -> Result<(), Flow> {
     if args.len() < min || args.len() > max {
-        Err(signal(
-            LispCondition::WrongNumberOfArguments,
-            vec![Value::symbol(name), Value::fixnum(args.len() as i64)],
-        ))
+        Err(wrong_number_of_arguments(name, args.len()))
     } else {
         Ok(())
     }
