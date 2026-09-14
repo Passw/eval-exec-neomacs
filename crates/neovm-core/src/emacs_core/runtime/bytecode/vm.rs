@@ -7062,6 +7062,79 @@ impl<'a> Vm<'a> {
                 vm.execute_with_func_value(bc, args, callee),
             )
         }
+        /// Normalize the caller's call-args slot into the leaf's ABI and run
+        /// it — the callee has `&optional` slots to nil-pad or a `&rest` tail
+        /// to cons, so it is not a pure pass-through.
+        ///
+        /// `#[inline(never)]`: this is a real path (org takes it 210K times
+        /// per edit iteration), but the PURE path above is the one that must
+        /// stay small. `run_leaf_native_to_native` is `#[inline(always)]` into
+        /// both call shims, so folding this body in with it cost `flet` 2.3%
+        /// and `listlen-tc` 0.3% — benchmarks that never take this branch at
+        /// all.
+        #[inline(never)]
+        fn marshal_and_run(
+            ctx_ptr: *mut crate::emacs_core::eval::Context,
+            bc: &ByteCodeFunction,
+            callee: Value,
+            leaf: &crate::emacs_core::jit::compile::CompiledLeaf,
+            args_ptr: *const i64,
+            nargs: usize,
+        ) -> crate::emacs_core::jit::cache::NativeCallOutcome {
+            use crate::emacs_core::jit::cache::NativeCallOutcome;
+            let nonrest = leaf.arity - usize::from(leaf.has_rest);
+            let nil = Value::NIL.bits() as i64;
+            let fixed = nargs.min(nonrest);
+            // Nil-padding allocates NOTHING, so the `&optional`-only case —
+            // the common one — needs no root scope at all. Only the `&rest`
+            // cons does.
+            let saved = leaf
+                .has_rest
+                .then(crate::emacs_core::eval::save_scratch_gc_roots);
+            if saved.is_some() {
+                for i in 0..nargs {
+                    // SAFETY: args_ptr addresses `nargs` valid words.
+                    crate::emacs_core::eval::push_scratch_gc_root(Value::from_bits(unsafe {
+                        *args_ptr.add(i)
+                    }
+                        as usize));
+                }
+            }
+            let mut bits: smallvec::SmallVec<[i64; 8]> = (0..fixed)
+                // SAFETY: args_ptr addresses `nargs` valid words, fixed <= nargs.
+                .map(|i| unsafe { *args_ptr.add(i) })
+                .chain(std::iter::repeat_n(nil, nonrest - fixed))
+                .collect();
+            if leaf.has_rest {
+                let rest = if nargs > nonrest {
+                    let tail: LispArgVec = (nonrest..nargs)
+                        // SAFETY: as above.
+                        .map(|i| Value::from_bits(unsafe { *args_ptr.add(i) } as usize))
+                        .collect();
+                    // SAFETY: the seam-provided dormant Context.
+                    unsafe { (*ctx_ptr).tagged_heap.list_from_slice(&tail) }
+                } else {
+                    Value::NIL
+                };
+                bits.push(rest.bits() as i64);
+            }
+            let outcome = match crate::emacs_core::jit::cache::run_resolved_leaf_native(
+                ctx_ptr,
+                bc,
+                callee,
+                leaf,
+                bits.as_ptr(),
+            ) {
+                NativeCallOutcome::Fallback => {
+                    interp_fallback(ctx_ptr, bc, callee, args_ptr, nargs)
+                }
+                o => o,
+            };
+            if let Some(saved) = saved {
+                crate::emacs_core::eval::restore_scratch_gc_roots(saved);
+            }
+            outcome
+        }
         let outcome = {
             let ctx_ptr = core::ptr::from_mut(&mut *ctx);
             if pure {
@@ -7078,29 +7151,7 @@ impl<'a> Vm<'a> {
                     o => o,
                 }
             } else {
-                // Marshaled (callee has &optional/&rest): build + root args in
-                // this branch's OWN scratch-root scope (the shim's armed fast
-                // path no longer opens one).
-                let saved = crate::emacs_core::eval::save_scratch_gc_roots();
-                let mut args = LispArgVec::new();
-                for i in 0..nargs {
-                    // SAFETY: args_ptr addresses `nargs` valid words.
-                    let v = Value::from_bits(unsafe { *args_ptr.add(i) } as usize);
-                    crate::emacs_core::eval::push_scratch_gc_root(v);
-                    args.push(v);
-                }
-                let ran = crate::emacs_core::jit::cache::run_resolved_leaf(
-                    ctx_ptr, bc, callee, leaf, &args,
-                );
-                crate::emacs_core::eval::restore_scratch_gc_roots(saved);
-                match ran {
-                    Ok(Some(bits)) => NativeCallOutcome::Value(Value::from_bits(bits)),
-                    Ok(None) => interp_fallback(ctx_ptr, bc, callee, args_ptr, nargs),
-                    Err(flow) => {
-                        crate::emacs_core::jit::compile::stash_pending_flow(flow);
-                        NativeCallOutcome::FlowStashed
-                    }
-                }
+                marshal_and_run(ctx_ptr, bc, callee, leaf, args_ptr, nargs)
             }
         };
         ctx.depth -= 1;
