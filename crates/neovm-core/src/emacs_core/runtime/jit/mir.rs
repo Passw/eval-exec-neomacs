@@ -865,6 +865,32 @@ fn map_op_operands(op: &mut MirOp, mut f: impl FnMut(MirValue) -> MirValue) {
     }
 }
 
+/// The `MirValue` operands of an op (read-only twin of [`map_op_operands`]).
+pub(crate) fn op_operands(op: &MirOp) -> impl Iterator<Item = MirValue> + '_ {
+    let (fixed, rest): ([Option<MirValue>; 2], &[MirValue]) = match op {
+        MirOp::Arg(_) | MirOp::Const(_) => ([None, None], &[]),
+        MirOp::Bin(_, a, b) | MirOp::Cmp(_, a, b) | MirOp::Eq(a, b) | MirOp::Cons(a, b) => {
+            ([Some(*a), Some(*b)], &[])
+        }
+        MirOp::Unary(_, a) | MirOp::Pred(_, a) => ([Some(*a), None], &[]),
+        MirOp::CarCdr { arg, .. } => ([Some(*arg), None], &[]),
+        MirOp::Opaque { args, .. } => ([None, None], args.as_slice()),
+    };
+    fixed.into_iter().flatten().chain(rest.iter().copied())
+}
+
+/// The `MirValue` operands of a terminator (read-only twin of
+/// [`map_term_operands`]): the condition and every edge argument.
+pub(crate) fn term_operands(term: &MirTerm) -> impl Iterator<Item = MirValue> + '_ {
+    let cond = match term {
+        MirTerm::Return(v) => Some(*v),
+        MirTerm::Goto { .. } => None,
+        MirTerm::Branch { cond, .. } => Some(*cond),
+    };
+    cond.into_iter()
+        .chain(successor_edges(term).flat_map(|(_, args)| args.iter().copied()))
+}
+
 /// Apply `f` to every `MirValue` operand of a terminator, in place.
 fn map_term_operands(term: &mut MirTerm, mut f: impl FnMut(MirValue) -> MirValue) {
     match term {

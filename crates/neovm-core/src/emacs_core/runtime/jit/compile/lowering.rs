@@ -757,23 +757,42 @@ pub fn lower_nullary_leaf(ops: &[Op], constants: &[Value]) -> Result<CompiledLea
 /// Get MIR value `v` as a RAW (untagged) fixnum i64 for arithmetic. If `cval_raw`
 /// marks it already raw (a prior fixnum arithmetic result or fixnum constant in
 /// this block), use it directly — no re-guard, no re-untag (the unboxing fast
-/// path: chained fixnum arithmetic stays raw). Otherwise guard it is a fixnum
-/// (deopt else) and untag.
+/// path: chained fixnum arithmetic stays raw). Otherwise a value is guarded
+/// and untagged AT MOST ONCE per block: the guard is skipped when the type
+/// fixpoint proved the value a fixnum (`proven_fixnum`, a block param the
+/// loop carries as a `Bin`/`Unary` result on every edge — the baseline's
+/// cross-block `known` set, per value rather than per slot because every
+/// `MirValue` is block-local), and the untagged form is memoized in
+/// `raw_twin`, so a second use (`(+ acc i)` then `(1+ i)`) reuses it.
+///
+/// The twin is NEVER written back into `cval`/`cval_raw`: the terminators
+/// force-tag every edge arg, so an untagged param would be retagged on every
+/// edge; the tagged form stays in `cval` and flows through an edge unchanged.
+/// (`guard_fixnum`'s own `is_known_fixnum` still covers a retagged result.)
 pub(crate) fn mir_as_raw(
     fb: &mut FunctionBuilder,
     cval: &[Option<ClifValue>],
     cval_raw: &[bool],
+    raw_twin: &mut [Option<ClifValue>],
+    proven_fixnum: &[bool],
     v: mir::MirValue,
     deopt: Block,
 ) -> Result<ClifValue, CompileError> {
     let i = v.0 as usize;
     let cv = cval[i].ok_or(CompileError::BadOperand)?;
     if cval_raw[i] {
-        Ok(cv)
-    } else {
-        guard_fixnum(fb, deopt, cv, &HashSet::new());
-        Ok(sshr_imm_p(fb, cv, FIXNUM_SHIFT as i64))
+        return Ok(cv);
     }
+    if let Some(t) = raw_twin[i] {
+        return Ok(t);
+    }
+    if !proven_fixnum[i] {
+        guard_fixnum(fb, deopt, cv, &HashSet::new());
+    }
+    UNTAG_COUNT.with(|c| c.set(c.get() + 1));
+    let t = sshr_imm_p(fb, cv, FIXNUM_SHIFT as i64);
+    raw_twin[i] = Some(t);
+    Ok(t)
 }
 
 /// Get MIR value `v` as a TAGGED `Value` (for boundaries: returns, predicates,
@@ -795,15 +814,17 @@ pub(crate) fn mir_as_tagged(
 }
 
 /// Force MIR value `v` to its TAGGED form IN PLACE (mutating `cval`/`cval_raw`),
-/// returning the tagged value. Wired by the calls-slice (next increment); kept
-/// separate so the soundness-critical force-tag/deopt-routing logic lands and is
-/// reviewable on its own. Use before a call (a GC SAFEPOINT): a raw
-/// (untagged) fixnum must not be live across a call — the concurrent GC would
-/// trace the bare i64 as a tagged pointer (a raw `3` has bits `0b011` == TAG_CONS
-/// -> a bogus rooted cons -> UAF). Unlike [`mir_as_tagged`] (which retags WITHOUT
-/// writing back), this clears the raw mask so every LATER use and every
-/// deopt-framestate snapshot sees the tagged form — no stale raw alias survives
-/// the safepoint. The MIR analogue of the baseline's `stack_force_tagged`.
+/// returning the tagged value. Use before a call, an allocation, an edge or a
+/// deopt snapshot: those are the points where a value reaches a GC-VISIBLE
+/// STORE (the call-args slot, the root window, a cons cell, the spill buffer)
+/// or a block boundary, and a raw i64 stored there would be traced as a
+/// tagged pointer (a raw `3` has bits `0b011` == TAG_CONS -> a bogus rooted
+/// cons -> UAF). The collector uses exact roots only, so a raw i64 that stays
+/// in a register across a shim is invisible to it and needs nothing. Unlike
+/// [`mir_as_tagged`] (which retags WITHOUT writing back), this clears the raw
+/// mask so every LATER use and every deopt-framestate snapshot sees the
+/// tagged form — no stale raw alias survives the safepoint. The MIR analogue
+/// of the baseline's `stack_force_tagged`.
 pub(crate) fn mir_force_tagged(
     fb: &mut FunctionBuilder,
     cval: &mut [Option<ClifValue>],
@@ -1716,8 +1737,30 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
         // Fixnum arithmetic results + fixnum constants stay raw WITHIN a block (no
         // intermediate retag/untag/re-guard); boundaries (returns, predicates,
         // car/cdr, cross-block args) retag. Block params/args + non-fixnum values
-        // are tagged (false) — no raw phis (the simpler, sound scope).
+        // are tagged (false) — no raw phis (the simpler, sound scope). A param
+        // the fixpoint proved `Fixnum` skips its tag guard, and the untagged
+        // form of any tagged value is memoized per block in `raw_twin`, never
+        // written back (see `mir_as_raw`).
         let mut cval_raw: Vec<bool> = vec![false; m.value_types.len()];
+        let mut proven_fixnum: Vec<bool> =
+            types.iter().map(|t| *t == mir::LispType::Fixnum).collect();
+        let mut raw_twin: Vec<Option<ClifValue>> = vec![None; m.value_types.len()];
+        // Every `MirValue` is defined and used within ONE block (edge args are
+        // the source block's values; the target sees only its own params), which
+        // is what lets `raw_twin` skip a per-block reset and lets `proven_fixnum`
+        // stand in for the baseline's per-block-entry set. Checked in debug.
+        let owner: Vec<u32> = {
+            let mut o = vec![u32::MAX; m.value_types.len()];
+            for (bi, blk) in m.blocks.iter().enumerate() {
+                for p in &blk.params {
+                    o[p.0 as usize] = bi as u32;
+                }
+                for inst in &blk.insts {
+                    o[inst.result.0 as usize] = bi as u32;
+                }
+            }
+            o
+        };
 
         // Shared deopt landing block: pure bodies rerun the interpreter from the
         // start (STATUS_DEOPT), created lazily on the first guard.
@@ -1792,6 +1835,11 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
 
             for inst in &blk.insts {
                 let r = inst.result.0 as usize;
+                debug_assert!(
+                    mir::op_operands(&inst.op).all(|v| owner[v.0 as usize] == bi as u32),
+                    "MIR operands are block-local (block {bi}, {:?})",
+                    inst.op
+                );
                 match &inst.op {
                     MirOp::Arg(_) => {
                         // The param already holds the argument (bound above).
@@ -1843,8 +1891,24 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
                             &mut deopt,
                             &mut pending,
                         )?;
-                        let av = mir_as_raw(&mut fb, &cval, &cval_raw, *a, d)?;
-                        let bv = mir_as_raw(&mut fb, &cval, &cval_raw, *b, d)?;
+                        let av = mir_as_raw(
+                            &mut fb,
+                            &cval,
+                            &cval_raw,
+                            &mut raw_twin,
+                            &proven_fixnum,
+                            *a,
+                            d,
+                        )?;
+                        let bv = mir_as_raw(
+                            &mut fb,
+                            &cval,
+                            &cval_raw,
+                            &mut raw_twin,
+                            &proven_fixnum,
+                            *b,
+                            d,
+                        )?;
                         let res = match kind {
                             BinKind::Add => raw_fixnum_addsub(&mut fb, d, false, av, bv),
                             BinKind::Sub => raw_fixnum_addsub(&mut fb, d, true, av, bv),
@@ -1872,7 +1936,15 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
                             &mut deopt,
                             &mut pending,
                         )?;
-                        let av = mir_as_raw(&mut fb, &cval, &cval_raw, *a, d)?;
+                        let av = mir_as_raw(
+                            &mut fb,
+                            &cval,
+                            &cval_raw,
+                            &mut raw_twin,
+                            &proven_fixnum,
+                            *a,
+                            d,
+                        )?;
                         cval[r] = Some(raw_fixnum_unop(&mut fb, d, k, av));
                         cval_raw[r] = true;
                     }
@@ -1893,8 +1965,24 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
                             &mut deopt,
                             &mut pending,
                         )?;
-                        let av = mir_as_raw(&mut fb, &cval, &cval_raw, *a, d)?;
-                        let bv = mir_as_raw(&mut fb, &cval, &cval_raw, *b, d)?;
+                        let av = mir_as_raw(
+                            &mut fb,
+                            &cval,
+                            &cval_raw,
+                            &mut raw_twin,
+                            &proven_fixnum,
+                            *a,
+                            d,
+                        )?;
+                        let bv = mir_as_raw(
+                            &mut fb,
+                            &cval,
+                            &cval_raw,
+                            &mut raw_twin,
+                            &proven_fixnum,
+                            *b,
+                            d,
+                        )?;
                         let cond = fb.ins().icmp(cc, av, bv);
                         let t = fb.ins().iconst(types::I64, Value::T.bits() as i64);
                         let nil = fb.ins().iconst(types::I64, Value::NIL.bits() as i64);
@@ -1922,6 +2010,13 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
                             let src = if *cdr { cdr_v } else { car_v };
                             cval[r] = cval[src.0 as usize];
                             cval_raw[r] = cval_raw[src.0 as usize];
+                            // The read IS the operand, so its proof and its
+                            // untagged twin carry over too (the builder types
+                            // a CarCdr `Any`; the fixpoint does not see
+                            // through an elided cons). The rooting skip still
+                            // reads `types[r]` — `Any` — so it stays rooted.
+                            proven_fixnum[r] = proven_fixnum[src.0 as usize];
+                            raw_twin[r] = raw_twin[src.0 as usize];
                         } else {
                             let d = if *safe {
                                 None
@@ -1979,7 +2074,24 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
                         for k in 0..residual_len {
                             let rv = inst.pre_stack[k];
                             let v = mir_force_tagged(&mut fb, &mut cval, &mut cval_raw, rv)?;
-                            if on && m.value_type(rv).never_needs_gc_root() {
+                            // The SAME inferred table the guard elision reads:
+                            // a wrong `Fixnum` here is a missing root (a UAF),
+                            // not a deopt, so debug builds trap on a skipped
+                            // residual whose tag is not the fixnum tag.
+                            let ty = types[rv.0 as usize];
+                            if on && ty.never_needs_gc_root() {
+                                if cfg!(debug_assertions) && ty == mir::LispType::Fixnum {
+                                    let tag = band_imm_p(&mut fb, v, FIXNUM_CHECK_MASK as i64);
+                                    let not_fix = fb.ins().icmp_imm(
+                                        IntCC::NotEqual,
+                                        tag,
+                                        FIXNUM_CHECK_VALUE as i64,
+                                    );
+                                    fb.ins().trapnz(
+                                        not_fix,
+                                        cranelift_codegen::ir::TrapCode::unwrap_user(4),
+                                    );
+                                }
                                 continue;
                             }
                             to_root.push(v);
@@ -2080,6 +2192,10 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
             }
 
             // Terminator.
+            debug_assert!(
+                mir::term_operands(&blk.term).all(|v| owner[v.0 as usize] == bi as u32),
+                "MIR terminator operands are block-local (block {bi})"
+            );
             match &blk.term {
                 MirTerm::Return(v) => {
                     let rv = mir_as_tagged(&mut fb, &cval, &cval_raw, *v)?;

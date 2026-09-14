@@ -519,20 +519,19 @@ fn jit_matches_interpreter_on_if_branch() {
             "if-branch mismatch for arg bits {}",
             arg.bits()
         );
-        // Also via the typed-MIR Tier-2 path (probe lower_mir_pure control flow).
-        if let Ok(mir) = mir::build_mir(&ops, &constants, 1) {
-            if let Ok(mleaf) = lower_mir_pure(&mir) {
-                let ctx_ptr = &mut eval as *mut Context as *mut u8;
-                if let NativeRun::Ok(bits) = mleaf.call(ctx_ptr, &[arg]) {
-                    assert_eq!(
-                        bits,
-                        want,
-                        "MIR if-branch mismatch for arg bits {}",
-                        arg.bits()
-                    );
-                }
-            }
-        }
+        // Also via the typed-MIR Tier-2 path (lower_mir_pure control flow).
+        let mir = mir::build_mir(&ops, &constants, 1).expect("MIR builds the if");
+        let mleaf = lower_mir_pure(&mir).expect("MIR lowers the if");
+        let ctx_ptr = &mut eval as *mut Context as *mut u8;
+        let NativeRun::Ok(bits) = mleaf.call(ctx_ptr, &[arg]) else {
+            panic!("MIR if must run natively for arg bits {}", arg.bits());
+        };
+        assert_eq!(
+            bits,
+            want,
+            "MIR if-branch mismatch for arg bits {}",
+            arg.bits()
+        );
     }
 }
 
@@ -640,15 +639,15 @@ fn compiles_countdown_loop_matches_interpreter() {
             Some(Value::make_int(0).bits()),
             "countdown should reach 0 (n={n})"
         );
-        // Also via the typed-MIR Tier-2 path (probe lower_mir_pure loops/back-edges).
-        if let Ok(mir) = mir::build_mir(&ops, &constants, 1) {
-            if let Ok(mleaf) = lower_mir_pure(&mir) {
-                let ctx_ptr = &mut eval as *mut Context as *mut u8;
-                if let NativeRun::Ok(bits) = mleaf.call(ctx_ptr, &[Value::make_int(n)]) {
-                    assert_eq!(bits, want, "MIR loop mismatch for n={n}");
-                }
-            }
-        }
+        // Also via the typed-MIR Tier-2 path (lower_mir_pure loops/back-edges).
+        // Hard failures: a MIR build/lowering regression must not pass silently.
+        let mir = mir::build_mir(&ops, &constants, 1).expect("MIR builds the loop");
+        let mleaf = lower_mir_pure(&mir).expect("MIR lowers the loop");
+        let ctx_ptr = &mut eval as *mut Context as *mut u8;
+        let NativeRun::Ok(bits) = mleaf.call(ctx_ptr, &[Value::make_int(n)]) else {
+            panic!("MIR loop must run natively for n={n}");
+        };
+        assert_eq!(bits, want, "MIR loop mismatch for n={n}");
     }
 }
 
@@ -683,18 +682,233 @@ fn mir_merge_phi_matches_interpreter() {
             let mut vm = Vm::from_context(&mut eval);
             vm.execute(&f, vec![c]).expect("interp diamond").bits()
         };
-        if let Ok(mir) = mir::build_mir(&ops, &constants, 1) {
-            if let Ok(mleaf) = lower_mir_pure(&mir) {
-                let ctx_ptr = &mut eval as *mut Context as *mut u8;
-                if let NativeRun::Ok(bits) = mleaf.call(ctx_ptr, &[c]) {
-                    assert_eq!(
-                        bits,
-                        want,
-                        "MIR merge-phi mismatch for cond bits {}",
-                        c.bits()
-                    );
-                }
-            }
+        let mir = mir::build_mir(&ops, &constants, 1).expect("MIR builds the diamond");
+        let mleaf = lower_mir_pure(&mir).expect("MIR lowers the diamond");
+        let ctx_ptr = &mut eval as *mut Context as *mut u8;
+        let NativeRun::Ok(bits) = mleaf.call(ctx_ptr, &[c]) else {
+            panic!("MIR diamond must run natively for cond bits {}", c.bits());
+        };
+        assert_eq!(
+            bits,
+            want,
+            "MIR merge-phi mismatch for cond bits {}",
+            c.bits()
+        );
+    }
+}
+
+/// The MIR known-fixnum fixpoint, end to end on GNU's byte-compile of
+///
+///     (defun probe-a (n v)
+///       (let ((i 0) (acc 0))
+///         (while (< i n) (setq acc (+ acc i)) (setq i (1+ i)))
+///         (if v acc acc)))
+///
+/// `i` and `acc` are loop-carried block params fed a fixnum constant on the
+/// entry edge and a `Bin`/`Unary` result on the back edge, so the fixpoint
+/// proves them `Fixnum` at every leader and the lowering elides their tag
+/// guards; `i`'s untagged twin serves both the `+` and the `1+`. What
+/// remains per iteration: ONE tag guard (`n`, an untyped argument) plus the
+/// two range guards. Before the port every use re-guarded: 7 guards.
+#[test]
+fn mir_probe_a_emits_one_tag_guard_per_iteration() {
+    use crate::emacs_core::bytecode::Vm;
+    use crate::emacs_core::eval::Context;
+    let ops = [
+        Op::Constant(0),
+        Op::Dup,
+        Op::StackRef(1),
+        Op::StackRef(4),
+        Op::Lss,
+        Op::GotoIfNil(14),
+        Op::Dup,
+        Op::StackRef(2),
+        Op::Add,
+        Op::StackSet(1),
+        Op::StackRef(1),
+        Op::Add1,
+        Op::StackSet(2),
+        Op::Goto(2),
+        Op::Return,
+    ];
+    let constants = [Value::make_int(0)];
+    let mir = mir::build_mir(&ops, &constants, 2).expect("MIR builds probe-a");
+    let mleaf = lower_mir_pure(&mir).expect("MIR lowers probe-a");
+    assert_eq!(
+        super::lowering::guards_emitted(),
+        3,
+        "one tag guard (n) + the Add and Add1 range guards; 7 means the block \
+         params were not proven fixnum"
+    );
+    assert_eq!(
+        super::lowering::untags_emitted(),
+        4,
+        "test block: i and n; body: acc and i, the 1+ reusing i's twin; 5 means \
+         the twin memo is not hit"
+    );
+    assert_eq!(
+        super::lowering::retags_emitted(),
+        3,
+        "the entry edge's fixnum constant and the two back-edge results; more \
+         means a proven param was written back untagged and retagged on an edge"
+    );
+    for n in [0i64, 1, 7, 1000] {
+        let mut eval = Context::new_minimal_vm_harness();
+        let mut f = ByteCodeFunction::new(LambdaParams {
+            required: vec![
+                crate::emacs_core::intern::SymId(1),
+                crate::emacs_core::intern::SymId(2),
+            ],
+            optional: Vec::new(),
+            rest: None,
+        });
+        f.lexical = true;
+        f.ops = ops.to_vec();
+        f.constants = constants.to_vec().into();
+        f.max_stack = 16;
+        let args = [Value::make_int(n), Value::T];
+        let want = {
+            let mut vm = Vm::from_context(&mut eval);
+            vm.execute(&f, args.to_vec())
+                .expect("interp probe-a")
+                .bits()
+        };
+        let ctx_ptr = &mut eval as *mut Context as *mut u8;
+        let NativeRun::Ok(bits) = mleaf.call(ctx_ptr, &args) else {
+            panic!("probe-a must run natively for n={n}");
+        };
+        assert_eq!(bits, want, "probe-a mismatch for n={n}");
+        assert_eq!(bits, Value::make_int(n * (n - 1) / 2).bits());
+    }
+    // The elision is type-directed, so a non-fixnum `n` still deopts on the
+    // remaining guard rather than being shifted as a pointer.
+    let mut eval = Context::new_minimal_vm_harness();
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    assert!(
+        matches!(
+            mleaf.call(ctx_ptr, &[Value::make_float(3.0), Value::NIL]),
+            NativeRun::Deopt
+        ),
+        "a float n must deopt at the one remaining guard"
+    );
+}
+
+/// A value the fixpoint knows is NOT a fixnum keeps its tag guard: the
+/// elision is keyed on `Fixnum` alone, not on "immediate" (`Boolean`, `Nil`,
+/// `True` and `Symbol` need no GC root but are not numbers). `(1+ (< a b))`
+/// must deopt to the interpreter's `wrong-type-argument`, never shift `t`.
+#[test]
+fn mir_known_boolean_keeps_its_guard() {
+    use crate::emacs_core::eval::Context;
+    let ops = [
+        Op::StackRef(1),
+        Op::StackRef(1),
+        Op::Lss,
+        Op::Add1,
+        Op::Return,
+    ];
+    let mir = mir::build_mir(&ops, &[], 2).expect("MIR builds");
+    let mleaf = lower_mir_pure(&mir).expect("MIR lowers");
+    assert_eq!(
+        super::lowering::guards_emitted(),
+        4,
+        "a and b tag guards, the Boolean's tag guard, the 1+ range guard"
+    );
+    let mut eval = Context::new_minimal_vm_harness();
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    assert!(
+        matches!(
+            mleaf.call(ctx_ptr, &[Value::make_int(1), Value::make_int(2)]),
+            NativeRun::Deopt
+        ),
+        "(1+ t) must deopt, not shift the tag bits of t"
+    );
+}
+
+/// The other consumer of the inferred table — the GC-root skip at a call —
+/// on a loop-carried param the fixpoint proved `Fixnum`, live across an
+/// ALLOCATING residual call under GC stress:
+///
+///     F = (let ((i 0)) (while (< i n) (g (sq i)) (setq i (1+ i))) i)
+///     sq = (* x x)   [inlined, so the tier gate takes the MIR leaf]
+///     g  = (cons y y) [a residual call: not inlinable, allocates]
+///
+/// At `(g ..)` the residual stack is `[n i]`: `n` is an untyped argument and
+/// stays conditionally rooted; `i` is skipped by type, and debug builds trap
+/// if the skipped value's tag is not the fixnum tag. With every allocation
+/// collecting, a wrongly skipped heap value would be freed under the callee.
+#[test]
+fn mir_rooting_skip_on_an_inferred_fixnum_param_across_an_allocating_call() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::intern::SymId;
+    let mut ev = Context::new();
+    ev.gc_stress = true;
+    let ctx = &mut ev as *mut Context;
+    let mk_sym = |name: &str| {
+        let s = Value::symbol(name);
+        let crate::emacs_core::value::ValueKind::Symbol(id) = s.kind() else {
+            panic!("symbol");
+        };
+        (s, id)
+    };
+    let (sq_sym, sq_id) = mk_sym("jit-rs-sq");
+    let (g_sym, g_id) = mk_sym("jit-rs-g");
+    let mut sq = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(1)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    sq.lexical = true;
+    sq.ops = vec![Op::Dup, Op::Mul, Op::Return];
+    sq.max_stack = 16;
+    ev.obarray
+        .set_symbol_function_id(sq_id, Value::make_bytecode(sq));
+    let mut g = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(1)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    g.lexical = true;
+    g.ops = vec![Op::Dup, Op::Cons, Op::Return];
+    g.max_stack = 16;
+    ev.obarray
+        .set_symbol_function_id(g_id, Value::make_bytecode(g));
+    let mut f = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(3)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    f.lexical = true;
+    f.ops = vec![
+        Op::Constant(0),   // 0: i = 0            [n i]
+        Op::StackRef(0),   // 1: i (loop header) [n i i]
+        Op::StackRef(2),   // 2: n                [n i i n]
+        Op::Lss,           // 3                   [n i c]
+        Op::GotoIfNil(15), // 4                   [n i]
+        Op::Constant(1),   // 5: g                [n i g]
+        Op::Constant(2),   // 6: sq               [n i g sq]
+        Op::StackRef(2),   // 7: i                [n i g sq i]
+        Op::Call(1),       // 8: (sq i)           [n i g r]
+        Op::Call(1),       // 9: (g r)  residual = [n i]
+        Op::Pop,           // 10                  [n i]
+        Op::StackRef(0),   // 11: i               [n i i]
+        Op::Add1,          // 12                  [n i i+1]
+        Op::StackSet(1),   // 13: i = i+1         [n i+1]
+        Op::Goto(1),       // 14
+        Op::Return,        // 15: i
+    ];
+    f.constants = vec![Value::make_int(0), g_sym, sq_sym].into();
+    f.max_stack = 16;
+    let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("F compiles");
+    assert!(
+        leaf.inline_epoch().is_some(),
+        "F inlined sq -> took the MIR tier (not the baseline)"
+    );
+    assert!(leaf.has_side_effects, "F keeps the residual call to g");
+    for n in [0i64, 3, 50] {
+        match leaf.call(ctx as *mut u8, &[Value::make_int(n)]) {
+            NativeRun::Ok(bits) => assert_eq!(bits, Value::make_int(n).bits(), "F({n}) = {n}"),
+            other => panic!("F({n}): expected Ok({n}), got {other:?}"),
         }
     }
 }
@@ -733,19 +947,21 @@ fn mir_multi_phi_merge_matches_interpreter() {
             let mut vm = Vm::from_context(&mut eval);
             vm.execute(&f, vec![c]).expect("interp multi-phi").bits()
         };
-        if let Ok(mir) = mir::build_mir(&ops, &constants, 1) {
-            if let Ok(mleaf) = lower_mir_pure(&mir) {
-                let ctx_ptr = &mut eval as *mut Context as *mut u8;
-                if let NativeRun::Ok(bits) = mleaf.call(ctx_ptr, &[c]) {
-                    assert_eq!(
-                        bits,
-                        want,
-                        "MIR multi-phi-merge mismatch for cond bits {}",
-                        c.bits()
-                    );
-                }
-            }
-        }
+        let mir = mir::build_mir(&ops, &constants, 1).expect("MIR builds the two-phi diamond");
+        let mleaf = lower_mir_pure(&mir).expect("MIR lowers the two-phi diamond");
+        let ctx_ptr = &mut eval as *mut Context as *mut u8;
+        let NativeRun::Ok(bits) = mleaf.call(ctx_ptr, &[c]) else {
+            panic!(
+                "MIR two-phi diamond must run natively for cond bits {}",
+                c.bits()
+            );
+        };
+        assert_eq!(
+            bits,
+            want,
+            "MIR multi-phi-merge mismatch for cond bits {}",
+            c.bits()
+        );
     }
 }
 
