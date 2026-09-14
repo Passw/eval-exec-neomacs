@@ -455,6 +455,35 @@ fn pure_dispatch_typed_div_float_zero_uses_ieee_results() {
     }
 }
 
+/// GNU keeps an INPUT NaN's sign — x86 `divsd` propagates it — and only an
+/// invalid op (`0.0/0.0`) yields the negative default NaN. `(/ 0.0e+NaN 1)`
+/// prints `0.0e+NaN` in GNU; forcing every NaN negative diverged there.
+#[test]
+fn float_division_propagates_an_input_nan_with_its_sign() {
+    for args in [
+        vec![Value::make_float(f64::NAN), Value::make_int(1)],
+        vec![Value::make_int(1), Value::make_float(f64::NAN)],
+        vec![Value::make_float(f64::NAN), Value::make_float(f64::NAN)],
+    ] {
+        let r = dispatch_builtin_pure("/", args)
+            .expect("builtin / should resolve")
+            .expect("float division should evaluate");
+        let f = r.as_float().expect("a float");
+        assert!(f.is_nan());
+        assert!(
+            !f.is_sign_negative(),
+            "an input NaN (positive) must propagate positive"
+        );
+    }
+    let r = dispatch_builtin_pure("/", vec![Value::make_float(-f64::NAN), Value::make_int(1)])
+        .expect("builtin / should resolve")
+        .expect("float division should evaluate");
+    assert!(
+        r.as_float().expect("a float").is_sign_negative(),
+        "a negative input NaN stays negative"
+    );
+}
+
 #[test]
 fn pure_dispatch_typed_ash_handles_extreme_negative_shift_counts() {
     crate::test_utils::init_test_tracing();
