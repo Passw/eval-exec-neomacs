@@ -541,17 +541,17 @@ pub(crate) fn evict_inline_dependents(sym: SymId) {
     COMPILED.with(|cache| {
         let mut cache = cache.borrow_mut();
         for id in dependents {
-            // Disjointness (spec-slot pointer safety): only leaves that RECORDED
-            // inline deps are ever in a dep set, and resolve_compiled_leaf_ptr
-            // refuses to cache such a leaf's pointer in a spec slot — so evicting
-            // one here can never dangle a baked SpecSlot.leaf raw pointer. The
-            // predicate is the dep list, NOT `inline_epoch`: a baseline leaf with
-            // an inlined bit-op (LEVEL-B, `inline_arith_callee_syms`) records
-            // deps and deliberately no epoch, and the 2026-09-05 gate-off census
-            // tripped the epoch-based version of this assertion on exactly that.
+            // Only leaves that RECORDED inline deps are ever in a dep set. A
+            // baseline bit-op leaf among them may sit in a spec or leaf slot
+            // (see resolve_compiled_leaf_ptr): `remove` retires it, so the
+            // pointer stays valid, and disarms the leaf slots. The predicate is
+            // the dep list, NOT `inline_epoch`: a baseline leaf with an inlined
+            // bit-op (LEVEL-B, `inline_arith_callee_syms`) records deps and
+            // deliberately no epoch, and the 2026-09-05 gate-off census tripped
+            // the epoch-based version of this assertion on exactly that.
             debug_assert!(
                 !matches!(cache.get(id), Some(CacheEntry::Compiled(l)) if l.inline_deps().is_empty()),
-                "precise eviction must only touch leaves that recorded inline deps (spec-slot pointer safety)"
+                "precise eviction must only touch leaves that recorded inline deps"
             );
             cache.remove(id);
         }
@@ -1153,14 +1153,22 @@ pub(crate) fn resolve_compiled_leaf_ptr(
                 },
             )
         }) {
-            // INLINED leaves must NOT be fast-path-cached in a spec slot: their
-            // validity depends on an inlined callee's epoch, which the caller's
-            // spec guard doesn't check. Force them through try_run_compiled (which
-            // re-JITs on a stale epoch). Non-inlined leaves keep the stable-pointer
-            // fast path (they are never epoch-stale, so the per-entry eviction
-            // never drops them — only a wholesale clear() can, and that cannot
-            // fire mid-native-execution; see resolve_compiled_leaf_ptr).
-            CacheEntry::Compiled(leaf) if leaf.inline_deps().is_empty() => Some(Rc::as_ptr(leaf)),
+            // MIR-INLINED leaves must NOT be fast-path-cached in a spec slot:
+            // their validity depends on an inlined callee's epoch
+            // (`inline_epoch`), which only try_run_compiled checks (it re-JITs
+            // on a stale epoch). A baseline leaf that inlined a bit-op
+            // (`inline_deps` with no epoch) is cached: redefining the bit-op
+            // evicts it (`evict_inline_dependents`), which disarms every leaf
+            // slot, and the same redefinition moves the function epoch, whose
+            // re-arm drops a spec slot's cached leaf. Before, every call into
+            // such a leaf — each bindat packer that masks with `logand` — took
+            // the strict seam. A retired leaf stays allocated (`DenseCache::
+            // remove`), so a pointer never dangles.
+            CacheEntry::Compiled(leaf)
+                if leaf.inline_deps().is_empty() || leaf.inline_epoch().is_none() =>
+            {
+                Some(Rc::as_ptr(leaf))
+            }
             _ => None,
         }
     })

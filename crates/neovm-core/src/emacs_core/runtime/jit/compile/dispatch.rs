@@ -1013,6 +1013,18 @@ pub extern "C" fn neovm_jit_call_spec(
                     (!jit_force_slow_spec() && slot_epoch == epoch) || {
                         let cur = ctx.obarray.symbol_function_id(SymId(sym as u32));
                         if cur.is_some_and(|v| v.bits() as i64 == expected) {
+                            // An unchanged binding keeps its cached leaf unless
+                            // that leaf inlined a bit-op: the redefinition that
+                            // moved the epoch may be the bit-op's, which retired
+                            // the leaf (retired leaves stay allocated, so the
+                            // read is sound).
+                            let cached = slot.leaf.load(Ordering::Relaxed)
+                                as *const crate::emacs_core::jit::compile::CompiledLeaf;
+                            // SAFETY: a nonzero slot names a live or retired
+                            // cache leaf.
+                            if !cached.is_null() && !unsafe { (*cached).inline_deps().is_empty() } {
+                                slot.leaf.store(0, Ordering::Relaxed);
+                            }
                             slot.epoch.store(epoch, Ordering::Relaxed);
                             true
                         } else {

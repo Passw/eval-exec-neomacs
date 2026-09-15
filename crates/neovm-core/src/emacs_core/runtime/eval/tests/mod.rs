@@ -25660,6 +25660,103 @@ fn redefining_a_function_is_visible_to_the_next_interpreted_call() {
 /// same answers as the builtin; a dotted LIST, a non-compiled F and a
 /// redefined `apply` take the builtin path.
 #[cfg(feature = "jit")]
+/// A speculated call into a compiled callee that inlined a bit-op runs
+/// natively through the call site's cached leaf, and redefining the bit-op
+/// still takes effect at the next call (the cached leaf is dropped, the
+/// callee recompiled).
+#[test]
+fn a_speculated_call_caches_a_bit_op_inlining_callee_and_sees_its_redefinition() {
+    crate::test_utils::init_test_tracing();
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    crate::emacs_core::jit::compile::force_inline_arith_for_test(true);
+    use crate::emacs_core::bytecode::ByteCodeFunction;
+    use crate::emacs_core::bytecode::opcode::Op;
+    use crate::emacs_core::intern::SymId;
+    use crate::emacs_core::value::LambdaParams;
+    use std::sync::atomic::Ordering;
+    let mut ev = Context::new();
+    let lambda = |ops: Vec<Op>, constants: Vec<Value>| {
+        let mut f = ByteCodeFunction::new(LambdaParams {
+            required: vec![SymId(1)],
+            optional: Vec::new(),
+            rest: None,
+        });
+        f.lexical = true;
+        f.ops = ops;
+        f.constants = constants.into();
+        f.max_stack = 16;
+        f.jit_runtime().set_hot_for_test();
+        Value::make_bytecode(f)
+    };
+    // (lambda (x) (if x (logand x 255) (logand x 255))): two blocks, so the
+    // caller speculates the call instead of inlining the body.
+    let callee = lambda(
+        vec![
+            Op::StackRef(0),
+            Op::GotoIfNil(7),
+            Op::Constant(0),
+            Op::StackRef(1),
+            Op::Constant(1),
+            Op::Call(2),
+            Op::Return,
+            Op::Constant(0),
+            Op::StackRef(1),
+            Op::Constant(1),
+            Op::Call(2),
+            Op::Return,
+        ],
+        vec![Value::symbol("logand"), Value::make_int(255)],
+    );
+    let callee_id = crate::emacs_core::intern::intern("jit-bitop-callee");
+    ev.obarray.set_symbol_function_id(callee_id, callee);
+    // (lambda (x) (jit-bitop-callee x))
+    let caller = lambda(
+        vec![Op::Constant(0), Op::StackRef(1), Op::Call(1), Op::Return],
+        vec![Value::symbol("jit-bitop-callee")],
+    );
+    crate::emacs_core::eval::push_scratch_gc_root(caller);
+    let arg = vec![Value::make_int(300)];
+    for _ in 0..3 {
+        assert_eq!(
+            ev.funcall_general_untraced(caller, arg.clone()).unwrap(),
+            Value::make_int(44)
+        );
+    }
+    let fast = || crate::emacs_core::jit::compile::SPEC_FAST_CALL_COUNT.load(Ordering::Relaxed);
+    let before = fast();
+    assert_eq!(
+        ev.funcall_general_untraced(caller, arg.clone()).unwrap(),
+        Value::make_int(44)
+    );
+    assert!(fast() > before, "the call runs the cached callee leaf");
+    let logand = ev
+        .obarray
+        .symbol_function_id(crate::emacs_core::intern::intern("logand"))
+        .expect("logand");
+    ev.eval_str("(fset 'logand (lambda (_a _b) 'redefined))")
+        .expect("redefine logand");
+    assert_eq!(
+        ev.funcall_general_untraced(caller, arg.clone()).unwrap(),
+        Value::symbol("redefined")
+    );
+    ev.obarray
+        .set_symbol_function_id(crate::emacs_core::intern::intern("logand"), logand);
+    assert_eq!(
+        ev.funcall_general_untraced(caller, arg.clone()).unwrap(),
+        Value::make_int(44)
+    );
+    // A non-fixnum reaching the inlined bit-op leaves native code and signals
+    // as the builtin does.
+    let not_a_number = ev.eval_str("'(1)").expect("list");
+    match ev.funcall_general_untraced(caller, vec![not_a_number]) {
+        Err(crate::emacs_core::error::Flow::Signal(sig)) => {
+            assert_eq!(sig.symbol_name(), "wrong-type-argument")
+        }
+        other => panic!("(logand '(1) 255) must signal: {other:?}"),
+    }
+    crate::emacs_core::jit::compile::force_inline_arith_for_test(false);
+}
+
 /// A native call into a compiled callee with `&optional` slots or a `&rest`
 /// list marshals the caller's arguments into the callee's slots: the given
 /// ones, nil for each missing optional, and the rest consed. Driven through
