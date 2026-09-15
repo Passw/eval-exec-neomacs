@@ -1491,7 +1491,8 @@ impl TaggedHeap {
         // the lifetime total is what has been banked at the resets plus what
         // has accumulated since.  Every cons in the engine paid for that
         // extra saturating add.
-        self.bytes_since_gc = self.bytes_since_gc.saturating_add(bytes);
+        // A plain add: a usize of allocated bytes cannot overflow.
+        self.bytes_since_gc += bytes;
     }
 
     /// Every byte this heap has ever allocated.

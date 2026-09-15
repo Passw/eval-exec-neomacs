@@ -91,7 +91,7 @@ pub extern "C" fn neovm_jit_cons(car: i64, cdr: i64) -> i64 {
 /// while the caller's other values sit in native slots.
 #[unsafe(no_mangle)]
 pub extern "C" fn neovm_jit_make_float(value: f64) -> i64 {
-    Value::make_float(value).bits() as i64
+    crate::tagged::gc::with_tagged_heap(|heap| heap.alloc_float_inline(value)).bits() as i64
 }
 
 /// Cold overflow path of the JIT residual-root window (see

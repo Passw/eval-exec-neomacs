@@ -636,6 +636,7 @@ impl<T: PagedObject> ObjectArena<T> {
     /// full-header-write the slot (its bytes are garbage until then, and the
     /// sweep may legally visit it as soon as the mutator next yields —
     /// allocated-bit ⇒ readable header is the sweep's contract).
+    #[inline(always)]
     pub(super) fn alloc_slot(&mut self) -> *mut T {
         // 1. Class free list: pop from the first page with freed slots.
         //    Retired pages are never on this chain (they never gain free
@@ -663,6 +664,15 @@ impl<T: PagedObject> ObjectArena<T> {
             page.set_allocated(index);
             return page.slot_ptr(index);
         }
+        self.alloc_slot_new_page()
+    }
+
+    /// Step 3 of [`Self::alloc_slot`], out of line: kept inline, the page set-up
+    /// made every allocation save and restore the callee-saved registers it
+    /// uses (14 of `alloc_float`'s 56 instructions).
+    #[cold]
+    #[inline(never)]
+    fn alloc_slot_new_page(&mut self) -> *mut T {
         // 3. Fresh 64KB-aligned page, over a released page's storage if one
         //    is spare.
         let mut page = match self.spare_storage.pop() {

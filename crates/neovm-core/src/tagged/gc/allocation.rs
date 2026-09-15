@@ -169,21 +169,32 @@ impl TaggedHeap {
     /// sweep with `free_gc_object`/`Box::from_raw`, which would corrupt the
     /// heap on a page pointer. The page sweep is the only float reclaimer.
     pub fn alloc_float(&mut self, value: f64) -> TaggedValue {
+        self.alloc_float_inline(value)
+    }
+
+    /// [`Self::alloc_float`] inlined into its caller: for the JIT's float
+    /// boxing shim, which makes nearly every float a float loop allocates.
+    /// Other callers keep the call, so the VM's arithmetic arms stay small.
+    #[inline(always)]
+    pub(crate) fn alloc_float_inline(&mut self, value: f64) -> TaggedValue {
         self.add_memory_use_count(MemoryUseCountSlot::Floats, 1);
         let ptr = self.float_arena.alloc_slot();
         unsafe {
             // FULL-HEADER WRITE: never partially reuse prior slot bytes.
+            // BORN-AT-PARITY, unconditionally — the link seam's store (see
+            // `link_object`): allocate-black during a mark/sweep, pre-armed
+            // white for the next `begin_collection` flip otherwise. Written
+            // with the header, before the pointer escapes.
             std::ptr::write(
                 ptr,
                 FloatObj {
-                    header: GcHeader::new(HeapObjectKind::Float),
+                    header: GcHeader {
+                        marked: std::sync::atomic::AtomicBool::new(self.mark_parity),
+                        ..GcHeader::new(HeapObjectKind::Float)
+                    },
                     value,
                 },
             );
-            // BORN-AT-PARITY, unconditionally — the link seam's store (see
-            // `link_object`): allocate-black during a mark/sweep, pre-armed
-            // white for the next `begin_collection` flip otherwise.
-            (*ptr).header.set_marked(self.mark_parity);
         }
         #[cfg(test)]
         alloc_probe::record(ptr as *const GcHeader, self.non_cons_object_addrs.len());
