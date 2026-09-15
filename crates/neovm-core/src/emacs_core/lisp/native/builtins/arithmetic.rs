@@ -6,6 +6,7 @@ use malachite::base::num::logic::traits::SignificantBits;
 use malachite::base::rounding_modes::RoundingMode;
 use malachite::integer::Integer;
 use malachite::natural::Natural;
+use std::mem::MaybeUninit;
 use std::sync::Mutex;
 
 // ===========================================================================
@@ -51,18 +52,215 @@ fn wrong_integer_or_marker(value: &Value) -> Flow {
     )
 }
 
-/// `xs * m` for the limbs of a magnitude and one limb, into a vector sized
-/// for the carry up front. malachite's own `limbs_mul_limb` reserves only
-/// `xs.len()`, so a carry out of the top limb reallocated — and copied — the
-/// whole product; its in-place form does the same to the operand's buffer.
-fn natural_mul_limb(xs: &[u64], m: u64) -> Natural {
-    let mut out: Vec<u64> = Vec::with_capacity(xs.len() + 1);
-    let mut carry = 0u64;
-    out.extend(xs.iter().map(|&x| {
+/// GNU `CHECK_NUMBER`: signal `numberp` unless `value` is a number. Only the
+/// type — `expect_number` also converts, and a bignum's conversion to a
+/// double was 200 instructions thrown away by every caller that only wanted
+/// the check.
+#[inline]
+fn check_number(value: &Value) -> Result<(), Flow> {
+    if value.is_fixnum() || value.is_float() || value.is_bignum() {
+        Ok(())
+    } else {
+        Err(signal(
+            LispCondition::WrongTypeArgument,
+            vec![Value::symbol("numberp"), *value],
+        ))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Limb kernels for the bignum paths
+// ---------------------------------------------------------------------------
+//
+// malachite's entry points for these shapes do more than the result needs:
+// `&x + &y` pushes its sum a limb at a time (13 instructions a limb on
+// pidigits), a product by one limb reserves no room for its carry, and
+// `div_round` computes a quotient AND a remainder with calloc'd scratch even
+// to truncate. The kernels below write each result once, into a vector
+// allocated at its final size. GMP's are hand-written assembly; the BMI2
+// product and the carry chains here land within about 1.5x of them.
+
+/// `dst = xs * m` over `xs.len()` limbs; returns the carry-out limb.
+#[inline]
+fn limbs_mul_limb_to(xs: &[u64], m: u64, dst: &mut [MaybeUninit<u64>]) -> u64 {
+    let dst = &mut dst[..xs.len()];
+    #[cfg(target_arch = "x86_64")]
+    if std::arch::is_x86_feature_detected!("bmi2") {
+        // SAFETY: the CPU supports BMI2, checked just above.
+        return unsafe { limbs_mul_limb_to_bmi2(xs, m, dst) };
+    }
+    limbs_mul_limb_to_generic(xs, m, dst, 0)
+}
+
+fn limbs_mul_limb_to_generic(
+    xs: &[u64],
+    m: u64,
+    dst: &mut [MaybeUninit<u64>],
+    mut carry: u64,
+) -> u64 {
+    for (d, &x) in dst.iter_mut().zip(xs) {
         let p = u128::from(x) * u128::from(m) + u128::from(carry);
+        d.write(p as u64);
         carry = (p >> 64) as u64;
-        p as u64
-    }));
+    }
+    carry
+}
+
+/// Four independent `mulx` products, then ONE add-with-carry chain over the
+/// low halves and the previous high halves (`mulx` leaves the flags alone),
+/// as GMP's `mul_1` does: 5 instructions a limb against 8.5 for the u128
+/// loop.
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "bmi2")]
+fn limbs_mul_limb_to_bmi2(xs: &[u64], m: u64, dst: &mut [MaybeUninit<u64>]) -> u64 {
+    use std::arch::x86_64::{_addcarry_u64, _mulx_u64};
+    let mut carry = 0u64;
+    let mut xc = xs.chunks_exact(4);
+    let mut dc = dst.chunks_exact_mut(4);
+    for (x, d) in (&mut xc).zip(&mut dc) {
+        let (mut h0, mut h1, mut h2, mut h3) = (0u64, 0u64, 0u64, 0u64);
+        let l0 = _mulx_u64(x[0], m, &mut h0);
+        let l1 = _mulx_u64(x[1], m, &mut h1);
+        let l2 = _mulx_u64(x[2], m, &mut h2);
+        let l3 = _mulx_u64(x[3], m, &mut h3);
+        let (mut o0, mut o1, mut o2, mut o3) = (0u64, 0u64, 0u64, 0u64);
+        let c = _addcarry_u64(0, l0, carry, &mut o0);
+        let c = _addcarry_u64(c, l1, h0, &mut o1);
+        let c = _addcarry_u64(c, l2, h1, &mut o2);
+        let c = _addcarry_u64(c, l3, h2, &mut o3);
+        // h3 <= m - 1, so the carry-in cannot overflow it.
+        _addcarry_u64(c, h3, 0, &mut carry);
+        d[0].write(o0);
+        d[1].write(o1);
+        d[2].write(o2);
+        d[3].write(o3);
+    }
+    limbs_mul_limb_to_generic(xc.remainder(), m, dc.into_remainder(), carry)
+}
+
+/// `dst = xs + ys` over `xs.len()` limbs, `xs.len() >= ys.len()`; returns the
+/// carry out of the top limb.
+fn limbs_add_to(xs: &[u64], ys: &[u64], dst: &mut [MaybeUninit<u64>]) -> bool {
+    debug_assert!(xs.len() >= ys.len() && dst.len() >= xs.len());
+    let (lo, hi) = xs.split_at(ys.len());
+    let (dlo, dhi) = dst[..xs.len()].split_at_mut(ys.len());
+    let mut carry = limbs_add_same_to(lo, ys, dlo);
+    for (d, &x) in dhi.iter_mut().zip(hi) {
+        let (s, c) = x.overflowing_add(u64::from(carry));
+        d.write(s);
+        carry = c;
+    }
+    carry
+}
+
+#[cfg(target_arch = "x86_64")]
+fn limbs_add_same_to(xs: &[u64], ys: &[u64], dst: &mut [MaybeUninit<u64>]) -> bool {
+    use std::arch::x86_64::_addcarry_u64;
+    let mut c = 0u8;
+    let mut xc = xs.chunks_exact(4);
+    let mut yc = ys.chunks_exact(4);
+    let mut dc = dst.chunks_exact_mut(4);
+    for ((x, y), d) in (&mut xc).zip(&mut yc).zip(&mut dc) {
+        let (mut o0, mut o1, mut o2, mut o3) = (0u64, 0u64, 0u64, 0u64);
+        c = _addcarry_u64(c, x[0], y[0], &mut o0);
+        c = _addcarry_u64(c, x[1], y[1], &mut o1);
+        c = _addcarry_u64(c, x[2], y[2], &mut o2);
+        c = _addcarry_u64(c, x[3], y[3], &mut o3);
+        d[0].write(o0);
+        d[1].write(o1);
+        d[2].write(o2);
+        d[3].write(o3);
+    }
+    for ((&x, &y), d) in xc
+        .remainder()
+        .iter()
+        .zip(yc.remainder())
+        .zip(dc.into_remainder())
+    {
+        let mut o = 0u64;
+        c = _addcarry_u64(c, x, y, &mut o);
+        d.write(o);
+    }
+    c != 0
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+fn limbs_add_same_to(xs: &[u64], ys: &[u64], dst: &mut [MaybeUninit<u64>]) -> bool {
+    let mut carry = false;
+    for ((&x, &y), d) in xs.iter().zip(ys).zip(dst) {
+        let (s1, c1) = x.overflowing_add(y);
+        let (s2, c2) = s1.overflowing_add(u64::from(carry));
+        d.write(s2);
+        carry = c1 | c2;
+    }
+    carry
+}
+
+/// `dst = xs - ys` over `xs.len()` limbs, for `xs >= ys` as numbers (so no
+/// borrow leaves the top limb).
+fn limbs_sub_to(xs: &[u64], ys: &[u64], dst: &mut [MaybeUninit<u64>]) {
+    debug_assert!(xs.len() >= ys.len() && dst.len() >= xs.len());
+    let (lo, hi) = xs.split_at(ys.len());
+    let (dlo, dhi) = dst[..xs.len()].split_at_mut(ys.len());
+    let mut borrow = limbs_sub_same_to(lo, ys, dlo);
+    for (d, &x) in dhi.iter_mut().zip(hi) {
+        let (s, b) = x.overflowing_sub(u64::from(borrow));
+        d.write(s);
+        borrow = b;
+    }
+    debug_assert!(!borrow, "limbs_sub_to needs xs >= ys");
+}
+
+#[cfg(target_arch = "x86_64")]
+fn limbs_sub_same_to(xs: &[u64], ys: &[u64], dst: &mut [MaybeUninit<u64>]) -> bool {
+    use std::arch::x86_64::_subborrow_u64;
+    let mut b = 0u8;
+    let mut xc = xs.chunks_exact(4);
+    let mut yc = ys.chunks_exact(4);
+    let mut dc = dst.chunks_exact_mut(4);
+    for ((x, y), d) in (&mut xc).zip(&mut yc).zip(&mut dc) {
+        let (mut o0, mut o1, mut o2, mut o3) = (0u64, 0u64, 0u64, 0u64);
+        b = _subborrow_u64(b, x[0], y[0], &mut o0);
+        b = _subborrow_u64(b, x[1], y[1], &mut o1);
+        b = _subborrow_u64(b, x[2], y[2], &mut o2);
+        b = _subborrow_u64(b, x[3], y[3], &mut o3);
+        d[0].write(o0);
+        d[1].write(o1);
+        d[2].write(o2);
+        d[3].write(o3);
+    }
+    for ((&x, &y), d) in xc
+        .remainder()
+        .iter()
+        .zip(yc.remainder())
+        .zip(dc.into_remainder())
+    {
+        let mut o = 0u64;
+        b = _subborrow_u64(b, x, y, &mut o);
+        d.write(o);
+    }
+    b != 0
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+fn limbs_sub_same_to(xs: &[u64], ys: &[u64], dst: &mut [MaybeUninit<u64>]) -> bool {
+    let mut borrow = false;
+    for ((&x, &y), d) in xs.iter().zip(ys).zip(dst) {
+        let (s1, b1) = x.overflowing_sub(y);
+        let (s2, b2) = s1.overflowing_sub(u64::from(borrow));
+        d.write(s2);
+        borrow = b1 | b2;
+    }
+    borrow
+}
+
+/// A limb vector filled by `fill` over its first `len` limbs, with room for
+/// one carry limb; `fill` returns that carry (0 for none).
+fn natural_from_kernel(len: usize, fill: impl FnOnce(&mut [MaybeUninit<u64>]) -> u64) -> Natural {
+    let mut out: Vec<u64> = Vec::with_capacity(len + 1);
+    let carry = fill(&mut out.spare_capacity_mut()[..len]);
+    // SAFETY: `fill` initialized the first `len` limbs.
+    unsafe { out.set_len(len) };
     if carry != 0 {
         out.push(carry);
     }
@@ -77,8 +275,107 @@ fn integer_mul_i64(x: &Integer, n: i64) -> Integer {
         return Integer::from(0);
     }
     let negative = (*x < 0) != (n < 0);
-    let magnitude = natural_mul_limb(x.unsigned_abs_ref().as_limbs_asc(), n.unsigned_abs());
+    let xs = x.unsigned_abs_ref().as_limbs_asc();
+    let m = n.unsigned_abs();
+    let magnitude = natural_from_kernel(xs.len(), |dst| limbs_mul_limb_to(xs, m, dst));
     Integer::from_sign_and_abs(!negative, magnitude)
+}
+
+/// `|a| + |b|`.
+fn natural_add_limbs(a: &[u64], b: &[u64]) -> Natural {
+    let (xs, ys) = if a.len() >= b.len() { (a, b) } else { (b, a) };
+    natural_from_kernel(xs.len(), |dst| u64::from(limbs_add_to(xs, ys, dst)))
+}
+
+/// `|a| - |b|` for `|a| >= |b|`.
+fn natural_sub_limbs(a: &[u64], b: &[u64]) -> Natural {
+    natural_from_kernel(a.len(), |dst| {
+        limbs_sub_to(a, b, dst);
+        0
+    })
+}
+
+/// `a + b` if `b_negative` is `b`'s sign, `a - b` if it is the opposite:
+/// one allocation, both operands by reference.
+fn integer_add_signed(a: &Integer, b: &Natural, b_negative: bool) -> Integer {
+    let an = a.unsigned_abs_ref();
+    let a_negative = *a < 0;
+    if a_negative == b_negative {
+        return Integer::from_sign_and_abs(
+            !a_negative,
+            natural_add_limbs(an.as_limbs_asc(), b.as_limbs_asc()),
+        );
+    }
+    match an.cmp(b) {
+        std::cmp::Ordering::Equal => Integer::from(0),
+        std::cmp::Ordering::Greater => Integer::from_sign_and_abs(
+            !a_negative,
+            natural_sub_limbs(an.as_limbs_asc(), b.as_limbs_asc()),
+        ),
+        std::cmp::Ordering::Less => Integer::from_sign_and_abs(
+            !b_negative,
+            natural_sub_limbs(b.as_limbs_asc(), an.as_limbs_asc()),
+        ),
+    }
+}
+
+/// `a + b` for two integers, by reference.
+fn integer_add_ref(a: &Integer, b: &Integer) -> Integer {
+    integer_add_signed(a, b.unsigned_abs_ref(), *b < 0)
+}
+
+/// `a - b` for two integers, by reference.
+fn integer_sub_ref(a: &Integer, b: &Integer) -> Integer {
+    integer_add_signed(a, b.unsigned_abs_ref(), *b > 0)
+}
+
+/// `floor (x / 2^k)` for a magnitude `x` of at most `k + 128` bits.
+fn limbs_shr_to_u128(xs: &[u64], k: u64) -> u128 {
+    let i = (k / 64) as usize;
+    let b = (k % 64) as u32;
+    let limb = |j: usize| u128::from(xs.get(j).copied().unwrap_or(0));
+    let v = (limb(i) | (limb(i + 1) << 64)) >> b;
+    if b == 0 {
+        v
+    } else {
+        v | (limb(i + 2) << (128 - b))
+    }
+}
+
+/// `floor (|n| / |d|)` when the top 128 bits of both operands PROVE it,
+/// `None` otherwise (caller divides in full).
+///
+/// With `N = floor (n / 2^k)`, `D = floor (d / 2^k)`, `q = floor (N / D)` and
+/// `R = N - q*D`: `n - q*d` lies strictly between `(R - q) * 2^k` and
+/// `(R + 1) * 2^k <= d`. So `q <= floor (n / d)` always, and `q` IS the
+/// quotient whenever `R >= q`. For the small quotients of `(truncate a b)`
+/// on similar-sized bignums `R` is essentially a random remainder below a
+/// divisor of at least 2^63, so the check practically always holds. GMP's
+/// `mpn_div_q` takes the same shortcut from an approximate quotient.
+fn natural_div_small_quotient(ns: &[u64], ds: &[u64]) -> Option<u128> {
+    let bit_len = |xs: &[u64]| -> u64 {
+        xs.last().map_or(0, |&top| {
+            xs.len() as u64 * 64 - u64::from(top.leading_zeros())
+        })
+    };
+    let n_bits = bit_len(ns);
+    let d_bits = bit_len(ds);
+    if d_bits == 0 {
+        return None;
+    }
+    if n_bits < d_bits {
+        return Some(0);
+    }
+    let k = n_bits.saturating_sub(128);
+    let n_top = limbs_shr_to_u128(ns, k);
+    let d_top = limbs_shr_to_u128(ds, k);
+    if d_top == 0 {
+        return None;
+    }
+    let q = n_top / d_top;
+    let r = n_top - q * d_top;
+    // With k == 0 nothing was truncated: the division was exact.
+    (k == 0 || r >= q).then_some(q)
 }
 
 /// Materialize an integer-valued operand as a `malachite::Integer`. Used by
@@ -169,7 +466,7 @@ pub(crate) fn builtin_add_slice(
             if sum == 0
                 && let Some(next) = rest.first().and_then(|v| v.as_bignum())
             {
-                return continue_bignum_add(eval, &rest[1..], big + next);
+                return continue_bignum_add(eval, &rest[1..], integer_add_ref(big, next));
             }
             let acc = if sum == 0 {
                 big.clone()
@@ -241,7 +538,9 @@ fn continue_bignum_add(
         match a.kind() {
             ValueKind::Fixnum(n) => acc += Integer::from(n),
             // By reference: `integer_from_value` would clone it to read it.
-            ValueKind::Veclike(VecLikeType::Bignum) => acc += a.as_bignum().unwrap(),
+            ValueKind::Veclike(VecLikeType::Bignum) => {
+                acc = integer_add_ref(&acc, a.as_bignum().unwrap());
+            }
             _ => acc += integer_from_value(eval, a)?,
         }
     }
@@ -279,7 +578,11 @@ pub(crate) fn builtin_sub_slice(
                 return continue_bignum_sub(eval, &rest[1..], big - Integer::from(n));
             }
             Some(ValueKind::Veclike(VecLikeType::Bignum)) => {
-                return continue_bignum_sub(eval, &rest[1..], big - rest[0].as_bignum().unwrap());
+                return continue_bignum_sub(
+                    eval,
+                    &rest[1..],
+                    integer_sub_ref(big, rest[0].as_bignum().unwrap()),
+                );
             }
             _ => return continue_bignum_sub(eval, rest, big.clone()),
         }
@@ -358,7 +661,9 @@ fn continue_bignum_sub(
         }
         match a.kind() {
             ValueKind::Fixnum(n) => acc -= Integer::from(n),
-            ValueKind::Veclike(VecLikeType::Bignum) => acc -= a.as_bignum().unwrap(),
+            ValueKind::Veclike(VecLikeType::Bignum) => {
+                acc = integer_sub_ref(&acc, a.as_bignum().unwrap());
+            }
             _ => acc -= integer_from_value(eval, a)?,
         }
     }
@@ -1368,7 +1673,7 @@ fn rounding_with_divisor(
     // before doing anything else.  It then treats a nil (or omitted)
     // divisor as the single-argument form, so cl-lib may safely forward an
     // unsupplied `&optional y` as nil.
-    let _ = expect_number(&args[0])?;
+    check_number(&args[0])?;
     if args.len() == 1 || args[1].is_nil() {
         return match args[0].kind() {
             ValueKind::Fixnum(n) => Ok(Value::fixnum(n)),
@@ -1386,7 +1691,7 @@ fn rounding_with_divisor(
     // before integer/float dispatch.  Keeping this validation at the shared
     // boundary prevents an implementation-specific `integer-or-marker-p`
     // error from leaking out of the integer slow path.
-    let _ = expect_number(&args[1])?;
+    check_number(&args[1])?;
     // 2-arg form: (op ARG DIVISOR)
     if args[1].is_float() && args[1].xfloat() == 0.0 {
         return Err(signal(LispCondition::ArithError, vec![]));
@@ -1438,6 +1743,24 @@ fn rounding_with_divisor(
     };
     if *d == 0 {
         return Err(signal(LispCondition::ArithError, vec![]));
+    }
+    // A rounding that is truncation for this sign pair needs only the
+    // quotient's magnitude, which the top 128 bits usually prove.
+    let negative = (*a < 0) != (*d < 0);
+    let truncating = match mode {
+        RoundingMode::Down => true,
+        RoundingMode::Floor => !negative,
+        RoundingMode::Ceiling => negative,
+        _ => false,
+    };
+    if truncating
+        && let Some(q) = natural_div_small_quotient(
+            a.unsigned_abs_ref().as_limbs_asc(),
+            d.unsigned_abs_ref().as_limbs_asc(),
+        )
+    {
+        let q = Integer::from(q);
+        return Ok(Value::make_integer(if negative { -q } else { q }));
     }
     Ok(Value::make_integer(a.div_round(d, mode).0))
 }
@@ -1680,8 +2003,8 @@ pub(crate) fn builtin_expt(args: Vec<Value>) -> EvalResult {
     // GNU `Fexpt` (data.c) does CHECK_NUMBER on both args first, so any
     // non-numeric argument must signal `numberp`, not the more specific
     // type checks the integer/float dispatch would otherwise emit.
-    let _ = expect_number(&args[0])?;
-    let _ = expect_number(&args[1])?;
+    check_number(&args[0])?;
+    check_number(&args[1])?;
     if has_float(&args) {
         let base = expect_number(&args[0])?;
         let exp = expect_number(&args[1])?;
@@ -1923,3 +2246,7 @@ mod arithmetic_bignum_borrowed_test;
 #[cfg(test)]
 #[path = "tests/arithmetic_rounding_float_exact.rs"]
 mod arithmetic_rounding_float_exact_test;
+
+#[cfg(test)]
+#[path = "tests/arithmetic_limb_kernels.rs"]
+mod arithmetic_limb_kernels_test;
