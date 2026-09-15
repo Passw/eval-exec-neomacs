@@ -176,3 +176,91 @@ fn gethash_puthash_remhash_match_gnu() {
         Some("(x y nil f g nil s seven nil gone z 2)")
     );
 }
+
+/// Small `eq`/`eql` tables answer fixnum and symbol lookups by scanning
+/// slots for the key's bits (`small_identity_scan`). Across every table size
+/// up to and past the scan limit, with removals leaving holes and mixed key
+/// shapes, the answer must be the hashed lookup's.
+#[test]
+fn small_table_identity_scans_agree_with_hashed_lookups() {
+    struct Rng(u64);
+    impl Rng {
+        fn below(&mut self, n: usize) -> usize {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            (self.0 % n as u64) as usize
+        }
+    }
+    let mut rng = Rng(0x243f_6a88_85a3_08d3);
+    let syms: Vec<Value> = (0..24)
+        .map(|i| Value::from_sym_id(intern(&format!("small-scan-sym-{i}"))))
+        .collect();
+    let pool = |rng: &mut Rng| -> Value {
+        match rng.below(7) {
+            0 | 1 => Value::fixnum(rng.below(40) as i64 - 5),
+            2 | 3 => syms[rng.below(syms.len())],
+            4 => Value::make_float(rng.below(4) as f64),
+            5 => Value::string(&format!("k{}", rng.below(4))),
+            _ => [Value::NIL, Value::T, Value::keyword("small-scan-kw")][rng.below(3)],
+        }
+    };
+    let mut checked = 0;
+    for test in [HashTableTest::Eq, HashTableTest::Eql] {
+        for size in 0..40 {
+            let mut storage = HashTableStorage::default();
+            for i in 0..size {
+                let key = pool(&mut rng);
+                storage.insert(
+                    key.to_hash_key_swp(&test, false),
+                    key,
+                    Value::fixnum(i as i64),
+                );
+                if rng.below(5) == 0 {
+                    let gone = pool(&mut rng);
+                    storage.remove(&gone.to_hash_key_swp(&test, false));
+                }
+            }
+            for _ in 0..60 {
+                let probe = pool(&mut rng);
+                let by_key = storage.get(&probe.to_hash_key_swp(&test, false)).copied();
+                assert_eq!(
+                    storage
+                        .get_by_value(probe, test, false)
+                        .copied()
+                        .map(|v| v.bits()),
+                    by_key.map(|v| v.bits()),
+                    "{probe:?} under {test:?} in a {size}-entry table"
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked > 4000, "checked {checked}");
+}
+
+/// With `symbols-with-pos-enabled`, a positioned key `eq`s its bare symbol,
+/// which no bit comparison sees: the scan must decline.
+#[test]
+fn small_table_scans_decline_under_symbols_with_pos() {
+    let mut ctx = Context::new();
+    let sym = Value::from_sym_id(intern("small-scan-positioned"));
+    let positioned = ctx.tagged_heap.alloc_symbol_with_pos(sym, Value::fixnum(3));
+    for test in [HashTableTest::Eq, HashTableTest::Eql] {
+        let mut storage = HashTableStorage::default();
+        storage.insert(
+            positioned.to_hash_key_swp(&test, true),
+            positioned,
+            Value::fixnum(7),
+        );
+        let by_key = storage.get(&sym.to_hash_key_swp(&test, true)).copied();
+        assert_eq!(
+            storage
+                .get_by_value(sym, test, true)
+                .copied()
+                .map(|v| v.bits()),
+            by_key.map(|v| v.bits()),
+            "bare symbol against a positioned key under {test:?}"
+        );
+    }
+}

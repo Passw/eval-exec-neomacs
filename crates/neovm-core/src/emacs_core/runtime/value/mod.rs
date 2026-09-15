@@ -798,6 +798,9 @@ impl HashTableStorage {
         test: HashTableTest,
         symbols_with_pos_enabled: bool,
     ) -> Option<&Value> {
+        if let Some(found) = self.small_identity_scan(value, test, symbols_with_pos_enabled) {
+            return found;
+        }
         let slot = match ValueKeyProbe::new(value, test, symbols_with_pos_enabled) {
             Some(probe) => *self.index.get(&probe)?,
             None => *self
@@ -809,6 +812,40 @@ impl HashTableStorage {
             .and_then(Option::as_ref)
             .map(|entry| &entry.value)
     }
+
+    /// `get` on a small `eq`/`eql` table by a fixnum or bare-symbol key: a
+    /// scan of the slots comparing bits, instead of hashing a probe. For
+    /// those keys both tests ARE bit identity, and no other key shape can
+    /// equal them, so a miss over every live slot is a real miss — except
+    /// with `symbols-with-pos-enabled`, where a positioned key `eq`s its bare
+    /// symbol, so that declines. `None` = not applicable; `Some(hit)` is the
+    /// answer. Jump tables are this shape: bindat's `pcase` dispatches hash
+    /// 6-16 entries, where hashing cost ~110 instructions a lookup.
+    #[inline]
+    fn small_identity_scan(
+        &self,
+        value: Value,
+        test: HashTableTest,
+        symbols_with_pos_enabled: bool,
+    ) -> Option<Option<&Value>> {
+        const SCAN_SLOTS: usize = 32;
+        if self.slots.len() > SCAN_SLOTS
+            || symbols_with_pos_enabled
+            || matches!(test, HashTableTest::Equal)
+            || !(value.is_fixnum() || value.is_symbol())
+        {
+            return None;
+        }
+        let bits = value.bits();
+        Some(
+            self.slots
+                .iter()
+                .flatten()
+                .find(|entry| entry.key.bits() == bits)
+                .map(|entry| &entry.value),
+        )
+    }
+
     /// `get_mut` counterpart of [`Self::get_by_value`].
     pub fn get_mut_by_value(
         &mut self,
