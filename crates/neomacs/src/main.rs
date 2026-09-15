@@ -84,6 +84,13 @@ cfg_select! {
         // 11,200 -> ~9,780 with purging deferred). Startup's transient peak
         // is bounded by the explicit one-shot purge in
         // `jemalloc_release_startup_slack` once the evaluator is up.
+        //
+        // Slabs are 16 pages for every small size class. At the stock sizes a
+        // bignum loop's limb vectors (malachite's) emptied and refilled slabs
+        // of a few regions each, and the slab turnover cost elb pidigits 12.7%
+        // of its instructions (41.62G -> 36.35G, GNU 36.54G; other rows within
+        // 0.3%, startup and peak RSS unchanged). 1025-4096 alone recovers
+        // 8%, 8 pages 10%, 32 pages 14%.
         union JemallocConfigPointer {
             byte: &'static u8,
             c_char: &'static libc::c_char,
@@ -92,7 +99,7 @@ cfg_select! {
         #[unsafe(export_name = "_rjem_malloc_conf")]
         pub static JEMALLOC_CONFIG: Option<&'static libc::c_char> = Some(unsafe {
             JemallocConfigPointer {
-                byte: &b"dirty_decay_ms:10000,muzzy_decay_ms:10000,narenas:2\0"[0],
+                byte: &b"dirty_decay_ms:10000,muzzy_decay_ms:10000,narenas:2,slab_sizes:1-4096:16\0"[0],
             }
             .c_char
         });
