@@ -261,3 +261,47 @@ fn small_table_scans_decline_under_symbols_with_pos() {
         );
     }
 }
+
+/// `retain_entries` (the weak-table sweep) leaves exactly what removing each
+/// rejected entry by key in `iter` order left: the same survivors in the same
+/// slots, and the freed slots reused in the same order, so `maphash` order
+/// after later insertions is unchanged.
+#[test]
+fn retain_entries_matches_removal_by_key_in_iteration_order() {
+    let values = corpus();
+    for test in TESTS {
+        let mut storage = HashTableStorage::default();
+        for (i, value) in values.iter().enumerate() {
+            storage.insert(
+                value.to_hash_key_swp(&test, false),
+                *value,
+                Value::fixnum(i as i64),
+            );
+        }
+        let keep = |_key: Value, value: Value| value.as_fixnum().is_some_and(|i| i % 3 != 1);
+        let mut by_key = storage.clone();
+        let dead: Vec<HashKey> = by_key
+            .iter()
+            .filter(|&(hk, &value)| {
+                let key = *by_key.key_snapshot(hk).expect("a live key");
+                !keep(key, value)
+            })
+            .map(|(hk, _)| hk.clone())
+            .collect();
+        for hk in dead {
+            by_key.remove(&hk);
+        }
+        storage.retain_entries(keep);
+        let fresh = |storage: &mut HashTableStorage| {
+            for i in 0..values.len() {
+                let key = Value::fixnum(1_000_000 + i as i64);
+                storage.insert(key.to_hash_key_swp(&test, false), key, key);
+            }
+            storage
+                .entries_in_slot_order()
+                .map(|entry| (entry.key.bits(), entry.value.bits()))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(fresh(&mut storage), fresh(&mut by_key), "{test:?}");
+    }
+}

@@ -5,6 +5,35 @@
 
 use super::*;
 
+/// Where [`TaggedHeap::for_each_veclike_child`] sends children: one at a
+/// time, or a run at once, which a vector collects with one reservation.
+pub(super) trait ChildSink {
+    fn child(&mut self, value: TaggedValue);
+    fn children(&mut self, values: impl IntoIterator<Item = TaggedValue>) {
+        for value in values {
+            self.child(value);
+        }
+    }
+}
+
+impl ChildSink for Vec<TaggedValue> {
+    fn child(&mut self, value: TaggedValue) {
+        self.push(value);
+    }
+    fn children(&mut self, values: impl IntoIterator<Item = TaggedValue>) {
+        self.extend(values);
+    }
+}
+
+/// A closure as a [`ChildSink`].
+pub(super) struct VisitChild<F>(pub(super) F);
+
+impl<F: FnMut(TaggedValue)> ChildSink for VisitChild<F> {
+    fn child(&mut self, value: TaggedValue) {
+        (self.0)(value);
+    }
+}
+
 impl TaggedHeap {
     /// Run a full mark-sweep garbage collection.
     ///
@@ -572,14 +601,14 @@ impl TaggedHeap {
             self.last_remembered_seed_us = 0;
             return;
         }
-        let owners: Vec<TaggedValue> = self
-            .mapped_remembered
-            .iter()
-            .map(|&bits| TaggedValue(bits))
-            .collect();
-        for owner in owners {
-            self.push_value_children_to_gray(owner, "remembered-dump-child");
+        // Walk the set in place (taken out for the borrow, not copied); an
+        // owner inserted meanwhile would be merged back.
+        let owners = std::mem::take(&mut self.mapped_remembered);
+        for &bits in &owners {
+            self.push_value_children_to_gray(TaggedValue(bits), "remembered-dump-child");
         }
+        let inserted = std::mem::replace(&mut self.mapped_remembered, owners);
+        self.mapped_remembered.extend(inserted);
         self.last_remembered_seed_us = seed_t0.elapsed().as_micros() as u64;
     }
 
@@ -620,9 +649,12 @@ impl TaggedHeap {
                     // dump-partition verifier require every heap child of a
                     // permanent owner to be marked, or it is swept while still
                     // referenced (UAF).
-                    for child in self.collect_veclike_children(ptr as *mut VecLikeHeader) {
-                        self.mark_or_push_child(child, origin);
-                    }
+                    Self::for_each_veclike_child(
+                        ptr as *mut VecLikeHeader,
+                        &mut VisitChild(|child| {
+                            self.mark_or_push_child(child, origin);
+                        }),
+                    );
                 }
             }
         } else if owner.is_string()
@@ -1077,47 +1109,56 @@ impl TaggedHeap {
     /// Direct children of a mapped vectorlike object (read-only) for the verifier.
     pub(super) fn collect_veclike_children(&self, ptr: *mut VecLikeHeader) -> Vec<TaggedValue> {
         let mut out = Vec::new();
+        Self::for_each_veclike_child(ptr, &mut out);
+        out
+    }
+
+    /// Visit the direct children [`Self::collect_veclike_children`] lists,
+    /// without collecting them: the remembered-set rescan and the SATB log
+    /// visit ~80K children twice per cycle, and building a vector per owner
+    /// cost more than the visits (jemalloc growth was most of it).
+    pub(super) fn for_each_veclike_child(ptr: *mut VecLikeHeader, sink: &mut impl ChildSink) {
         unsafe {
             match (*ptr).type_tag {
                 VecLikeType::Vector => {
-                    out.extend((*(ptr as *const VectorObj)).data.iter().copied());
+                    sink.children((*(ptr as *const VectorObj)).data.iter().copied());
                 }
                 VecLikeType::Record | VecLikeType::WindowConfiguration => {
-                    out.extend((*(ptr as *const RecordObj)).data.iter().copied());
+                    sink.children((*(ptr as *const RecordObj)).data.iter().copied());
                 }
                 VecLikeType::Font => {
                     let font = &(*(ptr as *const FontObj)).data;
-                    out.extend(font.fields.iter().copied());
-                    out.push(font.capability);
+                    sink.children(font.fields.iter().copied());
+                    sink.child(font.capability);
                 }
                 VecLikeType::CharTable => {
                     let o = &*(ptr as *const CharTableObj);
-                    out.extend([o.defalt, o.parent, o.purpose, o.ascii]);
-                    out.extend(o.contents.iter().copied());
-                    out.extend(o.extras.iter().copied());
+                    sink.children([o.defalt, o.parent, o.purpose, o.ascii]);
+                    sink.children(o.contents.iter().copied());
+                    sink.children(o.extras.iter().copied());
                 }
                 VecLikeType::SubCharTable => {
-                    out.extend((*(ptr as *const SubCharTableObj)).contents.iter().copied());
+                    sink.children((*(ptr as *const SubCharTableObj)).contents.iter().copied());
                 }
                 VecLikeType::Obarray => {
-                    out.extend((*(ptr as *const ObarrayObj)).buckets.iter().copied());
+                    sink.children((*(ptr as *const ObarrayObj)).buckets.iter().copied());
                 }
                 VecLikeType::Lambda | VecLikeType::Macro => {
-                    out.extend((*(ptr as *const LambdaObj)).data.iter().copied());
+                    sink.children((*(ptr as *const LambdaObj)).data.iter().copied());
                 }
                 VecLikeType::HashTable => {
                     let ht = &(*(ptr as *const HashTableObj)).table;
                     if let Some(pending) = ht.data.pending_entries() {
                         // Un-hydrated dump table (see `trace_veclike`).
                         for (_, value, snapshot) in pending {
-                            out.push(*value);
+                            sink.child(*value);
                             if let Some(snapshot) = snapshot {
-                                out.push(*snapshot);
+                                sink.child(*snapshot);
                             }
                         }
                     }
-                    out.extend(ht.data.values().copied());
-                    out.extend(ht.key_snapshots().copied());
+                    sink.children(ht.data.values().copied());
+                    sink.children(ht.key_snapshots().copied());
                     // Custom test/hash closures (`define-hash-table-test`) live
                     // ONLY in these fields and are traced by `trace_veclike`; keep
                     // the two enumerations in sync so the remembered/SATB strong-
@@ -1125,10 +1166,10 @@ impl TaggedHeap {
                     // cover them — otherwise a dumped/tenured custom-test table's
                     // closures are swept while the table still calls them (UAF).
                     if let Some(f) = ht.user_cmp_function {
-                        out.push(f);
+                        sink.child(f);
                     }
                     if let Some(f) = ht.user_hash_function {
-                        out.push(f);
+                        sink.child(f);
                     }
                 }
                 VecLikeType::ByteCode => {
@@ -1143,44 +1184,44 @@ impl TaggedHeap {
                         crate::emacs_core::pdump::mapped_heap::for_each_stub_bytecode_child(
                             obj,
                             data.closure_slot_count,
-                            |child| out.push(child),
+                            |child| sink.child(child),
                         );
-                        return out;
+                        return;
                     }
-                    out.push(data.arglist);
-                    out.extend(data.constants.iter().copied());
+                    sink.child(data.arglist);
+                    sink.children(data.constants.iter().copied());
                     if let Some(env) = data.env {
-                        out.push(env);
+                        sink.child(env);
                     }
                     if let Some(doc_form) = data.doc_form {
-                        out.push(doc_form);
+                        sink.child(doc_form);
                     }
                     if let Some(interactive) = data.interactive {
-                        out.push(interactive);
+                        sink.child(interactive);
                     }
-                    out.extend(data.extra_slots.iter().copied());
+                    sink.children(data.extra_slots.iter().copied());
                 }
                 VecLikeType::Overlay => {
-                    out.push((*(ptr as *const OverlayObj)).data.plist);
+                    sink.child((*(ptr as *const OverlayObj)).data.plist);
                 }
                 VecLikeType::SymbolWithPos => {
                     let o = &*(ptr as *const SymbolWithPosObj);
-                    out.extend([o.sym, o.pos]);
+                    sink.children([o.sym, o.pos]);
                 }
                 VecLikeType::Finalizer => {
-                    out.push((*(ptr as *const FinalizerObj)).function);
+                    sink.child((*(ptr as *const FinalizerObj)).function);
                 }
                 VecLikeType::ModuleFunction => {
                     let o = &*(ptr as *const ModuleFunctionObj);
-                    out.extend([o.documentation, o.interactive_form]);
+                    sink.children([o.documentation, o.interactive_form]);
                 }
                 VecLikeType::Xwidget => {
                     let o = &*(ptr as *const XwidgetObj);
-                    out.extend([o.plist, o.type_, o.buffer, o.title, o.script_callbacks]);
+                    sink.children([o.plist, o.type_, o.buffer, o.title, o.script_callbacks]);
                 }
                 VecLikeType::XwidgetView => {
                     let o = &*(ptr as *const XwidgetViewObj);
-                    out.extend([o.model, o.window]);
+                    sink.children([o.model, o.window]);
                 }
                 // Buffer/Window/Frame/Timer/Process/Terminal/Marker/Subr/
                 // Bignum/Sqlite/UserPtr/SurfaceHandle/VideoHandle and the three
@@ -1204,7 +1245,6 @@ impl TaggedHeap {
                 | VecLikeType::CondVar => {}
             }
         }
-        out
     }
 
     pub(crate) fn seed_root(&mut self, root: TaggedValue) {
@@ -1420,31 +1460,23 @@ impl TaggedHeap {
         }
 
         // -- Mark phase: keep marking surviving entries until nothing changes. --
+        // Entries are read straight from each table's slots (weak tables are
+        // hydrated at load, so none is pending): snapshotting them into a
+        // vector, re-hashing every key to find its snapshot, cost ~1.8M
+        // instructions a cycle on elb nbody (GNU: 16K).
         loop {
             let mut marked = false;
-            // The worklist holds raw pointers, stable across this stop-the-world
-            // step; copy them so the body can call `&mut self` methods.
-            let tables = self.weak_hash_tables.clone();
-            for tptr in tables {
+            // `mark_or_push_child` only queues, so the list cannot change
+            // under this pass; `mark_all` below may register more tables.
+            for i in 0..self.weak_hash_tables.len() {
+                let tptr = self.weak_hash_tables[i];
                 // SAFETY: `tptr` was recorded this cycle from a live veclike; the
-                // heap is exclusively owned here (mutator stopped). Snapshot the
-                // entries so the `ht` borrow is released before `push_gray`.
-                let (weakness, entries): (
-                    Option<HashTableWeakness>,
-                    Vec<(TaggedValue, TaggedValue)>,
-                ) = unsafe {
-                    let ht = &(*tptr).table;
-                    let entries = ht
-                        .data
-                        .iter()
-                        .map(|(hk, &value)| {
-                            let key = ht.key_snapshot(hk).copied().unwrap_or(value);
-                            (key, value)
-                        })
-                        .collect();
-                    (ht.weakness, entries)
-                };
-                for (key, value) in entries {
+                // heap is exclusively owned here (mutator stopped), and nothing
+                // below mutates the table.
+                let ht = unsafe { &(*tptr).table };
+                let weakness = ht.weakness;
+                for entry in ht.data.entries_in_slot_order() {
+                    let (key, value) = (entry.key, entry.value);
                     let key_survives = self.is_value_marked(key);
                     let value_survives = self.is_value_marked(value);
                     if Self::keep_weak_entry(weakness, key_survives, value_survives) {
@@ -1470,41 +1502,17 @@ impl TaggedHeap {
         let tables = std::mem::take(&mut self.weak_hash_tables);
         self.weak_hash_tables_set.clear();
         for tptr in tables {
-            // SAFETY: as above; exclusive heap access.
-            let (weakness, entries): (
-                Option<HashTableWeakness>,
-                Vec<(HashKey, TaggedValue, TaggedValue)>,
-            ) = unsafe {
-                let ht = &(*tptr).table;
-                let entries = ht
-                    .data
-                    .iter()
-                    .map(|(hk, &value)| {
-                        let key = ht.key_snapshot(hk).copied().unwrap_or(value);
-                        (hk.clone(), key, value)
-                    })
-                    .collect();
-                (ht.weakness, entries)
-            };
-            let dead: Vec<HashKey> = entries
-                .into_iter()
-                .filter_map(|(hk, key, value)| {
-                    let keep = Self::keep_weak_entry(
-                        weakness,
-                        self.is_value_marked(key),
-                        self.is_value_marked(value),
-                    );
-                    (!keep).then_some(hk)
-                })
-                .collect();
-            if dead.is_empty() {
-                continue;
-            }
-            // SAFETY: exclusive heap access. Mirror `builtin_remhash`'s removal.
+            // SAFETY: as above; exclusive heap access. Mirrors `builtin_remhash`'s
+            // removal, in the same order.
             let ht = unsafe { &mut (*tptr).table };
-            for hk in dead {
-                let _ = ht.data.remove(&hk);
-            }
+            let weakness = ht.weakness;
+            ht.data.retain_entries(|key, value| {
+                Self::keep_weak_entry(
+                    weakness,
+                    self.is_value_marked(key),
+                    self.is_value_marked(value),
+                )
+            });
         }
     }
 

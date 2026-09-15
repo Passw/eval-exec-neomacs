@@ -1042,6 +1042,25 @@ impl HashTableStorage {
         keys.into_iter().flatten().collect()
     }
 
+    /// Remove every entry `keep(key, value)` rejects, in index order (the
+    /// order [`Self::remove`] over [`Self::iter`] would free the slots in),
+    /// without re-hashing or cloning a key.
+    pub fn retain_entries(&mut self, mut keep: impl FnMut(Value, Value) -> bool) {
+        let slots = &mut self.slots;
+        let free_slots = &mut self.free_slots;
+        self.index.retain(|_, &mut slot| {
+            let entry = slots[slot]
+                .as_ref()
+                .expect("hash index points to an empty entry slot");
+            if keep(entry.key, entry.value) {
+                return true;
+            }
+            slots[slot] = None;
+            free_slots.push(slot);
+            false
+        });
+    }
+
     pub fn retain(&mut self, mut keep: impl FnMut(&HashKey, &mut Value) -> bool) {
         let mut removed = Vec::new();
         for (key, &slot) in &self.index {
