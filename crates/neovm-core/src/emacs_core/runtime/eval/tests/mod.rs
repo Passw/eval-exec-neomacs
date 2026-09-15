@@ -25660,6 +25660,121 @@ fn redefining_a_function_is_visible_to_the_next_interpreted_call() {
 /// same answers as the builtin; a dotted LIST, a non-compiled F and a
 /// redefined `apply` take the builtin path.
 #[cfg(feature = "jit")]
+/// A native call into a compiled callee with `&optional` slots or a `&rest`
+/// list marshals the caller's arguments into the callee's slots: the given
+/// ones, nil for each missing optional, and the rest consed. Driven through
+/// `apply`'s native path so every argument count is reachable, including a
+/// callee wider than the marshaling's stack buffer.
+#[test]
+fn native_calls_marshal_optional_and_rest_arguments() {
+    crate::test_utils::init_test_tracing();
+    use crate::emacs_core::bytecode::ByteCodeFunction;
+    use crate::emacs_core::bytecode::opcode::Op;
+    use crate::emacs_core::bytecode::vm::APPLY_NATIVE_CALLS;
+    use crate::emacs_core::intern::SymId;
+    use crate::emacs_core::print::print_value;
+    use crate::emacs_core::value::LambdaParams;
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let mut ev = Context::new();
+    // A callee that lists its slots: `(list SLOT...)`.
+    let callee = |required: u32, optional: u32, rest: bool| {
+        let slots = required + optional + u32::from(rest);
+        let mut f = ByteCodeFunction::new(LambdaParams {
+            required: (1..=required).map(SymId).collect(),
+            optional: (100..100 + optional).map(SymId).collect(),
+            rest: rest.then_some(SymId(200)),
+        });
+        f.lexical = true;
+        f.ops = vec![Op::List(slots as u16), Op::Return];
+        f.max_stack = slots as u16 + 1;
+        f.jit_runtime().set_hot_for_test();
+        let v = Value::make_bytecode(f);
+        crate::emacs_core::eval::push_scratch_gc_root(v);
+        (v, required as usize, optional as usize, rest)
+    };
+    let shapes = [
+        callee(1, 2, false),
+        callee(1, 0, true),
+        callee(2, 1, true),
+        callee(0, 17, false),
+        callee(1, 16, true),
+    ];
+    // (lambda (f l) (apply f 1 l))
+    let mut caller = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(1), SymId(2)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    caller.lexical = true;
+    caller.ops = vec![
+        Op::Constant(0),
+        Op::StackRef(2),
+        Op::Constant(1),
+        Op::StackRef(3),
+        Op::Call(3),
+        Op::Return,
+    ];
+    caller.constants = vec![Value::symbol("apply"), Value::make_int(1)].into();
+    caller.max_stack = 16;
+    caller.jit_runtime().set_hot_for_test();
+    let caller = Value::make_bytecode(caller);
+    crate::emacs_core::eval::push_scratch_gc_root(caller);
+    let run = |ev: &mut Context, f: Value, nargs: usize| {
+        // The arguments after the leading 1: 2, 3, ...
+        let elements: Vec<String> = (2..=nargs).map(|n| n.to_string()).collect();
+        let list = ev
+            .eval_str(&format!("(list {})", elements.join(" ")))
+            .expect("list");
+        match ev.funcall_general_untraced(caller, vec![f, list]) {
+            Ok(v) => print_value(&v),
+            Err(crate::emacs_core::error::Flow::Signal(sig)) => {
+                format!("signal {}", sig.symbol_name())
+            }
+            Err(other) => format!("{other:?}"),
+        }
+    };
+    for &(f, ..) in &shapes {
+        for _ in 0..3 {
+            let _ = run(&mut ev, f, 2);
+        }
+    }
+    let mut native = 0;
+    for &(f, required, optional, rest) in &shapes {
+        for nargs in 1..=20 {
+            let accepted = nargs >= required && (rest || nargs <= required + optional);
+            let before = APPLY_NATIVE_CALLS.with(|c| c.get());
+            let got = run(&mut ev, f, nargs);
+            let ran_native = APPLY_NATIVE_CALLS.with(|c| c.get()) - before;
+            let shape = format!("({required} req, {optional} opt, rest {rest}) with {nargs}");
+            if !accepted {
+                assert_eq!(got, "signal wrong-number-of-arguments", "{shape}");
+                assert_eq!(ran_native, 0, "{shape}: the builtin signals");
+                continue;
+            }
+            let fixed = required + optional;
+            let mut slots: Vec<String> = (1..=nargs.min(fixed)).map(|n| n.to_string()).collect();
+            slots.resize(fixed, "nil".to_string());
+            if rest {
+                slots.push(if nargs > fixed {
+                    format!(
+                        "({})",
+                        (fixed + 1..=nargs)
+                            .map(|n| n.to_string())
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    )
+                } else {
+                    "nil".to_string()
+                });
+            }
+            assert_eq!(got, format!("({})", slots.join(" ")), "{shape}");
+            assert_eq!(ran_native, 1, "{shape}: ran natively");
+            native += 1;
+        }
+    }
+    assert!(native >= 60, "native calls checked: {native}");
+}
+
 #[test]
 fn jit_apply_enters_a_compiled_callee_natively() {
     crate::test_utils::init_test_tracing();

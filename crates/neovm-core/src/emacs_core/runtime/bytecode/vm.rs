@@ -7220,58 +7220,52 @@ impl<'a> Vm<'a> {
             nargs: usize,
         ) -> crate::emacs_core::jit::cache::NativeCallOutcome {
             use crate::emacs_core::jit::cache::NativeCallOutcome;
+            /// Leaf ABIs up to this many slots are marshaled on the stack.
+            const STACK_SLOTS: usize = 16;
             let nonrest = leaf.arity - usize::from(leaf.has_rest);
             let nil = Value::NIL.bits() as i64;
+            let mut stack_buf = [nil; STACK_SLOTS];
+            let mut heap_buf = Vec::new();
+            let slots: &mut [i64] = if leaf.arity <= STACK_SLOTS {
+                &mut stack_buf[..leaf.arity]
+            } else {
+                heap_buf.resize(leaf.arity, nil);
+                &mut heap_buf
+            };
+            // The given arguments, then nil for each missing `&optional`
+            // (the buffer's fill).
             let fixed = nargs.min(nonrest);
-            // Nil-padding allocates NOTHING, so the `&optional`-only case —
-            // the common one — needs no root scope at all. Only the `&rest`
-            // cons does.
-            let saved = leaf
-                .has_rest
-                .then(crate::emacs_core::eval::save_scratch_gc_roots);
-            if saved.is_some() {
-                for i in 0..nargs {
-                    // SAFETY: args_ptr addresses `nargs` valid words.
-                    crate::emacs_core::eval::push_scratch_gc_root(Value::from_bits(unsafe {
-                        *args_ptr.add(i)
-                    }
-                        as usize));
-                }
-            }
-            let mut bits: smallvec::SmallVec<[i64; 8]> = (0..fixed)
-                // SAFETY: args_ptr addresses `nargs` valid words, fixed <= nargs.
-                .map(|i| unsafe { *args_ptr.add(i) })
-                .chain(std::iter::repeat_n(nil, nonrest - fixed))
-                .collect();
+            // SAFETY: args_ptr addresses `nargs` valid words, fixed <= nargs,
+            // and `slots` holds at least `nonrest` words.
+            unsafe { std::ptr::copy_nonoverlapping(args_ptr, slots.as_mut_ptr(), fixed) };
             if leaf.has_rest {
-                let rest = if nargs > nonrest {
-                    let tail: LispArgVec = (nonrest..nargs)
-                        // SAFETY: as above.
-                        .map(|i| Value::from_bits(unsafe { *args_ptr.add(i) } as usize))
-                        .collect();
-                    // SAFETY: the seam-provided dormant Context.
-                    unsafe { (*ctx_ptr).tagged_heap.list_from_slice(&tail) }
-                } else {
-                    Value::NIL
-                };
-                bits.push(rest.bits() as i64);
+                // Consed back to front straight from the caller's slot. No
+                // root scope: `alloc_cons` cannot collect, and the callee's
+                // backtrace frame, pushed before this runs, roots the
+                // arguments (the scope and a `LispArgVec` copy of the tail
+                // were most of this function's ~240 instructions).
+                // SAFETY: the seam-provided dormant Context.
+                let heap = unsafe { &mut (*ctx_ptr).tagged_heap };
+                let mut rest = Value::NIL;
+                for i in (nonrest..nargs).rev() {
+                    // SAFETY: args_ptr addresses `nargs` valid words.
+                    let arg = Value::from_bits(unsafe { *args_ptr.add(i) } as usize);
+                    rest = heap.alloc_cons(arg, rest);
+                }
+                slots[nonrest] = rest.bits() as i64;
             }
-            let outcome = match crate::emacs_core::jit::cache::run_resolved_leaf_native(
+            match crate::emacs_core::jit::cache::run_resolved_leaf_native(
                 ctx_ptr,
                 bc,
                 callee,
                 leaf,
-                bits.as_ptr(),
+                slots.as_ptr(),
             ) {
                 NativeCallOutcome::Fallback => {
                     interp_fallback(ctx_ptr, bc, callee, args_ptr, nargs)
                 }
                 o => o,
-            };
-            if let Some(saved) = saved {
-                crate::emacs_core::eval::restore_scratch_gc_roots(saved);
             }
-            outcome
         }
         let outcome = {
             let ctx_ptr = core::ptr::from_mut(&mut *ctx);
