@@ -1705,7 +1705,7 @@ fn run_prefilter_fuzz(
             Err(_) => continue,
         };
         c.compiled += 1;
-        let has_pf = cp.prefilter.is_some();
+        let has_pf = cp.literal_prefilter().is_some();
         if has_pf {
             c.with_prefilter += 1;
         }
@@ -1791,7 +1791,7 @@ fn prefilter_built_for_leading_literal() {
     // A plain multi-byte literal → a single-needle prefilter (memmem).
     let cp = regex_compile("unread-command-events", false, false).expect("compile");
     assert!(
-        cp.prefilter.is_some(),
+        cp.literal_prefilter().is_some(),
         "leading literal should get a prefilter"
     );
     assert_prefilter_equiv(
@@ -1810,7 +1810,7 @@ fn prefilter_built_for_keyword_alternation() {
     ] {
         let cp = regex_compile(pat, false, false).expect("compile");
         assert!(
-            cp.prefilter.is_some(),
+            cp.literal_prefilter().is_some(),
             "keyword alternation should get a prefilter: {pat:?}"
         );
     }
@@ -1829,7 +1829,7 @@ fn prefilter_none_for_syntax_class_head() {
     let cp =
         regex_compile("(\\(\\(?:\\w\\|\\s_\\|\\\\.\\)+\\)\\_>", false, false).expect("compile");
     assert!(
-        cp.prefilter.is_none(),
+        cp.literal_prefilter().is_none(),
         "single-byte `(` prefix must not build a prefilter (fastmap suffices)"
     );
 }
@@ -1839,7 +1839,7 @@ fn prefilter_none_for_leading_nonliteral() {
     for pat in ["\\w+foo", ".*bar", "[a-z]+baz", "\\(?:\\w\\|x\\)y"] {
         let cp = regex_compile(pat, false, false).expect("compile");
         assert!(
-            cp.prefilter.is_none(),
+            cp.literal_prefilter().is_none(),
             "leading non-literal must have no prefilter: {pat:?}"
         );
     }
@@ -1850,7 +1850,7 @@ fn prefilter_none_for_casefold() {
     // regex_compile(pattern, posix, case_fold).
     let cp = regex_compile("defun", false, true).expect("compile");
     assert!(
-        cp.prefilter.is_none(),
+        cp.literal_prefilter().is_none(),
         "case-fold patterns are deliberately skipped"
     );
 }
@@ -1865,7 +1865,7 @@ fn prefilter_none_for_alternation_with_nonliteral_arm() {
     ] {
         let cp = regex_compile(pat, false, false).expect("compile");
         assert!(
-            cp.prefilter.is_none(),
+            cp.literal_prefilter().is_none(),
             "alternation with a non-literal/empty arm must bail: {pat:?}"
         );
     }
@@ -1904,4 +1904,31 @@ fn test_pattern_max_match_chars() {
     assert_eq!(max("a\\{2,5\\}"), None);
     assert_eq!(max("\\(x\\)\\1"), None);
     assert_eq!(max(".*foo"), None);
+}
+
+/// The literal prefilter is built by the first forward search long enough to
+/// use it, not at compile time: most patterns only ever match short strings.
+/// A short search leaves it unbuilt and still finds the match.
+#[test]
+fn prefilter_is_built_by_the_first_long_forward_search() {
+    let cp = regex_compile("unread-command-events", false, false).expect("compile");
+    assert!(
+        cp.prefilter.get().is_none(),
+        "compiling builds no prefilter"
+    );
+    let short = b"xx unread-command-events";
+    let found = re_search(&cp, short, 0, short.len() as isize, &DefaultSyntaxLookup, 0);
+    assert_eq!(found.map(|(pos, _)| pos), Some(3));
+    assert!(
+        cp.prefilter.get().is_none(),
+        "a short search builds no prefilter"
+    );
+    let mut long = vec![b'x'; 1000];
+    long.extend_from_slice(b"unread-command-events");
+    let found = re_search(&cp, &long, 0, long.len() as isize, &DefaultSyntaxLookup, 0);
+    assert_eq!(found.map(|(pos, _)| pos), Some(1000));
+    assert!(
+        cp.prefilter.get().is_some_and(Option::is_some),
+        "a long search builds and uses the prefilter"
+    );
 }

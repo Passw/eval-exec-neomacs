@@ -370,7 +370,26 @@ pub(crate) struct CompiledPattern {
     /// correct).  Never set for case-fold patterns or patterns whose only
     /// required literals are single bytes (the fastmap's memchr already handles
     /// those).
-    pub prefilter: Option<LiteralPrefilter>,
+    ///
+    /// Built on first use by a search long enough to use it
+    /// ([`CompiledPattern::literal_prefilter`]): most compiled patterns only
+    /// ever match short strings, and building the scanner cost the byte
+    /// compiler 6M instructions per file for 100 patterns that never
+    /// searched a buffer.
+    pub prefilter: std::cell::OnceCell<Option<LiteralPrefilter>>,
+}
+
+/// Bytes of text below which a forward search does not build a pattern's
+/// literal prefilter (it still uses one already built).
+const PREFILTER_MIN_BUILD_SPAN: usize = 256;
+
+impl CompiledPattern {
+    /// The multi-literal prefilter, built now if it was not yet.
+    pub(crate) fn literal_prefilter(&self) -> Option<&LiteralPrefilter> {
+        self.prefilter
+            .get_or_init(|| build_literal_prefilter(self))
+            .as_ref()
+    }
 }
 
 /// A sound multi-literal prefilter for a compiled pattern.  See
@@ -523,7 +542,7 @@ impl CompiledPattern {
             pike_eligible: false,
             buffer_sealed: false,
             pike_buffer: None,
-            prefilter: None,
+            prefilter: std::cell::OnceCell::new(),
         }
     }
 
@@ -1741,11 +1760,11 @@ pub(crate) fn regex_compile_lisp_with_translation(
     // (GNU `search.c:compile_pattern` + `used_syntax`).
     compile_fastmap(&mut buf, &DefaultSyntaxLookup);
 
-    // Build the multi-literal SIMD prefilter (AUGMENTS the fastmap; the
-    // backtracker still verifies every candidate).  Depends only on the
-    // bytecode's required-literal structure, which is syntax-table
-    // independent, so it survives `recompute_fastmap` cloning unchanged.
-    buf.prefilter = build_literal_prefilter(&buf);
+    // The multi-literal SIMD prefilter (AUGMENTS the fastmap; the
+    // backtracker still verifies every candidate) is built at the first
+    // search that can use it (`CompiledPattern::literal_prefilter`). It
+    // depends only on the bytecode's required-literal structure, which is
+    // syntax-table independent, so it survives `recompute_fastmap` cloning.
 
     // Decide once whether the non-backtracking Pike VM can simulate this
     // bytecode byte-exactly (see `compute_pike_eligible`).
@@ -7990,7 +8009,12 @@ pub(crate) fn re_search(
             }
         }
         if use_fastmap {
-            if let Some(pref) = &pattern.prefilter {
+            let prefilter = if text_len.saturating_sub(start) >= PREFILTER_MIN_BUILD_SPAN {
+                pattern.literal_prefilter()
+            } else {
+                pattern.prefilter.get().and_then(Option::as_ref)
+            };
+            if let Some(pref) = prefilter {
                 // SIMD multi-literal skip: jump straight to the next position
                 // whose text provably contains a required match literal, far
                 // more aggressively than the single-byte fastmap.  The

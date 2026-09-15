@@ -3221,7 +3221,7 @@ fn regex_bench_fontlock_engine() {
         // (identical match engine + fastmap; the ONLY difference is the SIMD
         // multi-literal skip), so this is an apples-to-apples before/after.
         let mut cp_off = cp.clone();
-        cp_off.prefilter = None;
+        cp_off.prefilter = std::cell::OnceCell::from(None);
 
         let matches = regex_bench_engine_scan(&cp, bytes);
         // Semantics unchanged: the prefilter must never alter the match count.
@@ -3252,7 +3252,7 @@ fn regex_bench_fontlock_engine() {
         total_on += t_on;
         report.push_str(&format!(
             "  {name:<16} {t_off:>12.1?} {t_on:>12.1?}  {matches:>5}  {}\n",
-            if cp.prefilter.is_some() {
+            if cp.literal_prefilter().is_some() {
                 "YES"
             } else {
                 "none"
