@@ -7926,6 +7926,10 @@ mod apply1_bytecode_tests;
 #[path = "tests/varset_plain_fast_path.rs"]
 mod varset_plain_fast_path_tests;
 
+#[cfg(test)]
+#[path = "tests/gc_sweep_cap.rs"]
+mod gc_sweep_cap_tests;
+
 /// Allocator for [`Context::context_instance_id`].
 fn next_context_instance_id() -> u64 {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);

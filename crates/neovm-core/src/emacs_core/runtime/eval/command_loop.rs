@@ -1872,7 +1872,25 @@ impl Context {
                 cycle_completed = true;
             } else if (*heap_ptr).sweep_in_progress() {
                 // Phase 3: drain the deferred sweep started at mark termination.
-                if (*heap_ptr).incremental_sweep_slice(INCREMENTAL_SWEEP_BUDGET) {
+                //
+                // A sweep that allocation has outrun -- the NEXT cycle is
+                // already due -- finishes now, as the concurrent mark's cap
+                // does. Slices come one per safe point, and a loop whose safe
+                // points are sparse can cons faster than they reclaim: the next
+                // cycle cannot start until this one drains, so each cycle began
+                // with more garbage, swept longer, and set a higher threshold
+                // from the consing its own sweep let through. elb pidigits'
+                // threshold climbed 18 MB -> 311 MB over 14 cycles at a flat
+                // ~10 MB live, and the benchmark peaked at 3 GB resident (GNU,
+                // which sweeps synchronously, 495 MB). The cap is the threshold
+                // itself, not a multiple: at 4x (the mark's) a threshold that
+                // counts half the consing since the last cycle could still
+                // double every cycle.
+                let overdue = (*heap_ptr).bytes_since_gc() > (*heap_ptr).gc_threshold();
+                if overdue {
+                    (*heap_ptr).finish_incremental_sweep_now();
+                    cycle_completed = true;
+                } else if (*heap_ptr).incremental_sweep_slice(INCREMENTAL_SWEEP_BUDGET) {
                     cycle_completed = true; // sweep drained -> cycle done
                 } else {
                     return; // more sweep to do; defer bookkeeping
