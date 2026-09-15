@@ -3162,6 +3162,12 @@ impl Buffer {
         self.text.get_property_run_at_char_pos(pos, name)
     }
 
+    /// Test hook: see `TextPropertyTable::debug_syntax_caches_consistent`.
+    #[cfg(test)]
+    pub(crate) fn debug_syntax_caches_consistent(&self) -> Result<(), String> {
+        self.text.debug_syntax_caches_consistent()
+    }
+
     /// The interval plist covering char `pos` plus its `[start, end)` char run.
     /// See [`BufferText::interval_plist_run_at_char_pos`].
     pub fn interval_plist_run_at_char_pos(

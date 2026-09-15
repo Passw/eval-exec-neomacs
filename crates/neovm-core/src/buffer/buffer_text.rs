@@ -1520,6 +1520,15 @@ impl BufferText {
             .next_watched_property_change(pos, cap, keys)
     }
 
+    /// Test hook: see `TextPropertyTable::debug_syntax_caches_consistent`.
+    #[cfg(test)]
+    pub(crate) fn debug_syntax_caches_consistent(&self) -> Result<(), String> {
+        self.storage
+            .borrow()
+            .text_props
+            .debug_syntax_caches_consistent()
+    }
+
     /// See [`crate::buffer::text_props::TextPropertyTable::syntax_prop_free_run_end`].
     ///
     /// Memoized in a small ring keyed by (content epoch, property mutation

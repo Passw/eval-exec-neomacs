@@ -2187,6 +2187,21 @@ impl IntervalTree {
 /// materialization). An absent key reads as nil, so two plists differing only in
 /// e.g. `face` compare equal for the watched display keys, and passing
 /// `Value::NIL` as `right` tests whether `left`'s watched keys are all nil.
+/// `syntax-table` and `category`, the plist keys syntax resolution reads.
+fn syntax_relevant_names() -> [Value; 2] {
+    static IDS: std::sync::OnceLock<(SymId, SymId)> = std::sync::OnceLock::new();
+    let (syntax_table, category) = *IDS.get_or_init(|| {
+        (
+            crate::emacs_core::intern::intern("syntax-table"),
+            crate::emacs_core::intern::intern("category"),
+        )
+    });
+    [
+        Value::from_sym_id(syntax_table),
+        Value::from_sym_id(category),
+    ]
+}
+
 fn watched_keys_equal_eq_plist(left: Value, right: Value, keys: &[Value]) -> bool {
     keys.iter().all(|k| {
         let a = plist_value_get(left, *k).unwrap_or(Value::NIL);
@@ -2982,15 +2997,16 @@ impl TextPropertyTable {
         }
     }
 
-    /// The end of the run from `pos` (capped at `cap`) over which NO interval
-    /// carries a `syntax-table`/`category` plist key, using the cached
-    /// per-node bit — one bool compare per boundary instead of plist walks.
+    /// The end of the run from `pos` (capped at `cap`) over which the
+    /// `syntax-table`/`category` keys are provably constant: from a bit-free
+    /// interval, up to the first interval that carries either key; from a
+    /// bit-set interval, over the following intervals whose two key values
+    /// are `eq` to its own (face-only splits inside one `syntax-table` put).
     ///
-    /// Only meaningful when the interval AT `pos` itself lacks the bit: a
-    /// bit-set interval's value can differ from its bit-set neighbor's, so
-    /// prop-bearing intervals are never merged — the walk stops at the first
-    /// one. Callers with a bit-set current interval must use the precise
-    /// `next_watched_property_change` instead.
+    /// The cached range list only ever COVERS the bit-set intervals — removals,
+    /// inserts and `category` puts leave entries wider than, and not constant
+    /// over, what they cover — so it answers "prop-free until the next entry"
+    /// and nothing else; a position inside an entry takes the interval walk.
     pub fn syntax_prop_free_run_end(&self, pos: CharPos0, cap: CharPos0) -> CharPos0 {
         if cap <= pos {
             return cap;
@@ -3016,18 +3032,34 @@ impl TextPropertyTable {
             let ranges = &guard.1;
             // First range whose end is beyond `pos`.
             let idx = ranges.partition_point(|&(_, end)| end <= pos);
-            return match ranges.get(idx) {
-                Some(&(start, end)) if start <= pos => end.min(cap), // inside a prop interval
-                Some(&(start, _)) => start.min(cap),                 // prop-free until the next one
-                None => cap,
-            };
+            match ranges.get(idx) {
+                // Prop-free until the next covered range.
+                Some(&(start, _)) if start > pos => return start.min(cap),
+                // Inside a covered range: walk the intervals below.
+                Some(_) => {}
+                None => return cap,
+            }
         }
         let mut cursor = self.intervals.cursor_at(pos);
         let Some((_, mut boundary, first)) = cursor.next() else {
             return cap; // no intervals at all: implicit-nil to the cap
         };
         if first.has_syntax_prop {
-            return boundary.min(cap); // prop-bearing: just its own extent
+            let keys = syntax_relevant_names();
+            loop {
+                if boundary >= cap {
+                    return cap;
+                }
+                match cursor.next() {
+                    Some((_, end, node))
+                        if node.has_syntax_prop
+                            && watched_keys_equal_eq_plist(first.plist, node.plist, &keys) =>
+                    {
+                        boundary = end;
+                    }
+                    _ => return boundary,
+                }
+            }
         }
         loop {
             if boundary >= cap {
@@ -3062,11 +3094,28 @@ impl TextPropertyTable {
             return;
         }
         if !range.is_empty() {
-            guard
-                .1
-                .retain(|&(s, e)| e <= range.start() || s >= range.end());
-            let idx = guard.1.partition_point(|&(s, _)| s < range.start());
-            guard.1.insert(idx, (range.start(), range.end()));
+            let (put_start, put_end) = (range.start(), range.end());
+            let mut ranges = Vec::with_capacity(guard.1.len() + 2);
+            for &(start, end) in &guard.1 {
+                if end <= put_start || start >= put_end {
+                    ranges.push((start, end));
+                    continue;
+                }
+                // The parts of an overlapped entry outside the put still
+                // carry their own properties: keep covering them. Dropping the
+                // whole entry left those intervals out of the list, so
+                // `syntax_prop_free_run_end` called them prop-free and scans
+                // ignored their `syntax-table` property.
+                if start < put_start {
+                    ranges.push((start, put_start));
+                }
+                if end > put_end {
+                    ranges.push((put_end, end));
+                }
+            }
+            let idx = ranges.partition_point(|&(s, _)| s < put_start);
+            ranges.insert(idx, (put_start, put_end));
+            guard.1 = ranges;
         }
         guard.0 = self.syntax_prop_tick + 1;
         // The any-flag is monotone under put; refresh it too.
@@ -3096,6 +3145,45 @@ impl TextPropertyTable {
         } else {
             *guard = (0, Vec::new());
         }
+    }
+
+    /// Test hook: every bit-set interval is covered by the cached range list
+    /// when that list is valid, and the any-flag agrees with the tree.
+    #[cfg(test)]
+    pub(crate) fn debug_syntax_caches_consistent(&self) -> Result<(), String> {
+        use std::sync::atomic::Ordering;
+        let actual: Vec<(usize, usize)> = self
+            .intervals
+            .cursor_at(CharPos0::ZERO)
+            .filter(|(_, _, node)| node.has_syntax_prop)
+            .map(|(s, e, _)| (s.get(), e.get()))
+            .collect();
+        let packed = self.syntax_prop_any.load(Ordering::Relaxed);
+        if packed >> 1 == self.syntax_prop_tick + 1 && packed & 1 == 0 && !actual.is_empty() {
+            return Err(format!("any flag {} but actual {:?}", packed & 1, actual));
+        }
+        if let Ok(guard) = self.syntax_prop_ranges.try_lock()
+            && guard.0 == self.syntax_prop_tick + 1
+        {
+            for &(s, e) in &actual {
+                let covered = guard
+                    .1
+                    .iter()
+                    .any(|&(rs, re)| rs.get() <= s && e <= re.get());
+                if !covered {
+                    return Err(format!(
+                        "interval [{s}, {e}) not covered by ranges {:?} (tick {})",
+                        guard
+                            .1
+                            .iter()
+                            .map(|(a, b)| (a.get(), b.get()))
+                            .collect::<Vec<_>>(),
+                        self.syntax_prop_tick
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Whether ANY interval in the table carries a syntax-relevant plist key

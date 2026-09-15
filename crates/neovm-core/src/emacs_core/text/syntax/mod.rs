@@ -7469,6 +7469,10 @@ fn expect_skip_syntax_args(caller: &str, args: &[Value]) -> Result<(String, Opti
 mod back_comment_safe_positions_test;
 
 #[cfg(test)]
+#[path = "tests/syntax_prop_byte_run.rs"]
+mod syntax_prop_byte_run_test;
+
+#[cfg(test)]
 #[path = "tests/mod.rs"]
 mod tests;
 
