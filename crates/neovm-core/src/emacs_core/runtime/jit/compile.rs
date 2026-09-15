@@ -406,7 +406,7 @@ fn jit_profile_emit(
     let inlinable = match obarray {
         Some(ob) => analyze_cfg(ops, &f.constants, f.executable_gnu_byte_offset_map(), arity)
             .map(|cfg| {
-                find_spec_sites(ops, &f.constants, &cfg.leaders, ob)
+                find_spec_sites(ops, &f.constants, &cfg.leaders, ob, false)
                     .values()
                     .filter(|site| site.kind == SpecCalleeKind::Bytecode)
                     .count()
@@ -1742,139 +1742,78 @@ fn find_spec_sites(
     constants: &[Value],
     leaders: &[usize],
     obarray: &Obarray,
+    cross_block: bool,
 ) -> HashMap<usize, SpecSite> {
     let mut sites = HashMap::new();
     let mut next_slot = 0usize;
     // Block-local abstract operand stack: a SUFFIX of the real stack where a
     // tracked slot is `Some(const-idx)` iff it provably holds that SYMBOL
-    // constant (pushed by `Op::Constant` in this block, copied only through
-    // the stack-shuffling ops modeled below). An `Op::Call(n)` whose callee
-    // slot (n below the top) carries a tag becomes a speculation site — this
-    // generalizes the old scan, which required every argument between the
-    // callee push and the call to be a TRIVIAL push and therefore rejected
-    // any call with a computed argument (e.g. a self-recursive
+    // constant (pushed by `Op::Constant`, copied only through the
+    // stack-shuffling ops modeled in [`spec_tag_transfer`]). An `Op::Call(n)`
+    // whose callee slot (n below the top) carries a tag becomes a speculation
+    // site — this generalizes the old scan, which required every argument
+    // between the callee push and the call to be a TRIVIAL push and therefore
+    // rejected any call with a computed argument (e.g. a self-recursive
     // `(fib (- n 1))`, whose `Op::Sub` disqualified the site and pinned every
     // recursive call to the generic shim).
     //
     // Soundness split: this pass SELECTS sites; the `Op::Call` lowering only
     // emits the spec shim after independently PROVING (SSA inspection,
     // `callee_is_symbol_const`) that the callee slot's value is the site's
-    // symbol constant — so a divergence between this model and the lowering
-    // degrades to the generic call, never a wrong-callee speculation.
+    // symbol constant, or — for a site whose callee crossed a block boundary
+    // (`cross_block`, JIT only) — behind a run-time check of the callee's
+    // bits. A divergence between this model and the lowering degrades to the
+    // generic call, never a wrong-callee speculation.
     //
-    // Suffix discipline: cleared at every block leader (unknown entry stack)
-    // and on any unmodeled op; pops past the suffix bottom just empty it (the
-    // values below were already unknown) and later pushes re-grow it, so
-    // top-relative reads inside the suffix stay exact.
+    // Suffix discipline: each leader starts from the tags every predecessor
+    // agrees on (`cross_block`) or from nothing, and an unmodeled op forgets
+    // everything; pops past the suffix bottom just empty it (the values below
+    // were already unknown) and later pushes re-grow it, so top-relative
+    // reads inside the suffix stay exact.
+    let entry = if cross_block {
+        spec_tag_entry_states(ops, constants, leaders)
+    } else {
+        HashMap::new()
+    };
     let mut tags: Vec<Option<u16>> = Vec::new();
     for (i, op) in ops.iter().enumerate() {
         if leaders.binary_search(&i).is_ok() {
             tags.clear();
+            if let Some(agreed) = entry.get(&i) {
+                tags.extend_from_slice(agreed);
+            }
         }
-        match op {
-            Op::Constant(cidx) => {
-                let tag = constants
-                    .get(*cidx as usize)
-                    .and_then(|v| v.as_symbol_id())
-                    .map(|_| *cidx);
-                tags.push(tag);
-            }
-            Op::Nil | Op::True => tags.push(None),
-            Op::Dup => {
-                let t = tags.last().copied().flatten();
-                tags.push(t);
-            }
-            Op::StackRef(n) => {
-                let n = *n as usize;
-                let t = if tags.len() > n {
-                    tags[tags.len() - 1 - n]
+        if let op @ (Op::Call(n) | Op::Apply(n)) = op {
+            let nargs = *n as usize;
+            // Site check BEFORE applying the call's stack effect: the
+            // callee sits nargs below the top (Apply never speculates).
+            if matches!(op, Op::Call(_))
+                && tags.len() > nargs
+                && let Some(cidx) = tags[tags.len() - 1 - nargs]
+                && let Some(sym_val) = constants.get(cidx as usize)
+                && let Some(sym_id) = sym_val.as_symbol_id()
+                && let Some(binding) = obarray.symbol_function_id(sym_id)
+            {
+                let kind = if binding.is_bytecode() {
+                    Some(SpecCalleeKind::Bytecode)
                 } else {
-                    None
+                    subr_spec_kind(binding, sym_id, nargs)
                 };
-                tags.push(t);
-            }
-            Op::StackSet(n) => {
-                // Interpreter semantics: the top value moves into the slot `n`
-                // below it, then the top is dropped (n == 0 is a plain pop).
-                let n = *n as usize;
-                let t = tags.pop().flatten();
-                if n > 0 && tags.len() >= n {
-                    let d = tags.len() - n;
-                    tags[d] = t;
+                if let Some(kind) = kind {
+                    sites.insert(
+                        i,
+                        SpecSite {
+                            sym: sym_id.0,
+                            expected_bits: binding.bits() as u64,
+                            slot: next_slot,
+                            kind,
+                        },
+                    );
+                    next_slot += 1;
                 }
             }
-            Op::DiscardN(raw) => {
-                let preserve_tos = (raw & 0x80) != 0;
-                let n = (raw & 0x7F) as usize;
-                if preserve_tos && n > 0 {
-                    // The top survives, landing n slots lower.
-                    let t = tags.pop().flatten();
-                    for _ in 0..n.min(tags.len()) {
-                        tags.pop();
-                    }
-                    tags.push(t);
-                } else {
-                    for _ in 0..n.min(tags.len()) {
-                        tags.pop();
-                    }
-                }
-            }
-            op @ (Op::Call(n) | Op::Apply(n)) => {
-                let nargs = *n as usize;
-                // Site check BEFORE applying the call's stack effect: the
-                // callee sits nargs below the top (Apply never speculates).
-                if matches!(op, Op::Call(_))
-                    && tags.len() > nargs
-                    && let Some(cidx) = tags[tags.len() - 1 - nargs]
-                    && let Some(sym_val) = constants.get(cidx as usize)
-                    && let Some(sym_id) = sym_val.as_symbol_id()
-                    && let Some(binding) = obarray.symbol_function_id(sym_id)
-                {
-                    let kind = if binding.is_bytecode() {
-                        Some(SpecCalleeKind::Bytecode)
-                    } else {
-                        subr_spec_kind(binding, sym_id, nargs)
-                    };
-                    if let Some(kind) = kind {
-                        sites.insert(
-                            i,
-                            SpecSite {
-                                sym: sym_id.0,
-                                expected_bits: binding.bits() as u64,
-                                slot: next_slot,
-                                kind,
-                            },
-                        );
-                        next_slot += 1;
-                    }
-                }
-                // [func a1 .. aN] -> [result]
-                for _ in 0..(nargs + 1).min(tags.len()) {
-                    tags.pop();
-                }
-                tags.push(None);
-            }
-            other => match simple_effect(other) {
-                Ok((needs, delta)) => {
-                    // For every op reaching this arm, `needs` IS the consumed
-                    // operand count and `needs + delta` the produced count.
-                    // The ops where that identity does NOT hold — the
-                    // stack-shuffling Dup/StackRef/StackSet/DiscardN (reads
-                    // without consuming / writes in place) — are all handled
-                    // explicitly above, as are Constant/Nil/True/Call/Apply.
-                    let consumed = needs;
-                    let produced = (needs as i64 + delta).max(0) as usize;
-                    for _ in 0..consumed.min(tags.len()) {
-                        tags.pop();
-                    }
-                    for _ in 0..produced {
-                        tags.push(None);
-                    }
-                }
-                // Control flow / anything unmodeled: forget everything.
-                Err(_) => tags.clear(),
-            },
         }
+        spec_tag_transfer(op, constants, &mut tags);
     }
     // R2: CallBuiltinSym intrinsic sites (self-contained per-op, classified by
     // NAME — obarray-free). Runs for BOTH JIT (here) and AOT baseline emit (via
@@ -1882,6 +1821,176 @@ fn find_spec_sites(
     // `Op::Call` pass above so the JIT map is byte-identical.
     append_cbsym_spec_sites(ops, &mut sites, &mut next_slot);
     sites
+}
+
+/// The symbol-constant tags one op leaves on [`find_spec_sites`]' abstract
+/// operand stack suffix (control-flow edges are [`spec_tag_entry_states`]').
+fn spec_tag_transfer(op: &Op, constants: &[Value], tags: &mut Vec<Option<u16>>) {
+    match op {
+        Op::Constant(cidx) => {
+            let tag = constants
+                .get(*cidx as usize)
+                .and_then(|v| v.as_symbol_id())
+                .map(|_| *cidx);
+            tags.push(tag);
+        }
+        Op::Nil | Op::True => tags.push(None),
+        Op::Dup => {
+            let t = tags.last().copied().flatten();
+            tags.push(t);
+        }
+        Op::StackRef(n) => {
+            let n = *n as usize;
+            let t = if tags.len() > n {
+                tags[tags.len() - 1 - n]
+            } else {
+                None
+            };
+            tags.push(t);
+        }
+        Op::StackSet(n) => {
+            // Interpreter semantics: the top value moves into the slot `n`
+            // below it, then the top is dropped (n == 0 is a plain pop).
+            let n = *n as usize;
+            let t = tags.pop().flatten();
+            if n > 0 && tags.len() >= n {
+                let d = tags.len() - n;
+                tags[d] = t;
+            }
+        }
+        Op::DiscardN(raw) => {
+            let preserve_tos = (raw & 0x80) != 0;
+            let n = (raw & 0x7F) as usize;
+            if preserve_tos && n > 0 {
+                // The top survives, landing n slots lower.
+                let t = tags.pop().flatten();
+                for _ in 0..n.min(tags.len()) {
+                    tags.pop();
+                }
+                tags.push(t);
+            } else {
+                for _ in 0..n.min(tags.len()) {
+                    tags.pop();
+                }
+            }
+        }
+        Op::Call(n) | Op::Apply(n) => {
+            // [func a1 .. aN] -> [result]
+            let nargs = *n as usize;
+            for _ in 0..(nargs + 1).min(tags.len()) {
+                tags.pop();
+            }
+            tags.push(None);
+        }
+        other => match simple_effect(other) {
+            Ok((needs, delta)) => {
+                // For every op reaching this arm, `needs` IS the consumed
+                // operand count and `needs + delta` the produced count.
+                // The ops where that identity does NOT hold — the
+                // stack-shuffling Dup/StackRef/StackSet/DiscardN (reads
+                // without consuming / writes in place) — are all handled
+                // explicitly above, as are Constant/Nil/True/Call/Apply.
+                let consumed = needs;
+                let produced = (needs as i64 + delta).max(0) as usize;
+                for _ in 0..consumed.min(tags.len()) {
+                    tags.pop();
+                }
+                for _ in 0..produced {
+                    tags.push(None);
+                }
+            }
+            // Control flow / anything unmodeled: forget everything.
+            Err(_) => tags.clear(),
+        },
+    }
+}
+
+/// The tags each block of a JIT body starts with: what every predecessor
+/// that reaches it agrees on, as a forward must-analysis over the goto edges
+/// (a slot two edges disagree on, or one only the longer suffix knows, is
+/// unknown). eieio's generated code pushes a callee, then an inlined
+/// `cl-defstruct` type check — `type-of`, `memq`, a conditional jump and a
+/// join — then the arguments, so the block-local scan lost every such call
+/// (gethash, alist-get, rassq, copy-sequence, `eieio--initarg-to-attribute`:
+/// ~700 calls per `make-instance` repeat through the generic call path).
+///
+/// Only a selection heuristic: a switch target or handler entry this does not
+/// model starts unknown or from its modeled predecessors, and the lowering
+/// re-checks every cross-block callee at run time.
+fn spec_tag_entry_states(
+    ops: &[Op],
+    constants: &[Value],
+    leaders: &[usize],
+) -> HashMap<usize, Vec<Option<u16>>> {
+    let n = ops.len();
+    let next_leader = |i: usize| {
+        let at = leaders.partition_point(|&l| l <= i);
+        leaders.get(at).copied().unwrap_or(n)
+    };
+    let mut entry: HashMap<usize, Vec<Option<u16>>> = HashMap::new();
+    let mut work: Vec<usize> = Vec::new();
+    let flow = |target: usize,
+                incoming: &[Option<u16>],
+                entry: &mut HashMap<usize, Vec<Option<u16>>>,
+                work: &mut Vec<usize>| {
+        if target >= n {
+            return;
+        }
+        let meet = match entry.get(&target) {
+            None => incoming.to_vec(),
+            Some(current) => {
+                let k = current.len().min(incoming.len());
+                current[current.len() - k..]
+                    .iter()
+                    .zip(&incoming[incoming.len() - k..])
+                    .map(|(&a, &b)| if a == b { a } else { None })
+                    .collect()
+            }
+        };
+        // Unknown slots at the bottom of a suffix carry nothing.
+        let known_from = meet.iter().position(Option::is_some).unwrap_or(meet.len());
+        let meet = meet[known_from..].to_vec();
+        if entry.get(&target) != Some(&meet) {
+            entry.insert(target, meet);
+            work.push(target);
+        }
+    };
+    flow(0, &[], &mut entry, &mut work);
+    while let Some(block) = work.pop() {
+        let mut tags = entry[&block].clone();
+        let end = next_leader(block);
+        let mut falls_through = true;
+        for op in &ops[block..end] {
+            match op {
+                Op::Return | Op::Throw => {
+                    falls_through = false;
+                    break;
+                }
+                Op::Goto(t) => {
+                    flow(*t as usize, &tags, &mut entry, &mut work);
+                    falls_through = false;
+                    break;
+                }
+                Op::GotoIfNil(t) | Op::GotoIfNotNil(t) => {
+                    tags.pop();
+                    flow(*t as usize, &tags, &mut entry, &mut work);
+                }
+                Op::GotoIfNilElsePop(t) | Op::GotoIfNotNilElsePop(t) => {
+                    flow(*t as usize, &tags, &mut entry, &mut work);
+                    tags.pop();
+                }
+                Op::PushConditionCase(t) | Op::PushConditionCaseRaw(t) | Op::PushCatch(t) => {
+                    flow(*t as usize, &[], &mut entry, &mut work);
+                    spec_tag_transfer(op, constants, &mut tags);
+                }
+                _ => spec_tag_transfer(op, constants, &mut tags),
+            }
+        }
+        if falls_through {
+            flow(end, &tags, &mut entry, &mut work);
+        }
+    }
+    entry
 }
 
 /// The CallBuiltinSym intrinsic classification pass of [`find_spec_sites`], split
@@ -1954,7 +2063,7 @@ pub(crate) fn has_op_call_spec_sites(
     let Ok(cfg) = analyze_cfg(ops, constants, None, arity) else {
         return false;
     };
-    find_spec_sites(ops, constants, &cfg.leaders, obarray)
+    find_spec_sites(ops, constants, &cfg.leaders, obarray, false)
         .values()
         .any(|s| s.kind.to_spec_disc().is_some())
 }
@@ -3006,7 +3115,7 @@ pub fn lower_leaf_full_osr(
     // code as immediates and the Box moves into the CompiledLeaf at the end.
     let (spec_sites, spec_slots): (HashMap<usize, SpecSite>, Box<[SpecSlot]>) = match obarray {
         Some(ob) => {
-            let sites = find_spec_sites(ops, constants, &cfg.leaders, ob);
+            let sites = find_spec_sites(ops, constants, &cfg.leaders, ob, true);
             let slots: Box<[SpecSlot]> = (0..sites.len())
                 .map(|_| SpecSlot {
                     epoch: AtomicU64::new(0),
@@ -3212,7 +3321,7 @@ pub(crate) fn build_baseline_leaf_object<M: Module>(
     // arms each). `finalize_baseline_spec_sites` DROPs an un-reloc'd callee, dense-
     // renumbers the surviving slots, and returns the descriptor sites in slot order.
     let mut spec_sites: HashMap<usize, SpecSite> = match obarray {
-        Some(ob) => find_spec_sites(ops, constants, &cfg.leaders, ob),
+        Some(ob) => find_spec_sites(ops, constants, &cfg.leaders, ob, false),
         None => find_cbsym_spec_sites(ops),
     };
     let aot_spec_sites = finalize_baseline_spec_sites(&mut spec_sites, ops, reloc_index);

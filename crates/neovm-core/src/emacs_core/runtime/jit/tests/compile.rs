@@ -3639,7 +3639,7 @@ fn cbsym_classifier_selects_shipset_by_name() {
     let mbeg = Op::CallBuiltinSym(intern("match-beginning"), 1);
     let ops = [point, insert, car, gc, goto, mbeg, Op::Return];
     // The CBSym loop ignores `leaders`; pass the entry leader only.
-    let sites = find_spec_sites(&ops, &[], &[0], &ev.obarray);
+    let sites = find_spec_sites(&ops, &[], &[0], &ev.obarray, false);
     assert_eq!(
         sites.get(&0).map(|s| s.kind),
         Some(SpecCalleeKind::CbsymTierA {
@@ -3726,7 +3726,7 @@ fn spec_sites_track_callee_through_computed_arguments() {
         Op::Call(1),
         Op::Return,
     ];
-    let sites = find_spec_sites(&ops, &consts, &[0], &ev.obarray);
+    let sites = find_spec_sites(&ops, &consts, &[0], &ev.obarray, false);
     assert_eq!(
         sites.get(&4).map(|s| s.kind),
         Some(SpecCalleeKind::Bytecode),
@@ -3750,7 +3750,7 @@ fn spec_sites_track_both_calls_of_a_nested_call_argument() {
         Op::Call(1),
         Op::Return,
     ];
-    let sites = find_spec_sites(&ops, &consts, &[0], &ev.obarray);
+    let sites = find_spec_sites(&ops, &consts, &[0], &ev.obarray, false);
     assert_eq!(
         sites.get(&3).map(|s| s.kind),
         Some(SpecCalleeKind::Bytecode),
@@ -3771,10 +3771,188 @@ fn spec_sites_reset_at_block_leaders() {
     let (ev, sym_val) = harness_with_inc_callee("spec-leader-reset-callee");
     let consts = [sym_val, Value::make_int(5)];
     let ops = [Op::Constant(0), Op::Constant(1), Op::Call(1), Op::Return];
-    let sites = find_spec_sites(&ops, &consts, &[0, 2], &ev.obarray);
+    let sites = find_spec_sites(&ops, &consts, &[0, 2], &ev.obarray, false);
     assert!(
         !sites.contains_key(&2),
         "a leader between push and call must clear the tracking"
+    );
+}
+
+/// `(lambda (a) (callee (if a 5 7)))`: the callee is pushed before the
+/// conditional, so it reaches the call through a join. Every predecessor of
+/// the join agrees on it, so the JIT (`cross_block`) keeps the site; the
+/// block-local scan does not.
+fn cross_block_call_ops() -> [Op; 8] {
+    [
+        Op::Constant(0),  // callee        [a callee]
+        Op::StackRef(1),  // a             [a callee a]
+        Op::GotoIfNil(5), //               [a callee]
+        Op::Constant(1),  // 5
+        Op::Goto(6),
+        Op::Constant(2), // 7
+        Op::Call(1),
+        Op::Return,
+    ]
+}
+
+#[test]
+fn spec_sites_keep_a_callee_every_predecessor_agrees_on() {
+    let (ev, sym_val) = harness_with_inc_callee("spec-cross-block-callee");
+    let consts = [sym_val, Value::make_int(5), Value::make_int(7)];
+    let ops = cross_block_call_ops();
+    let leaders = [0, 3, 5, 6];
+    let sites = find_spec_sites(&ops, &consts, &leaders, &ev.obarray, true);
+    assert_eq!(
+        sites.get(&6).map(|s| s.kind),
+        Some(SpecCalleeKind::Bytecode),
+        "both arms carry the callee to the call"
+    );
+    let block_local = find_spec_sites(&ops, &consts, &leaders, &ev.obarray, false);
+    assert!(!block_local.contains_key(&6));
+
+    // The arms push different callees: the join knows neither.
+    let other = Value::symbol("spec-cross-block-other");
+    let consts = [sym_val, Value::make_int(5), other];
+    let ops = [
+        Op::StackRef(0),  // a        [a a]
+        Op::GotoIfNil(4), //          [a]
+        Op::Constant(0),  // callee   [a callee]
+        Op::Goto(5),
+        Op::Constant(2), // other    [a other]
+        Op::Constant(1), // 5
+        Op::Call(1),
+        Op::Return,
+    ];
+    let sites = find_spec_sites(&ops, &consts, &[0, 2, 4, 5], &ev.obarray, true);
+    assert!(
+        !sites.contains_key(&6),
+        "predecessors that disagree on the callee must not speculate"
+    );
+}
+
+fn cross_block_call_function(sym_val: Value) -> ByteCodeFunction {
+    let mut f = ByteCodeFunction::new(LambdaParams {
+        required: vec![crate::emacs_core::intern::SymId(1)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    f.lexical = true;
+    f.ops = cross_block_call_ops().to_vec();
+    f.constants = vec![sym_val, Value::make_int(5), Value::make_int(7)].into();
+    f.max_stack = 8;
+    f
+}
+
+/// The site selected across the join runs speculated (its callee's bits
+/// checked at run time), and with that check forced to miss it runs the
+/// plain generic call to the same answer.
+#[test]
+fn a_cross_block_call_site_speculates_behind_a_callee_check() {
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let (mut ev, sym_val) = harness_with_inc_callee("spec-cross-block-run");
+    let f = cross_block_call_function(sym_val);
+    let ctx_ptr = &mut ev as *mut crate::emacs_core::eval::Context as *mut u8;
+    for force_miss in [false, true] {
+        super::lowering::force_spec_guard_miss_for_test(force_miss);
+        let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+        let before = super::shims::SPEC_CALL_COUNT.load(std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(
+            leaf.call(ctx_ptr, &[Value::T]),
+            NativeRun::Ok(Value::make_int(6).bits())
+        );
+        assert_eq!(
+            leaf.call(ctx_ptr, &[Value::NIL]),
+            NativeRun::Ok(Value::make_int(8).bits())
+        );
+        let spec_calls =
+            super::shims::SPEC_CALL_COUNT.load(std::sync::atomic::Ordering::Relaxed) - before;
+        if force_miss {
+            assert_eq!(spec_calls, 0, "a missed check takes the generic call");
+        } else {
+            assert_eq!(spec_calls, 2, "both calls take the speculated path");
+        }
+    }
+    super::lowering::force_spec_guard_miss_for_test(false);
+}
+
+/// The generic call a missed callee check enters skips every root-window
+/// store the speculated path made, so it may not elide against them. A
+/// `setq` stores `[a b]`; `a`'s slot then gets a fresh `c`; the guarded call's
+/// speculated path stores `[c b]`. On the miss path slot 0 still holds `a`,
+/// so its generic call must store `c` again rather than trust that record.
+///
+///     (lambda (a b) (setq v v) (let ((c (cons a a))) (setq a c) (callee (if c 5 7)) b))
+#[test]
+fn a_missed_callee_check_does_not_elide_the_speculated_path_stores() {
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let (ev, sym_val) = harness_with_inc_callee("spec-cross-block-carry");
+    let mut f = ByteCodeFunction::new(LambdaParams {
+        required: vec![
+            crate::emacs_core::intern::SymId(1),
+            crate::emacs_core::intern::SymId(2),
+        ],
+        optional: Vec::new(),
+        rest: None,
+    });
+    f.lexical = true;
+    f.ops = vec![
+        Op::Constant(3),   // v             [a b v]
+        Op::VarSet(3),     // stores [a b]  [a b]
+        Op::StackRef(1),   // a             [a b a]
+        Op::Dup,           //               [a b a a]
+        Op::Cons,          // c             [a b c]
+        Op::StackSet(2),   //               [c b]
+        Op::Constant(0),   // callee        [c b callee]
+        Op::StackRef(2),   // c             [c b callee c]
+        Op::GotoIfNil(11), //               [c b callee]
+        Op::Constant(1),   // 5
+        Op::Goto(12),
+        Op::Constant(2), // 7
+        Op::Call(1),     // residual [c b]
+        Op::Pop,
+        Op::Return, // b
+    ];
+    f.constants = vec![
+        sym_val,
+        Value::make_int(5),
+        Value::make_int(7),
+        Value::symbol("spec-cross-block-carry-v"),
+    ]
+    .into();
+    f.max_stack = 16;
+    let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+    assert_eq!(leaf.tier, super::leaf::LeafTier::Baseline);
+    assert_eq!(
+        super::lowering::rootwin_counters(),
+        (6, 0),
+        "a+b, the speculated path's c+b (the call is at a join, which forgets the \
+         record), the miss path's c+b; (4, 2) means the miss path trusted stores \
+         only the speculated path made"
+    );
+    // The call is the guarded kind: with its check forced to miss, it runs
+    // unspeculated.
+    super::lowering::force_spec_guard_miss_for_test(true);
+    let missing = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+    super::lowering::force_spec_guard_miss_for_test(false);
+    let mut ev = ev;
+    let ctx_ptr = &mut ev as *mut crate::emacs_core::eval::Context as *mut u8;
+    let before = super::shims::SPEC_CALL_COUNT.load(std::sync::atomic::Ordering::Relaxed);
+    let args = [Value::make_int(1), Value::make_int(2)];
+    assert_eq!(
+        missing.call(ctx_ptr, &args),
+        NativeRun::Ok(Value::make_int(2).bits())
+    );
+    assert_eq!(
+        super::shims::SPEC_CALL_COUNT.load(std::sync::atomic::Ordering::Relaxed),
+        before
+    );
+    assert_eq!(
+        leaf.call(ctx_ptr, &args),
+        NativeRun::Ok(Value::make_int(2).bits())
+    );
+    assert_eq!(
+        super::shims::SPEC_CALL_COUNT.load(std::sync::atomic::Ordering::Relaxed),
+        before + 1
     );
 }
 
@@ -3794,7 +3972,7 @@ fn spec_sites_respect_stackset_clobbering_the_callee_slot() {
         Op::Call(1),
         Op::Return,
     ];
-    let sites = find_spec_sites(&ops, &consts, &[0], &ev.obarray);
+    let sites = find_spec_sites(&ops, &consts, &[0], &ev.obarray, false);
     assert!(
         !sites.contains_key(&4),
         "a clobbered callee slot must not speculate"

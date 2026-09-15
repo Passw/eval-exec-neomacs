@@ -2740,6 +2740,18 @@ struct RootWinCarry {
 
 /// Forget the carried record: a new function, a bytecode leader, a MIR block
 /// head, or a site that runs a nested activation without storing anything.
+#[cfg(test)]
+thread_local! {
+    static FORCE_SPEC_GUARD_MISS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Compile every cross-block spec site's callee check so it never matches
+/// (tests only): exercises the generic call behind it.
+#[cfg(test)]
+pub(crate) fn force_spec_guard_miss_for_test(on: bool) {
+    FORCE_SPEC_GUARD_MISS.with(|c| c.set(on));
+}
+
 pub(crate) fn rootwin_carry_reset() {
     ROOTWIN_CARRY.with(|c| c.borrow_mut().stored.clear());
 }
@@ -4607,17 +4619,26 @@ pub(crate) fn lower_simple_op(
             // tracking selected this site; if the lowering cannot re-prove it
             // here, the site silently degrades to the generic call below —
             // never a wrong-callee speculation.
-            let spec = spec.filter(|&(sym, ..)| {
-                let proven =
-                    callee_is_symbol_const(fb, stack[args_at - 1], sym, reloc_base, reloc_index);
-                if !proven {
-                    tracing::debug!(
-                        target: "neovm_jit",
-                        sym,
-                        "spec site dropped: callee slot not provably the tracked symbol"
-                    );
+            // A JIT site whose callee crossed a block boundary (its value is a
+            // block parameter the proof cannot see through) speculates behind a
+            // run-time check of the callee's bits instead (`guarded_sym`): a
+            // mismatch takes the plain generic call. Not for AOT (the symbol's
+            // bits are relocated there) or inline arithmetic (which deopts).
+            let mut guarded_sym: Option<u32> = None;
+            let spec = spec.filter(|&(sym, _, _, _, kind)| {
+                if callee_is_symbol_const(fb, stack[args_at - 1], sym, reloc_base, reloc_index) {
+                    return true;
                 }
-                proven
+                if !aot && !matches!(kind, SpecCalleeKind::ArithIntrinsic { .. }) {
+                    guarded_sym = Some(sym);
+                    return true;
+                }
+                tracing::debug!(
+                    target: "neovm_jit",
+                    sym,
+                    "spec site dropped: callee slot not provably the tracked symbol"
+                );
+                false
             });
             // LEVEL-B (JIT only): inline logand/logior/logxor/lognot as native ops
             // on the TAGGED fixnum bits, guarded by a fixnum check that DEOPTS —
@@ -4701,6 +4722,33 @@ pub(crate) fn lower_simple_op(
             };
             let func_val = stack[args_at - 1];
             stack.truncate(args_at - 1);
+            // What the generic call uses must dominate the guard's edge into
+            // it, so a guarded site defines the call buffers first.
+            let guarded_buffers = guarded_sym.map(|_| {
+                (
+                    fb.ins().stack_addr(rt.ptr_ty, rt.call_args_slot, 0),
+                    fb.ins().stack_addr(rt.ptr_ty, rt.call_result_slot, 0),
+                    fb.ins().iconst(types::I64, n as i64),
+                )
+            });
+            // The guarded site's check, before anything the speculated path
+            // stores: a mismatch enters the generic-fallback block below.
+            let guard_generic: Option<Block> = guarded_sym.map(|sym| {
+                let bits = Value::from_sym_id(crate::emacs_core::intern::SymId(sym)).bits();
+                #[cfg(test)]
+                let bits = if FORCE_SPEC_GUARD_MISS.with(|c| c.get()) {
+                    !bits
+                } else {
+                    bits
+                };
+                let is_sym = icmp_imm_p(fb, IntCC::Equal, func_val, bits as i64);
+                let speculated = fb.create_block();
+                let generic = fb.create_block();
+                fb.ins().brif(is_sym, speculated, &[], generic, &[]);
+                fb.switch_to_block(speculated);
+                fb.seal_block(speculated);
+                generic
+            });
             // Root every value that stays live across the call (the callee +
             // args are rooted by the shim; the constants are rooted by the
             // dispatch seam via the executing function). Pred/EqIncl direct
@@ -4713,14 +4761,18 @@ pub(crate) fn lower_simple_op(
                 emit_cond_residual_roots_pre(fb, rt, stack.as_slice())
             };
             let vmctx = fb.use_var(rt.vmctx_var);
-            let args_addr = fb.ins().stack_addr(rt.ptr_ty, rt.call_args_slot, 0);
-            let out_addr = fb.ins().stack_addr(rt.ptr_ty, rt.call_result_slot, 0);
-            let n_val = fb.ins().iconst(types::I64, n as i64);
+            let (args_addr, out_addr, n_val) = guarded_buffers.unwrap_or_else(|| {
+                (
+                    fb.ins().stack_addr(rt.ptr_ty, rt.call_args_slot, 0),
+                    fb.ins().stack_addr(rt.ptr_ty, rt.call_result_slot, 0),
+                    fb.ins().iconst(types::I64, n as i64),
+                )
+            });
             // Subr-kind sites can return STATUS_NEED_GENERIC, which routes to a
             // fallback block that re-does this site as the ORIGINAL generic
             // call; bytecode-kind sites keep their everything-inside-the-shim
             // protocol. `None` = no NEED_GENERIC possible.
-            let mut generic_fallback: Option<Block> = None;
+            let mut generic_fallback: Option<Block> = guard_generic;
             let call = match spec {
                 Some((sym, expected, slot_ptr, slot_idx, SpecCalleeKind::Bytecode)) => {
                     let sym_v = materialize_op_sym_id(fb, reloc_base, reloc_index, sym);
@@ -4735,7 +4787,10 @@ pub(crate) fn lower_simple_op(
                 Some((sym, expected, slot_ptr, slot_idx, kind)) => {
                     // PRESERVE emission order: create the generic-fallback block
                     // FIRST (byte-identical to before B2), then the operands.
-                    generic_fallback = Some(fb.create_block());
+                    // A guarded site already made it (both edges enter it).
+                    if generic_fallback.is_none() {
+                        generic_fallback = Some(fb.create_block());
+                    }
                     let sym_v = materialize_op_sym_id(fb, reloc_base, reloc_index, sym);
                     let exp_v =
                         materialize_spec_expected(fb, aot, spec_expected_base, expected, slot_idx);
@@ -4845,6 +4900,11 @@ pub(crate) fn lower_simple_op(
                 // The fast path may have stored nothing (a reg-args site);
                 // the continuation merges both store histories.
                 let carry_fast = rootwin_carry_snapshot();
+                if guard_generic.is_some() {
+                    // The guard's edge skips every store the speculated path
+                    // made, so this path may elide none of them.
+                    rootwin_carry_reset();
+                }
                 let saved_gen = if stack.is_empty() {
                     CondRoots::NONE
                 } else {
