@@ -502,6 +502,32 @@ fn aset_fast(array: Value, index: Value, value: Value) -> bool {
     let Some(idx) = index.as_fixnum().and_then(|i| usize::try_from(i).ok()) else {
         return false;
     };
+    if array.veclike_type() == Some(crate::tagged::header::VecLikeType::Vector) {
+        // One pass over what `set_vector_slot` would check again: owned
+        // storage (a mapped pdump vector copies itself on the slow path),
+        // bounds, a plain vector, the barrier, the store.
+        let obj = array.as_veclike_ptr().unwrap() as *mut crate::tagged::header::VectorObj;
+        // SAFETY: a live vector owner; nothing below runs Lisp or collects.
+        let data = unsafe { &mut (*obj).data };
+        if !data.is_owned() {
+            return false;
+        }
+        let items = data.as_slice();
+        if idx >= items.len()
+            || crate::emacs_core::chartable::classify_vector_slots(items, false)
+                != crate::emacs_core::chartable::VectorTag::Plain
+        {
+            return false;
+        }
+        crate::tagged::gc::note_heap_slot_write(
+            array,
+            crate::tagged::gc::HeapWriteKind::VectorSlot,
+            idx,
+            value,
+        );
+        data.store_atomic(idx, value);
+        return true;
+    }
     if array.is_veclike() {
         let (items, record) = match array.veclike_type() {
             Some(crate::tagged::header::VecLikeType::Vector) => match array.as_vector_data() {
@@ -557,12 +583,10 @@ pub extern "C" fn neovm_jit_aset(ctx: *mut u8, array: i64, index: i64, value: i6
     let index = Value::from_bits(index as usize);
     let value = Value::from_bits(value as usize);
     {
-        // SAFETY: seam-provided dormant Context; read-only access.
+        // SAFETY: seam-provided dormant Context; only the epoch cell is written.
         let ctx = unsafe { &*(ctx as *const Context) };
-        if !crate::emacs_core::bytecode::vm::named_builtin_fast_path_allowed_in(
-            ctx,
-            Vm::aset_builtin_id(),
-        ) {
+        let epoch = ctx.obarray.function_epoch();
+        if ctx.aset_fast_path_epoch.get() != epoch && !aset_regate(ctx, epoch) {
             return VALUE_SHIM_NEED_GENERIC;
         }
     }
@@ -570,6 +594,22 @@ pub extern "C" fn neovm_jit_aset(ctx: *mut u8, array: i64, index: i64, value: i6
         return value.bits() as i64;
     }
     aset_slow(ctx, array, index, value)
+}
+
+/// Ask the obarray whether `aset` is still the builtin, and remember the
+/// answer for this function epoch when it is. The per-call check was 44 of
+/// the shim's 103 instructions.
+#[cold]
+#[inline(never)]
+fn aset_regate(ctx: &Context, epoch: u64) -> bool {
+    if !crate::emacs_core::bytecode::vm::named_builtin_fast_path_allowed_in(
+        ctx,
+        Vm::aset_builtin_id(),
+    ) {
+        return false;
+    }
+    ctx.aset_fast_path_epoch.set(epoch);
+    true
 }
 
 #[cold]

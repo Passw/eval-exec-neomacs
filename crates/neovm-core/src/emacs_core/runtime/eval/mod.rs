@@ -3306,6 +3306,12 @@ pub struct Context {
     /// thread-local's lookup plus RefCell borrow ran on every bind, unbind
     /// and native entry.
     pub(crate) jit_bind_stack: Vec<usize>,
+    /// The `function_epoch` at which compiled code last found `aset`'s
+    /// function cell still the builtin (and no compiler overrides active),
+    /// so `Op::Aset` shims ask the obarray only after a function cell changes
+    /// (every change, and an overrides toggle, advances the epoch). `u64::MAX`
+    /// is never a live epoch.
+    pub(crate) aset_fast_path_epoch: std::cell::Cell<u64>,
     /// Hot cache for named callable resolution in `funcall`/`apply`.
     /// Keyed by symbol id; entries are validated against the obarray's
     /// `function_epoch` so that any `defalias` / `fset` / autoload

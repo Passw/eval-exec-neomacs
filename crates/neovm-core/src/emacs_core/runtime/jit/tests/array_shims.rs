@@ -635,6 +635,40 @@ fn a_later_call_site_roots_what_only_the_aset_fallback_stored() {
     }
 }
 
+/// The aset shim asks the obarray whether `aset` is still the builtin once per
+/// function epoch. Warmed up on the builtin, a compiled `aset` must still see
+/// a redefinition made afterwards, and the builtin again once it is restored.
+#[test]
+fn a_warmed_aset_sees_a_later_redefinition_and_its_undoing() {
+    let mut eval = Context::new();
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    let aset_leaf = compile_bytecode_function(&aset_fn()).expect("aset compiles");
+    let v = eval.eval_str("(vector 0 0)").expect("v");
+    let run = |v: Value, value: i64| {
+        native(
+            ctx_ptr,
+            &aset_leaf,
+            &[v, Value::make_int(1), Value::make_int(value)],
+            "aset",
+        )
+    };
+    assert_eq!(run(v, 1), "1");
+    assert_eq!(run(v, 2), "2");
+    assert_eq!(print_value(&v), "[0 2]");
+    eval.eval_str(
+        "(progn
+           (defvar ashim-warm-orig (symbol-function 'aset))
+           (fset 'aset (lambda (a i v) (funcall ashim-warm-orig a i (list 'wrapped v)))))",
+    )
+    .expect("redefine");
+    assert_eq!(run(v, 3), "(wrapped 3)");
+    assert_eq!(print_value(&v), "[0 (wrapped 3)]");
+    eval.eval_str("(fset 'aset ashim-warm-orig)")
+        .expect("restore");
+    assert_eq!(run(v, 4), "4");
+    assert_eq!(print_value(&v), "[0 4]");
+}
+
 /// `(lambda (n l) (nth n l))`
 fn nth_fn() -> ByteCodeFunction {
     lexical_fn(
