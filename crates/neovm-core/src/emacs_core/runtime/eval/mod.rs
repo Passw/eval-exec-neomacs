@@ -1831,6 +1831,7 @@ struct CoreEvalSymbols {
     noninteractive_symbol: SymId,
     symbols_with_pos_enabled_symbol: SymId,
     print_symbols_bare_symbol: SymId,
+    runtime_projection_mask: Box<[u64]>,
 }
 
 fn install_core_eval_symbols(obarray: &mut Obarray, reset_runtime_values: bool) -> CoreEvalSymbols {
@@ -1885,7 +1886,18 @@ fn install_core_eval_symbols(obarray: &mut Obarray, reset_runtime_values: bool) 
         obarray.mark_runtime_projected_id(projected);
     }
 
+    let runtime_projection_mask = runtime_projection::runtime_projection_mask_for(&[
+        quit_flag_symbol,
+        inhibit_quit_symbol,
+        throw_on_input_symbol,
+        compiler_function_overrides_symbol,
+        noninteractive_symbol,
+        symbols_with_pos_enabled_symbol,
+        print_symbols_bare_symbol,
+    ]);
+
     CoreEvalSymbols {
+        runtime_projection_mask,
         internal_interpreter_environment_symbol,
         load_read_stream_token,
         compiler_function_overrides_symbol,
@@ -2890,6 +2902,9 @@ pub struct Context {
     /// symbol-with-pos objects. Bound to `t` by the byte-compiler.
     pub(crate) symbols_with_pos_enabled: bool,
     print_symbols_bare_symbol: SymId,
+    /// `runtime_binding_has_projection`'s membership as a bitset over symbol
+    /// ids (see `runtime_projection_mask_for`).
+    runtime_projection_mask: Box<[u64]>,
     /// When true, the printer outputs bare symbol names for symbol-with-pos.
     pub(crate) print_symbols_bare: bool,
     /// Features list (for require/provide).
@@ -3405,6 +3420,15 @@ impl GcSettingSyms {
             memory_full: intern("memory-full"),
             startup_ceiling: intern("neomacs--startup-gc-ceiling-active"),
         }
+    }
+
+    fn all(&self) -> [SymId; 4] {
+        [
+            self.threshold,
+            self.percentage,
+            self.memory_full,
+            self.startup_ceiling,
+        ]
     }
 
     fn contains(&self, sym_id: SymId) -> bool {
@@ -4245,27 +4269,6 @@ impl Context {
         self.obarray
             .swap_plain_untrapped_value_id(id, value)
             .is_some()
-    }
-
-    /// Whether `publish_runtime_binding_write_by_id` would do anything for
-    /// `resolved` (an alias-resolved symbol): the union of the four
-    /// projections' own tests.  Lets a writer skip computing the value Lisp
-    /// sees -- a lexenv scan plus a full variable lookup -- for the vast
-    /// majority of symbols, which project to nothing.  GNU has no such
-    /// projection layer at all (its C globals ARE the value).
-    pub(crate) fn runtime_binding_has_projection(&self, resolved: SymId) -> bool {
-        resolved == self.quit_flag_symbol
-            || resolved == self.inhibit_quit_symbol
-            || resolved == self.throw_on_input_symbol
-            || resolved == self.compiler_function_overrides_symbol
-            || resolved == self.noninteractive_symbol
-            || resolved == self.symbols_with_pos_enabled_symbol
-            || resolved == self.print_symbols_bare_symbol
-            || resolved == max_lisp_eval_depth_symbol()
-            || resolved == input_decode_map_symbol()
-            || resolved == local_function_key_map_symbol()
-            || self.is_gc_runtime_setting_symbol(resolved)
-            || crate::buffer::buffer::variable_affects_display_by_sym_id(resolved)
     }
 
     #[inline(always)]
@@ -7870,6 +7873,8 @@ fn value_list_to_values(list: &Value) -> LispArgVec {
 // Tests
 // ---------------------------------------------------------------------------
 mod gc_pacing;
+
+mod runtime_projection;
 
 mod pdump_reconstruct;
 

@@ -24327,6 +24327,36 @@ fn compact_saved_binding_options_round_trip_none_and_live_values() {
 /// GNU's `union specbinding` is 32 bytes on the supported 64-bit Unix build.
 /// A bytecode call pushes one of these entries and Breturn immediately pops
 /// it, so matching GNU's four-word stride is part of the hot call protocol.
+/// The projection gate is a bitset over symbol ids; it must answer exactly as
+/// the comparison chain it replaced, for every symbol the obarray holds, once
+/// the GC settings are resolved (before that the chain answered false for
+/// them, and a write that then publishes does nothing extra).
+#[test]
+fn runtime_projection_mask_matches_the_comparison_chain() {
+    crate::test_utils::init_test_tracing();
+    let mut ev = Context::new();
+    ev.refresh_gc_runtime_settings_cache();
+    let mut projected = 0;
+    for id in 0..ev.obarray.len() as u32 {
+        let id = crate::emacs_core::intern::SymId(id);
+        let by_mask = ev.runtime_binding_has_projection(id);
+        assert_eq!(
+            by_mask,
+            ev.runtime_binding_has_projection_by_comparison(id),
+            "symbol id {} ({})",
+            id.0,
+            crate::emacs_core::intern::resolve_sym(id)
+        );
+        projected += usize::from(by_mask);
+    }
+    assert!(
+        projected > 40,
+        "the gate covers the display variables too ({projected})"
+    );
+    // Ids beyond the mask are not projected.
+    assert!(!ev.runtime_binding_has_projection(crate::emacs_core::intern::SymId(u32::MAX - 1)));
+}
+
 /// Every variable whose value this `Context` mirrors must answer true to the
 /// projection gate, or a write that consults the gate leaves the mirror
 /// stale -- and every mirrored `Value` must be a GC root, or the stale copy

@@ -2134,6 +2134,7 @@ impl Context {
             symbols_with_pos_enabled_symbol: core_eval_symbols.symbols_with_pos_enabled_symbol,
             symbols_with_pos_enabled,
             print_symbols_bare_symbol: core_eval_symbols.print_symbols_bare_symbol,
+            runtime_projection_mask: core_eval_symbols.runtime_projection_mask,
             print_symbols_bare,
             features: initial_feature_ids(),
             require_stack: Vec::new(),
