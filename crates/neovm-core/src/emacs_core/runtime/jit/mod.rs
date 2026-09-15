@@ -46,8 +46,8 @@
 //! | `NEOVM_JIT_DEBUG_ID` | Dump the bytecode body of the one compiled function with this id. |
 //! | `NEOVM_JIT_PROFILE` | Append per-function workload-characterization records to this file path. |
 //! | `NEOVM_JIT_COMPILE_STATS` | `=1`: print a running compile-stall summary line every 64 compiles. |
-//! | `NEOVM_JIT_SIZE_UNIT` | Override [`RuntimeState::SIZE_UNIT`] (64): the ops-per-unit divisor scaling the tier-up threshold by body size. |
-//! | `NEOVM_JIT_MAX_OPS` | Override [`RuntimeState::MAX_TIER_OPS`] (256): largest body that tiers at all; `0` = uncapped (the mid-end campaign's acceptance configuration). |
+//! | `NEOVM_JIT_SIZE_UNIT` | Override [`RuntimeState::SIZE_UNIT`] (512): the ops-per-unit divisor scaling the tier-up threshold by body size. |
+//! | `NEOVM_JIT_MAX_OPS` | Override [`RuntimeState::MAX_TIER_OPS`] (4096): largest body that tiers at all; `0` = uncapped (the mid-end campaign's acceptance configuration). |
 //! | `NEOVM_JIT_REGALLOC` | Force one Cranelift register allocator for every JIT compile: `backtracking` (regalloc2 ion) or `single_pass` (fastalloc). Unset = the policy in `lowering::choose_regalloc` (fast for straight-line bodies, full for loops/OSR, re-tier when hot). |
 //! | `NEOVM_JIT_PROFIT_DEFER` | Override [`RuntimeState::PROFIT_DEFER_FACTOR`] (4): a body the profitability gate refuses tiers up anyway at `factor × hot_threshold()` calls (`0` = never, the former veto). |
 //! | `NEOVM_JIT_RETIER_FACTOR` | Override [`RuntimeState::RETIER_FACTOR`] (16): a fast-allocator leaf is rebuilt with the full allocator at `factor × hot_threshold()` heat; `0` = never. |
@@ -779,7 +779,16 @@ impl RuntimeState {
     /// to compile and ran break-even natively, so a flat threshold paid the
     /// whole compile inside one fontification for nothing. V8's interrupt
     /// budget is the precedent for scaling tier-up by bytecode length.
-    pub const SIZE_UNIT: u32 = 64;
+    ///
+    /// 512 since 2026-09-15 (was 64), with [`Self::MAX_TIER_OPS`] raised to
+    /// 4096: the byte compiler's workhorses are big and called tens of times
+    /// per file — `byte-optimize-lapcode` is 2,528 ops and ~64 calls, which at
+    /// 64 ops a unit needed 39,000 calls, and `byte-compile-out-toplevel` (288
+    /// ops) was over the old cap — so they never left the interpreter. elb
+    /// bytecomp -11.5% instructions (50 compiles: 19.83G -> 17.54G, GNU
+    /// 16.0G), org-editing -3.7%, org-editing-heavy -0.7%; the other ELB rows
+    /// within noise; a 3-file compile pays +4.7% in compile time.
+    pub const SIZE_UNIT: u32 = 512;
 
     /// Default [`retier_heat`] factor: a leaf compiled with the fast register
     /// allocator (`lowering::RegallocChoice::Fast`) is rebuilt with the full
@@ -833,7 +842,11 @@ impl RuntimeState {
     /// the ENTRY tier for big bodies whose loops OSR anyway; lifting it is
     /// pending a real-workload A/B (byte-compile watch per the GATE_RELAX
     /// precedent) — see the mid-end campaign notes.
-    pub const MAX_TIER_OPS: u32 = 256;
+    ///
+    /// That A/B (2026-09-15, see [`Self::SIZE_UNIT`]) raised it to 4096: a
+    /// stall guard, not a profit gate, sized to admit the byte compiler's
+    /// 2,528-op `byte-optimize-lapcode`.
+    pub const MAX_TIER_OPS: u32 = 4096;
 
     /// [`dispatch`](Self::dispatch) with the tier-up budget scaled by the body
     /// size (`ops_len`): bodies above [`max_tier_ops`] never tier, and the hot
@@ -1315,7 +1328,8 @@ mod tests {
         if cap != 0 {
             let huge = Runtime::new();
             huge.set_hot_for_test();
-            for _ in 0..scaled {
+            let cap_calls = threshold.saturating_mul((cap / unit) as u32);
+            for _ in 0..cap_calls {
                 assert!(matches!(huge.dispatch_sized(cap + 1), Plan::Interpret));
             }
             assert!(matches!(huge.dispatch_sized(cap), Plan::Compiled));
