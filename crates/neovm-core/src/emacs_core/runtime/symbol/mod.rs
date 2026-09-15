@@ -2236,6 +2236,17 @@ impl Obarray {
         Some(old)
     }
 
+    /// Whether a write to `id` could be a bare `SET_SYMBOL_VAL`: an interned,
+    /// plain, untrapped, unprojected cell — the shape
+    /// [`Self::swap_plain_untrapped_value_id`] accepts, asked without storing
+    /// so a writer can run its own refusals first and so the writes that are
+    /// not plain (buffer-local, forwarded, watched) leave after one load.
+    #[inline]
+    pub(crate) fn is_plain_value_cell_id(&self, id: SymId) -> bool {
+        self.slot(id)
+            .is_some_and(|sym| sym.flags.is_plain_untrapped_unprojected() && sym.interned_global)
+    }
+
     /// Mark `id` as carrying a host projection (see
     /// `SymbolFlags::RUNTIME_PROJECTED_BIT`).  Armed at `Context`
     /// construction, not carried by a dump image.

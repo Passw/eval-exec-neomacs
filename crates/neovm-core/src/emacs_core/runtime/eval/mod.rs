@@ -4208,6 +4208,45 @@ impl Context {
         self.mark_redisplay_dirty_if_display_var_resolved(resolved);
     }
 
+    /// GNU `set_internal`'s `SYMBOL_PLAINVAL` arm — `SET_SYMBOL_VAL` and
+    /// return — for the one shape where neomacs' general write path would
+    /// reach the same single store: an interned, plain, untrapped cell that
+    /// is not a keyword and that no host projection mirrors. Returns `false`
+    /// (having written nothing) for anything else, which then takes
+    /// `assign_var_id`'s full path.
+    ///
+    /// Every refusal matches a step of the general path the store would
+    /// otherwise skip:
+    /// - not `Plainval` (alias, buffer-local, forwarded): a different cell;
+    /// - `NoWrite`: the setting-constant rule, including a keyword's silent
+    ///   self-assign. A keyword needs no test of its own: it is marked
+    ///   `NoWrite` when it becomes a global member (GNU `intern_sym`), and
+    ///   the fast path requires membership — asserted in debug builds;
+    /// - `Trapped`: variable watchers;
+    /// - a projection (`runtime_binding_has_projection`, the union of what
+    ///   `publish_runtime_binding_write_by_resolved_id` republishes: cached
+    ///   quit/inhibit flags, GC settings, keyboard maps, display variables)
+    ///   or the flag byte's own projected bit (`buffer-undo-list`);
+    /// - not a global member: the general store marks membership first.
+    ///
+    /// A plain cell has no forward type to check, and nothing here allocates
+    /// or reaches a safe point, so the value needs no rooting. The general
+    /// path costs ~800 instructions per write; GNU's `Bvarset` on a plain
+    /// cell, a handful.
+    #[inline]
+    pub(crate) fn try_set_plain_variable(&mut self, id: SymId, value: Value) -> bool {
+        if !self.obarray.is_plain_value_cell_id(id) || self.runtime_binding_has_projection(id) {
+            return false;
+        }
+        debug_assert!(
+            !crate::emacs_core::intern::is_keyword_id(id),
+            "an interned keyword is NoWrite, never a plain value cell"
+        );
+        self.obarray
+            .swap_plain_untrapped_value_id(id, value)
+            .is_some()
+    }
+
     /// Whether `publish_runtime_binding_write_by_id` would do anything for
     /// `resolved` (an alias-resolved symbol): the union of the four
     /// projections' own tests.  Lets a writer skip computing the value Lisp
@@ -7874,6 +7913,10 @@ mod jit_known_fixnum_float_tests;
 #[cfg(test)]
 #[path = "tests/jit_mir_known_fixnum_float.rs"]
 mod jit_mir_known_fixnum_float_tests;
+// `setq` of a special variable: the plain-cell fast path and every shape it must refuse.
+#[cfg(test)]
+#[path = "tests/varset_plain_fast_path.rs"]
+mod varset_plain_fast_path_tests;
 
 /// Allocator for [`Context::context_instance_id`].
 fn next_context_instance_id() -> u64 {

@@ -985,6 +985,15 @@ pub extern "C" fn neovm_jit_varset(ctx: *mut u8, sym: i64, val: i64) -> i64 {
     jit_shim_contain!(ctx, STATUS_SIGNAL, {
         use crate::emacs_core::intern::SymId;
         let value = Value::from_bits(val as usize);
+        {
+            // SAFETY: see neovm_jit_call's function-level contract.
+            let ctx = unsafe { &mut *(ctx as *mut Context) };
+            // A plain cell: one store, no safe point, so no scratch roots and
+            // no `Vm` (see `Context::try_set_plain_variable`).
+            if ctx.try_set_plain_variable(SymId(sym as u32), value) {
+                return STATUS_OK;
+            }
+        }
         let saved = save_scratch_gc_roots();
         push_scratch_gc_root(value);
         // SAFETY: see neovm_jit_call's function-level contract.

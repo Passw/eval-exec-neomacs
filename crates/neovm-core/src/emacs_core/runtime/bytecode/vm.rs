@@ -4007,10 +4007,14 @@ impl<'a> Vm<'a> {
                     Op::VarSet(idx) => {
                         let name_id = sym_id_at(constants, *idx);
                         let val = stk!().pop().unwrap_or(Value::NIL);
-                        let extra = [val];
-                        vm_try!(self.with_frame_roots(func, &extra, |vm| {
-                            vm.assign_var_id(name_id, val)
-                        },));
+                        // A plain cell is one store that cannot reach a safe
+                        // point, so it needs none of the frame rooting below.
+                        if !self.ctx.try_set_plain_variable(name_id, val) {
+                            let extra = [val];
+                            vm_try!(self.with_frame_roots(func, &extra, |vm| {
+                                vm.assign_var_id(name_id, val)
+                            },));
+                        }
                     }
                     Op::VarBind(idx) => {
                         // GNU bytecode.c Bvarbind: `specbind (vectorp[arg], POP);`
@@ -5961,6 +5965,15 @@ impl<'a> Vm<'a> {
     /// Like `Bvarref`, bytecode assignment is dynamic.  Lexical bytecode
     /// locals are stack slots, not `varset` targets.
     fn assign_var_id(&mut self, name_id: SymId, value: Value) -> Result<(), Flow> {
+        // The general `Bvarset`. Both callers (the `Op::VarSet` arm and the JIT
+        // `varset` shim) have already offered the write to
+        // `Context::try_set_plain_variable` — the one-store path for a plain
+        // cell — before paying their rooting, so it is not repeated here.
+        debug_assert!(
+            !self.ctx.obarray.is_plain_value_cell_id(name_id)
+                || self.ctx.runtime_binding_has_projection(name_id),
+            "a plain unprojected cell must have taken the fast path"
+        );
         let resolved = crate::emacs_core::builtins::symbols::resolve_variable_alias_id_in_obarray(
             &self.ctx.obarray,
             name_id,
