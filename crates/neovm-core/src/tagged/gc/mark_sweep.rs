@@ -107,6 +107,7 @@ impl TaggedHeap {
         // start-of-cycle reachability (a carried-over entry would wrongly suppress
         // the snapshot of an owner whose children differ this cycle).
         self.satb_snapshotted_owners.clear();
+        clear_barrier_cache(&TAGGED_HEAP_SATB_CACHE);
         // CONCURRENT STRING MARKING: same per-cycle reset for the enforced
         // in-mutator string interval pre-image dedup (`note_string_interval_preimage`).
         self.satb_string_preimage_addrs.clear();

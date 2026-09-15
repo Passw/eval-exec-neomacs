@@ -1001,8 +1001,9 @@ pub fn set_tagged_heap(heap: &mut TaggedHeap) {
     TAGGED_HEAP_PARTITION_ACTIVE.with(|p| p.set(heap.partition_dump));
     TAGGED_HEAP_CONCURRENT_ACTIVE.with(|c| c.set(heap.concurrent_mark_running));
     TAGGED_HEAP_DUMP_SPAN.with(|s| s.set((heap.dump_addr_lo, heap.dump_addr_hi)));
-    // Owner bits are heap-specific: a different heap invalidates the cache.
-    TAGGED_HEAP_LAST_REMEMBERED.with(|l| l.set(0));
+    // Owner bits are heap-specific: a different heap invalidates the caches.
+    clear_barrier_cache(&TAGGED_HEAP_REMEMBERED_CACHE);
+    clear_barrier_cache(&TAGGED_HEAP_SATB_CACHE);
 }
 
 /// Uninstall `heap` from this thread's allocation slot, if it is the heap
@@ -1028,7 +1029,8 @@ pub fn clear_tagged_heap_if_installed(heap: &TaggedHeap) {
             TAGGED_HEAP_PARTITION_ACTIVE.with(|p| p.set(false));
             TAGGED_HEAP_CONCURRENT_ACTIVE.with(|c| c.set(false));
             TAGGED_HEAP_DUMP_SPAN.with(|s| s.set((usize::MAX, 0)));
-            TAGGED_HEAP_LAST_REMEMBERED.with(|l| l.set(0));
+            clear_barrier_cache(&TAGGED_HEAP_REMEMBERED_CACHE);
+            clear_barrier_cache(&TAGGED_HEAP_SATB_CACHE);
         }
     });
 }
@@ -1099,7 +1101,15 @@ pub fn note_heap_slot_write(
     note_heap_write_record(HeapWriteRecord::slot(owner, kind, slot, value));
 }
 
-#[inline]
+/// The barrier's inline part: the rejects that decide most writes — no
+/// barrier needed at all, or a cons owner outside the dump span, which is
+/// every `setcar`/`setcdr` of a list loop — before a call.
+///
+/// `#[inline(always)]` is load-bearing: this body is inlined into every heap
+/// store (`set_cons_car`, `set_vector_slot`, ...), and when the outlined
+/// rejects below lived here it grew past LLVM's threshold and every `setcar`
+/// made a call (elb inclist +9% instructions).
+#[inline(always)]
 pub(super) fn note_heap_write_record(record: HeapWriteRecord) {
     if !record.owner.is_heap_object() {
         return;
@@ -1115,26 +1125,48 @@ pub(super) fn note_heap_write_record(record: HeapWriteRecord) {
     if disabled && !partition && !concurrent {
         return;
     }
-    if disabled && !concurrent {
-        // Partition-only path: the barrier's sole job is the append-only dump
-        // remembered set (see `record_heap_write`), so two cheap thread-local
-        // rejects apply. (1) A repeat of the last-inserted owner has nothing
-        // to add — its entry is permanent. (2) A cons owner's decision is the
-        // dump-span test alone (`value_is_tenured` is always false for cons,
-        // and neither an address nor the span ever changes), so a cons outside
-        // the span never needs the heap at all.
-        let bits = record.owner.bits();
-        if TAGGED_HEAP_LAST_REMEMBERED.with(|l| l.get()) == bits {
+    if disabled && !concurrent && record.owner.is_cons() {
+        // Partition-only path: a cons is never tenured, so outside the dump
+        // span it is never inserted into the remembered set (see below).
+        let addr = record.owner.bits() & !crate::tagged::value::TAG_MASK;
+        let (lo, hi) = TAGGED_HEAP_DUMP_SPAN.with(|s| s.get());
+        if addr < lo || addr >= hi {
             return;
         }
-        if record.owner.is_cons()
+    }
+    note_heap_write_record_slow(record, disabled, concurrent);
+}
+
+#[inline(never)]
+fn note_heap_write_record_slow(record: HeapWriteRecord, disabled: bool, concurrent: bool) {
+    let bits = record.owner.bits();
+    if disabled && !concurrent {
+        // Partition-only path: the barrier's sole job is the append-only dump
+        // remembered set (see `record_heap_write`), whose only effect here is
+        // inserting a mapped or tenured owner, so two cheap thread-local
+        // rejects apply. (1) An owner already inserted has nothing to add —
+        // its entry is permanent. (2) A non-cons owner outside the dump span
+        // that is not tenured is not inserted: it points at a `GcHeader`
+        // whose `tenured` byte is exactly what `value_is_tenured` reads.
+        if TAGGED_HEAP_REMEMBERED_CACHE.with(|slots| slots[barrier_cache_slot(bits)].get()) == bits
+        {
+            return;
+        }
+        if !record.owner.is_cons()
             && let Some(addr) = TaggedHeap::value_heap_addr(record.owner)
         {
             let (lo, hi) = TAGGED_HEAP_DUMP_SPAN.with(|s| s.get());
-            if addr < lo || addr >= hi {
+            if (addr < lo || addr >= hi) && !unsafe { (*(addr as *const GcHeader)).tenured } {
                 return;
             }
         }
+    } else if disabled
+        && !record.owner.is_cons()
+        && TAGGED_HEAP_SATB_CACHE.with(|slots| slots[barrier_cache_slot(bits)].get()) == bits
+    {
+        // Concurrent mark, owner tracking off: this owner's pre-image is
+        // already logged this cycle (see `TAGGED_HEAP_SATB_CACHE`).
+        return;
     }
     with_tagged_heap(|heap| heap.record_heap_write(record));
 }

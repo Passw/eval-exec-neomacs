@@ -404,6 +404,7 @@ impl TaggedHeap {
         // interval tables mid-cycle (their wrapper barriers land the owner
         // in the same set).
         let written = std::mem::take(&mut self.satb_snapshotted_owners);
+        clear_barrier_cache(&TAGGED_HEAP_SATB_CACHE);
         for bits in written {
             self.push_value_children_to_gray(TaggedValue(bits), "satb-written-retrace");
         }
@@ -476,8 +477,12 @@ impl TaggedHeap {
         debug_assert!(self.gray_queue.is_empty());
         // Multi-child owners are deduped once per cycle; conses fall through to
         // the cheap direct enumeration below.
-        if !owner.is_cons() && !self.satb_snapshotted_owners.insert(owner.bits()) {
-            return; // this owner's full pre-image was already logged this cycle
+        if !owner.is_cons() {
+            let bits = owner.bits();
+            TAGGED_HEAP_SATB_CACHE.with(|slots| slots[barrier_cache_slot(bits)].set(bits));
+            if !self.satb_snapshotted_owners.insert(bits) {
+                return; // this owner's full pre-image was already logged this cycle
+            }
         }
         self.push_value_children_to_gray(owner, "satb-concurrent");
         if !self.gray_queue.is_empty() {

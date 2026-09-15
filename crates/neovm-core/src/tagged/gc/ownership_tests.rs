@@ -3037,3 +3037,86 @@ fn finalizer_cycle_passes_partition_verifier() {
         TaggedValue::fixnum(46).0,
     );
 }
+
+/// The write barrier's thread-local caches answer exactly what the heap
+/// would, without asking it: a tenured owner already in the remembered set
+/// and a young owner outside the dump need nothing on the partition-only
+/// path, and during a concurrent mark an owner whose pre-image this cycle
+/// already logged needs nothing more — until the next cycle begins.
+#[test]
+fn write_barrier_caches_skip_only_writes_with_nothing_to_record() {
+    crate::test_utils::init_test_tracing();
+    let mut heap = TaggedHeap::new();
+    set_tagged_heap(&mut heap);
+    heap.extend_dump_span(4096, 16);
+    let owners: Vec<TaggedValue> = (0..5)
+        .map(|_| heap.alloc_vector(vec![TaggedValue::NIL; 2]))
+        .collect();
+    let mut root = TaggedValue::NIL;
+    for &owner in &owners {
+        root = heap.alloc_cons(owner, root);
+    }
+    // The first partition cycle tenures every survivor.
+    heap.collect_exact(std::iter::once(root));
+    assert!(owners.iter().all(|&owner| heap.value_is_tenured(owner)));
+    let calls = || RECORD_HEAP_WRITE_CALLS.with(|c| c.get());
+
+    // Partition-only: each tenured owner reaches the heap once, in any order.
+    let before = calls();
+    for round in 0..10 {
+        for &owner in &owners {
+            let child = heap.alloc_cons(TaggedValue::fixnum(round), TaggedValue::NIL);
+            assert!(crate::tagged::mutate::set_vector_slot(owner, 0, child));
+        }
+    }
+    assert_eq!(calls() - before, owners.len());
+    for &owner in &owners {
+        assert!(heap.mapped_remembered.contains(&owner.bits()));
+    }
+    // A young owner has nothing to record at all.
+    let young = heap.alloc_vector(vec![TaggedValue::NIL; 2]);
+    assert!(!heap.value_is_tenured(young));
+    let before = calls();
+    for i in 0..10 {
+        let child = heap.alloc_cons(TaggedValue::fixnum(i), TaggedValue::NIL);
+        assert!(crate::tagged::mutate::set_vector_slot(young, 0, child));
+    }
+    assert_eq!(calls(), before);
+    assert!(!heap.mapped_remembered.contains(&young.bits()));
+
+    // Concurrent mark: an owner's first write logs its pre-image, the rest
+    // of the cycle's writes by it have nothing to add.
+    let arm = |heap: &mut TaggedHeap, on: bool| {
+        heap.concurrent_mark_running = on;
+        TAGGED_HEAP_CONCURRENT_ACTIVE.with(|c| c.set(on));
+    };
+    arm(&mut heap, true);
+    let before = calls();
+    for i in 0..10 {
+        let child = heap.alloc_cons(TaggedValue::fixnum(i), TaggedValue::NIL);
+        assert!(crate::tagged::mutate::set_vector_slot(young, 1, child));
+    }
+    assert_eq!(calls() - before, 1);
+    assert!(heap.satb_snapshotted_owners.contains(&young.bits()));
+    arm(&mut heap, false);
+
+    // The next cycle logs the owner's pre-image again.
+    heap.satb_shared.lock().unwrap().clear();
+    heap.begin_collection();
+    heap.seed_root(root);
+    heap.seed_root(young);
+    let bytes_before = heap.live_bytes();
+    heap.incremental_drain_all();
+    heap.incremental_finish(bytes_before, std::time::Instant::now());
+    heap.finish_incremental_sweep_now();
+    arm(&mut heap, true);
+    let before = calls();
+    let child = heap.alloc_cons(TaggedValue::fixnum(99), TaggedValue::NIL);
+    assert!(crate::tagged::mutate::set_vector_slot(young, 1, child));
+    assert_eq!(
+        calls() - before,
+        1,
+        "a new cycle must log the pre-image anew"
+    );
+    arm(&mut heap, false);
+}

@@ -183,16 +183,48 @@ thread_local! {
     /// barrier's partition-only path can span-test a cons owner without
     /// dereferencing the heap. `(usize::MAX, 0)` = empty span.
     static TAGGED_HEAP_DUMP_SPAN: Cell<(usize, usize)> = const { Cell::new((usize::MAX, 0)) };
-    /// The owner most recently inserted into `mapped_remembered`. That set is
-    /// append-only for the life of the heap ("permanent root"), so a repeat
-    /// write by the same owner has nothing to add on the partition-only path
-    /// (owner tracking Disabled, no concurrent mark — both re-checked before
-    /// this cache is consulted). Reset whenever a heap is (re)installed.
-    static TAGGED_HEAP_LAST_REMEMBERED: Cell<usize> = const { Cell::new(0) };
+    /// Owners already inserted into `mapped_remembered`, direct-mapped by
+    /// [`barrier_cache_slot`]. That set is append-only for the life of the heap
+    /// ("permanent root") and its owners (mapped or tenured) are never freed,
+    /// so a hit means a write by that owner has nothing to add on the
+    /// partition-only path (owner tracking Disabled, no concurrent mark — both
+    /// re-checked before this cache is consulted). One entry used to be kept;
+    /// elb nbody writes five tenured body vectors in turn and missed a third
+    /// of the time. Cleared whenever a heap is (re)installed.
+    static TAGGED_HEAP_REMEMBERED_CACHE: [Cell<usize>; BARRIER_CACHE_SLOTS] =
+        const { [const { Cell::new(0) }; BARRIER_CACHE_SLOTS] };
+    /// Non-cons owners already in this cycle's `satb_snapshotted_owners`,
+    /// direct-mapped like the remembered cache. During a concurrent mark a
+    /// write by such an owner has nothing to add: its pre-image was logged at
+    /// its first write this cycle, and that same `record_heap_write` made any
+    /// remembered-set insert (tenure cannot change inside a mark). Cleared
+    /// with the set (`begin_collection`, the termination's take) and whenever
+    /// a heap is (re)installed.
+    static TAGGED_HEAP_SATB_CACHE: [Cell<usize>; BARRIER_CACHE_SLOTS] =
+        const { [const { Cell::new(0) }; BARRIER_CACHE_SLOTS] };
     /// Auto-allocated heap for tests that construct Values without a Context.
     #[cfg(test)]
     static TEST_FALLBACK_TAGGED_HEAP: std::cell::RefCell<Option<Box<TaggedHeap>>> =
         const { std::cell::RefCell::new(None) };
+}
+
+const BARRIER_CACHE_SLOTS: usize = 64;
+
+#[cfg(test)]
+thread_local! {
+    /// Writes the barrier's thread-local rejects passed on to the heap.
+    static RECORD_HEAP_WRITE_CALLS: Cell<usize> = const { Cell::new(0) };
+}
+
+/// The write-barrier caches' slot for an owner's bits (heap addresses are
+/// 8-aligned, so the low tag bits carry nothing).
+#[inline(always)]
+fn barrier_cache_slot(bits: usize) -> usize {
+    ((bits >> 4) ^ (bits >> 12)) & (BARRIER_CACHE_SLOTS - 1)
+}
+
+fn clear_barrier_cache(cache: &'static std::thread::LocalKey<[Cell<usize>; BARRIER_CACHE_SLOTS]>) {
+    cache.with(|slots| slots.iter().for_each(|slot| slot.set(0)));
 }
 
 static NEXT_TAGGED_HEAP_ID: AtomicUsize = AtomicUsize::new(1);
@@ -1380,6 +1412,8 @@ impl TaggedHeap {
     }
 
     fn record_heap_write(&mut self, record: HeapWriteRecord) {
+        #[cfg(test)]
+        RECORD_HEAP_WRITE_CALLS.with(|calls| calls.set(calls.get() + 1));
         // Dump partition: a mutated dumped object may now hold heap children,
         // so remember it as a permanent root. Conservative — a false positive
         // (a heap owner inside the dump address span) just adds a redundant
@@ -1388,10 +1422,11 @@ impl TaggedHeap {
         if self.partition_dump
             && (self.owner_is_mapped(record.owner) || self.value_is_tenured(record.owner))
         {
-            self.mapped_remembered.insert(record.owner.bits());
+            let bits = record.owner.bits();
+            self.mapped_remembered.insert(bits);
             // Arm the barrier's repeat-owner reject: this entry is permanent,
             // so the partition-only path can skip the same owner's next write.
-            TAGGED_HEAP_LAST_REMEMBERED.with(|l| l.set(record.owner.bits()));
+            TAGGED_HEAP_REMEMBERED_CACHE.with(|slots| slots[barrier_cache_slot(bits)].set(bits));
         }
         // SATB (snapshot-at-the-beginning) barrier. Runs BEFORE the store, so the
         // owner's current children are its PRE-overwrite values; logging them
