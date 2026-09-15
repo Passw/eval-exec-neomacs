@@ -1107,6 +1107,7 @@ pub(crate) fn lower_mir_inst_via_baseline(
     reloc_base: Option<ClifValue>,
     reloc_index: &std::collections::HashMap<usize, u32>,
     aot: bool,
+    max_call_args: usize,
 ) -> Result<(), CompileError> {
     use mir::MirOp;
     let bail = |key: String| {
@@ -1158,6 +1159,10 @@ pub(crate) fn lower_mir_inst_via_baseline(
         "operand count follows simple_effect: {op:?}"
     );
     let safepoint = matches!(inst.op, MirOp::Opaque { .. });
+    debug_assert!(
+        !safepoint || needs <= max_call_args,
+        "the call-args slot ({max_call_args} words) holds this op's {needs} operands: {op:?}"
+    );
     let mut stack: Vec<ClifValue> = if safepoint {
         let base = inst.pre_stack.len();
         if base < needs || inst.pre_stack[base - needs..] != args[..] {
@@ -2283,6 +2288,7 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
                                     reloc_base,
                                     reloc_index,
                                     aot,
+                                    plan.max_call_args,
                                 )?;
                                 continue;
                             }
@@ -2491,6 +2497,7 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
                             reloc_base,
                             reloc_index,
                             aot,
+                            plan.max_call_args,
                         )?;
                     }
                 }

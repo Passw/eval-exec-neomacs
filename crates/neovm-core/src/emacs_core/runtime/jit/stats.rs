@@ -74,8 +74,8 @@ pub(crate) struct CompileStats {
     pub mir_lower_failed: u64,
     /// Built (and inlined), but the tier gate sent it to the baseline before
     /// lowering — keyed `gate:*` in the bail census: a Float-feedback site, a
-    /// loop with a shim-lowered op, or a generic call in a body that inlined
-    /// nothing.
+    /// loop with a shim-lowered op, a generic call left after inlining, or a
+    /// shim-lowered op in a body that inlined a callee.
     pub mir_tier_rejected: u64,
     /// Actually took the MIR tier.
     pub mir_taken: u64,

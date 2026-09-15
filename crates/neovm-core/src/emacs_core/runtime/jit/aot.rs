@@ -847,6 +847,22 @@ fn resolve_reloc_from_descriptor(
 ///     upstream: `write_value_recipe` bails → `leaf_content_hash` is `None`.
 ///
 /// A rejected body stays JIT-only (strictly additive).
+/// Whether the MIR lowering would route any instruction through the
+/// baseline-emitter adapter (`lower_mir_inst_via_baseline`): an `eq`, a
+/// shim predicate, or an `Opaque` other than `Call`/`Apply`.
+fn uses_mir_adapter(m: &mir::MirFunction) -> bool {
+    use mir::{MirOp, PredKind};
+    m.blocks
+        .iter()
+        .flat_map(|b| b.insts.iter())
+        .any(|i| match &i.op {
+            MirOp::Eq(..)
+            | MirOp::Pred(PredKind::Symbolp | PredKind::Integerp | PredKind::Numberp, _) => true,
+            MirOp::Opaque { op, .. } => !matches!(op, Op::Call(_) | Op::Apply(_)),
+            _ => false,
+        })
+}
+
 fn mir_is_aot_runnable(m: &mir::MirFunction) -> bool {
     use mir::MirOp;
     // Reject the sym-bearing opaque ops (audit #17): their Debug-keyed hash
@@ -1012,6 +1028,13 @@ fn prepare_leaf_emit(
         Err(_) => return Ok(None), // not MIR-lowerable → JIT-only.
     };
     if !mir_is_aot_runnable(&m) {
+        return Ok(None);
+    }
+    // The MIR tier's baseline-emitter adapter has no AOT parity coverage, and
+    // a MIR loop has no back-edge poll: keep the AOT MIR population exactly
+    // what it was before the adapter — shim-free bodies plus `Call`/`Apply`
+    // (whose shims poll quit). Anything else stays JIT-only here.
+    if uses_mir_adapter(&m) {
         return Ok(None);
     }
     // Reloc consts → rebuild recipe (R1c-3), in the SAME order the lowering

@@ -871,7 +871,25 @@ fn mir_rooting_skip_on_an_inferred_fixnum_param_across_an_allocating_call() {
         rest: None,
     });
     g.lexical = true;
-    g.ops = vec![Op::Dup, Op::Cons, Op::Return];
+    // (lambda (y) (garbage-collect) (make-list 4096 0)): an exact collection,
+    // then a reallocation that reuses any freed cell.
+    g.ops = vec![
+        Op::Constant(0),
+        Op::Call(0),
+        Op::Pop,
+        Op::Constant(1),
+        Op::Constant(2),
+        Op::Constant(3),
+        Op::Call(2),
+        Op::Return,
+    ];
+    g.constants = vec![
+        Value::symbol("garbage-collect"),
+        Value::symbol("make-list"),
+        Value::make_int(4096),
+        Value::make_int(0),
+    ]
+    .into();
     g.max_stack = 16;
     ev.obarray
         .set_symbol_function_id(g_id, Value::make_bytecode(g));
@@ -891,9 +909,12 @@ fn mir_rooting_skip_on_an_inferred_fixnum_param_across_an_allocating_call() {
         Op::Constant(3),  // 6: sq              [c i g sq]
         Op::StackRef(2),  // 7: i               [c i g sq i]
         Op::Call(1),      // 8: (sq i)          [c i g r]
-        Op::Call(1),      // 9: (g r) residual = [c i]
+        Op::Call(1),      // 9: (g r) residual = [c i]: c heap, i Fixnum
         Op::Pop,          // 10                 [c i]
-        Op::Return,       // 11: i
+        Op::StackRef(1),  // 11: c              [c i c]
+        Op::StackRef(1),  // 12: i              [c i c i]
+        Op::Cons,         // 13: (c . i)        [c i p]
+        Op::Return,       // 14
     ];
     f.constants = vec![Value::make_int(1), Value::make_int(2), g_sym, sq_sym].into();
     f.max_stack = 16;
@@ -933,12 +954,29 @@ fn mir_rooting_skip_on_an_inferred_fixnum_param_across_an_allocating_call() {
     let leaf = lower_mir_pure(&mir).expect("F lowers in the MIR tier");
     assert_eq!(leaf.tier, super::leaf::LeafTier::Mir);
     assert!(leaf.has_side_effects, "F keeps the residual call to g");
-    for (c, want) in [(Value::T, 1i64), (Value::NIL, 2)] {
-        match leaf.call(ctx as *mut u8, &[c]) {
-            NativeRun::Ok(bits) => assert_eq!(bits, Value::make_int(want).bits(), "F({c:?})"),
-            other => panic!("F({c:?}): expected Ok({want}), got {other:?}"),
-        }
+    for _ in 0..3 {
+        // c non-nil: a fresh heap list that only the residual root keeps alive
+        // across g's exact collection.
+        let c = ev.eval_str("(list 7 8 9)").expect("c");
+        let NativeRun::Ok(bits) = leaf.call(ctx as *mut u8, &[c]) else {
+            panic!("F(list) must run natively");
+        };
+        let p = Value::from_bits(bits);
+        assert!(p.is_cons());
+        let c2 = p.cons_car();
+        assert!(c2.is_cons(), "c survived the collection (got {c2:?})");
+        assert_eq!(c2.cons_car(), Value::make_int(7), "c's contents intact");
+        assert_eq!(
+            p.cons_cdr(),
+            Value::make_int(1),
+            "i = 1 on the non-nil path"
+        );
     }
+    let NativeRun::Ok(bits) = leaf.call(ctx as *mut u8, &[Value::NIL]) else {
+        panic!("F(nil) must run natively");
+    };
+    let p = Value::from_bits(bits);
+    assert!(p.cons_car().is_nil() && p.cons_cdr() == Value::make_int(2));
 }
 
 #[test]
@@ -2543,6 +2581,138 @@ fn baseline_reg_args_fallback_stores_do_not_leak_into_the_next_site() {
     );
 }
 
+/// The tier gate, through the production compile path. A loop with a
+/// shim-lowered op goes to the baseline (the MIR tier has no back-edge
+/// poll), although the MIR lowering itself accepts it; the same op outside
+/// a loop takes the MIR tier.
+#[test]
+fn tier_gate_sends_a_loop_with_a_shim_op_to_the_baseline() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::intern::SymId;
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    // (lambda (n l) (let ((i 0)) (while (< i n) (length l) (setq i (1+ i))) i))
+    let loop_ops = vec![
+        Op::Constant(0),   // 0: i = 0     [n l i]
+        Op::StackRef(0),   // 1: i (head)  [n l i i]
+        Op::StackRef(3),   // 2: n         [n l i i n]
+        Op::Lss,           // 3            [n l i c]
+        Op::GotoIfNil(12), // 4            [n l i]
+        Op::StackRef(1),   // 5: l         [n l i l]
+        Op::Length,        // 6            [n l i len]
+        Op::Pop,           // 7            [n l i]
+        Op::StackRef(0),   // 8: i         [n l i i]
+        Op::Add1,          // 9            [n l i i1]
+        Op::StackSet(1),   // 10           [n l i1]
+        Op::Goto(1),       // 11
+        Op::Return,        // 12: i
+    ];
+    let mut f = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(1), SymId(2)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    f.lexical = true;
+    f.ops = loop_ops.clone();
+    f.constants = vec![Value::make_int(0)].into();
+    f.max_stack = 16;
+    let mir = mir::build_mir(&loop_ops, &f.constants, 2).expect("MIR builds");
+    assert!(
+        lower_mir_pure(&mir).is_ok(),
+        "the MIR lowering accepts the loop, so the gate is what rejects it"
+    );
+    let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+    assert_eq!(
+        leaf.tier,
+        super::leaf::LeafTier::Baseline,
+        "gate:loop-opaque"
+    );
+    let l = ev.eval_str("(list 1 2)").expect("l");
+    match leaf.call(ctx, &[Value::make_int(5), l]) {
+        NativeRun::Ok(bits) => assert_eq!(bits, Value::make_int(5).bits()),
+        other => panic!("loop: {other:?}"),
+    }
+    // The same op, loop-free: the MIR tier.
+    let mut g = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(1)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    g.lexical = true;
+    g.ops = vec![Op::StackRef(0), Op::Length, Op::Return];
+    g.max_stack = 16;
+    let leaf = compile_bytecode_function_with(&g, Some(&ev.obarray)).expect("compiles");
+    assert_eq!(leaf.tier, super::leaf::LeafTier::Mir);
+    let l = ev.eval_str("(list 1 2 3)").expect("l");
+    match leaf.call(ctx, &[l]) {
+        NativeRun::Ok(bits) => assert_eq!(bits, Value::make_int(3).bits()),
+        other => panic!("length: {other:?}"),
+    }
+}
+
+/// `gate:inline-opaque`: a body that inlines `f` and then redefines it through
+/// an adapter op must not run the stale inlined copy. The epoch check that
+/// guards inlining runs only at ENTRY.
+///
+///     (lambda (x new) (fset 'f new) (f x))   ; f = (lambda (y) (1+ y)) at compile time
+///
+/// Called with new = (lambda (y) (1- y)): GNU and the interpreter give 4.
+#[test]
+fn tier_gate_keeps_an_inlining_body_free_of_shim_ops() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::intern::SymId;
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    let f_sym = Value::symbol("jit-gate-redefined-f");
+    let crate::emacs_core::value::ValueKind::Symbol(f_id) = f_sym.kind() else {
+        panic!("symbol");
+    };
+    let unary = |op: Op| {
+        let mut b = ByteCodeFunction::new(LambdaParams {
+            required: vec![SymId(1)],
+            optional: Vec::new(),
+            rest: None,
+        });
+        b.lexical = true;
+        b.ops = vec![Op::StackRef(0), op, Op::Return];
+        b.max_stack = 16;
+        Value::make_bytecode(b)
+    };
+    let inc = unary(Op::Add1);
+    let dec = unary(Op::Sub1);
+    ev.obarray.set_symbol_function_id(f_id, inc);
+    let mut bar = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(2), SymId(3)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    bar.lexical = true;
+    bar.ops = vec![
+        Op::Constant(0), // 'f           [x new f]
+        Op::StackRef(1), // new          [x new f new]
+        Op::Fset,        //              [x new r]
+        Op::Pop,         //              [x new]
+        Op::Constant(0), // 'f           [x new f]
+        Op::StackRef(2), // x            [x new f x]
+        Op::Call(1),     // (f x)        [x new r]
+        Op::Return,
+    ];
+    bar.constants = vec![f_sym].into();
+    bar.max_stack = 16;
+    let leaf = compile_bytecode_function_with(&bar, Some(&ev.obarray)).expect("compiles");
+    assert_eq!(
+        leaf.tier,
+        super::leaf::LeafTier::Baseline,
+        "an inlining body with an fset stays on the baseline"
+    );
+    match leaf.call(ctx, &[Value::make_int(5), dec]) {
+        NativeRun::Ok(bits) => assert_eq!(bits, Value::make_int(4).bits(), "(f 5) after fset is 4"),
+        other => panic!("bar: {other:?}"),
+    }
+}
+
 /// A cons-only body has no rooting site (the cons shim is context-free), so
 /// nothing is hoisted and it still runs with a null vmctx.
 #[test]
@@ -2599,10 +2769,8 @@ fn mir_adapter_lowers_a_variable_read() {
 #[test]
 fn mir_adapter_deopt_after_a_varset_resumes_past_it() {
     use crate::emacs_core::eval::Context;
-    // The harness reads the knob once per process; nextest runs each test in
-    // its own process, so set it before the first compile.
-    // SAFETY: single-threaded test process, set before any reader.
-    unsafe { std::env::set_var("NEOVM_JIT_FORCE_DEOPT", "1") };
+    // Every guard fails, for compiles on this thread only.
+    crate::emacs_core::jit::compile::force_deopt_for_test(true);
     let mut ev = Context::new();
     let ctx = &mut ev as *mut Context as *mut u8;
     let sym = Value::symbol("jit-mir-adapter-set");
@@ -2669,30 +2837,37 @@ fn mir_adapter_sizes_the_args_slot_for_a_wide_list() {
     assert!(l.is_nil());
 }
 
-/// No cons scalar replacement in an Opaque-bearing body: the framestate and
-/// the residual roots must hold REAL values. `(let ((p (cons (list a) b)))
-/// (length b) (car p))` keeps `p` live across the `length` shim, and under GC
-/// stress the fresh list must survive it.
+/// No cons scalar replacement in an Opaque-bearing body, and the adapter's
+/// residual rooting holds across a shim that REALLY collects:
+///
+///     (lambda (a b) (let ((p (cons (list a) b))) (garbage-collect) (make-list 4096 0) (car p)))
+///
+/// `p` is live across both builtin calls only through the residual stack.
+/// `garbage-collect` is an exact collection (it ignores the native stack),
+/// and the `make-list` reallocation reuses any cell it freed, so a missing
+/// root reads back garbage instead of `(42)`.
 #[test]
 fn mir_adapter_keeps_conses_real_across_a_shim() {
     use crate::emacs_core::eval::Context;
+    use crate::emacs_core::intern::intern;
     let mut ev = Context::new();
-    ev.gc_stress = true;
     let ctx = &mut ev as *mut Context as *mut u8;
-    // (lambda (a b)): 0 StackRef(1)=a; 1 List(1); 2 StackRef(1)=b; 3 Cons;
-    //  4 StackRef(1)=b; 5 Length; 6 Pop; 7 Car; 8 Return
     let ops = vec![
-        Op::StackRef(1),
-        Op::List(1),
-        Op::StackRef(1),
-        Op::Cons,
-        Op::StackRef(1),
-        Op::Length,
-        Op::Pop,
-        Op::Car,
+        Op::StackRef(1),                                  // a          [a b a]
+        Op::List(1),                                      // (a)        [a b (a)]
+        Op::StackRef(1),                                  // b          [a b (a) b]
+        Op::Cons,                                         // p          [a b p]
+        Op::CallBuiltinSym(intern("garbage-collect"), 0), // residual [a b p]
+        Op::Pop,                                          //            [a b p]
+        Op::Constant(0),                                  // 4096
+        Op::Constant(1),                                  // 0
+        Op::CallBuiltinSym(intern("make-list"), 2),       // residual [a b p]
+        Op::Pop,                                          //            [a b p]
+        Op::Car,                                          // (car p)
         Op::Return,
     ];
-    let mir = mir::build_mir(&ops, &[], 2).expect("MIR builds");
+    let constants = [Value::make_int(4096), Value::make_int(0)];
+    let mir = mir::build_mir(&ops, &constants, 2).expect("MIR builds");
     let plan = super::lowering::plan_mir_leaf(&mir);
     assert!(plan.has_opaque && plan.precise);
     assert!(
@@ -2700,14 +2875,19 @@ fn mir_adapter_keeps_conses_real_across_a_shim() {
         "no elided cons in an Opaque body"
     );
     let leaf = lower_mir_pure(&mir).expect("lowers via the adapter");
-    let b = ev.eval_str("(list 1 2 3)").expect("b");
-    let NativeRun::Ok(bits) = leaf.call(ctx, &[Value::make_int(42), b]) else {
-        panic!("must run natively");
-    };
-    let l = Value::from_bits(bits);
-    assert!(
-        l.is_cons() && l.cons_car().bits() == Value::make_int(42).bits() && l.cons_cdr().is_nil()
-    );
+    for _ in 0..3 {
+        let NativeRun::Ok(bits) = leaf.call(ctx, &[Value::make_int(42), Value::NIL]) else {
+            panic!("must run natively");
+        };
+        let l = Value::from_bits(bits);
+        assert!(l.is_cons(), "(car p) is the fresh list (got {l:?})");
+        assert_eq!(
+            l.cons_car(),
+            Value::make_int(42),
+            "car intact after the collection"
+        );
+        assert!(l.cons_cdr().is_nil(), "cdr intact");
+    }
 }
 
 /// An INLINED predicate reads its own operand, not the call site's stack
@@ -4869,45 +5049,105 @@ fn fuzz_varset_bodies_match_interpreter_state() {
         };
         let want_state = snap(&ev, &var_ids);
 
-        // The REAL tier dispatch (MIR if it claims the body, else baseline);
-        // fall back to a direct baseline lowering if the dispatch declines
-        // (e.g. profitability) so every seed still gets state coverage.
-        let leaf = compile_bytecode_function(&f)
-            .or_else(|_| lower_leaf(&ops, &constants, 0))
-            .unwrap_or_else(|e| panic!("seed {seed}: body must compile, got {e}: {ops:?}"));
-        reset(&mut ev, &var_ids, &init);
-        let init_state = snap(&ev, &var_ids);
+        // Hold BOTH tiers to the interpreter's result and side-effect state,
+        // independently of which one the tier gate would pick: a loop-free
+        // VarSet body now takes the MIR tier (through the baseline-emitter
+        // adapter), which would otherwise leave the baseline's own arms
+        // unfuzzed. The baseline must always lower these bodies.
+        let baseline = lower_leaf(&ops, &constants, 0)
+            .unwrap_or_else(|e| panic!("seed {seed}: baseline must lower, got {e}: {ops:?}"));
+        check_state_contract(
+            &mut ev,
+            ctx_ptr,
+            &baseline,
+            &f,
+            &ops,
+            &interp,
+            &want_state,
+            &var_ids,
+            &init,
+            seed,
+            "baseline",
+        );
+        if let Ok(mir) = mir::build_mir(&ops, &constants, 0)
+            && let Ok(mleaf) = lower_mir_pure(&mir)
+        {
+            check_state_contract(
+                &mut ev,
+                ctx_ptr,
+                &mleaf,
+                &f,
+                &ops,
+                &interp,
+                &want_state,
+                &var_ids,
+                &init,
+                seed,
+                "mir",
+            );
+        }
+    }
+
+    /// Run `leaf` from the initial variable state and hold it to the
+    /// interpreter's result and final state, resuming any deopt on the Tier-0
+    /// interpreter exactly as the dispatch would.
+    #[allow(clippy::too_many_arguments)]
+    fn check_state_contract<E: std::fmt::Debug>(
+        ev: &mut Context,
+        ctx_ptr: *mut u8,
+        leaf: &CompiledLeaf,
+        f: &ByteCodeFunction,
+        ops: &[Op],
+        interp: &Result<Value, E>,
+        want_state: &[Option<usize>],
+        var_ids: &[SymId],
+        init: &[Value],
+        seed: u64,
+        tier: &str,
+    ) {
+        reset(ev, var_ids, init);
+        let init_state = snap(ev, var_ids);
         match leaf.call(ctx_ptr, &[]) {
             NativeRun::Ok(bits) => {
                 let want = interp.as_ref().unwrap_or_else(|e| {
-                    panic!("seed {seed}: JIT Ok but interpreter erred ({e:?}): {ops:?}")
+                    panic!("seed {seed} [{tier}]: JIT Ok but interpreter erred ({e:?}): {ops:?}")
                 });
-                assert_eq!(bits, want.bits(), "seed {seed}: result mismatch on {ops:?}");
                 assert_eq!(
-                    snap(&ev, &var_ids),
+                    bits,
+                    want.bits(),
+                    "seed {seed} [{tier}]: result mismatch on {ops:?}"
+                );
+                assert_eq!(
+                    snap(ev, var_ids),
                     want_state,
-                    "seed {seed}: SIDE-EFFECT STATE mismatch (a VarSet was dropped or mis-lowered) on {ops:?}"
+                    "seed {seed} [{tier}]: SIDE-EFFECT STATE mismatch (a VarSet was dropped or mis-lowered) on {ops:?}"
                 );
             }
             NativeRun::Deopt => {
                 // Rerun-from-start is only sound if no side effect ran yet
                 // (VarSet poisons later guards) — the vars must be untouched.
                 assert_eq!(
-                    snap(&ev, &var_ids),
+                    snap(ev, var_ids),
                     init_state,
-                    "seed {seed}: rerun-from-start deopt AFTER a side effect on {ops:?}"
+                    "seed {seed} [{tier}]: rerun-from-start deopt AFTER a side effect on {ops:?}"
                 );
                 let rerun = {
-                    let mut vm = Vm::from_context(&mut ev);
-                    vm.execute(&f, vec![])
+                    let mut vm = Vm::from_context(ev);
+                    vm.execute(f, vec![])
                 };
-                match (&rerun, &interp) {
+                match (&rerun, interp) {
                     (Ok(got), Ok(want)) => {
-                        assert_eq!(got.bits(), want.bits(), "seed {seed}: {ops:?}");
-                        assert_eq!(snap(&ev, &var_ids), want_state, "seed {seed}: {ops:?}");
+                        assert_eq!(got.bits(), want.bits(), "seed {seed} [{tier}]: {ops:?}");
+                        assert_eq!(
+                            snap(ev, var_ids),
+                            want_state,
+                            "seed {seed} [{tier}]: {ops:?}"
+                        );
                     }
                     (Err(_), Err(_)) => {}
-                    other => panic!("seed {seed}: deopt-rerun mismatch {other:?}: {ops:?}"),
+                    other => {
+                        panic!("seed {seed} [{tier}]: deopt-rerun mismatch {other:?}: {ops:?}")
+                    }
                 }
             }
             NativeRun::DeoptAt(resume) => {
@@ -4921,9 +5161,9 @@ fn fuzz_varset_bodies_match_interpreter_state() {
                 } = *resume;
                 // Precise deopt: resume mid-function on the MUTATED state.
                 let resumed = {
-                    let mut vm = Vm::from_context(&mut ev);
+                    let mut vm = Vm::from_context(ev);
                     vm.run_resumed_frame(
-                        &f,
+                        f,
                         Value::NIL,
                         pc,
                         &stack,
@@ -4933,63 +5173,32 @@ fn fuzz_varset_bodies_match_interpreter_state() {
                         cond_base,
                     )
                 };
-                match (&resumed, &interp) {
+                match (&resumed, interp) {
                     (Ok(got), Ok(want)) => {
-                        assert_eq!(got.bits(), want.bits(), "seed {seed}: {ops:?}");
-                        assert_eq!(snap(&ev, &var_ids), want_state, "seed {seed}: {ops:?}");
+                        assert_eq!(got.bits(), want.bits(), "seed {seed} [{tier}]: {ops:?}");
+                        assert_eq!(
+                            snap(ev, var_ids),
+                            want_state,
+                            "seed {seed} [{tier}]: {ops:?}"
+                        );
                     }
                     (Err(_), Err(_)) => {}
-                    other => panic!("seed {seed}: resume mismatch {other:?}: {ops:?}"),
+                    other => panic!("seed {seed} [{tier}]: resume mismatch {other:?}: {ops:?}"),
                 }
             }
             NativeRun::Signal => {
                 let _ = take_pending_flow();
                 assert!(
                     interp.is_err(),
-                    "seed {seed}: JIT signaled but interpreter succeeded: {ops:?}"
+                    "seed {seed} [{tier}]: JIT signaled but interpreter succeeded: {ops:?}"
                 );
                 // Same deterministic prefix ran on both engines before the
                 // signal, so the partial writes must agree too.
                 assert_eq!(
-                    snap(&ev, &var_ids),
+                    snap(ev, var_ids),
                     want_state,
-                    "seed {seed}: state mismatch after signal on {ops:?}"
+                    "seed {seed} [{tier}]: state mismatch after signal on {ops:?}"
                 );
-            }
-        }
-
-        // Also pin the MIR tier explicitly on the same body — the exact
-        // historical bug shape: build_mir once DROPPED the 0-result VarSet, so
-        // lower_mir_pure succeeded (nothing to bail on) and returned a leaf
-        // whose return value was right and whose side effect was gone. Today
-        // lower_mir_pure bails on the Opaque (Err, skipped below); if a future
-        // MIR VarSet port lands, this holds it to the same state contract.
-        if let Ok(mir) = mir::build_mir(&ops, &constants, 0) {
-            if let Ok(mleaf) = lower_mir_pure(&mir) {
-                reset(&mut ev, &var_ids, &init);
-                match mleaf.call(ctx_ptr, &[]) {
-                    NativeRun::Ok(bits) => {
-                        if let Ok(want) = &interp {
-                            assert_eq!(bits, want.bits(), "seed {seed}: MIR result: {ops:?}");
-                        }
-                        assert_eq!(
-                            snap(&ev, &var_ids),
-                            want_state,
-                            "seed {seed}: MIR SIDE-EFFECT STATE mismatch on {ops:?}"
-                        );
-                    }
-                    NativeRun::Deopt => {
-                        assert_eq!(
-                            snap(&ev, &var_ids),
-                            init_state,
-                            "seed {seed}: MIR rerun-deopt after a side effect on {ops:?}"
-                        );
-                    }
-                    NativeRun::DeoptAt(_) => {}
-                    NativeRun::Signal => {
-                        let _ = take_pending_flow();
-                    }
-                }
             }
         }
     }

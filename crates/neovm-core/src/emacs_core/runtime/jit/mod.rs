@@ -31,7 +31,7 @@
 //! | `NEOVM_JIT_LEVER1` | on | Residual-rooting non-heap skip; `=off` reverts to an unconditional gc_push per residual (single-build A/B). |
 //! | `NEOVM_JIT_OSR` | on | Mid-loop interpreter→native transfer (on-stack replacement); `=off` disables. |
 //! | `NEOVM_JIT_PROFIT` | on | Profitability gate (calls ≤ arith); `=off` also compiles call-heavy bodies. |
-//! | `NEOVM_JIT_MIR_OPAQUE` | on | The MIR tier lowers shim-using ops (variable ops, builtins, `eq`, list ops) through the baseline's emitters; `=0`/`off` makes every such op bail the body to the baseline (the pre-adapter behaviour, the single-build A/B). |
+//! | `NEOVM_JIT_MIR_OPAQUE` | on | The MIR tier lowers shim-using ops (variable ops, builtins, `eq`, list ops) through the baseline's emitters; `=0`/`off` makes every such op bail the body to the baseline — an A/B of the adapter alone: the tier gate (`gate:loop-opaque`/`generic-call`/`inline-opaque`) applies either way, so it is not the pre-adapter gate. |
 //!
 //! ## Opt-in features (default-OFF, pending a graduation decision)
 //! | Knob | Enable | Meaning / graduation blocker |

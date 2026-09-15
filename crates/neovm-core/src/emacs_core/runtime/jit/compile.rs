@@ -270,9 +270,26 @@ fn jit_profile_path() -> Option<&'static str> {
 /// of `NEOVM_GC_STRESS`/`gc_stress`. Catches deopt-frame-reconstruction bugs (the
 /// riskiest part of speculation) before the optimizing Tier-2 adds more guards.
 fn jit_force_deopt() -> bool {
+    #[cfg(test)]
+    if let Some(on) = FORCE_DEOPT_TEST_OVERRIDE.with(|c| c.get()) {
+        return on;
+    }
     use std::sync::OnceLock;
     static FORCE: OnceLock<bool> = OnceLock::new();
     *FORCE.get_or_init(|| std::env::var("NEOVM_JIT_FORCE_DEOPT").as_deref() == Ok("1"))
+}
+
+#[cfg(test)]
+thread_local! {
+    static FORCE_DEOPT_TEST_OVERRIDE: std::cell::Cell<Option<bool>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// Force the J0 every-guard-fails harness on/off for compiles on the current
+/// thread (tests only) — without the process-global environment variable.
+#[cfg(test)]
+pub(crate) fn force_deopt_for_test(on: bool) {
+    FORCE_DEOPT_TEST_OVERRIDE.with(|c| c.set(Some(on)));
 }
 
 /// Verification harness (Gap 1): when `NEOVM_JIT_FORCE_SLOW_SPEC=1`, EVERY
@@ -1091,6 +1108,13 @@ fn compile_bytecode_function_inner(
         //  * loop-opaque: a loop with a shim-lowered op. The MIR tier has no
         //    back-edge poll (quit + GC safepoint), so such a loop would be
         //    uninterruptible. Pure loops keep the tier.
+        //  * inline-opaque: a body that INLINED a callee and still has a shim-
+        //    lowered op. Inlining is guarded by the function epoch only at
+        //    ENTRY; an adapter op (`fset`, a builtin, a `setq` whose watcher
+        //    runs Lisp) can redefine the inlined callee mid-activation, and
+        //    the running code would go on executing the stale copy. Before
+        //    the adapter every such op bailed the lowering, so an inlining
+        //    body was always shim-free; this keeps it that way.
         //  * generic-call: a `Call`/`Apply`/`CallBuiltinSym` left in the body
         //    after inlining. The baseline speculates such a site (native-to-
         //    native `call_spec`/`call_subr_spec`, CBSym intrinsics); the MIR
@@ -1108,6 +1132,8 @@ fn compile_bytecode_function_inner(
             Some("gate:loop-opaque")
         } else if plan.has_generic_call {
             Some("gate:generic-call")
+        } else if inline_epoch.is_some() && plan.has_opaque {
+            Some("gate:inline-opaque")
         } else {
             None
         };
