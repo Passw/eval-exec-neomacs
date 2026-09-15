@@ -293,6 +293,12 @@ static PROFILER_SAMPLE_DUE: std::sync::atomic::AtomicBool =
 /// re-checks `is_active`).
 static PROFILER_TIMER_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
+/// The address of the flag [`profiler_sample_due`] reads, for compiled code
+/// that makes the quit poll's fast test inline.
+pub(crate) fn profiler_sample_due_addr() -> usize {
+    std::ptr::from_ref(&PROFILER_SAMPLE_DUE) as usize
+}
+
 #[inline]
 pub(crate) fn profiler_sample_due() -> bool {
     PROFILER_SAMPLE_DUE.load(std::sync::atomic::Ordering::Relaxed)

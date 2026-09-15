@@ -7881,7 +7881,7 @@ fn value_list_to_values(list: &Value) -> LispArgVec {
 // ---------------------------------------------------------------------------
 mod gc_pacing;
 
-mod runtime_projection;
+pub(crate) mod runtime_projection;
 
 mod pdump_reconstruct;
 

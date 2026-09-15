@@ -7,6 +7,37 @@
 
 use super::*;
 
+/// Where compiled code reads `Context::compiler_function_overrides_active`
+/// (a `bool` byte): an armed call site bounces to the generic call while
+/// overrides shadow function cells.
+pub(crate) const CONTEXT_COMPILER_OVERRIDES_ACTIVE_OFFSET: usize =
+    std::mem::offset_of!(Context, compiler_function_overrides_active);
+const _: () = assert!(std::mem::size_of::<bool>() == 1);
+/// Where compiled code reads `Context::quit_flag` and `throw_on_input` (each a
+/// `Value` word), the two Lisp-visible halves of `maybe_quit_hot_ok`.
+pub(crate) const CONTEXT_QUIT_FLAG_OFFSET: usize = std::mem::offset_of!(Context, quit_flag);
+/// See [`CONTEXT_QUIT_FLAG_OFFSET`].
+pub(crate) const CONTEXT_THROW_ON_INPUT_OFFSET: usize =
+    std::mem::offset_of!(Context, throw_on_input);
+/// Where compiled code reads `Context::quit_requested`'s `Arc` pointer.
+pub(crate) const CONTEXT_QUIT_REQUESTED_OFFSET: usize =
+    std::mem::offset_of!(Context, quit_requested);
+
+/// How far past the pointer an `Arc<AtomicBool>` holds its flag sits, probed
+/// on a live `Arc` (the pointer names the shared allocation, whose layout std
+/// does not promise). `None` when the probe cannot find it.
+pub(crate) fn arc_atomic_bool_data_offset() -> Option<usize> {
+    let arc = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    // SAFETY: an `Arc` is exactly one non-null pointer word.
+    let inner: usize = unsafe { std::mem::transmute_copy(&arc) };
+    let data = std::sync::Arc::as_ptr(&arc) as usize;
+    const _: () = assert!(
+        std::mem::size_of::<std::sync::Arc<std::sync::atomic::AtomicBool>>()
+            == std::mem::size_of::<usize>()
+    );
+    data.checked_sub(inner).filter(|&off| off < 64)
+}
+
 /// The gate's membership as one bit per symbol id, resolved against the
 /// current obarray (after any dump remap): the Context mirrors passed in by
 /// `install_core_eval_symbols`, the keyboard maps, the GC settings the

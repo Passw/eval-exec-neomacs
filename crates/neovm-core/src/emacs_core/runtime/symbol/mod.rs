@@ -998,6 +998,14 @@ struct SymbolChunks {
 /// LISP_SYMBOL_SIZE`. An empty slot reads as a `Plainval` unbound cell.
 pub(crate) const OBARRAY_JIT_SPINE_OFFSET: usize =
     std::mem::offset_of!(Obarray, symbols) + std::mem::offset_of!(SymbolChunks, spine_addr);
+/// Where compiled code reads the obarray's function epoch (a `u64`), which
+/// every function-cell write moves: an armed call site compares it inline.
+pub(crate) const OBARRAY_FUNCTION_EPOCH_OFFSET: usize =
+    std::mem::offset_of!(Obarray, function_epoch);
+/// Where compiled code reads the memoized `debug-on-next-call` descriptor
+/// pointer (null until resolved; see `Obarray::debug_on_next_call_bool_fwd`).
+pub(crate) const OBARRAY_DEBUG_ON_NEXT_CALL_FWD_OFFSET: usize =
+    std::mem::offset_of!(Obarray, debug_on_next_call_fwd);
 /// See [`OBARRAY_JIT_SPINE_OFFSET`].
 pub(crate) const OBARRAY_JIT_LEN_OFFSET: usize =
     std::mem::offset_of!(Obarray, symbols) + std::mem::offset_of!(SymbolChunks, len);

@@ -854,6 +854,200 @@ fn emit_inline_aref(
     true
 }
 
+/// `type-of` / `cl-type-of` of a record, answered inline at an armed spec
+/// site: `record_type_of`, which is slot 0, or slot 1 of slot 0 when slot 0
+/// is itself a record of two or more slots (an EIEIO object's class). The
+/// arming test is `subr_spec_armed`'s fast answer — the site's epoch is the
+/// obarray's, no compiler overrides — plus `debug-on-next-call` down (its
+/// memoized cell resolved and false) and `maybe_quit_hot_ok` (no quit, signal,
+/// profiler tick or bound `throw-on-input`: those take the shim, which polls
+/// first, as GNU's `Bcall` does). Anything else, a non-record or a record of
+/// no slots included, continues in the block this leaves current, where the
+/// caller emits the shim call. Every length is read only after its object's
+/// type tag says record. Returns the merge block and the result variable the
+/// hit path defined; the caller defines it on its own path and jumps to the
+/// merge. `None`, emitting nothing, when a layout probe fails.
+///
+/// Every `cl-defstruct` accessor and predicate asks `(type-of x)`; through
+/// `neovm_jit_pred_spec` that was ~100 instructions a call, 2,508 per
+/// elb-eieio repeat.
+fn emit_inline_record_type_of(
+    fb: &mut FunctionBuilder,
+    rt: &RtCtx,
+    slot: ClifValue,
+    arg: ClifValue,
+) -> Option<(Block, Variable)> {
+    use crate::emacs_core::eval::runtime_projection::{
+        CONTEXT_COMPILER_OVERRIDES_ACTIVE_OFFSET, CONTEXT_QUIT_FLAG_OFFSET,
+        CONTEXT_QUIT_REQUESTED_OFFSET, CONTEXT_THROW_ON_INPUT_OFFSET, arc_atomic_bool_data_offset,
+    };
+    use crate::emacs_core::forward::LISP_BOOL_FWD_VALUE_OFFSET;
+    use crate::emacs_core::symbol::{
+        OBARRAY_DEBUG_ON_NEXT_CALL_FWD_OFFSET, OBARRAY_FUNCTION_EPOCH_OFFSET,
+    };
+    use crate::tagged::header::{LispValueVec, VecLikeHeader, VecLikeType, VectorObj};
+    let (ptr_off, len_off) = LispValueVec::jit_slice_offsets()?;
+    let quit_requested_off = arc_atomic_bool_data_offset()?;
+    const_assert_vector_record_share_layout();
+    let data_off = core::mem::offset_of!(VectorObj, data);
+    let type_off = core::mem::offset_of!(VecLikeHeader, type_tag);
+    let ob = core::mem::offset_of!(Context, obarray);
+    let slot_epoch_off = core::mem::offset_of!(super::SpecSlot, epoch);
+    let flags = MemFlagsData::trusted();
+    debug_assert_eq!(Value::NIL.bits(), 0, "the clear test ORs nil words");
+    let record_tag = VecLikeType::Record as u8 as i64;
+
+    let miss = fb.create_block();
+    let merge = fb.create_block();
+    let res = fb.declare_var(types::I64);
+    // Stage 1: a veclike argument, the one test a miss usually fails.
+    let tag = band_imm_p(fb, arg, TAG_MASK as i64);
+    let veclike = icmp_imm_p(
+        fb,
+        IntCC::Equal,
+        tag,
+        crate::tagged::value::TAG_VECLIKE as i64,
+    );
+    let stage2 = fb.create_block();
+    fb.ins().brif(veclike, stage2, &[], miss, &[]);
+    // Stage 2: arming, the quit poll's fast test, and a record. Every flag
+    // and word that must be clear is ORed into one test (nil is zero).
+    fb.switch_to_block(stage2);
+    fb.seal_block(stage2);
+    let vmctx = fb.use_var(rt.vmctx_var);
+    let epoch = fb.ins().load(
+        types::I64,
+        flags,
+        vmctx,
+        (ob + OBARRAY_FUNCTION_EPOCH_OFFSET) as i32,
+    );
+    let armed_epoch = fb
+        .ins()
+        .load(types::I64, flags, slot, slot_epoch_off as i32);
+    let epoch_ok = fb.ins().icmp(IntCC::Equal, epoch, armed_epoch);
+    let overrides = fb.ins().uload8(
+        types::I64,
+        flags,
+        vmctx,
+        CONTEXT_COMPILER_OVERRIDES_ACTIVE_OFFSET as i32,
+    );
+    let quit_flag = fb
+        .ins()
+        .load(types::I64, flags, vmctx, CONTEXT_QUIT_FLAG_OFFSET as i32);
+    let throw_on_input = fb.ins().load(
+        types::I64,
+        flags,
+        vmctx,
+        CONTEXT_THROW_ON_INPUT_OFFSET as i32,
+    );
+    let requested_arc = fb.ins().load(
+        rt.ptr_ty,
+        flags,
+        vmctx,
+        CONTEXT_QUIT_REQUESTED_OFFSET as i32,
+    );
+    let requested = fb
+        .ins()
+        .uload8(types::I64, flags, requested_arc, quit_requested_off as i32);
+    let signal_addr = fb.ins().iconst(
+        rt.ptr_ty,
+        crate::emacs_core::os_signal::pending_flag_addr() as i64,
+    );
+    let signal = fb.ins().uload8(types::I64, flags, signal_addr, 0);
+    let tick_addr = fb.ins().iconst(
+        rt.ptr_ty,
+        crate::emacs_core::profiler::profiler_sample_due_addr() as i64,
+    );
+    let tick = fb.ins().uload8(types::I64, flags, tick_addr, 0);
+    // An unresolved `debug-on-next-call` cell reads through a stand-in that
+    // is always armed.
+    let fwd = fb.ins().load(
+        rt.ptr_ty,
+        flags,
+        vmctx,
+        (ob + OBARRAY_DEBUG_ON_NEXT_CALL_FWD_OFFSET) as i32,
+    );
+    let always_armed = fb.ins().iconst(
+        rt.ptr_ty,
+        std::ptr::from_ref(&crate::emacs_core::forward::JIT_ALWAYS_TRUE_BOOL_FWD) as i64,
+    );
+    let fwd_resolved = icmp_imm_p(fb, IntCC::NotEqual, fwd, 0);
+    let cell = fb.ins().select(fwd_resolved, fwd, always_armed);
+    let debug = fb
+        .ins()
+        .uload8(types::I64, flags, cell, LISP_BOOL_FWD_VALUE_OFFSET as i32);
+    let object = band_imm_p(fb, arg, !(TAG_MASK as i64));
+    let type_tag = fb.ins().uload8(types::I64, flags, object, type_off as i32);
+    let not_record = fb.ins().bxor_imm(type_tag, record_tag);
+    let set = fb.ins().bor(overrides, quit_flag);
+    let set = fb.ins().bor(set, throw_on_input);
+    let set = fb.ins().bor(set, requested);
+    let set = fb.ins().bor(set, signal);
+    let set = fb.ins().bor(set, tick);
+    let set = fb.ins().bor(set, debug);
+    let set = fb.ins().bor(set, not_record);
+    let clear = icmp_imm_p(fb, IntCC::Equal, set, 0);
+    let stage2_ok = fb.ins().band(epoch_ok, clear);
+    let sized = fb.create_block();
+    fb.ins().brif(stage2_ok, sized, &[], miss, &[]);
+    // Stage 3: a record of one or more slots.
+    fb.switch_to_block(sized);
+    fb.seal_block(sized);
+    let len = fb
+        .ins()
+        .load(types::I64, flags, object, (data_off + len_off) as i32);
+    let has_slot = icmp_imm_p(fb, IntCC::NotEqual, len, 0);
+    let hit = fb.create_block();
+    fb.ins().brif(has_slot, hit, &[], miss, &[]);
+    fb.switch_to_block(miss);
+    // All three edges into `miss` exist now.
+    fb.seal_block(miss);
+    // The hit: slot 0, which is the answer unless it is a class record.
+    fb.switch_to_block(hit);
+    fb.seal_block(hit);
+    let slots = fb
+        .ins()
+        .load(types::I64, flags, object, (data_off + ptr_off) as i32);
+    let tag_slot = fb.ins().load(types::I64, flags, slots, 0);
+    fb.def_var(res, tag_slot);
+    let tag_slot_tag = band_imm_p(fb, tag_slot, TAG_MASK as i64);
+    let tag_slot_veclike = icmp_imm_p(
+        fb,
+        IntCC::Equal,
+        tag_slot_tag,
+        crate::tagged::value::TAG_VECLIKE as i64,
+    );
+    let class = fb.create_block();
+    fb.ins().brif(tag_slot_veclike, class, &[], merge, &[]);
+    fb.switch_to_block(class);
+    fb.seal_block(class);
+    let class_object = band_imm_p(fb, tag_slot, !(TAG_MASK as i64));
+    let class_type = fb
+        .ins()
+        .uload8(types::I64, flags, class_object, type_off as i32);
+    let class_is_record = icmp_imm_p(fb, IntCC::Equal, class_type, record_tag);
+    let class_sized = fb.create_block();
+    fb.ins().brif(class_is_record, class_sized, &[], merge, &[]);
+    fb.switch_to_block(class_sized);
+    fb.seal_block(class_sized);
+    let class_len = fb
+        .ins()
+        .load(types::I64, flags, class_object, (data_off + len_off) as i32);
+    let two_or_more = icmp_imm_p(fb, IntCC::UnsignedGreaterThan, class_len, 1);
+    let name = fb.create_block();
+    fb.ins().brif(two_or_more, name, &[], merge, &[]);
+    fb.switch_to_block(name);
+    fb.seal_block(name);
+    let class_slots = fb
+        .ins()
+        .load(types::I64, flags, class_object, (data_off + ptr_off) as i32);
+    let class_name = fb.ins().load(types::I64, flags, class_slots, 8);
+    fb.def_var(res, class_name);
+    fb.ins().jump(merge, &[]);
+    fb.switch_to_block(miss);
+    Some((merge, res))
+}
+
 /// `emit_inline_aref` reads a record through `VectorObj`'s offsets.
 const fn const_assert_vector_record_share_layout() {
     use crate::tagged::header::{RecordObj, VectorObj};
@@ -4890,6 +5084,28 @@ pub(crate) fn lower_simple_op(
                     fb.ins().iconst(types::I64, n as i64),
                 )
             });
+            // A JIT `type-of` / `cl-type-of` site answers a record inline and
+            // leaves everything else to the shim below (see
+            // `emit_inline_record_type_of`). The inline path stores nothing,
+            // so the merge meets the shim path's store record with this one.
+            let inline_type_of = match (spec, &reg_args) {
+                (
+                    Some((
+                        _,
+                        _,
+                        slot_ptr,
+                        _,
+                        SpecCalleeKind::PredTypeOf | SpecCalleeKind::PredClTypeOf,
+                    )),
+                    Some(args),
+                ) if !aot && !jit_force_slow_spec() && jit_inline_type_of_on() => {
+                    let carry = rootwin_carry_snapshot();
+                    let slot_v = fb.ins().iconst(types::I64, slot_ptr);
+                    emit_inline_record_type_of(fb, rt, slot_v, args[0])
+                        .map(|(merge, res)| (merge, res, carry))
+                }
+                _ => None,
+            };
             // Subr-kind sites can return STATUS_NEED_GENERIC, which routes to a
             // fallback block that re-does this site as the ORIGINAL generic
             // call; bytecode-kind sites keep their everything-inside-the-shim
@@ -5050,7 +5266,17 @@ pub(crate) fn lower_simple_op(
             let result = fb
                 .ins()
                 .stack_load(rt.ptr_ty, types::I64, rt.call_result_slot, 0);
-            stack.push(result);
+            match inline_type_of {
+                Some((merge, res, carry)) => {
+                    fb.def_var(res, result);
+                    fb.ins().jump(merge, &[]);
+                    fb.switch_to_block(merge);
+                    fb.seal_block(merge);
+                    rootwin_carry_meet(&carry);
+                    stack.push(fb.use_var(res));
+                }
+                None => stack.push(result),
+            }
         }
         Op::Cons => {
             // `rt` is always present here: analyze_cfg accepts Cons only when the

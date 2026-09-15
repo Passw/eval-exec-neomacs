@@ -631,6 +631,12 @@ fn classify_previous(old: &libc::sigaction) -> PreviousDisposition {
 // The safe-point half (runs on the Lisp thread, where anything is allowed)
 // ---------------------------------------------------------------------------
 
+/// The address of the flag [`pending`] reads, for compiled code that makes
+/// the quit poll's fast test inline.
+pub(crate) fn pending_flag_addr() -> usize {
+    std::ptr::from_ref(&PENDING_ANY) as usize
+}
+
 /// GNU's `pending_signals` (src/keyboard.c:105), read by `maybe_quit`
 /// (src/lisp.h:3896-3900).  One relaxed `'static` load.
 #[inline(always)]

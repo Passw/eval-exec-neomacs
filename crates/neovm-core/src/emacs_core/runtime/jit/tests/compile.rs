@@ -7599,6 +7599,133 @@ fn only_a_non_fixnum_operand_records_other_feedback() {
 /// dispatch. The answer must be the builtin's for every kind of value, the
 /// fast path must actually be taken, and a redefinition of the function must
 /// reach the generic call.
+/// A JIT `type-of` / `cl-type-of` site answers a record inline: its type
+/// slot, or its class record's name. The result is this site's own, not the
+/// previous call's; a redefinition or an armed `debug-on-next-call` takes
+/// the shim again.
+#[test]
+fn a_record_type_of_site_answers_inline() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::intern::{SymId, intern};
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    // (lambda (x) (cons (symbol-name 'zzz) (type-of x))): the subr call
+    // before it leaves "zzz" in the call result slot.
+    let site = |name: &str| {
+        let mut f = ByteCodeFunction::new(LambdaParams {
+            required: vec![SymId(1)],
+            optional: Vec::new(),
+            rest: None,
+        });
+        f.lexical = true;
+        f.ops = vec![
+            Op::Constant(0),
+            Op::Constant(1),
+            Op::Call(1),
+            Op::Constant(2),
+            Op::StackRef(2),
+            Op::Call(1),
+            Op::Cons,
+            Op::Return,
+        ];
+        f.constants = vec![
+            Value::symbol("symbol-name"),
+            Value::symbol("zzz"),
+            Value::symbol(name),
+        ]
+        .into();
+        f.max_stack = 8;
+        f
+    };
+    let pool = ev
+        .eval_str(
+            "(list (record 'foo 1) (record 'bar) (record (record 'eieio--class 'my-class) 2)
+                   (record (record 'lone) 3) (record \"str\" 1) (record (current-buffer) 1)
+                   (current-buffer) 5 'sym nil (cons 1 2) (vector 1))",
+        )
+        .expect("pool");
+    crate::emacs_core::eval::push_scratch_gc_root(pool);
+    let items = crate::emacs_core::value::list_to_vec(&pool).expect("list");
+    for name in ["type-of", "cl-type-of"] {
+        let f = site(name);
+        let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+        // Resolve the memoized debug-on-next-call cell the inline test reads.
+        let _ = ev.debug_on_next_call_is_armed();
+        let run = |item: Value| match leaf.call(ctx, &[item]) {
+            NativeRun::Ok(bits) => crate::emacs_core::print::print_value(&Value::from_bits(bits)),
+            other => format!("{other:?}"),
+        };
+        for &item in &items {
+            let want = if name == "type-of" {
+                crate::emacs_core::builtins::types::builtin_type_of(&[item])
+            } else {
+                crate::emacs_core::builtins::types::builtin_cl_type_of(&[item])
+            }
+            .expect("builtin answers");
+            #[cfg(debug_assertions)]
+            let shim0 = SUBR_SPEC_COUNT.load(Ordering::Relaxed);
+            assert_eq!(
+                run(item),
+                format!(
+                    "(\"zzz\" . {})",
+                    crate::emacs_core::print::print_value(&want)
+                ),
+                "({name} {})",
+                crate::emacs_core::print::print_value(&item)
+            );
+            // Two subr sites: symbol-name's always, type-of's for a non-record.
+            #[cfg(debug_assertions)]
+            assert_eq!(
+                SUBR_SPEC_COUNT.load(Ordering::Relaxed) - shim0,
+                if item.is_record() { 1 } else { 2 },
+                "({name} {}) inline only for a record",
+                crate::emacs_core::print::print_value(&item)
+            );
+        }
+        let record = items[0];
+        // debug-on-next-call armed: the site takes the shim. (A site of its
+        // own: the call before it would consume the flag.)
+        let lone = {
+            let mut f = site(name);
+            f.ops = vec![Op::Constant(2), Op::StackRef(1), Op::Call(1), Op::Return];
+            compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles")
+        };
+        // A pending quit: the site takes the shim, which polls first and
+        // signals.
+        ev.set_quit_flag_value(Value::T);
+        let quit = lone.call(ctx, &[record]);
+        ev.set_quit_flag_value(Value::NIL);
+        assert!(
+            matches!(quit, NativeRun::Signal),
+            "{name}: a pending quit signals at the call: {quit:?}"
+        );
+        let _ = take_pending_flow();
+        let cell = ev
+            .obarray
+            .debug_on_next_call_bool_fwd(intern("debug-on-next-call"))
+            .expect("debug-on-next-call cell");
+        cell.set(true);
+        #[cfg(debug_assertions)]
+        let shim0 = SUBR_SPEC_COUNT.load(Ordering::Relaxed);
+        let _ = lone.call(ctx, &[record]);
+        cell.set(false);
+        #[cfg(debug_assertions)]
+        assert_eq!(
+            SUBR_SPEC_COUNT.load(Ordering::Relaxed) - shim0,
+            1,
+            "{name}: an armed debug-on-next-call takes the shim"
+        );
+        // A redefinition: the inline answer no longer applies.
+        let original = ev.obarray.symbol_function_id(intern(name)).expect("bound");
+        ev.eval_str(&format!("(fset '{name} (lambda (_) 'redefined))"))
+            .expect("fset");
+        assert_eq!(run(record), "(\"zzz\" . redefined)", "{name} redefined");
+        ev.obarray.set_symbol_function_id(intern(name), original);
+        assert_eq!(run(record), "(\"zzz\" . foo)", "{name} restored");
+    }
+}
+
 #[test]
 fn type_of_call_sites_answer_as_the_builtin_on_the_fast_path() {
     use crate::emacs_core::eval::Context;
@@ -7658,12 +7785,13 @@ fn type_of_call_sites_answer_as_the_builtin_on_the_fast_path() {
                 other => panic!("({name} ...) must run natively: {other:?}"),
             }
         }
+        // The two records are answered inline, before the intrinsic shim.
         #[cfg(debug_assertions)]
         let fast = SUBR_SPEC_FAST_COUNT.load(Ordering::Relaxed) - fast0;
         #[cfg(debug_assertions)]
         assert!(
-            fast >= items.len() as u64,
-            "{name}: every call took the intrinsic ({fast} of {})",
+            fast >= items.len() as u64 - 2,
+            "{name}: every other call took the intrinsic ({fast} of {})",
             items.len()
         );
         // A redefinition is honoured: the site re-validates and takes the

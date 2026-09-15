@@ -504,6 +504,17 @@ pub struct LispBoolFwd {
     value: AtomicBool,
 }
 
+/// Byte offset of a [`LispBoolFwd`]'s flag, for compiled code's inline read.
+pub(crate) const LISP_BOOL_FWD_VALUE_OFFSET: usize = std::mem::offset_of!(LispBoolFwd, value);
+
+/// A Boolean cell that always reads true: what compiled code reads in place
+/// of a `debug-on-next-call` cell the obarray has not resolved yet, so that
+/// case reads as armed without a branch.
+pub(crate) static JIT_ALWAYS_TRUE_BOOL_FWD: LispBoolFwd = LispBoolFwd {
+    ty: LispFwdType::Bool,
+    value: AtomicBool::new(true),
+};
+
 impl LispBoolFwd {
     #[inline]
     pub fn get(&self) -> bool {
