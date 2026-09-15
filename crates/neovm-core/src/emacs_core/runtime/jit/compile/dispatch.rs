@@ -519,7 +519,7 @@ fn aset_fast(array: Value, index: Value, value: Value) -> bool {
         {
             return false;
         }
-        crate::tagged::gc::note_heap_slot_write(
+        crate::tagged::gc::note_heap_slot_write_inline(
             array,
             crate::tagged::gc::HeapWriteKind::VectorSlot,
             idx,

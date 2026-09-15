@@ -1139,25 +1139,60 @@ pub(super) fn note_heap_write_record(record: HeapWriteRecord) {
 
 #[inline(never)]
 fn note_heap_write_record_slow(record: HeapWriteRecord, disabled: bool, concurrent: bool) {
+    if barrier_needs_heap(record, disabled, concurrent) {
+        with_tagged_heap(|heap| heap.record_heap_write(record));
+    }
+}
+
+/// The whole barrier inline, for a store site hot enough to want it (the
+/// JIT's `aset`): the rejects [`note_heap_write_record`] makes inline and
+/// the ones it leaves to its outlined part, then the heap.
+#[inline(always)]
+pub(crate) fn note_heap_slot_write_inline(
+    owner: TaggedValue,
+    kind: HeapWriteKind,
+    slot: usize,
+    value: TaggedValue,
+) {
+    if !owner.is_heap_object() {
+        return;
+    }
+    let disabled =
+        TAGGED_HEAP_WRITE_TRACKING_MODE.with(|mode| mode.get()) == WriteTrackingMode::Disabled;
+    let partition = TAGGED_HEAP_PARTITION_ACTIVE.with(|p| p.get());
+    let concurrent = TAGGED_HEAP_CONCURRENT_ACTIVE.with(|c| c.get());
+    if disabled && !partition && !concurrent {
+        return;
+    }
+    let record = HeapWriteRecord::slot(owner, kind, slot, value);
+    if barrier_needs_heap(record, disabled, concurrent) {
+        with_tagged_heap(|heap| heap.record_heap_write(record));
+    }
+}
+
+/// Whether a write that passed the flag test must reach `record_heap_write`.
+#[inline(always)]
+fn barrier_needs_heap(record: HeapWriteRecord, disabled: bool, concurrent: bool) -> bool {
     let bits = record.owner.bits();
     if disabled && !concurrent {
         // Partition-only path: the barrier's sole job is the append-only dump
         // remembered set (see `record_heap_write`), whose only effect here is
         // inserting a mapped or tenured owner, so two cheap thread-local
         // rejects apply. (1) An owner already inserted has nothing to add —
-        // its entry is permanent. (2) A non-cons owner outside the dump span
-        // that is not tenured is not inserted: it points at a `GcHeader`
+        // its entry is permanent. (2) An owner outside the dump span that is
+        // not tenured is not inserted: a cons never is (`value_is_tenured` is
+        // false for cons), and any other heap value points at a `GcHeader`
         // whose `tenured` byte is exactly what `value_is_tenured` reads.
         if TAGGED_HEAP_REMEMBERED_CACHE.with(|slots| slots[barrier_cache_slot(bits)].get()) == bits
         {
-            return;
+            return false;
         }
-        if !record.owner.is_cons()
-            && let Some(addr) = TaggedHeap::value_heap_addr(record.owner)
-        {
+        if let Some(addr) = TaggedHeap::value_heap_addr(record.owner) {
             let (lo, hi) = TAGGED_HEAP_DUMP_SPAN.with(|s| s.get());
-            if (addr < lo || addr >= hi) && !unsafe { (*(addr as *const GcHeader)).tenured } {
-                return;
+            if (addr < lo || addr >= hi)
+                && (record.owner.is_cons() || !unsafe { (*(addr as *const GcHeader)).tenured })
+            {
+                return false;
             }
         }
     } else if disabled
@@ -1166,9 +1201,9 @@ fn note_heap_write_record_slow(record: HeapWriteRecord, disabled: bool, concurre
     {
         // Concurrent mark, owner tracking off: this owner's pre-image is
         // already logged this cycle (see `TAGGED_HEAP_SATB_CACHE`).
-        return;
+        return false;
     }
-    with_tagged_heap(|heap| heap.record_heap_write(record));
+    true
 }
 
 /// SATB deletion barrier for ROOT-slot overwrites — specifically a symbol's
