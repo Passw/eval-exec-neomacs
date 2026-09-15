@@ -82,7 +82,9 @@ pub(crate) const ABI_TAG: u32 = compute_abi_tag();
 /// (value-returning shims; a `VALUE_SHIM_*` tag-`0b001` word is a sentinel), and
 /// `neovm_jit_named_builtin` no longer has variant 3.
 /// v7: `Op::Memq` and `Op::Assq` call `neovm_jit_memq` / `neovm_jit_assq`.
-const ABI_TAG_VERSION: u32 = 7;
+/// v8: `Op::VarRef` reads a plain symbol's value cell inline, through the
+/// `Context`/`Obarray`/`LispSymbol` layout offsets salted below.
+const ABI_TAG_VERSION: u32 = 8;
 
 /// Format version of the AOT descriptor spec-section + the runtime spec ABI
 /// (`SpecSlot`/`spec_expected` sidecar bases, the loader re-classify+arm protocol).
@@ -127,6 +129,13 @@ const fn compute_abi_tag() -> u32 {
         }};
     }
     mix_u64!(ABI_TAG_VERSION as u64);
+    // The inline `Op::VarRef` read bakes these layout facts into the code.
+    mix_u64!(core::mem::offset_of!(crate::emacs_core::eval::Context, obarray) as u64);
+    mix_u64!(crate::emacs_core::symbol::OBARRAY_JIT_SPINE_OFFSET as u64);
+    mix_u64!(crate::emacs_core::symbol::OBARRAY_JIT_LEN_OFFSET as u64);
+    mix_u64!(crate::emacs_core::symbol::LISP_SYMBOL_SIZE as u64);
+    mix_u64!(crate::emacs_core::symbol::LISP_SYMBOL_FLAGS_OFFSET as u64);
+    mix_u64!(crate::emacs_core::symbol::LISP_SYMBOL_VAL_OFFSET as u64);
     // STATUS_* codes (the loader + code agree on these). STATUS_NEED_GENERIC
     // never crosses the leaf entry ABI (it is consumed inside a leaf's OWN
     // generated code by the fast-shim -> generic-fallback branch — this now

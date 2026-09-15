@@ -982,30 +982,76 @@ struct SymbolChunks {
     seqs: Vec<Box<std::sync::atomic::AtomicU32>>,
     /// Logical slot count; grows to a chunk boundary as chunks are appended.
     len: usize,
+    /// Address of `chunks`' buffer — an array of thin pointers, one per chunk
+    /// — kept equal to `chunks.as_ptr()` by every operation that can move it
+    /// (construction, clone, growth). Compiled code reads it at a fixed offset
+    /// to reach a symbol's cell without a call (see
+    /// [`OBARRAY_JIT_SPINE_OFFSET`]). A plain integer, not a raw pointer, so
+    /// the store stays `Send`/`Sync`.
+    spine_addr: usize,
 }
+
+/// Where compiled code finds a symbol's value cell from the `Obarray`:
+/// `len` at [`OBARRAY_JIT_LEN_OFFSET`] bounds the slot index, the spine at
+/// [`OBARRAY_JIT_SPINE_OFFSET`] holds one pointer per chunk, and slot `idx`
+/// lives at `spine[idx >> OBARRAY_CHUNK_BITS] + (idx & (OBARRAY_CHUNK - 1)) *
+/// LISP_SYMBOL_SIZE`. An empty slot reads as a `Plainval` unbound cell.
+pub(crate) const OBARRAY_JIT_SPINE_OFFSET: usize =
+    std::mem::offset_of!(Obarray, symbols) + std::mem::offset_of!(SymbolChunks, spine_addr);
+/// See [`OBARRAY_JIT_SPINE_OFFSET`].
+pub(crate) const OBARRAY_JIT_LEN_OFFSET: usize =
+    std::mem::offset_of!(Obarray, symbols) + std::mem::offset_of!(SymbolChunks, len);
+/// See [`OBARRAY_JIT_SPINE_OFFSET`].
+pub(crate) const OBARRAY_CHUNK_BITS: u32 = 12;
+/// See [`OBARRAY_JIT_SPINE_OFFSET`].
+pub(crate) const OBARRAY_CHUNK_SLOTS: usize = OBARRAY_CHUNK;
+/// See [`OBARRAY_JIT_SPINE_OFFSET`].
+pub(crate) const LISP_SYMBOL_SIZE: usize = std::mem::size_of::<LispSymbol>();
+/// Byte offset of a symbol's packed flags; its low bits are the redirect.
+pub(crate) const LISP_SYMBOL_FLAGS_OFFSET: usize = std::mem::offset_of!(LispSymbol, flags);
+/// Byte offset of a symbol's value cell (`SymbolVal::plain` for `Plainval`).
+pub(crate) const LISP_SYMBOL_VAL_OFFSET: usize = std::mem::offset_of!(LispSymbol, val);
+/// Mask of the redirect bits in the flags byte; `Plainval` is zero.
+pub(crate) const SYMBOL_FLAGS_REDIRECT_MASK: u8 = SymbolFlags::REDIRECT_MASK;
+
+const _: () = {
+    assert!(OBARRAY_CHUNK == 1 << OBARRAY_CHUNK_BITS);
+    assert!(
+        std::mem::size_of::<Box<[LispSymbol; OBARRAY_CHUNK]>>() == std::mem::size_of::<usize>()
+    );
+    assert!(std::mem::size_of::<SymbolFlags>() == 1);
+    assert!(SymbolRedirect::Plainval as u8 == 0);
+    assert!(std::mem::size_of::<SymbolVal>() == std::mem::size_of::<Value>());
+};
 
 impl Clone for SymbolChunks {
     fn clone(&self) -> Self {
         // A cloned obarray is never concurrently marked, so the seqlocks reset
         // to 0 (even). (`AtomicU32` is not `Clone`, hence the manual impl.)
+        let chunks = self.chunks.clone();
+        let spine_addr = chunks.as_ptr() as usize;
         Self {
-            chunks: self.chunks.clone(),
+            chunks,
             seqs: self
                 .chunks
                 .iter()
                 .map(|_| Box::new(std::sync::atomic::AtomicU32::new(0)))
                 .collect(),
             len: self.len,
+            spine_addr,
         }
     }
 }
 
 impl SymbolChunks {
     fn new() -> Self {
+        let chunks = Vec::new();
+        let spine_addr = chunks.as_ptr() as usize;
         Self {
-            chunks: Vec::new(),
+            chunks,
             seqs: Vec::new(),
             len: 0,
+            spine_addr,
         }
     }
 
@@ -1065,6 +1111,10 @@ impl SymbolChunks {
             self.chunks.push(chunk);
             self.seqs
                 .push(Box::new(std::sync::atomic::AtomicU32::new(0)));
+            // The push may have moved the spine; publish it BEFORE `len` covers
+            // the new slots, so a reader bounded by `len` never indexes a
+            // stale spine.
+            self.spine_addr = self.chunks.as_ptr() as usize;
             self.len += OBARRAY_CHUNK;
         }
     }
@@ -1888,6 +1938,12 @@ impl Obarray {
     /// Ensure symbol storage exists for an arbitrary symbol id.
     pub fn ensure_symbol_id(&mut self, id: SymId) -> &mut LispSymbol {
         self.ensure_slot(id)
+    }
+
+    /// Test hook: the slot count the compiled-code bounds check reads.
+    #[cfg(test)]
+    pub(crate) fn symbol_count_upper_bound_for_test(&self) -> usize {
+        self.symbols.len()
     }
 
     /// Get symbol data by identity.
@@ -4486,6 +4542,10 @@ impl Drop for ObarraySymbolCellSkipGuard {
 #[cfg(test)]
 #[path = "tests/mod.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "tests/jit_layout.rs"]
+mod jit_layout_tests;
 
 /// Ledger 196: the buffer-local-read class ledger 191 named, pinned per site.
 #[cfg(test)]

@@ -940,6 +940,13 @@ pub extern "C" fn neovm_jit_symbolp_slow(ctx: *mut u8, v: i64) -> i64 {
     }) as i64
 }
 
+#[cfg(test)]
+thread_local! {
+    /// Test hook: calls that reached `neovm_jit_varref` instead of the inline
+    /// plain-cell read.
+    pub(crate) static VARREF_SHIM_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// Read a variable from JIT code (`Op::VarRef` semantics via
 /// `Vm::varref_for_jit`). Writes the value through `out` and returns
 /// [`STATUS_OK`], or stashes the `Flow` (e.g. `void-variable`) and returns
@@ -947,6 +954,8 @@ pub extern "C" fn neovm_jit_symbolp_slow(ctx: *mut u8, v: i64) -> i64 {
 #[allow(clippy::not_unsafe_ptr_arg_deref)] // C-ABI shim: raw ptrs per documented SAFETY contract; only ever called from generated code.
 #[unsafe(no_mangle)]
 pub extern "C" fn neovm_jit_varref(ctx: *mut u8, sym: i64, out: *mut i64) -> i64 {
+    #[cfg(test)]
+    VARREF_SHIM_CALLS.with(|c| c.set(c.get() + 1));
     jit_shim_contain!(ctx, STATUS_SIGNAL, {
         use crate::emacs_core::intern::SymId;
         use crate::emacs_core::symbol::SymbolRedirect;

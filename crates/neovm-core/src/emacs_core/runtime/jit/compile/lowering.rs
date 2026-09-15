@@ -4445,28 +4445,118 @@ pub(crate) fn lower_simple_op(
             // this neither poisons nor guards.
             let rt = rt.ok_or(CompileError::UnsupportedOp("variable"))?;
             let sym = const_sym_id(constants, *idx)?;
-            // Root live stack values: variable access may allocate.
+            let sym_v = materialize_op_sym_id(fb, reloc_base, reloc_index, sym);
+            // GNU's `Bvarref` reads a plain symbol's value cell inline; so does
+            // this: the answer `neovm_jit_varref`'s first branch gives, without
+            // the call — a slot in range whose redirect is `Plainval` and whose
+            // value is bound (an empty slot reads unbound). `nil` answers here
+            // too unless the symbol is a dedicated buffer-local, whose `nil`
+            // cell means "read the buffer" (decided now: the set is fixed by
+            // symbol identity). Everything else takes the shim.
+            let res = fb.declare_var(types::I64);
+            let slow = fb.create_block();
+            let cont = fb.create_block();
+            {
+                use crate::emacs_core::symbol::{
+                    LISP_SYMBOL_FLAGS_OFFSET, LISP_SYMBOL_SIZE, LISP_SYMBOL_VAL_OFFSET,
+                    OBARRAY_CHUNK_BITS, OBARRAY_CHUNK_SLOTS, OBARRAY_JIT_LEN_OFFSET,
+                    OBARRAY_JIT_SPINE_OFFSET, SYMBOL_FLAGS_REDIRECT_MASK,
+                };
+                let ob = core::mem::offset_of!(Context, obarray);
+                let vmctx = fb.use_var(rt.vmctx_var);
+                let len = fb.ins().load(
+                    types::I64,
+                    MemFlagsData::trusted(),
+                    vmctx,
+                    (ob + OBARRAY_JIT_LEN_OFFSET) as i32,
+                );
+                let in_range = fb.ins().icmp(IntCC::UnsignedLessThan, sym_v, len);
+                let cell_blk = fb.create_block();
+                fb.ins().brif(in_range, cell_blk, &[], slow, &[]);
+                fb.switch_to_block(cell_blk);
+                fb.seal_block(cell_blk);
+                let spine = fb.ins().load(
+                    rt.ptr_ty,
+                    MemFlagsData::trusted(),
+                    vmctx,
+                    (ob + OBARRAY_JIT_SPINE_OFFSET) as i32,
+                );
+                let chunk_index = ushr_imm_p(fb, sym_v, OBARRAY_CHUNK_BITS as i64);
+                let chunk_off = ishl_imm_p(fb, chunk_index, 3);
+                let chunk_slot = fb.ins().iadd(spine, chunk_off);
+                let chunk = fb
+                    .ins()
+                    .load(rt.ptr_ty, MemFlagsData::trusted(), chunk_slot, 0);
+                let slot_index = band_imm_p(fb, sym_v, (OBARRAY_CHUNK_SLOTS - 1) as i64);
+                let cell_off = fb.ins().imul_imm(slot_index, LISP_SYMBOL_SIZE as i64);
+                let cell = fb.ins().iadd(chunk, cell_off);
+                let flags = fb.ins().uload8(
+                    types::I64,
+                    MemFlagsData::trusted(),
+                    cell,
+                    LISP_SYMBOL_FLAGS_OFFSET as i32,
+                );
+                let redirect = band_imm_p(fb, flags, SYMBOL_FLAGS_REDIRECT_MASK as i64);
+                let plain = icmp_imm_p(fb, IntCC::Equal, redirect, 0);
+                let val_blk = fb.create_block();
+                fb.ins().brif(plain, val_blk, &[], slow, &[]);
+                fb.switch_to_block(val_blk);
+                fb.seal_block(val_blk);
+                let val = fb.ins().load(
+                    types::I64,
+                    MemFlagsData::trusted(),
+                    cell,
+                    LISP_SYMBOL_VAL_OFFSET as i32,
+                );
+                let unbound = icmp_imm_p(fb, IntCC::Equal, val, Value::UNBOUND.bits() as i64);
+                let refused = if crate::buffer::buffer::DedicatedBufferLocal::from_sym_id(
+                    crate::emacs_core::intern::SymId(sym),
+                )
+                .is_some()
+                {
+                    let nil = icmp_imm_p(fb, IntCC::Equal, val, Value::NIL.bits() as i64);
+                    fb.ins().bor(unbound, nil)
+                } else {
+                    unbound
+                };
+                let fast_blk = fb.create_block();
+                fb.ins().brif(refused, slow, &[], fast_blk, &[]);
+                fb.switch_to_block(fast_blk);
+                fb.seal_block(fast_blk);
+                fb.def_var(res, val);
+                fb.ins().jump(cont, &[]);
+            }
+            // The shim: root live stack values (variable access may allocate).
+            // The inline read stored nothing, so the continuation meets both
+            // store records.
+            fb.switch_to_block(slow);
+            fb.seal_block(slow);
+            let carry_fast = rootwin_carry_snapshot();
             let saved = if stack.is_empty() {
                 CondRoots::NONE
             } else {
                 emit_cond_residual_roots_pre(fb, rt, stack.as_slice())
             };
             let vmctx = fb.use_var(rt.vmctx_var);
-            let sym_v = materialize_op_sym_id(fb, reloc_base, reloc_index, sym);
             let out_addr = fb.ins().stack_addr(rt.ptr_ty, rt.call_result_slot, 0);
             let call = fb.ins().call(rt.refs.varref, &[vmctx, sym_v, out_addr]);
             let status = fb.inst_results(call)[0];
             emit_cond_residual_roots_post(fb, rt, saved);
+            rootwin_carry_meet(&carry_fast);
             let se = signal_target_for_site(fb, signal_exit, handlers, pending, stack);
-            let cont = fb.create_block();
+            let slow_ok = fb.create_block();
             let ok = icmp_imm_p(fb, IntCC::Equal, status, STATUS_OK);
-            fb.ins().brif(ok, cont, &[], se, &[]);
-            fb.switch_to_block(cont);
-            fb.seal_block(cont);
+            fb.ins().brif(ok, slow_ok, &[], se, &[]);
+            fb.switch_to_block(slow_ok);
+            fb.seal_block(slow_ok);
             let result = fb
                 .ins()
                 .stack_load(rt.ptr_ty, types::I64, rt.call_result_slot, 0);
-            stack.push(result);
+            fb.def_var(res, result);
+            fb.ins().jump(cont, &[]);
+            fb.switch_to_block(cont);
+            fb.seal_block(cont);
+            stack.push(fb.use_var(res));
         }
         Op::VarSet(idx) => {
             // Assign through the runtime (may run variable watchers — arbitrary

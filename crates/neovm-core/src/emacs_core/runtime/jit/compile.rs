@@ -4070,3 +4070,6 @@ mod array_shim_tests;
 #[cfg(test)]
 #[path = "tests/compile.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "tests/varref_inline.rs"]
+mod varref_inline_tests;

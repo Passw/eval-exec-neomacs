@@ -2600,7 +2600,7 @@ fn baseline_reg_args_fallback_stores_do_not_leak_into_the_next_site() {
 /// slot 1 is common to both paths, so the next site must store `c` and may
 /// elide `b`.
 ///
-///     (lambda (a b) v (let ((c (cons a a))) (setq a c) (point) v b))
+///     (lambda (a b) (setq v v) (let ((c (cons a a))) (setq a c) (point) (setq v v) b))
 #[test]
 fn baseline_fallback_meet_keeps_only_the_slots_both_paths_agree_on() {
     use crate::emacs_core::eval::Context;
@@ -2614,16 +2614,16 @@ fn baseline_fallback_meet_keeps_only_the_slots_both_paths_agree_on() {
     });
     f.lexical = true;
     f.ops = vec![
-        Op::VarRef(0),                          // residual [a b]: stores a, b
-        Op::Pop,                                // [a b]
+        Op::Constant(0),                        // [a b v]
+        Op::VarSet(0),                          // residual [a b]: stores a, b
         Op::StackRef(1),                        // a        [a b a]
         Op::Dup,                                //          [a b a a]
         Op::Cons,                               // c        [a b c]
         Op::StackSet(2),                        //          [c b]
         Op::CallBuiltinSym(intern("point"), 0), // residual [c b]: fast path stores nothing
         Op::Pop,                                // [c b]
-        Op::VarRef(0),                          // residual [c b]: store c, elide b
-        Op::Pop,                                // [c b]
+        Op::Constant(0),                        // [c b v]
+        Op::VarSet(0),                          // residual [c b]: store c, elide b
         Op::Return,                             // b
     ];
     f.constants = vec![Value::symbol("jit-meet-carry-v")].into();
@@ -2641,12 +2641,12 @@ fn baseline_fallback_meet_keeps_only_the_slots_both_paths_agree_on() {
 /// Rule 3 at a handler-dispatch block. Dispatch blocks are emitted after the
 /// whole bytecode block, so the store record they see is the block's END
 /// state, but each is entered from ONE site's signal edge. A Tier-A `point`
-/// site stores nothing on its fast path; the `setq`-free `VarRef` after it
-/// stores `[a x]`. If `point` signals, its dispatch block roots `[a x]` for the
+/// site stores nothing on its fast path; the `setq` after it (whose shim
+/// call always roots its residual) stores `[a x]`. If `point` signals, its dispatch block roots `[a x]` for the
 /// match shim (which can run Lisp) — and must STORE them, not trust a record
 /// written by a site the signal path never ran.
 ///
-///     (lambda (a) (let ((x (cons a a))) (condition-case nil (progn (point) v) (error x))))
+///     (lambda (a) (let ((x (cons a a))) (condition-case nil (progn (point) (setq v v)) (error x))))
 #[test]
 fn baseline_handler_dispatch_blocks_do_not_trust_the_block_end_store_record() {
     use crate::emacs_core::eval::Context;
@@ -2666,8 +2666,8 @@ fn baseline_handler_dispatch_blocks_do_not_trust_the_block_end_store_record() {
         Op::PushConditionCase(10),              // 3                 [a x]
         Op::CallBuiltinSym(intern("point"), 0), // 4: Tier-A site    [a x p]
         Op::Pop,                                // 5                 [a x]
-        Op::VarRef(0),                          // 6: stores [a x]   [a x v]
-        Op::Pop,                                // 7                 [a x]
+        Op::Constant(0),                        // 6                 [a x v]
+        Op::VarSet(0),                          // 7: stores [a x]   [a x]
         Op::PopHandler,                         // 8                 [a x]
         Op::Return,                             // 9: x
         Op::Return,                             // 10: handler       [a x err]
@@ -2702,8 +2702,8 @@ fn baseline_switch_back_edge_polls_store_their_own_roots() {
         }
     });
     let ops = [
-        Op::VarRef(0),   // 0: residual [k acc]      [k acc v]
-        Op::Pop,         // 1                        [k acc]
+        Op::Constant(0), // 0                        [k acc foo]
+        Op::VarSet(0),   // 1: residual [k acc]      [k acc]
         Op::Constant(1), // 2: (target) 1            [k acc 1]
         Op::StackRef(1), // 3: acc                   [k acc 1 acc]
         Op::Cons,        // 4: c                     [k acc c]
@@ -2711,8 +2711,8 @@ fn baseline_switch_back_edge_polls_store_their_own_roots() {
         Op::StackRef(1), // 6: k                     [k c k]
         Op::Constant(2), // 7: table                 [k c k table]
         Op::Switch,      // 8: -> 0 or 2 (both back) [k c]
-        Op::VarRef(0),   // 9: residual [k c]        [k c v]
-        Op::Pop,         // 10                       [k c]
+        Op::Constant(0), // 9                        [k c foo]
+        Op::VarSet(0),   // 10: residual [k c]       [k c]
         Op::Return,      // 11: c
     ];
     let constants = [Value::symbol("jit-sw-carry-foo"), Value::make_int(1), table];
