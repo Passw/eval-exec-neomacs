@@ -4272,3 +4272,151 @@ fn ascii_syntax_memo_decodes_each_char_at_most_once_per_scan() {
          distinct chars -- the lazy memo must survive on short spans"
     );
 }
+
+/// A `parse-partial-sexp` RESUMED from OLDSTATE whose element 10 names a
+/// comment-start-first character pairs it with the first character of the new
+/// range, as GNU's `scan_sexps_forward` does at entry
+/// (`in_2char_comment_start`, src/syntax.c:3265). Each case is
+/// `(let ((s1 (parse-partial-sexp 1 SPLIT))) (parse-partial-sexp SPLIT END nil STOP s1 COMMENTSTOP))`
+/// with the values GNU 31.1 printed (tmp/eb/pps-resume-oracle.el): the first
+/// state, point after the second parse, the second state.
+#[test]
+fn a_resumed_parse_pairs_a_comment_opener_split_at_its_start_like_gnu() {
+    crate::test_utils::init_test_tracing();
+    // (text, split, end, commentstop, nested-table?, GNU's printed result)
+    let cases: &[(&str, i64, i64, Option<&str>, bool, &str)] = &[
+        (
+            "a /* b */ c",
+            4,
+            12,
+            None,
+            false,
+            "((0 nil 1 nil nil nil 0 nil nil nil 2818049) 12 (0 nil 11 nil nil nil 0 nil nil nil nil))",
+        ),
+        (
+            "a /* b */ c",
+            4,
+            7,
+            None,
+            false,
+            "((0 nil 1 nil nil nil 0 nil nil nil 2818049) 7 (0 nil nil nil t nil 0 nil 3 nil nil))",
+        ),
+        (
+            "a // b\nc",
+            4,
+            9,
+            None,
+            false,
+            "((0 nil 1 nil nil nil 0 nil nil nil 2818049) 9 (0 nil 8 nil nil nil 0 nil nil nil nil))",
+        ),
+        (
+            "a /x",
+            4,
+            5,
+            None,
+            false,
+            "((0 nil 1 nil nil nil 0 nil nil nil 2818049) 5 (0 nil 4 nil nil nil 0 nil nil nil nil))",
+        ),
+        (
+            "a /* b",
+            4,
+            5,
+            None,
+            false,
+            "((0 nil 1 nil nil nil 0 nil nil nil 2818049) 5 (0 nil nil nil t nil 0 nil 3 nil nil))",
+        ),
+        (
+            "a /* b */ c",
+            4,
+            12,
+            Some("t"),
+            false,
+            "((0 nil 1 nil nil nil 0 nil nil nil 2818049) 5 (0 nil nil nil t nil 0 nil 3 nil nil))",
+        ),
+        (
+            "a /* b */ c",
+            4,
+            12,
+            Some("syntax-table"),
+            false,
+            "((0 nil 1 nil nil nil 0 nil nil nil 2818049) 5 (0 nil nil nil t nil 0 nil 3 nil nil))",
+        ),
+        (
+            "a /* b */ c",
+            3,
+            12,
+            None,
+            false,
+            "((0 nil 1 nil nil nil 0 nil nil nil nil) 12 (0 nil 11 nil nil nil 0 nil nil nil nil))",
+        ),
+        (
+            "(* a *) b",
+            2,
+            9,
+            None,
+            true,
+            "((1 1 nil nil nil nil 0 nil nil (1) 4259844) 9 (1 1 nil nil nil nil 1 nil nil (1) nil))",
+        ),
+        (
+            "x (* (* a *) *) b",
+            4,
+            18,
+            None,
+            true,
+            "((1 3 nil nil nil nil 0 nil nil (3) 4259844) 18 (1 3 17 nil nil nil 1 nil nil (3) nil))",
+        ),
+        (
+            "a /* b */ c",
+            5,
+            12,
+            None,
+            false,
+            "((0 nil 1 nil t nil 0 nil 3 nil nil) 12 (0 nil 11 nil nil nil 0 nil nil nil nil))",
+        ),
+    ];
+    for &(text, split, end, commentstop, nested, gnu) in cases {
+        let mut eval = crate::emacs_core::eval::Context::new();
+        replace_current_buffer_text(&mut eval, text);
+        if nested {
+            for (ch, desc) in [('(', "()1n"), (')', ")(4n"), ('*', ". 23n")] {
+                builtin_modify_syntax_entry(
+                    &mut eval,
+                    vec![Value::fixnum(ch as i64), Value::string(desc)],
+                )
+                .expect("nested comment syntax");
+            }
+        } else {
+            install_c_line_and_block_comment_syntax(&mut eval);
+        }
+        let s1 =
+            builtin_parse_partial_sexp(&mut eval, vec![Value::fixnum(1), Value::fixnum(split)])
+                .expect("first parse");
+        let commentstop = match commentstop {
+            None => Value::NIL,
+            Some("t") => Value::T,
+            Some(sym) => Value::symbol(sym),
+        };
+        let s2 = builtin_parse_partial_sexp(
+            &mut eval,
+            vec![
+                Value::fixnum(split),
+                Value::fixnum(end),
+                Value::NIL,
+                Value::NIL,
+                s1,
+                commentstop,
+            ],
+        )
+        .expect("resumed parse");
+        let got = format!(
+            "({} {} {})",
+            crate::emacs_core::print::print_value(&s1),
+            current_point_lisp_pos(&eval),
+            crate::emacs_core::print::print_value(&s2)
+        );
+        assert_eq!(
+            got, gnu,
+            "{text:?} split {split} end {end} commentstop {commentstop:?}"
+        );
+    }
+}

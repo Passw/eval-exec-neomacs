@@ -6628,7 +6628,48 @@ fn parse_state_from_range_recording<const RECORD: bool>(
         }
     };
 
-    while idx < to_idx {
+    // GNU `scan_sexps_forward` enters its loop through `in_2char_comment_start`
+    // (src/syntax.c:3265): a parse RESUMED from an OLDSTATE whose element 10
+    // names a comment-start-first character pairs it with the first character
+    // here, the pair straddling the previous TO. This parser pairs by peeking
+    // inside its own range, so without the entry check a split `/*` (or a
+    // nested `(*`) was read as punctuation and a star: a resumed parse -- every
+    // syntax-ppss cache midpoint -- missed the comment and miscounted parens.
+    let mut stopped_at_entry = false;
+    if oldstate.is_some()
+        && state.in_comment.is_none()
+        && state.in_string.is_none()
+        && !state.quoted
+        && to_idx > 0
+    {
+        let prev_flags = SyntaxFlags::new(((state.prev_syntax >> 16) & 0xff) as u8);
+        if prev_flags.contains(SyntaxFlags::COMMENT_START_FIRST) {
+            let (_, next_flags) =
+                syntax_class_and_flags(buf, table, chars.peek(), from_char, &prop_cache);
+            if next_flags.contains(SyntaxFlags::COMMENT_START_SECOND) {
+                state.in_comment = Some(ParseCommentState::Syntax {
+                    depth: 1,
+                    flavor: CommentFlavor::two_char_start(prev_flags, next_flags),
+                });
+                // GNU `comstr_start = prev_from`: the Lisp position of the
+                // pair's first character, the one before FROM.
+                state.comment_or_string_start = Some(from_char as i64);
+                chars.skip();
+                idx = 1;
+                state.prev_syntax = PARSE_PREV_SYNTAX_SMAX;
+                // GNU `atcomment: if (commentstop || boundary_stop) goto done`.
+                if commentstop != CommentStopMode::None {
+                    comment_exit = ParseCommentExit::StoppedAtEntry;
+                    stopped_at_entry = true;
+                }
+            }
+        }
+    }
+
+    // Stopped at an entry comment: the loop does not run (one compare, not a
+    // flag test per character).
+    let loop_end = if stopped_at_entry { idx } else { to_idx };
+    while idx < loop_end {
         let abs_char = from_char + idx;
         // A safe restart position: about to scan a character outside every
         // comment and string. Every two-character decision about the previous
