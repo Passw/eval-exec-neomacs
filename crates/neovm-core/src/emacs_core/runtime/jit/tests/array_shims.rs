@@ -634,3 +634,72 @@ fn a_later_call_site_roots_what_only_the_aset_fallback_stored() {
         assert_eq!(print_value(&v), "[7 0]");
     }
 }
+
+/// `(lambda (n l) (nth n l))`
+fn nth_fn() -> ByteCodeFunction {
+    lexical_fn(
+        2,
+        vec![Op::StackRef(1), Op::StackRef(1), Op::Nth, Op::Return],
+        vec![],
+    )
+}
+
+/// Byte-code `nth` is GNU `Bnth`: a count of 0..127 walks the list inline
+/// and signals with the non-list TAIL it stops at, where the `nth` function
+/// signals with the whole list. The interpreter's opcode and compiled code
+/// agree, and match GNU Emacs 31.0.90 byte-compiled results.
+#[test]
+fn byte_code_nth_reports_the_tail_it_stops_at() {
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let mut eval = Context::new();
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    let f = nth_fn();
+    let leaf = compile_bytecode_function(&f).expect("nth compiles");
+    let cases = [
+        ("0", "'(a b)", "a"),
+        ("1", "'(a b)", "b"),
+        ("2", "'(a b)", "nil"),
+        ("-1", "'(a b)", "a"),
+        ("127", "nil", "nil"),
+        ("128", "'(a)", "nil"),
+        (
+            "2",
+            "'(a . b)",
+            "signal wrong-type-argument [\"listp\", \"b\"]",
+        ),
+        (
+            "3",
+            "'(a b . c)",
+            "signal wrong-type-argument [\"listp\", \"c\"]",
+        ),
+        ("1", "'x", "signal wrong-type-argument [\"listp\", \"x\"]"),
+        (
+            "200",
+            "'(a . b)",
+            "signal wrong-type-argument [\"listp\", \"(a . b)\"]",
+        ),
+        (
+            "'z",
+            "'(a)",
+            "signal wrong-type-argument [\"integerp\", \"z\"]",
+        ),
+        ("(expt 2 70)", "'(a b)", "nil"),
+    ];
+    for (n, list, want) in cases {
+        let n_value = eval.eval_str(n).expect("n");
+        let list_value = eval.eval_str(list).expect("list");
+        let interpreted = interpret(&mut eval, &f, vec![n_value, list_value]);
+        let compiled = native(ctx_ptr, &leaf, &[n_value, list_value], "nth");
+        assert_eq!(interpreted, want, "interpreted (nth {n} {list})");
+        assert_eq!(compiled, want, "compiled (nth {n} {list})");
+    }
+    // The function keeps `Fnth`'s whole-list error.
+    assert_eq!(
+        print_value(
+            &eval
+                .eval_str("(condition-case e (nth 2 '(a . b)) (error e))")
+                .expect("nth function")
+        ),
+        "(wrong-type-argument listp (a . b))"
+    );
+}

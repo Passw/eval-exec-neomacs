@@ -5129,7 +5129,7 @@ impl<'a> Vm<'a> {
                         let len = stk!().len();
                         let n = stk!()[len - 2];
                         let list = stk!()[len - 1];
-                        let result = vm_try!(builtins::builtin_nth_2(&mut *self.ctx, n, list));
+                        let result = vm_try_pure!(builtins::bytecode_nth_values(n, list));
                         stk!()[len - 2] = result;
                         stk!().pop();
                     }

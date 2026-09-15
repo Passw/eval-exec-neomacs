@@ -636,6 +636,33 @@ pub(crate) fn builtin_nth_values(n_value: Value, list: Value) -> EvalResult {
     }
 }
 
+/// GNU `Bnth` (`bytecode.c`), the byte-code `nth`: a count of 0..127 walks
+/// the list inline and a non-list tail signals with that TAIL, where `Fnth`
+/// (a funcall or interpreted `nth`, [`builtin_nth_values`]) signals with the
+/// whole list. Byte-compiled `(nth 2 '(a . b))` is `(wrong-type-argument
+/// listp b)` in GNU. Any other count is `Fnth`'s.
+pub(crate) fn bytecode_nth_values(n_value: Value, list: Value) -> EvalResult {
+    if let Some(n) = n_value.as_fixnum()
+        && (0..=127).contains(&n)
+    {
+        let mut tail = list;
+        for _ in 0..n {
+            if !tail.is_cons() {
+                break;
+            }
+            tail = tail.cons_cdr();
+        }
+        return if tail.is_cons() {
+            Ok(tail.cons_car())
+        } else if tail.is_nil() {
+            Ok(Value::NIL)
+        } else {
+            Err(listp_error(tail))
+        };
+    }
+    builtin_nth_values(n_value, list)
+}
+
 enum NthcdrCount {
     Fixnum(i64),
     NegativeBignum,

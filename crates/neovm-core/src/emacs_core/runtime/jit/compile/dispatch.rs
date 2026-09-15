@@ -53,7 +53,7 @@ pub(crate) static JIT_BUILTIN2: [JitBuiltin2; 15] = [
 pub(crate) type JitBuiltin2Pure = fn(&Context, Value, Value) -> Result<Value, Flow>;
 
 fn pure_nth(_: &Context, n: Value, list: Value) -> Result<Value, Flow> {
-    b::builtin_nth_values(n, list)
+    b::bytecode_nth_values(n, list)
 }
 fn pure_nthcdr(_: &Context, n: Value, list: Value) -> Result<Value, Flow> {
     b::builtin_nthcdr_values(n, list)
