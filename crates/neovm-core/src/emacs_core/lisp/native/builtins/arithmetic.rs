@@ -1346,21 +1346,6 @@ pub(crate) fn builtin_float(args: Vec<Value>) -> EvalResult {
     }
 }
 
-/// Helper: extract a number as f64, signaling wrong-type-argument if not numeric.
-fn value_to_f64(_name: &str, v: &Value) -> Result<f64, Flow> {
-    match v.kind() {
-        ValueKind::Fixnum(n) => Ok(n as f64),
-        ValueKind::Float => Ok(v.xfloat()),
-        ValueKind::Veclike(VecLikeType::Bignum) => {
-            Ok(f64::rounding_from(v.as_bignum().unwrap(), RoundingMode::Nearest).0)
-        }
-        _ => Err(signal(
-            LispCondition::WrongTypeArgument,
-            vec![Value::symbol("numberp"), *v],
-        )),
-    }
-}
-
 /// Helper for 1-or-2-arg rounding functions.
 /// When called with 2 args, divides first by second, then applies the rounding op.
 /// For int/int with no remainder, returns integer directly.
@@ -1403,13 +1388,8 @@ fn rounding_with_divisor(
     // error from leaking out of the integer slow path.
     let _ = expect_number(&args[1])?;
     // 2-arg form: (op ARG DIVISOR)
-    if args[1].is_float() {
-        let divisor = args[1].xfloat();
-        if divisor == 0.0 {
-            return Err(signal(LispCondition::ArithError, vec![]));
-        }
-        let dividend = value_to_f64(name, &args[0])?;
-        return float_to_lisp_integer(round_fn(dividend / divisor));
+    if args[1].is_float() && args[1].xfloat() == 0.0 {
+        return Err(signal(LispCondition::ArithError, vec![]));
     }
     if let Some(d) = args[1].as_fixnum() {
         if d == 0 {
@@ -1422,18 +1402,17 @@ fn rounding_with_divisor(
     if args[1].is_bignum() && *args[1].as_bignum().unwrap() == 0 {
         return Err(signal(LispCondition::ArithError, vec![]));
     }
-    // Mixed bignum / float / fixnum 2-arg fallback. For non-float
-    // operands fall through to the float path; this loses precision
-    // for very large bignums but matches the existing behavior for
-    // the cases the test suite covers. A future pass can wire in
-    // mpz_tdiv_q etc. for full bignum-divisor support.
+    // The four flavors, as `int_div` is for fixnums: `round` is half to
+    // even (malachite's `Nearest`, GNU's `rounddiv_q`).
+    let mode = match name {
+        "truncate" => RoundingMode::Down,
+        "floor" => RoundingMode::Floor,
+        "ceiling" => RoundingMode::Ceiling,
+        "round" => RoundingMode::Nearest,
+        _ => unreachable!("unknown rounding name {name}"),
+    };
     if args[0].is_float() || args[1].is_float() {
-        let dividend = value_to_f64(name, &args[0])?;
-        let divisor = value_to_f64(name, &args[1])?;
-        if divisor == 0.0 {
-            return Err(signal(LispCondition::ArithError, vec![]));
-        }
-        return float_to_lisp_integer(round_fn(dividend / divisor));
+        return rounding_float_exact(&args[0], &args[1], mode);
     }
     // Bignum-divisor or bignum-dividend integer path, GNU's `rounddiv_q` and
     // friends: one division in the requested rounding mode. Bignums are read
@@ -1460,16 +1439,85 @@ fn rounding_with_divisor(
     if *d == 0 {
         return Err(signal(LispCondition::ArithError, vec![]));
     }
-    // The four flavors, as `int_div` is for fixnums: `round` is half to
-    // even (malachite's `Nearest`, GNU's `rounddiv_q`).
-    let mode = match name {
-        "truncate" => RoundingMode::Down,
-        "floor" => RoundingMode::Floor,
-        "ceiling" => RoundingMode::Ceiling,
-        "round" => RoundingMode::Nearest,
-        _ => unreachable!("unknown rounding name {name}"),
-    };
     Ok(Value::make_integer(a.div_round(d, mode).0))
+}
+
+/// GNU `double_integer_scale` (`src/floatfns.c`) for IEEE doubles: the
+/// power of two that scales `d` to an integer with `d`'s full precision —
+/// `DBL_MANT_DIG - 1 - ilogb (d)` — or 1074 for zero and subnormals, 1075
+/// for an infinity, 1076 for a NaN.
+fn double_integer_scale(d: f64) -> i32 {
+    const MAX_SCALE: i32 = 1074; // DBL_MANT_DIG - DBL_MIN_EXP
+    if d.is_nan() {
+        return MAX_SCALE + 2;
+    }
+    if d.is_infinite() {
+        return MAX_SCALE + 1;
+    }
+    let biased = ((d.to_bits() >> 52) & 0x7ff) as i32;
+    if biased == 0 {
+        // Zero or subnormal: `ilogb` is below `DBL_MIN_EXP - 1`.
+        return MAX_SCALE;
+    }
+    // ilogb (d) = biased - 1023.
+    52 - (biased - 1023)
+}
+
+/// A finite double times `2^double_integer_scale (d)`, exactly: its signed
+/// 53-bit significand (GNU `mpz_set_d (scalbn (d, scale))`).
+fn double_scaled_significand(d: f64) -> Integer {
+    let bits = d.to_bits();
+    let fraction = bits & ((1u64 << 52) - 1);
+    let significand = if (bits >> 52) & 0x7ff == 0 {
+        fraction
+    } else {
+        fraction | (1u64 << 52)
+    };
+    let magnitude = Integer::from(significand);
+    if bits >> 63 == 1 {
+        -magnitude
+    } else {
+        magnitude
+    }
+}
+
+/// The two-argument rounding functions with a float operand, exactly as GNU
+/// `rounding_driver` computes them: scale both operands by the same power
+/// of two until both are integers, then divide in the requested mode. The
+/// quotient of the DOUBLES was wrong whenever it is not representable:
+/// `(truncate 1e19 3)` is 3333333333333333333, not 3333333333333333504. The
+/// divisor has already been checked non-zero.
+fn rounding_float_exact(n: &Value, d: &Value, mode: RoundingMode) -> EvalResult {
+    const MAX_SCALE: i32 = 1074;
+    let nscale = if n.is_float() {
+        double_integer_scale(n.xfloat())
+    } else {
+        0
+    };
+    let dscale = if d.is_float() {
+        double_integer_scale(d.xfloat())
+    } else {
+        0
+    };
+    // A finite numerator over an infinite denominator: the quotient is zero.
+    if dscale == MAX_SCALE + 1 && nscale < dscale {
+        return Ok(Value::fixnum(0));
+    }
+    let rescale = |v: &Value, own: i32| -> Result<Integer, Flow> {
+        if v.is_float() {
+            // An infinity or a NaN has no integer scaling.
+            if own > MAX_SCALE {
+                return Err(signal(LispCondition::OverflowError, vec![]));
+            }
+            Ok(double_scaled_significand(v.xfloat()))
+        } else {
+            bignum_or_int_to_integer(v)
+        }
+    };
+    let scale = nscale.max(dscale);
+    let n_int = rescale(n, nscale)? << ((scale - nscale) as u64);
+    let d_int = rescale(d, dscale)? << ((scale - dscale) as u64);
+    Ok(Value::make_integer(n_int.div_round(d_int, mode).0))
 }
 
 /// Convert a finite f64 into a Lisp integer (fixnum or bignum). NaN
@@ -1871,3 +1919,7 @@ mod arithmetic_ash_overflow_test;
 #[cfg(test)]
 #[path = "tests/arithmetic_bignum_borrowed.rs"]
 mod arithmetic_bignum_borrowed_test;
+
+#[cfg(test)]
+#[path = "tests/arithmetic_rounding_float_exact.rs"]
+mod arithmetic_rounding_float_exact_test;
