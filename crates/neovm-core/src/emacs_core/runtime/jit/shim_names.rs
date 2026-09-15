@@ -23,6 +23,9 @@ const NEOVM_JIT_SHIM_NAMES: &[&str] = &[
     "neovm_jit_aset",
     "neovm_jit_assq",
     "neovm_jit_memq",
+    // `Op::Setcar` / `Op::Setcdr`: value-returning shims, same contract.
+    "neovm_jit_setcar",
+    "neovm_jit_setcdr",
     // logand/logior/logxor bitwise intrinsic — emitted by AOT baseline leaves
     // (its Op::Call classification runs under Some(obarray) at emit), so an AOT
     // `.so` may import it: MUST be host-exported + salted into ABI_TAG.

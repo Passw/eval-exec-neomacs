@@ -3085,6 +3085,12 @@ pub(crate) struct RtRefs {
     pub(crate) memq: FuncRef,
     /// `Op::Assq` (`neovm_jit_assq`): the entry's bits or `VALUE_SHIM_SIGNAL`.
     pub(crate) assq: FuncRef,
+    /// `Op::Setcar` (`neovm_jit_setcar`): the new car's bits or
+    /// `VALUE_SHIM_SIGNAL`.
+    pub(crate) setcar: FuncRef,
+    /// `Op::Setcdr` (`neovm_jit_setcdr`): the new cdr's bits or
+    /// `VALUE_SHIM_SIGNAL`.
+    pub(crate) setcdr: FuncRef,
     pub(crate) push_cc: FuncRef,
     pub(crate) push_cc_raw: FuncRef,
     pub(crate) push_catch: FuncRef,
@@ -3293,6 +3299,8 @@ pub(crate) fn declare_rt_refs<M: Module>(
     let aset_id = declare(module, "neovm_jit_aset", &sig_aset)?;
     let memq_id = declare(module, "neovm_jit_memq", &sig_aref)?;
     let assq_id = declare(module, "neovm_jit_assq", &sig_aref)?;
+    let setcar_id = declare(module, "neovm_jit_setcar", &sig_aref)?;
+    let setcdr_id = declare(module, "neovm_jit_setcdr", &sig_aref)?;
     // (vmctx, target, stack_len) -> ()  — condition-case push (infallible).
     let mut sig_pcc = Signature::new(call_conv);
     sig_pcc.params.push(AbiParam::new(ptr_ty));
@@ -3433,6 +3441,8 @@ pub(crate) fn declare_rt_refs<M: Module>(
         aset: module.declare_func_in_func(aset_id, func),
         memq: module.declare_func_in_func(memq_id, func),
         assq: module.declare_func_in_func(assq_id, func),
+        setcar: module.declare_func_in_func(setcar_id, func),
+        setcdr: module.declare_func_in_func(setcdr_id, func),
         push_cc: module.declare_func_in_func(pcc_id, func),
         push_cc_raw: module.declare_func_in_func(pcc_raw_id, func),
         push_catch: module.declare_func_in_func(pcatch_id, func),
@@ -5490,12 +5500,15 @@ pub(crate) fn lower_simple_op(
                 Op::Aref => Some(rt.refs.aref),
                 Op::Memq => Some(rt.refs.memq),
                 Op::Assq => Some(rt.refs.assq),
+                Op::Setcar => Some(rt.refs.setcar),
+                Op::Setcdr => Some(rt.refs.setcdr),
                 _ => None,
             };
             if let Some(value_shim) = value_shim {
-                // `neovm_jit_aref`/`_memq`/`_assq` answer the result's bits or
-                // VALUE_SHIM_SIGNAL (tag 0b001, never a Lisp value). GC-free
-                // like the pure table entries they stand in for: no roots.
+                // `neovm_jit_aref`/`_memq`/`_assq`/`_setcar`/`_setcdr` answer
+                // the result's bits or VALUE_SHIM_SIGNAL (tag 0b001, never a
+                // Lisp value). GC-free like the pure table entries they stand
+                // in for: no roots.
                 //
                 // JIT `aref` of a plain vector or record at an in-range fixnum
                 // index reads the slot inline and calls the shim for anything

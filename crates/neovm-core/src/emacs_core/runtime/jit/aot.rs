@@ -84,7 +84,9 @@ pub(crate) const ABI_TAG: u32 = compute_abi_tag();
 /// v7: `Op::Memq` and `Op::Assq` call `neovm_jit_memq` / `neovm_jit_assq`.
 /// v8: `Op::VarRef` reads a plain symbol's value cell inline, through the
 /// `Context`/`Obarray`/`LispSymbol` layout offsets salted below.
-const ABI_TAG_VERSION: u32 = 8;
+/// v9: `Op::Setcar` and `Op::Setcdr` call `neovm_jit_setcar` /
+/// `neovm_jit_setcdr`.
+const ABI_TAG_VERSION: u32 = 9;
 
 /// Format version of the AOT descriptor spec-section + the runtime spec ABI
 /// (`SpecSlot`/`spec_expected` sidecar bases, the loader re-classify+arm protocol).

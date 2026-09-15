@@ -482,6 +482,37 @@ pub extern "C" fn neovm_jit_assq(ctx: *mut u8, key: i64, list: i64) -> i64 {
     }
 }
 
+/// `Op::Setcar` (GNU `Bsetcar`) from compiled code: NEWCAR's bits, or
+/// [`VALUE_SHIM_SIGNAL`] when CELL is not a cons. GC-free on every path.
+///
+/// Through `neovm_jit_builtin2`'s table and `pure_setcar` a list loop's
+/// `setcar` cost 93 instructions, over half of elb inclist; here a cons
+/// takes the store and its barrier in one frame.
+/// SAFETY: same vmctx contract as [`neovm_jit_call`]; only read here.
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // C-ABI shim: raw ptrs per documented SAFETY contract; only ever called from generated code.
+#[unsafe(no_mangle)]
+pub extern "C" fn neovm_jit_setcar(ctx: *mut u8, cell: i64, new_car: i64) -> i64 {
+    let cell = Value::from_bits(cell as usize);
+    let new_car = Value::from_bits(new_car as usize);
+    if crate::tagged::mutate::set_cons_car(cell, new_car) {
+        return new_car.bits() as i64;
+    }
+    list_slow(ctx, pure_setcar, cell, new_car)
+}
+
+/// `Op::Setcdr` (GNU `Bsetcdr`): [`neovm_jit_setcar`]'s twin.
+/// SAFETY: same vmctx contract as [`neovm_jit_call`]; only read here.
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // C-ABI shim: raw ptrs per documented SAFETY contract; only ever called from generated code.
+#[unsafe(no_mangle)]
+pub extern "C" fn neovm_jit_setcdr(ctx: *mut u8, cell: i64, new_cdr: i64) -> i64 {
+    let cell = Value::from_bits(cell as usize);
+    let new_cdr = Value::from_bits(new_cdr as usize);
+    if crate::tagged::mutate::set_cons_cdr(cell, new_cdr) {
+        return new_cdr.bits() as i64;
+    }
+    list_slow(ctx, pure_setcdr, cell, new_cdr)
+}
+
 #[cold]
 #[inline(never)]
 fn list_slow(ctx: *mut u8, builtin: JitBuiltin2Pure, a: Value, b_: Value) -> i64 {

@@ -1,9 +1,9 @@
-//! `Op::Aref`, `Op::Aset`, `Op::Memq` and `Op::Assq` from compiled code:
-//! `neovm_jit_aref`/`_aset`/`_memq`/`_assq` answer the common shapes on a
-//! fast path and everything else through the builtin, returning the result's
-//! own bits or a `VALUE_SHIM_*` sentinel word. Every case must match the
-//! interpreter's opcode arm — result, signal, and what the array looks like
-//! afterwards.
+//! `Op::Aref`, `Op::Aset`, `Op::Memq`, `Op::Assq`, `Op::Setcar` and
+//! `Op::Setcdr` from compiled code: `neovm_jit_aref`/`_aset`/`_memq`/`_assq`/
+//! `_setcar`/`_setcdr` answer the common shapes on a fast path and everything
+//! else through the builtin, returning the result's own bits or a
+//! `VALUE_SHIM_*` sentinel word. Every case must match the interpreter's
+//! opcode arm — result, signal, and what the array looks like afterwards.
 
 use super::*;
 use crate::emacs_core::bytecode::Vm;
@@ -799,5 +799,57 @@ fn compiled_aref_reads_plain_vectors_and_records_inline() {
             inline,
             "(aref {array} {index}) inline: {inline}"
         );
+    }
+}
+
+/// `setcar` and `setcdr` through the compiled site and the interpreter's
+/// opcode arm, each on its own fresh cell: the same result or signal, and
+/// the same cell afterwards. A cons stores on the shim's fast path; anything
+/// else reaches the builtin, which signals.
+#[test]
+fn list_stores_match_the_interpreter_natively() {
+    use super::dispatch::ARRAY_SHIM_SLOW_CALLS;
+    let mut eval = Context::new();
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    let cells: &[(&str, bool)] = &[
+        ("(cons 1 2)", true),
+        ("(list 'a 'b 'c)", true),
+        ("(nthcdr 2 (list 1 2 3))", true),
+        ("nil", false),
+        ("'sym", false),
+        ("5", false),
+        ("(vector 1 2)", false),
+        ("\"str\"", false),
+        ("(position-symbol 'y 3)", false),
+    ];
+    for op in [Op::Setcar, Op::Setcdr] {
+        let f = list_fn(op.clone());
+        let leaf = compile_bytecode_function(&f).expect("compiles");
+        for &(cell_src, is_cons) in cells {
+            for value_src in VALUES {
+                let what = format!("({op:?} {cell_src} {value_src})");
+                // One evaluation: a cell held only in a Rust local would be
+                // unrooted across the value's safe point.
+                let fresh = |eval: &mut Context| {
+                    let pair = eval
+                        .eval_str(&format!("(cons {cell_src} {value_src})"))
+                        .expect("operands");
+                    (pair.cons_car(), pair.cons_cdr())
+                };
+                let (cell, value) = fresh(&mut eval);
+                let want = interpret(&mut eval, &f, vec![cell, value]);
+                let want_after = describe(cell);
+                let (cell, value) = fresh(&mut eval);
+                ARRAY_SHIM_SLOW_CALLS.with(|c| c.set(0));
+                let got = native(ctx_ptr, &leaf, &[cell, value], &what);
+                assert_eq!(got, want, "{what}");
+                assert_eq!(describe(cell), want_after, "{what}: the cell afterwards");
+                assert_eq!(
+                    ARRAY_SHIM_SLOW_CALLS.with(|c| c.get()),
+                    usize::from(!is_cons),
+                    "{what}: only a non-cons leaves the fast path"
+                );
+            }
+        }
     }
 }
