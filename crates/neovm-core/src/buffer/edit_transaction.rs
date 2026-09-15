@@ -772,6 +772,20 @@ impl Buffer {
         }
         self.overlays.adjust_for_replaced_text(replacement);
         self.record_char_modification(edit.changed_chars());
+        // Phase 3 unchanged-region accumulator, as the insert, delete and
+        // same-length paths do: a replace of [start, start + old) by `new`
+        // chars changes that span, and everything after it shifts by
+        // new - old. Without this a replace-shaped edit (`replace-match`,
+        // `translate-region`, `replace-region-contents`, ...) left the
+        // accumulator unchanged: the mode line's line-number anchor survived
+        // a replacement before it, and a redisplay that also saw a genuine
+        // insert elsewhere took that insert's span as the frame's whole damage.
+        let start = edit.old_char_start().get() as i64;
+        let old_len = edit.old_char_len().get() as i64;
+        let new_len = edit.new_char_len().get() as i64;
+        let new_z = self.text.char_count().get() as i64;
+        self.text
+            .note_changed_char_region(start, start + old_len, new_z - new_len + old_len);
     }
 
     pub(in crate::buffer) fn apply_shared_text_edit_side_effects(

@@ -3749,6 +3749,31 @@ fn changed_char_range_tracks_real_edits() {
     assert_eq!(buf.changed_char_range(), Some((10, 10)));
 }
 
+/// A replace-shaped edit feeds the unchanged-region accumulator like an insert
+/// or a delete: its dirty span is the replacement's new extent, and it unions
+/// with an insert elsewhere.
+#[test]
+fn changed_char_range_tracks_replacements() {
+    let mut buf = buf_with_text("hello world\nfoo bar\nbaz qux\n");
+    buf.reset_unchanged_region();
+    // "world" (chars [6, 11)) -> "there!!" (7 chars).
+    buf.replace_emacs_byte_range_lisp_string(
+        EmacsByteRange::from_start_len(EmacsBytePos::new(6), EmacsByteLen::new(5)),
+        &crate::heap_types::LispString::from_utf8("there!!"),
+    );
+    assert_eq!(buf.changed_char_range(), Some((6, 13)));
+    // A shrinking replace later in the buffer unions in.
+    buf.reset_unchanged_region();
+    buf.replace_emacs_byte_range_lisp_string(
+        EmacsByteRange::from_start_len(EmacsBytePos::new(14), EmacsByteLen::new(3)),
+        &crate::heap_types::LispString::from_utf8("F"),
+    );
+    assert_eq!(buf.changed_char_range(), Some((14, 15)));
+    buf.goto_emacs_byte_pos(EmacsBytePos::new(0));
+    buf.insert("Z");
+    assert_eq!(buf.changed_char_range(), Some((0, 16)));
+}
+
 /// The automatic-composition memo must answer from cache only while every
 /// input it reads is unchanged, and must recompute when any of them moves.
 /// A cache that goes stale silently is worse than no cache: the scan feeds
