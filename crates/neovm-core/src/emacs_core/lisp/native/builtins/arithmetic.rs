@@ -1,10 +1,11 @@
 use super::*;
 use crate::emacs_core::error::{expect_args, expect_args_range, expect_max_args, expect_min_args};
-use malachite::base::num::arithmetic::traits::{Abs, Pow};
+use malachite::base::num::arithmetic::traits::{Abs, DivRound, Pow};
 use malachite::base::num::conversion::traits::RoundingFrom;
 use malachite::base::num::logic::traits::SignificantBits;
 use malachite::base::rounding_modes::RoundingMode;
 use malachite::integer::Integer;
+use malachite::natural::Natural;
 use std::sync::Mutex;
 
 // ===========================================================================
@@ -48,6 +49,36 @@ fn wrong_integer_or_marker(value: &Value) -> Flow {
         LispCondition::WrongTypeArgument,
         vec![Value::symbol("integer-or-marker-p"), *value],
     )
+}
+
+/// `xs * m` for the limbs of a magnitude and one limb, into a vector sized
+/// for the carry up front. malachite's own `limbs_mul_limb` reserves only
+/// `xs.len()`, so a carry out of the top limb reallocated — and copied — the
+/// whole product; its in-place form does the same to the operand's buffer.
+fn natural_mul_limb(xs: &[u64], m: u64) -> Natural {
+    let mut out: Vec<u64> = Vec::with_capacity(xs.len() + 1);
+    let mut carry = 0u64;
+    out.extend(xs.iter().map(|&x| {
+        let p = u128::from(x) * u128::from(m) + u128::from(carry);
+        carry = (p >> 64) as u64;
+        p as u64
+    }));
+    if carry != 0 {
+        out.push(carry);
+    }
+    Natural::from_owned_limbs_asc(out)
+}
+
+/// `x * n` in one pass and one allocation, reading `x` by reference. GNU
+/// multiplies by a fixnum with `mpz_mul_si` into a fresh result the same way;
+/// seeding `Integer::from(1) *= x` first cloned `x`.
+fn integer_mul_i64(x: &Integer, n: i64) -> Integer {
+    if n == 0 || *x == 0 {
+        return Integer::from(0);
+    }
+    let negative = (*x < 0) != (n < 0);
+    let magnitude = natural_mul_limb(x.unsigned_abs_ref().as_limbs_asc(), n.unsigned_abs());
+    Integer::from_sign_and_abs(!negative, magnitude)
 }
 
 /// Materialize an integer-valued operand as a `malachite::Integer`. Used by
@@ -131,9 +162,21 @@ pub(crate) fn builtin_add_slice(
             return continue_float_add(eval, &args[i + 1..], acc);
         }
         if let Some(big) = a.as_bignum() {
-            let mut acc = Integer::from(sum);
-            acc += big;
-            return continue_bignum_add(eval, &args[i + 1..], acc);
+            // Read the bignum by reference: `Integer::from(sum) += big`
+            // cloned it (an allocation and a copy of every limb) only to add
+            // to it. Two bignums in a row add in one pass into one result.
+            let rest = &args[i + 1..];
+            if sum == 0
+                && let Some(next) = rest.first().and_then(|v| v.as_bignum())
+            {
+                return continue_bignum_add(eval, &rest[1..], big + next);
+            }
+            let acc = if sum == 0 {
+                big.clone()
+            } else {
+                big + Integer::from(sum)
+            };
+            return continue_bignum_add(eval, rest, acc);
         }
         if super::marker::is_marker(a) {
             let n = super::marker::marker_position_as_int_eval(eval, a)?;
@@ -195,8 +238,12 @@ fn continue_bignum_add(
                 f64::rounding_from(&acc, RoundingMode::Nearest).0 + a.xfloat(),
             );
         }
-        let n = integer_from_value(eval, a)?;
-        acc += n;
+        match a.kind() {
+            ValueKind::Fixnum(n) => acc += Integer::from(n),
+            // By reference: `integer_from_value` would clone it to read it.
+            ValueKind::Veclike(VecLikeType::Bignum) => acc += a.as_bignum().unwrap(),
+            _ => acc += integer_from_value(eval, a)?,
+        }
     }
     Ok(Value::make_integer(acc))
 }
@@ -224,7 +271,18 @@ pub(crate) fn builtin_sub_slice(
     } else if first.is_float() {
         return continue_float_sub(eval, &args[1..], first.xfloat());
     } else if let Some(big) = first.as_bignum() {
-        return continue_bignum_sub(eval, &args[1..], big.clone());
+        // By reference, as in `builtin_add_slice`: the next integer operand
+        // is subtracted into the one result instead of into a clone.
+        let rest = &args[1..];
+        match rest.first().map(|v| v.kind()) {
+            Some(ValueKind::Fixnum(n)) => {
+                return continue_bignum_sub(eval, &rest[1..], big - Integer::from(n));
+            }
+            Some(ValueKind::Veclike(VecLikeType::Bignum)) => {
+                return continue_bignum_sub(eval, &rest[1..], big - rest[0].as_bignum().unwrap());
+            }
+            _ => return continue_bignum_sub(eval, rest, big.clone()),
+        }
     } else if super::marker::is_marker(first) {
         super::marker::marker_position_as_int_eval(eval, first)?
     } else {
@@ -298,8 +356,11 @@ fn continue_bignum_sub(
                 f64::rounding_from(&acc, RoundingMode::Nearest).0 - a.xfloat(),
             );
         }
-        let n = integer_from_value(eval, a)?;
-        acc -= n;
+        match a.kind() {
+            ValueKind::Fixnum(n) => acc -= Integer::from(n),
+            ValueKind::Veclike(VecLikeType::Bignum) => acc -= a.as_bignum().unwrap(),
+            _ => acc -= integer_from_value(eval, a)?,
+        }
     }
     Ok(Value::make_integer(acc))
 }
@@ -351,9 +412,21 @@ pub(crate) fn builtin_mul(args: &[Value]) -> EvalResult {
             return continue_float_mul(&args[i + 1..], prod as f64 * a.xfloat());
         }
         if let Some(big) = a.as_bignum() {
-            let mut acc = Integer::from(prod);
-            acc *= big;
-            return continue_bignum_mul(&args[i + 1..], acc);
+            // `Integer::from(prod) *= big` cloned the bignum before the real
+            // multiplication; multiply by reference into one result instead.
+            let rest = &args[i + 1..];
+            if prod != 1 {
+                return continue_bignum_mul(rest, integer_mul_i64(big, prod));
+            }
+            match rest.first().map(|v| v.kind()) {
+                Some(ValueKind::Fixnum(n)) => {
+                    return continue_bignum_mul(&rest[1..], integer_mul_i64(big, n));
+                }
+                Some(ValueKind::Veclike(VecLikeType::Bignum)) => {
+                    return continue_bignum_mul(&rest[1..], big * rest[0].as_bignum().unwrap());
+                }
+                _ => return continue_bignum_mul(rest, big.clone()),
+            }
         }
         if super::marker::is_marker(a) {
             let n = super::marker::marker_position_as_int(a)?;
@@ -390,10 +463,10 @@ fn continue_bignum_mul(rest: &[Value], mut acc: Integer) -> EvalResult {
             );
         }
         match a.kind() {
-            ValueKind::Fixnum(n) => acc *= Integer::from(n),
+            ValueKind::Fixnum(n) => acc = integer_mul_i64(&acc, n),
             ValueKind::Veclike(VecLikeType::Bignum) => acc *= a.as_bignum().unwrap(),
             _ if super::marker::is_marker(a) => {
-                acc *= Integer::from(super::marker::marker_position_as_int(a)?);
+                acc = integer_mul_i64(&acc, super::marker::marker_position_as_int(a)?);
             }
             _ => return Err(wrong_number_or_marker(a)),
         }
@@ -1086,8 +1159,11 @@ fn arithcompare(
             if f.is_nan() {
                 return Ok(None);
             }
-            let bi = integer_or_marker_to_big(eval, b)?;
             // We have bi.partial_cmp(f); reverse to get a.cmp(b).
+            if let Some(bi) = b.as_bignum() {
+                return Ok(bi.partial_cmp(&f).map(|o| o.reverse()));
+            }
+            let bi = integer_or_marker_to_big(eval, b)?;
             return Ok(bi.partial_cmp(&f).map(|o| o.reverse()));
         }
         // b is the float side, a is the integer-or-marker side.
@@ -1095,6 +1171,9 @@ fn arithcompare(
             let f = b.xfloat();
             if f.is_nan() {
                 return Ok(None);
+            }
+            if let Some(ai) = a.as_bignum() {
+                return Ok(ai.partial_cmp(&f));
             }
             let ai = integer_or_marker_to_big(eval, a)?;
             return Ok(ai.partial_cmp(&f));
@@ -1111,10 +1190,23 @@ fn arithcompare(
         return Ok(Some(ai.cmp(&bi)));
     }
 
-    // Bignum-aware integer compare.
-    let ai = integer_or_marker_to_big(eval, a)?;
-    let bi = integer_or_marker_to_big(eval, b)?;
-    Ok(Some(ai.cmp(&bi)))
+    // Bignum-aware integer compare, reading bignums by reference (cloning
+    // both operands cost two allocations and two limb copies per `<`).
+    // Exactly one side may be a non-bignum here.
+    Ok(Some(match (a.as_bignum(), b.as_bignum()) {
+        (Some(ai), Some(bi)) => ai.cmp(bi),
+        (Some(ai), None) => {
+            let bi = expect_integer_or_marker_after_number_check_eval(eval, b)?;
+            ai.partial_cmp(&bi).expect("integers are totally ordered")
+        }
+        (None, Some(bi)) => {
+            let ai = expect_integer_or_marker_after_number_check_eval(eval, a)?;
+            bi.partial_cmp(&ai)
+                .expect("integers are totally ordered")
+                .reverse()
+        }
+        (None, None) => unreachable!("the fixnum case returned above"),
+    }))
 }
 
 /// Materialize an exact integer (fixnum, bignum, or marker position) as
@@ -1343,69 +1435,41 @@ fn rounding_with_divisor(
         }
         return float_to_lisp_integer(round_fn(dividend / divisor));
     }
-    // Bignum-divisor or bignum-dividend integer path: do GMP
-    // truncation and reapply the rounding flavor on the residue.
-    let a = bignum_or_int_to_integer(&args[0])?;
-    let d = bignum_or_int_to_integer(&args[1])?;
-    if d == 0 {
+    // Bignum-divisor or bignum-dividend integer path, GNU's `rounddiv_q` and
+    // friends: one division in the requested rounding mode. Bignums are read
+    // by reference; this used to clone both operands, divide toward zero,
+    // and then compute the remainder `a - q*d` (a multiplication and a
+    // subtraction the width of the operands) even for `truncate`, which
+    // never looks at it.
+    let a_small;
+    let a: &Integer = match args[0].as_bignum() {
+        Some(big) => big,
+        None => {
+            a_small = bignum_or_int_to_integer(&args[0])?;
+            &a_small
+        }
+    };
+    let d_small;
+    let d: &Integer = match args[1].as_bignum() {
+        Some(big) => big,
+        None => {
+            d_small = bignum_or_int_to_integer(&args[1])?;
+            &d_small
+        }
+    };
+    if *d == 0 {
         return Err(signal(LispCondition::ArithError, vec![]));
     }
-    // Truncation (toward-zero) division as the building block.
-    let q = &a / &d;
-    let r = &a - (&q * &d);
-    // Apply the same flavor that the int_div lambda would for fixnums,
-    // but in GMP. We dispatch by name because the closure type erases
-    // intent — and there are only four flavors.
-    let adjusted = match name {
-        "truncate" => q,
-        "floor" => {
-            // Toward -inf: if remainder is nonzero and r and d have
-            // opposite signs, subtract 1.
-            if r != 0 && (r < 0) != (d < 0) {
-                q - Integer::from(1)
-            } else {
-                q
-            }
-        }
-        "ceiling" => {
-            // Toward +inf: if remainder is nonzero and r and d have
-            // the same sign, add 1.
-            if r != 0 && (r < 0) == (d < 0) {
-                q + Integer::from(1)
-            } else {
-                q
-            }
-        }
-        "round" => {
-            // Round half to even (banker's rounding).
-            let abs_r2 = (&r * Integer::from(2)).abs();
-            let abs_d = (&d).abs();
-            use std::cmp::Ordering;
-            match abs_r2.cmp(&abs_d) {
-                Ordering::Greater => {
-                    if (r < 0) == (d < 0) {
-                        q + Integer::from(1)
-                    } else {
-                        q - Integer::from(1)
-                    }
-                }
-                Ordering::Equal => {
-                    if &q & Integer::from(1) != 0 {
-                        if (r < 0) == (d < 0) {
-                            q + Integer::from(1)
-                        } else {
-                            q - Integer::from(1)
-                        }
-                    } else {
-                        q
-                    }
-                }
-                Ordering::Less => q,
-            }
-        }
+    // The four flavors, as `int_div` is for fixnums: `round` is half to
+    // even (malachite's `Nearest`, GNU's `rounddiv_q`).
+    let mode = match name {
+        "truncate" => RoundingMode::Down,
+        "floor" => RoundingMode::Floor,
+        "ceiling" => RoundingMode::Ceiling,
+        "round" => RoundingMode::Nearest,
         _ => unreachable!("unknown rounding name {name}"),
     };
-    Ok(Value::make_integer(adjusted))
+    Ok(Value::make_integer(a.div_round(d, mode).0))
 }
 
 /// Convert a finite f64 into a Lisp integer (fixnum or bignum). NaN
@@ -1803,3 +1867,7 @@ mod arithmetic_rounding_nil_divisor_test;
 #[cfg(test)]
 #[path = "tests/arithmetic_ash_overflow.rs"]
 mod arithmetic_ash_overflow_test;
+
+#[cfg(test)]
+#[path = "tests/arithmetic_bignum_borrowed.rs"]
+mod arithmetic_bignum_borrowed_test;
