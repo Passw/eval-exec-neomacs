@@ -2292,6 +2292,29 @@ impl Obarray {
         Some(old)
     }
 
+    /// [`Self::swap_plain_untrapped_value_id`] for a writer that does not
+    /// want the old value: `false`, storing nothing, unless `id` is an
+    /// interned, plain, untrapped, unprojected cell. Off the concurrent mark
+    /// (the common case) the slot is visited once, with no seqlock bracket
+    /// and no SATB note, neither of which a store needs then.
+    #[inline(always)]
+    pub(crate) fn set_plain_untrapped_value_id(&mut self, id: SymId, value: Value) -> bool {
+        if crate::tagged::gc::concurrent_mark_active() {
+            return self.swap_plain_untrapped_value_id(id, value).is_some();
+        }
+        let Some(sym) = self.symbols.get_mut(Self::slot_index(id)) else {
+            return false;
+        };
+        if !sym.flags.is_plain_untrapped_unprojected() || !sym.interned_global {
+            return false;
+        }
+        #[cfg(test)]
+        note_plain_value_slot_visit();
+        // SAFETY: the redirect is `Plainval`, so `val.plain` is the live arm.
+        store_value_atomic(unsafe { &mut sym.val.plain }, value);
+        true
+    }
+
     /// Whether a write to `id` could be a bare `SET_SYMBOL_VAL`: an interned,
     /// plain, untrapped, unprojected cell — the shape
     /// [`Self::swap_plain_untrapped_value_id`] accepts, asked without storing

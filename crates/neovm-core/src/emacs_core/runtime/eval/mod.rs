@@ -4267,16 +4267,16 @@ impl Context {
     /// cell, a handful.
     #[inline]
     pub(crate) fn try_set_plain_variable(&mut self, id: SymId, value: Value) -> bool {
-        if !self.obarray.is_plain_value_cell_id(id) || self.runtime_binding_has_projection(id) {
+        // The bit test first, so the store's shape test is the one slot visit.
+        if self.runtime_binding_has_projection(id) {
             return false;
         }
+        let stored = self.obarray.set_plain_untrapped_value_id(id, value);
         debug_assert!(
-            !crate::emacs_core::intern::is_keyword_id(id),
+            !stored || !crate::emacs_core::intern::is_keyword_id(id),
             "an interned keyword is NoWrite, never a plain value cell"
         );
-        self.obarray
-            .swap_plain_untrapped_value_id(id, value)
-            .is_some()
+        stored
     }
 
     #[inline(always)]

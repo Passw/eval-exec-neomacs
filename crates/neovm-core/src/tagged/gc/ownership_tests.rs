@@ -3120,3 +3120,47 @@ fn write_barrier_caches_skip_only_writes_with_nothing_to_record() {
     );
     arm(&mut heap, false);
 }
+
+/// A plain variable store during a concurrent mark logs the value it
+/// overwrites (the symbol cell is a root the mark may have scanned already),
+/// and off the mark it logs nothing: `Obarray::set_plain_untrapped_value_id`,
+/// the store every compiled and interpreted `setq` of a special tries first.
+#[test]
+fn a_plain_variable_store_logs_its_pre_image_only_while_marking() {
+    use crate::emacs_core::intern::intern;
+    use crate::emacs_core::symbol::Obarray;
+    crate::test_utils::init_test_tracing();
+    let mut heap = TaggedHeap::new();
+    set_tagged_heap(&mut heap);
+    let mut ob = Obarray::new();
+    let sym = intern("plain-store-pre-image");
+    let first = heap.alloc_cons(TaggedValue::fixnum(1), TaggedValue::NIL);
+    ob.set_symbol_value_id(sym, first);
+
+    let second = heap.alloc_cons(TaggedValue::fixnum(2), TaggedValue::NIL);
+    assert!(ob.set_plain_untrapped_value_id(sym, second));
+    assert!(
+        heap.satb_shared.lock().unwrap().is_empty(),
+        "no mark, no log"
+    );
+
+    heap.concurrent_mark_running = true;
+    TAGGED_HEAP_CONCURRENT_ACTIVE.with(|c| c.set(true));
+    let stored = ob.set_plain_untrapped_value_id(sym, TaggedValue::fixnum(3));
+    let logged: Vec<usize> = heap
+        .satb_shared
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|v| v.bits())
+        .collect();
+    heap.concurrent_mark_running = false;
+    TAGGED_HEAP_CONCURRENT_ACTIVE.with(|c| c.set(false));
+
+    assert!(stored);
+    assert_eq!(logged, vec![second.bits()], "the overwritten value");
+    assert_eq!(
+        ob.symbol_value_id(sym).map(|v| v.bits()),
+        Some(TaggedValue::fixnum(3).bits())
+    );
+}
