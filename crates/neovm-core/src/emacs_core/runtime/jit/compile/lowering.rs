@@ -748,6 +748,118 @@ pub(crate) fn lower_car_cdr(
     fb.use_var(res)
 }
 
+/// `aref` of a plain vector or record, read inline — GNU `Baref`'s
+/// in-bytecode path. Emits the checks `neovm_jit_aref`'s fast path makes
+/// (a vector or record, a fixnum index in range, not a tagged char-table or
+/// bool-vector vector), branching to `slow` when any fails; on success defines
+/// `res` as the slot and jumps to `merge`. The shim was ~60 instructions per
+/// `aref` with the call: 63M arefs in elb nbody.
+///
+/// Returns `false`, emitting nothing, when this build's vector storage does
+/// not keep its element pointer and length at offsets every storage kind
+/// shares (`LispValueVec::jit_slice_offsets`).
+fn emit_inline_aref(
+    fb: &mut FunctionBuilder,
+    array: ClifValue,
+    index: ClifValue,
+    slow: Block,
+    res: Variable,
+    merge: Block,
+) -> bool {
+    use crate::tagged::header::{LispValueVec, VecLikeHeader, VecLikeType, VectorObj};
+    let Some((ptr_off, len_off)) = LispValueVec::jit_slice_offsets() else {
+        return false;
+    };
+    const_assert_vector_record_share_layout();
+    let data_off = core::mem::offset_of!(VectorObj, data);
+    let type_off = core::mem::offset_of!(VecLikeHeader, type_tag);
+    let (char_table_tag, bool_vector_tag, char_table_min_len) =
+        crate::emacs_core::chartable::inline_vector_tag_shape();
+
+    let tag = band_imm_p(fb, array, TAG_MASK as i64);
+    let is_veclike = icmp_imm_p(
+        fb,
+        IntCC::Equal,
+        tag,
+        crate::tagged::value::TAG_VECLIKE as i64,
+    );
+    let index_tag = band_imm_p(fb, index, FIXNUM_CHECK_MASK as i64);
+    let is_fixnum = icmp_imm_p(fb, IntCC::Equal, index_tag, FIXNUM_CHECK_VALUE as i64);
+    let shapes = fb.ins().band(is_veclike, is_fixnum);
+    let typed = fb.create_block();
+    fb.ins().brif(shapes, typed, &[], slow, &[]);
+    fb.switch_to_block(typed);
+    fb.seal_block(typed);
+    let object = band_imm_p(fb, array, !(TAG_MASK as i64));
+    let type_tag = fb
+        .ins()
+        .load(types::I8, MemFlagsData::trusted(), object, type_off as i32);
+    let is_vector = fb
+        .ins()
+        .icmp_imm(IntCC::Equal, type_tag, VecLikeType::Vector as u8 as i64);
+    let is_record = fb
+        .ins()
+        .icmp_imm(IntCC::Equal, type_tag, VecLikeType::Record as u8 as i64);
+    let either = fb.ins().bor(is_vector, is_record);
+    let ranged = fb.create_block();
+    fb.ins().brif(either, ranged, &[], slow, &[]);
+    fb.switch_to_block(ranged);
+    fb.seal_block(ranged);
+    let len = fb.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        object,
+        (data_off + len_off) as i32,
+    );
+    let slots = fb.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        object,
+        (data_off + ptr_off) as i32,
+    );
+    let i = sshr_imm_p(fb, index, FIXNUM_SHIFT as i64);
+    // Unsigned: a negative index is out of range too.
+    let in_range = fb.ins().icmp(IntCC::UnsignedLessThan, i, len);
+    let plain = fb.create_block();
+    fb.ins().brif(in_range, plain, &[], slow, &[]);
+    fb.switch_to_block(plain);
+    fb.seal_block(plain);
+    // `classify_vector_slots`: a vector of two or more slots whose slot 0 is
+    // the bool-vector tag, or of `char_table_min_len` or more whose slot 0 is
+    // the char-table tag (vectors only), is not plain. `i < len` put slot 0
+    // in bounds.
+    let first = fb.ins().load(types::I64, MemFlagsData::trusted(), slots, 0);
+    let is_bool_vector = icmp_imm_p(fb, IntCC::Equal, first, bool_vector_tag as i64);
+    let is_char_table_tag = icmp_imm_p(fb, IntCC::Equal, first, char_table_tag as i64);
+    let long_enough = icmp_imm_p(
+        fb,
+        IntCC::UnsignedGreaterThanOrEqual,
+        len,
+        char_table_min_len as i64,
+    );
+    let char_table = fb.ins().band(is_char_table_tag, long_enough);
+    let char_table = fb.ins().band(char_table, is_vector);
+    let tagged = fb.ins().bor(is_bool_vector, char_table);
+    let two_or_more = icmp_imm_p(fb, IntCC::UnsignedGreaterThanOrEqual, len, 2);
+    let not_plain = fb.ins().band(tagged, two_or_more);
+    let load = fb.create_block();
+    fb.ins().brif(not_plain, slow, &[], load, &[]);
+    fb.switch_to_block(load);
+    fb.seal_block(load);
+    let byte_off = ishl_imm_p(fb, i, 3);
+    let slot = fb.ins().iadd(slots, byte_off);
+    let element = fb.ins().load(types::I64, MemFlagsData::trusted(), slot, 0);
+    fb.def_var(res, element);
+    fb.ins().jump(merge, &[]);
+    true
+}
+
+/// `emit_inline_aref` reads a record through `VectorObj`'s offsets.
+const fn const_assert_vector_record_share_layout() {
+    use crate::tagged::header::{RecordObj, VectorObj};
+    assert!(core::mem::offset_of!(VectorObj, data) == core::mem::offset_of!(RecordObj, data));
+}
+
 /// Lower a no-argument straight-line leaf body. Thin wrapper over [`lower_leaf`]
 /// kept for the existing call sites/tests.
 pub fn lower_nullary_leaf(ops: &[Op], constants: &[Value]) -> Result<CompiledLeaf, CompileError> {
@@ -5384,6 +5496,22 @@ pub(crate) fn lower_simple_op(
                 // `neovm_jit_aref`/`_memq`/`_assq` answer the result's bits or
                 // VALUE_SHIM_SIGNAL (tag 0b001, never a Lisp value). GC-free
                 // like the pure table entries they stand in for: no roots.
+                //
+                // JIT `aref` of a plain vector or record at an in-range fixnum
+                // index reads the slot inline and calls the shim for anything
+                // else (see `emit_inline_aref`).
+                let inline_aref = if matches!(other, Op::Aref) && !aot && jit_inline_aref_on() {
+                    let merge = fb.create_block();
+                    let slow = fb.create_block();
+                    let res = fb.declare_var(types::I64);
+                    emit_inline_aref(fb, operands[0], operands[1], slow, res, merge).then(|| {
+                        fb.switch_to_block(slow);
+                        fb.seal_block(slow);
+                        (merge, res)
+                    })
+                } else {
+                    None
+                };
                 let vmctx = fb.use_var(rt.vmctx_var);
                 let call = fb
                     .ins()
@@ -5401,7 +5529,16 @@ pub(crate) fn lower_simple_op(
                 fb.ins().brif(is_signal, se, &[], cont, &[]);
                 fb.switch_to_block(cont);
                 fb.seal_block(cont);
-                stack.push(word);
+                match inline_aref {
+                    Some((merge, res)) => {
+                        fb.def_var(res, word);
+                        fb.ins().jump(merge, &[]);
+                        fb.switch_to_block(merge);
+                        fb.seal_block(merge);
+                        stack.push(fb.use_var(res));
+                    }
+                    None => stack.push(word),
+                }
                 return Ok(());
             }
             // Root remaining live values (the builtin may allocate/GC; the

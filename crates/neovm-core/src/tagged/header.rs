@@ -636,6 +636,44 @@ impl LispValueVec {
         }
     }
 
+    /// Byte offsets, within a `LispValueVec`, of the element pointer and the
+    /// length — when an owned and a mapped vector keep both at the same
+    /// offsets, which compiled code then reads directly (`None` otherwise:
+    /// the storage enum's layout is the compiler's choice, so it is measured
+    /// here rather than assumed).
+    pub(crate) fn jit_slice_offsets() -> Option<(usize, usize)> {
+        static OFFSETS: std::sync::OnceLock<Option<(usize, usize)>> = std::sync::OnceLock::new();
+        *OFFSETS.get_or_init(|| {
+            const WORD: usize = std::mem::size_of::<usize>();
+            let words = std::mem::size_of::<LispValueVec>() / WORD;
+            let read = |v: &LispValueVec| -> Vec<usize> {
+                let base = v as *const LispValueVec as *const usize;
+                // SAFETY: reads `words` whole words inside the value.
+                (0..words)
+                    .map(|i| unsafe { base.add(i).read_unaligned() })
+                    .collect()
+            };
+            let find = |words: &[usize], want: usize| -> Option<usize> {
+                let mut hits = words.iter().enumerate().filter(|&(_, &w)| w == want);
+                let (i, _) = hits.next()?;
+                hits.next().is_none().then_some(i * WORD)
+            };
+            let mut items = Vec::with_capacity(7);
+            items.extend([TaggedValue::NIL; 3]);
+            let owned = LispValueVec::owned(items);
+            let owned_words = read(&owned);
+            let owned_ptr = find(&owned_words, owned.as_slice().as_ptr() as usize)?;
+            let owned_len = find(&owned_words, 3)?;
+            let backing = [TaggedValue::T; 5];
+            // SAFETY: `backing` outlives `mapped`, which is never mutated.
+            let mapped = unsafe { LispValueVec::mapped(backing.as_ptr(), 5) };
+            let mapped_words = read(&mapped);
+            let mapped_ptr = find(&mapped_words, backing.as_ptr() as usize)?;
+            let mapped_len = find(&mapped_words, 5)?;
+            (owned_ptr == mapped_ptr && owned_len == mapped_len).then_some((owned_ptr, owned_len))
+        })
+    }
+
     pub fn as_slice(&self) -> &[TaggedValue] {
         match self.storage {
             LispValueVecStorage::Owned(ref items) => items,

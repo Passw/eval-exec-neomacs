@@ -748,6 +748,17 @@ pub(crate) fn bool_vector_tag_sym_id() -> SymId {
     *ID.get_or_init(|| intern(BOOL_VECTOR_TAG))
 }
 
+/// What [`classify_vector_slots`] compares, for compiled code that inlines
+/// it: the char-table and bool-vector tag symbols' bits, and the length from
+/// which a tagged vector is a char-table.
+pub(crate) fn inline_vector_tag_shape() -> (u64, u64, usize) {
+    (
+        Value::from_sym_id(char_table_tag_sym_id()).bits() as u64,
+        Value::from_sym_id(bool_vector_tag_sym_id()).bits() as u64,
+        CT_EXTRA_START,
+    )
+}
+
 fn char_table_tag_sym_id() -> SymId {
     static ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new();
     *ID.get_or_init(|| intern(CHAR_TABLE_TAG))

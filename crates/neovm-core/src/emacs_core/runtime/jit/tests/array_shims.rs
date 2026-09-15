@@ -737,3 +737,67 @@ fn byte_code_nth_reports_the_tail_it_stops_at() {
         "(wrong-type-argument listp (a . b))"
     );
 }
+
+/// Compiled `aref` reads a plain vector's or record's slot inline, calling
+/// `neovm_jit_aref` for every other shape: a tagged char-table or
+/// bool-vector vector, a string, a bool-vector, an out-of-range or
+/// non-fixnum index. Answers match the interpreter either way.
+#[test]
+fn compiled_aref_reads_plain_vectors_and_records_inline() {
+    assert!(
+        crate::tagged::header::LispValueVec::jit_slice_offsets().is_some(),
+        "owned and mapped vectors keep pointer and length at shared offsets"
+    );
+    let mut eval = Context::new();
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    let f = aref_fn();
+    let leaf = compile_bytecode_function(&f).expect("aref compiles");
+    let cases: &[(&str, &str, bool)] = &[
+        ("(vector 10 20 30)", "1", true),
+        ("(vector 'x)", "0", true),
+        ("(record 'foo 1 2)", "2", true),
+        (
+            "(let ((v (make-vector 3 nil))) (aset v 0 '--char-table--) v)",
+            "0",
+            true,
+        ),
+        ("(vector 10 20 30)", "3", false),
+        ("(vector 10 20 30)", "-1", false),
+        ("(vector 10 20 30)", "'x", false),
+        ("(vector)", "0", false),
+        (
+            "(let ((v (make-vector 80 nil))) (aset v 0 '--char-table--) (aset v 3 'dflt) v)",
+            "3",
+            false,
+        ),
+        (
+            "(let ((v (make-vector 3 nil))) (aset v 0 '--bool-vector--) v)",
+            "1",
+            false,
+        ),
+        (
+            "(let ((v (make-vector 1 nil))) (aset v 0 '--bool-vector--) v)",
+            "0",
+            true,
+        ),
+        ("(make-string 3 ?a)", "1", false),
+        ("(make-bool-vector 5 t)", "1", false),
+    ];
+    for &(array, index, inline) in cases {
+        // One evaluation, so the array is never unrooted across a safe point.
+        let pair = eval
+            .eval_str(&format!("(cons {array} {index})"))
+            .expect("operands");
+        let (array_value, index_value) = (pair.cons_car(), pair.cons_cdr());
+        let want = interpret(&mut eval, &f, vec![array_value, index_value]);
+        let before = super::dispatch::AREF_SHIM_CALLS.with(|c| c.get());
+        let got = native(ctx_ptr, &leaf, &[array_value, index_value], "aref");
+        let calls = super::dispatch::AREF_SHIM_CALLS.with(|c| c.get()) - before;
+        assert_eq!(got, want, "(aref {array} {index})");
+        assert_eq!(
+            calls == 0,
+            inline,
+            "(aref {array} {index}) inline: {inline}"
+        );
+    }
+}
