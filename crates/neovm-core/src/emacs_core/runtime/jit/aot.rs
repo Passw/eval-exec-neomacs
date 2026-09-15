@@ -74,7 +74,11 @@ pub(crate) const ABI_TAG: u32 = compute_abi_tag();
 /// three round-1 spec shims (auto-salted via `MIR_SHIM_NAMES`), and carry a
 /// descriptor spec-section. The [`SPEC_ENCODING_VERSION`], `SpecSlot` size, and
 /// `SpecCalleeKind::DISC_COUNT` are salted (see [`compute_abi_tag`]).
-const ABI_TAG_VERSION: u32 = 4;
+/// v5: `Op::Aset` now calls `neovm_jit_named_builtin` with variant 3 (the
+/// root-free fast path, which bounces a redefined `aset` with
+/// STATUS_NEED_GENERIC to a rooted variant-2 fallback). A host that predates
+/// variant 3 would run such a call as `CallBuiltinSym`.
+const ABI_TAG_VERSION: u32 = 5;
 
 /// Format version of the AOT descriptor spec-section + the runtime spec ABI
 /// (`SpecSlot`/`spec_expected` sidecar bases, the loader re-classify+arm protocol).
