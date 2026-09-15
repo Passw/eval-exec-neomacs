@@ -33,7 +33,7 @@ pub(crate) fn builtin_aref_2(
     builtin_aref_values(array, index)
 }
 
-fn builtin_aref_values(array: Value, index: Value) -> EvalResult {
+pub(crate) fn builtin_aref_values(array: Value, index: Value) -> EvalResult {
     let idx_fixnum = expect_fixnum(&index)?;
     match array.kind() {
         ValueKind::Veclike(VecLikeType::CharTable) => {

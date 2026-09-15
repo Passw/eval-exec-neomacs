@@ -389,7 +389,7 @@ pub(crate) fn builtin_setcar_2(
     builtin_setcar_values(cons, new_car)
 }
 
-fn builtin_setcar_values(cons: Value, new_car: Value) -> EvalResult {
+pub(crate) fn builtin_setcar_values(cons: Value, new_car: Value) -> EvalResult {
     match cons.kind() {
         ValueKind::Cons => {
             cons.set_car(new_car);
@@ -410,7 +410,7 @@ pub(crate) fn builtin_setcdr_2(
     builtin_setcdr_values(cons, new_cdr)
 }
 
-fn builtin_setcdr_values(cons: Value, new_cdr: Value) -> EvalResult {
+pub(crate) fn builtin_setcdr_values(cons: Value, new_cdr: Value) -> EvalResult {
     match cons.kind() {
         ValueKind::Cons => {
             cons.set_cdr(new_cdr);
@@ -624,7 +624,7 @@ pub(crate) fn builtin_nth_2(
     builtin_nth_values(n_value, list)
 }
 
-fn builtin_nth_values(n_value: Value, list: Value) -> EvalResult {
+pub(crate) fn builtin_nth_values(n_value: Value, list: Value) -> EvalResult {
     let tail = nthcdr_impl(n_value, list)?;
     match tail.kind() {
         ValueKind::Cons => Ok(tail.cons_car()),
@@ -771,7 +771,7 @@ pub(crate) fn builtin_nthcdr_2(
     builtin_nthcdr_values(n_value, list)
 }
 
-fn builtin_nthcdr_values(n_value: Value, list: Value) -> EvalResult {
+pub(crate) fn builtin_nthcdr_values(n_value: Value, list: Value) -> EvalResult {
     nthcdr_impl(n_value, list)
 }
 
@@ -1079,7 +1079,11 @@ pub(crate) fn builtin_member_2(
     builtin_member_values(target, list, eval.symbols_with_pos_enabled)
 }
 
-fn builtin_member_values(target: Value, list: Value, symbols_with_pos_enabled: bool) -> EvalResult {
+pub(crate) fn builtin_member_values(
+    target: Value,
+    list: Value,
+    symbols_with_pos_enabled: bool,
+) -> EvalResult {
     if list.is_t() {
         tracing::error!(
             "(member {} t) — list is bare t! target={:?}",
@@ -1105,7 +1109,11 @@ pub(crate) fn builtin_memq_2(
     builtin_memq_values(target, list, eval.symbols_with_pos_enabled)
 }
 
-fn builtin_memq_values(target: Value, list: Value, symbols_with_pos_enabled: bool) -> EvalResult {
+pub(crate) fn builtin_memq_values(
+    target: Value,
+    list: Value,
+    symbols_with_pos_enabled: bool,
+) -> EvalResult {
     if symbols_with_pos_enabled {
         return builtin_memq_values_swp(target, list);
     }
@@ -1213,7 +1221,11 @@ pub(crate) fn builtin_assq_2(
     builtin_assq_values(key, list, eval.symbols_with_pos_enabled)
 }
 
-fn builtin_assq_values(key: Value, list: Value, symbols_with_pos_enabled: bool) -> EvalResult {
+pub(crate) fn builtin_assq_values(
+    key: Value,
+    list: Value,
+    symbols_with_pos_enabled: bool,
+) -> EvalResult {
     if symbols_with_pos_enabled {
         return builtin_assq_values_swp(key, list);
     }
@@ -1540,15 +1552,21 @@ pub(crate) fn builtin_elt(args: Vec<Value>) -> EvalResult {
 }
 
 pub(crate) fn builtin_elt_2(
-    eval: &mut super::eval::Context,
+    _eval: &mut super::eval::Context,
     sequence: Value,
     n: Value,
 ) -> EvalResult {
+    builtin_elt_values(sequence, n)
+}
+
+/// `elt` over values alone: its list arm is `nth` and its array arm `aref`,
+/// neither of which touches the evaluator.
+pub(crate) fn builtin_elt_values(sequence: Value, n: Value) -> EvalResult {
     match sequence.kind() {
-        ValueKind::Cons | ValueKind::Nil => builtin_nth_2(eval, n, sequence),
+        ValueKind::Cons | ValueKind::Nil => builtin_nth_values(n, sequence),
         ValueKind::Veclike(VecLikeType::Vector)
         | ValueKind::Veclike(VecLikeType::CharTable)
-        | ValueKind::String => builtin_aref_2(eval, sequence, n),
+        | ValueKind::String => builtin_aref_values(sequence, n),
         _ => Err(signal(
             LispCondition::WrongTypeArgument,
             vec![Value::symbol("sequencep"), sequence],

@@ -4929,8 +4929,13 @@ pub(crate) fn lower_simple_op(
             let operands: Vec<ClifValue> = stack[at..].to_vec();
             stack.truncate(at);
             // Root remaining live values (the builtin may allocate/GC; the
-            // shim roots the operands themselves).
-            let saved = if stack.is_empty() {
+            // shim roots the operands themselves) — unless the builtin cannot
+            // collect at all (`dispatch::JitBuiltin2Pure`). Such a site stores
+            // nothing and cannot start a nested activation, so the root-window
+            // store record stays exact across it (`RootWinCarry` rule 1 applies
+            // only to sites that can).
+            let gc_free = arity == 2 && dispatch::JIT_BUILTIN2_PURE[idx].is_some();
+            let saved = if stack.is_empty() || gc_free {
                 CondRoots::NONE
             } else {
                 emit_cond_residual_roots_pre(fb, rt, stack.as_slice())

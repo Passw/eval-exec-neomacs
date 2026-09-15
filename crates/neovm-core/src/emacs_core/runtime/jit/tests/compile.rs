@@ -2713,6 +2713,106 @@ fn baseline_switch_back_edge_polls_store_their_own_roots() {
     );
 }
 
+/// Every `JIT_BUILTIN2_PURE` entry answers exactly as the rooted builtin at
+/// the same index: same value (by `eq`-bits, or structural `equal` for a
+/// freshly consed answer) or the same signal. Each comparison gets freshly
+/// built arguments, because `setcar`/`setcdr` mutate them.
+#[test]
+fn jit_builtin2_pure_matches_the_table() {
+    use super::dispatch::{JIT_BUILTIN2, JIT_BUILTIN2_PURE};
+    use crate::emacs_core::error::Flow;
+    use crate::emacs_core::eval::Context;
+    let mut ev = Context::new();
+    ev.eval_str("(put 'jit-pure-sym 'jit-pure-prop 42)")
+        .expect("put");
+    let pool_src = [
+        "nil",
+        "t",
+        "0",
+        "1",
+        "-1",
+        "5",
+        "1.5",
+        "'jit-pure-sym",
+        "'jit-pure-prop",
+        "(list 1 2 3)",
+        "(list (cons 'a 1) (cons 'b 2) (cons 1 3))",
+        "(vector 1 2 3)",
+        "(copy-sequence \"abc\")",
+        "(list 'jit-pure-sym 'x)",
+        // `equal` but not `eq` to the fresh `1.5` and `"abc"` above: tells
+        // memq/assq from member/assoc.
+        "(list 1.5 (copy-sequence \"abc\") (cons 1.5 'f))",
+    ];
+    let outcome = |r: Result<Value, Flow>| -> String {
+        match r {
+            Ok(v) => crate::emacs_core::print::print_value(&v),
+            Err(Flow::Signal(sig)) => format!("signal {}", sig.symbol_name()),
+            Err(other) => format!("{other:?}"),
+        }
+    };
+    let mut checked = 0;
+    for (idx, pure) in JIT_BUILTIN2_PURE.iter().enumerate() {
+        let Some(pure) = pure else { continue };
+        for a_src in pool_src {
+            for b_src in pool_src {
+                // Both arguments come from ONE evaluation and go straight into
+                // the call: a Rust local is not a GC root, and a second
+                // evaluation under GC stress would free the first argument.
+                let pair_src = format!("(cons {a_src} {b_src})");
+                let pair = ev.eval_str(&pair_src).expect("args");
+                let (a1, b1) = (pair.cons_car(), pair.cons_cdr());
+                let rooted = outcome(JIT_BUILTIN2[idx](&mut ev, a1, b1));
+                let pair = ev.eval_str(&pair_src).expect("args");
+                let (a2, b2) = (pair.cons_car(), pair.cons_cdr());
+                let root_free = outcome(pure(&ev, a2, b2));
+                assert_eq!(
+                    root_free, rooted,
+                    "JIT_BUILTIN2[{idx}] on ({a_src}, {b_src}): the pure entry must answer as the table does"
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert_eq!(checked, 11 * pool_src.len() * pool_src.len());
+}
+
+/// A GC-free builtin site roots nothing: two `memq` sites with a live
+/// residual `[a l]` in a hoisted body emit no root-window stores at all, and
+/// the body still answers.
+///
+///     (lambda (a l) (memq a l) (memq a l))
+#[test]
+fn gc_free_builtin_sites_root_no_residual() {
+    use crate::emacs_core::eval::Context;
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    let ops = [
+        Op::StackRef(1), // a   [a l a]
+        Op::StackRef(1), // l   [a l a l]
+        Op::Memq,        // residual [a l]
+        Op::Pop,         //     [a l]
+        Op::StackRef(1), // a   [a l a]
+        Op::StackRef(1), // l   [a l a l]
+        Op::Memq,        // residual [a l]
+        Op::Return,
+    ];
+    let leaf = lower_leaf(&ops, &[], 2).expect("lowers");
+    assert_eq!(
+        super::lowering::rootwin_counters(),
+        (0, 0),
+        "a GC-free builtin site stores no residual root"
+    );
+    let l = ev.eval_str("(list 1 2 3)").expect("l");
+    let NativeRun::Ok(bits) = leaf.call(ctx, &[Value::make_int(2), l]) else {
+        panic!("memq must run natively");
+    };
+    assert_eq!(
+        crate::emacs_core::print::print_value(&Value::from_bits(bits)),
+        "(2 3)"
+    );
+}
+
 /// The tier gate, through the production compile path. A loop with a
 /// shim-lowered op goes to the baseline (the MIR tier has no back-edge
 /// poll), although the MIR lowering itself accepts it; the same op outside

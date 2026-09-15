@@ -36,6 +36,83 @@ pub(crate) static JIT_BUILTIN2: [JitBuiltin2; 15] = [
     b::builtin_string_lessp_2, // 14
 ];
 
+/// A direct builtin that needs only a SHARED borrow of the evaluator.
+///
+/// Holding `&Context` rather than `&mut Context` is the whole contract: a GC
+/// safe point (`maybe_gc`), a quit poll (`maybe_quit`, which can sample the
+/// profiler and drain OS signals) and any call back into Lisp all require
+/// `&mut Context`, so a function of this type cannot collect, cannot run
+/// Lisp and cannot start a nested native activation — checked by the
+/// compiler, not by a comment. On its success path it only reads and mutates
+/// heap objects it was handed (`setcar`'s store keeps its write barrier), and
+/// its error payload is an in-flight `Flow` that roots itself.
+///
+/// So the shim calls such an entry with no scratch roots, and the call site
+/// roots no residual stack (a value live across the call cannot be moved or
+/// freed, because no collection can run).
+pub(crate) type JitBuiltin2Pure = fn(&Context, Value, Value) -> Result<Value, Flow>;
+
+fn pure_nth(_: &Context, n: Value, list: Value) -> Result<Value, Flow> {
+    b::builtin_nth_values(n, list)
+}
+fn pure_nthcdr(_: &Context, n: Value, list: Value) -> Result<Value, Flow> {
+    b::builtin_nthcdr_values(n, list)
+}
+fn pure_elt(_: &Context, sequence: Value, n: Value) -> Result<Value, Flow> {
+    b::builtin_elt_values(sequence, n)
+}
+fn pure_member(ctx: &Context, target: Value, list: Value) -> Result<Value, Flow> {
+    b::builtin_member_values(target, list, ctx.symbols_with_pos_enabled)
+}
+fn pure_memq(ctx: &Context, target: Value, list: Value) -> Result<Value, Flow> {
+    b::builtin_memq_values(target, list, ctx.symbols_with_pos_enabled)
+}
+fn pure_assq(ctx: &Context, key: Value, list: Value) -> Result<Value, Flow> {
+    b::builtin_assq_values(key, list, ctx.symbols_with_pos_enabled)
+}
+fn pure_equal(ctx: &Context, a: Value, b_: Value) -> Result<Value, Flow> {
+    Ok(Value::bool_val(
+        crate::emacs_core::value::try_equal_value_swp(&a, &b_, 0, ctx.symbols_with_pos_enabled)?,
+    ))
+}
+fn pure_setcar(_: &Context, cons: Value, new_car: Value) -> Result<Value, Flow> {
+    b::builtin_setcar_values(cons, new_car)
+}
+fn pure_setcdr(_: &Context, cons: Value, new_cdr: Value) -> Result<Value, Flow> {
+    b::builtin_setcdr_values(cons, new_cdr)
+}
+fn pure_aref(_: &Context, array: Value, index: Value) -> Result<Value, Flow> {
+    b::builtin_aref_values(array, index)
+}
+fn pure_get(ctx: &Context, symbol: Value, prop: Value) -> Result<Value, Flow> {
+    Ok(b::symbol_property_get(ctx, symbol, prop)?
+        .1
+        .unwrap_or(Value::NIL))
+}
+
+/// [`JIT_BUILTIN2`] entries that are [`JitBuiltin2Pure`], index for index.
+/// `set` runs variable watchers and `fset` redefines functions, so both keep
+/// the rooted path; `string=`/`string<` go through `typed_subr!`'s argument
+/// conversion and are not claimed here. `jit_builtin2_pure_matches_the_table`
+/// holds every entry to the rooted builtin's answers.
+pub(crate) static JIT_BUILTIN2_PURE: [Option<JitBuiltin2Pure>; 15] = [
+    Some(pure_nth),    // 0
+    Some(pure_nthcdr), // 1
+    Some(pure_elt),    // 2
+    Some(pure_member), // 3
+    Some(pure_memq),   // 4
+    Some(pure_assq),   // 5
+    Some(pure_equal),  // 6
+    Some(pure_setcar), // 7
+    Some(pure_setcdr), // 8
+    Some(pure_aref),   // 9
+    None,              // 10 set
+    None,              // 11 fset
+    Some(pure_get),    // 12
+    None,              // 13 string=
+    None,              // 14 string<
+];
+
 pub(crate) static JIT_BUILTIN3: [JitBuiltin3; 1] = [
     b::builtin_put_3, // 0
 ];
@@ -128,6 +205,22 @@ pub extern "C" fn neovm_jit_builtin2(ctx: *mut u8, idx: i64, a: i64, b: i64, out
     jit_shim_contain!(ctx, STATUS_SIGNAL, {
         let a = Value::from_bits(a as usize);
         let b = Value::from_bits(b as usize);
+        if let Some(pure) = JIT_BUILTIN2_PURE[idx as usize] {
+            // No collection can run (see `JitBuiltin2Pure`): no scratch roots.
+            // SAFETY: see neovm_jit_call's function-level contract.
+            let ctx = unsafe { &*(ctx as *const Context) };
+            return match pure(ctx, a, b) {
+                Ok(value) => {
+                    // SAFETY: `out` is the generated code's result stack slot.
+                    unsafe { *out = value.bits() as i64 };
+                    STATUS_OK
+                }
+                Err(flow) => {
+                    stash_pending_flow(flow);
+                    STATUS_SIGNAL
+                }
+            };
+        }
         let saved = save_scratch_gc_roots();
         push_scratch_gc_root(a);
         push_scratch_gc_root(b);
