@@ -339,7 +339,8 @@ pub extern "C" fn neovm_jit_builtin_slice(
 /// helpers, which mirror the interpreter arms exactly (override-aware named
 /// dispatch for CallBuiltin/Aset, advice-bypassing direct dispatch for
 /// CallBuiltinSym, mutating-first-arg string writeback, trailing quit poll).
-/// `variant`: 0 = CallBuiltin, 1 = CallBuiltinSym, 2 = Aset.
+/// `variant`: 0 = CallBuiltin, 1 = CallBuiltinSym, 2 = Aset, 3 = Aset's
+/// root-free fast path (below).
 /// SAFETY: same vmctx contract as [`neovm_jit_call`].
 #[allow(clippy::not_unsafe_ptr_arg_deref)] // C-ABI shim: raw ptrs per documented SAFETY contract; only ever called from generated code.
 #[unsafe(no_mangle)]
@@ -353,6 +354,39 @@ pub extern "C" fn neovm_jit_named_builtin(
 ) -> i64 {
     jit_shim_contain!(ctx, STATUS_SIGNAL, {
         let nargs = nargs as usize;
+        if variant == 3 {
+            // `Op::Aset`'s fast path, called with NO residual roots at the
+            // site. The inline builtin is `builtin_aset_args`, a function of
+            // its three values alone, and the check that it may run inline
+            // only reads the function cell: nothing here can reach a safe
+            // point, so nothing needs rooting. A redefined or advised `aset`
+            // (which runs Lisp) bounces to the site's rooted fallback block,
+            // which calls this shim again as variant 2.
+            debug_assert_eq!(nargs, 3, "Op::Aset shim expects three arguments");
+            // SAFETY: the generated code stored exactly three words at
+            // `args_ptr` immediately before this call.
+            let a: [Value; 3] =
+                std::array::from_fn(|i| Value::from_bits(unsafe { *args_ptr.add(i) } as usize));
+            // SAFETY: see neovm_jit_call's function-level contract.
+            let ctx = unsafe { &*(ctx as *const Context) };
+            if !crate::emacs_core::bytecode::vm::named_builtin_fast_path_allowed_in(
+                ctx,
+                Vm::aset_builtin_id(),
+            ) {
+                return STATUS_NEED_GENERIC;
+            }
+            return match crate::emacs_core::builtins::builtin_aset_args(&a) {
+                Ok(value) => {
+                    // SAFETY: `out` is the generated code's result stack slot.
+                    unsafe { *out = value.bits() as i64 };
+                    STATUS_OK
+                }
+                Err(flow) => {
+                    stash_pending_flow(flow);
+                    STATUS_SIGNAL
+                }
+            };
+        }
         let saved = save_scratch_gc_roots();
         // SAFETY (all three reads below): the generated code stored exactly
         // `nargs` words at `args_ptr` (its call-args stack slot) immediately

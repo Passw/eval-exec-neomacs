@@ -4732,7 +4732,10 @@ pub(crate) fn lower_simple_op(
             // the operands themselves). The Tier-A read shim is GC-free by
             // contract, so its fast path needs NO residual rooting; its
             // NEED_GENERIC fallback block re-roots for the general call.
-            let saved = if stack.is_empty() || cbsym_a_which.is_some() {
+            // `Op::Aset` likewise: its fast path (variant 3) cannot reach a safe
+            // point, and bounces a redefined `aset` to the rooted fallback.
+            let aset_root_free = matches!(op, Op::Aset);
+            let saved = if stack.is_empty() || cbsym_a_which.is_some() || aset_root_free {
                 CondRoots::NONE
             } else {
                 emit_cond_residual_roots_pre(fb, rt, stack.as_slice())
@@ -4784,6 +4787,15 @@ pub(crate) fn lower_simple_op(
                     .ok_or(CompileError::UnsupportedOp("cbsym-spec-refs"))?;
                 fb.ins()
                     .call(f, &[vmctx, sym_v, args_addr, n_val, out_addr])
+            } else if aset_root_free {
+                // Variant 3: the root-free aset; NEED_GENERIC -> the fallback
+                // below, which roots and calls variant 2.
+                generic_fallback = Some(fb.create_block());
+                let fast_v = fb.ins().iconst(types::I64, 3);
+                fb.ins().call(
+                    rt.refs.named_builtin,
+                    &[vmctx, fast_v, sym_v, args_addr, n_val, out_addr],
+                )
             } else {
                 let variant_v = fb.ins().iconst(types::I64, variant);
                 fb.ins().call(

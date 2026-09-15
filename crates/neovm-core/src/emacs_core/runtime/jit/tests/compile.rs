@@ -2813,6 +2813,140 @@ fn gc_free_builtin_sites_root_no_residual() {
     );
 }
 
+/// Compiled `aset` (the root-free variant-3 shim) answers exactly as the
+/// builtin on every array kind and error: the returned value or signal, and
+/// the array afterwards. Each case's array is built fresh, in one evaluation,
+/// for both the compiled call and the reference call.
+#[test]
+fn compiled_aset_matches_the_builtin() {
+    use crate::emacs_core::error::Flow;
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::print::print_value;
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    // (lambda (a i v) (aset a i v))
+    let ops = [
+        Op::StackRef(2),
+        Op::StackRef(2),
+        Op::StackRef(2),
+        Op::Aset,
+        Op::Return,
+    ];
+    let leaf = lower_leaf(&ops, &[], 3).expect("aset lowers");
+    let cases = [
+        "(list (vector 1 2 3) 1 'x)",
+        "(list (vector 1 2 3) 3 'x)",
+        "(list (vector 1 2 3) -1 'x)",
+        "(list (vector 1 2 3) 'a 'x)",
+        "(list (copy-sequence \"abc\") 0 ?z)",
+        "(list (copy-sequence \"abc\") 1 ?\\u00e9)",
+        "(list (copy-sequence \"h\\u00e9llo\") 1 ?e)",
+        "(list (copy-sequence \"abc\") 5 ?z)",
+        "(list (copy-sequence \"abc\") 0 'notachar)",
+        "(list (make-bool-vector 4 nil) 2 t)",
+        "(list (make-char-table 'test) ?a 'val)",
+        "(list (record 'foo 1 2) 1 'y)",
+        "(list 'not-an-array 0 1)",
+        "(list nil 0 1)",
+    ];
+    let show = |r: Result<Value, String>, arr: Value| -> String {
+        match r {
+            Ok(v) => format!("{} / {}", print_value(&v), print_value(&arr)),
+            Err(e) => format!("{e} / {}", print_value(&arr)),
+        }
+    };
+    for case in cases {
+        let args = ev.eval_str(case).expect("args");
+        let (a, i, v) = (
+            args.cons_car(),
+            args.cons_cdr().cons_car(),
+            args.cons_cdr().cons_cdr().cons_car(),
+        );
+        let native = match leaf.call(ctx, &[a, i, v]) {
+            NativeRun::Ok(bits) => Ok(Value::from_bits(bits)),
+            NativeRun::Signal => match take_pending_flow() {
+                Some(Flow::Signal(sig)) => Err(format!("signal {}", sig.symbol_name())),
+                other => Err(format!("{other:?}")),
+            },
+            other => Err(format!("unexpected {other:?}")),
+        };
+        let got = show(native, a);
+        let args = ev.eval_str(case).expect("args");
+        let (a, i, v) = (
+            args.cons_car(),
+            args.cons_cdr().cons_car(),
+            args.cons_cdr().cons_cdr().cons_car(),
+        );
+        let reference = match crate::emacs_core::builtins::builtin_aset_args(&[a, i, v]) {
+            Ok(v) => Ok(v),
+            Err(Flow::Signal(sig)) => Err(format!("signal {}", sig.symbol_name())),
+            Err(other) => Err(format!("{other:?}")),
+        };
+        assert_eq!(got, show(reference, a), "(aset . {case})");
+    }
+}
+
+/// A REDEFINED `aset` still runs from compiled code, through the rooted
+/// fallback: the fast shim bounces it, and the fallback roots the residual
+/// across a redefinition that collects exactly and reallocates. `h` lives
+/// only in the residual.
+///
+///     (lambda (v) (let ((h (cons 1 2))) (aset v 0 9) h))
+#[test]
+fn redefined_aset_takes_the_rooted_fallback() {
+    use crate::emacs_core::eval::Context;
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    let ops = [
+        Op::Constant(0), // 1                 [v 1]
+        Op::Constant(1), // 2                 [v 1 2]
+        Op::Cons,        // h                 [v h]
+        Op::StackRef(1), // v                 [v h v]
+        Op::Constant(2), // 0                 [v h v 0]
+        Op::Constant(3), // 9                 [v h v 0 9]
+        Op::Aset,        // residual [v h]    [v h r]
+        Op::Pop,         //                   [v h]
+        Op::Return,      // h
+    ];
+    let constants = [
+        Value::make_int(1),
+        Value::make_int(2),
+        Value::make_int(0),
+        Value::make_int(9),
+    ];
+    let leaf = lower_leaf(&ops, &constants, 1).expect("lowers");
+    // The builtin: the vector changes.
+    let v = ev.eval_str("(vector 0 0)").expect("v");
+    let NativeRun::Ok(bits) = leaf.call(ctx, &[v]) else {
+        panic!("aset must run natively");
+    };
+    let h = Value::from_bits(bits);
+    assert_eq!(h.cons_car(), Value::make_int(1));
+    assert_eq!(crate::emacs_core::print::print_value(&v), "[9 0]");
+    // Redefined: it collects and reallocates; `h` must survive, the vector
+    // is untouched.
+    ev.eval_str("(fset 'aset (lambda (a i x) (garbage-collect) (make-list 4096 0) 'redefined))")
+        .expect("fset");
+    for _ in 0..3 {
+        let v = ev.eval_str("(vector 0 0)").expect("v");
+        let NativeRun::Ok(bits) = leaf.call(ctx, &[v]) else {
+            panic!("redefined aset must still run");
+        };
+        let h = Value::from_bits(bits);
+        assert!(
+            h.is_cons(),
+            "h survived the redefinition's collection (got {h:?})"
+        );
+        assert_eq!(h.cons_car(), Value::make_int(1), "car intact");
+        assert_eq!(h.cons_cdr(), Value::make_int(2), "cdr intact");
+        assert_eq!(
+            crate::emacs_core::print::print_value(&v),
+            "[0 0]",
+            "the redefinition ran instead of the builtin"
+        );
+    }
+}
+
 /// The tier gate, through the production compile path. A loop with a
 /// shim-lowered op goes to the baseline (the MIR tier has no back-edge
 /// poll), although the MIR lowering itself accepts it; the same op outside

@@ -2019,6 +2019,30 @@ static MINUS_ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new(); // '-'
 static MODULO_ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new(); // '%'
 static NUMEQ_ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new(); // '='
 static ASET_ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new(); // 'aset'
+
+/// Whether an opcode may run builtin `id` inline: no compiler function
+/// overrides are active and `id`'s function cell is still that builtin (or
+/// empty) — not a redefinition or advice, which the opcode must dispatch
+/// through. Reads only, so JIT shims that must not reach a safe point can ask
+/// it with a shared borrow.
+pub(crate) fn named_builtin_fast_path_allowed_in(
+    ctx: &crate::emacs_core::eval::Context,
+    id: SymId,
+) -> bool {
+    if ctx.compiler_function_overrides_active() {
+        return false;
+    }
+    match ctx.obarray.symbol_function_id(id) {
+        Some(val) => match val.kind() {
+            ValueKind::Subr(_) | ValueKind::Veclike(VecLikeType::Subr) => {
+                val.as_subr_id() == Some(id)
+            }
+            ValueKind::Nil => true,
+            _ => false,
+        },
+        None => true,
+    }
+}
 static PLUS_ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new(); // '+'
 static SUB1_ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new(); // '1-'
 static TIMES_ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new(); // '*'
@@ -5615,19 +5639,12 @@ impl<'a> Vm<'a> {
     }
 
     fn named_builtin_fast_path_allowed_id(&self, id: SymId) -> bool {
-        if self.ctx.compiler_function_overrides_active() {
-            return false;
-        }
-        match self.ctx.obarray.symbol_function_id(id) {
-            Some(val) => match val.kind() {
-                ValueKind::Subr(_) | ValueKind::Veclike(VecLikeType::Subr) => {
-                    val.as_subr_id() == Some(id)
-                }
-                ValueKind::Nil => true,
-                _ => false,
-            },
-            None => true,
-        }
+        named_builtin_fast_path_allowed_in(self.ctx, id)
+    }
+
+    /// The symbol `aset`, interned once.
+    pub(crate) fn aset_builtin_id() -> SymId {
+        Self::cached_builtin_id("aset", &ASET_ID)
     }
 
     /// `Some(result)` when `id`'s live function cell is NOT the plain builtin
