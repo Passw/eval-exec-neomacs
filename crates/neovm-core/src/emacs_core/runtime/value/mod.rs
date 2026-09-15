@@ -2001,6 +2001,9 @@ impl TaggedValue {
 
     /// Allocate a GNU-shaped char-table.
     pub fn make_char_table(purpose: Value, init: Value, n_extras: usize) -> Self {
+        // A new table can reuse a collected table's address; caches keyed on
+        // (table bits, char-table write tick) must not match across that.
+        crate::emacs_core::chartable::bump_char_table_write_tick();
         with_tagged_heap(|h| h.alloc_char_table(purpose, init, n_extras))
     }
 

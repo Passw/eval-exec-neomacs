@@ -3188,6 +3188,25 @@ impl Buffer {
         self.text.syntax_prop_free_run_end_at_char_pos(pos, cap)
     }
 
+    /// See [`crate::buffer::buffer_text::BufferText::syntax_content_key`].
+    pub(crate) fn syntax_content_key(&self) -> (u64, u64) {
+        self.text.syntax_content_key()
+    }
+
+    /// See [`crate::buffer::buffer_text::SyntaxSafePositions`].
+    pub(crate) fn take_syntax_safe_positions(
+        &self,
+    ) -> crate::buffer::buffer_text::SyntaxSafePositions {
+        self.text.take_syntax_safe_positions()
+    }
+
+    pub(crate) fn put_syntax_safe_positions(
+        &self,
+        index: crate::buffer::buffer_text::SyntaxSafePositions,
+    ) {
+        self.text.put_syntax_safe_positions(index)
+    }
+
     /// See [`crate::buffer::buffer_text::BufferText::syntax_byte_run_memo_lookup`].
     pub fn syntax_byte_run_memo_lookup(
         &self,

@@ -231,6 +231,37 @@ struct BufferTextStorage {
     /// Char-coordinate resolved-run memo for the parse loop's prop cache.
     syntax_char_run_memo: RefCell<[SyntaxCharRunMemoEntry; 4]>,
     syntax_char_run_memo_cursor: Cell<usize>,
+    /// Safe restart positions for `back_comment`'s forward re-parse (see
+    /// [`SyntaxSafePositions`]). Per storage, so indirect buffers share it
+    /// and `buffer-swap-text` carries it with the text it describes.
+    syntax_safe_positions: RefCell<SyntaxSafePositions>,
+}
+
+/// Validity key of a [`SyntaxSafePositions`] index: everything a forward
+/// syntax parse of the accessible text reads. `content_epoch` and
+/// `syntax_prop_tick` are the key the syntax run memos already trust for the
+/// text and its syntax-relevant properties.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SyntaxSafeKey {
+    pub(crate) content_epoch: u64,
+    pub(crate) syntax_prop_tick: u64,
+    pub(crate) begv: usize,
+    pub(crate) table_bits: usize,
+    pub(crate) char_table_tick: u64,
+    pub(crate) honor_props: bool,
+    pub(crate) escape_quotes_ender: bool,
+}
+
+/// Char positions (ascending) where a forward parse from BEGV, with no stop
+/// conditions, was about to scan a character outside every comment and
+/// string. A fresh parse started at such a position computes the same
+/// comment/string state at every later position as the parse from BEGV did,
+/// so `back_comment`'s lossage re-parse can start at the nearest one instead
+/// of at BEGV. Recorded and consumed only in `syntax::back_comment_reparse`.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct SyntaxSafePositions {
+    pub(crate) key: Option<SyntaxSafeKey>,
+    pub(crate) points: Vec<usize>,
 }
 
 impl BufferTextStorage {
@@ -339,6 +370,8 @@ impl Clone for BufferTextStorage {
             syntax_byte_run_memo_cursor: self.syntax_byte_run_memo_cursor.clone(),
             syntax_char_run_memo: self.syntax_char_run_memo.clone(),
             syntax_char_run_memo_cursor: self.syntax_char_run_memo_cursor.clone(),
+            // A snapshot starts without the index; it is rebuilt on demand.
+            syntax_safe_positions: RefCell::new(SyntaxSafePositions::default()),
         }
     }
 }
@@ -408,6 +441,7 @@ impl BufferText {
                 syntax_byte_run_memo_cursor: Cell::new(0),
                 syntax_char_run_memo: RefCell::new([SyntaxCharRunMemoEntry::default(); 4]),
                 syntax_char_run_memo_cursor: Cell::new(0),
+                syntax_safe_positions: RefCell::new(SyntaxSafePositions::default()),
             })),
         }
     }
@@ -1303,6 +1337,25 @@ impl BufferText {
         *storage.syntax_run_memo.borrow_mut() = [SyntaxRunMemoEntry::default(); 4];
         *storage.syntax_byte_run_memo.borrow_mut() = [SyntaxByteRunMemoEntry::default(); 4];
         *storage.syntax_char_run_memo.borrow_mut() = [SyntaxCharRunMemoEntry::default(); 4];
+        // Same reason: the new table's syntax tick is not comparable.
+        *storage.syntax_safe_positions.borrow_mut() = SyntaxSafePositions::default();
+    }
+
+    /// The content epoch and the text-property table's syntax tick: the
+    /// text-side half of a [`SyntaxSafeKey`].
+    pub(crate) fn syntax_content_key(&self) -> (u64, u64) {
+        let storage = self.storage.borrow();
+        (storage.content_epoch, storage.text_props.syntax_prop_tick())
+    }
+
+    /// Move the safe-position index out (no borrow is held while the caller
+    /// parses); hand it back with [`Self::put_syntax_safe_positions`].
+    pub(crate) fn take_syntax_safe_positions(&self) -> SyntaxSafePositions {
+        std::mem::take(&mut *self.storage.borrow().syntax_safe_positions.borrow_mut())
+    }
+
+    pub(crate) fn put_syntax_safe_positions(&self, index: SyntaxSafePositions) {
+        *self.storage.borrow().syntax_safe_positions.borrow_mut() = index;
     }
 
     pub fn replace_storage(&self, text: &str, multibyte: bool, text_props: TextPropertyTable) {

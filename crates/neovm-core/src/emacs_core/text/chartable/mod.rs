@@ -287,7 +287,7 @@ pub(crate) fn char_table_write_tick() -> u64 {
 }
 
 #[inline]
-fn bump_char_table_write_tick() {
+pub(crate) fn bump_char_table_write_tick() {
     CHAR_TABLE_WRITE_TICK.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 }
 
@@ -1191,6 +1191,7 @@ pub(crate) fn fill_char_table_from_fillarray(table: &Value, item: Value) -> Resu
     if !is_char_table(table) {
         return Err(wrong_type("char-table-p", table));
     }
+    bump_char_table_write_tick();
     if table.is_char_table() {
         let _ = table.with_char_table_mut(|obj| {
             obj.defalt = item;
@@ -1228,6 +1229,10 @@ pub(crate) fn builtin_set_char_table_range(
     obarray: Option<&super::symbol::Obarray>,
 ) -> EvalResult {
     expect_args("set-char-table-range", &args, 3)?;
+    // Every branch below writes the table (including the nil-range default
+    // and the legacy vector representation, which do not reach the
+    // tick-bumping slot primitives).
+    bump_char_table_write_tick();
     let table = &args[0];
     let range = &args[1];
     let value = &args[2];
@@ -3031,6 +3036,7 @@ pub(crate) fn builtin_char_table_extra_slot(args: Vec<Value>) -> EvalResult {
 /// `(set-char-table-extra-slot TABLE N VALUE)` -- set extra slot N.
 pub(crate) fn builtin_set_char_table_extra_slot(args: Vec<Value>) -> EvalResult {
     expect_args("set-char-table-extra-slot", &args, 3)?;
+    bump_char_table_write_tick();
     let table = &args[0];
     let n = expect_fixnump(&args[1])?;
     let value = &args[2];

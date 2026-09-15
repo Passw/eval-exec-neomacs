@@ -4877,6 +4877,63 @@ fn char_quoted_at_byte(
     quoted
 }
 
+/// The validity key of the buffer's safe-position index for this re-parse, or
+/// `None` when the index must not be used: a `syntax-table` property resolver
+/// with `char-property-alias-alist` aliases or a `default-text-properties`
+/// fallback depends on Lisp list structure no key observes.
+fn back_comment_safe_key(
+    buf: &Buffer,
+    table: &SyntaxTable,
+    props: SyntaxProperties<'_>,
+    escape_policy: CommentEndEscapePolicy,
+) -> Option<crate::buffer::buffer_text::SyntaxSafeKey> {
+    #[cfg(test)]
+    if BACK_COMMENT_SAFE_BYPASS.with(|b| b.get()) {
+        return None;
+    }
+    let honor_props = match props {
+        SyntaxProperties::Ignore => false,
+        SyntaxProperties::Honor(resolver) => {
+            if !resolver.supports_presence_coalescing() {
+                return None;
+            }
+            true
+        }
+    };
+    let (content_epoch, syntax_prop_tick) = buf.syntax_content_key();
+    Some(crate::buffer::buffer_text::SyntaxSafeKey {
+        content_epoch,
+        syntax_prop_tick,
+        begv: buf.accessible_char_region().start().get(),
+        table_bits: table.chartable.bits(),
+        char_table_tick: crate::emacs_core::chartable::char_table_write_tick(),
+        honor_props,
+        escape_quotes_ender: escape_policy == CommentEndEscapePolicy::EscapeQuotesEnder,
+    })
+}
+
+/// Characters between recorded safe positions.
+fn back_comment_safe_chunk() -> usize {
+    #[cfg(test)]
+    {
+        let over = BACK_COMMENT_SAFE_CHUNK_OVERRIDE.with(|c| c.get());
+        if over != 0 {
+            return over;
+        }
+    }
+    1024
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Test hooks: bypass the safe-position index entirely; override the
+    /// chunk; count re-parses that started after BEGV.
+    pub(crate) static BACK_COMMENT_SAFE_BYPASS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    pub(crate) static BACK_COMMENT_SAFE_CHUNK_OVERRIDE: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    pub(crate) static BACK_COMMENT_SAFE_STARTS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    pub(crate) static BACK_COMMENT_SAFE_REPARSES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// GNU `back_comment`'s `lossage` fallback: re-parse *forward* and take the
 /// comment start from the resulting parse state.
 ///
@@ -4918,18 +4975,96 @@ fn back_comment_reparse(
     }
 
     let table = SyntaxTable::for_buffer(buf);
-    let (state, _) = parse_state_from_range_core(
-        buf,
-        &table,
-        from,
-        to,
-        None,
-        false,
-        None,
-        CommentStopMode::None,
-        prop_cache.props(),
-        escape_policy,
-    );
+    let props = prop_cache.props();
+    let state = match back_comment_safe_key(buf, &table, props, escape_policy) {
+        Some(key) => {
+            let mut index = buf.take_syntax_safe_positions();
+            #[cfg(test)]
+            BACK_COMMENT_SAFE_REPARSES.with(|c| c.set(c.get() + 1));
+            if index.key != Some(key) {
+                index.points.clear();
+                index.key = Some(key);
+            }
+            // Restart from the last safe position before `to` (BEGV if none),
+            // and extend the index only when parsing past its end.
+            let to0 = (to - 1) as usize;
+            let i = index.points.partition_point(|&p| p < to0);
+            let start0 = if i == 0 {
+                begv.get()
+            } else {
+                index.points[i - 1]
+            };
+            let chunk = back_comment_safe_chunk();
+            let next_target = if i == index.points.len() {
+                start0.saturating_add(chunk)
+            } else {
+                usize::MAX
+            };
+            let (state, _) = parse_state_from_range_recording::<true>(
+                buf,
+                &table,
+                char_pos_to_lisp_i64(start0),
+                to,
+                None,
+                false,
+                None,
+                CommentStopMode::None,
+                props,
+                escape_policy,
+                &mut SafePositionRecorder {
+                    next_target,
+                    chunk,
+                    points: &mut index.points,
+                },
+            );
+            buf.put_syntax_safe_positions(index);
+            #[cfg(test)]
+            BACK_COMMENT_SAFE_STARTS.with(|c| c.set(c.get() + usize::from(start0 > begv.get())));
+            #[cfg(debug_assertions)]
+            {
+                let (full, _) = parse_state_from_range_core(
+                    buf,
+                    &table,
+                    from,
+                    to,
+                    None,
+                    false,
+                    None,
+                    CommentStopMode::None,
+                    props,
+                    escape_policy,
+                );
+                debug_assert_eq!(
+                    (
+                        &state.in_comment,
+                        state.in_comment.map(|_| state.comment_or_string_start)
+                    ),
+                    (
+                        &full.in_comment,
+                        full.in_comment.map(|_| full.comment_or_string_start)
+                    ),
+                    "a parse from safe position {start0} must reach the comment state \
+                     the parse from BEGV reaches at {to}"
+                );
+            }
+            state
+        }
+        None => {
+            parse_state_from_range_core(
+                buf,
+                &table,
+                from,
+                to,
+                None,
+                false,
+                None,
+                CommentStopMode::None,
+                props,
+                escape_policy,
+            )
+            .0
+        }
+    };
 
     // GNU's acceptance test is `state.incomment == (comnested ? 1 : -1) &&
     // state.comstyle == comstyle`: the parse has to end inside a comment of
@@ -6371,6 +6506,7 @@ fn parse_state_from_range_with_options(
 /// in-tree callers -- `parse-partial-sexp` and `back_comment`'s forward
 /// re-parse -- can read it without going through the Lisp representation.
 #[allow(clippy::too_many_arguments)] // mirrors GNU `scan_sexps_forward`'s parameters
+#[inline(always)]
 fn parse_state_from_range_core(
     buf: &Buffer,
     table: &SyntaxTable,
@@ -6382,6 +6518,58 @@ fn parse_state_from_range_core(
     commentstop: CommentStopMode,
     props: SyntaxProperties<'_>,
     escape_policy: CommentEndEscapePolicy,
+) -> (PartialParseState, i64) {
+    let mut none = Vec::new();
+    parse_state_from_range_recording::<false>(
+        buf,
+        table,
+        from,
+        to,
+        target_depth,
+        stop_before,
+        oldstate,
+        commentstop,
+        props,
+        escape_policy,
+        &mut SafePositionRecorder::inactive(&mut none),
+    )
+}
+
+/// Where a recording parse (`parse_state_from_range_recording::<true>`)
+/// notes safe restart positions: see `buffer_text::SyntaxSafePositions`.
+struct SafePositionRecorder<'a> {
+    /// The next char position at or after which a safe position is noted.
+    next_target: usize,
+    chunk: usize,
+    points: &'a mut Vec<usize>,
+}
+
+impl<'a> SafePositionRecorder<'a> {
+    fn inactive(points: &'a mut Vec<usize>) -> Self {
+        Self {
+            next_target: usize::MAX,
+            chunk: 0,
+            points,
+        }
+    }
+}
+
+/// [`parse_state_from_range_core`], optionally noting safe restart
+/// positions. `RECORD` is a const parameter so the non-recording instance --
+/// every Lisp `parse-partial-sexp` -- compiles to the loop it always had.
+#[allow(clippy::too_many_arguments)]
+fn parse_state_from_range_recording<const RECORD: bool>(
+    buf: &Buffer,
+    table: &SyntaxTable,
+    from: i64,
+    to: i64,
+    target_depth: Option<i64>,
+    stop_before: bool,
+    oldstate: Option<&Value>,
+    commentstop: CommentStopMode,
+    props: SyntaxProperties<'_>,
+    escape_policy: CommentEndEscapePolicy,
+    rec: &mut SafePositionRecorder<'_>,
 ) -> (PartialParseState, i64) {
     let accessible_chars = buf.accessible_char_region();
     let point_min = accessible_chars.start().get();
@@ -6442,6 +6630,20 @@ fn parse_state_from_range_core(
 
     while idx < to_idx {
         let abs_char = from_char + idx;
+        // A safe restart position: about to scan a character outside every
+        // comment and string. Every two-character decision about the previous
+        // character was made with this one visible (the parse peeks), and an
+        // escape consumed it rather than stopping before it, so a fresh parse
+        // from here reaches the same comment/string state as this one.
+        if RECORD
+            && abs_char >= rec.next_target
+            && state.in_comment.is_none()
+            && state.in_string.is_none()
+        {
+            debug_assert!(!state.quoted, "quoted is only set at the range end");
+            rec.points.push(abs_char);
+            rec.next_target = abs_char.saturating_add(rec.chunk);
+        }
         let pos1 = (abs_char + 1) as i64;
         let ch = chars.next();
         // Flat-table fast path, in ascending order of cost: a register test
@@ -7221,6 +7423,10 @@ fn expect_skip_syntax_args(caller: &str, args: &[Value]) -> Result<(String, Opti
 // ===========================================================================
 // Tests
 // ===========================================================================
+#[cfg(test)]
+#[path = "tests/back_comment_safe_positions.rs"]
+mod back_comment_safe_positions_test;
+
 #[cfg(test)]
 #[path = "tests/mod.rs"]
 mod tests;
