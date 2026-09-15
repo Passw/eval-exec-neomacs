@@ -815,3 +815,45 @@ fn tenured_owner_keeps_young_page_float_alive() {
 fn tenured_owner_keeps_young_page_float_alive_verified() {
     tenured_owner_keeps_young_page_float_alive_body(true);
 }
+
+/// A deferred sweep visits the pages that existed at mark termination, and
+/// finishes even when the mutator opens a new page between every two slices
+/// (under the JIT, elb nbody filled pages faster than a slice visited them;
+/// bounded by the live page count the sweep never ended, and no cycle ran
+/// again).
+#[test]
+fn a_deferred_sweep_finishes_while_the_mutator_opens_pages() {
+    crate::test_utils::init_test_tracing();
+    let mut heap = TaggedHeap::new();
+    set_tagged_heap(&mut heap);
+    for i in 0..(4 * FLOAT_PAGE_SLOTS) {
+        let _ = heap.alloc_float(i as f64);
+    }
+    heap.begin_collection();
+    let bytes_before = heap.live_bytes();
+    heap.incremental_drain_all();
+    heap.incremental_finish(bytes_before, std::time::Instant::now());
+    let mut slices = 0;
+    let mut born = Vec::new();
+    loop {
+        // Two pages' worth of floats per slice, which sweeps one page. The
+        // first page's worth refills the page just swept.
+        for i in 0..(2 * FLOAT_PAGE_SLOTS) {
+            born.push(heap.alloc_float(i as f64));
+        }
+        slices += 1;
+        if heap.incremental_sweep_slice(1) {
+            break;
+        }
+        assert!(
+            slices < 16,
+            "the sweep must end with the pages it began with"
+        );
+    }
+    assert_eq!(slices, 4);
+    heap.assert_object_arenas_coherent();
+    // Everything born during the sweep survived it.
+    for (i, f) in born.iter().enumerate() {
+        assert_eq!(f.xfloat(), (i % (2 * FLOAT_PAGE_SLOTS)) as f64);
+    }
+}

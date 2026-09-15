@@ -96,8 +96,11 @@ impl TaggedHeap {
         self.all_objects = std::ptr::null_mut();
         self.cons_free_list = std::ptr::null_mut();
         self.sweep_cons_cursor = 0;
+        self.sweep_cons_end = self.cons_blocks.len();
+        self.sweep_cons_live_cells = 0;
         // Object arena pages are swept in place behind these cursors (no
-        // detached list exists for them; the bitmap is re-read per slice).
+        // detached list exists for them; the bitmap is re-read per slice),
+        // up to the pages that exist now.
         self.sweep_float_page_cursor = 0;
         self.sweep_string_page_cursor = 0;
         self.sweep_vector_page_cursor = 0;
@@ -107,6 +110,15 @@ impl TaggedHeap {
         self.sweep_record_page_cursor = 0;
         self.sweep_symbol_with_pos_page_cursor = 0;
         self.sweep_marker_page_cursor = 0;
+        self.sweep_float_page_end = self.float_arena.pages.len();
+        self.sweep_string_page_end = self.string_arena.pages.len();
+        self.sweep_vector_page_end = self.vector_arena.pages.len();
+        self.sweep_bytecode_page_end = self.bytecode_arena.pages.len();
+        self.sweep_lambda_page_end = self.lambda_arena.pages.len();
+        self.sweep_macro_page_end = self.macro_arena.pages.len();
+        self.sweep_record_page_end = self.record_arena.pages.len();
+        self.sweep_symbol_with_pos_page_end = self.symbol_with_pos_arena.pages.len();
+        self.sweep_marker_page_end = self.marker_arena.pages.len();
         self.sweep_noncons_live_bytes = 0;
         self.sweep_mark_us = self.incremental_mark_us;
         self.sweep_bytes_before = bytes_before;
@@ -126,6 +138,7 @@ impl TaggedHeap {
         let pace_alloc = self
             .bytes_since_gc
             .saturating_sub(self.pace_mark_start_bytes);
+        self.sweep_mark_window_alloc_bytes = pace_alloc;
         let forced = self.forced_termination_pending;
         self.forced_termination_pending = false;
         self.pace_close_mark_window(pace_wall_us, pace_alloc, forced);
@@ -193,10 +206,11 @@ impl TaggedHeap {
         let t0 = std::time::Instant::now();
         // -- cons: reclaim up to `budget` blocks (each ~64KB of cells) --
         let mut swept_blocks = 0usize;
-        while swept_blocks < budget && self.sweep_cons_cursor < self.cons_blocks.len() {
+        while swept_blocks < budget && self.sweep_cons_cursor < self.sweep_cons_end {
             let idx = self.sweep_cons_cursor;
             let free_list: *mut *mut ConsCell = &mut self.cons_free_list;
-            self.cons_blocks[idx].sweep(unsafe { &mut *free_list });
+            let live = self.cons_blocks[idx].sweep(unsafe { &mut *free_list });
+            self.sweep_cons_live_cells += live;
             self.sweep_cons_cursor += 1;
             swept_blocks += 1;
         }
@@ -204,19 +218,17 @@ impl TaggedHeap {
         //    (64KB each, like cons blocks), page-at-a-time behind the
         //    per-class cursors. Each visit re-reads the live bitmap (the
         //    mutator can reallocate freed slots between slices — see
-        //    `ObjectArena::sweep_range`). Pages created mid-sweep may or may
-        //    not be visited by the moving cursor/len race; either is correct
-        //    — every slot in them is born-at-parity (marked), so a visit
-        //    counts survivors and a skip frees nothing it shouldn't. Page
+        //    `ObjectArena::sweep_range`). Pages created mid-sweep are past
+        //    the termination snapshot (`sweep_*_page_end`) and never visited:
+        //    every slot in them is born-at-parity (marked), so a visit would
+        //    free nothing, and chasing them need never finish. Page
         //    survivor bytes accumulate into `sweep_noncons_live_bytes`, the
         //    incremental half of the live-bytes recompute
         //    (`finish_incremental_sweep`). --
         let mut float_freed = 0usize;
         {
             let mut swept_pages = 0usize;
-            while swept_pages < budget
-                && self.sweep_float_page_cursor < self.float_arena.pages.len()
-            {
+            while swept_pages < budget && self.sweep_float_page_cursor < self.sweep_float_page_end {
                 let idx = self.sweep_float_page_cursor;
                 let (live, freed) = self.sweep_arena_pages_ranges(
                     (idx, idx + 1),
@@ -235,8 +247,7 @@ impl TaggedHeap {
                 swept_pages += 1;
             }
             let mut swept_pages = 0usize;
-            while swept_pages < budget
-                && self.sweep_string_page_cursor < self.string_arena.pages.len()
+            while swept_pages < budget && self.sweep_string_page_cursor < self.sweep_string_page_end
             {
                 let idx = self.sweep_string_page_cursor;
                 let (live, freed) = self.sweep_arena_pages_ranges(
@@ -256,8 +267,7 @@ impl TaggedHeap {
                 swept_pages += 1;
             }
             let mut swept_pages = 0usize;
-            while swept_pages < budget
-                && self.sweep_vector_page_cursor < self.vector_arena.pages.len()
+            while swept_pages < budget && self.sweep_vector_page_cursor < self.sweep_vector_page_end
             {
                 let idx = self.sweep_vector_page_cursor;
                 let (live, freed) = self.sweep_arena_pages_ranges(
@@ -278,7 +288,7 @@ impl TaggedHeap {
             }
             let mut swept_pages = 0usize;
             while swept_pages < budget
-                && self.sweep_bytecode_page_cursor < self.bytecode_arena.pages.len()
+                && self.sweep_bytecode_page_cursor < self.sweep_bytecode_page_end
             {
                 let idx = self.sweep_bytecode_page_cursor;
                 let (live, freed) = self.sweep_arena_pages_ranges(
@@ -298,8 +308,7 @@ impl TaggedHeap {
                 swept_pages += 1;
             }
             let mut swept_pages = 0usize;
-            while swept_pages < budget
-                && self.sweep_lambda_page_cursor < self.lambda_arena.pages.len()
+            while swept_pages < budget && self.sweep_lambda_page_cursor < self.sweep_lambda_page_end
             {
                 let idx = self.sweep_lambda_page_cursor;
                 let (live, freed) = self.sweep_arena_pages_ranges(
@@ -319,9 +328,7 @@ impl TaggedHeap {
                 swept_pages += 1;
             }
             let mut swept_pages = 0usize;
-            while swept_pages < budget
-                && self.sweep_macro_page_cursor < self.macro_arena.pages.len()
-            {
+            while swept_pages < budget && self.sweep_macro_page_cursor < self.sweep_macro_page_end {
                 let idx = self.sweep_macro_page_cursor;
                 let (live, freed) = self.sweep_arena_pages_ranges(
                     (0, 0),
@@ -340,8 +347,7 @@ impl TaggedHeap {
                 swept_pages += 1;
             }
             let mut swept_pages = 0usize;
-            while swept_pages < budget
-                && self.sweep_record_page_cursor < self.record_arena.pages.len()
+            while swept_pages < budget && self.sweep_record_page_cursor < self.sweep_record_page_end
             {
                 let idx = self.sweep_record_page_cursor;
                 let (live, freed) = self.sweep_arena_pages_ranges(
@@ -362,7 +368,7 @@ impl TaggedHeap {
             }
             let mut swept_pages = 0usize;
             while swept_pages < budget
-                && self.sweep_symbol_with_pos_page_cursor < self.symbol_with_pos_arena.pages.len()
+                && self.sweep_symbol_with_pos_page_cursor < self.sweep_symbol_with_pos_page_end
             {
                 let idx = self.sweep_symbol_with_pos_page_cursor;
                 let (live, freed) = self.sweep_arena_pages_ranges(
@@ -382,8 +388,7 @@ impl TaggedHeap {
                 swept_pages += 1;
             }
             let mut swept_pages = 0usize;
-            while swept_pages < budget
-                && self.sweep_marker_page_cursor < self.marker_arena.pages.len()
+            while swept_pages < budget && self.sweep_marker_page_cursor < self.sweep_marker_page_end
             {
                 let idx = self.sweep_marker_page_cursor;
                 let (live, freed) = self.sweep_arena_pages_ranges(
@@ -440,17 +445,17 @@ impl TaggedHeap {
             processed += 1;
         }
 
-        let done = self.sweep_cons_cursor >= self.cons_blocks.len()
+        let done = self.sweep_cons_cursor >= self.sweep_cons_end
             && self.sweep_noncons_pending.is_null()
-            && self.sweep_float_page_cursor >= self.float_arena.pages.len()
-            && self.sweep_string_page_cursor >= self.string_arena.pages.len()
-            && self.sweep_vector_page_cursor >= self.vector_arena.pages.len()
-            && self.sweep_bytecode_page_cursor >= self.bytecode_arena.pages.len()
-            && self.sweep_lambda_page_cursor >= self.lambda_arena.pages.len()
-            && self.sweep_macro_page_cursor >= self.macro_arena.pages.len()
-            && self.sweep_record_page_cursor >= self.record_arena.pages.len()
-            && self.sweep_symbol_with_pos_page_cursor >= self.symbol_with_pos_arena.pages.len()
-            && self.sweep_marker_page_cursor >= self.marker_arena.pages.len();
+            && self.sweep_float_page_cursor >= self.sweep_float_page_end
+            && self.sweep_string_page_cursor >= self.sweep_string_page_end
+            && self.sweep_vector_page_cursor >= self.sweep_vector_page_end
+            && self.sweep_bytecode_page_cursor >= self.sweep_bytecode_page_end
+            && self.sweep_lambda_page_cursor >= self.sweep_lambda_page_end
+            && self.sweep_macro_page_cursor >= self.sweep_macro_page_end
+            && self.sweep_record_page_cursor >= self.sweep_record_page_end
+            && self.sweep_symbol_with_pos_page_cursor >= self.sweep_symbol_with_pos_page_end
+            && self.sweep_marker_page_cursor >= self.sweep_marker_page_end;
         let slice_us = t0.elapsed().as_micros() as u64;
         self.sweep_slice_us_total += slice_us;
         self.sweep_slice_count += 1;
@@ -508,13 +513,27 @@ impl TaggedHeap {
             .iter()
             .map(MappedConsRange::live_count)
             .sum();
-        let cons_live_bytes = recount
+        // The live count the next threshold derives from comes from what the
+        // sweep visited: the blocks and pages that existed at termination.
+        // What they hold that was allocated during the mark window was born
+        // marked, so it counted as surviving; take it back out. Most of it is
+        // garbage by now, and a threshold derived from it grew with the
+        // allocation rate: elb nbody's "live" climbed 13 MB -> 438 MB over
+        // eight cycles at a flat 75K live conses. A stop-the-world
+        // collection allocates nothing while it runs, so its live count is
+        // GNU's; this brings the incremental one to the same measure. It
+        // undercounts what the mark window allocated that stays live, which
+        // only paces the next cycle sooner.
+        let cons_live_bytes = self
+            .sweep_cons_live_cells
             .saturating_add(mapped_cons_live)
             .saturating_mul(size_of::<ConsCell>());
         let mapped_object_live_bytes = self.mapped_non_cons_live_bytes();
         self.live_bytes = cons_live_bytes
             .saturating_add(self.sweep_noncons_live_bytes)
-            .saturating_add(mapped_object_live_bytes);
+            .saturating_add(mapped_object_live_bytes)
+            .saturating_sub(self.sweep_mark_window_alloc_bytes)
+            .max(mapped_object_live_bytes);
 
         self.gc_collections += 1;
         self.sweep_lifetime_us += self.sweep_slice_us_total;

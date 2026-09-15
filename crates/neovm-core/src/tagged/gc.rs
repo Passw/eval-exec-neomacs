@@ -755,6 +755,24 @@ pub struct TaggedHeap {
     sweep_record_page_cursor: usize,
     sweep_symbol_with_pos_page_cursor: usize,
     sweep_marker_page_cursor: usize,
+    /// Where the deferred sweep stops: the cons blocks and arena pages that
+    /// existed at mark termination. Blocks and pages created during the sweep
+    /// hold only objects born marked, which it would count and not free, so
+    /// bounding it by the live `len()` let a mutator that fills pages faster
+    /// than one slice visits them keep the sweep from ever finishing (elb
+    /// nbody under the JIT: two collections in the whole run, 2.9 GB).
+    sweep_cons_end: usize,
+    sweep_float_page_end: usize,
+    sweep_string_page_end: usize,
+    sweep_vector_page_end: usize,
+    sweep_bytecode_page_end: usize,
+    sweep_lambda_page_end: usize,
+    sweep_macro_page_end: usize,
+    sweep_record_page_end: usize,
+    sweep_symbol_with_pos_page_end: usize,
+    sweep_marker_page_end: usize,
+    /// Cons cells the deferred sweep found marked in the blocks it visited.
+    sweep_cons_live_cells: usize,
     /// Non-cons objects detached from `all_objects` at sweep start, reclaimed
     /// incrementally. New non-cons allocations link onto a fresh `all_objects`
     /// and are not swept this cycle.
@@ -764,6 +782,11 @@ pub struct TaggedHeap {
     /// Carried from mark termination for the completion trace/accounting.
     sweep_mark_us: u64,
     sweep_bytes_before: usize,
+    /// Bytes allocated during the terminated concurrent mark window. Those
+    /// objects were born marked, so the deferred sweep counts them as
+    /// survivors; `finish_incremental_sweep` takes them back out of
+    /// `live_bytes`.
+    sweep_mark_window_alloc_bytes: usize,
     /// Per-cycle deferred-sweep cost accumulators (reset when the sweep is
     /// armed at `incremental_finish`) + lifetime totals, and the
     /// concurrent-termination drain probe. Snapshot via `sweep_stats`.
@@ -949,10 +972,22 @@ impl TaggedHeap {
             sweep_record_page_cursor: 0,
             sweep_symbol_with_pos_page_cursor: 0,
             sweep_marker_page_cursor: 0,
+            sweep_cons_end: 0,
+            sweep_float_page_end: 0,
+            sweep_string_page_end: 0,
+            sweep_vector_page_end: 0,
+            sweep_bytecode_page_end: 0,
+            sweep_lambda_page_end: 0,
+            sweep_macro_page_end: 0,
+            sweep_record_page_end: 0,
+            sweep_symbol_with_pos_page_end: 0,
+            sweep_marker_page_end: 0,
+            sweep_cons_live_cells: 0,
             sweep_noncons_pending: std::ptr::null_mut(),
             sweep_noncons_live_bytes: 0,
             sweep_mark_us: 0,
             sweep_bytes_before: 0,
+            sweep_mark_window_alloc_bytes: 0,
             sweep_slice_us_total: 0,
             sweep_slice_count: 0,
             sweep_cons_blocks_swept: 0,

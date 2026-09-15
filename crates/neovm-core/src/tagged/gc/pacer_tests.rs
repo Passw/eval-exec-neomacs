@@ -46,3 +46,46 @@ fn pacer_lead_escalates_on_forced_termination_and_recovers_on_clean() {
         heap.pace_lead_bytes
     );
 }
+
+/// Objects allocated while a cycle is marking or sweeping are born marked,
+/// so the deferred sweep's bitmaps count them as survivors. They must not
+/// reach `live_bytes`, which the next threshold is derived from: counted,
+/// they made an allocation-heavy loop's threshold grow with its allocation
+/// rate (elb nbody: 13 MB -> 438 MB "live" at a flat real live set).
+#[test]
+fn allocation_during_an_incremental_cycle_is_not_counted_live() {
+    let mut heap = TaggedHeap::new();
+    let mut rooted = TaggedValue::NIL;
+    for i in 0..1_000 {
+        rooted = heap.alloc_cons(TaggedValue::fixnum(i), rooted);
+    }
+    // A completed cycle first, so the live count reflects just the list.
+    heap.begin_collection();
+    heap.seed_root(rooted);
+    let before = heap.live_bytes();
+    heap.incremental_drain_all();
+    heap.incremental_finish(before, std::time::Instant::now());
+    while !heap.incremental_sweep_slice(8) {}
+    let settled = heap.live_bytes();
+
+    heap.begin_collection();
+    heap.seed_root(rooted);
+    heap.incremental_drain_all();
+    // Born marked during the mark window...
+    for i in 0..100_000 {
+        let _ = heap.alloc_float(i as f64);
+    }
+    let before = heap.live_bytes();
+    heap.incremental_finish(before, std::time::Instant::now());
+    // ...and during the sweep.
+    for i in 0..100_000 {
+        let _ = heap.alloc_float(i as f64);
+    }
+    while !heap.incremental_sweep_slice(8) {}
+    let floats = 200_000 * size_of::<FloatObj>();
+    assert!(
+        heap.live_bytes() < settled + floats / 10,
+        "live {} after a cycle that allocated {floats} bytes of garbage (settled at {settled})",
+        heap.live_bytes()
+    );
+}
