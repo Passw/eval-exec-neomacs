@@ -1136,6 +1136,19 @@ pub(crate) fn builtin_memq_2(
     builtin_memq_values(target, list, eval.symbols_with_pos_enabled)
 }
 
+/// How many cells a list scan with no cycle check visits before handing the
+/// list to the exact algorithm, which starts again from the head. A cycle
+/// cannot hide a match from the scan: every distinct cell is visited before
+/// the first repeated one, which is the only cell a cycle check reacts to.
+/// Only a list with no match that is circular, improper or longer than this
+/// pays the replay.
+const LIST_SCAN_BUDGET: usize = 1 << 16;
+
+/// `memq`. The scan tests each cell and nothing else, so it needs no stack
+/// frame: the tortoise-and-hare bookkeeping it no longer carries was 4 to 5
+/// of each cell's instructions, and its state and an inlined error path made
+/// the function save five registers on every call (208,797 calls per
+/// compile of elb-smie.el).
 pub(crate) fn builtin_memq_values(
     target: Value,
     list: Value,
@@ -1144,7 +1157,30 @@ pub(crate) fn builtin_memq_values(
     if symbols_with_pos_enabled {
         return builtin_memq_values_swp(target, list);
     }
+    let target_bits = target.bits();
+    let mut tail = list;
+    let mut budget = LIST_SCAN_BUDGET;
+    while budget != 0 {
+        if !tail.is_cons() {
+            if tail.is_nil() {
+                return Ok(Value::NIL);
+            }
+            break;
+        }
+        if tail.cons_car().bits() == target_bits {
+            return Ok(tail);
+        }
+        tail = tail.cons_cdr();
+        budget -= 1;
+    }
+    memq_exact(target, list)
+}
 
+/// [`builtin_memq_values`]'s exact algorithm, from the head: the match, or
+/// the circular-list or improper-list signal with GNU's data.
+#[cold]
+#[inline(never)]
+fn memq_exact(target: Value, list: Value) -> EvalResult {
     let target_bits = target.bits();
     for_each_proper_list_tail(list, list, |tail| {
         let pair_car = tail.cons_car();
@@ -1187,12 +1223,34 @@ pub(crate) fn listp_error(list: Value) -> Flow {
 // The byte compiler binds `symbols-with-pos-enabled`, so every `memq` it runs
 // comes here: one test per element against the target's bare symbol, not a
 // closure unwrapping both sides of every comparison (246 instructions a call,
-// 13.5% of compiling elb-smie.el).
+// 13.5% of compiling elb-smie.el). The same budgeted scan as the plain case.
 fn builtin_memq_values_swp(target: Value, list: Value) -> EvalResult {
     let bare = target.as_symbol_with_pos_sym().unwrap_or(target);
     if !bare.is_symbol() {
         return builtin_memq_values(target, list, false);
     }
+    let mut tail = list;
+    let mut budget = LIST_SCAN_BUDGET;
+    while budget != 0 {
+        if !tail.is_cons() {
+            if tail.is_nil() {
+                return Ok(Value::NIL);
+            }
+            break;
+        }
+        if eq_bare_symbol_swp(tail.cons_car(), bare) {
+            return Ok(tail);
+        }
+        tail = tail.cons_cdr();
+        budget -= 1;
+    }
+    memq_swp_exact(bare, list)
+}
+
+/// [`builtin_memq_values_swp`]'s exact algorithm, from the head.
+#[cold]
+#[inline(never)]
+fn memq_swp_exact(bare: Value, list: Value) -> EvalResult {
     let mut tail = list;
     let mut tortoise = list;
     let mut max = 2i64;
@@ -1214,6 +1272,16 @@ fn builtin_memq_values_swp(target: Value, list: Value) -> EvalResult {
         Ok(Value::NIL)
     } else {
         Err(listp_error(list))
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn memq_exact_for_test(target: Value, list: Value, swp: bool) -> EvalResult {
+    let bare = target.as_symbol_with_pos_sym().unwrap_or(target);
+    if swp && bare.is_symbol() {
+        memq_swp_exact(bare, list)
+    } else {
+        memq_exact(target, list)
     }
 }
 

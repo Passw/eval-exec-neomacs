@@ -288,3 +288,98 @@ const THIRD_BATCH_FORM: &str = r#"(list (assoc "b" '(("a" . 1) ("b" . 2))) (asso
               (memq p (list 'foo p)) (assoc p (list (cons 'foo 9))))))"#;
 
 const THIRD_BATCH_GNU: &str = r#"(("b" . 2) (2 . b) ("b" . 2) (x . 1) 2 2 nil "abc" [1 2] nil (1 2) 2.0 0.0 1.0 0.0 0.0 0.0 1.0 1.5 (wrong-number-of-arguments sqrt 0) (wrong-number-of-arguments sqrt 2) (wrong-type-argument numberp a) (wrong-type-argument numberp "x") (wrong-number-of-arguments assoc 1) (wrong-number-of-arguments assoc 4) (wrong-number-of-arguments plist-get 1) (wrong-number-of-arguments copy-sequence 0) (wrong-type-argument sequencep 1) (1 . 2) (wrong-type-argument listp ((1 . 2) . 3)) (2 . 3) (2 . 3) (1 . 1) (1 . 1) (2 1 1 1 nil 1 nil 1 2 5 8 nil 1 2 nil 4 (wrong-type-argument listp (1 2 . 3)) (wrong-type-argument listp ((1 . 2) . 3)) (wrong-type-argument listp ((1 . 2) . 3)) circular-list (circular-list circular-list) (foo #<symbol foo at 3>) (foo . 9)))"#;
+
+/// `memq`'s scan with no cycle check answers what the exact algorithm does —
+/// the same tail, the same `circular-list` data, the same improper-list
+/// object — for every list shape: a cycle with the match inside it or before
+/// it, a cycle with no match, an improper end, and a list longer than the
+/// scan's budget with the match at its end. With `symbols-with-pos-enabled`
+/// both on and off.
+#[test]
+fn memq_scan_answers_as_the_exact_algorithm() {
+    use crate::emacs_core::builtins::cons_list::{builtin_memq_values, memq_exact_for_test};
+    use crate::emacs_core::value::Value;
+    crate::test_utils::init_test_tracing();
+    let mut eval = Context::new();
+    let describe = |result: &crate::emacs_core::error::EvalResult| match result {
+        Ok(v) => format!("ok {:#x}", v.bits()),
+        Err(crate::emacs_core::error::Flow::Signal(sig)) => format!(
+            "signal {} {:?}",
+            sig.symbol_name(),
+            sig.data.iter().map(|v| v.bits()).collect::<Vec<_>>()
+        ),
+        Err(other) => format!("{other:?}"),
+    };
+    let positioned = eval
+        .eval_str("(list (position-symbol 'b 4) (position-symbol 'c 9))")
+        .expect("positioned symbols");
+    crate::emacs_core::eval::push_scratch_gc_root(positioned);
+    // Built without evaluating anything, so nothing collects meanwhile.
+    let seq = |n: i64| {
+        (1..=n)
+            .rev()
+            .fold(Value::NIL, |l, i| Value::cons(Value::fixnum(i), l))
+    };
+    let nthcdr = |mut l: Value, k: usize| {
+        for _ in 0..k {
+            l = l.cons_cdr();
+        }
+        l
+    };
+    let cyc = |n: i64, k: usize| {
+        let l = seq(n);
+        nthcdr(l, n as usize - 1).set_cdr(nthcdr(l, k));
+        l
+    };
+    let improper = Value::cons(
+        Value::fixnum(1),
+        Value::cons(Value::fixnum(2), Value::fixnum(3)),
+    );
+    let with_positions = Value::cons(
+        Value::symbol("a"),
+        Value::cons(
+            positioned.cons_car(),
+            Value::cons(Value::symbol("c"), Value::NIL),
+        ),
+    );
+    let lists = [
+        Value::NIL,
+        seq(3),
+        improper,
+        Value::cons(Value::fixnum(1), Value::fixnum(2)),
+        Value::fixnum(5),
+        cyc(1, 0),
+        cyc(2, 0),
+        cyc(2, 1),
+        cyc(7, 3),
+        cyc(40, 39),
+        seq(70000),
+        with_positions,
+    ];
+    for &list in &lists {
+        crate::emacs_core::eval::push_scratch_gc_root(list);
+    }
+    let targets = [1, 2, 3, 5, 7, 39, 40, 41, 70000, 70001]
+        .into_iter()
+        .map(Value::fixnum)
+        .chain([
+            Value::symbol("a"),
+            Value::symbol("b"),
+            Value::symbol("zz"),
+            positioned.cons_cdr().cons_car(),
+            Value::NIL,
+        ])
+        .collect::<Vec<_>>();
+    let mut checked = 0;
+    for &list in &lists {
+        for &target in &targets {
+            for swp in [false, true] {
+                let got = builtin_memq_values(target, list, swp);
+                let want = memq_exact_for_test(target, list, swp);
+                assert_eq!(describe(&got), describe(&want), "swp {swp}");
+                checked += 1;
+            }
+        }
+    }
+    assert_eq!(checked, 12 * 15 * 2);
+}
