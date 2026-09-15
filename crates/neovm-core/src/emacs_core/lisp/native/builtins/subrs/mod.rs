@@ -3168,12 +3168,7 @@ pub(crate) fn register_subrs(ctx: &mut crate::emacs_core::eval::Context) {
         SubrArity::new(2, Some(2)),
     ));
     ctx.register_subr(
-        SubrSpec::new(
-            "assoc",
-            NativeFn::ContextVec(builtin_assoc),
-            SubrArity::new(2, Some(3)),
-        )
-        .requires_eval_state(),
+        SubrSpec::fixed3("assoc", builtin_assoc_3, FixedMin3::Two).requires_eval_state(),
     );
     ctx.register_subr(
         SubrSpec::new(
@@ -3754,46 +3749,18 @@ pub(crate) fn register_subrs(ctx: &mut crate::emacs_core::eval::Context) {
         NativeFn::ContextVec(|_ctx, args| builtin_substring_no_properties(args)),
         SubrArity::new(1, Some(3)),
     ));
-    ctx.register_subr(SubrSpec::new(
-        "sqrt",
-        NativeFn::ContextVec(|_ctx, args| builtin_sqrt(args)),
-        SubrArity::new(1, Some(1)),
-    ));
-    ctx.register_subr(SubrSpec::new(
-        "sin",
-        NativeFn::ContextVec(|_ctx, args| builtin_sin(args)),
-        SubrArity::new(1, Some(1)),
-    ));
-    ctx.register_subr(SubrSpec::new(
-        "cos",
-        NativeFn::ContextVec(|_ctx, args| builtin_cos(args)),
-        SubrArity::new(1, Some(1)),
-    ));
-    ctx.register_subr(SubrSpec::new(
-        "tan",
-        NativeFn::ContextVec(|_ctx, args| builtin_tan(args)),
-        SubrArity::new(1, Some(1)),
-    ));
-    ctx.register_subr(SubrSpec::new(
-        "asin",
-        NativeFn::ContextVec(|_ctx, args| builtin_asin(args)),
-        SubrArity::new(1, Some(1)),
-    ));
-    ctx.register_subr(SubrSpec::new(
-        "acos",
-        NativeFn::ContextVec(|_ctx, args| builtin_acos(args)),
-        SubrArity::new(1, Some(1)),
-    ));
+    ctx.register_subr(SubrSpec::fixed1("sqrt", builtin_sqrt_1, FixedMin1::One));
+    ctx.register_subr(SubrSpec::fixed1("sin", builtin_sin_1, FixedMin1::One));
+    ctx.register_subr(SubrSpec::fixed1("cos", builtin_cos_1, FixedMin1::One));
+    ctx.register_subr(SubrSpec::fixed1("tan", builtin_tan_1, FixedMin1::One));
+    ctx.register_subr(SubrSpec::fixed1("asin", builtin_asin_1, FixedMin1::One));
+    ctx.register_subr(SubrSpec::fixed1("acos", builtin_acos_1, FixedMin1::One));
     ctx.register_subr(SubrSpec::new(
         "atan",
         NativeFn::ContextVec(|_ctx, args| builtin_atan(args)),
         SubrArity::new(1, Some(2)),
     ));
-    ctx.register_subr(SubrSpec::new(
-        "exp",
-        NativeFn::ContextVec(|_ctx, args| builtin_exp(args)),
-        SubrArity::new(1, Some(1)),
-    ));
+    ctx.register_subr(SubrSpec::fixed1("exp", builtin_exp_1, FixedMin1::One));
     ctx.register_subr(SubrSpec::new(
         "log",
         NativeFn::ContextVec(|_ctx, args| builtin_log(args)),
@@ -6808,15 +6775,15 @@ pub(crate) fn register_subrs(ctx: &mut crate::emacs_core::eval::Context) {
     ctx.register_subr(SubrSpec::fixed2("member", builtin_member_2, FixedMin2::Two));
     ctx.register_subr(SubrSpec::fixed2("memq", builtin_memq_2, FixedMin2::Two));
     ctx.register_subr(SubrSpec::fixed2("assq", builtin_assq_2, FixedMin2::Two));
-    ctx.register_subr(SubrSpec::new(
+    ctx.register_subr(SubrSpec::fixed1(
         "copy-sequence",
-        NativeFn::ContextVec(|_ctx, args| builtin_copy_sequence(args)),
-        SubrArity::new(1, Some(1)),
+        builtin_copy_sequence_1,
+        FixedMin1::One,
     ));
-    ctx.register_subr(SubrSpec::new(
+    ctx.register_subr(SubrSpec::fixed3(
         "plist-get",
-        NativeFn::ContextSlice(builtin_plist_get_slice),
-        SubrArity::new(2, Some(3)),
+        builtin_plist_get_3,
+        FixedMin3::Two,
     ));
     ctx.register_subr(SubrSpec::new(
         "plist-put",

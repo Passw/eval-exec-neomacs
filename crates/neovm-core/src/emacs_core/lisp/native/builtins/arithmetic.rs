@@ -1928,34 +1928,34 @@ pub(crate) fn builtin_round(args: Vec<Value>) -> EvalResult {
 // Math functions (pure)
 // ===========================================================================
 
-pub(crate) fn builtin_sqrt(args: Vec<Value>) -> EvalResult {
-    expect_args("sqrt", &args, 1)?;
-    Ok(Value::make_float(expect_number(&args[0])?.sqrt()))
+/// `sqrt` as a one-slot subr: no argument vector per call.
+pub(crate) fn builtin_sqrt_1(_eval: &mut super::eval::Context, arg: Value) -> EvalResult {
+    Ok(Value::make_float(expect_number(&arg)?.sqrt()))
 }
 
-pub(crate) fn builtin_sin(args: Vec<Value>) -> EvalResult {
-    expect_args("sin", &args, 1)?;
-    Ok(Value::make_float(expect_number(&args[0])?.sin()))
+/// `sin` as a one-slot subr: no argument vector per call.
+pub(crate) fn builtin_sin_1(_eval: &mut super::eval::Context, arg: Value) -> EvalResult {
+    Ok(Value::make_float(expect_number(&arg)?.sin()))
 }
 
-pub(crate) fn builtin_cos(args: Vec<Value>) -> EvalResult {
-    expect_args("cos", &args, 1)?;
-    Ok(Value::make_float(expect_number(&args[0])?.cos()))
+/// `cos` as a one-slot subr: no argument vector per call.
+pub(crate) fn builtin_cos_1(_eval: &mut super::eval::Context, arg: Value) -> EvalResult {
+    Ok(Value::make_float(expect_number(&arg)?.cos()))
 }
 
-pub(crate) fn builtin_tan(args: Vec<Value>) -> EvalResult {
-    expect_args("tan", &args, 1)?;
-    Ok(Value::make_float(expect_number(&args[0])?.tan()))
+/// `tan` as a one-slot subr: no argument vector per call.
+pub(crate) fn builtin_tan_1(_eval: &mut super::eval::Context, arg: Value) -> EvalResult {
+    Ok(Value::make_float(expect_number(&arg)?.tan()))
 }
 
-pub(crate) fn builtin_asin(args: Vec<Value>) -> EvalResult {
-    expect_args("asin", &args, 1)?;
-    Ok(Value::make_float(expect_number(&args[0])?.asin()))
+/// `asin` as a one-slot subr: no argument vector per call.
+pub(crate) fn builtin_asin_1(_eval: &mut super::eval::Context, arg: Value) -> EvalResult {
+    Ok(Value::make_float(expect_number(&arg)?.asin()))
 }
 
-pub(crate) fn builtin_acos(args: Vec<Value>) -> EvalResult {
-    expect_args("acos", &args, 1)?;
-    Ok(Value::make_float(expect_number(&args[0])?.acos()))
+/// `acos` as a one-slot subr: no argument vector per call.
+pub(crate) fn builtin_acos_1(_eval: &mut super::eval::Context, arg: Value) -> EvalResult {
+    Ok(Value::make_float(expect_number(&arg)?.acos()))
 }
 
 pub(crate) fn builtin_atan(args: Vec<Value>) -> EvalResult {
@@ -1969,9 +1969,9 @@ pub(crate) fn builtin_atan(args: Vec<Value>) -> EvalResult {
     }
 }
 
-pub(crate) fn builtin_exp(args: Vec<Value>) -> EvalResult {
-    expect_args("exp", &args, 1)?;
-    Ok(Value::make_float(expect_number(&args[0])?.exp()))
+/// `exp` as a one-slot subr: no argument vector per call.
+pub(crate) fn builtin_exp_1(_eval: &mut super::eval::Context, arg: Value) -> EvalResult {
+    Ok(Value::make_float(expect_number(&arg)?.exp()))
 }
 
 pub(crate) fn builtin_log(args: Vec<Value>) -> EvalResult {

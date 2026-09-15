@@ -1129,15 +1129,65 @@ pub(crate) fn builtin_memq_values(
     })
 }
 
+/// `eq` to the bare symbol `bare` while `symbols-with-pos-enabled`: `value`
+/// is `bare` itself or a symbol with position whose symbol is `bare` (GNU
+/// `slow_eq` with a bare-symbol side). Only a symbol can equal a symbol with
+/// position, so a caller whose key is no symbol at all compares bits instead.
+#[inline(always)]
+pub(crate) fn eq_bare_symbol_swp(value: Value, bare: Value) -> bool {
+    value.bits() == bare.bits()
+        || (value.is_veclike()
+            && value
+                .as_symbol_with_pos_sym()
+                .is_some_and(|sym| sym.bits() == bare.bits()))
+}
+
+#[cold]
+#[inline(never)]
+pub(crate) fn circular_list_error(tail: Value) -> Flow {
+    signal(LispCondition::CircularList, vec![tail])
+}
+
+#[cold]
+#[inline(never)]
+pub(crate) fn listp_error(list: Value) -> Flow {
+    signal(
+        LispCondition::WrongTypeArgument,
+        vec![Value::symbol("listp"), list],
+    )
+}
+
+// The byte compiler binds `symbols-with-pos-enabled`, so every `memq` it runs
+// comes here: one test per element against the target's bare symbol, not a
+// closure unwrapping both sides of every comparison (246 instructions a call,
+// 13.5% of compiling elb-smie.el).
 fn builtin_memq_values_swp(target: Value, list: Value) -> EvalResult {
-    for_each_proper_list_tail(list, list, |tail| {
-        let pair_car = tail.cons_car();
-        if eq_value_swp(&target, &pair_car, true) {
-            Ok(Some(tail))
-        } else {
-            Ok(None)
+    let bare = target.as_symbol_with_pos_sym().unwrap_or(target);
+    if !bare.is_symbol() {
+        return builtin_memq_values(target, list, false);
+    }
+    let mut tail = list;
+    let mut tortoise = list;
+    let mut max = 2i64;
+    let mut n = 0i64;
+    let mut q = 2i64;
+    while tail.is_cons() {
+        if eq_bare_symbol_swp(tail.cons_car(), bare) {
+            return Ok(tail);
         }
-    })
+        tail = tail.cons_cdr();
+        if tail.is_cons()
+            && let Some(cycle_tail) =
+                for_each_tail_cycle_tail(tail, &mut tortoise, &mut max, &mut n, &mut q)
+        {
+            return Err(circular_list_error(cycle_tail));
+        }
+    }
+    if tail.is_nil() {
+        Ok(Value::NIL)
+    } else {
+        Err(listp_error(list))
+    }
 }
 
 pub(crate) fn builtin_memql_2(
@@ -1159,8 +1209,31 @@ fn builtin_memql_values(target: Value, list: Value, symbols_with_pos_enabled: bo
     })
 }
 
-pub(crate) fn builtin_assoc(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
-    builtin_assoc_slice(eval, &args)
+/// `assoc` as a three-slot subr (an omitted TESTFN arrives as nil). Without
+/// TESTFN nothing it runs can collect or call Lisp, so the list needs no
+/// root and a key `eq` to the entry's answers before `equal` is asked.
+pub(crate) fn builtin_assoc_3(
+    eval: &mut super::eval::Context,
+    key: Value,
+    list: Value,
+    test_fn: Value,
+) -> EvalResult {
+    if !test_fn.is_nil() {
+        return builtin_assoc_slice(eval, &[key, list, test_fn]);
+    }
+    let symbols_with_pos_enabled = eval.symbols_with_pos_enabled;
+    for_each_proper_list_tail(list, list, |tail| {
+        let pair_car = tail.cons_car();
+        if pair_car.is_cons() {
+            let entry_key = pair_car.cons_car();
+            if entry_key.bits() == key.bits()
+                || equal_value_swp(&key, &entry_key, 0, symbols_with_pos_enabled)
+            {
+                return Ok(Some(pair_car));
+            }
+        }
+        Ok(None)
+    })
 }
 
 pub(crate) fn builtin_assoc_slice(eval: &mut super::eval::Context, args: &[Value]) -> EvalResult {
@@ -1270,6 +1343,10 @@ pub(crate) fn builtin_assq_values(
 }
 
 fn builtin_assq_values_swp(key: Value, list: Value) -> EvalResult {
+    let bare = key.as_symbol_with_pos_sym().unwrap_or(key);
+    if !bare.is_symbol() {
+        return builtin_assq_values(key, list, false);
+    }
     let mut tail = list;
     let mut tortoise = list;
     let mut power = 1usize;
@@ -1278,8 +1355,7 @@ fn builtin_assq_values_swp(key: Value, list: Value) -> EvalResult {
     while tail.is_cons() {
         let pair_car = tail.cons_car();
         if pair_car.is_cons() {
-            let entry_key = pair_car.cons_car();
-            if eq_value_swp(&key, &entry_key, true) {
+            if eq_bare_symbol_swp(pair_car.cons_car(), bare) {
                 return Ok(pair_car);
             }
         }
@@ -1288,7 +1364,7 @@ fn builtin_assq_values_swp(key: Value, list: Value) -> EvalResult {
         if tail.is_cons() {
             distance = distance.saturating_add(1);
             if tail.bits() == tortoise.bits() {
-                return Err(signal(LispCondition::CircularList, vec![tail]));
+                return Err(circular_list_error(tail));
             }
             if distance == power {
                 tortoise = tail;
@@ -1301,21 +1377,26 @@ fn builtin_assq_values_swp(key: Value, list: Value) -> EvalResult {
     if tail.is_nil() {
         Ok(Value::NIL)
     } else {
-        Err(signal(
-            LispCondition::WrongTypeArgument,
-            vec![Value::symbol("listp"), list],
-        ))
+        Err(listp_error(list))
     }
 }
 
 pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
     expect_args("copy-sequence", &args, 1)?;
-    match args[0].kind() {
+    copy_sequence_value(args[0])
+}
+
+pub(crate) fn builtin_copy_sequence_1(_eval: &mut super::eval::Context, arg: Value) -> EvalResult {
+    copy_sequence_value(arg)
+}
+
+fn copy_sequence_value(arg: Value) -> EvalResult {
+    match arg.kind() {
         ValueKind::Nil => Ok(Value::NIL),
         ValueKind::Cons => {
-            let copy = Value::cons(args[0].cons_car(), Value::NIL);
+            let copy = Value::cons(arg.cons_car(), Value::NIL);
             let mut prev = copy;
-            let mut tail = args[0].cons_cdr();
+            let mut tail = arg.cons_cdr();
             let mut tortoise = tail;
             let mut max = 2i64;
             let mut n = 0i64;
@@ -1345,17 +1426,17 @@ pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
             }
         }
         ValueKind::String => {
-            let string = args[0]
+            let string = arg
                 .as_lisp_string()
                 .expect("ValueKind::String must carry LispString payload");
             // GNU Emacs: (copy-sequence "") returns "" itself (eq).
             if string.is_empty() {
-                return Ok(args[0]);
+                return Ok(arg);
             }
             let new_val = Value::heap_string(string.clone());
             // Copy text properties
             if new_val.is_string()
-                && let Some(table) = get_string_text_properties_table_for_value(args[0])
+                && let Some(table) = get_string_text_properties_table_for_value(arg)
             {
                 set_string_text_properties_table_for_value(
                     new_val,
@@ -1365,28 +1446,28 @@ pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
             Ok(new_val)
         }
         ValueKind::Veclike(VecLikeType::Vector) => {
-            let elems = args[0].as_vector_data().unwrap().clone();
+            let elems = arg.as_vector_data().unwrap().clone();
             // GNU Emacs: (copy-sequence (vector)) returns the same empty vector (eq).
             if elems.is_empty() {
-                return Ok(args[0]);
+                return Ok(arg);
             }
             Ok(Value::vector(elems))
         }
         ValueKind::Veclike(VecLikeType::CharTable) => {
-            crate::emacs_core::chartable::copy_char_table(args[0]).ok_or_else(|| {
+            crate::emacs_core::chartable::copy_char_table(arg).ok_or_else(|| {
                 signal(
                     LispCondition::WrongTypeArgument,
-                    vec![Value::symbol("sequencep"), args[0]],
+                    vec![Value::symbol("sequencep"), arg],
                 )
             })
         }
         ValueKind::Veclike(VecLikeType::Record) => {
-            let items = args[0].as_record_data().unwrap().clone();
+            let items = arg.as_record_data().unwrap().clone();
             Ok(Value::make_record(items))
         }
         _ => Err(signal(
             LispCondition::WrongTypeArgument,
-            vec![Value::symbol("sequencep"), args[0]],
+            vec![Value::symbol("sequencep"), arg],
         )),
     }
 }

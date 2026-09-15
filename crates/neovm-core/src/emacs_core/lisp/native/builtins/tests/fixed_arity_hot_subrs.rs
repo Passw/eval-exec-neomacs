@@ -6,7 +6,7 @@ use crate::emacs_core::eval::Context;
 use crate::emacs_core::intern::intern;
 use crate::tagged::header::SubrFn;
 
-const HOT_FIXED_ARITY_SUBRS: [(&str, usize); 59] = [
+const HOT_FIXED_ARITY_SUBRS: [(&str, usize); 69] = [
     ("get-char-property", 3),
     ("match-beginning", 1),
     ("widen", 0),
@@ -66,6 +66,17 @@ const HOT_FIXED_ARITY_SUBRS: [(&str, usize); 59] = [
     ("downcase", 1),
     ("get-pos-property", 3),
     ("char-equal", 2),
+    // eieio's generated code and nbody's float math.
+    ("assoc", 3),
+    ("plist-get", 3),
+    ("copy-sequence", 1),
+    ("sqrt", 1),
+    ("sin", 1),
+    ("cos", 1),
+    ("tan", 1),
+    ("asin", 1),
+    ("acos", 1),
+    ("exp", 1),
 ];
 
 #[test]
@@ -236,3 +247,44 @@ fn inline_subr_kinds_follow_the_gnu_inline_opcode_shape() {
         assert_eq!(kind(name), InlineSubrKind::Generic, "{name}");
     }
 }
+
+/// assoc, plist-get, copy-sequence and the one-argument float functions as
+/// fixed-arity subrs, and memq/assq/rassq under `symbols-with-pos-enabled`
+/// (the byte compiler's setting): absent and nil optionals agree, arity and
+/// type errors keep GNU's shape, and a symbol with position is `eq` to its
+/// bare symbol from either side only. Expectation taken from GNU Emacs
+/// 31.0.90 --batch.
+#[test]
+fn third_batch_and_symbols_with_pos_list_searches_match_gnu() {
+    crate::test_utils::init_test_tracing();
+    let mut eval = Context::new();
+    let result = eval
+        .eval_str(&format!("(format \"%S\" {})", THIRD_BATCH_FORM))
+        .unwrap_or_else(|error| {
+            panic!(
+                "third batch form: {}",
+                crate::emacs_core::error::format_eval_result(&Err(error))
+            )
+        });
+    assert_eq!(result.as_utf8_str(), Some(THIRD_BATCH_GNU));
+}
+
+const THIRD_BATCH_FORM: &str = r#"(list (assoc "b" '(("a" . 1) ("b" . 2))) (assoc 2 '((1 . a) (2 . b)) nil) (assoc "B" '(("a" . 1) ("b" . 2)) (lambda (a b) (string-equal (upcase a) (upcase b))))
+      (assoc 'x '(a (x . 1))) (plist-get '(:a 1 :b 2) :b) (plist-get '(:a 1 "b" 2) "b" #'equal) (plist-get '(:a 1) :c nil)
+      (copy-sequence "abc") (copy-sequence [1 2]) (copy-sequence nil) (copy-sequence '(1 2))
+      (sqrt 4) (sin 0) (cos 0) (tan 0) (asin 0) (acos 1) (exp 0) (sqrt 2.25)
+      (condition-case e (sqrt) (error e)) (condition-case e (sqrt 1 2) (error e)) (condition-case e (sqrt 'a) (error e)) (condition-case e (exp "x") (error e))
+      (condition-case e (assoc 1) (error e)) (condition-case e (assoc 1 2 3 4) (error e)) (condition-case e (plist-get '(a)) (error e)) (condition-case e (copy-sequence) (error e)) (condition-case e (copy-sequence 1) (error e))
+      (condition-case e (assoc 1 '((1 . 2) . 3)) (error e)) (condition-case e (assoc 5 '((1 . 2) . 3)) (error e))
+      (func-arity 'assoc) (func-arity 'plist-get) (func-arity 'sqrt) (func-arity 'copy-sequence)
+      (let ((symbols-with-pos-enabled t) (p (position-symbol 'foo 3)) (n (position-symbol nil 1)))
+        (list (length (memq 'foo (list 1 p 'bar))) (length (memq p (list 'foo))) (length (memq p (list 1 (position-symbol 'foo 9))))
+              (length (memq nil (list 1 n))) (memq 'bar (list p)) (length (memq 3 (list p 3))) (memq "s" (list p "s"))
+              (cdr (assq 'foo (list 5 (cons p 1)))) (cdr (assq p (list (cons 'foo 2)))) (cdr (assq nil (list (cons n 5)))) (cdr (assq 7 (list (cons p 1) (cons 7 8)))) (assq 'q (list (cons p 1)))
+              (car (rassq 'foo (list (cons 1 p)))) (car (rassq p (list (cons 2 'foo)))) (rassq 'baz (list (cons 1 p))) (car (rassq nil (list 3 (cons 4 n))))
+              (condition-case e (memq 'zz '(1 2 . 3)) (error e)) (condition-case e (assq 'zz '((1 . 2) . 3)) (error e)) (condition-case e (rassq 'zz '((1 . 2) . 3)) (error e))
+              (let ((l (list 1 2 3))) (setcdr (nthcdr 2 l) l) (condition-case e (memq 'zz l) (error (car e))))
+              (let ((l (list '(1) '(2) '(3)))) (setcdr (nthcdr 2 l) l) (list (condition-case e (assq 'zz l) (error (car e))) (condition-case e (rassq 'zz l) (error (car e)))))
+              (memq p (list 'foo p)) (assoc p (list (cons 'foo 9))))))"#;
+
+const THIRD_BATCH_GNU: &str = r#"(("b" . 2) (2 . b) ("b" . 2) (x . 1) 2 2 nil "abc" [1 2] nil (1 2) 2.0 0.0 1.0 0.0 0.0 0.0 1.0 1.5 (wrong-number-of-arguments sqrt 0) (wrong-number-of-arguments sqrt 2) (wrong-type-argument numberp a) (wrong-type-argument numberp "x") (wrong-number-of-arguments assoc 1) (wrong-number-of-arguments assoc 4) (wrong-number-of-arguments plist-get 1) (wrong-number-of-arguments copy-sequence 0) (wrong-type-argument sequencep 1) (1 . 2) (wrong-type-argument listp ((1 . 2) . 3)) (2 . 3) (2 . 3) (1 . 1) (1 . 1) (2 1 1 1 nil 1 nil 1 2 5 8 nil 1 2 nil 4 (wrong-type-argument listp (1 2 . 3)) (wrong-type-argument listp ((1 . 2) . 3)) (wrong-type-argument listp ((1 . 2) . 3)) circular-list (circular-list circular-list) (foo #<symbol foo at 3>) (foo . 9)))"#;

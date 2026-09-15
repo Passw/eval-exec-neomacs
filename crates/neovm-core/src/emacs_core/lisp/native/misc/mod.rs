@@ -228,6 +228,10 @@ fn builtin_rassq_values(key: Value, alist: Value, symbols_with_pos_enabled: bool
 }
 
 fn builtin_rassq_values_swp(key: Value, alist: Value) -> EvalResult {
+    let bare = key.as_symbol_with_pos_sym().unwrap_or(key);
+    if !bare.is_symbol() {
+        return builtin_rassq_values(key, alist, false);
+    }
     let mut tail = alist;
     let mut tortoise = alist;
     let mut power = 1usize;
@@ -236,8 +240,7 @@ fn builtin_rassq_values_swp(key: Value, alist: Value) -> EvalResult {
     while tail.is_cons() {
         let pair_car = tail.cons_car();
         if pair_car.is_cons() {
-            let pair_cdr = pair_car.cons_cdr();
-            if eq_value_swp(&pair_cdr, &key, true) {
+            if crate::emacs_core::builtins::eq_bare_symbol_swp(pair_car.cons_cdr(), bare) {
                 return Ok(pair_car);
             }
         }

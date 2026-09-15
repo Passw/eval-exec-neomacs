@@ -1024,21 +1024,22 @@ pub(crate) fn builtin_plist_get(args: Vec<Value>) -> EvalResult {
 /// opts `plist-get` into it. The rare PREDICATE form still needs an owned
 /// `Vec` because the predicate can run Lisp that mutates the list mid-walk, so
 /// it delegates to the existing entry point.
-pub(crate) fn builtin_plist_get_slice(
+/// `plist-get` as a three-slot subr (an omitted PREDICATE arrives as nil).
+pub(crate) fn builtin_plist_get_3(
     eval: &mut super::eval::Context,
-    args: &[Value],
+    plist: Value,
+    prop: Value,
+    predicate: Value,
 ) -> EvalResult {
-    expect_min_args("plist-get", args, 2)?;
-    expect_max_args("plist-get", args, 3)?;
-    if args.get(2).is_none_or(|value| value.is_nil()) {
+    if predicate.is_nil() {
         return Ok(crate::emacs_core::plist::plist_get_swp(
-            args[0],
-            &args[1],
+            plist,
+            &prop,
             eval.symbols_with_pos_enabled,
         )
         .unwrap_or(Value::NIL));
     }
-    builtin_plist_get_with_ctx(eval, args.to_vec())
+    builtin_plist_get_with_ctx(eval, vec![plist, prop, predicate])
 }
 
 pub(crate) fn builtin_plist_get_with_ctx(
