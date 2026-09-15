@@ -2726,8 +2726,11 @@ thread_local! {
 ///    creates (status checks, guards) has all its predecessors inside that
 ///    op and runs the same stores on every path, so the only edges that can
 ///    reach a site with a different store history are jumps to a bytecode
-///    leader (loop heads, branch targets, handlers, the OSR entry) or a MIR
-///    block head — the record is dropped there.
+///    leader (loop heads, branch targets, handlers, the OSR entry), a MIR
+///    block head, a handler-dispatch block (emitted at the end of its
+///    bytecode block but entered from one earlier site's signal edge), and a
+///    back-edge poll block (a Switch compare chain emits one per backward
+///    target, as sibling paths) — the record is dropped there.
 struct RootWinCarry {
     stored: Vec<Option<ClifValue>>,
     /// Diagnostics: root-window stores emitted / elided in this function.
@@ -3556,6 +3559,12 @@ pub(crate) fn emit_pending_dispatches(
     for pd in pending.drain(..) {
         fb.switch_to_block(pd.block);
         fb.seal_block(pd.block);
+        // Emitted after the whole bytecode block, but ENTERED from the signal
+        // edge of one earlier site: the store record as it stands now belongs
+        // to the block's end, not to that site (a fast path that stored
+        // nothing, a later site that did). A join with a different store
+        // history — rule 3 on `RootWinCarry`. Cold code; nothing to save.
+        rootwin_carry_reset();
         let saved = if pd.stack.is_empty() {
             CondRoots::NONE
         } else {

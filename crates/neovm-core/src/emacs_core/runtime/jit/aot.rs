@@ -5077,6 +5077,38 @@ mod tests {
     /// `load_leaf_from_unit` → `CompiledLeaf::call` — is byte-identical to BOTH
     /// the interpreter and the JIT, incl across several args.
     #[cfg(target_os = "linux")]
+    /// The AOT MIR population is exactly what it was before the MIR tier's
+    /// baseline-emitter adapter: a body that would lower any op through the
+    /// adapter (here `length`) is not emitted as an AOT MIR leaf — the adapter
+    /// has no AOT parity coverage, and a MIR loop has no back-edge poll.
+    #[test]
+    fn aot_mir_emit_refuses_bodies_that_would_use_the_adapter() {
+        let pure = [Op::StackRef(0), Op::Add1, Op::Return];
+        let m = mir::build_mir(&pure, &[], 1).expect("builds");
+        assert!(!uses_mir_adapter(&m));
+        assert!(
+            prepare_leaf_emit(&pure, &[], 1)
+                .expect("prepares")
+                .is_some(),
+            "a shim-free body is still an AOT MIR leaf"
+        );
+        let with_length = [Op::StackRef(0), Op::Length, Op::Return];
+        let m = mir::build_mir(&with_length, &[], 1).expect("builds");
+        assert!(uses_mir_adapter(&m));
+        assert!(
+            prepare_leaf_emit(&with_length, &[], 1)
+                .expect("prepares")
+                .is_none(),
+            "a body with an adapter op stays out of the AOT MIR tier"
+        );
+        let with_call = [Op::Constant(0), Op::Call(0), Op::Return];
+        let m = mir::build_mir(&with_call, &[Value::symbol("jit-aot-callee")], 0).expect("builds");
+        assert!(
+            !uses_mir_adapter(&m),
+            "Call/Apply keep their pre-adapter AOT admission"
+        );
+    }
+
     #[test]
     fn aot_pure_leaf_matches_jit_and_interp() {
         // 1-arg pure body: (* (+ arg 5) 2) — fixnum arith, no consts/calls.

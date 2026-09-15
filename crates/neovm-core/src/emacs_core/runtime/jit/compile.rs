@@ -2689,6 +2689,12 @@ fn emit_backedge_jump(
 
     fb.switch_to_block(poll);
     fb.seal_block(poll);
+    // A poll block is a store history of its own: a Switch compare chain
+    // emits one per backward target, as SIBLING paths that the compile-time
+    // record would otherwise thread through one another (rule 3 on
+    // `lowering::RootWinCarry`). It runs once per 256 iterations, so storing
+    // afresh costs nothing measurable.
+    lowering::rootwin_carry_reset();
     let one = fb.ins().iconst(types::I64, 1);
     fb.ins().stack_store(rt.ptr_ty, one, counter_slot, 0);
     // The live operand stack at the jump (already written to vars): rooted

@@ -2581,6 +2581,138 @@ fn baseline_reg_args_fallback_stores_do_not_leak_into_the_next_site() {
     );
 }
 
+/// Rule 2 must compare slot by slot, not just truncate. An earlier site
+/// stores `[a b]`; slot 0 is then replaced by a fresh `c`; a Tier-A `point`
+/// site has residual `[c b]` — its fast path stores nothing (slot 0 still
+/// holds `a`), its fallback stores `c` over it. At the continuation only
+/// slot 1 is common to both paths, so the next site must store `c` and may
+/// elide `b`.
+///
+///     (lambda (a b) v (let ((c (cons a a))) (setq a c) (point) v b))
+#[test]
+fn baseline_fallback_meet_keeps_only_the_slots_both_paths_agree_on() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::intern::{SymId, intern};
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let ev = Context::new();
+    let mut f = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(1), SymId(2)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    f.lexical = true;
+    f.ops = vec![
+        Op::VarRef(0),                          // residual [a b]: stores a, b
+        Op::Pop,                                // [a b]
+        Op::StackRef(1),                        // a        [a b a]
+        Op::Dup,                                //          [a b a a]
+        Op::Cons,                               // c        [a b c]
+        Op::StackSet(2),                        //          [c b]
+        Op::CallBuiltinSym(intern("point"), 0), // residual [c b]: fast path stores nothing
+        Op::Pop,                                // [c b]
+        Op::VarRef(0),                          // residual [c b]: store c, elide b
+        Op::Pop,                                // [c b]
+        Op::Return,                             // b
+    ];
+    f.constants = vec![Value::symbol("jit-meet-carry-v")].into();
+    f.max_stack = 16;
+    let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+    assert_eq!(leaf.tier, super::leaf::LeafTier::Baseline);
+    assert_eq!(
+        super::lowering::rootwin_counters(),
+        (4, 2),
+        "a+b, then the fallback's c (b elided), then the last site's c (b elided); \
+         (3, 3) means the meet kept the fallback's slot 0 though the fast path never wrote it"
+    );
+}
+
+/// Rule 3 at a handler-dispatch block. Dispatch blocks are emitted after the
+/// whole bytecode block, so the store record they see is the block's END
+/// state, but each is entered from ONE site's signal edge. A Tier-A `point`
+/// site stores nothing on its fast path; the `setq`-free `VarRef` after it
+/// stores `[a x]`. If `point` signals, its dispatch block roots `[a x]` for the
+/// match shim (which can run Lisp) — and must STORE them, not trust a record
+/// written by a site the signal path never ran.
+///
+///     (lambda (a) (let ((x (cons a a))) (condition-case nil (progn (point) v) (error x))))
+#[test]
+fn baseline_handler_dispatch_blocks_do_not_trust_the_block_end_store_record() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::intern::{SymId, intern};
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let ev = Context::new();
+    let mut f = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(1)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    f.lexical = true;
+    f.ops = vec![
+        Op::StackRef(0),                        // 0: a              [a a]
+        Op::Dup,                                // 1                 [a a a]
+        Op::Cons,                               // 2: x              [a x]
+        Op::PushConditionCase(10),              // 3                 [a x]
+        Op::CallBuiltinSym(intern("point"), 0), // 4: Tier-A site    [a x p]
+        Op::Pop,                                // 5                 [a x]
+        Op::VarRef(0),                          // 6: stores [a x]   [a x v]
+        Op::Pop,                                // 7                 [a x]
+        Op::PopHandler,                         // 8                 [a x]
+        Op::Return,                             // 9: x
+        Op::Return,                             // 10: handler       [a x err]
+    ];
+    f.constants = vec![Value::symbol("jit-dispatch-carry-v")].into();
+    f.max_stack = 16;
+    let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+    assert_eq!(leaf.tier, super::leaf::LeafTier::Baseline);
+    let (stored, elided) = super::lowering::rootwin_counters();
+    assert_eq!(
+        elided, 0,
+        "every dispatch block stores its residual (stored {stored}); an elision means \
+         a dispatch block trusted the record from the end of its bytecode block"
+    );
+}
+
+/// Rule 3 at back-edge poll blocks. A Switch whose jump table has two
+/// BACKWARD targets emits two poll trampolines as sibling paths of its
+/// compare chain; each roots the live stack `[k c]` around the poll shim (a
+/// GC safe point). The second must not elide the stores the first made — at
+/// run time it is reached without passing through the first.
+///
+///     0: (foo) [k acc] 2: (setq acc (cons 1 acc)) ... (switch k (a -> 0) (b -> 2)) (foo) acc
+#[test]
+fn baseline_switch_back_edge_polls_store_their_own_roots() {
+    use crate::emacs_core::value::HashTableTest;
+    let table = Value::hash_table(HashTableTest::Eq);
+    let _ = table.with_hash_table_mut(|ht| {
+        for (name, target) in [("jit-sw-carry-a", 0), ("jit-sw-carry-b", 2)] {
+            let key = Value::symbol(name).to_hash_key(&ht.test);
+            ht.insert(key, Value::symbol(name), Value::fixnum(target));
+        }
+    });
+    let ops = [
+        Op::VarRef(0),   // 0: residual [k acc]      [k acc v]
+        Op::Pop,         // 1                        [k acc]
+        Op::Constant(1), // 2: (target) 1            [k acc 1]
+        Op::StackRef(1), // 3: acc                   [k acc 1 acc]
+        Op::Cons,        // 4: c                     [k acc c]
+        Op::StackSet(1), // 5                        [k c]
+        Op::StackRef(1), // 6: k                     [k c k]
+        Op::Constant(2), // 7: table                 [k c k table]
+        Op::Switch,      // 8: -> 0 or 2 (both back) [k c]
+        Op::VarRef(0),   // 9: residual [k c]        [k c v]
+        Op::Pop,         // 10                       [k c]
+        Op::Return,      // 11: c
+    ];
+    let constants = [Value::symbol("jit-sw-carry-foo"), Value::make_int(1), table];
+    lower_leaf_with_map(&ops, &constants, 2, None).expect("switch loop compiles");
+    let (stored, elided) = super::lowering::rootwin_counters();
+    assert_eq!(
+        elided, 0,
+        "each poll trampoline stores [k c] itself (stored {stored}); an elision means \
+         the second trampoline trusted stores made only on the first's path"
+    );
+}
+
 /// The tier gate, through the production compile path. A loop with a
 /// shim-lowered op goes to the baseline (the MIR tier has no back-edge
 /// poll), although the MIR lowering itself accepts it; the same op outside
@@ -2633,6 +2765,41 @@ fn tier_gate_sends_a_loop_with_a_shim_op_to_the_baseline() {
         NativeRun::Ok(bits) => assert_eq!(bits, Value::make_int(5).bits()),
         other => panic!("loop: {other:?}"),
     }
+    // A single-block loop (block 0 jumps to itself) is a loop too.
+    // (lambda (l n) (while (progn (length l) (setq n (1- n)) (> n 0))) n)
+    let self_loop = vec![
+        Op::StackRef(1),     // 0: l          [l n l]
+        Op::Length,          // 1             [l n len]
+        Op::Pop,             // 2             [l n]
+        Op::StackRef(0),     // 3: n          [l n n]
+        Op::Sub1,            // 4             [l n n1]
+        Op::StackSet(1),     // 5             [l n1]
+        Op::StackRef(0),     // 6: n          [l n n]
+        Op::Constant(0),     // 7: 0          [l n n 0]
+        Op::Gtr,             // 8             [l n c]
+        Op::GotoIfNotNil(0), // 9             [l n]
+        Op::Return,          // 10: n
+    ];
+    let mut h = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(1), SymId(2)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    h.lexical = true;
+    h.ops = self_loop.clone();
+    h.constants = vec![Value::make_int(0)].into();
+    h.max_stack = 16;
+    let mir = mir::build_mir(&self_loop, &h.constants, 2).expect("MIR builds the self-loop");
+    assert!(
+        super::lowering::plan_mir_leaf(&mir).has_backedge,
+        "block 0 jumps to itself"
+    );
+    let leaf = compile_bytecode_function_with(&h, Some(&ev.obarray)).expect("compiles");
+    assert_eq!(
+        leaf.tier,
+        super::leaf::LeafTier::Baseline,
+        "gate:loop-opaque (self-loop)"
+    );
     // The same op, loop-free: the MIR tier.
     let mut g = ByteCodeFunction::new(LambdaParams {
         required: vec![SymId(1)],
@@ -2711,6 +2878,32 @@ fn tier_gate_keeps_an_inlining_body_free_of_shim_ops() {
         NativeRun::Ok(bits) => assert_eq!(bits, Value::make_int(4).bits(), "(f 5) after fset is 4"),
         other => panic!("bar: {other:?}"),
     }
+    // The gate is keyed on ANY shim-lowered op, not on the ones that can
+    // redefine a function: a variable read in an inlining body keeps it on
+    // the baseline too.
+    ev.obarray.set_symbol_function_id(f_id, inc);
+    let mut baz = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(2)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    baz.lexical = true;
+    baz.ops = vec![
+        Op::VarRef(1),   // v            [x v]
+        Op::Pop,         //              [x]
+        Op::Constant(0), // 'f           [x f]
+        Op::StackRef(1), // x            [x f x]
+        Op::Call(1),     // (f x)        [x r]
+        Op::Return,
+    ];
+    baz.constants = vec![f_sym, Value::symbol("jit-gate-some-var")].into();
+    baz.max_stack = 16;
+    let leaf = compile_bytecode_function_with(&baz, Some(&ev.obarray)).expect("compiles");
+    assert_eq!(
+        leaf.tier,
+        super::leaf::LeafTier::Baseline,
+        "an inlining body with any shim-lowered op stays on the baseline"
+    );
 }
 
 /// A cons-only body has no rooting site (the cons shim is context-free), so
@@ -5144,7 +5337,13 @@ fn fuzz_varset_bodies_match_interpreter_state() {
                             "seed {seed} [{tier}]: {ops:?}"
                         );
                     }
-                    (Err(_), Err(_)) => {}
+                    // Both signal at the same op of the same deterministic
+                    // prefix, so the partial writes must agree too.
+                    (Err(_), Err(_)) => assert_eq!(
+                        snap(ev, var_ids),
+                        want_state,
+                        "seed {seed} [{tier}]: state after a deopt-rerun error: {ops:?}"
+                    ),
                     other => {
                         panic!("seed {seed} [{tier}]: deopt-rerun mismatch {other:?}: {ops:?}")
                     }
@@ -5182,7 +5381,11 @@ fn fuzz_varset_bodies_match_interpreter_state() {
                             "seed {seed} [{tier}]: {ops:?}"
                         );
                     }
-                    (Err(_), Err(_)) => {}
+                    (Err(_), Err(_)) => assert_eq!(
+                        snap(ev, var_ids),
+                        want_state,
+                        "seed {seed} [{tier}]: state after a resumed error: {ops:?}"
+                    ),
                     other => panic!("seed {seed} [{tier}]: resume mismatch {other:?}: {ops:?}"),
                 }
             }
