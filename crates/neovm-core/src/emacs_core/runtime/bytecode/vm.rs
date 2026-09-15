@@ -7050,23 +7050,33 @@ impl<'a> Vm<'a> {
         // that can collect runs until the callee's backtrace frame records
         // this buffer (which then roots its values for the call); the
         // elements are also reachable from LIST, itself in `apply`'s frame.
+        // A plain array and a count: `SmallVec`'s inline/spilled test on
+        // every push was a sixth of this function.
         const SPREAD_MAX: usize = 64;
-        let mut spread: smallvec::SmallVec<[i64; 16]> = smallvec::SmallVec::new();
+        if nargs - 2 > SPREAD_MAX {
+            return None;
+        }
+        let mut spread = [std::mem::MaybeUninit::<i64>::uninit(); SPREAD_MAX];
+        let mut count = 0;
         for i in 1..nargs - 1 {
-            spread.push(arg(i).bits() as i64);
+            spread[count].write(arg(i).bits() as i64);
+            count += 1;
         }
         let mut tail = arg(nargs - 1);
         while tail.is_cons() {
-            if spread.len() == SPREAD_MAX {
+            if count == SPREAD_MAX {
                 return None;
             }
-            spread.push(tail.cons_car().bits() as i64);
+            spread[count].write(tail.cons_car().bits() as i64);
+            count += 1;
             tail = tail.cons_cdr();
         }
         if !tail.is_nil() {
             return None;
         }
-        let count = spread.len();
+        // The first `count` words are written; the leaf and the callee's
+        // backtrace frame read only those.
+        let spread_ptr = spread.as_ptr().cast::<i64>();
         let ptr = crate::emacs_core::jit::cache::armed_leaf_for_native_call(bc, count)?;
         // SAFETY: armed under the current `leaf_slot_epoch` (its contract).
         let leaf = unsafe { &*ptr };
@@ -7080,9 +7090,8 @@ impl<'a> Vm<'a> {
         unsafe {
             ctx.push_backtrace_frame_from_native_args(apply, args_ptr, nargs);
         }
-        let outcome =
-            Self::run_leaf_native_to_native(ctx, function, bc, leaf, spread.as_ptr(), count)
-                .expect("an accepted arity runs");
+        let outcome = Self::run_leaf_native_to_native(ctx, function, bc, leaf, spread_ptr, count)
+            .expect("an accepted arity runs");
         if ctx.pop_native_backtrace_frame(bt_count) {
             return Some(outcome);
         }
