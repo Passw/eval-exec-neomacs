@@ -7920,6 +7920,9 @@ mod jit_known_fixnum_float_tests;
 mod jit_mir_known_fixnum_float_tests;
 // `setq` of a special variable: the plain-cell fast path and every shape it must refuse.
 #[cfg(test)]
+#[path = "tests/apply1_bytecode.rs"]
+mod apply1_bytecode_tests;
+#[cfg(test)]
 #[path = "tests/varset_plain_fast_path.rs"]
 mod varset_plain_fast_path_tests;
 

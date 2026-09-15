@@ -1599,13 +1599,6 @@ impl Context {
     }
 
     #[inline]
-    pub(crate) fn apply1(&mut self, function: Value, arg0: Value) -> EvalResult {
-        let mut args = LispArgVec::new();
-        args.push(arg0);
-        self.apply(function, args)
-    }
-
-    #[inline]
     pub(crate) fn apply2(&mut self, function: Value, arg0: Value, arg1: Value) -> EvalResult {
         let mut args = LispArgVec::new();
         args.push(arg0);
@@ -1690,7 +1683,7 @@ impl Context {
     ) -> EvalResult {
         #[cfg(feature = "jit")]
         {
-            use crate::emacs_core::jit::{Plan, cache};
+            use crate::emacs_core::jit::cache;
             // Direct entry, as in `dispatch_bytecode_call_from_stack`: an armed
             // slot means this function already tiered up, so the heat
             // dispatcher's threshold/deferral/cap math, the compiled-cache
@@ -1762,57 +1755,187 @@ impl Context {
                     Err(flow) => Err(flow),
                 };
             }
-            match bc_data
-                .jit_runtime()
-                .dispatch_sized(bc_data.executable_ops().len())
-            {
-                Plan::Interpret => {
-                    let mut vm = super::super::bytecode::Vm::from_context(self);
-                    vm.execute_with_func_value(bc_data, args, func_value)
-                }
-                Plan::Compiled => {
-                    // Run native code when the body is compilable and the
-                    // call is valid (arity is checked inside
-                    // try_run_compiled). Ok(None) — non-compilable body, a
-                    // deopt (sound to rerun: guards never follow a call),
-                    // or an arity mismatch — falls back to the Tier-0
-                    // interpreter; Err propagates a Flow raised by a
-                    // runtime call inside native code.
-                    //
-                    // Root the executing function for the duration: native
-                    // code references its constants by raw bits, and a
-                    // runtime call inside (Call/cons) may trigger GC.
-                    let saved_roots = save_scratch_gc_roots();
-                    push_scratch_gc_root(func_value);
-                    let ctx_ptr = self as *mut Context;
-                    let native = crate::emacs_core::jit::try_run_compiled(
-                        ctx_ptr, bc_data, func_value, &args,
-                    );
-                    // Arm the direct entry once its leaf actually ran, so the
-                    // next call of this arity skips the dispatcher and the
-                    // cache probe above — the same hand-off
-                    // `dispatch_bytecode_call_from_stack` makes.
-                    if matches!(native, Ok(Some(_))) {
-                        cache::arm_leaf_slot(ctx_ptr, bc_data);
-                    }
-                    restore_scratch_gc_roots(saved_roots);
-                    match native {
-                        Ok(Some(bits)) => Ok(crate::emacs_core::value::Value::from_bits(bits)),
-                        Ok(None) => {
-                            crate::emacs_core::jit::note_seam_interp_fallback();
-                            let mut vm = super::super::bytecode::Vm::from_context(self);
-                            vm.execute_with_func_value(bc_data, args, func_value)
-                        }
-                        Err(flow) => Err(flow),
-                    }
-                }
-            }
+            self.execute_bytecode_call_dispatched(bc_data, args, func_value)
         }
         #[cfg(not(feature = "jit"))]
         {
             let mut vm = super::super::bytecode::Vm::from_context(self);
             vm.execute_with_func_value(bc_data, args, func_value)
         }
+    }
+
+    /// The tier dispatch of [`Self::execute_bytecode_call`] for a call that did
+    /// not take the armed direct entry: interpret, or tier up and run the leaf.
+    #[cfg(feature = "jit")]
+    #[inline(always)]
+    fn execute_bytecode_call_dispatched(
+        &mut self,
+        bc_data: &super::super::bytecode::ByteCodeFunction,
+        args: LispArgVec,
+        func_value: Value,
+    ) -> EvalResult {
+        use crate::emacs_core::jit::{Plan, cache};
+        match bc_data
+            .jit_runtime()
+            .dispatch_sized(bc_data.executable_ops().len())
+        {
+            Plan::Interpret => {
+                let mut vm = super::super::bytecode::Vm::from_context(self);
+                vm.execute_with_func_value(bc_data, args, func_value)
+            }
+            Plan::Compiled => {
+                // Run native code when the body is compilable and the
+                // call is valid (arity is checked inside
+                // try_run_compiled). Ok(None) — non-compilable body, a
+                // deopt (sound to rerun: guards never follow a call),
+                // or an arity mismatch — falls back to the Tier-0
+                // interpreter; Err propagates a Flow raised by a
+                // runtime call inside native code.
+                //
+                // Root the executing function for the duration: native
+                // code references its constants by raw bits, and a
+                // runtime call inside (Call/cons) may trigger GC.
+                let saved_roots = save_scratch_gc_roots();
+                push_scratch_gc_root(func_value);
+                let ctx_ptr = self as *mut Context;
+                let native =
+                    crate::emacs_core::jit::try_run_compiled(ctx_ptr, bc_data, func_value, &args);
+                // Arm the direct entry once its leaf actually ran, so the
+                // next call of this arity skips the dispatcher and the
+                // cache probe above — the same hand-off
+                // `dispatch_bytecode_call_from_stack` makes.
+                if matches!(native, Ok(Some(_))) {
+                    cache::arm_leaf_slot(ctx_ptr, bc_data);
+                }
+                restore_scratch_gc_roots(saved_roots);
+                match native {
+                    Ok(Some(bits)) => Ok(crate::emacs_core::value::Value::from_bits(bits)),
+                    Ok(None) => {
+                        crate::emacs_core::jit::note_seam_interp_fallback();
+                        let mut vm = super::super::bytecode::Vm::from_context(self);
+                        vm.execute_with_func_value(bc_data, args, func_value)
+                    }
+                    Err(flow) => Err(flow),
+                }
+            }
+        }
+    }
+
+    /// `(funcall FUNCTION ARG0)` from Rust -- every builtin that calls back
+    /// into Lisp with one argument (`mapc`, `mapcar`, `mapcan`, `mapconcat`,
+    /// ...). For a byte-code FUNCTION this is [`Self::apply_internal`] and
+    /// [`Self::execute_bytecode_call`] folded into one frame over a one-word
+    /// argument: the general path built a `LispArgVec` and moved it by value
+    /// through three frames (`apply_internal` -> `funcall_general_untraced` ->
+    /// `execute_bytecode_call`), which with their prologues was most of the
+    /// ~450 instructions `mapc` spent per element around a ~100-instruction
+    /// compiled closure (GNU `Ffuncall` -> `funcall_lambda`: ~150).
+    ///
+    /// The steps and their order are `apply_internal`'s with
+    /// `record_backtrace`: quit, depth, backtrace frame, GC safe point,
+    /// debug-on-next-call, stack growth, then the call, signal dispatch and
+    /// the unwind to the frame.
+    #[inline]
+    pub(crate) fn apply1(&mut self, function: Value, arg0: Value) -> EvalResult {
+        #[cfg(feature = "jit")]
+        if function.veclike_type() == Some(VecLikeType::ByteCode) {
+            return self.apply1_bytecode(function, arg0);
+        }
+        let mut args = LispArgVec::new();
+        args.push(arg0);
+        self.apply(function, args)
+    }
+
+    #[cfg(feature = "jit")]
+    fn apply1_bytecode(&mut self, function: Value, arg0: Value) -> EvalResult {
+        self.maybe_quit_before_gc()?;
+        self.enter_interpreted_eval_depth()?;
+        let bt_count = self.specpdl.len();
+        self.push_backtrace_frame(function, std::slice::from_ref(&arg0));
+        let result = {
+            if self.gc_safe_point_exact_should_collect() {
+                self.gc_collect_from_current_roots();
+            }
+            let entered = match self.take_debug_on_call_arm(DebugOnCallCode::Funcall) {
+                Some(arm) => self.do_debug_on_call(arm),
+                None => Ok(()),
+            };
+            match entered {
+                Err(flow) => Err(flow),
+                Ok(()) => self.maybe_grow_eval_stack(|ctx| {
+                    // As `funcall_general_untraced`: fetched after the safe
+                    // point (it may materialize a dump stub).
+                    let bc_data = function.get_bytecode_data().unwrap();
+                    ctx.execute_bytecode_call_1(bc_data, arg0, function)
+                }),
+            }
+        };
+        self.depth -= 1;
+        let result = self.dispatch_signal_result_if_needed(result);
+        self.unbind_to_with_result(bt_count, result)
+    }
+
+    /// [`Self::execute_bytecode_call`] for one argument held in a local: the
+    /// armed entry reads it in place (the backtrace frame roots it), and a
+    /// leaf taking `&optional`/`&rest` gets it marshaled exactly as there.
+    #[cfg(feature = "jit")]
+    #[inline(always)]
+    fn execute_bytecode_call_1(
+        &mut self,
+        bc_data: &super::super::bytecode::ByteCodeFunction,
+        arg0: Value,
+        func_value: Value,
+    ) -> EvalResult {
+        use crate::emacs_core::jit::cache;
+        if let Some((leaf, nonrest, has_rest)) = cache::armed_leaf_for_stack_call(bc_data, 1) {
+            crate::emacs_core::jit::stats::record_dispatch(true);
+            let ctx_ptr = self as *mut Context;
+            let saved_roots = save_scratch_gc_roots();
+            push_scratch_gc_root(func_value);
+            let native = if !has_rest && nonrest == 1 {
+                // `Value` is `#[repr(transparent)]` over a word: the local IS
+                // a one-element argument array in the leaf's ABI.
+                cache::run_armed_leaf(
+                    ctx_ptr,
+                    bc_data,
+                    func_value,
+                    leaf,
+                    std::ptr::from_ref(&arg0).cast::<i64>(),
+                )
+            } else {
+                let nil = Value::NIL.bits() as i64;
+                let fixed = nonrest.min(1);
+                let mut bits: smallvec::SmallVec<[i64; 8]> = std::iter::once(arg0.bits() as i64)
+                    .take(fixed)
+                    .chain(std::iter::repeat_n(nil, nonrest - fixed))
+                    .collect();
+                if has_rest {
+                    let rest = if nonrest == 0 {
+                        self.tagged_heap
+                            .list_from_slice(std::slice::from_ref(&arg0))
+                    } else {
+                        Value::NIL
+                    };
+                    bits.push(rest.bits() as i64);
+                }
+                cache::run_armed_leaf(ctx_ptr, bc_data, func_value, leaf, bits.as_ptr())
+            };
+            restore_scratch_gc_roots(saved_roots);
+            return match native {
+                Ok(Some(b)) => Ok(Value::from_bits(b)),
+                Ok(None) => {
+                    crate::emacs_core::jit::note_seam_interp_fallback();
+                    let mut args = LispArgVec::new();
+                    args.push(arg0);
+                    let mut vm = super::super::bytecode::Vm::from_context(self);
+                    vm.execute_with_func_value(bc_data, args, func_value)
+                }
+                Err(flow) => Err(flow),
+            };
+        }
+        let mut args = LispArgVec::new();
+        args.push(arg0);
+        self.execute_bytecode_call_dispatched(bc_data, args, func_value)
     }
 
     /// [`Context::execute_bytecode_call`] for arguments that already live on

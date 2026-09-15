@@ -173,10 +173,9 @@ fn apply0(eval: &mut super::eval::Context, func: Value) -> EvalResult {
 }
 
 #[inline]
+#[inline]
 fn apply1(eval: &mut super::eval::Context, func: Value, arg: Value) -> EvalResult {
-    let mut args = crate::emacs_core::eval::LispArgVec::new();
-    args.push(arg);
-    eval.apply(func, args)
+    eval.apply1(func, arg)
 }
 pub(crate) fn builtin_apply_slice(eval: &mut super::eval::Context, args: &[Value]) -> EvalResult {
     // GNU eval.c Fapply: with one argument, the argument itself is the spread
