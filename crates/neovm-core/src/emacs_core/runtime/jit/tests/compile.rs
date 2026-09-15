@@ -7352,3 +7352,65 @@ fn a_generic_arith_signal_hook_that_collects_keeps_the_residual_alive() {
         }
     }
 }
+
+/// What the interpreter records at an arithmetic site's slow arm: a bignum
+/// operand is `Other`; an all-fixnum miss (overflow, zero divisor, `1+` at
+/// the boundary) records nothing, so one overflow during warm-up does not
+/// turn a fixnum-hot site into a generic-fallback site for good — and does
+/// not downgrade a `Float` site either.
+#[test]
+fn only_a_non_fixnum_operand_records_other_feedback() {
+    use crate::emacs_core::bytecode::Vm;
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::jit::NumericFeedback as NF;
+    let mut eval = Context::new();
+    let run = |eval: &mut Context, f: &ByteCodeFunction, args: Vec<Value>| {
+        let mut vm = Vm::from_context(eval);
+        let _ = vm.execute(f, args);
+    };
+    let mpf = Value::make_int(Value::MOST_POSITIVE_FIXNUM);
+    // Overflow on fixnums: nothing recorded.
+    let add = generic_arith_fn(Op::Add, 2, NF::FixnumOnly);
+    run(&mut eval, &add, vec![mpf, Value::make_int(1)]);
+    assert_eq!(
+        add.jit_runtime().numeric_feedback(2),
+        NF::FixnumOnly,
+        "overflow"
+    );
+    let div = generic_arith_fn(Op::Div, 2, NF::FixnumOnly);
+    run(
+        &mut eval,
+        &div,
+        vec![Value::make_int(1), Value::make_int(0)],
+    );
+    assert_eq!(
+        div.jit_runtime().numeric_feedback(2),
+        NF::FixnumOnly,
+        "zero divisor"
+    );
+    let add1 = generic_arith_fn(Op::Add1, 1, NF::FixnumOnly);
+    run(&mut eval, &add1, vec![mpf]);
+    assert_eq!(
+        add1.jit_runtime().numeric_feedback(1),
+        NF::FixnumOnly,
+        "1+ at the boundary"
+    );
+    // A bignum operand: Other.
+    let big = eval.eval_str("(expt 2 80)").expect("big");
+    run(&mut eval, &add, vec![big, Value::make_int(1)]);
+    assert_eq!(add.jit_runtime().numeric_feedback(2), NF::Other, "bignum");
+    // A float site stays Float through a later fixnum overflow.
+    let mul = generic_arith_fn(Op::Mul, 2, NF::FixnumOnly);
+    run(
+        &mut eval,
+        &mul,
+        vec![Value::make_float(1.5), Value::make_int(2)],
+    );
+    assert_eq!(mul.jit_runtime().numeric_feedback(2), NF::Float);
+    run(&mut eval, &mul, vec![mpf, Value::make_int(4)]);
+    assert_eq!(
+        mul.jit_runtime().numeric_feedback(2),
+        NF::Float,
+        "overflow keeps Float"
+    );
+}

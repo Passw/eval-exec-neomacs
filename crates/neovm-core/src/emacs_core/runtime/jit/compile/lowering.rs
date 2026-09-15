@@ -3066,11 +3066,11 @@ pub(crate) fn declare_rt_refs<M: Module>(
     sig_make_float.params.push(AbiParam::new(types::F64));
     sig_make_float.returns.push(AbiParam::new(i64t));
     let make_float_id = declare(module, "neovm_jit_make_float", &sig_make_float)?;
-    // (vmctx, kind, args_ptr, nargs, out_ptr) -> status
+    // (vmctx, kind, a, b, out_ptr) -> status
     let mut sig_arith_generic = Signature::new(call_conv);
     sig_arith_generic.params.push(AbiParam::new(ptr_ty));
     sig_arith_generic.params.push(AbiParam::new(i64t));
-    sig_arith_generic.params.push(AbiParam::new(ptr_ty));
+    sig_arith_generic.params.push(AbiParam::new(i64t));
     sig_arith_generic.params.push(AbiParam::new(i64t));
     sig_arith_generic.params.push(AbiParam::new(ptr_ty));
     sig_arith_generic.returns.push(AbiParam::new(i64t));
@@ -3833,18 +3833,15 @@ fn lower_generic_arith_site(
     } else {
         emit_cond_residual_roots_pre(fb, rt, stack.as_slice())
     };
-    for (i, &v) in operands.iter().enumerate() {
-        fb.ins()
-            .stack_store(rt.ptr_ty, v, rt.call_args_slot, (i * 8) as i32);
-    }
+    // Operands in registers: `call_args_slot` is sized for the body's
+    // CALL sites only, so it must not carry them.
     let vmctx = fb.use_var(rt.vmctx_var);
     let kind_v = fb.ins().iconst(types::I64, kind);
-    let args_addr = fb.ins().stack_addr(rt.ptr_ty, rt.call_args_slot, 0);
-    let n_val = fb.ins().iconst(types::I64, nargs as i64);
+    let second = if nargs == 2 { operands[1] } else { operands[0] };
     let out_addr = fb.ins().stack_addr(rt.ptr_ty, rt.call_result_slot, 0);
     let call = fb.ins().call(
         rt.refs.arith_generic,
-        &[vmctx, kind_v, args_addr, n_val, out_addr],
+        &[vmctx, kind_v, operands[0], second, out_addr],
     );
     let status = fb.inst_results(call)[0];
     emit_cond_residual_roots_post(fb, rt, saved);

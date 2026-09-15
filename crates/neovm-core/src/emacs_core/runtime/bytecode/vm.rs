@@ -7505,7 +7505,12 @@ impl<'a> Vm<'a> {
     ///
     /// `Float` means every operand is a float or a fixnum and at least one is
     /// a float: exactly what an `f64` lowering can take, promoting the
-    /// fixnums. Anything else (bignum, marker, non-number) is `Other`.
+    /// fixnums. A bignum, marker or non-number is `Other`. All fixnums — an
+    /// overflow, a zero divisor, `1+` at the boundary — is `FixnumOnly`, the
+    /// operand types the fixnum lowering assumes, and the caller records
+    /// nothing: one overflow during warm-up must not turn a fixnum-hot site
+    /// into a generic-fallback site for good (`Other` is sticky, and it takes
+    /// the body out of the MIR tier).
     #[cfg(feature = "jit")]
     #[inline]
     fn classify_arith_operands(args: &[Value]) -> crate::emacs_core::jit::NumericFeedback {
@@ -7521,7 +7526,7 @@ impl<'a> Vm<'a> {
         if saw_float {
             NumericFeedback::Float
         } else {
-            NumericFeedback::Other
+            NumericFeedback::FixnumOnly
         }
     }
 
@@ -7550,7 +7555,11 @@ impl<'a> Vm<'a> {
             if rt.wants_numeric_feedback() {
                 let seen =
                     Self::classify_arith_operands(&self.ctx.bc_buf[args_start..args_start + nargs]);
-                rt.record_numeric(pc, func.executable_ops().len(), seen);
+                // `FixnumOnly` is the slot's zero state; recording it would
+                // also DOWNGRADE a `Float` slot.
+                if seen != crate::emacs_core::jit::NumericFeedback::FixnumOnly {
+                    rt.record_numeric(pc, func.executable_ops().len(), seen);
+                }
             }
         }
         match Self::call_arith_builtin_on_context(self.ctx, sym_id, args_start, nargs) {
@@ -7589,6 +7598,15 @@ impl<'a> Vm<'a> {
             Op::Negate => (14, 1),
             _ => return None,
         })
+    }
+
+    /// The operand count of a [`Self::arith_generic_kind`] kind.
+    pub(crate) fn arith_generic_arity(kind: i64) -> Option<usize> {
+        match kind {
+            0..=11 => Some(2),
+            12..=14 => Some(1),
+            _ => None,
+        }
     }
 
     /// The builtin each [`Self::arith_generic_kind`] calls: the SAME cached

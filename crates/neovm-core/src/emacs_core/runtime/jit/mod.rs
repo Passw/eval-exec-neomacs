@@ -210,7 +210,8 @@ pub enum NumericFeedback {
     /// Every non-fixnum pair so far was floats (fixnums alongside are fine —
     /// they promote). Lowerable as `f64`.
     Float,
-    /// Bignums, markers, non-numbers: nothing an unboxed lowering can take.
+    /// A bignum, marker or non-number operand: nothing an unboxed lowering
+    /// can take. (A fixnum overflow or zero divisor records nothing.)
     Other,
 }
 

@@ -1198,8 +1198,8 @@ pub(crate) fn ash_fixnum_fast(value: i64, count: i64) -> Option<i64> {
 /// misses its fixnum fast path (`compile::arith_site_takes_generic`): the
 /// interpreter's own slow arm (`Vm::call_arith_builtin_on_context` — the
 /// static builtin, no backtrace frame, the debugger check on a signal) on the
-/// `nargs` operands the generated code stored at `args_ptr`. `kind` is
-/// `Vm::arith_generic_kind`'s.
+/// operands `a` and (for a binary kind) `b`, passed in registers. `kind` is
+/// `Vm::arith_generic_kind`'s; a unary kind ignores `b`.
 ///
 /// The operands go onto the GC-traced `bc_buf` for the call, as in
 /// [`neovm_jit_call_subr_spec`]; the generated code rooted its residual stack
@@ -1210,15 +1210,18 @@ pub(crate) fn ash_fixnum_fast(value: i64, count: i64) -> Option<i64> {
 pub extern "C" fn neovm_jit_arith_generic(
     ctx: *mut u8,
     kind: i64,
-    args_ptr: *const i64,
-    nargs: i64,
+    a: i64,
+    b: i64,
     out: *mut i64,
 ) -> i64 {
     jit_shim_contain!(ctx, STATUS_SIGNAL, {
+        use crate::emacs_core::bytecode::Vm;
         // SAFETY: see neovm_jit_call's function-level contract.
         let ctx = unsafe { &mut *(ctx as *mut Context) };
-        let nargs = nargs as usize;
-        let Some(sym) = crate::emacs_core::bytecode::Vm::arith_generic_builtin_id(kind) else {
+        let (Some(nargs), Some(sym)) = (
+            Vm::arith_generic_arity(kind),
+            Vm::arith_generic_builtin_id(kind),
+        ) else {
             stash_pending_flow(signal(
                 crate::emacs_core::error::LispCondition::InvalidFunction,
                 vec![Value::fixnum(kind)],
@@ -1226,19 +1229,17 @@ pub extern "C" fn neovm_jit_arith_generic(
             return STATUS_SIGNAL;
         };
         let args_start = ctx.bc_buf.len();
-        // SAFETY: the generated code stored exactly `nargs` argument words at
-        // `args_ptr` (its call-args slot) immediately before this call.
-        ctx.bc_buf
-            .extend((0..nargs).map(|i| Value::from_bits(unsafe { *args_ptr.add(i) } as usize)));
-        let res = crate::emacs_core::bytecode::Vm::call_arith_builtin_on_context(
-            ctx, sym, args_start, nargs,
-        )
-        .unwrap_or_else(|| {
-            Err(signal(
-                crate::emacs_core::error::LispCondition::VoidFunction,
-                vec![Value::from_sym_id(sym)],
-            ))
-        });
+        ctx.bc_buf.push(Value::from_bits(a as usize));
+        if nargs == 2 {
+            ctx.bc_buf.push(Value::from_bits(b as usize));
+        }
+        let res =
+            Vm::call_arith_builtin_on_context(ctx, sym, args_start, nargs).unwrap_or_else(|| {
+                Err(signal(
+                    crate::emacs_core::error::LispCondition::VoidFunction,
+                    vec![Value::from_sym_id(sym)],
+                ))
+            });
         ctx.bc_buf.truncate(args_start);
         match res {
             Ok(value) => {

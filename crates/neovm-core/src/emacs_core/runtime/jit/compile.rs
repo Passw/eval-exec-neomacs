@@ -1119,12 +1119,13 @@ fn compile_bytecode_function_inner(
                     ..
                 ) | mir::MirOp::Cmp(..)
             ) && active_numeric_feedback(i.pc) == crate::emacs_core::jit::NumericFeedback::Float
-        }) || ops
+        });
+        // A generic-fallback site: MIR guards it as a fixnum and would
+        // rerun-from-start on every entry that misses; the baseline calls the
+        // builtin. Read from THIS body's ops, before inlining.
+        let has_generic_arith_site = ops
             .iter()
             .enumerate()
-            // A generic-fallback site: MIR guards it as a fixnum and would
-            // rerun-from-start on every entry that misses; the baseline calls
-            // the builtin. Read from THIS body's ops, before inlining.
             .any(|(pc, o)| arith_site_takes_generic(o, pc));
         let mut inlined_syms: Vec<crate::emacs_core::intern::SymId> = Vec::new();
         let inline_epoch = obarray.and_then(|ob| {
@@ -1170,6 +1171,8 @@ fn compile_bytecode_function_inner(
         let plan = lowering::plan_mir_leaf(&mir);
         let reject = if has_float_site {
             Some("gate:float-site")
+        } else if has_generic_arith_site {
+            Some("gate:generic-arith-site")
         } else if plan.has_backedge && plan.has_adapter_site {
             Some("gate:loop-opaque")
         } else if plan.has_generic_call {
