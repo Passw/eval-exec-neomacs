@@ -518,10 +518,14 @@ pub extern "C" fn neovm_jit_call(
                 // staged generic path below runs it — and tiers it up.
                 // SAFETY: `args_ptr` is the generated code's call-args slot,
                 // holding `nargs` words for the whole call.
-                if func_val.is_bytecode()
-                    && let Some(outcome) =
-                        Vm::call_armed_bytecode_value_native(ctx_ref, func_val, args_ptr, nargs)
-                {
+                let native = if func_val.is_bytecode() {
+                    Vm::call_armed_bytecode_value_native(ctx_ref, func_val, args_ptr, nargs)
+                } else if nargs >= 2 && func_val.as_symbol_id() == Some(Vm::apply_builtin_id()) {
+                    Vm::call_apply_native(ctx_ref, func_val, args_ptr, nargs)
+                } else {
+                    None
+                };
+                if let Some(outcome) = native {
                     return match outcome {
                         NativeCallOutcome::Value(value) => {
                             // SAFETY: `out` is the generated code's result slot.

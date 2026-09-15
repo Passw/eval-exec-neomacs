@@ -2019,6 +2019,13 @@ static MINUS_ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new(); // '-'
 static MODULO_ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new(); // '%'
 static NUMEQ_ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new(); // '='
 static ASET_ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new(); // 'aset'
+static APPLY_ID: std::sync::OnceLock<SymId> = std::sync::OnceLock::new(); // 'apply'
+
+#[cfg(test)]
+thread_local! {
+    /// `apply` calls `Vm::call_apply_native` ran natively.
+    pub(crate) static APPLY_NATIVE_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
 
 /// Whether an opcode may run builtin `id` inline: no compiler function
 /// overrides are active and `id`'s function cell is still that builtin (or
@@ -5647,6 +5654,10 @@ impl<'a> Vm<'a> {
         Self::cached_builtin_id("aset", &ASET_ID)
     }
 
+    pub(crate) fn apply_builtin_id() -> SymId {
+        Self::cached_builtin_id("apply", &APPLY_ID)
+    }
+
     /// `Some(result)` when `id`'s live function cell is NOT the plain builtin
     /// the opcode would inline — a redefinition or advice — so the opcode must
     /// dispatch through it; `None` to take the inline builtin.
@@ -6993,6 +7004,99 @@ impl<'a> Vm<'a> {
         // current `leaf_slot_epoch` — see its own contract.
         let leaf = unsafe { &*ptr };
         Self::run_leaf_native_to_native(ctx, callee, bc, leaf, args_ptr, nargs)
+    }
+
+    /// `(apply F ARG... LIST)` from compiled code where F is a bytecode object
+    /// with an armed leaf, entered without leaving native code: the builtin
+    /// call, `Fapply`'s spread into a vector, `funcall`'s dispatch and the
+    /// callee's argument normalization were four layers and ~1,000
+    /// instructions per call, and every `cl-generic` dispatcher applies its
+    /// method (600 per elb-eieio repeat). Same frames as that path: `apply`'s,
+    /// then the callee's with the spread arguments, one level of depth.
+    ///
+    /// `None` = take the builtin path: `apply` redefined or advised, compiler
+    /// overrides active, the debugger armed, F not an armed bytecode leaf
+    /// (a symbol, an interpreted closure, a subr), a LIST that is dotted,
+    /// circular or longer than the spread buffer, or an arity the leaf
+    /// rejects — each of which the builtin handles (and signals) as before.
+    ///
+    /// SAFETY: `args_ptr` addresses `nargs >= 2` valid tagged words, the
+    /// caller's native call-args slot, valid for the whole call.
+    #[cfg(feature = "jit")]
+    #[inline(never)]
+    pub(crate) fn call_apply_native(
+        ctx: &mut crate::emacs_core::eval::Context,
+        apply: Value,
+        args_ptr: *const i64,
+        nargs: usize,
+    ) -> Option<crate::emacs_core::jit::cache::NativeCallOutcome> {
+        use crate::emacs_core::jit::cache::NativeCallOutcome;
+        debug_assert!(nargs >= 2);
+        if ctx.debug_on_next_call_is_armed() {
+            return None;
+        }
+        let epoch = ctx.obarray.function_epoch();
+        if ctx.apply_fast_path_epoch.get() != epoch {
+            if !named_builtin_fast_path_allowed_in(ctx, Self::apply_builtin_id()) {
+                return None;
+            }
+            ctx.apply_fast_path_epoch.set(epoch);
+        }
+        // SAFETY: the caller's `nargs` words.
+        let arg = |i: usize| Value::from_bits(unsafe { *args_ptr.add(i) } as usize);
+        let function = arg(0);
+        let bc = function.get_bytecode_data()?;
+        // The spread: the leading arguments, then LIST's elements. Nothing
+        // that can collect runs until the callee's backtrace frame records
+        // this buffer (which then roots its values for the call); the
+        // elements are also reachable from LIST, itself in `apply`'s frame.
+        const SPREAD_MAX: usize = 64;
+        let mut spread: smallvec::SmallVec<[i64; 16]> = smallvec::SmallVec::new();
+        for i in 1..nargs - 1 {
+            spread.push(arg(i).bits() as i64);
+        }
+        let mut tail = arg(nargs - 1);
+        while tail.is_cons() {
+            if spread.len() == SPREAD_MAX {
+                return None;
+            }
+            spread.push(tail.cons_car().bits() as i64);
+            tail = tail.cons_cdr();
+        }
+        if !tail.is_nil() {
+            return None;
+        }
+        let count = spread.len();
+        let ptr = crate::emacs_core::jit::cache::armed_leaf_for_native_call(bc, count)?;
+        // SAFETY: armed under the current `leaf_slot_epoch` (its contract).
+        let leaf = unsafe { &*ptr };
+        if !leaf.accepts(count) {
+            return None;
+        }
+        #[cfg(test)]
+        APPLY_NATIVE_CALLS.with(|calls| calls.set(calls.get() + 1));
+        let bt_count = ctx.specpdl.len();
+        // SAFETY: `args_ptr` addresses `nargs` valid words for the whole call.
+        unsafe {
+            ctx.push_backtrace_frame_from_native_args(apply, args_ptr, nargs);
+        }
+        let outcome =
+            Self::run_leaf_native_to_native(ctx, function, bc, leaf, spread.as_ptr(), count)
+                .expect("an accepted arity runs");
+        if ctx.pop_native_backtrace_frame(bt_count) {
+            return Some(outcome);
+        }
+        let res = match outcome {
+            NativeCallOutcome::Value(v) => Ok(v),
+            NativeCallOutcome::FlowStashed => {
+                Err(crate::emacs_core::jit::compile::take_pending_flow()
+                    .expect("FlowStashed implies a pending flow"))
+            }
+            NativeCallOutcome::Fallback => unreachable!("Fallback resolved inside the run"),
+        };
+        Some(NativeCallOutcome::from_result(
+            ctx.pop_bytecode_backtrace_frame_with_result(bt_count, res),
+        ))
     }
 
     /// Run `leaf` for `callee` with `args_ptr` as the argument words, without

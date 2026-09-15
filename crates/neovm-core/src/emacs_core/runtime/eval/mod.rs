@@ -3312,6 +3312,8 @@ pub struct Context {
     /// (every change, and an overrides toggle, advances the epoch). `u64::MAX`
     /// is never a live epoch.
     pub(crate) aset_fast_path_epoch: std::cell::Cell<u64>,
+    /// The same record for `apply` (`Vm::call_apply_native`).
+    pub(crate) apply_fast_path_epoch: std::cell::Cell<u64>,
     /// Hot cache for named callable resolution in `funcall`/`apply`.
     /// Keyed by symbol id; entries are validated against the obarray's
     /// `function_epoch` so that any `defalias` / `fset` / autoload

@@ -2239,6 +2239,7 @@ impl Context {
             interpreter_stacks: crate::emacs_core::bytecode::vm::InterpreterStackPool::new(),
             jit_bind_stack: Vec::new(),
             aset_fast_path_epoch: std::cell::Cell::new(u64::MAX),
+            apply_fast_path_epoch: std::cell::Cell::new(u64::MAX),
             named_call_cache: FxHashMap::with_capacity_and_hasher(
                 NAMED_CALL_CACHE_CAPACITY,
                 Default::default(),

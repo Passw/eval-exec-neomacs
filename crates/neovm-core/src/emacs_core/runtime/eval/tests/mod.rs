@@ -25654,3 +25654,126 @@ fn redefining_a_function_is_visible_to_the_next_interpreted_call() {
         vec!["OK (1 2 3 30)"],
     );
 }
+
+/// `(apply F ARG LIST)` from compiled code enters an armed bytecode F without
+/// leaving native code, for fixed, `&optional` and `&rest` callees, with the
+/// same answers as the builtin; a dotted LIST, a non-compiled F and a
+/// redefined `apply` take the builtin path.
+#[cfg(feature = "jit")]
+#[test]
+fn jit_apply_enters_a_compiled_callee_natively() {
+    crate::test_utils::init_test_tracing();
+    use crate::emacs_core::bytecode::ByteCodeFunction;
+    use crate::emacs_core::bytecode::opcode::Op;
+    use crate::emacs_core::bytecode::vm::APPLY_NATIVE_CALLS;
+    use crate::emacs_core::intern::SymId;
+    use crate::emacs_core::print::print_value;
+    use crate::emacs_core::value::LambdaParams;
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let mut ev = Context::new();
+    let callee = |required: u32, optional: u32, rest: bool, ops: Vec<Op>| {
+        let mut f = ByteCodeFunction::new(LambdaParams {
+            required: (1..=required).map(SymId).collect(),
+            optional: (10..10 + optional).map(SymId).collect(),
+            rest: rest.then_some(SymId(20)),
+        });
+        f.lexical = true;
+        f.ops = ops;
+        f.max_stack = 16;
+        f.jit_runtime().set_hot_for_test();
+        let v = Value::make_bytecode(f);
+        crate::emacs_core::eval::push_scratch_gc_root(v);
+        v
+    };
+    // (lambda (a b c) (list a b c))
+    let fixed = callee(
+        3,
+        0,
+        false,
+        vec![
+            Op::StackRef(2),
+            Op::StackRef(2),
+            Op::StackRef(2),
+            Op::List(3),
+            Op::Return,
+        ],
+    );
+    // (lambda (a &optional b) (list a b))
+    let optional = callee(
+        1,
+        1,
+        false,
+        vec![Op::StackRef(1), Op::StackRef(1), Op::List(2), Op::Return],
+    );
+    // (lambda (a &rest r) (cons a r))
+    let rest = callee(
+        1,
+        0,
+        true,
+        vec![Op::StackRef(1), Op::StackRef(1), Op::Cons, Op::Return],
+    );
+    // (lambda (f l) (apply f 1 l))
+    let mut caller = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(1), SymId(2)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    caller.lexical = true;
+    caller.ops = vec![
+        Op::Constant(0),
+        Op::StackRef(2),
+        Op::Constant(1),
+        Op::StackRef(3),
+        Op::Call(3),
+        Op::Return,
+    ];
+    caller.constants = vec![Value::symbol("apply"), Value::make_int(1)].into();
+    caller.max_stack = 16;
+    caller.jit_runtime().set_hot_for_test();
+    let caller = Value::make_bytecode(caller);
+    crate::emacs_core::eval::push_scratch_gc_root(caller);
+    let run = |ev: &mut Context, f: Value, list: &str| {
+        let list = ev.eval_str(list).expect("list");
+        match ev.funcall_general_untraced(caller, vec![f, list]) {
+            Ok(v) => print_value(&v),
+            Err(crate::emacs_core::error::Flow::Signal(sig)) => format!(
+                "signal {} {:?}",
+                sig.symbol_name(),
+                sig.data.iter().map(print_value).collect::<Vec<_>>()
+            ),
+            Err(other) => format!("{other:?}"),
+        }
+    };
+    // Warm up: compiles the caller and every callee.
+    for f in [fixed, optional, rest] {
+        for _ in 0..3 {
+            let _ = run(&mut ev, f, "'(2 3)");
+            let _ = run(&mut ev, f, "'(2)");
+            let _ = run(&mut ev, f, "nil");
+        }
+    }
+    let before = APPLY_NATIVE_CALLS.with(|c| c.get());
+    assert_eq!(run(&mut ev, fixed, "'(2 3)"), "(1 2 3)");
+    assert_eq!(run(&mut ev, optional, "'(2)"), "(1 2)");
+    assert_eq!(run(&mut ev, optional, "nil"), "(1 nil)");
+    assert_eq!(run(&mut ev, rest, "'(2 3 4)"), "(1 2 3 4)");
+    assert_eq!(run(&mut ev, rest, "nil"), "(1)");
+    assert_eq!(
+        APPLY_NATIVE_CALLS.with(|c| c.get()) - before,
+        5,
+        "all five ran natively"
+    );
+    // The builtin path, with its own answers.
+    let before = APPLY_NATIVE_CALLS.with(|c| c.get());
+    assert!(run(&mut ev, fixed, "'(2)").starts_with("signal wrong-number-of-arguments"));
+    assert_eq!(
+        run(&mut ev, rest, "'(2 . 3)"),
+        "signal wrong-type-argument [\"listp\", \"3\"]"
+    );
+    assert_eq!(run(&mut ev, Value::symbol("list"), "'(2 3)"), "(1 2 3)");
+    assert_eq!(APPLY_NATIVE_CALLS.with(|c| c.get()), before);
+    ev.eval_str("(fset 'apply (lambda (&rest _) 'redefined))")
+        .expect("redefine");
+    assert_eq!(run(&mut ev, fixed, "'(2 3)"), "redefined");
+    assert_eq!(APPLY_NATIVE_CALLS.with(|c| c.get()), before);
+}
