@@ -99,6 +99,8 @@ const ARRAYS: &[&str] = &[
     "(make-bool-vector 5 t)",
     "(make-bool-vector 0 nil)",
     "(make-char-table 'foo 7)",
+    // The legacy tagged-vector char-table (a vector whose slot 0 is the tag).
+    "(let ((v (make-vector 80 nil))) (aset v 0 '--char-table--) (aset v 3 'dflt) v)",
     "(make-string 3 ?a)",
     "(string-to-multibyte (make-string 3 ?a))",
     "(copy-sequence \"aβc\")",
@@ -572,5 +574,63 @@ fn record_type_of_is_gnus_record_arm() {
             want,
             "{src}"
         );
+    }
+}
+
+/// The general `aset` call's store record must MEET the fast path's (which
+/// stores nothing): the call site after it roots `h` itself. Were the
+/// continuation to inherit the general call's record, that later call would
+/// skip storing `h`, and on the fast path — the only one taken here — `h`
+/// would be unrooted across a collection.
+///
+///     (lambda (v) (let ((h (cons 1 2))) (aset v 0 7) (collect-and-allocate) h))
+#[test]
+fn a_later_call_site_roots_what_only_the_aset_fallback_stored() {
+    // A one-call body is below the profitability gate; this test is about
+    // the lowering, not the gate.
+    super::force_profit_gate_for_test(false);
+    let mut eval = Context::new();
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    eval.eval_str(
+        "(fset 'ashim-collect (lambda () (garbage-collect) (make-list 4096 (cons 0 0)) nil))",
+    )
+    .expect("collector");
+    let f = lexical_fn(
+        1,
+        vec![
+            Op::Constant(0), // [v 1]
+            Op::Constant(1), // [v 1 2]
+            Op::Cons,        // [v h]
+            Op::StackRef(1), // [v h v]
+            Op::Constant(2), // [v h v 0]
+            Op::Constant(3), // [v h v 0 7]
+            Op::Aset,        // [v h r]   residual [v h]
+            Op::Pop,         // [v h]
+            Op::Constant(4), // [v h f]
+            Op::Call(0),     // [v h r]   residual [v h]
+            Op::Pop,         // [v h]
+            Op::Return,      // h
+        ],
+        vec![
+            Value::make_int(1),
+            Value::make_int(2),
+            Value::make_int(0),
+            Value::make_int(7),
+            Value::symbol("ashim-collect"),
+        ],
+    );
+    let leaf = compile_bytecode_function(&f).expect("compiles");
+    for _ in 0..3 {
+        let v = eval.eval_str("(vector 0 0)").expect("v");
+        match leaf.call(ctx_ptr, &[v]) {
+            NativeRun::Ok(bits) => {
+                let h = Value::from_bits(bits);
+                assert!(h.is_cons(), "h survived the collection (got {h:?})");
+                assert_eq!(h.cons_car(), Value::make_int(1), "car intact");
+                assert_eq!(h.cons_cdr(), Value::make_int(2), "cdr intact");
+            }
+            other => panic!("must run natively, got {other:?}"),
+        }
+        assert_eq!(print_value(&v), "[7 0]");
     }
 }
