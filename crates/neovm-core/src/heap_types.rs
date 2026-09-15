@@ -749,6 +749,26 @@ impl LispString {
     /// Mutate the logical string bytes and restore GNU string invariants before
     /// returning: trailing NUL after `SBYTES`, direct data pointer, and cached
     /// character/byte sizes.
+    /// Overwrite the byte at `byte_pos`, for a replacement that cannot change
+    /// the character count: any byte of a unibyte string, or an ASCII byte
+    /// over an ASCII byte of a multibyte one -- the only replacements `aset`
+    /// makes. [`Self::mutate_bytes`] would pop and re-push the trailing NUL
+    /// and recount a multibyte string's characters (a scan of the whole
+    /// string per `aset`).
+    pub fn set_byte_same_char_count(&mut self, byte_pos: usize, byte: u8) {
+        debug_assert!(byte_pos < self.sbytes(), "byte position in range");
+        debug_assert!(
+            !self.is_multibyte() || (byte < 0x80 && self.as_bytes()[byte_pos] < 0x80),
+            "a multibyte string only takes ASCII over ASCII in place"
+        );
+        if self.is_rodata() {
+            self.size_byte = SIZE_BYTE_UNIBYTE_NORMAL;
+        }
+        self.ensure_owned();
+        // SAFETY: owned storage holds `sbytes() + 1` initialized bytes.
+        unsafe { *(self.data as *mut u8).add(byte_pos) = byte };
+    }
+
     pub fn mutate_bytes<R>(&mut self, f: impl FnOnce(&mut Vec<u8>) -> R) -> R {
         if self.is_rodata() {
             self.size_byte = SIZE_BYTE_UNIBYTE_NORMAL;
@@ -1169,6 +1189,24 @@ mod tests {
         assert_eq!(rodata.size_byte(), -1);
         assert!(rodata.has_owned_storage());
         assert!(rodata.has_trailing_nul());
+    }
+
+    #[test]
+    fn set_byte_same_char_count_copies_rodata_before_writing() {
+        static DATA: &[u8] = b"abc\0";
+        let mut string = LispString::from_rodata_unibyte(DATA);
+        string.set_byte_same_char_count(1, b'z');
+        assert_eq!(string.as_bytes(), b"azc");
+        assert!(
+            !string.is_rodata(),
+            "a written string no longer points at rodata"
+        );
+        assert_eq!(string.schars(), 3);
+        assert_eq!(DATA, b"abc\0", "the rodata itself is untouched");
+        let mut multibyte = LispString::from_utf8("aéc");
+        multibyte.set_byte_same_char_count(3, b'x');
+        assert_eq!(multibyte.as_bytes(), "aéx".as_bytes());
+        assert_eq!((multibyte.schars(), multibyte.sbytes()), (3, 4));
     }
 
     #[test]

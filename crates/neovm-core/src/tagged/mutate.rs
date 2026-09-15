@@ -204,6 +204,24 @@ pub fn with_lisp_string_mut<R>(
     Some(f(unsafe { &mut (*ptr).data }))
 }
 
+/// Overwrite one byte of a string's text in place (see
+/// `LispString::set_byte_same_char_count`), WITHOUT the heap write barrier.
+/// The barrier logs the owner's object children for the concurrent collector
+/// and remembers dumped owners that may have gained heap children; a string's
+/// bytes are not objects, and this touches nothing else (its text-property
+/// intervals keep their own enforced barrier). `aset` on a string paid the
+/// full barrier -- 43 instructions per character on dhrystone.
+#[inline]
+pub fn set_string_byte_same_char_count(value: TaggedValue, byte_pos: usize, byte: u8) -> bool {
+    let Some(ptr) = value.as_string_ptr() else {
+        return false;
+    };
+    let ptr = ptr as *mut StringObj;
+    // SAFETY: a live string object; the caller holds the only mutation.
+    unsafe { (*ptr).data.set_byte_same_char_count(byte_pos, byte) };
+    true
+}
+
 #[inline]
 pub fn with_hash_table_mut<R>(
     value: TaggedValue,

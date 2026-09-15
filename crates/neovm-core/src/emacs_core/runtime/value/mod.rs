@@ -3112,6 +3112,11 @@ impl TaggedValue {
         mutate::with_lisp_string_mut(self, f)
     }
 
+    /// See [`mutate::set_string_byte_same_char_count`].
+    pub fn set_string_byte_same_char_count(self, byte_pos: usize, byte: u8) -> bool {
+        mutate::set_string_byte_same_char_count(self, byte_pos, byte)
+    }
+
     /// Convert to hash key based on the hash table test.
     pub fn to_hash_key(&self, test: &HashTableTest) -> HashKey {
         match test {

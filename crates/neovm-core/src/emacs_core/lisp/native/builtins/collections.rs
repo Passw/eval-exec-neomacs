@@ -152,22 +152,14 @@ pub(crate) fn aset_string_replacement(
                 )],
             ));
         }
-        let _ = array.with_lisp_string_mut(|s| {
-            s.mutate_bytes(|data| {
-                data[byte_pos] = replacement_code as u8;
-            });
-        });
+        array.set_string_byte_same_char_count(byte_pos, replacement_code as u8);
         return Ok(*array);
     }
 
     // GNU's unibyte `Faset` is one bounds check plus `SSET`.  Rebuilding the
     // complete string here made byte-at-a-time protocol transforms (for
     // example WebSocket masking) quadratic in the frame size.
-    let _ = array.with_lisp_string_mut(|s| {
-        s.mutate_bytes(|data| {
-            data[idx] = replacement_code as u8;
-        });
-    });
+    array.set_string_byte_same_char_count(idx, replacement_code as u8);
     Ok(*array)
 }
 
@@ -1395,3 +1387,7 @@ pub(crate) fn plist_member_eq_swp(args: Vec<Value>, symbols_with_pos_enabled: bo
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/aset_string_in_place.rs"]
+mod aset_string_in_place_test;
