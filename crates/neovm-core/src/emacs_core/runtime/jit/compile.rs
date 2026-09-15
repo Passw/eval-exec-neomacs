@@ -1314,6 +1314,11 @@ pub(crate) enum SpecCalleeKind {
     PredRecordp,
     /// `symbol-with-pos-p` (1 arg): `neovm_jit_pred_spec`, pure tag test.
     PredSymbolWithPos,
+    /// `type-of` (1 arg): `neovm_jit_pred_spec` computes the builtin's answer
+    /// GC-free (an existing symbol or a record's type slot; never signals).
+    PredTypeOf,
+    /// `cl-type-of` (1 arg): as [`Self::PredTypeOf`].
+    PredClTypeOf,
     /// `equal-including-properties` (2 args): `neovm_jit_eq_incl_props_spec`,
     /// bitwise-eq hit → `t`; anything else bounces to the generic block.
     EqInclProps,
@@ -1372,6 +1377,8 @@ impl SpecCalleeKind {
             self,
             SpecCalleeKind::PredRecordp
                 | SpecCalleeKind::PredSymbolWithPos
+                | SpecCalleeKind::PredTypeOf
+                | SpecCalleeKind::PredClTypeOf
                 | SpecCalleeKind::EqInclProps
                 | SpecCalleeKind::ArithIntrinsic { .. }
         )
@@ -1388,6 +1395,8 @@ impl SpecCalleeKind {
             SpecCalleeKind::SubrGeneral
                 | SpecCalleeKind::PredRecordp
                 | SpecCalleeKind::PredSymbolWithPos
+                | SpecCalleeKind::PredTypeOf
+                | SpecCalleeKind::PredClTypeOf
                 | SpecCalleeKind::EqInclProps
                 | SpecCalleeKind::ArithIntrinsic { .. }
         )
@@ -1429,6 +1438,8 @@ impl SpecCalleeKind {
                 debug_assert!(op <= 5, "ArithIntrinsic op discriminant out of range");
                 Some(5 + op)
             }
+            SpecCalleeKind::PredTypeOf => Some(11),
+            SpecCalleeKind::PredClTypeOf => Some(12),
             SpecCalleeKind::CbsymTierA { .. } | SpecCalleeKind::CbsymTierB => None,
         }
     }
@@ -1436,7 +1447,7 @@ impl SpecCalleeKind {
     /// Number of distinct `Op::Call` spec discriminants [`to_spec_disc`](Self::to_spec_disc)
     /// assigns (0..DISC_COUNT). Salted into `ABI_TAG` so a renumber/count change
     /// re-tags stale `.so`s.
-    pub(crate) const DISC_COUNT: u8 = 11;
+    pub(crate) const DISC_COUNT: u8 = 13;
 }
 
 /// A speculated direct-call site: an `Op::Call` whose callee slot provably
@@ -1556,6 +1567,11 @@ fn subr_spec_kind(binding: Value, site_sym: SymId, nargs: usize) -> Option<SpecC
     if let Some(op) = arith_intrinsic_op_by_name(resolved_name, nargs) {
         return Some(SpecCalleeKind::ArithIntrinsic { op });
     }
+    // `cl-type-of` is a slice subr, which the fixed-arity branch below never
+    // sees; classify it by the subr's own name, as the bit-ops above.
+    if resolved_name == "cl-type-of" && nargs == 1 {
+        return Some(SpecCalleeKind::PredClTypeOf);
+    }
     if Context::subr_entry_uses_fixed_value_call(entry) {
         if nargs < entry.min_args as usize {
             return None;
@@ -1566,6 +1582,7 @@ fn subr_spec_kind(binding: Value, site_sym: SymId, nargs: usize) -> Option<SpecC
         Some(match (resolved_name, nargs) {
             ("recordp", 1) => SpecCalleeKind::PredRecordp,
             ("symbol-with-pos-p", 1) => SpecCalleeKind::PredSymbolWithPos,
+            ("type-of", 1) => SpecCalleeKind::PredTypeOf,
             ("equal-including-properties", 2) => SpecCalleeKind::EqInclProps,
             _ => SpecCalleeKind::SubrGeneral,
         })

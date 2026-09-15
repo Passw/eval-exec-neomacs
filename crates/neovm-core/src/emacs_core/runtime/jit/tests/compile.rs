@@ -7414,3 +7414,89 @@ fn only_a_non_fixnum_operand_records_other_feedback() {
         "overflow keeps Float"
     );
 }
+
+/// `type-of` and `cl-type-of` called through `Op::Call` are GC-free predicate
+/// intrinsics (`SpecCalleeKind::PredTypeOf`/`PredClTypeOf`): armed, the site
+/// answers from `neovm_jit_pred_spec` with no backtrace frame and no generic
+/// dispatch. The answer must be the builtin's for every kind of value, the
+/// fast path must actually be taken, and a redefinition of the function must
+/// reach the generic call.
+#[test]
+fn type_of_call_sites_answer_as_the_builtin_on_the_fast_path() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::intern::SymId;
+    use std::sync::atomic::Ordering;
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    let pool_src = "(list 5 (expt 2 70) 1.5 \"s\" (cons 1 2) 'sym nil t :kw \
+                    (record 'foo 1) (record (record 'eieio--class 'my-class) 2) \
+                    (vector 1) (make-char-table 'x) (make-bool-vector 2 t) \
+                    (make-hash-table) (symbol-function 'car) (make-marker) \
+                    (current-buffer) (lambda (x) x))";
+    for name in ["type-of", "cl-type-of"] {
+        let mut f = ByteCodeFunction::new(LambdaParams {
+            required: vec![SymId(1)],
+            optional: Vec::new(),
+            rest: None,
+        });
+        f.lexical = true;
+        f.ops = vec![Op::Constant(0), Op::StackRef(1), Op::Call(1), Op::Return];
+        f.constants = vec![Value::symbol(name)].into();
+        f.max_stack = 8;
+        // The site is the GC-free predicate intrinsic, not a general subr
+        // speculation (which counts as a fast completion too).
+        let binding = ev
+            .obarray
+            .symbol_function_id(crate::emacs_core::intern::intern(name))
+            .expect("bound");
+        assert_eq!(
+            super::subr_spec_kind(binding, crate::emacs_core::intern::intern(name), 1),
+            Some(if name == "type-of" {
+                super::SpecCalleeKind::PredTypeOf
+            } else {
+                super::SpecCalleeKind::PredClTypeOf
+            }),
+            "{name}"
+        );
+        let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+        let pool = ev.eval_str(pool_src).expect("pool");
+        let items = crate::emacs_core::value::list_to_vec(&pool).expect("list");
+        let fast0 = SUBR_SPEC_FAST_COUNT.load(Ordering::Relaxed);
+        for item in &items {
+            let want = if name == "type-of" {
+                crate::emacs_core::builtins::types::builtin_type_of(&[*item])
+            } else {
+                crate::emacs_core::builtins::types::builtin_cl_type_of(&[*item])
+            }
+            .expect("builtin answers");
+            match leaf.call(ctx, &[*item]) {
+                NativeRun::Ok(bits) => assert_eq!(
+                    crate::emacs_core::print::print_value(&Value::from_bits(bits)),
+                    crate::emacs_core::print::print_value(&want),
+                    "({name} {})",
+                    crate::emacs_core::print::print_value(item)
+                ),
+                other => panic!("({name} ...) must run natively: {other:?}"),
+            }
+        }
+        let fast = SUBR_SPEC_FAST_COUNT.load(Ordering::Relaxed) - fast0;
+        assert!(
+            fast >= items.len() as u64,
+            "{name}: every call took the intrinsic ({fast} of {})",
+            items.len()
+        );
+        // A redefinition is honoured: the site re-validates and takes the
+        // generic call.
+        ev.eval_str(&format!("(fset '{name} (lambda (_) 'redefined))"))
+            .expect("fset");
+        match leaf.call(ctx, &[Value::make_int(1)]) {
+            NativeRun::Ok(bits) => assert_eq!(
+                crate::emacs_core::print::print_value(&Value::from_bits(bits)),
+                "redefined",
+                "{name} redefined"
+            ),
+            other => panic!("redefined {name}: {other:?}"),
+        }
+    }
+}

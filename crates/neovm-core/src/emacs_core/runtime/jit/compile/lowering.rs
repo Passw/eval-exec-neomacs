@@ -4639,7 +4639,10 @@ pub(crate) fn lower_simple_op(
                             )
                         }
                         (
-                            SpecCalleeKind::PredRecordp | SpecCalleeKind::PredSymbolWithPos,
+                            SpecCalleeKind::PredRecordp
+                            | SpecCalleeKind::PredSymbolWithPos
+                            | SpecCalleeKind::PredTypeOf
+                            | SpecCalleeKind::PredClTypeOf,
                             Some(args),
                         ) => {
                             let f = rt
@@ -4648,10 +4651,13 @@ pub(crate) fn lower_simple_op(
                                 .ok_or(CompileError::UnsupportedOp("subr-spec-refs"))?;
                             let kind_v = fb.ins().iconst(
                                 types::I64,
-                                if kind == SpecCalleeKind::PredRecordp {
-                                    PRED_KIND_RECORDP
-                                } else {
-                                    PRED_KIND_SYMBOL_WITH_POS_P
+                                match kind {
+                                    SpecCalleeKind::PredRecordp => PRED_KIND_RECORDP,
+                                    SpecCalleeKind::PredSymbolWithPos => {
+                                        PRED_KIND_SYMBOL_WITH_POS_P
+                                    }
+                                    SpecCalleeKind::PredTypeOf => PRED_KIND_TYPE_OF,
+                                    _ => PRED_KIND_CL_TYPE_OF,
                                 },
                             );
                             fb.ins()

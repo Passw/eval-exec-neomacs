@@ -173,7 +173,6 @@ fn apply0(eval: &mut super::eval::Context, func: Value) -> EvalResult {
 }
 
 #[inline]
-#[inline]
 fn apply1(eval: &mut super::eval::Context, func: Value, arg: Value) -> EvalResult {
     eval.apply1(func, arg)
 }

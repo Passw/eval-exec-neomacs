@@ -735,6 +735,10 @@ pub extern "C" fn neovm_jit_call_spec(
 pub(crate) const PRED_KIND_RECORDP: i64 = 0;
 /// Predicate discriminator for [`neovm_jit_pred_spec`]: `symbol-with-pos-p`.
 pub(crate) const PRED_KIND_SYMBOL_WITH_POS_P: i64 = 1;
+/// `type-of`: the builtin's answer (see [`SpecCalleeKind::PredTypeOf`]).
+pub(crate) const PRED_KIND_TYPE_OF: i64 = 2;
+/// `cl-type-of`.
+pub(crate) const PRED_KIND_CL_TYPE_OF: i64 = 3;
 
 /// Op discriminators for [`neovm_jit_arith_spec`] (baked as an iconst by the
 /// lowering, and — offset by 5 — the [`SpecCalleeKind::to_spec_disc`] value):
@@ -1085,7 +1089,10 @@ pub extern "C" fn neovm_jit_pred_spec(
         }
         // SAFETY: slot points into the executing leaf's spec_slots.
         let slot = unsafe { &*(slot as *const SpecSlot) };
-        if !subr_spec_armed(ctx, sym, expected, slot) {
+        // GNU `Ffuncall` runs the debugger on entry to ANY function while
+        // `debug-on-next-call` is set, a subr included: that call takes the
+        // generic path, as `neovm_jit_call_subr_spec`'s does.
+        if ctx.debug_on_next_call_is_armed() || !subr_spec_armed(ctx, sym, expected, slot) {
             #[cfg(debug_assertions)]
             SUBR_SPEC_GENERIC_COUNT.fetch_add(1, Ordering::Relaxed);
             return STATUS_NEED_GENERIC;
@@ -1093,15 +1100,29 @@ pub extern "C" fn neovm_jit_pred_spec(
         #[cfg(debug_assertions)]
         SUBR_SPEC_FAST_COUNT.fetch_add(1, Ordering::Relaxed);
         let v = Value::from_bits(a as usize);
-        // `is_record`/`is_symbol_with_pos` = tag check BEFORE any header deref
-        // (`veclike_type` guards on `is_veclike` first) — safe on immediates.
-        let truth = if kind == PRED_KIND_RECORDP {
-            v.is_record()
-        } else {
-            debug_assert_eq!(kind, PRED_KIND_SYMBOL_WITH_POS_P);
-            v.is_symbol_with_pos()
+        let result = match kind {
+            // `is_record`/`is_symbol_with_pos` = tag check BEFORE any header
+            // deref (`veclike_type` guards on `is_veclike` first) — safe on
+            // immediates.
+            PRED_KIND_RECORDP => Value::bool_val(v.is_record()),
+            PRED_KIND_SYMBOL_WITH_POS_P => Value::bool_val(v.is_symbol_with_pos()),
+            // The registered `type-of`/`cl-type-of` bodies, which read the
+            // value and return an existing symbol or a record's type slot:
+            // no allocation, no Lisp, no safe point. An error (none is
+            // reachable at arity 1) bounces to the generic call to raise it.
+            _ => {
+                let answer = if kind == PRED_KIND_TYPE_OF {
+                    crate::emacs_core::builtins::types::builtin_type_of(&[v])
+                } else {
+                    debug_assert_eq!(kind, PRED_KIND_CL_TYPE_OF);
+                    crate::emacs_core::builtins::types::builtin_cl_type_of(&[v])
+                };
+                match answer {
+                    Ok(value) => value,
+                    Err(_) => return STATUS_NEED_GENERIC,
+                }
+            }
         };
-        let result = if truth { Value::T } else { Value::NIL };
         // SAFETY: `out` is the generated code's result stack slot.
         unsafe { *out = result.bits() as i64 };
         STATUS_OK
