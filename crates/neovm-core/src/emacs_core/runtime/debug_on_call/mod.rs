@@ -155,7 +155,11 @@ impl Context {
     #[inline]
     fn debug_on_next_call_cell(&self) -> Option<&'static LispBoolFwd> {
         self.obarray
-            .debug_on_next_call_bool_fwd(debug_on_next_call_symbol())
+            .debug_on_next_call_bool_fwd_cached()
+            .or_else(|| {
+                self.obarray
+                    .debug_on_next_call_bool_fwd(debug_on_next_call_symbol())
+            })
     }
 
     /// GNU's bare `if (debug_on_next_call)` test, with no side effect.

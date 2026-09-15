@@ -2506,16 +2506,24 @@ impl Obarray {
         &self,
         id: SymId,
     ) -> Option<&'static crate::emacs_core::forward::LispBoolFwd> {
+        self.debug_on_next_call_bool_fwd_cached()
+            .or_else(|| self.debug_on_next_call_bool_fwd_slow(id))
+    }
+
+    /// The memoized descriptor of [`Self::debug_on_next_call_bool_fwd`], when
+    /// resolved: for a caller that names the symbol only on the miss (its
+    /// `OnceLock` read was most of the per-call check).
+    #[inline(always)]
+    pub(crate) fn debug_on_next_call_bool_fwd_cached(
+        &self,
+    ) -> Option<&'static crate::emacs_core::forward::LispBoolFwd> {
         let cached = self
             .debug_on_next_call_fwd
             .load(std::sync::atomic::Ordering::Relaxed);
-        if !cached.is_null() {
-            // Safety: the only store is the slow path below, which puts a
-            // `Box::leak`ed descriptor here, and no path replaces a resolved
-            // descriptor for a live obarray (see the field's invariant note).
-            return Some(unsafe { &*cached });
-        }
-        self.debug_on_next_call_bool_fwd_slow(id)
+        // Safety: the only store is the slow path below, which puts a
+        // `Box::leak`ed descriptor here, and no path replaces a resolved
+        // descriptor for a live obarray (see the field's invariant note).
+        (!cached.is_null()).then(|| unsafe { &*cached })
     }
 
     #[cold]
