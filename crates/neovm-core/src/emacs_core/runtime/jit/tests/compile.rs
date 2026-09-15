@@ -2381,6 +2381,168 @@ fn mir_hoists_the_root_window_across_shim_sites() {
     }
 }
 
+/// `RootWinCarry` rule 1 at a count of ZERO: a call whose live residual is
+/// all type-skipped stores nothing, runs its callee with `top` at the frame
+/// base, and so must empty the store record. `k` is a fixnum constant: the
+/// adapter's `length` sites store it (it is a retagged value, not a literal
+/// immediate), but the MIR call arm skips it by type.
+///
+///     (let ((k 7)) (length L) (f) (length L) k)
+///
+/// The second `length` must store `k` again — a nested activation inside
+/// `(f)` may have overwritten the slot. Before the fix it was elided.
+#[test]
+fn mir_call_that_roots_nothing_forgets_the_store_record() {
+    let ops = vec![
+        Op::Constant(0), // k = 7        [k]
+        Op::Constant(1), // L            [k L]
+        Op::Length,      // residual [k]: stores k
+        Op::Pop,         //              [k]
+        Op::Constant(2), // f            [k f]
+        Op::Call(0),     // residual [k]: Fixnum, skipped -> stores nothing
+        Op::Pop,         //              [k]
+        Op::Constant(1), // L            [k L]
+        Op::Length,      // residual [k]: must store k again
+        Op::Pop,         //              [k]
+        Op::Return,
+    ];
+    let constants = [
+        Value::make_int(7),
+        Value::symbol("jit-carry-l"),
+        Value::symbol("jit-carry-f"),
+    ];
+    let mir = mir::build_mir(&ops, &constants, 0).expect("MIR builds");
+    assert_eq!(super::lowering::plan_mir_leaf(&mir).rooting_sites, 3);
+    lower_mir_pure(&mir).expect("lowers");
+    assert_eq!(
+        super::lowering::rootwin_counters(),
+        (2, 0),
+        "both length sites store k; (1, 1) means the call left a stale record"
+    );
+}
+
+/// `RootWinCarry` rule 1 with a nonzero count: residuals of 3, then 1, then 3
+/// slots. The middle call roots only slot 0, so slots 1 and 2 may be
+/// overwritten by its callee and the third site must store them again.
+#[test]
+fn mir_store_record_is_truncated_to_each_sites_count() {
+    let ops = vec![
+        Op::StackRef(0), // [a a]
+        Op::StackRef(1), // [a a a]
+        Op::Constant(0), // [a a a L]
+        Op::Length,      // residual [a a a]: 3 stores
+        Op::DiscardN(3), // [a]
+        Op::Constant(1), // [a f]
+        Op::Call(0),     // residual [a]: slot 0 elided, record truncated to 1
+        Op::Pop,         // [a]
+        Op::StackRef(0), // [a a]
+        Op::StackRef(1), // [a a a]
+        Op::Constant(0), // [a a a L]
+        Op::Length,      // residual [a a a]: slot 0 elided, slots 1-2 stored
+        Op::DiscardN(3), // [a]
+        Op::Return,
+    ];
+    let constants = [Value::symbol("jit-carry-l"), Value::symbol("jit-carry-f")];
+    let mir = mir::build_mir(&ops, &constants, 1).expect("MIR builds");
+    lower_mir_pure(&mir).expect("lowers");
+    assert_eq!(
+        super::lowering::rootwin_counters(),
+        (5, 2),
+        "3 + 0 + 2 stores; (3, 4) means slots above the call's count were trusted"
+    );
+}
+
+/// `RootWinCarry` rule 2, in the BASELINE: a Tier-A `point` site stores
+/// nothing on its fast path (a GC-free read) but its NEED_GENERIC fallback
+/// roots the residual for a general call. The record at the continuation is
+/// the meet of the two paths; the following call site must still store its
+/// residual. Before the fix the fallback's compile-time stores leaked into
+/// the record, the call's stores were all elided, and on the (normal) fast
+/// path `x` sat unrooted across the call.
+///
+///     (lambda (a n) (let ((x (cons a a))) (h (+ n (point)) (1+ n)) x))
+#[test]
+fn baseline_tier_a_fallback_stores_do_not_leak_into_the_next_site() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::intern::{SymId, intern};
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let ev = Context::new();
+    let mut f = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(1), SymId(2)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    f.lexical = true;
+    f.ops = vec![
+        Op::StackRef(1),                        // a        [a n a]
+        Op::Dup,                                //          [a n a a]
+        Op::Cons,                               // x        [a n x]
+        Op::Constant(0),                        // h        [a n x h]
+        Op::StackRef(2),                        // n        [a n x h n]
+        Op::CallBuiltinSym(intern("point"), 0), // Tier-A   [a n x h n p]
+        Op::Add,                                //          [a n x h s]
+        Op::StackRef(3),                        // n        [a n x h s n]
+        Op::Add1,                               //          [a n x h s n1]
+        Op::Call(2),                            // residual [a n x]
+        Op::Pop,                                //          [a n x]
+        Op::Return,                             // x
+    ];
+    f.constants = vec![Value::symbol("jit-carry-h")].into();
+    f.max_stack = 16;
+    let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+    assert_eq!(leaf.tier, super::leaf::LeafTier::Baseline);
+    let (stored, elided) = super::lowering::rootwin_counters();
+    assert_eq!(
+        elided, 0,
+        "the call's residual [a n x] is stored after the Tier-A site (stored {stored}); \
+         an elision means the fallback-only stores were trusted on the fast path"
+    );
+}
+
+/// Rule 2 on the other conditional arm: a reg-args predicate spec site
+/// (`recordp` on a constant symbol) passes its argument in a register and
+/// roots nothing on the fast path; its NEED_GENERIC fallback roots the
+/// residual. The call after it must still store `[a n x]`.
+///
+///     (lambda (a n) (let ((x (cons a a))) (h (recordp n) (1+ n)) x))
+#[test]
+fn baseline_reg_args_fallback_stores_do_not_leak_into_the_next_site() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::intern::SymId;
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let ev = Context::new();
+    let mut f = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(1), SymId(2)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    f.lexical = true;
+    f.ops = vec![
+        Op::StackRef(1), // a                 [a n a]
+        Op::Dup,         //                   [a n a a]
+        Op::Cons,        // x                 [a n x]
+        Op::Constant(0), // h                 [a n x h]
+        Op::Constant(1), // 'recordp          [a n x h recordp]
+        Op::StackRef(3), // n                 [a n x h recordp n]
+        Op::Call(1),     // reg-args pred     [a n x h r]
+        Op::StackRef(3), // n                 [a n x h r n]
+        Op::Add1,        //                   [a n x h r n1]
+        Op::Call(2),     // residual [a n x]
+        Op::Pop,         //                   [a n x]
+        Op::Return,      // x
+    ];
+    f.constants = vec![Value::symbol("jit-carry-h2"), Value::symbol("recordp")].into();
+    f.max_stack = 16;
+    let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+    assert_eq!(leaf.tier, super::leaf::LeafTier::Baseline);
+    let (stored, elided) = super::lowering::rootwin_counters();
+    assert_eq!(
+        elided, 0,
+        "the call's residual is stored after the reg-args site (stored {stored}); an \
+         elision means the fallback-only stores were trusted on the fast path"
+    );
+}
+
 /// A cons-only body has no rooting site (the cons shim is context-free), so
 /// nothing is hoisted and it still runs with a null vmctx.
 #[test]

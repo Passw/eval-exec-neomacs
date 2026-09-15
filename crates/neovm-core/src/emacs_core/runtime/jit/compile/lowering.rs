@@ -1016,6 +1016,10 @@ pub(crate) fn emit_cond_residual_roots_pre(
         to_root.push(v);
     }
     if to_root.is_empty() {
+        // This site stores nothing, yet its shim may run a nested activation
+        // with `top` at the frame base, which can overwrite EVERY slot: the
+        // record must be truncated to this site's count, zero (`RootWinCarry`).
+        rootwin_carry_reset();
         return CondRoots::NONE;
     }
     CondRoots {
@@ -2394,6 +2398,13 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
                         // depth crosses the callee via `gc_saved_slot`, with
                         // -1 marking "nothing rooted".
                         let saved = if to_root.is_empty() {
+                            // Live residuals, all skipped by type: the callee
+                            // runs with `top` at the base and may overwrite
+                            // every slot (`RootWinCarry` rule 1). This arm
+                            // skips by MIR TYPE while the adapter's arms skip
+                            // only literal immediates, so a value skipped here
+                            // can be one an adapter site stored and recorded.
+                            rootwin_carry_reset();
                             CondRoots::NONE
                         } else {
                             CondRoots {
@@ -2683,22 +2694,33 @@ thread_local! {
 
 /// The per-window-index SSA value the last hoisted site stored.
 ///
-/// Why eliding a store whose recorded value matches is exact: between two
-/// sites of one activation the window slots below the first site's count
-/// are written by nobody — our sites are the only writers of this frame's
-/// slots, a nested activation works above `top`, and the collector only
-/// reads — so a slot whose stored SSA value is unchanged still holds it.
-/// Slots at or above a site's count may be clobbered by the nested
-/// activation during its call, so the record is truncated to that count.
+/// The invariant: whenever control reaches a site, window slot `i` holds
+/// `stored[i]` for every recorded `i`. Eliding a store whose recorded value
+/// matches is then exact. Three rules keep it true:
 ///
-/// Why resetting only at bytecode leaders is exact: sites are the window's
-/// only writers, and every internal block an op's lowering creates (status
-/// checks, guards, fast/slow merges) has all its predecessors inside that
-/// op, so within one bytecode basic block every path from the previous
-/// site to the next runs the same stores. The only edges that can reach a
-/// site with a different store history are jumps to a bytecode leader
-/// (loop heads, branch targets, handlers, the OSR entry) — the record is
-/// dropped there.
+/// 1. **Truncate at every site that can run a nested activation.** Between
+///    two sites the slots below the first site's count are written by nobody
+///    — our sites are the only writers of this frame's slots, a nested
+///    activation works above `top`, and the collector only reads. Slots at or
+///    above a site's count may be clobbered by the nested activation during
+///    its call, so the record is truncated to that count — INCLUDING a count
+///    of zero: a site that reaches its shim with live residuals but stores
+///    none (every residual skipped as provably immediate) runs the callee
+///    with `top` at the base, and the record must be emptied. A site whose
+///    residual is EMPTY may skip this: every value it recorded is dead (all
+///    live operand values are in a site's residual), so none can match again.
+/// 2. **Merge at a conditional fallback.** An arm whose fast path stores
+///    nothing (a GC-free read shim that cannot run a nested activation) and
+///    whose fallback block roots for a general call has two store histories
+///    meeting at its continuation. The record there is the MEET of the two
+///    (`rootwin_carry_snapshot` / `rootwin_carry_meet`): an entry survives
+///    only if both paths leave the same value in that slot.
+/// 3. **Reset at a join.** Every other internal block an op's lowering
+///    creates (status checks, guards) has all its predecessors inside that
+///    op and runs the same stores on every path, so the only edges that can
+///    reach a site with a different store history are jumps to a bytecode
+///    leader (loop heads, branch targets, handlers, the OSR entry) or a MIR
+///    block head — the record is dropped there.
 struct RootWinCarry {
     stored: Vec<Option<ClifValue>>,
     /// Diagnostics: root-window stores emitted / elided in this function.
@@ -2706,9 +2728,32 @@ struct RootWinCarry {
     elided: u32,
 }
 
-/// Forget the carried record: a new function, or a bytecode leader.
+/// Forget the carried record: a new function, a bytecode leader, a MIR block
+/// head, or a site that runs a nested activation without storing anything.
 pub(crate) fn rootwin_carry_reset() {
     ROOTWIN_CARRY.with(|c| c.borrow_mut().stored.clear());
+}
+
+/// The carried record as it stands — taken just before a conditional
+/// fallback roots, i.e. the record on the path that skips the fallback.
+pub(crate) fn rootwin_carry_snapshot() -> Vec<Option<ClifValue>> {
+    ROOTWIN_CARRY.with(|c| c.borrow().stored.clone())
+}
+
+/// Merge a conditional fallback's store history with the path that skipped
+/// it (`snapshot`): keep an entry only where both paths leave the same value
+/// in the slot (rule 2 on [`RootWinCarry`]).
+pub(crate) fn rootwin_carry_meet(snapshot: &[Option<ClifValue>]) {
+    ROOTWIN_CARRY.with(|c| {
+        let mut c = c.borrow_mut();
+        let n = c.stored.len().min(snapshot.len());
+        c.stored.truncate(n);
+        for (slot, &other) in c.stored.iter_mut().zip(snapshot) {
+            if *slot != other {
+                *slot = None;
+            }
+        }
+    });
 }
 
 /// Zero the per-function elision counters (at the hoisted prologue).
@@ -4476,6 +4521,9 @@ pub(crate) fn lower_simple_op(
                             .stack_store(rt.ptr_ty, v, rt.call_args_slot, (i * 8) as i32);
                     }
                 }
+                // The fast path may have stored nothing (a reg-args site);
+                // the continuation merges both store histories.
+                let carry_fast = rootwin_carry_snapshot();
                 let saved_gen = if stack.is_empty() {
                     CondRoots::NONE
                 } else {
@@ -4487,6 +4535,7 @@ pub(crate) fn lower_simple_op(
                     .call(shim, &[vmctx_gen, func_val, args_addr, n_val, out_addr]);
                 let status_gen = fb.inst_results(call_gen)[0];
                 emit_cond_residual_roots_post(fb, rt, saved_gen);
+                rootwin_carry_meet(&carry_fast);
                 let se_gen = signal_target_for_site(fb, signal_exit, handlers, pending, stack);
                 let ok_gen = icmp_imm_p(fb, IntCC::Equal, status_gen, STATUS_OK);
                 fb.ins().brif(ok_gen, cont, &[], se_gen, &[]);
@@ -4748,6 +4797,9 @@ pub(crate) fn lower_simple_op(
                 // stack was restored above, so re-root it around this call.
                 fb.switch_to_block(gen_block);
                 fb.seal_block(gen_block);
+                // A Tier-A fast path stored nothing; the continuation merges
+                // both store histories.
+                let carry_fast = rootwin_carry_snapshot();
                 let saved_gen = if stack.is_empty() {
                     CondRoots::NONE
                 } else {
@@ -4761,6 +4813,7 @@ pub(crate) fn lower_simple_op(
                 );
                 let status_gen = fb.inst_results(call_gen)[0];
                 emit_cond_residual_roots_post(fb, rt, saved_gen);
+                rootwin_carry_meet(&carry_fast);
                 let se_gen = signal_target_for_site(fb, signal_exit, handlers, pending, stack);
                 let ok_gen = icmp_imm_p(fb, IntCC::Equal, status_gen, STATUS_OK);
                 fb.ins().brif(ok_gen, cont, &[], se_gen, &[]);
