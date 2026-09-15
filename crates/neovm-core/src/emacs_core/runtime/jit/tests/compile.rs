@@ -7425,7 +7425,6 @@ fn only_a_non_fixnum_operand_records_other_feedback() {
 fn type_of_call_sites_answer_as_the_builtin_on_the_fast_path() {
     use crate::emacs_core::eval::Context;
     use crate::emacs_core::intern::SymId;
-    use std::sync::atomic::Ordering;
     crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
     let mut ev = Context::new();
     let ctx = &mut ev as *mut Context as *mut u8;
@@ -7462,6 +7461,7 @@ fn type_of_call_sites_answer_as_the_builtin_on_the_fast_path() {
         let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
         let pool = ev.eval_str(pool_src).expect("pool");
         let items = crate::emacs_core::value::list_to_vec(&pool).expect("list");
+        #[cfg(debug_assertions)]
         let fast0 = SUBR_SPEC_FAST_COUNT.load(Ordering::Relaxed);
         for item in &items {
             let want = if name == "type-of" {
@@ -7480,7 +7480,9 @@ fn type_of_call_sites_answer_as_the_builtin_on_the_fast_path() {
                 other => panic!("({name} ...) must run natively: {other:?}"),
             }
         }
+        #[cfg(debug_assertions)]
         let fast = SUBR_SPEC_FAST_COUNT.load(Ordering::Relaxed) - fast0;
+        #[cfg(debug_assertions)]
         assert!(
             fast >= items.len() as u64,
             "{name}: every call took the intrinsic ({fast} of {})",

@@ -5117,6 +5117,7 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn aot_pure_leaf_matches_jit_and_interp() {
         // 1-arg pure body: (* (+ arg 5) 2) — fixnum arith, no consts/calls.
