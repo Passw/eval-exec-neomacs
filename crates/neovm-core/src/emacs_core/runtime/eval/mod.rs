@@ -2163,8 +2163,10 @@ fn collect_thread_local_gc_roots(
     ));
 }
 
+#[inline]
 pub fn save_scratch_gc_roots() -> usize {
-    SCRATCH_GC_ROOTS.with(|scratch| scratch.borrow().len())
+    // SAFETY: a `borrow_mut` of the roots never outlives the call taking it.
+    SCRATCH_GC_ROOTS.with(|scratch| unsafe { (*scratch.as_ptr()).len() })
 }
 
 pub fn push_scratch_gc_root(value: Value) {
@@ -4272,10 +4274,7 @@ impl Context {
             return false;
         }
         let stored = self.obarray.set_plain_untrapped_value_id(id, value);
-        debug_assert!(
-            !stored || !crate::emacs_core::intern::is_keyword_id(id),
-            "an interned keyword is NoWrite, never a plain value cell"
-        );
+        debug_assert!(!stored || !crate::emacs_core::intern::is_keyword_id(id));
         stored
     }
 
