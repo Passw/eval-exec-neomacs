@@ -1,7 +1,7 @@
-//! The `syntax-table` property run cache (`SyntaxPropByteRun`) and the
-//! text property table's cached syntax ranges under it must answer exactly
-//! as a fresh lookup, in any query order and after any mix of puts,
-//! removals, `category` writes and text edits.
+//! The byte-addressed scanners' per-character helpers: the `syntax-table`
+//! property run cache (`SyntaxPropByteRun`) must answer exactly as a fresh
+//! lookup in any query order — forward, backward, random — and the ASCII
+//! fast path of `buffer_syntax_char_before` exactly as the general path.
 
 use super::*;
 
@@ -117,6 +117,65 @@ fn the_byte_run_cache_answers_like_a_fresh_lookup_in_any_order() {
         }
     }
     assert!(checked > 30000, "checked {checked}");
+}
+
+/// A backward walk over a property-free stretch refills once, not per
+/// character.
+#[test]
+fn a_backward_walk_refills_once_per_run() {
+    let mut eval = crate::emacs_core::eval::Context::new();
+    eval_ok(
+        &mut eval,
+        "(progn (erase-buffer) (insert (make-string 200 ?a))
+                (put-text-property 1 2 'syntax-table '(1)))",
+    );
+    let props = SyntaxProperties::for_scan(true, &eval.obarray, &eval.buffers);
+    let buf = eval.buffers.current_buffer().expect("buffer");
+    let cache = SyntaxPropByteRun::new(props);
+    SYNTAX_BYTE_RUN_REFILLS.with(|c| c.set(0));
+    for byte in (1..200).rev() {
+        assert_eq!(
+            cache.syntax_table_prop_at_emacs_byte(buf, EmacsBytePos::new(byte)),
+            None
+        );
+    }
+    let refills = SYNTAX_BYTE_RUN_REFILLS.with(|c| c.get());
+    assert!(refills <= 2, "a backward walk refilled {refills} times");
+}
+
+#[test]
+fn the_ascii_char_before_is_the_general_answer() {
+    let mut eval = crate::emacs_core::eval::Context::new();
+    let mut rng = Rng(0x2545_f491_4f6c_dd1d);
+    let mut checked = 0;
+    for round in 0..40 {
+        random_buffer(&mut eval, &mut rng, round % 2 == 0);
+        if round % 4 == 1 {
+            // Raw bytes in a multibyte buffer.
+            eval_ok(
+                &mut eval,
+                "(progn (set-buffer-multibyte t) (goto-char (point-max))
+                        (insert (string-to-multibyte \"a\\200\\377b\")))",
+            );
+        }
+        let buf = eval.buffers.current_buffer().expect("buffer");
+        let end = buf.total_emacs_byte_end_pos().get();
+        for byte in 0..=end + 1 {
+            let pos = EmacsBytePos::new(byte);
+            let got =
+                buffer_syntax_char_before(buf, pos).map(|u| (u.ch, u.start.get(), u.end.get()));
+            let want = buf.char_before_emacs_byte_pos(pos).map(|ch| {
+                let len = buf
+                    .char_before_emacs_byte_len(pos)
+                    .map(|len| len.max(EmacsByteLen::new(1)))
+                    .unwrap_or_else(|| EmacsByteLen::new(ch.len_utf8().max(1)));
+                (ch, pos.saturating_sub_len(len).get(), pos.get())
+            });
+            assert_eq!(got, want, "round {round} byte {byte}");
+            checked += 1;
+        }
+    }
+    assert!(checked > 2000, "checked {checked}");
 }
 
 /// A `syntax-table` put that overlaps an earlier one must not hide the

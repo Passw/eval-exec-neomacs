@@ -88,6 +88,24 @@ fn buffer_syntax_char_after(buf: &Buffer, byte_pos: EmacsBytePos) -> Option<Buff
 
 #[inline]
 fn buffer_syntax_char_before(buf: &Buffer, byte_pos: EmacsBytePos) -> Option<BufferSyntaxChar> {
+    // A byte below 0x80 is a whole character in a multibyte buffer (every
+    // byte of every other character, raw bytes included, is 0x80 or above)
+    // and in a unibyte one, so the character before is that byte. The
+    // general path below reaches the same answer with two backward steps
+    // (each re-reading the byte through the text backend) and a decode:
+    // ~200 instructions per character of a backward comment walk.
+    if byte_pos > EmacsBytePos::ZERO && byte_pos <= buf.total_emacs_byte_end_pos() {
+        let start = EmacsBytePos::new(byte_pos.get() - 1);
+        if let Some(byte) = buf.emacs_byte_at_pos(start)
+            && byte < 0x80
+        {
+            return Some(BufferSyntaxChar {
+                ch: byte as char,
+                start,
+                end: byte_pos,
+            });
+        }
+    }
     let ch = buf.char_before_emacs_byte_pos(byte_pos)?;
     let len = buf
         .char_before_emacs_byte_len(byte_pos)
@@ -3216,6 +3234,8 @@ impl<'a> SyntaxPropByteRun<'a> {
         byte_pos: EmacsBytePos,
         resolver: CharPropertyResolver<'_>,
     ) -> Option<Value> {
+        #[cfg(test)]
+        SYNTAX_BYTE_RUN_REFILLS.with(|c| c.set(c.get() + 1));
         // Byte-run memo: a hit answers with zero conversions and no interval
         // lookup. Only sound when the resolver's coalescing preconditions
         // hold (no aliases / no default fallback) — the same guard the
@@ -3226,14 +3246,23 @@ impl<'a> SyntaxPropByteRun<'a> {
             return value;
         }
         let char_pos = buf.emacs_byte_pos_to_char_pos_clamped(byte_pos);
-        let (plist, _start, _end) = buf.interval_plist_run_at_char_pos(char_pos);
+        let (plist, start, _end) = buf.interval_plist_run_at_char_pos(char_pos);
         let value = plist.and_then(|plist| resolver.resolve_interval_plist(plist));
         // See `coalesced_syntax_run_end`: extend over face-only splits.
         let end = coalesced_syntax_run_end(buf, char_pos, &resolver);
         let end_byte = buffer_char_to_emacs_byte_pos(buf, end).get();
-        self.run.set(byte_pos.get(), end_byte, value);
+        // The run starts where the interval does, as the char-addressed twin's
+        // does. Starting it at the position that missed made every step of a
+        // BACKWARD walk (`forward-comment` with a negative count, `char_quoted`,
+        // regexp look-behind) miss again: elb-smie refilled 6M times.
+        let start_byte = if start < char_pos {
+            buffer_char_to_emacs_byte_pos(buf, start).get()
+        } else {
+            byte_pos.get()
+        };
+        self.run.set(start_byte, end_byte, value);
         if coalesce {
-            buf.syntax_byte_run_memo_store(byte_pos.get() as u64, end_byte as u64, value);
+            buf.syntax_byte_run_memo_store(start_byte as u64, end_byte as u64, value);
         }
         value
     }
@@ -7464,6 +7493,12 @@ fn expect_skip_syntax_args(caller: &str, args: &[Value]) -> Result<(String, Opti
 // ===========================================================================
 // Tests
 // ===========================================================================
+#[cfg(test)]
+thread_local! {
+    /// Test hook: byte-addressed `syntax-table` run refills.
+    pub(crate) static SYNTAX_BYTE_RUN_REFILLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 #[cfg(test)]
 #[path = "tests/back_comment_safe_positions.rs"]
 mod back_comment_safe_positions_test;
