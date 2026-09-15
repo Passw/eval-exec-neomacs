@@ -1862,17 +1862,40 @@ impl Context {
             };
             match entered {
                 Err(flow) => Err(flow),
-                Ok(()) => self.maybe_grow_eval_stack(|ctx| {
+                // `maybe_grow_eval_stack`'s test, made here so the common
+                // depth calls the leaf directly: through the stack-growth
+                // closure, which LLVM kept out of line, every call from a
+                // mapping builtin paid its frame (elb map-closure: 5M calls).
+                Ok(())
+                    if self.depth < STACK_GROWTH_PROBE_START_DEPTH
+                        || !self.depth.is_multiple_of(STACK_GROWTH_PROBE_INTERVAL) =>
+                {
                     // As `funcall_general_untraced`: fetched after the safe
                     // point (it may materialize a dump stub).
                     let bc_data = function.get_bytecode_data().unwrap();
-                    ctx.execute_bytecode_call_1(bc_data, arg0, function)
-                }),
+                    self.execute_bytecode_call_1(bc_data, arg0, function)
+                }
+                Ok(()) => self.apply1_bytecode_probing_stack(function, arg0),
             }
         };
         self.depth -= 1;
-        let result = self.dispatch_signal_result_if_needed(result);
+        let result = match result {
+            Ok(value) => Ok(value),
+            result => self.dispatch_signal_result_if_needed(result),
+        };
         self.unbind_to_with_result(bt_count, result)
+    }
+
+    /// [`Self::apply1_bytecode`]'s call at a depth that probes the native
+    /// stack, where it may grow.
+    #[cfg(feature = "jit")]
+    #[cold]
+    #[inline(never)]
+    fn apply1_bytecode_probing_stack(&mut self, function: Value, arg0: Value) -> EvalResult {
+        self.maybe_grow_eval_stack(|ctx| {
+            let bc_data = function.get_bytecode_data().unwrap();
+            ctx.execute_bytecode_call_1(bc_data, arg0, function)
+        })
     }
 
     /// [`Self::execute_bytecode_call`] for one argument held in a local: the
@@ -1890,8 +1913,10 @@ impl Context {
         if let Some((leaf, nonrest, has_rest)) = cache::armed_leaf_for_stack_call(bc_data, 1) {
             crate::emacs_core::jit::stats::record_dispatch(true);
             let ctx_ptr = self as *mut Context;
+            // No scratch root for the callee or the argument: the caller's
+            // backtrace frame, pushed just before, roots both. The depth is
+            // for the error path (below).
             let saved_roots = save_scratch_gc_roots();
-            push_scratch_gc_root(func_value);
             let native = if !has_rest && nonrest == 1 {
                 // `Value` is `#[repr(transparent)]` over a word: the local IS
                 // a one-element argument array in the leaf's ABI.
@@ -1920,7 +1945,6 @@ impl Context {
                 }
                 cache::run_armed_leaf(ctx_ptr, bc_data, func_value, leaf, bits.as_ptr())
             };
-            restore_scratch_gc_roots(saved_roots);
             return match native {
                 Ok(Some(b)) => Ok(Value::from_bits(b)),
                 Ok(None) => {
@@ -1930,7 +1954,13 @@ impl Context {
                     let mut vm = super::super::bytecode::Vm::from_context(self);
                     vm.execute_with_func_value(bc_data, args, func_value)
                 }
-                Err(flow) => Err(flow),
+                Err(flow) => {
+                    // A shim panic contained in a direct-call leaf that
+                    // published no leaf bases arms no root sweep; its dead
+                    // scratch-root pushes end here, as the scope did.
+                    restore_scratch_gc_roots(saved_roots);
+                    Err(flow)
+                }
             };
         }
         let mut args = LispArgVec::new();
