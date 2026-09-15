@@ -2953,6 +2953,10 @@ pub(crate) struct RtRefs {
     pub(crate) builtin1: FuncRef,
     pub(crate) builtin2: FuncRef,
     pub(crate) builtin3: FuncRef,
+    /// `Op::Aref` (`neovm_jit_aref`): the element's bits or `VALUE_SHIM_SIGNAL`.
+    pub(crate) aref: FuncRef,
+    /// `Op::Aset` (`neovm_jit_aset`): the value's bits or a `VALUE_SHIM_*` word.
+    pub(crate) aset: FuncRef,
     pub(crate) push_cc: FuncRef,
     pub(crate) push_cc_raw: FuncRef,
     pub(crate) push_catch: FuncRef,
@@ -3148,6 +3152,17 @@ pub(crate) fn declare_rt_refs<M: Module>(
     let b1_id = declare(module, "neovm_jit_builtin1", &sig_b1)?;
     let b2_id = declare(module, "neovm_jit_builtin2", &sig_b2)?;
     let b3_id = declare(module, "neovm_jit_builtin3", &sig_b3)?;
+    // (vmctx, array, index) -> element bits | VALUE_SHIM_SIGNAL
+    let mut sig_aref = Signature::new(call_conv);
+    sig_aref.params.push(AbiParam::new(ptr_ty));
+    sig_aref.params.push(AbiParam::new(i64t));
+    sig_aref.params.push(AbiParam::new(i64t));
+    sig_aref.returns.push(AbiParam::new(i64t));
+    // (vmctx, array, index, value) -> value bits | VALUE_SHIM_*
+    let mut sig_aset = sig_aref.clone();
+    sig_aset.params.push(AbiParam::new(i64t));
+    let aref_id = declare(module, "neovm_jit_aref", &sig_aref)?;
+    let aset_id = declare(module, "neovm_jit_aset", &sig_aset)?;
     // (vmctx, target, stack_len) -> ()  — condition-case push (infallible).
     let mut sig_pcc = Signature::new(call_conv);
     sig_pcc.params.push(AbiParam::new(ptr_ty));
@@ -3284,6 +3299,8 @@ pub(crate) fn declare_rt_refs<M: Module>(
         builtin1: module.declare_func_in_func(b1_id, func),
         builtin2: module.declare_func_in_func(b2_id, func),
         builtin3: module.declare_func_in_func(b3_id, func),
+        aref: module.declare_func_in_func(aref_id, func),
+        aset: module.declare_func_in_func(aset_id, func),
         push_cc: module.declare_func_in_func(pcc_id, func),
         push_cc_raw: module.declare_func_in_func(pcc_raw_id, func),
         push_catch: module.declare_func_in_func(pcatch_id, func),
@@ -4873,17 +4890,101 @@ pub(crate) fn lower_simple_op(
                 .stack_load(rt.ptr_ty, types::I64, rt.call_result_slot, 0);
             stack.push(result);
         }
-        Op::CallBuiltin(..) | Op::CallBuiltinSym(..) | Op::Aset => {
-            // Named-builtin escape hatch + aset: route through the
-            // Vm::*_for_jit helpers mirroring the interpreter arms
-            // (override-aware / advice-bypassing / writeback / quit poll).
+        Op::Aset => {
+            // `neovm_jit_aset` answers VALUE's bits for every `aset` it can run
+            // itself — the vector, record and same-width string stores, and
+            // `builtin_aset_args` for the other shapes — or a `VALUE_SHIM_*`
+            // word (tag 0b001, never a Lisp value). None of that reaches a safe
+            // point, so the call roots nothing. A redefined or advised `aset`
+            // runs Lisp: the shim answers NEED_GENERIC before storing anything
+            // and the site takes the rooted general call (named builtin,
+            // variant 2).
+            let rt = rt.ok_or(CompileError::UnsupportedOp("builtin"))?;
+            if stack.len() < 3 {
+                return Err(CompileError::StackUnderflow);
+            }
+            let at = stack.len() - 3;
+            let operands = [stack[at], stack[at + 1], stack[at + 2]];
+            stack.truncate(at);
+            let vmctx = fb.use_var(rt.vmctx_var);
+            let call = fb.ins().call(
+                rt.refs.aset,
+                &[vmctx, operands[0], operands[1], operands[2]],
+            );
+            let word = fb.inst_results(call)[0];
+            let res = fb.declare_var(types::I64);
+            fb.def_var(res, word);
+            let cont = fb.create_block();
+            let sentinel = fb.create_block();
+            let tag = band_imm_p(fb, word, TAG_MASK as i64);
+            let is_sentinel = icmp_imm_p(
+                fb,
+                IntCC::Equal,
+                tag,
+                dispatch::VALUE_SHIM_SIGNAL & TAG_MASK as i64,
+            );
+            fb.ins().brif(is_sentinel, sentinel, &[], cont, &[]);
+
+            fb.switch_to_block(sentinel);
+            fb.seal_block(sentinel);
+            let se = signal_target_for_site(fb, signal_exit, handlers, pending, stack);
+            let gen_block = fb.create_block();
+            let need_gen = icmp_imm_p(fb, IntCC::Equal, word, dispatch::VALUE_SHIM_NEED_GENERIC);
+            fb.ins().brif(need_gen, gen_block, &[], se, &[]);
+
+            // The general call. The shim stored nothing on this edge, so the
+            // continuation meets the fast path's store record with this one.
+            fb.switch_to_block(gen_block);
+            fb.seal_block(gen_block);
+            let carry_fast = rootwin_carry_snapshot();
+            for (i, &v) in operands.iter().enumerate() {
+                fb.ins()
+                    .stack_store(rt.ptr_ty, v, rt.call_args_slot, (i * 8) as i32);
+            }
+            let saved_gen = if stack.is_empty() {
+                CondRoots::NONE
+            } else {
+                emit_cond_residual_roots_pre(fb, rt, stack.as_slice())
+            };
+            let vmctx_gen = fb.use_var(rt.vmctx_var);
+            let variant_gen = fb.ins().iconst(types::I64, 2);
+            let sym_gen = fb.ins().iconst(types::I64, 0);
+            let args_addr = fb.ins().stack_addr(rt.ptr_ty, rt.call_args_slot, 0);
+            let n_val = fb.ins().iconst(types::I64, 3);
+            let out_addr = fb.ins().stack_addr(rt.ptr_ty, rt.call_result_slot, 0);
+            let call_gen = fb.ins().call(
+                rt.refs.named_builtin,
+                &[vmctx_gen, variant_gen, sym_gen, args_addr, n_val, out_addr],
+            );
+            let status_gen = fb.inst_results(call_gen)[0];
+            emit_cond_residual_roots_post(fb, rt, saved_gen);
+            rootwin_carry_meet(&carry_fast);
+            let se_gen = signal_target_for_site(fb, signal_exit, handlers, pending, stack);
+            let gen_ok = fb.create_block();
+            let ok_gen = icmp_imm_p(fb, IntCC::Equal, status_gen, STATUS_OK);
+            fb.ins().brif(ok_gen, gen_ok, &[], se_gen, &[]);
+            fb.switch_to_block(gen_ok);
+            fb.seal_block(gen_ok);
+            let gen_result = fb
+                .ins()
+                .stack_load(rt.ptr_ty, types::I64, rt.call_result_slot, 0);
+            fb.def_var(res, gen_result);
+            fb.ins().jump(cont, &[]);
+
+            fb.switch_to_block(cont);
+            fb.seal_block(cont);
+            stack.push(fb.use_var(res));
+        }
+        Op::CallBuiltin(..) | Op::CallBuiltinSym(..) => {
+            // Named-builtin escape hatch: route through the Vm::*_for_jit
+            // helpers mirroring the interpreter arms (override-aware /
+            // advice-bypassing / writeback / quit poll).
             let rt = rt.ok_or(CompileError::UnsupportedOp("builtin"))?;
             let (variant, sym, nargs): (i64, u32, usize) = match op {
                 Op::CallBuiltin(name_idx, n) => {
                     (0, const_sym_id(constants, *name_idx)?, *n as usize)
                 }
                 Op::CallBuiltinSym(sym, n) => (1, sym.0, *n as usize),
-                Op::Aset => (2, 0, 3),
                 _ => unreachable!("matched named-builtin ops above"),
             };
             if stack.len() < nargs {
@@ -4922,10 +5023,7 @@ pub(crate) fn lower_simple_op(
             // the operands themselves). The Tier-A read shim is GC-free by
             // contract, so its fast path needs NO residual rooting; its
             // NEED_GENERIC fallback block re-roots for the general call.
-            // `Op::Aset` likewise: its fast path (variant 3) cannot reach a safe
-            // point, and bounces a redefined `aset` to the rooted fallback.
-            let aset_root_free = matches!(op, Op::Aset);
-            let saved = if stack.is_empty() || cbsym_a_which.is_some() || aset_root_free {
+            let saved = if stack.is_empty() || cbsym_a_which.is_some() {
                 CondRoots::NONE
             } else {
                 emit_cond_residual_roots_pre(fb, rt, stack.as_slice())
@@ -4937,13 +5035,10 @@ pub(crate) fn lower_simple_op(
             // bits from reloc_base[idx] and recover the SymId (`bits >> TAG_BITS`,
             // TAG_SYMBOL==0). Keyed on `reloc_index` presence: the JIT reloc set never
             // contains op-symbols (only heap consts), so JIT always bakes → byte-
-            // identical. `Aset` (variant 2, sym==0) has no symbol → unchanged iconst.
+            // identical.
             // Shared by the fast-shim call, the direct general call, AND the
             // fallback (all JIT-only when a CBSym spec site exists).
-            let sym_v = match reloc_index
-                .get(&((sym as usize) << TAG_BITS | TAG_SYMBOL))
-                .filter(|_| variant != 2)
-            {
+            let sym_v = match reloc_index.get(&((sym as usize) << TAG_BITS | TAG_SYMBOL)) {
                 Some(&idx) => {
                     let base = reloc_base.expect("reloc_base set when an op-symbol is reloc'd");
                     let sym_bits =
@@ -4977,15 +5072,6 @@ pub(crate) fn lower_simple_op(
                     .ok_or(CompileError::UnsupportedOp("cbsym-spec-refs"))?;
                 fb.ins()
                     .call(f, &[vmctx, sym_v, args_addr, n_val, out_addr])
-            } else if aset_root_free {
-                // Variant 3: the root-free aset; NEED_GENERIC -> the fallback
-                // below, which roots and calls variant 2.
-                generic_fallback = Some(fb.create_block());
-                let fast_v = fb.ins().iconst(types::I64, 3);
-                fb.ins().call(
-                    rt.refs.named_builtin,
-                    &[vmctx, fast_v, sym_v, args_addr, n_val, out_addr],
-                )
             } else {
                 let variant_v = fb.ins().iconst(types::I64, variant);
                 fb.ins().call(
@@ -5130,6 +5216,30 @@ pub(crate) fn lower_simple_op(
             let at = stack.len() - arity;
             let operands: Vec<ClifValue> = stack[at..].to_vec();
             stack.truncate(at);
+            if matches!(other, Op::Aref) {
+                // `neovm_jit_aref` answers the element's bits or
+                // VALUE_SHIM_SIGNAL (tag 0b001, never a Lisp value). GC-free
+                // like the pure table entry it stands in for: no roots.
+                let vmctx = fb.use_var(rt.vmctx_var);
+                let call = fb
+                    .ins()
+                    .call(rt.refs.aref, &[vmctx, operands[0], operands[1]]);
+                let word = fb.inst_results(call)[0];
+                let se = signal_target_for_site(fb, signal_exit, handlers, pending, stack);
+                let cont = fb.create_block();
+                let tag = band_imm_p(fb, word, TAG_MASK as i64);
+                let is_signal = icmp_imm_p(
+                    fb,
+                    IntCC::Equal,
+                    tag,
+                    dispatch::VALUE_SHIM_SIGNAL & TAG_MASK as i64,
+                );
+                fb.ins().brif(is_signal, se, &[], cont, &[]);
+                fb.switch_to_block(cont);
+                fb.seal_block(cont);
+                stack.push(word);
+                return Ok(());
+            }
             // Root remaining live values (the builtin may allocate/GC; the
             // shim roots the operands themselves) — unless the builtin cannot
             // collect at all (`dispatch::JitBuiltin2Pure`). Such a site stores

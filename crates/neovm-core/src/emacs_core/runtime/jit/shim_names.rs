@@ -17,6 +17,10 @@
 // const inside each build.rs `main` (no module/use context required).
 const NEOVM_JIT_SHIM_NAMES: &[&str] = &[
     "neovm_jit_apply",
+    // `Op::Aref` / `Op::Aset`: value-returning array shims (baseline lowering,
+    // so AOT leaves import them too).
+    "neovm_jit_aref",
+    "neovm_jit_aset",
     // logand/logior/logxor bitwise intrinsic — emitted by AOT baseline leaves
     // (its Op::Call classification runs under Some(obarray) at emit), so an AOT
     // `.so` may import it: MUST be host-exported + salted into ABI_TAG.

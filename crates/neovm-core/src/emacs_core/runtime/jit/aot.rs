@@ -78,7 +78,10 @@ pub(crate) const ABI_TAG: u32 = compute_abi_tag();
 /// root-free fast path, which bounces a redefined `aset` with
 /// STATUS_NEED_GENERIC to a rooted variant-2 fallback). A host that predates
 /// variant 3 would run such a call as `CallBuiltinSym`.
-const ABI_TAG_VERSION: u32 = 5;
+/// v6: `Op::Aref` calls `neovm_jit_aref` and `Op::Aset` calls `neovm_jit_aset`
+/// (value-returning shims; a `VALUE_SHIM_*` tag-`0b001` word is a sentinel), and
+/// `neovm_jit_named_builtin` no longer has variant 3.
+const ABI_TAG_VERSION: u32 = 6;
 
 /// Format version of the AOT descriptor spec-section + the runtime spec ABI
 /// (`SpecSlot`/`spec_expected` sidecar bases, the loader re-classify+arm protocol).

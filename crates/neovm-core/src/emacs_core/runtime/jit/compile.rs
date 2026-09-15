@@ -4065,5 +4065,8 @@ pub use shims::*;
 mod dispatch;
 pub use dispatch::*;
 #[cfg(test)]
+#[path = "tests/array_shims.rs"]
+mod array_shim_tests;
+#[cfg(test)]
 #[path = "tests/compile.rs"]
 mod tests;

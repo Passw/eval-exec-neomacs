@@ -294,6 +294,200 @@ pub extern "C" fn neovm_jit_builtin2(ctx: *mut u8, idx: i64, a: i64, b: i64, out
     })
 }
 
+/// A return word of the value-returning array shims ([`neovm_jit_aref`],
+/// [`neovm_jit_aset`]): a non-local exit was stashed with
+/// [`stash_pending_flow`], so take the site's signal edge. Every other word
+/// such a shim returns is the result's own bits, and no Lisp value carries
+/// tag `0b001`, so one tag test tells the two apart.
+pub const VALUE_SHIM_SIGNAL: i64 = 0b0001;
+/// The other sentinel word of [`neovm_jit_aset`]: `aset` is redefined or
+/// advised, so the site must run its rooted general call instead.
+pub const VALUE_SHIM_NEED_GENERIC: i64 = 0b1001;
+
+const _: () = {
+    use crate::tagged::value::{TAG_FLOAT, TAG_VECLIKE};
+    let tag = VALUE_SHIM_SIGNAL as usize & TAG_MASK;
+    assert!(tag == VALUE_SHIM_NEED_GENERIC as usize & TAG_MASK);
+    assert!(VALUE_SHIM_SIGNAL != VALUE_SHIM_NEED_GENERIC);
+    assert!(tag & FIXNUM_CHECK_MASK != FIXNUM_CHECK_VALUE);
+    assert!(tag != TAG_SYMBOL && tag != TAG_CONS && tag != TAG_STRING);
+    assert!(tag != TAG_VECLIKE && tag != TAG_FLOAT);
+};
+
+/// `(aref ARRAY INDEX)` on the shapes a loop indexes, answered without the
+/// builtin's `ValueKind` decode and `Result`: a plain vector or record slot,
+/// or a character of a string whose characters are all one byte. `None` for
+/// everything else, which [`builtin_aref_values`](b::builtin_aref_values)
+/// then answers (or signals) exactly as before. Must agree with it wherever it
+/// answers.
+#[inline(always)]
+fn aref_fast(array: Value, index: Value) -> Option<Value> {
+    let idx = usize::try_from(index.as_fixnum()?).ok()?;
+    if array.is_veclike() {
+        let (items, record) = match array.veclike_type()? {
+            crate::tagged::header::VecLikeType::Vector => (array.as_vector_data()?, false),
+            crate::tagged::header::VecLikeType::Record => (array.as_record_data()?, true),
+            _ => return None,
+        };
+        if crate::emacs_core::chartable::classify_vector_slots(items, record)
+            != crate::emacs_core::chartable::VectorTag::Plain
+        {
+            return None;
+        }
+        return items.get(idx).copied();
+    }
+    if array.is_string() {
+        let string = array.as_lisp_string()?;
+        // A multibyte string whose character count is its byte count holds
+        // only ASCII: every other character takes two or more bytes.
+        if string.is_multibyte() && string.schars() != string.sbytes() {
+            return None;
+        }
+        return string
+            .as_bytes()
+            .get(idx)
+            .map(|&byte| Value::fixnum(byte as i64));
+    }
+    None
+}
+
+/// `Op::Aref` (GNU `Baref`) from compiled code: the element's bits, or
+/// [`VALUE_SHIM_SIGNAL`]. `builtin2`'s table dispatch, `Result` and result
+/// slot cost ~50 instructions on top of the builtin's own decode — dhrystone
+/// indexes 90M times. GC-free on every path, like the pure table entry it
+/// replaces at the site, so the site roots nothing.
+/// SAFETY: `ctx` is only handed to the panic containment (vmctx contract of
+/// [`neovm_jit_call`]).
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // C-ABI shim: raw ptrs per documented SAFETY contract; only ever called from generated code.
+#[unsafe(no_mangle)]
+pub extern "C" fn neovm_jit_aref(ctx: *mut u8, array: i64, index: i64) -> i64 {
+    let array = Value::from_bits(array as usize);
+    let index = Value::from_bits(index as usize);
+    match aref_fast(array, index) {
+        Some(value) => value.bits() as i64,
+        None => aref_slow(ctx, array, index),
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Test hook: how many times an array shim fell past its fast path.
+    pub(crate) static ARRAY_SHIM_SLOW_CALLS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cold]
+#[inline(never)]
+fn aref_slow(ctx: *mut u8, array: Value, index: Value) -> i64 {
+    #[cfg(test)]
+    ARRAY_SHIM_SLOW_CALLS.with(|c| c.set(c.get() + 1));
+    jit_shim_contain!(ctx, VALUE_SHIM_SIGNAL, {
+        match b::builtin_aref_values(array, index) {
+            Ok(value) => value.bits() as i64,
+            Err(flow) => {
+                stash_pending_flow(flow);
+                VALUE_SHIM_SIGNAL
+            }
+        }
+    })
+}
+
+/// `(aset ARRAY INDEX VALUE)` into a plain vector or record slot, or a byte
+/// of a string that cannot change width: any byte of a unibyte string, or
+/// ASCII into an all-ASCII multibyte one. `false` for everything else, which
+/// [`builtin_aset_args`](b::builtin_aset_args) then handles (or signals).
+/// Must agree with it wherever it stores.
+#[inline(always)]
+fn aset_fast(array: Value, index: Value, value: Value) -> bool {
+    let Some(idx) = index.as_fixnum().and_then(|i| usize::try_from(i).ok()) else {
+        return false;
+    };
+    if array.is_veclike() {
+        let (items, record) = match array.veclike_type() {
+            Some(crate::tagged::header::VecLikeType::Vector) => match array.as_vector_data() {
+                Some(items) => (items, false),
+                None => return false,
+            },
+            Some(crate::tagged::header::VecLikeType::Record) => match array.as_record_data() {
+                Some(items) => (items, true),
+                None => return false,
+            },
+            _ => return false,
+        };
+        if idx >= items.len()
+            || crate::emacs_core::chartable::classify_vector_slots(items, record)
+                != crate::emacs_core::chartable::VectorTag::Plain
+        {
+            return false;
+        }
+        // Both setters run the heap write barrier.
+        return if record {
+            array.set_record_slot(idx, value)
+        } else {
+            array.set_vector_slot(idx, value)
+        };
+    }
+    if array.is_string() {
+        let (Some(code), Some(string)) = (value.as_fixnum(), array.as_lisp_string()) else {
+            return false;
+        };
+        if idx >= string.schars() {
+            return false;
+        }
+        let fits = if string.is_multibyte() {
+            string.schars() == string.sbytes() && (0..=0x7f).contains(&code)
+        } else {
+            (0..=0xff).contains(&code)
+        };
+        return fits && array.set_string_byte_same_char_count(idx, code as u8);
+    }
+    false
+}
+
+/// `Op::Aset` (GNU `Baset`) from compiled code: VALUE's bits, or one of the
+/// two `VALUE_SHIM_*` words. Nothing here reaches a safe point — the stores
+/// and [`builtin_aset_args`](b::builtin_aset_args) run no Lisp and never
+/// collect — so the site roots nothing; a redefined or advised `aset` (which
+/// runs Lisp) answers [`VALUE_SHIM_NEED_GENERIC`] before anything is stored.
+/// SAFETY: same vmctx contract as [`neovm_jit_call`]; only read here.
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // C-ABI shim: raw ptrs per documented SAFETY contract; only ever called from generated code.
+#[unsafe(no_mangle)]
+pub extern "C" fn neovm_jit_aset(ctx: *mut u8, array: i64, index: i64, value: i64) -> i64 {
+    let array = Value::from_bits(array as usize);
+    let index = Value::from_bits(index as usize);
+    let value = Value::from_bits(value as usize);
+    {
+        // SAFETY: seam-provided dormant Context; read-only access.
+        let ctx = unsafe { &*(ctx as *const Context) };
+        if !crate::emacs_core::bytecode::vm::named_builtin_fast_path_allowed_in(
+            ctx,
+            Vm::aset_builtin_id(),
+        ) {
+            return VALUE_SHIM_NEED_GENERIC;
+        }
+    }
+    if aset_fast(array, index, value) {
+        return value.bits() as i64;
+    }
+    aset_slow(ctx, array, index, value)
+}
+
+#[cold]
+#[inline(never)]
+fn aset_slow(ctx: *mut u8, array: Value, index: Value, value: Value) -> i64 {
+    #[cfg(test)]
+    ARRAY_SHIM_SLOW_CALLS.with(|c| c.set(c.get() + 1));
+    jit_shim_contain!(ctx, VALUE_SHIM_SIGNAL, {
+        match b::builtin_aset_args(&[array, index, value]) {
+            Ok(value) => value.bits() as i64,
+            Err(flow) => {
+                stash_pending_flow(flow);
+                VALUE_SHIM_SIGNAL
+            }
+        }
+    })
+}
+
 /// Ternary variant of [`neovm_jit_builtin1`].
 /// SAFETY: same vmctx contract as [`neovm_jit_call`].
 #[allow(clippy::not_unsafe_ptr_arg_deref)] // C-ABI shim: raw ptrs per documented SAFETY contract; only ever called from generated code.
@@ -391,8 +585,8 @@ pub extern "C" fn neovm_jit_builtin_slice(
 /// helpers, which mirror the interpreter arms exactly (override-aware named
 /// dispatch for CallBuiltin/Aset, advice-bypassing direct dispatch for
 /// CallBuiltinSym, mutating-first-arg string writeback, trailing quit poll).
-/// `variant`: 0 = CallBuiltin, 1 = CallBuiltinSym, 2 = Aset, 3 = Aset's
-/// root-free fast path (below).
+/// `variant`: 0 = CallBuiltin, 1 = CallBuiltinSym, 2 = Aset (the rooted
+/// general call behind [`neovm_jit_aset`]'s [`VALUE_SHIM_NEED_GENERIC`]).
 /// SAFETY: same vmctx contract as [`neovm_jit_call`].
 #[allow(clippy::not_unsafe_ptr_arg_deref)] // C-ABI shim: raw ptrs per documented SAFETY contract; only ever called from generated code.
 #[unsafe(no_mangle)]
@@ -406,39 +600,6 @@ pub extern "C" fn neovm_jit_named_builtin(
 ) -> i64 {
     jit_shim_contain!(ctx, STATUS_SIGNAL, {
         let nargs = nargs as usize;
-        if variant == 3 {
-            // `Op::Aset`'s fast path, called with NO residual roots at the
-            // site. The inline builtin is `builtin_aset_args`, a function of
-            // its three values alone, and the check that it may run inline
-            // only reads the function cell: nothing here can reach a safe
-            // point, so nothing needs rooting. A redefined or advised `aset`
-            // (which runs Lisp) bounces to the site's rooted fallback block,
-            // which calls this shim again as variant 2.
-            debug_assert_eq!(nargs, 3, "Op::Aset shim expects three arguments");
-            // SAFETY: the generated code stored exactly three words at
-            // `args_ptr` immediately before this call.
-            let a: [Value; 3] =
-                std::array::from_fn(|i| Value::from_bits(unsafe { *args_ptr.add(i) } as usize));
-            // SAFETY: see neovm_jit_call's function-level contract.
-            let ctx = unsafe { &*(ctx as *const Context) };
-            if !crate::emacs_core::bytecode::vm::named_builtin_fast_path_allowed_in(
-                ctx,
-                Vm::aset_builtin_id(),
-            ) {
-                return STATUS_NEED_GENERIC;
-            }
-            return match crate::emacs_core::builtins::builtin_aset_args(&a) {
-                Ok(value) => {
-                    // SAFETY: `out` is the generated code's result stack slot.
-                    unsafe { *out = value.bits() as i64 };
-                    STATUS_OK
-                }
-                Err(flow) => {
-                    stash_pending_flow(flow);
-                    STATUS_SIGNAL
-                }
-            };
-        }
         let saved = save_scratch_gc_roots();
         // SAFETY (all three reads below): the generated code stored exactly
         // `nargs` words at `args_ptr` (its call-args stack slot) immediately
