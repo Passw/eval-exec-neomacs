@@ -2351,7 +2351,7 @@ pub extern "C" fn neovm_jit_switch(ctx: *mut u8, dispatch: i64, table: i64) -> i
         // per org edit iteration.
         match ht
             .data
-            .get_by_value(dispatch, ht.test, ctx.symbols_with_pos_enabled)
+            .lookup(dispatch, ht.test, ctx.symbols_with_pos_enabled)
             .copied()
         {
             Some(v) => match v.kind() {

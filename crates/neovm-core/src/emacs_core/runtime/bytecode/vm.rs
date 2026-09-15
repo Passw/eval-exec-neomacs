@@ -4481,7 +4481,7 @@ impl<'a> Vm<'a> {
                         // see `neovm_jit_switch` for the same lookup compiled.
                         let target = ht
                             .data
-                            .get_by_value(dispatch, ht.test, self.ctx.symbols_with_pos_enabled)
+                            .lookup(dispatch, ht.test, self.ctx.symbols_with_pos_enabled)
                             .copied();
 
                         if let Some(target_val) = target {

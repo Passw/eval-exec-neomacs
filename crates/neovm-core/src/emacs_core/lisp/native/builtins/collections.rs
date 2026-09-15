@@ -719,7 +719,7 @@ fn builtin_gethash_values(
             let ht = table.as_hash_table().unwrap();
             Ok(ht
                 .data
-                .get_by_value(key_value, ht.test, symbols_with_pos_enabled)
+                .lookup(key_value, ht.test, symbols_with_pos_enabled)
                 .cloned()
                 .unwrap_or(default))
         }

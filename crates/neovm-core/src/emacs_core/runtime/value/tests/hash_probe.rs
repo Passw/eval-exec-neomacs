@@ -131,7 +131,7 @@ fn storage_lookups_by_value_agree_with_lookups_by_key() {
         for value in &values {
             let by_key = storage.get(&value.to_hash_key_swp(&test, false)).copied();
             assert_eq!(
-                storage.get_by_value(*value, test, false).copied(),
+                storage.lookup(*value, test, false).copied(),
                 by_key,
                 "{value:?} under {test:?}"
             );
@@ -226,7 +226,7 @@ fn small_table_identity_scans_agree_with_hashed_lookups() {
                 let by_key = storage.get(&probe.to_hash_key_swp(&test, false)).copied();
                 assert_eq!(
                     storage
-                        .get_by_value(probe, test, false)
+                        .lookup(probe, test, false)
                         .copied()
                         .map(|v| v.bits()),
                     by_key.map(|v| v.bits()),
@@ -255,10 +255,7 @@ fn small_table_scans_decline_under_symbols_with_pos() {
         );
         let by_key = storage.get(&sym.to_hash_key_swp(&test, true)).copied();
         assert_eq!(
-            storage
-                .get_by_value(sym, test, true)
-                .copied()
-                .map(|v| v.bits()),
+            storage.lookup(sym, test, true).copied().map(|v| v.bits()),
             by_key.map(|v| v.bits()),
             "bare symbol against a positioned key under {test:?}"
         );
