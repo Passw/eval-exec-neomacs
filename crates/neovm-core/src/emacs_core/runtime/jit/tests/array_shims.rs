@@ -1,8 +1,9 @@
-//! `Op::Aref` and `Op::Aset` from compiled code: `neovm_jit_aref` and
-//! `neovm_jit_aset` answer the common shapes on a fast path and everything
-//! else through the builtin, returning the result's own bits or a
-//! `VALUE_SHIM_*` sentinel word. Every case must match the interpreter's
-//! opcode arm — result, signal, and what the array looks like afterwards.
+//! `Op::Aref`, `Op::Aset`, `Op::Memq` and `Op::Assq` from compiled code:
+//! `neovm_jit_aref`/`_aset`/`_memq`/`_assq` answer the common shapes on a
+//! fast path and everything else through the builtin, returning the result's
+//! own bits or a `VALUE_SHIM_*` sentinel word. Every case must match the
+//! interpreter's opcode arm — result, signal, and what the array looks like
+//! afterwards.
 
 use super::*;
 use crate::emacs_core::bytecode::Vm;
@@ -417,5 +418,159 @@ fn array_site_edges_keep_the_residual_alive() {
             }
             eval.eval_str("(fset 'aset ashim-orig2)").expect("restore");
         }
+    }
+}
+
+/// `(lambda (x l) (OP x l))`
+fn list_fn(op: Op) -> ByteCodeFunction {
+    lexical_fn(
+        2,
+        vec![Op::StackRef(1), Op::StackRef(1), op, Op::Return],
+        vec![],
+    )
+}
+
+const LISTS: &[&str] = &[
+    "nil",
+    "'(1 2 3)",
+    "'(a b a)",
+    "'(1 2 . 3)",
+    "'(9 . 3)",
+    "(let ((l (list 1 2 3))) (setcdr (nthcdr 2 l) l) l)",
+    "(let ((l (list (cons 'a 1) (cons 'b 2)))) (setcdr (cdr l) l) l)",
+    "(let ((l nil) (i 100)) (while (> i 0) (setq i (1- i) l (cons i l))) l)",
+    "(let ((l nil) (i 100)) (while (> i 0) (setq i (1- i) l (cons (cons i i) l))) l)",
+    "'((a . 1) (b . 2) (a . 3))",
+    "'(a (b . 2) nil (c))",
+    "'((a . 1) . tail)",
+    "'((a . 1) (b . 2) . tail)",
+    "5",
+    "\"str\"",
+];
+
+const ELTS: &[&str] = &[
+    "1", "3", "'a", "'b", "'c", "70", "99", "'zz", "nil", "'tail",
+];
+
+/// `memq` and `assq` on proper, improper, circular, short and long lists
+/// through the compiled site and the interpreter's opcode arm.
+#[test]
+fn list_sites_match_the_interpreter_natively() {
+    let mut eval = Context::new();
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    let mut checked = 0;
+    for op in [Op::Memq, Op::Assq] {
+        let f = list_fn(op.clone());
+        let leaf = compile_bytecode_function(&f).expect("compiles");
+        for list_src in LISTS {
+            for elt_src in ELTS {
+                let what = format!("({op:?} {elt_src} {list_src})");
+                let pair = eval
+                    .eval_str(&format!("(cons {elt_src} {list_src})"))
+                    .expect("operands");
+                let args = vec![pair.cons_car(), pair.cons_cdr()];
+                let want = interpret(&mut eval, &f, args.clone());
+                let got = native(ctx_ptr, &leaf, &args, &what);
+                assert_eq!(got, want, "{what}");
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked >= 300, "checked {checked}");
+}
+
+/// Short lists stay on the fast path; a long list or
+/// `symbols-with-pos-enabled` reach the builtin, which still answers.
+#[test]
+fn short_list_lookups_stay_on_the_fast_path() {
+    use super::dispatch::ARRAY_SHIM_SLOW_CALLS;
+    let mut eval = Context::new();
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    let memq = compile_bytecode_function(&list_fn(Op::Memq)).expect("memq compiles");
+    let assq = compile_bytecode_function(&list_fn(Op::Assq)).expect("assq compiles");
+    let short = eval.eval_str("'(x y z)").expect("list");
+    let alist = eval.eval_str("'((x . 1) (y . 2))").expect("alist");
+    ARRAY_SHIM_SLOW_CALLS.with(|c| c.set(0));
+    assert_eq!(
+        native(ctx_ptr, &memq, &[Value::symbol("y"), short], "memq"),
+        "(y z)"
+    );
+    assert_eq!(
+        native(ctx_ptr, &memq, &[Value::symbol("w"), short], "memq"),
+        "nil"
+    );
+    assert_eq!(
+        native(ctx_ptr, &assq, &[Value::symbol("y"), alist], "assq"),
+        "(y . 2)"
+    );
+    assert_eq!(
+        native(ctx_ptr, &assq, &[Value::symbol("w"), alist], "assq"),
+        "nil"
+    );
+    assert_eq!(ARRAY_SHIM_SLOW_CALLS.with(|c| c.get()), 0, "short lists");
+    let long = eval
+        .eval_str("(let ((l nil) (i 200)) (while (> i 0) (setq i (1- i) l (cons i l))) l)")
+        .expect("long");
+    assert_eq!(
+        native(ctx_ptr, &memq, &[Value::make_int(198), long], "long memq"),
+        "(198 199)"
+    );
+    assert_eq!(ARRAY_SHIM_SLOW_CALLS.with(|c| c.get()), 1, "a long list");
+    let positioned = eval
+        .eval_str("(position-symbol 'y 3)")
+        .expect("symbol with pos");
+    assert_eq!(
+        native(ctx_ptr, &memq, &[positioned, short], "memq, positions off"),
+        "nil"
+    );
+    eval.eval_str("(setq symbols-with-pos-enabled t)")
+        .expect("swp");
+    ARRAY_SHIM_SLOW_CALLS.with(|c| c.set(0));
+    assert_eq!(
+        native(ctx_ptr, &memq, &[Value::symbol("y"), short], "swp memq"),
+        "(y z)"
+    );
+    assert_eq!(
+        ARRAY_SHIM_SLOW_CALLS.with(|c| c.get()),
+        1,
+        "symbols-with-pos"
+    );
+    // With positions enabled `eq` looks through them, and so must the site.
+    assert_eq!(
+        native(ctx_ptr, &memq, &[positioned, short], "memq, positions on"),
+        "(y z)"
+    );
+    assert_eq!(
+        native(ctx_ptr, &assq, &[positioned, alist], "assq, positions on"),
+        "(y . 2)"
+    );
+    eval.eval_str("(setq symbols-with-pos-enabled nil)")
+        .expect("swp off");
+}
+
+/// `type-of` of a record, the answer the JIT's predicate intrinsic now gives
+/// without the builtin: the type slot, or an EIEIO class record's name.
+#[test]
+fn record_type_of_is_gnus_record_arm() {
+    use crate::emacs_core::builtins::types::record_type_of;
+    let mut eval = Context::new();
+    for (src, want) in [
+        ("(record 'foo 1 2)", Some("foo")),
+        (
+            "(record (record 'eieio--class 'my-class) 2)",
+            Some("my-class"),
+        ),
+        ("(record (record 'lonely) 2)", Some("#s(lonely)")),
+        ("(record 7)", Some("7")),
+        ("(vector 'foo 1)", None),
+        ("'foo", None),
+        ("(make-bool-vector 3 t)", None),
+    ] {
+        let value = eval.eval_str(src).expect("value");
+        assert_eq!(
+            record_type_of(value).map(|v| print_value(&v)).as_deref(),
+            want,
+            "{src}"
+        );
     }
 }

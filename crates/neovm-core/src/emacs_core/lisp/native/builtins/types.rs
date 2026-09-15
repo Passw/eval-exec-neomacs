@@ -271,27 +271,32 @@ pub(crate) fn builtin_type_of_with_ctx_1(
     builtin_type_of(&args)
 }
 
+/// `type-of` and `cl-type-of` of a record, `None` for any other value: the
+/// type slot (slot 0), or — GNU data.c:269-277 — when slot 0 is itself a
+/// record with more than one slot, that record's slot 1 (the class name:
+/// an EIEIO object's slot 0 is its `eieio--class` record). Reads only; the
+/// JIT's GC-free `type-of` intrinsic answers records with it directly.
+#[inline]
+pub(crate) fn record_type_of(value: Value) -> Option<Value> {
+    if !value.is_record() {
+        return None;
+    }
+    let tag = value.as_record_data().and_then(|v| v.first().copied());
+    if let Some(tag_val) = tag
+        && tag_val.is_record()
+        && let Some(tv) = tag_val.as_record_data()
+        && tv.len() > 1
+    {
+        return Some(tv[1]);
+    }
+    Some(tag.unwrap_or_else(|| Value::symbol("record")))
+}
+
 pub(crate) fn builtin_cl_type_of(args: &[Value]) -> EvalResult {
     expect_args("cl-type-of", &args, 1)?;
     // Stale tagged pointer detection is not applicable with tagged pointers.
-    // Records: return the type tag (slot 0).
-    // GNU data.c:269-277: if slot 0 is itself a record with len > 1,
-    // return slot 1 of that inner record (the class name symbol).
-    // This is how EIEIO objects work: slot 0 is the eieio--class
-    // record, and slot 1 of that record is the class name.
-    if args[0].is_record() {
-        let tag = args[0].as_record_data().and_then(|v| v.first().copied());
-        if let Some(tag_val) = tag
-            && tag_val.is_record()
-        {
-            let tag_vec = tag_val.as_record_data();
-            if let Some(tv) = tag_vec
-                && tv.len() > 1
-            {
-                return Ok(tv[1]);
-            }
-        }
-        return Ok(tag.unwrap_or_else(|| Value::symbol("record")));
+    if let Some(type_symbol) = record_type_of(args[0]) {
+        return Ok(type_symbol);
     }
     // Char-tables and bool-vectors are tagged vectors
     if chartable::is_char_table(&args[0]) {

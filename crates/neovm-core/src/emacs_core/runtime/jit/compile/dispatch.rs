@@ -392,6 +392,106 @@ fn aref_slow(ctx: *mut u8, array: Value, index: Value) -> i64 {
     })
 }
 
+/// How many conses the list shims' fast walks visit before handing the rest
+/// of a long list to the builtin (which then walks it from the start, with
+/// its cycle check).
+const LIST_SHIM_FAST_STEPS: usize = 64;
+
+/// `(memq ELT LIST)` for a short list, bit-identity only. `None` when
+/// `symbols-with-pos-enabled` (`eq` then looks through positions), the
+/// list is improper before a match, or it is longer than
+/// [`LIST_SHIM_FAST_STEPS`]; the builtin answers those. A match is found
+/// before the builtin's cycle check could fire: that check fires only after
+/// every distinct cons has been visited.
+#[inline(always)]
+fn memq_fast(ctx: &Context, elt: Value, list: Value) -> Option<Value> {
+    if ctx.symbols_with_pos_enabled {
+        return None;
+    }
+    let mut tail = list;
+    for _ in 0..LIST_SHIM_FAST_STEPS {
+        if !tail.is_cons() {
+            return tail.is_nil().then_some(Value::NIL);
+        }
+        if tail.cons_car().bits() == elt.bits() {
+            return Some(tail);
+        }
+        tail = tail.cons_cdr();
+    }
+    None
+}
+
+/// `(assq KEY LIST)` for a short list, as [`memq_fast`]: the first element
+/// that is a cons whose car is KEY's bits.
+#[inline(always)]
+fn assq_fast(ctx: &Context, key: Value, list: Value) -> Option<Value> {
+    if ctx.symbols_with_pos_enabled {
+        return None;
+    }
+    let mut tail = list;
+    for _ in 0..LIST_SHIM_FAST_STEPS {
+        if !tail.is_cons() {
+            return tail.is_nil().then_some(Value::NIL);
+        }
+        let entry = tail.cons_car();
+        if entry.is_cons() && entry.cons_car().bits() == key.bits() {
+            return Some(entry);
+        }
+        tail = tail.cons_cdr();
+    }
+    None
+}
+
+/// `Op::Memq` (GNU `Bmemq`) from compiled code: the tail's bits or
+/// [`VALUE_SHIM_SIGNAL`]. GC-free on every path.
+/// SAFETY: same vmctx contract as [`neovm_jit_call`]; only read here.
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // C-ABI shim: raw ptrs per documented SAFETY contract; only ever called from generated code.
+#[unsafe(no_mangle)]
+pub extern "C" fn neovm_jit_memq(ctx: *mut u8, elt: i64, list: i64) -> i64 {
+    let elt = Value::from_bits(elt as usize);
+    let list = Value::from_bits(list as usize);
+    // SAFETY: seam-provided dormant Context; read-only access.
+    let ctx_ref = unsafe { &*(ctx as *const Context) };
+    match memq_fast(ctx_ref, elt, list) {
+        Some(value) => value.bits() as i64,
+        None => list_slow(ctx, pure_memq, elt, list),
+    }
+}
+
+/// `Op::Assq` (GNU `Bassq`) from compiled code: the entry's bits or
+/// [`VALUE_SHIM_SIGNAL`]. GC-free on every path.
+/// SAFETY: same vmctx contract as [`neovm_jit_call`]; only read here.
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // C-ABI shim: raw ptrs per documented SAFETY contract; only ever called from generated code.
+#[unsafe(no_mangle)]
+pub extern "C" fn neovm_jit_assq(ctx: *mut u8, key: i64, list: i64) -> i64 {
+    let key = Value::from_bits(key as usize);
+    let list = Value::from_bits(list as usize);
+    // SAFETY: seam-provided dormant Context; read-only access.
+    let ctx_ref = unsafe { &*(ctx as *const Context) };
+    match assq_fast(ctx_ref, key, list) {
+        Some(value) => value.bits() as i64,
+        None => list_slow(ctx, pure_assq, key, list),
+    }
+}
+
+#[cold]
+#[inline(never)]
+fn list_slow(ctx: *mut u8, builtin: JitBuiltin2Pure, a: Value, b_: Value) -> i64 {
+    #[cfg(test)]
+    ARRAY_SHIM_SLOW_CALLS.with(|c| c.set(c.get() + 1));
+    jit_shim_contain!(ctx, VALUE_SHIM_SIGNAL, {
+        // SAFETY: seam-provided dormant Context; read-only access.
+        let ctx_ref = unsafe { &*(ctx as *const Context) };
+        match builtin(ctx_ref, a, b_) {
+            Ok(value) => value.bits() as i64,
+            Err(flow) => {
+                stash_pending_flow(flow);
+                VALUE_SHIM_SIGNAL
+            }
+        }
+    })
+}
+
 /// `(aset ARRAY INDEX VALUE)` into a plain vector or record slot, or a byte
 /// of a string that cannot change width: any byte of a unibyte string, or
 /// ASCII into an all-ASCII multibyte one. `false` for everything else, which
@@ -1271,6 +1371,11 @@ pub extern "C" fn neovm_jit_pred_spec(
             // value and return an existing symbol or a record's type slot:
             // no allocation, no Lisp, no safe point. An error (none is
             // reachable at arity 1) bounces to the generic call to raise it.
+            // A record answers the same for both (a `cl-defstruct`
+            // predicate is `(memq (type-of x) TAGS)`): no decode, no Result.
+            _ if let Some(type_symbol) = crate::emacs_core::builtins::types::record_type_of(v) => {
+                type_symbol
+            }
             _ => {
                 let answer = if kind == PRED_KIND_TYPE_OF {
                     crate::emacs_core::builtins::types::builtin_type_of(&[v])

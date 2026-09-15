@@ -2957,6 +2957,10 @@ pub(crate) struct RtRefs {
     pub(crate) aref: FuncRef,
     /// `Op::Aset` (`neovm_jit_aset`): the value's bits or a `VALUE_SHIM_*` word.
     pub(crate) aset: FuncRef,
+    /// `Op::Memq` (`neovm_jit_memq`): the tail's bits or `VALUE_SHIM_SIGNAL`.
+    pub(crate) memq: FuncRef,
+    /// `Op::Assq` (`neovm_jit_assq`): the entry's bits or `VALUE_SHIM_SIGNAL`.
+    pub(crate) assq: FuncRef,
     pub(crate) push_cc: FuncRef,
     pub(crate) push_cc_raw: FuncRef,
     pub(crate) push_catch: FuncRef,
@@ -3163,6 +3167,8 @@ pub(crate) fn declare_rt_refs<M: Module>(
     sig_aset.params.push(AbiParam::new(i64t));
     let aref_id = declare(module, "neovm_jit_aref", &sig_aref)?;
     let aset_id = declare(module, "neovm_jit_aset", &sig_aset)?;
+    let memq_id = declare(module, "neovm_jit_memq", &sig_aref)?;
+    let assq_id = declare(module, "neovm_jit_assq", &sig_aref)?;
     // (vmctx, target, stack_len) -> ()  — condition-case push (infallible).
     let mut sig_pcc = Signature::new(call_conv);
     sig_pcc.params.push(AbiParam::new(ptr_ty));
@@ -3301,6 +3307,8 @@ pub(crate) fn declare_rt_refs<M: Module>(
         builtin3: module.declare_func_in_func(b3_id, func),
         aref: module.declare_func_in_func(aref_id, func),
         aset: module.declare_func_in_func(aset_id, func),
+        memq: module.declare_func_in_func(memq_id, func),
+        assq: module.declare_func_in_func(assq_id, func),
         push_cc: module.declare_func_in_func(pcc_id, func),
         push_cc_raw: module.declare_func_in_func(pcc_raw_id, func),
         push_catch: module.declare_func_in_func(pcatch_id, func),
@@ -5216,14 +5224,20 @@ pub(crate) fn lower_simple_op(
             let at = stack.len() - arity;
             let operands: Vec<ClifValue> = stack[at..].to_vec();
             stack.truncate(at);
-            if matches!(other, Op::Aref) {
-                // `neovm_jit_aref` answers the element's bits or
+            let value_shim = match other {
+                Op::Aref => Some(rt.refs.aref),
+                Op::Memq => Some(rt.refs.memq),
+                Op::Assq => Some(rt.refs.assq),
+                _ => None,
+            };
+            if let Some(value_shim) = value_shim {
+                // `neovm_jit_aref`/`_memq`/`_assq` answer the result's bits or
                 // VALUE_SHIM_SIGNAL (tag 0b001, never a Lisp value). GC-free
-                // like the pure table entry it stands in for: no roots.
+                // like the pure table entries they stand in for: no roots.
                 let vmctx = fb.use_var(rt.vmctx_var);
                 let call = fb
                     .ins()
-                    .call(rt.refs.aref, &[vmctx, operands[0], operands[1]]);
+                    .call(value_shim, &[vmctx, operands[0], operands[1]]);
                 let word = fb.inst_results(call)[0];
                 let se = signal_target_for_site(fb, signal_exit, handlers, pending, stack);
                 let cont = fb.create_block();

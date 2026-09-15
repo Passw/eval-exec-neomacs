@@ -81,7 +81,8 @@ pub(crate) const ABI_TAG: u32 = compute_abi_tag();
 /// v6: `Op::Aref` calls `neovm_jit_aref` and `Op::Aset` calls `neovm_jit_aset`
 /// (value-returning shims; a `VALUE_SHIM_*` tag-`0b001` word is a sentinel), and
 /// `neovm_jit_named_builtin` no longer has variant 3.
-const ABI_TAG_VERSION: u32 = 6;
+/// v7: `Op::Memq` and `Op::Assq` call `neovm_jit_memq` / `neovm_jit_assq`.
+const ABI_TAG_VERSION: u32 = 7;
 
 /// Format version of the AOT descriptor spec-section + the runtime spec ABI
 /// (`SpecSlot`/`spec_expected` sidecar bases, the loader re-classify+arm protocol).
