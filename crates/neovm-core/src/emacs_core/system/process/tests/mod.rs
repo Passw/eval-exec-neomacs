@@ -10148,6 +10148,14 @@ fn an_interactive_filter_error_is_reported_without_exiting_like_gnu() {
 /// divergence was timing-dependent: GNU answers `closed` 12/12; before this
 /// fix neomacs answered `GONE` 10/12 (the pipe reaped out of the alist ahead
 /// of the owner's sentinel) and `open` 2/12 (EOF discarded entirely).
+///
+/// GNU's tie-break holds only when the pipe's EOF and the owner's exit are
+/// pending TOGETHER. The kernel closes a dying child's descriptors before it
+/// signals the parent, so a parent that polls inside that window sees the EOF
+/// alone and correctly retires the pipe first: pinned to a CPU shared with 12
+/// busy loops, GNU 31 answered `(closed GONE)` in 1 of 3 runs of this exact
+/// form, and the gate (which runs alongside a build) failed on it the same way.
+/// So each iteration lets the child finish exiting before the first poll.
 #[test]
 fn the_stderr_pipe_is_closed_and_attached_when_the_owner_sentinel_runs() {
     crate::test_utils::init_test_tracing();
@@ -10172,6 +10180,10 @@ fn the_stderr_pipe_is_closed_and_attached_when_the_owner_sentinel_runs() {
                             (let ((sp (get-buffer-process err)))
                               (push (if sp (process-status sp) 'GONE) seen))
                             (setq done t))))
+                     ;; No polling until the child has exited: its EOF and
+                     ;; its exit are then pending together.
+                     (let ((end (+ (float-time) 0.2)))
+                       (while (< (float-time) end)))
                      (while (not done) (accept-process-output nil 0.05))))))
              (delete-dups (nreverse seen)))"#
     ));
