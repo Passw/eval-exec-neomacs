@@ -21,6 +21,9 @@ const NEOVM_JIT_SHIM_NAMES: &[&str] = &[
     // (its Op::Call classification runs under Some(obarray) at emit), so an AOT
     // `.so` may import it: MUST be host-exported + salted into ABI_TAG.
     "neovm_jit_arith_spec",
+    // Generic fallback of a feedback-`Other` arithmetic site (JIT-only today:
+    // AOT publishes no feedback, so no AOT leaf emits it).
+    "neovm_jit_arith_generic",
     "neovm_jit_backedge",
     "neovm_jit_builtin1",
     "neovm_jit_builtin2",

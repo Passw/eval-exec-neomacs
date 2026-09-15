@@ -2931,6 +2931,9 @@ pub(crate) struct RtRefs {
     pub(crate) cons: FuncRef,
     /// Boxes an `f64` computed in a register (`neovm_jit_make_float`).
     pub(crate) make_float: FuncRef,
+    /// The generic fallback of an arithmetic site whose feedback says the
+    /// fixnum path misses (`neovm_jit_arith_generic`).
+    pub(crate) arith_generic: FuncRef,
     pub(crate) call: FuncRef,
     pub(crate) apply: FuncRef,
     pub(crate) eq_slow: FuncRef,
@@ -3063,6 +3066,15 @@ pub(crate) fn declare_rt_refs<M: Module>(
     sig_make_float.params.push(AbiParam::new(types::F64));
     sig_make_float.returns.push(AbiParam::new(i64t));
     let make_float_id = declare(module, "neovm_jit_make_float", &sig_make_float)?;
+    // (vmctx, kind, args_ptr, nargs, out_ptr) -> status
+    let mut sig_arith_generic = Signature::new(call_conv);
+    sig_arith_generic.params.push(AbiParam::new(ptr_ty));
+    sig_arith_generic.params.push(AbiParam::new(i64t));
+    sig_arith_generic.params.push(AbiParam::new(ptr_ty));
+    sig_arith_generic.params.push(AbiParam::new(i64t));
+    sig_arith_generic.params.push(AbiParam::new(ptr_ty));
+    sig_arith_generic.returns.push(AbiParam::new(i64t));
+    let arith_generic_id = declare(module, "neovm_jit_arith_generic", &sig_arith_generic)?;
     let call_id = declare(module, "neovm_jit_call", &sig_call)?;
     let apply_id = declare(module, "neovm_jit_apply", &sig_call)?;
     let eq_id = declare(module, "neovm_jit_eq_slow", &sig_eq)?;
@@ -3252,6 +3264,7 @@ pub(crate) fn declare_rt_refs<M: Module>(
         gc_restore: module.declare_func_in_func(restore_id, func),
         cons: module.declare_func_in_func(cons_id, func),
         make_float: module.declare_func_in_func(make_float_id, func),
+        arith_generic: module.declare_func_in_func(arith_generic_id, func),
         call: module.declare_func_in_func(call_id, func),
         apply: module.declare_func_in_func(apply_id, func),
         eq_slow: module.declare_func_in_func(eq_id, func),
@@ -3696,6 +3709,165 @@ pub(crate) fn op_preserves_raw(op: &Op) -> bool {
     )
 }
 
+/// An arithmetic or comparison site whose feedback says its fixnum guard
+/// fails there (`compile::arith_site_takes_generic`): an inline fixnum fast
+/// path whose every miss — a non-fixnum operand, a result out of fixnum range,
+/// a zero divisor — calls the interpreter's own builtin through
+/// `neovm_jit_arith_generic`, instead of deopting to the interpreter for the
+/// rest of the activation.
+///
+/// * The whole model stack is tagged first: the fallback roots the residual
+///   and a signal re-materializes it for a handler, and neither may see a
+///   raw fixnum.
+/// * The fast path stores no root and runs no nested activation; the
+///   fallback roots the residual around its call. The continuation is the
+///   meet of the two store histories (`RootWinCarry` rule 2).
+/// * The result is TAGGED on both paths (the fallback's may be a bignum or a
+///   float), so it is pushed as a tagged value — and the known-fixnum
+///   analysis, reading the same predicate, does not call it a fixnum.
+#[allow(clippy::too_many_arguments)]
+fn lower_generic_arith_site(
+    fb: &mut FunctionBuilder,
+    rt: &RtCtx,
+    op: &Op,
+    stack: &mut Vec<ClifValue>,
+    stack_raw: &mut Vec<bool>,
+    handlers: &[HandlerStatic],
+    pending: &mut Vec<PendingDispatch>,
+    signal_exit: &mut Option<Block>,
+) -> Result<(), CompileError> {
+    let (kind, nargs) = crate::emacs_core::bytecode::Vm::arith_generic_kind(op)
+        .ok_or(CompileError::UnsupportedOp("arith-generic"))?;
+    if stack.len() < nargs {
+        return Err(CompileError::StackUnderflow);
+    }
+    retag_all_raw(fb, stack, stack_raw);
+    let at = stack.len() - nargs;
+    let operands: Vec<ClifValue> = stack[at..].to_vec();
+    stack.truncate(at);
+    stack_raw.truncate(at);
+
+    let res_var = fb.declare_var(types::I64);
+    let fix_b = fb.create_block();
+    let gen_b = fb.create_block();
+    let merge = fb.create_block();
+
+    // Fast path: fixnum operands, computed inline.
+    let is_fix = if nargs == 2 {
+        both_tag_test(
+            fb,
+            operands[0],
+            operands[1],
+            FIXNUM_CHECK_MASK as i64,
+            FIXNUM_CHECK_VALUE as i64,
+        )
+    } else {
+        fixnum_tag_test(fb, operands[0])
+    };
+    fb.ins().brif(is_fix, fix_b, &[], gen_b, &[]);
+    fb.switch_to_block(fix_b);
+    fb.seal_block(fix_b);
+    let raw = |fb: &mut FunctionBuilder, v: ClifValue| sshr_imm_p(fb, v, FIXNUM_SHIFT as i64);
+    let fast = match op {
+        Op::Add | Op::Sub => {
+            let (a, b) = (raw(fb, operands[0]), raw(fb, operands[1]));
+            let r = raw_fixnum_addsub(fb, gen_b, matches!(op, Op::Sub), a, b);
+            retag_fixnum(fb, r)
+        }
+        Op::Mul => {
+            let (a, b) = (raw(fb, operands[0]), raw(fb, operands[1]));
+            let r = raw_fixnum_mul(fb, gen_b, a, b);
+            retag_fixnum(fb, r)
+        }
+        Op::Div | Op::Rem => {
+            let (a, b) = (raw(fb, operands[0]), raw(fb, operands[1]));
+            let r = raw_fixnum_divrem(fb, gen_b, matches!(op, Op::Rem), a, b);
+            retag_fixnum(fb, r)
+        }
+        Op::Max | Op::Min => {
+            // Tagging is monotonic, so selecting on the tagged words picks the
+            // same operand.
+            let cc = if matches!(op, Op::Min) {
+                IntCC::SignedLessThan
+            } else {
+                IntCC::SignedGreaterThan
+            };
+            let cond = fb.ins().icmp(cc, operands[0], operands[1]);
+            fb.ins().select(cond, operands[0], operands[1])
+        }
+        Op::Eqlsign | Op::Lss | Op::Gtr | Op::Leq | Op::Geq => {
+            let cc = match op {
+                Op::Eqlsign => IntCC::Equal,
+                Op::Lss => IntCC::SignedLessThan,
+                Op::Gtr => IntCC::SignedGreaterThan,
+                Op::Leq => IntCC::SignedLessThanOrEqual,
+                _ => IntCC::SignedGreaterThanOrEqual,
+            };
+            let cond = fb.ins().icmp(cc, operands[0], operands[1]);
+            let t = fb.ins().iconst(types::I64, Value::T.bits() as i64);
+            let nil = fb.ins().iconst(types::I64, Value::NIL.bits() as i64);
+            fb.ins().select(cond, t, nil)
+        }
+        Op::Add1 | Op::Sub1 | Op::Negate => {
+            let a = raw(fb, operands[0]);
+            let unary = match op {
+                Op::Add1 => UnaryKind::Add1,
+                Op::Sub1 => UnaryKind::Sub1,
+                _ => UnaryKind::Negate,
+            };
+            let r = raw_fixnum_unop(fb, gen_b, unary, a);
+            retag_fixnum(fb, r)
+        }
+        _ => unreachable!("arith_generic_kind admitted {op:?}"),
+    };
+    fb.def_var(res_var, fast);
+    fb.ins().jump(merge, &[]);
+
+    // Fallback: every miss above branches here (the tag test, and the range
+    // and divisor guards, which target this block instead of a deopt).
+    fb.switch_to_block(gen_b);
+    fb.seal_block(gen_b);
+    let carry_fast = rootwin_carry_snapshot();
+    let saved = if stack.is_empty() {
+        CondRoots::NONE
+    } else {
+        emit_cond_residual_roots_pre(fb, rt, stack.as_slice())
+    };
+    for (i, &v) in operands.iter().enumerate() {
+        fb.ins()
+            .stack_store(rt.ptr_ty, v, rt.call_args_slot, (i * 8) as i32);
+    }
+    let vmctx = fb.use_var(rt.vmctx_var);
+    let kind_v = fb.ins().iconst(types::I64, kind);
+    let args_addr = fb.ins().stack_addr(rt.ptr_ty, rt.call_args_slot, 0);
+    let n_val = fb.ins().iconst(types::I64, nargs as i64);
+    let out_addr = fb.ins().stack_addr(rt.ptr_ty, rt.call_result_slot, 0);
+    let call = fb.ins().call(
+        rt.refs.arith_generic,
+        &[vmctx, kind_v, args_addr, n_val, out_addr],
+    );
+    let status = fb.inst_results(call)[0];
+    emit_cond_residual_roots_post(fb, rt, saved);
+    rootwin_carry_meet(&carry_fast);
+    let se = signal_target_for_site(fb, signal_exit, handlers, pending, stack);
+    let ok_b = fb.create_block();
+    let ok = icmp_imm_p(fb, IntCC::Equal, status, STATUS_OK);
+    fb.ins().brif(ok, ok_b, &[], se, &[]);
+    fb.switch_to_block(ok_b);
+    fb.seal_block(ok_b);
+    let slow = fb
+        .ins()
+        .stack_load(rt.ptr_ty, types::I64, rt.call_result_slot, 0);
+    fb.def_var(res_var, slow);
+    fb.ins().jump(merge, &[]);
+
+    fb.switch_to_block(merge);
+    fb.seal_block(merge);
+    stack.push(fb.use_var(res_var));
+    stack_raw.push(false);
+    Ok(())
+}
+
 /// Lower one non-control-flow opcode, updating the compile-time operand `stack`
 /// (the live CLIF SSA values within the current basic block). Terminators
 /// (`Return`/`Goto`/`GotoIf*`) are handled by the block lowerer before this.
@@ -3743,6 +3915,21 @@ pub(crate) fn lower_simple_op(
     // the GC-root + dispatch-snapshot soundness holes in one place).
     if !op_preserves_raw(op) {
         retag_all_raw(fb, stack, stack_raw);
+    }
+    if let Some(rt) = rt
+        && !aot
+        && super::arith_site_takes_generic(op, pc)
+    {
+        return lower_generic_arith_site(
+            fb,
+            rt,
+            op,
+            stack,
+            stack_raw,
+            handlers,
+            pending,
+            signal_exit,
+        );
     }
     match op {
         // A `make-closure`-patched slot: per-instance, so load it through the

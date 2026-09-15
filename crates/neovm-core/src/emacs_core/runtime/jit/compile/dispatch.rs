@@ -1194,6 +1194,66 @@ pub(crate) fn ash_fixnum_fast(value: i64, count: i64) -> Option<i64> {
     }
 }
 
+/// The generic fallback of an arithmetic/comparison site that feedback says
+/// misses its fixnum fast path (`compile::arith_site_takes_generic`): the
+/// interpreter's own slow arm (`Vm::call_arith_builtin_on_context` — the
+/// static builtin, no backtrace frame, the debugger check on a signal) on the
+/// `nargs` operands the generated code stored at `args_ptr`. `kind` is
+/// `Vm::arith_generic_kind`'s.
+///
+/// The operands go onto the GC-traced `bc_buf` for the call, as in
+/// [`neovm_jit_call_subr_spec`]; the generated code rooted its residual stack
+/// around this call. No `maybe_quit`: the opcode arms poll none either.
+/// SAFETY: same vmctx contract as [`neovm_jit_call`].
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // C-ABI shim: raw ptrs per documented SAFETY contract; only ever called from generated code.
+#[unsafe(no_mangle)]
+pub extern "C" fn neovm_jit_arith_generic(
+    ctx: *mut u8,
+    kind: i64,
+    args_ptr: *const i64,
+    nargs: i64,
+    out: *mut i64,
+) -> i64 {
+    jit_shim_contain!(ctx, STATUS_SIGNAL, {
+        // SAFETY: see neovm_jit_call's function-level contract.
+        let ctx = unsafe { &mut *(ctx as *mut Context) };
+        let nargs = nargs as usize;
+        let Some(sym) = crate::emacs_core::bytecode::Vm::arith_generic_builtin_id(kind) else {
+            stash_pending_flow(signal(
+                crate::emacs_core::error::LispCondition::InvalidFunction,
+                vec![Value::fixnum(kind)],
+            ));
+            return STATUS_SIGNAL;
+        };
+        let args_start = ctx.bc_buf.len();
+        // SAFETY: the generated code stored exactly `nargs` argument words at
+        // `args_ptr` (its call-args slot) immediately before this call.
+        ctx.bc_buf
+            .extend((0..nargs).map(|i| Value::from_bits(unsafe { *args_ptr.add(i) } as usize)));
+        let res = crate::emacs_core::bytecode::Vm::call_arith_builtin_on_context(
+            ctx, sym, args_start, nargs,
+        )
+        .unwrap_or_else(|| {
+            Err(signal(
+                crate::emacs_core::error::LispCondition::VoidFunction,
+                vec![Value::from_sym_id(sym)],
+            ))
+        });
+        ctx.bc_buf.truncate(args_start);
+        match res {
+            Ok(value) => {
+                // SAFETY: `out` is the generated code's result stack slot.
+                unsafe { *out = value.bits() as i64 };
+                STATUS_OK
+            }
+            Err(flow) => {
+                stash_pending_flow(flow);
+                STATUS_SIGNAL
+            }
+        }
+    })
+}
+
 /// Speculated bitwise-arithmetic call: `logand`/`logior`/`logxor`/`ash` (2 args)
 /// and `lognot` (1 arg). When armed AND the argument(s) are fixnums, computes the
 /// native op with zero dispatch — EXACTLY the interpreter's fixnum semantics:

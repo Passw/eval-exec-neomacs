@@ -6983,3 +6983,372 @@ fn a_float_site_compare_breaks_a_double_tie_on_exact_integers_like_gnu() {
         nil
     );
 }
+
+// ---------------------------------------------------------------------------
+// Generic fallback at arithmetic sites whose feedback says the fixnum path
+// misses (`compile::arith_site_takes_generic`).
+// ---------------------------------------------------------------------------
+
+/// A function `(lambda (a [b]) (OP a [b]))` with `feedback` recorded at the
+/// op's pc before its first compile.
+fn generic_arith_fn(
+    op: Op,
+    nargs: usize,
+    feedback: crate::emacs_core::jit::NumericFeedback,
+) -> ByteCodeFunction {
+    let mut f = nullary();
+    f.lexical = true;
+    f.params.required = (1..=nargs as u32)
+        .map(crate::emacs_core::intern::SymId)
+        .collect();
+    f.ops = if nargs == 2 {
+        vec![Op::StackRef(1), Op::StackRef(1), op, Op::Return]
+    } else {
+        vec![Op::StackRef(0), op, Op::Return]
+    };
+    f.max_stack = 8;
+    if feedback != crate::emacs_core::jit::NumericFeedback::FixnumOnly {
+        let pc = f.ops.len() - 2;
+        f.jit_runtime().record_numeric(pc, f.ops.len(), feedback);
+    }
+    f
+}
+
+fn outcome_of_flow(flow: crate::emacs_core::error::Flow) -> String {
+    match flow {
+        crate::emacs_core::error::Flow::Signal(sig) => format!(
+            "signal {} {:?}",
+            sig.symbol_name(),
+            sig.data
+                .iter()
+                .map(crate::emacs_core::print::print_value)
+                .collect::<Vec<_>>()
+        ),
+        other => format!("{other:?}"),
+    }
+}
+
+/// Every opcode with a generic fallback answers exactly as the interpreter's
+/// opcode arm, natively — no deopt — on fixnums, the fixnum boundaries,
+/// bignums, floats, zero divisors and non-numbers; and the interpreter's
+/// answer on fixnums is the fixnum fast path's.
+#[test]
+fn generic_arith_sites_match_the_interpreter_without_deopting() {
+    use crate::emacs_core::bytecode::Vm;
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::jit::NumericFeedback as NF;
+    use crate::emacs_core::print::print_value;
+    let mut eval = Context::new();
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    let pool_src = [
+        "0",
+        "1",
+        "-1",
+        "7",
+        "-3",
+        "most-positive-fixnum",
+        "most-negative-fixnum",
+        "(1+ most-positive-fixnum)",
+        "(1- most-negative-fixnum)",
+        "(expt 2 100)",
+        "(- (expt 3 80))",
+        "1.5",
+        "-0.0",
+        "0.0e+NaN",
+        "'x",
+    ];
+    let binary = [
+        Op::Add,
+        Op::Sub,
+        Op::Mul,
+        Op::Div,
+        Op::Rem,
+        Op::Max,
+        Op::Min,
+        Op::Eqlsign,
+        Op::Lss,
+        Op::Gtr,
+        Op::Leq,
+        Op::Geq,
+    ];
+    let unary = [Op::Add1, Op::Sub1, Op::Negate];
+    let interp = |eval: &mut Context, op: &Op, nargs: usize, args: Vec<Value>| -> String {
+        let f = generic_arith_fn(op.clone(), nargs, NF::FixnumOnly);
+        let mut vm = Vm::from_context(eval);
+        match vm.execute(&f, args) {
+            Ok(v) => print_value(&v),
+            Err(flow) => outcome_of_flow(flow),
+        }
+    };
+    let mut checked = 0;
+    for (ops, nargs) in [(&binary[..], 2usize), (&unary[..], 1usize)] {
+        for op in ops {
+            // Other for all; Float too where the op has no float lowering.
+            let mut feedbacks = vec![NF::Other];
+            if matches!(
+                op,
+                Op::Rem | Op::Max | Op::Min | Op::Add1 | Op::Sub1 | Op::Negate
+            ) {
+                feedbacks.push(NF::Float);
+            }
+            for fb in feedbacks {
+                let f = generic_arith_fn(op.clone(), nargs, fb);
+                let leaf = compile_bytecode_function(&f).expect("compiles");
+                let firsts: &[&str] = &pool_src;
+                let seconds: &[&str] = if nargs == 2 { &pool_src } else { &["0"] };
+                for a_src in firsts {
+                    for b_src in seconds {
+                        let pair = eval
+                            .eval_str(&format!("(cons {a_src} {b_src})"))
+                            .expect("operands");
+                        let args: Vec<Value> = if nargs == 2 {
+                            vec![pair.cons_car(), pair.cons_cdr()]
+                        } else {
+                            vec![pair.cons_car()]
+                        };
+                        let want = interp(&mut eval, op, nargs, args.clone());
+                        let got = match leaf.call(ctx_ptr, &args) {
+                            NativeRun::Ok(bits) => print_value(&Value::from_bits(bits)),
+                            NativeRun::Signal => {
+                                outcome_of_flow(take_pending_flow().expect("flow stashed"))
+                            }
+                            other => panic!(
+                                "{op:?} [{fb:?}] on ({a_src}, {b_src}) must not leave native code: {other:?}"
+                            ),
+                        };
+                        assert_eq!(got, want, "{op:?} [{fb:?}] on ({a_src}, {b_src})");
+                        checked += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert!(checked > 2000, "checked {checked}");
+}
+
+/// The result of a generic-fallback site is not a fixnum — an overflowing `*`
+/// returns a bignum — so the known-fixnum analysis must not carry it across a
+/// block edge as one. Here it reaches a `FixnumOnly` `1+` through a leader;
+/// had the analysis kept calling it a fixnum, `1+`'s guard would be elided
+/// and the bignum's POINTER shifted as a fixnum, silently.
+///
+///     (lambda (a b c) (let ((x (* a b))) (if c) (1+ x)))
+#[test]
+fn a_generic_site_result_is_not_a_known_fixnum_across_a_block_edge() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::jit::NumericFeedback as NF;
+    let mut f = nullary();
+    f.lexical = true;
+    f.params.required = (1..=3).map(crate::emacs_core::intern::SymId).collect();
+    f.ops = vec![
+        Op::StackRef(2),  // 0: a        [a b c a]
+        Op::StackRef(2),  // 1: b        [a b c a b]
+        Op::Mul,          // 2: x        [a b c x]    (Other)
+        Op::StackRef(1),  // 3: c        [a b c x c]
+        Op::GotoIfNil(5), // 4: leader 5 from both edges
+        Op::Add1,         // 5:          [a b c x+1]  (FixnumOnly)
+        Op::Return,
+    ];
+    f.max_stack = 8;
+    f.jit_runtime().record_numeric(2, f.ops.len(), NF::Other);
+    let leaf = compile_bytecode_function(&f).expect("compiles");
+    let mut eval = Context::new();
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    let two40 = Value::make_int(1 << 40);
+    for c in [Value::T, Value::NIL] {
+        match leaf.call(ctx_ptr, &[two40, two40, c]) {
+            NativeRun::Ok(bits) => panic!(
+                "(1+ bignum) at a FixnumOnly site cannot finish natively; got bits {bits:#x} ({})",
+                crate::emacs_core::print::print_value(&Value::from_bits(bits))
+            ),
+            NativeRun::Deopt | NativeRun::DeoptAt(_) => {}
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+    // Fixnum products still run natively through both paths.
+    for c in [Value::T, Value::NIL] {
+        assert_eq!(
+            leaf.call(ctx_ptr, &[Value::make_int(6), Value::make_int(7), c]),
+            NativeRun::Ok(Value::make_int(43).bits())
+        );
+    }
+}
+
+/// A body with a generic-fallback site stays out of the MIR tier, which
+/// guards fixnum and would rerun-from-start on every miss.
+#[test]
+fn a_body_with_a_generic_arith_site_is_rejected_from_the_mir_tier() {
+    use crate::emacs_core::jit::NumericFeedback as NF;
+    let control = generic_arith_fn(Op::Add, 2, NF::FixnumOnly);
+    let before = crate::emacs_core::jit::stats::compile_stats_snapshot();
+    compile_bytecode_function(&control).expect("compiles");
+    let mid = crate::emacs_core::jit::stats::compile_stats_snapshot();
+    assert_eq!(mid.mir_taken, before.mir_taken + 1, "control takes MIR");
+    for (op, nargs, fb) in [
+        (Op::Add, 2, NF::Other),
+        (Op::Gtr, 2, NF::Other),
+        (Op::Add1, 1, NF::Float),
+        (Op::Max, 2, NF::Other),
+    ] {
+        let s0 = crate::emacs_core::jit::stats::compile_stats_snapshot();
+        compile_bytecode_function(&generic_arith_fn(op.clone(), nargs, fb)).expect("compiles");
+        let s1 = crate::emacs_core::jit::stats::compile_stats_snapshot();
+        assert_eq!(
+            s1.mir_taken, s0.mir_taken,
+            "{op:?} [{fb:?}] must not take MIR"
+        );
+        assert_eq!(
+            s1.mir_tier_rejected,
+            s0.mir_tier_rejected + 1,
+            "{op:?} [{fb:?}] counted as TierRejected"
+        );
+    }
+}
+
+/// A signal from the generic fallback reaches a condition-case in the same
+/// compiled body, with the handler's stack intact.
+///
+///     (lambda (a b) (condition-case err (+ a b) (error (list 'caught err))))
+#[test]
+fn a_generic_arith_signal_is_caught_by_a_leaf_local_handler() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::jit::NumericFeedback as NF;
+    let mut f = nullary();
+    f.lexical = true;
+    f.params.required = (1..=2).map(crate::emacs_core::intern::SymId).collect();
+    f.ops = vec![
+        Op::PushConditionCase(6), // 0
+        Op::StackRef(1),          // 1 a
+        Op::StackRef(1),          // 2 b
+        Op::Add,                  // 3 (Other)
+        Op::PopHandler,           // 4
+        Op::Return,               // 5
+        Op::Constant(0),          // 6: handler [a b err] -> 'caught
+        Op::StackRef(1),          // 7 err
+        Op::List(2),              // 8
+        Op::Return,               // 9
+    ];
+    f.constants = vec![Value::symbol("caught")].into();
+    f.max_stack = 8;
+    f.jit_runtime().record_numeric(3, f.ops.len(), NF::Other);
+    let leaf = compile_bytecode_function(&f).expect("compiles");
+    let mut eval = Context::new();
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    let big = eval.eval_str("(expt 2 70)").expect("big");
+    match leaf.call(ctx_ptr, &[big, Value::symbol("oops")]) {
+        NativeRun::Ok(bits) => assert_eq!(
+            crate::emacs_core::print::print_value(&Value::from_bits(bits)),
+            "(caught (wrong-type-argument number-or-marker-p oops))"
+        ),
+        other => panic!("the handler must catch natively, got {other:?}"),
+    }
+    match leaf.call(ctx_ptr, &[big, Value::make_int(1)]) {
+        NativeRun::Ok(bits) => assert_eq!(
+            crate::emacs_core::print::print_value(&Value::from_bits(bits)),
+            "1180591620717411303425"
+        ),
+        other => panic!("bignum + fixnum must run natively, got {other:?}"),
+    }
+}
+
+/// Live values below a generic site survive its fallback call under GC
+/// stress, and two such sites in a row (a stored record, then a meet) keep
+/// the residual rooted.
+///
+///     (lambda (a b) (let ((h (cons 1 2))) (+ a b) (* a b) h))
+#[test]
+fn generic_arith_fallbacks_keep_the_residual_rooted() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::jit::NumericFeedback as NF;
+    let mut f = nullary();
+    f.lexical = true;
+    f.params.required = (1..=2).map(crate::emacs_core::intern::SymId).collect();
+    f.ops = vec![
+        Op::Constant(0), // [a b 1]
+        Op::Constant(1), // [a b 1 2]
+        Op::Cons,        // [a b h]
+        Op::StackRef(2), // [a b h a]
+        Op::StackRef(2), // [a b h a b]
+        Op::Add,         // 5 (Other)   residual [a b h]
+        Op::Pop,
+        Op::StackRef(2),
+        Op::StackRef(2),
+        Op::Mul, // 9 (Other)
+        Op::Pop,
+        Op::Return, // h
+    ];
+    f.constants = vec![Value::make_int(1), Value::make_int(2)].into();
+    f.max_stack = 8;
+    f.jit_runtime().record_numeric(5, f.ops.len(), NF::Other);
+    f.jit_runtime().record_numeric(9, f.ops.len(), NF::Other);
+    let leaf = compile_bytecode_function(&f).expect("compiles");
+    let mut eval = Context::new();
+    eval.gc_stress = true;
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    for _ in 0..3 {
+        let pair = eval
+            .eval_str("(cons (expt 2 90) (expt 3 50))")
+            .expect("operands");
+        match leaf.call(ctx_ptr, &[pair.cons_car(), pair.cons_cdr()]) {
+            NativeRun::Ok(bits) => {
+                let h = Value::from_bits(bits);
+                assert!(h.is_cons(), "h survived (got {h:?})");
+                assert_eq!(h.cons_car(), Value::make_int(1));
+                assert_eq!(h.cons_cdr(), Value::make_int(2));
+            }
+            other => panic!("must run natively, got {other:?}"),
+        }
+    }
+}
+
+/// The fallback's call can run Lisp: a signal from the builtin goes through
+/// `signal-hook-function` before any handler sees it. Here the hook runs an
+/// EXACT collection and reallocates, so a residual the fallback failed to
+/// root would be swept and its slot reused before the leaf's own handler
+/// returns it.
+///
+///     (lambda (a b) (let ((h (cons 1 2))) (condition-case nil (+ a b) (error h))))
+#[test]
+fn a_generic_arith_signal_hook_that_collects_keeps_the_residual_alive() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::jit::NumericFeedback as NF;
+    let mut f = nullary();
+    f.lexical = true;
+    f.params.required = (1..=2).map(crate::emacs_core::intern::SymId).collect();
+    f.ops = vec![
+        Op::Constant(0),          // 0  [a b 1]
+        Op::Constant(1),          // 1  [a b 1 2]
+        Op::Cons,                 // 2  [a b h]
+        Op::PushConditionCase(9), // 3
+        Op::StackRef(2),          // 4  [a b h a]
+        Op::StackRef(2),          // 5  [a b h a b]
+        Op::Add,                  // 6  (Other) residual [a b h]
+        Op::PopHandler,           // 7
+        Op::Return,               // 8  the sum
+        Op::Pop,                  // 9  handler [a b h err] -> [a b h]
+        Op::Return,               // 10 h
+    ];
+    f.constants = vec![Value::make_int(1), Value::make_int(2)].into();
+    f.max_stack = 8;
+    f.jit_runtime().record_numeric(6, f.ops.len(), NF::Other);
+    let leaf = compile_bytecode_function(&f).expect("compiles");
+    let mut eval = Context::new();
+    eval.eval_str(
+        "(setq signal-hook-function
+               (lambda (_sym _data) (garbage-collect) (make-list 4096 (cons 0 0)) nil))",
+    )
+    .expect("hook");
+    let ctx_ptr = &mut eval as *mut Context as *mut u8;
+    for _ in 0..3 {
+        let big = eval.eval_str("(expt 2 70)").expect("big");
+        match leaf.call(ctx_ptr, &[big, Value::symbol("oops")]) {
+            NativeRun::Ok(bits) => {
+                let h = Value::from_bits(bits);
+                assert!(h.is_cons(), "h survived the hook's collection (got {h:?})");
+                assert_eq!(h.cons_car(), Value::make_int(1), "car intact");
+                assert_eq!(h.cons_cdr(), Value::make_int(2), "cdr intact");
+            }
+            other => panic!("the handler must catch natively, got {other:?}"),
+        }
+    }
+}

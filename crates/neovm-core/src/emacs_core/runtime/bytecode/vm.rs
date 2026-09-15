@@ -7553,12 +7553,82 @@ impl<'a> Vm<'a> {
                 rt.record_numeric(pc, func.executable_ops().len(), seen);
             }
         }
-        let func_val = Value::subr_from_sym_id(sym_id);
-        let Some(callee) = ResolvedBuiltinCallee::from_subr_value(func_val) else {
+        match Self::call_arith_builtin_on_context(self.ctx, sym_id, args_start, nargs) {
+            Some(result) => result,
             // These are static subrs, so this is unreachable in practice; take
             // the traced path rather than invent a dispatch for it.
-            return self.call_function_from_stack_args(func_val, args_start, nargs, true);
-        };
+            None => self.call_function_from_stack_args(
+                Value::subr_from_sym_id(sym_id),
+                args_start,
+                nargs,
+                true,
+            ),
+        }
+    }
+
+    /// The arithmetic opcodes with a JIT generic fallback
+    /// (`compile::arith_site_takes_generic`): `(kind, nargs)`, where `kind`
+    /// is what the generated code passes to `neovm_jit_arith_generic` and
+    /// [`Self::arith_generic_builtin_id`] maps back to the builtin.
+    pub(crate) fn arith_generic_kind(op: &Op) -> Option<(i64, usize)> {
+        Some(match op {
+            Op::Add => (0, 2),
+            Op::Sub => (1, 2),
+            Op::Mul => (2, 2),
+            Op::Div => (3, 2),
+            Op::Rem => (4, 2),
+            Op::Max => (5, 2),
+            Op::Min => (6, 2),
+            Op::Eqlsign => (7, 2),
+            Op::Lss => (8, 2),
+            Op::Gtr => (9, 2),
+            Op::Leq => (10, 2),
+            Op::Geq => (11, 2),
+            Op::Add1 => (12, 1),
+            Op::Sub1 => (13, 1),
+            Op::Negate => (14, 1),
+            _ => return None,
+        })
+    }
+
+    /// The builtin each [`Self::arith_generic_kind`] calls: the SAME cached
+    /// symbol ids the opcode arms pass to
+    /// [`Self::call_arith_builtin_from_stack_args`].
+    pub(crate) fn arith_generic_builtin_id(kind: i64) -> Option<SymId> {
+        Some(match kind {
+            0 => Self::cached_builtin_id("+", &PLUS_ID),
+            1 | 14 => Self::cached_builtin_id("-", &MINUS_ID),
+            2 => Self::cached_builtin_id("*", &TIMES_ID),
+            3 => Self::cached_builtin_id("/", &DIVIDE_ID),
+            4 => Self::cached_builtin_id("%", &MODULO_ID),
+            5 => Self::cached_builtin_id("max", &MAX_ID),
+            6 => Self::cached_builtin_id("min", &MIN_ID),
+            7 => Self::cached_builtin_id("=", &NUMEQ_ID),
+            8 => Self::cached_builtin_id("<", &LT_ID),
+            9 => Self::cached_builtin_id(">", &GT_ID),
+            10 => Self::cached_builtin_id("<=", &LE_ID),
+            11 => Self::cached_builtin_id(">=", &GE_ID),
+            12 => Self::cached_builtin_id("1+", &ADD1_ID),
+            13 => Self::cached_builtin_id("1-", &SUB1_ID),
+            _ => return None,
+        })
+    }
+
+    /// The arithmetic opcodes' slow arm after feedback recording: the static
+    /// subr for `sym_id`, called on the `nargs` operands at
+    /// `ctx.bc_buf[args_start..]` with no backtrace frame, then the debugger
+    /// check on a signal. Shared with the JIT's generic arithmetic fallback
+    /// (`neovm_jit_arith_generic`), so compiled code reaches exactly what the
+    /// interpreter does. `None` only if the subr does not resolve.
+    #[inline]
+    pub(crate) fn call_arith_builtin_on_context(
+        ctx: &mut crate::emacs_core::eval::Context,
+        sym_id: SymId,
+        args_start: usize,
+        nargs: usize,
+    ) -> Option<EvalResult> {
+        let func_val = Value::subr_from_sym_id(sym_id);
+        let callee = ResolvedBuiltinCallee::from_subr_value(func_val)?;
         let (sym_id, function, min_args, max_args) = callee.dispatch_parts();
         let result =
             if nargs < min_args as usize || max_args.is_some_and(|max| nargs > max as usize) {
@@ -7568,14 +7638,14 @@ impl<'a> Vm<'a> {
                 ))
             } else if matches!(function, Some(SubrFn::ManySlice(_)))
                 && let Some(value) = Self::try_dispatch_builtin_subr_fast_value_from_stack_args(
-                    self.ctx, sym_id, args_start, nargs,
+                    ctx, sym_id, args_start, nargs,
                 )
             {
-                return Ok(value);
+                return Some(Ok(value));
             } else {
                 match function {
                     Some(function) => Self::dispatch_builtin_subr_from_stack_args_unchecked(
-                        self.ctx, function, args_start, nargs,
+                        ctx, function, args_start, nargs,
                     )
                     .unwrap_or_else(|| {
                         Err(signal(
@@ -7589,7 +7659,7 @@ impl<'a> Vm<'a> {
                     )),
                 }
             };
-        self.ctx.dispatch_signal_result_if_needed(result)
+        Some(ctx.dispatch_signal_result_if_needed(result))
     }
 
     #[inline]

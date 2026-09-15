@@ -884,6 +884,42 @@ pub(crate) fn active_numeric_feedback(pc: usize) -> crate::emacs_core::jit::Nume
 ///
 /// Reading the snapshot marks the body's feedback CONSUMED: from here the
 /// interpreter stops recording for it.
+/// Whether the arithmetic/comparison site `op` at `pc` of the body being
+/// compiled is lowered with a GENERIC fallback — an inline fixnum fast path
+/// whose miss (a non-fixnum operand, an overflow, a zero divisor) calls the
+/// interpreter's own builtin through `neovm_jit_arith_generic` — instead of
+/// deopting.
+///
+/// That is the lowering for a site whose feedback says the fixnum guard
+/// fails there: `Other` (bignums, markers, overflow) at `+ - * / = < > <= >=`,
+/// which have a float lowering for `Float`; and any non-`FixnumOnly` site at
+/// `% max min 1+ 1- -`, which have none. Deopting was a round trip to the
+/// interpreter per call: `pidigits` deopted 4,298 times per repeat, and the
+/// JIT made it 3.7% SLOWER than no JIT at all.
+///
+/// ONE predicate for every reader, as the float lowering learned the hard
+/// way: the lowering, the known-fixnum analysis (such a site's result is not a
+/// fixnum), `baseline_needs_rt` (the fallback calls a shim) and the MIR tier
+/// gate (MIR guards fixnum and would rerun-from-start).
+pub(crate) fn arith_site_takes_generic(op: &Op, pc: usize) -> bool {
+    use crate::emacs_core::jit::NumericFeedback;
+    match op {
+        Op::Add
+        | Op::Sub
+        | Op::Mul
+        | Op::Div
+        | Op::Eqlsign
+        | Op::Lss
+        | Op::Gtr
+        | Op::Leq
+        | Op::Geq => active_numeric_feedback(pc) == NumericFeedback::Other,
+        Op::Rem | Op::Max | Op::Min | Op::Add1 | Op::Sub1 | Op::Negate => {
+            active_numeric_feedback(pc) != NumericFeedback::FixnumOnly
+        }
+        _ => false,
+    }
+}
+
 pub(crate) struct NumericFeedbackScope(Option<Vec<crate::emacs_core::jit::NumericFeedback>>);
 
 impl Drop for NumericFeedbackScope {
@@ -1083,7 +1119,13 @@ fn compile_bytecode_function_inner(
                     ..
                 ) | mir::MirOp::Cmp(..)
             ) && active_numeric_feedback(i.pc) == crate::emacs_core::jit::NumericFeedback::Float
-        });
+        }) || ops
+            .iter()
+            .enumerate()
+            // A generic-fallback site: MIR guards it as a fixnum and would
+            // rerun-from-start on every entry that misses; the baseline calls
+            // the builtin. Read from THIS body's ops, before inlining.
+            .any(|(pc, o)| arith_site_takes_generic(o, pc));
         let mut inlined_syms: Vec<crate::emacs_core::intern::SymId> = Vec::new();
         let inline_epoch = obarray.and_then(|ob| {
             let armed = ob.function_epoch();
@@ -2460,23 +2502,28 @@ fn apply_known_fixnum_op(
         // pointer — a silent wrong value (`(1+ 203.0)` -> 35184269711586),
         // live since the float lowering landed. Read the same snapshot the
         // lowering reads: only a non-Float site yields a fixnum here.
-        // `FixnumOnly` and `Other` sites still guard both operands and
-        // range-check, so their result IS a fixnum (or deopts).
+        // A `FixnumOnly` site guards both operands and range-checks, so its
+        // result IS a fixnum (or deopts). An `Other` site's generic fallback
+        // (`arith_site_takes_generic`) returns whatever the builtin does — a
+        // bignum from an overflow — so it is not.
         Op::Add | Op::Sub | Op::Mul | Op::Div => {
             k.pop().ok_or(())?;
             k.pop().ok_or(())?;
-            k.push(active_numeric_feedback(pc) != crate::emacs_core::jit::NumericFeedback::Float);
+            k.push(
+                active_numeric_feedback(pc) != crate::emacs_core::jit::NumericFeedback::Float
+                    && !arith_site_takes_generic(op, pc),
+            );
         }
         // No float lowering: `guard_fixnum` on both operands, range-checked,
-        // retagged -> fixnum.
+        // retagged -> fixnum — unless the site takes the generic fallback.
         Op::Rem | Op::Max | Op::Min => {
             k.pop().ok_or(())?;
             k.pop().ok_or(())?;
-            k.push(true);
+            k.push(!arith_site_takes_generic(op, pc));
         }
         Op::Add1 | Op::Sub1 | Op::Negate => {
             k.pop().ok_or(())?;
-            k.push(true);
+            k.push(!arith_site_takes_generic(op, pc));
         }
         // Operand-consuming ops whose result is NOT a known fixnum: pop `needs`
         // (== the operands consumed for these) and push the results as unknown.
@@ -2793,8 +2840,10 @@ pub(crate) fn baseline_needs_rt(ops: &[Op], has_backedge: bool) -> bool {
         // on every float call. nbody never showed it: its bodies call `sqrt`.
         // AOT publishes no feedback (-> FixnumOnly), so its output is unchanged.
         || ops.iter().enumerate().any(|(pc, o)| {
-            matches!(o, Op::Add | Op::Sub | Op::Mul | Op::Div)
-                && active_numeric_feedback(pc) == crate::emacs_core::jit::NumericFeedback::Float
+            (matches!(o, Op::Add | Op::Sub | Op::Mul | Op::Div)
+                && active_numeric_feedback(pc) == crate::emacs_core::jit::NumericFeedback::Float)
+                // The generic fallback calls `neovm_jit_arith_generic`.
+                || arith_site_takes_generic(o, pc)
         })
         || ops.iter().any(|o| {
             direct_builtin_spec(o).is_some()
