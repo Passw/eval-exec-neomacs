@@ -378,16 +378,19 @@ impl<T: PagedObject> ObjectPage<T> {
         Layout::from_size_align(OBJECT_PAGE_BYTES, OBJECT_PAGE_ALIGN).expect("object page layout")
     }
 
+    /// A fresh page over newly allocated storage.
     pub(super) fn new() -> Self {
+        Self::over_storage(Self::alloc_storage())
+    }
+
+    /// A fresh page over `storage`, 64KB-aligned slot memory from
+    /// `alloc_storage` that no page owns (a released page's, or new). Its
+    /// bytes are garbage either way: every slot is full-header-written when
+    /// allocated.
+    pub(super) fn over_storage(storage: *mut u8) -> Self {
         // Force the per-class layout proofs (compile-time).
         #[allow(clippy::let_unit_value)]
         let () = Self::LAYOUT_OK;
-        let storage = unsafe { alloc::alloc(Self::layout()) };
-        if storage.is_null() {
-            alloc::handle_alloc_error(Self::layout());
-        }
-        #[cfg(test)]
-        T::live_page_counter().fetch_add(1, Ordering::Relaxed);
         Self {
             storage,
             next_index: 0,
@@ -399,6 +402,37 @@ impl<T: PagedObject> ObjectPage<T> {
             retired: false,
             _class: std::marker::PhantomData,
         }
+    }
+
+    /// Slot storage straight from the allocator. The test page counter
+    /// counts these allocations, spare storage included.
+    fn alloc_storage() -> *mut u8 {
+        let storage = unsafe { alloc::alloc(Self::layout()) };
+        if storage.is_null() {
+            alloc::handle_alloc_error(Self::layout());
+        }
+        #[cfg(test)]
+        T::live_page_counter().fetch_add(1, Ordering::Relaxed);
+        storage
+    }
+
+    /// Return `storage` (from `alloc_storage`, owned by no page) to the
+    /// allocator.
+    pub(super) fn free_storage(storage: *mut u8) {
+        #[cfg(test)]
+        T::live_page_counter().fetch_sub(1, Ordering::Relaxed);
+        unsafe { alloc::dealloc(storage, Self::layout()) };
+    }
+
+    /// Dissolve an EMPTY page, keeping its storage for a later page.
+    pub(super) fn into_storage(self) -> *mut u8 {
+        debug_assert_eq!(self.allocated, 0, "only an empty page gives up its storage");
+        debug_assert!(!self.retired, "a retired page is never released");
+        let storage = self.storage;
+        // No slot is allocated, so there is no payload to drop; forgetting
+        // the page skips only the storage free.
+        std::mem::forget(self);
+        storage
     }
 
     #[inline]
@@ -516,9 +550,7 @@ impl<T: PagedObject> Drop for ObjectPage<T> {
                 }
             }
         }
-        #[cfg(test)]
-        T::live_page_counter().fetch_sub(1, Ordering::Relaxed);
-        unsafe { alloc::dealloc(self.storage, Self::layout()) };
+        Self::free_storage(self.storage);
     }
 }
 
@@ -533,6 +565,17 @@ pub(super) struct ObjectArena<T: PagedObject> {
     /// empty young pages are removed after a full sweep; all remaining pages
     /// are freed by this vector's drop at heap teardown (`ObjectPage: Drop`).
     pub(super) pages: Vec<ObjectPage<T>>,
+    /// Storage of removed empty pages, handed to the next new pages before
+    /// the allocator is asked. A page-sized ALIGNED request cannot reuse a
+    /// freed page-sized extent in jemalloc, so without this a loop whose
+    /// garbage empties whole pages each cycle mapped fresh memory for every
+    /// page it refilled: elb nbody grew ~750 MB/s to 1.6 GB resident at a
+    /// 5 MB live set (GNU 60 MB). GNU keeps its aligned blocks the same way
+    /// (`lisp_align_malloc`'s free ablocks).
+    pub(super) spare_storage: Vec<*mut u8>,
+    /// The fewest spare storages held since the last release: that many
+    /// went unused for a whole cycle, and the next release frees them.
+    spare_unused_floor: usize,
     /// Page-base → `pages` index: O(1) page lookup from any slot pointer
     /// (pages are size-aligned, so `ObjectPage::page_base_for_ptr` masks the
     /// base out of the pointer). Retired pages STAY registered (C1).
@@ -549,6 +592,8 @@ impl<T: PagedObject> ObjectArena<T> {
             pages: Vec::new(),
             page_index_by_base: FxHashMap::default(),
             partial_head: PAGE_NONE,
+            spare_storage: Vec::new(),
+            spare_unused_floor: 0,
         }
     }
 
@@ -618,8 +663,15 @@ impl<T: PagedObject> ObjectArena<T> {
             page.set_allocated(index);
             return page.slot_ptr(index);
         }
-        // 3. Fresh 64KB-aligned page.
-        let mut page = ObjectPage::<T>::new();
+        // 3. Fresh 64KB-aligned page, over a released page's storage if one
+        //    is spare.
+        let mut page = match self.spare_storage.pop() {
+            Some(storage) => {
+                self.spare_unused_floor = self.spare_unused_floor.min(self.spare_storage.len());
+                ObjectPage::<T>::over_storage(storage)
+            }
+            None => ObjectPage::<T>::new(),
+        };
         let index = page.bump().expect("fresh arena page must have space");
         page.set_allocated(index);
         let ptr = page.slot_ptr(index);
@@ -739,7 +791,18 @@ impl<T: PagedObject> ObjectArena<T> {
     /// later indices and would invalidate both the sweep cursor and partial
     /// chain. Slot storage has its own stable allocation, so compacting the
     /// `Vec<ObjectPage<T>>` does not move any surviving Lisp object.
+    ///
+    /// A removed page's storage is kept spare for the pages the next cycle
+    /// creates; spare storage no page took during the whole cycle since the
+    /// previous release goes back to the allocator, so what stays spare is
+    /// bounded by one cycle's page turnover.
     pub(super) fn release_empty_pages(&mut self) -> usize {
+        let stale = self.spare_unused_floor.min(self.spare_storage.len());
+        for storage in self.spare_storage.drain(..stale) {
+            ObjectPage::<T>::free_storage(storage);
+        }
+        self.spare_unused_floor = self.spare_storage.len();
+
         let old_len = self.pages.len();
         if !self
             .pages
@@ -749,8 +812,13 @@ impl<T: PagedObject> ObjectArena<T> {
             return 0;
         }
 
-        self.pages
-            .retain(|page| page.allocated != 0 || page.retired);
+        for page in self
+            .pages
+            .extract_if(.., |page| page.allocated == 0 && !page.retired)
+        {
+            self.spare_storage.push(page.into_storage());
+        }
+        self.spare_unused_floor = self.spare_storage.len();
         self.pages.shrink_to_fit();
 
         self.page_index_by_base =
@@ -859,6 +927,14 @@ impl<T: PagedObject> ObjectArena<T> {
             "arena layout accounting lost an allocated slot",
         );
         stats
+    }
+}
+
+impl<T: PagedObject> Drop for ObjectArena<T> {
+    fn drop(&mut self) {
+        for storage in self.spare_storage.drain(..) {
+            ObjectPage::<T>::free_storage(storage);
+        }
     }
 }
 

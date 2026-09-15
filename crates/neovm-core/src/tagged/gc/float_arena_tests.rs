@@ -500,15 +500,27 @@ fn pages_freed_at_heap_drop_body(verify: bool) {
         before + 3,
         "2 full pages + 5 slots must occupy exactly 3 pages",
     );
-    // A GC in between releases pages that have no surviving slots.
+    // A GC in between releases pages that have no surviving slots. Their
+    // storage stays spare for the next cycle's pages...
+    heap.collect_exact(std::iter::empty());
+    assert!(heap.float_arena.pages.is_empty());
+    assert_eq!(heap.float_arena.spare_storage.len(), 3);
+    assert_eq!(LIVE_FLOAT_PAGES.load(Ordering::Relaxed), before + 3);
+    heap.assert_object_arenas_coherent();
+    // ...and a cycle that needs none of it returns it to the allocator.
     heap.collect_exact(std::iter::empty());
     assert_eq!(
         LIVE_FLOAT_PAGES.load(Ordering::Relaxed),
         before,
-        "a completed sweep must release completely empty arena pages",
+        "spare storage unused for a whole cycle must be freed",
     );
-    assert!(heap.float_arena.pages.is_empty());
-    heap.assert_object_arenas_coherent();
+    assert!(heap.float_arena.spare_storage.is_empty());
+    // Teardown frees spare storage too.
+    for i in 0..5 {
+        let _ = heap.alloc_float(i as f64);
+    }
+    heap.collect_exact(std::iter::empty());
+    assert_eq!(LIVE_FLOAT_PAGES.load(Ordering::Relaxed), before + 1);
     drop(heap);
     assert_eq!(
         LIVE_FLOAT_PAGES.load(Ordering::Relaxed),
@@ -814,6 +826,60 @@ fn tenured_owner_keeps_young_page_float_alive() {
 #[test]
 fn tenured_owner_keeps_young_page_float_alive_verified() {
     tenured_owner_keeps_young_page_float_alive_body(true);
+}
+
+/// A page emptied by one cycle lends its storage to the next page the
+/// mutator needs, instead of the allocator mapping another 64KB-aligned
+/// extent (jemalloc cannot hand a freed page-sized extent back for an
+/// aligned request, so elb nbody grew to 1.6 GB). Spare storage the next
+/// cycle leaves unused goes back; a partly reused spare set keeps only
+/// what was taken again.
+#[test]
+fn an_emptied_page_lends_its_storage_to_the_next_page() {
+    crate::test_utils::init_test_tracing();
+    let before = LIVE_FLOAT_PAGES.load(Ordering::Relaxed);
+    let mut heap = TaggedHeap::new();
+    set_tagged_heap(&mut heap);
+    for i in 0..(4 * FLOAT_PAGE_SLOTS) {
+        let _ = heap.alloc_float(i as f64);
+    }
+    let bases: std::collections::HashSet<usize> = heap
+        .float_arena
+        .pages
+        .iter()
+        .map(ObjectPage::base_addr)
+        .collect();
+    assert_eq!(bases.len(), 4);
+    heap.collect_exact(std::iter::empty());
+    assert!(heap.float_arena.pages.is_empty());
+    assert_eq!(heap.float_arena.spare_storage.len(), 4);
+
+    // One page's worth plus one slot: two pages, both over spare storage.
+    let mut kept = Vec::new();
+    for i in 0..(FLOAT_PAGE_SLOTS + 1) {
+        kept.push(heap.alloc_float(i as f64));
+    }
+    assert_eq!(heap.float_arena.pages.len(), 2);
+    for page in &heap.float_arena.pages {
+        assert!(
+            bases.contains(&page.base_addr()),
+            "a new page must reuse a released page's storage"
+        );
+    }
+    assert_eq!(LIVE_FLOAT_PAGES.load(Ordering::Relaxed), before + 4);
+    heap.assert_object_arenas_coherent();
+
+    // The two spares nobody took this cycle go back to the allocator; the
+    // live floats keep both pages.
+    heap.collect_exact(kept.iter().copied());
+    assert_eq!(heap.float_arena.pages.len(), 2);
+    assert!(heap.float_arena.spare_storage.is_empty());
+    assert_eq!(LIVE_FLOAT_PAGES.load(Ordering::Relaxed), before + 2);
+    for (i, f) in kept.iter().enumerate() {
+        assert_eq!(f.xfloat(), i as f64);
+    }
+    drop(heap);
+    assert_eq!(LIVE_FLOAT_PAGES.load(Ordering::Relaxed), before);
 }
 
 /// A deferred sweep visits the pages that existed at mark termination, and
