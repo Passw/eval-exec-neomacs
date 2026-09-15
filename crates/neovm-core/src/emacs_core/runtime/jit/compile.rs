@@ -1091,16 +1091,22 @@ fn compile_bytecode_function_inner(
         //  * loop-opaque: a loop with a shim-lowered op. The MIR tier has no
         //    back-edge poll (quit + GC safepoint), so such a loop would be
         //    uninterruptible. Pure loops keep the tier.
-        //  * generic-call: a `Call`/`Apply`/`CallBuiltinSym` the baseline
-        //    lowers BETTER (speculated native-to-native, CBSym intrinsics)
-        //    — unless the body INLINED something, the one case the MIR
-        //    tier wins across a call (cross-boundary unboxing/elision).
+        //  * generic-call: a `Call`/`Apply`/`CallBuiltinSym` left in the body
+        //    after inlining. The baseline speculates such a site (native-to-
+        //    native `call_spec`/`call_subr_spec`, CBSym intrinsics); the MIR
+        //    tier lowers it through the generic shim. This used to be waived
+        //    when the body inlined SOMETHING, on the theory that cross-
+        //    boundary unboxing wins; measured, it does not: a dhrystone body
+        //    that inlined one callee and kept a speculated call ran the
+        //    generic `neovm_jit_call` at 1.4% of the benchmark's samples and
+        //    cost +1.25% instructions. A body that inlined ALL its calls has
+        //    no generic call left and keeps the tier.
         let plan = lowering::plan_mir_leaf(&mir);
         let reject = if has_float_site {
             Some("gate:float-site")
         } else if plan.has_backedge && plan.has_adapter_site {
             Some("gate:loop-opaque")
-        } else if plan.has_generic_call && inline_epoch.is_none() {
+        } else if plan.has_generic_call {
             Some("gate:generic-call")
         } else {
             None

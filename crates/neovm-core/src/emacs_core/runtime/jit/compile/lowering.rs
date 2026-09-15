@@ -1392,7 +1392,8 @@ pub(crate) struct MirLeafPlan {
     /// shim-calling emitters (a call, a variable op, a builtin, ...).
     pub(crate) has_opaque: bool,
     /// An `Opaque` `Call`/`Apply`/`CallBuiltinSym`: a generic call the
-    /// baseline lowers BETTER (speculated native-to-native, CBSym intrinsics).
+    /// baseline lowers BETTER (speculated native-to-native, CBSym intrinsics),
+    /// so the tier gate sends such a body to the baseline.
     pub(crate) has_generic_call: bool,
     /// Any op that goes through a runtime shim: an `Opaque`, an `Eq` (the
     /// symbols-with-position slow path), a `symbolp`/`integerp`/`numberp`.

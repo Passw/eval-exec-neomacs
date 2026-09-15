@@ -908,11 +908,30 @@ fn mir_rooting_skip_on_an_inferred_fixnum_param_across_an_allocating_call() {
         mir::LispType::Fixnum,
         "i is a fixnum on both edges"
     );
-    let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("F compiles");
-    assert!(
-        leaf.inline_epoch().is_some(),
-        "F inlined sq -> took the MIR tier (not the baseline)"
+    // The tier gate sends a body with a residual generic call to the baseline,
+    // so drive the MIR lowering directly: inline sq as the production path
+    // would, then lower what is left.
+    let mut mir = mir;
+    let sq_mir = mir::build_mir(&[Op::Dup, Op::Mul, Op::Return], &[], 1).expect("sq builds");
+    let n = mir::inline_pure_single_block_callees(
+        &mut mir,
+        &|v| (v.bits() == sq_sym.bits()).then(|| sq_mir.clone()),
+        8,
+        &mut Vec::new(),
     );
+    assert_eq!(n, 1, "sq inlines");
+    let merge = mir
+        .blocks
+        .iter()
+        .find(|b| b.bytecode_pc == 5)
+        .expect("merge");
+    assert_eq!(
+        mir::infer_value_types(&mir)[merge.params[1].0 as usize],
+        mir::LispType::Fixnum,
+        "i is still a fixnum after inlining"
+    );
+    let leaf = lower_mir_pure(&mir).expect("F lowers in the MIR tier");
+    assert_eq!(leaf.tier, super::leaf::LeafTier::Mir);
     assert!(leaf.has_side_effects, "F keeps the residual call to g");
     for (c, want) in [(Value::T, 1i64), (Value::NIL, 2)] {
         match leaf.call(ctx as *mut u8, &[c]) {
@@ -1111,14 +1130,18 @@ fn mir_call_lowering_runs_a_non_inlined_call() {
 }
 
 #[test]
-fn inline_plus_residual_call_takes_mir_tier() {
+fn inline_plus_residual_call_takes_the_baseline() {
     use crate::emacs_core::eval::Context;
     use crate::emacs_core::intern::SymId;
     // F = (g (sq a)): sq = (* x x) [inlinable pure single-block]; g = a 2-block
-    // (if y (1+ y) 0) [non-inlinable]. The inliner splices sq, leaving a residual
-    // Call(g) + inline_epoch=Some, so the tier gate routes F to the MIR tier's
-    // calls-slice (sq's arithmetic unboxed up to the g-call boundary). Verifies
-    // the production compile path end-to-end: inlined + a residual call.
+    // (if y (1+ y) 0) [non-inlinable]. The inliner splices sq, but a residual
+    // Call(g) remains — a site the baseline speculates and the MIR tier would
+    // lower through the generic shim. Measured on dhrystone, inlining one
+    // callee did not pay for that (+1.25% instructions), so the tier gate
+    // (`gate:generic-call`) sends F to the baseline. Production path end to end.
+    // The baseline's profitability gate (calls > arithmetic) would refuse F
+    // outright; this test is about the tier choice, so switch it off.
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
     let mut ev = Context::new();
     let ctx = &mut ev as *mut Context;
     let mk_sym = |name: &str| {
@@ -1177,13 +1200,14 @@ fn inline_plus_residual_call_takes_mir_tier() {
     f.constants = vec![g_sym, sq_sym].into();
     f.max_stack = 16;
     let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("F compiles");
-    assert!(
-        leaf.inline_epoch().is_some(),
-        "F inlined sq -> took the MIR tier (not the baseline)"
+    assert_eq!(
+        leaf.tier,
+        super::leaf::LeafTier::Baseline,
+        "a residual generic call keeps F on the baseline"
     );
     assert!(
-        leaf.has_side_effects,
-        "F has a residual non-inlined call (g) lowered in the MIR tier"
+        leaf.inline_epoch().is_none(),
+        "the baseline inlines nothing"
     );
     // F(3) = g(sq(3)) = g(9) = 1+9 = 10.
     match leaf.call(ctx as *mut u8, &[Value::make_int(3)]) {
