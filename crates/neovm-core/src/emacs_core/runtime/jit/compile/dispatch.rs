@@ -90,6 +90,42 @@ fn pure_get(ctx: &Context, symbol: Value, prop: Value) -> Result<Value, Flow> {
         .unwrap_or(Value::NIL))
 }
 
+/// The unary twin of [`JitBuiltin2Pure`]: same contract.
+pub(crate) type JitBuiltin1Pure = fn(&Context, Value) -> Result<Value, Flow>;
+
+fn pure_length(_: &Context, sequence: Value) -> Result<Value, Flow> {
+    b::builtin_length_value(sequence)
+}
+fn pure_symbol_value(ctx: &Context, symbol_value: Value) -> Result<Value, Flow> {
+    // `builtin_symbol_value_1`: the void-variable error reports the argument
+    // as given (a symbol-with-pos keeps its wrapper).
+    let symbol = b::expect_symbol_id_checked(&symbol_value, ctx.symbols_with_pos_enabled)?;
+    match ctx.visible_runtime_variable_value_by_id(symbol)? {
+        Some(value) => Ok(value),
+        None => Err(signal(
+            crate::emacs_core::error::LispCondition::VoidVariable,
+            vec![symbol_value],
+        )),
+    }
+}
+fn pure_symbol_function(ctx: &Context, symbol_value: Value) -> Result<Value, Flow> {
+    let symbol = b::expect_symbol_id_checked(&symbol_value, ctx.symbols_with_pos_enabled)?;
+    b::symbol_function_by_id(ctx.obarray(), symbol)
+}
+fn pure_nreverse(_: &Context, arg: Value) -> Result<Value, Flow> {
+    b::nreverse_value(arg)
+}
+
+/// [`JIT_BUILTIN1`] entries that are [`JitBuiltin1Pure`], index for index.
+/// `jit_builtin1_pure_matches_the_table` holds every entry to the rooted
+/// builtin's answers.
+pub(crate) static JIT_BUILTIN1_PURE: [Option<JitBuiltin1Pure>; 4] = [
+    Some(pure_length),          // 0
+    Some(pure_symbol_value),    // 1
+    Some(pure_symbol_function), // 2
+    Some(pure_nreverse),        // 3
+];
+
 /// [`JIT_BUILTIN2`] entries that are [`JitBuiltin2Pure`], index for index.
 /// `set` runs variable watchers and `fset` redefines functions, so both keep
 /// the rooted path; `string=`/`string<` go through `typed_subr!`'s argument
@@ -177,6 +213,22 @@ pub(crate) fn direct_builtin_spec(op: &Op) -> Option<(u8, usize)> {
 pub extern "C" fn neovm_jit_builtin1(ctx: *mut u8, idx: i64, a: i64, out: *mut i64) -> i64 {
     jit_shim_contain!(ctx, STATUS_SIGNAL, {
         let a = Value::from_bits(a as usize);
+        if let Some(pure) = JIT_BUILTIN1_PURE[idx as usize] {
+            // No collection can run (see `JitBuiltin2Pure`): no scratch roots.
+            // SAFETY: see neovm_jit_call's function-level contract.
+            let ctx = unsafe { &*(ctx as *const Context) };
+            return match pure(ctx, a) {
+                Ok(value) => {
+                    // SAFETY: `out` is the generated code's result stack slot.
+                    unsafe { *out = value.bits() as i64 };
+                    STATUS_OK
+                }
+                Err(flow) => {
+                    stash_pending_flow(flow);
+                    STATUS_SIGNAL
+                }
+            };
+        }
         let saved = save_scratch_gc_roots();
         push_scratch_gc_root(a);
         // SAFETY: see neovm_jit_call's function-level contract.

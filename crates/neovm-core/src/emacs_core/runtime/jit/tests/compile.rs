@@ -2336,16 +2336,17 @@ fn mir_pure_lowering_handles_a_call() {
 }
 
 /// Rooting sites in one MIR body share ONE hoisted root window: the prologue
-/// loads the frame base and checks capacity once, the first `length` site
+/// loads the frame base and checks capacity once, the first `set` site
 /// stores the residual `[l h]`, and the next two sites (a call, a second
-/// `length`) find the same values already in the window and elide their
-/// stores. The elision is only sound if the slots really still hold them, so
+/// `set`) find the same values already in the window and elide their
+/// stores. (`set` because it runs variable watchers, so it roots for good;
+/// `length` was the example until it became GC-free.) The elision is only sound if the slots really still hold them, so
 /// the middle site is a call to a function that runs an EXACT collection
 /// (which ignores the native stack) and then reallocates 4096 conses: a
 /// dropped root for `h` would be swept and its slot reused, reading back
 /// `(0 . 0)`-shaped garbage instead of `(1 . 2)`.
 ///
-///     (lambda (l) (let ((h (cons 1 2))) (length l) (gcchurn) (length l) h))
+///     (lambda (l) (let ((h (cons 1 2))) (set 'v l) (gcchurn) (set 'v l) h))
 #[test]
 fn mir_hoists_the_root_window_across_shim_sites() {
     use crate::emacs_core::eval::Context;
@@ -2386,18 +2387,25 @@ fn mir_hoists_the_root_window_across_shim_sites() {
         Op::Constant(0), // 1                 [l 1]
         Op::Constant(1), // 2                 [l 1 2]
         Op::Cons,        // h = (1 . 2)       [l h]
-        Op::StackRef(1), // l                 [l h l]
-        Op::Length,      // residual [l h]    stores 2
+        Op::Constant(3), // 'v                [l h v]
+        Op::StackRef(2), // l                 [l h v l]
+        Op::Set,         // residual [l h]    stores 2
         Op::Pop,         //                   [l h]
         Op::Constant(2), // 'gcchurn          [l h g]
         Op::Call(0),     // residual [l h]    elides 2
         Op::Pop,         //                   [l h]
-        Op::StackRef(1), // l                 [l h l]
-        Op::Length,      // residual [l h]    elides 2
+        Op::Constant(3), // 'v                [l h v]
+        Op::StackRef(2), // l                 [l h v l]
+        Op::Set,         // residual [l h]    elides 2
         Op::Pop,         //                   [l h]
         Op::Return,      // h
     ];
-    let constants = [Value::make_int(1), Value::make_int(2), churn_sym];
+    let constants = [
+        Value::make_int(1),
+        Value::make_int(2),
+        churn_sym,
+        Value::symbol("jit-mir-hoist-var"),
+    ];
     let mir = mir::build_mir(&ops, &constants, 1).expect("MIR builds");
     let plan = super::lowering::plan_mir_leaf(&mir);
     assert_eq!(plan.rooting_sites, 3);
@@ -2422,25 +2430,27 @@ fn mir_hoists_the_root_window_across_shim_sites() {
 /// `RootWinCarry` rule 1 at a count of ZERO: a call whose live residual is
 /// all type-skipped stores nothing, runs its callee with `top` at the frame
 /// base, and so must empty the store record. `k` is a fixnum constant: the
-/// adapter's `length` sites store it (it is a retagged value, not a literal
+/// adapter's `set` sites store it (it is a retagged value, not a literal
 /// immediate), but the MIR call arm skips it by type.
 ///
-///     (let ((k 7)) (length L) (f) (length L) k)
+///     (let ((k 7)) (set 'L 'L) (f) (set 'L 'L) k)
 ///
-/// The second `length` must store `k` again — a nested activation inside
+/// The second `set` must store `k` again — a nested activation inside
 /// `(f)` may have overwritten the slot. Before the fix it was elided.
 #[test]
 fn mir_call_that_roots_nothing_forgets_the_store_record() {
     let ops = vec![
         Op::Constant(0), // k = 7        [k]
         Op::Constant(1), // L            [k L]
-        Op::Length,      // residual [k]: stores k
+        Op::Dup,         //              [k L L]
+        Op::Set,         // residual [k]: stores k
         Op::Pop,         //              [k]
         Op::Constant(2), // f            [k f]
         Op::Call(0),     // residual [k]: Fixnum, skipped -> stores nothing
         Op::Pop,         //              [k]
         Op::Constant(1), // L            [k L]
-        Op::Length,      // residual [k]: must store k again
+        Op::Dup,         //              [k L L]
+        Op::Set,         // residual [k]: must store k again
         Op::Pop,         //              [k]
         Op::Return,
     ];
@@ -2455,7 +2465,7 @@ fn mir_call_that_roots_nothing_forgets_the_store_record() {
     assert_eq!(
         super::lowering::rootwin_counters(),
         (2, 0),
-        "both length sites store k; (1, 1) means the call left a stale record"
+        "both set sites store k; (1, 1) means the call left a stale record"
     );
 }
 
@@ -2468,7 +2478,8 @@ fn mir_store_record_is_truncated_to_each_sites_count() {
         Op::StackRef(0), // [a a]
         Op::StackRef(1), // [a a a]
         Op::Constant(0), // [a a a L]
-        Op::Length,      // residual [a a a]: 3 stores
+        Op::Dup,         // [a a a L L]
+        Op::Set,         // residual [a a a]: 3 stores
         Op::DiscardN(3), // [a]
         Op::Constant(1), // [a f]
         Op::Call(0),     // residual [a]: slot 0 elided, record truncated to 1
@@ -2476,7 +2487,8 @@ fn mir_store_record_is_truncated_to_each_sites_count() {
         Op::StackRef(0), // [a a]
         Op::StackRef(1), // [a a a]
         Op::Constant(0), // [a a a L]
-        Op::Length,      // residual [a a a]: slot 0 elided, slots 1-2 stored
+        Op::Dup,         // [a a a L L]
+        Op::Set,         // residual [a a a]: slot 0 elided, slots 1-2 stored
         Op::DiscardN(3), // [a]
         Op::Return,
     ];
@@ -2775,6 +2787,91 @@ fn jit_builtin2_pure_matches_the_table() {
         }
     }
     assert_eq!(checked, 11 * pool_src.len() * pool_src.len());
+}
+
+/// The unary twin: every `JIT_BUILTIN1_PURE` entry answers exactly as the
+/// rooted builtin at its index (values and signals), each argument built in
+/// the same evaluation that feeds the call.
+#[test]
+fn jit_builtin1_pure_matches_the_table() {
+    use super::dispatch::{JIT_BUILTIN1, JIT_BUILTIN1_PURE};
+    use crate::emacs_core::error::Flow;
+    use crate::emacs_core::eval::Context;
+    let mut ev = Context::new();
+    ev.eval_str(
+        "(progn (defvar jit-pure1-var 7) (defvar jit-pure1-unbound) (fset 'jit-pure1-fn 'car))",
+    )
+    .expect("setup");
+    let pool_src = [
+        "nil",
+        "t",
+        "5",
+        "1.5",
+        "'jit-pure1-var",
+        "'jit-pure1-unbound",
+        "'jit-pure1-fn",
+        "'jit-pure1-never",
+        "(list 1 2 3)",
+        "(cons 1 2)",
+        "(vector 1 2 3)",
+        "(copy-sequence \"h\\u00e9llo\")",
+        "(make-bool-vector 3 t)",
+        "(record 'foo 1)",
+    ];
+    let outcome = |r: Result<Value, Flow>| -> String {
+        match r {
+            Ok(v) => crate::emacs_core::print::print_value(&v),
+            Err(Flow::Signal(sig)) => format!(
+                "signal {} {:?}",
+                sig.symbol_name(),
+                sig.data
+                    .iter()
+                    .map(crate::emacs_core::print::print_value)
+                    .collect::<Vec<_>>()
+            ),
+            Err(other) => format!("{other:?}"),
+        }
+    };
+    for (idx, pure) in JIT_BUILTIN1_PURE.iter().enumerate() {
+        let Some(pure) = pure else { continue };
+        for src in pool_src {
+            let a = ev.eval_str(src).expect("arg");
+            let rooted = outcome(JIT_BUILTIN1[idx](&mut ev, a));
+            let a = ev.eval_str(src).expect("arg");
+            let root_free = outcome(pure(&ev, a));
+            assert_eq!(root_free, rooted, "JIT_BUILTIN1[{idx}] on {src}");
+        }
+    }
+}
+
+/// The unary twin of `gc_free_builtin_sites_root_no_residual`: two `length`
+/// sites with a live residual `[l]` store no root, and both answer.
+///
+///     (lambda (l) (length l) (length l))
+#[test]
+fn gc_free_unary_builtin_sites_root_no_residual() {
+    use crate::emacs_core::eval::Context;
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    let ops = [
+        Op::StackRef(0), // l   [l l]
+        Op::Length,      // residual [l]
+        Op::Pop,         //     [l]
+        Op::StackRef(0), // l   [l l]
+        Op::Length,      // residual [l]
+        Op::Return,
+    ];
+    let leaf = lower_leaf(&ops, &[], 1).expect("lowers");
+    assert_eq!(
+        super::lowering::rootwin_counters(),
+        (0, 0),
+        "a GC-free unary builtin site stores no residual root"
+    );
+    let l = ev.eval_str("(list 1 2 3)").expect("l");
+    let NativeRun::Ok(bits) = leaf.call(ctx, &[l]) else {
+        panic!("length must run natively");
+    };
+    assert_eq!(Value::from_bits(bits), Value::make_int(3));
 }
 
 /// A GC-free builtin site roots nothing: two `memq` sites with a live

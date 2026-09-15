@@ -4946,7 +4946,11 @@ pub(crate) fn lower_simple_op(
             // nothing and cannot start a nested activation, so the root-window
             // store record stays exact across it (`RootWinCarry` rule 1 applies
             // only to sites that can).
-            let gc_free = arity == 2 && dispatch::JIT_BUILTIN2_PURE[idx].is_some();
+            let gc_free = match arity {
+                1 => dispatch::JIT_BUILTIN1_PURE[idx].is_some(),
+                2 => dispatch::JIT_BUILTIN2_PURE[idx].is_some(),
+                _ => false,
+            };
             let saved = if stack.is_empty() || gc_free {
                 CondRoots::NONE
             } else {

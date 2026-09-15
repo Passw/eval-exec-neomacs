@@ -437,7 +437,7 @@ pub(crate) fn builtin_length_1(_eval: &mut super::eval::Context, sequence: Value
     builtin_length_value(sequence)
 }
 
-fn builtin_length_value(sequence: Value) -> EvalResult {
+pub(crate) fn builtin_length_value(sequence: Value) -> EvalResult {
     match sequence.kind() {
         ValueKind::Nil => Ok(Value::fixnum(0)),
         ValueKind::Veclike(VecLikeType::Lambda) | ValueKind::Veclike(VecLikeType::ByteCode) => {
@@ -996,7 +996,7 @@ pub(crate) fn builtin_nreverse_1(_eval: &mut super::eval::Context, arg: Value) -
     nreverse_value(arg)
 }
 
-fn nreverse_value(arg: Value) -> EvalResult {
+pub(crate) fn nreverse_value(arg: Value) -> EvalResult {
     match arg.kind() {
         ValueKind::Nil => Ok(Value::NIL),
         ValueKind::Cons => {
