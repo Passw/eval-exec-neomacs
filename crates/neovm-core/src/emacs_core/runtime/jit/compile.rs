@@ -83,6 +83,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::backend::BackendError;
+use super::inline;
 use super::mir;
 use crate::emacs_core::bytecode::chunk::GnuByteOffsetMapEntry;
 use crate::emacs_core::bytecode::opcode::Op;
@@ -958,6 +959,16 @@ impl Drop for NumericFeedbackScope {
     }
 }
 
+/// [`publish_numeric_feedback`] for a vector built elsewhere — the fused
+/// body's, whose spliced slots carry the CALLEE's feedback.
+pub(crate) fn publish_numeric_feedback_vec(
+    seen: Vec<crate::emacs_core::jit::NumericFeedback>,
+) -> NumericFeedbackScope {
+    NumericFeedbackScope(Some(
+        ACTIVE_NUMERIC_FEEDBACK.with(|v| std::mem::replace(&mut *v.borrow_mut(), seen)),
+    ))
+}
+
 pub(crate) fn publish_numeric_feedback(f: &ByteCodeFunction) -> NumericFeedbackScope {
     let rt = f.jit_runtime();
     let seen: Vec<_> = (0..f.executable_ops().len())
@@ -1244,17 +1255,46 @@ fn compile_bytecode_function_inner(
             return Ok(leaf);
         }
     }
+    // Splice constant-bytecode callees into the body before any of the
+    // baseline's analyses run, so the CFG, the known-fixnum fixpoint, call
+    // speculation and the per-slot variables all see one fused function
+    // (`inline::fuse_calls`). The profitability gate below then judges the
+    // fused shape: a body whose calls are gone is no longer call-dominated.
+    let fused = inline::jit_inline_on()
+        .then(|| {
+            let caller_feedback: Vec<_> = (0..ops.len()).map(active_numeric_feedback).collect();
+            inline::fuse_calls(
+                ops,
+                constants,
+                f.executable_gnu_byte_offset_map(),
+                native_arity,
+                &caller_feedback,
+            )
+        })
+        .flatten()
+        .map(std::rc::Rc::new);
+    let (ops, constants) = match &fused {
+        Some(fused) => (fused.ops.as_slice(), fused.constants.as_slice()),
+        None => (ops, constants),
+    };
     // The MIR tier above already claimed any body its inlining/unboxing makes
     // worthwhile. What's left goes to the baseline, whose per-op call shims aren't
     // worth it for a call-dominated body — keep those on the interpreter.
     if !body_is_jit_profitable(ops, constants) {
         return Err(CompileError::NotProfitable);
     }
+    let _fused_scope = fused.clone().map(inline::FusedScope::enter);
+    let _fused_feedback = fused
+        .as_ref()
+        .map(|fused| publish_numeric_feedback_vec(fused.feedback.clone()));
     let mut leaf = lower_leaf_full(
         ops,
         constants,
         native_arity,
-        f.executable_gnu_byte_offset_map(),
+        match &fused {
+            Some(fused) => fused.offset_map.as_deref(),
+            None => f.executable_gnu_byte_offset_map(),
+        },
         obarray,
         dynamic_prefix,
     )?;
@@ -1869,12 +1909,15 @@ fn find_spec_sites(
 
 /// The symbol-constant tags one op leaves on [`find_spec_sites`]' abstract
 /// operand stack suffix (control-flow edges are [`spec_tag_entry_states`]').
-fn spec_tag_transfer(op: &Op, constants: &[Value], tags: &mut Vec<Option<u16>>) {
+pub(crate) fn spec_tag_transfer(op: &Op, constants: &[Value], tags: &mut Vec<Option<u16>>) {
     match op {
         Op::Constant(cidx) => {
+            // A SYMBOL constant (a speculation callee) or a BYTECODE constant
+            // (an inlining callee, `inline::fuse_calls`); every consumer
+            // re-checks which it has.
             let tag = constants
                 .get(*cidx as usize)
-                .and_then(|v| v.as_symbol_id())
+                .filter(|v| v.as_symbol_id().is_some() || v.is_bytecode())
                 .map(|_| *cidx);
             tags.push(tag);
         }
@@ -1961,7 +2004,7 @@ fn spec_tag_transfer(op: &Op, constants: &[Value], tags: &mut Vec<Option<u16>>) 
 /// Only a selection heuristic: a switch target or handler entry this does not
 /// model starts unknown or from its modeled predecessors, and the lowering
 /// re-checks every cross-block callee at run time.
-fn spec_tag_entry_states(
+pub(crate) fn spec_tag_entry_states(
     ops: &[Op],
     constants: &[Value],
     leaders: &[usize],
@@ -3818,6 +3861,34 @@ fn build_leaf_fn<M: Module>(
             let mut terminated = false;
             for (off, op) in ops[l..end].iter().enumerate() {
                 let i = l + off;
+                // An inlined region's ops deopt to the CALL they replaced,
+                // with the caller's pre-call stack — captured here, at the
+                // region's first op, where the stack still holds
+                // `[...residual, callee, args]`.
+                if let Some(fused) = inline::active_fused() {
+                    match fused.region_at(i) {
+                        Some(region) if i == region.start => {
+                            let region = region.clone();
+                            lowering::set_active_region(Some(lowering::RegionDeopt {
+                                call_site_pc: region.call_site_pc,
+                                stack: stack.clone(),
+                                stack_raw: stack_raw.clone(),
+                            }));
+                            // ...and the splice is a speculation, so check the
+                            // slot still holds the callee whose body is next.
+                            lowering::emit_region_entry_guard(
+                                &mut fb,
+                                &region,
+                                handlers.len(),
+                                &stack,
+                                &stack_raw,
+                                &mut pending_deopt,
+                            );
+                        }
+                        None => lowering::set_active_region(None),
+                        _ => {}
+                    }
+                }
                 // Terminators consume / snapshot / spill the operand stack as tagged
                 // Values; force-tag any raw slots first (the block's raw state is
                 // discarded after the terminator, so no per-pop lockstep is needed
@@ -4240,6 +4311,9 @@ pub use dispatch::*;
 #[cfg(test)]
 #[path = "tests/array_shims.rs"]
 mod array_shim_tests;
+#[cfg(test)]
+#[path = "tests/inline.rs"]
+mod inline_tests;
 #[cfg(test)]
 #[path = "tests/compile.rs"]
 mod tests;

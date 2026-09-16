@@ -91,6 +91,36 @@ thread_local! {
     /// tier: the ops that bail hot bodies most often go first.
     static MIR_BAIL_REASONS: std::cell::RefCell<std::collections::HashMap<String, u64>> =
         std::cell::RefCell::new(std::collections::HashMap::new());
+
+    /// `NEOVM_JIT_COMPILE_STATS=1`: what the bytecode fuser did at each call
+    /// site it looked at — `fused` once per spliced region, and one
+    /// `reject:<why>` per site it declined. The reject keys are the widening
+    /// worklist: the reason that dominates a real workload is the admission
+    /// rule worth relaxing next.
+    static INLINE_CENSUS: std::cell::RefCell<std::collections::HashMap<String, u64>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// Record one fuser verdict (compile-time only; never on a hot path).
+pub(crate) fn record_inline(key: impl Into<String>) {
+    if !summary_enabled() {
+        return;
+    }
+    INLINE_CENSUS.with(|m| *m.borrow_mut().entry(key.into()).or_insert(0) += 1);
+}
+
+/// Top-N fuser verdicts, most frequent first, for the summary line.
+pub(crate) fn inline_census_summary(n: usize) -> String {
+    INLINE_CENSUS.with(|m| {
+        let m = m.borrow();
+        let mut v: Vec<(&String, &u64)> = m.iter().collect();
+        v.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+        v.iter()
+            .take(n)
+            .map(|(k, c)| format!("{k}={c}"))
+            .collect::<Vec<_>>()
+            .join(",")
+    })
 }
 
 /// Record one MIR-tier bail reason (compile-time only; never on a hot path).
@@ -302,6 +332,10 @@ fn record_dispatch_enabled(said_compiled: bool) {
         if stats.dispatch_consulted.is_multiple_of(50_000) {
             eprintln!("[neovm-jit-dispatch] {}", format_summary(&stats));
             eprintln!("[neovm-jit-mir-bails] {}", mir_bail_summary(16));
+            let inline = inline_census_summary(16);
+            if !inline.is_empty() {
+                eprintln!("[neovm-jit-inline] {inline}");
+            }
         }
     });
 }

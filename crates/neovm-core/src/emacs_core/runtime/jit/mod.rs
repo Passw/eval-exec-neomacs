@@ -94,6 +94,9 @@ pub mod compile;
 #[cfg(feature = "jit")]
 pub mod cache;
 
+/// Bytecode-level inlining (see the module docs).
+pub mod inline;
+
 /// MIR: typed SSA IR for the optimizing Tier-2 (above the baseline `compile`).
 /// Live: `compile::compile_bytecode_function_inner` builds the MIR for pure
 /// required-only bodies, runs the pure inliner + type/unboxing/guard-elision and

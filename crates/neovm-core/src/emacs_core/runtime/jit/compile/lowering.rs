@@ -3744,12 +3744,83 @@ pub(crate) struct PendingDeopt {
     pub(crate) block: Block,
     pub(crate) pc: usize,
     pub(crate) handlers_len: usize,
+    /// The framestate of the INLINED region this site sits in, if any: a
+    /// deopt there resumes the interpreter at the call the region replaced,
+    /// with the caller's pre-call stack, and re-runs the whole call.
+    pub(crate) region: Option<RegionDeopt>,
     pub(crate) stack: Vec<ClifValue>,
     /// Per-slot raw mask snapshot (cross-op unboxing): `true` slots hold an
     /// untagged i64 and must be retagged in the cold deopt block before the
     /// framestate spill, since `run_resumed_frame` reads them back as tagged
     /// `Value`s.
     pub(crate) stack_raw: Vec<bool>,
+}
+
+/// What a deopt inside an inlined region resumes with: the caller's operand
+/// stack as it stood before the call (its residual, the callee object, and
+/// the arguments), and the caller pc of that call. Captured once at region
+/// entry — the region's own code never touches those slots, and re-reading
+/// the argument slots later would be wrong anyway, since a callee may
+/// `setq` its own parameter.
+#[derive(Clone)]
+pub(crate) struct RegionDeopt {
+    pub(crate) call_site_pc: usize,
+    pub(crate) stack: Vec<ClifValue>,
+    pub(crate) stack_raw: Vec<bool>,
+}
+
+thread_local! {
+    /// The region the lowering is inside, for every `deopt_site` it makes.
+    static ACTIVE_REGION: std::cell::RefCell<Option<RegionDeopt>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Enter (or leave) an inlined region for the ops lowered next.
+pub(crate) fn set_active_region(region: Option<RegionDeopt>) {
+    ACTIVE_REGION.with(|r| *r.borrow_mut() = region);
+}
+
+/// Check, at a spliced region's first op, that the callee slot still holds the
+/// object whose body was spliced — and deopt to the call if it does not.
+///
+/// The constant-propagation that picked the site is a SELECTION heuristic, not
+/// a proof: it does not model jump-table edges, so a block reachable only
+/// through a `Switch` can inherit a callee tag from an unrelated predecessor.
+/// The baseline's own `Op::Call` speculation answers this the same way — bake
+/// the expected callee, re-check it at run time — and here the deopt it needs
+/// already exists, since a region deopt replays the whole call.
+///
+/// Must be called with `set_active_region` already set for this region, so the
+/// site it queues carries the region's framestate.
+pub(crate) fn emit_region_entry_guard(
+    fb: &mut FunctionBuilder,
+    region: &super::super::inline::InlineRegion,
+    handlers_len: usize,
+    stack: &[ClifValue],
+    stack_raw: &[bool],
+    pending: &mut Vec<PendingDeopt>,
+) {
+    // The callee object sits one slot below the first argument.
+    let Some(slot) = region.frame_base.checked_sub(1) else {
+        return;
+    };
+    let (Some(&v), Some(&raw)) = (stack.get(slot), stack_raw.get(slot)) else {
+        return;
+    };
+    let dsite = deopt_site(
+        fb,
+        region.call_site_pc,
+        handlers_len,
+        stack,
+        stack_raw,
+        pending,
+    );
+    // A raw slot holds an untagged fixnum, which is never a bytecode object:
+    // retagging makes the comparison false, so such a site simply deopts.
+    let v = if raw { retag_fixnum(fb, v) } else { v };
+    let expected = fb.ins().iconst(types::I64, region.callee_bits as i64);
+    let same = fb.ins().icmp(IntCC::Equal, v, expected);
+    emit_guard(fb, dsite, same);
 }
 
 /// Queue (and return) the precise-deopt block for the guard-emitting op at
@@ -3763,10 +3834,20 @@ pub(crate) fn deopt_site(
     pending: &mut Vec<PendingDeopt>,
 ) -> Block {
     let block = fb.create_block();
+    let region = ACTIVE_REGION.with(|r| r.borrow().clone());
+    // `pc` indexes the ops being LOWERED, which after inlining is the fused
+    // body — but a deopt resumes the interpreter in the original one, so an
+    // unmapped fused index would be a wrong-instruction (or out-of-range)
+    // resume. Inside a region the region supplies the call's own pc instead.
+    let pc = match (&region, super::super::inline::active_fused()) {
+        (Some(_), _) | (None, None) => pc,
+        (None, Some(fused)) => fused.caller_pc(pc).unwrap_or(pc),
+    };
     pending.push(PendingDeopt {
         block,
         pc,
         handlers_len,
+        region,
         stack: stack.to_vec(),
         stack_raw: stack_raw.to_vec(),
     });
@@ -3853,20 +3934,27 @@ pub(crate) fn emit_pending_deopts(
                 meta_handlers,
             } => (spill_base, meta_pc, meta_depth, meta_handlers),
         };
-        for (j, &v) in pd.stack.iter().enumerate() {
+        // Inside an inlined region the interpreter must resume at the CALL,
+        // with the stack the caller had before it — the region's own operand
+        // stack means nothing to it.
+        let (pc, stack, stack_raw) = match &pd.region {
+            Some(region) => (
+                region.call_site_pc,
+                region.stack.as_slice(),
+                region.stack_raw.as_slice(),
+            ),
+            None => (pd.pc, pd.stack.as_slice(), pd.stack_raw.as_slice()),
+        };
+        for (j, &v) in stack.iter().enumerate() {
             // Retag raw fixnum slots in the COLD deopt block (zero hot-path cost):
             // the framestate is read back as tagged Values by run_resumed_frame.
-            let tagged = if pd.stack_raw[j] {
-                retag_fixnum(fb, v)
-            } else {
-                v
-            };
+            let tagged = if stack_raw[j] { retag_fixnum(fb, v) } else { v };
             fb.ins()
                 .store(MemFlagsData::trusted(), tagged, spill_base, (j * 8) as i32);
         }
-        let pc_v = fb.ins().iconst(types::I64, pd.pc as i64);
+        let pc_v = fb.ins().iconst(types::I64, pc as i64);
         fb.ins().store(MemFlagsData::trusted(), pc_v, meta_pc, 0);
-        let depth_v = fb.ins().iconst(types::I64, pd.stack.len() as i64);
+        let depth_v = fb.ins().iconst(types::I64, stack.len() as i64);
         fb.ins()
             .store(MemFlagsData::trusted(), depth_v, meta_depth, 0);
         let h_v = fb.ins().iconst(types::I64, pd.handlers_len as i64);
