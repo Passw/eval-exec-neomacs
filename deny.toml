@@ -54,4 +54,6 @@ allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = [
   "https://github.com/eval-exec/cosmic-text",
   "https://github.com/eval-exec/freetype-sys",
+  # Pinned Wayland popup-lifetime and inner-size-hint fixes in Cargo.toml.
+  "https://github.com/eval-exec/winit",
 ]
