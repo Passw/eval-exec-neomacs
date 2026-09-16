@@ -1120,7 +1120,7 @@ struct RetainedFrameState {
 /// point.
 fn visible_char_bound(params: &WindowParams) -> (usize, usize) {
     let cols = (params.text_bounds.width / params.char_width.max(1.0)).ceil() as usize;
-    let rows = (params.text_bounds.height / params.char_height.max(1.0)).ceil() as usize;
+    let rows = params.source_interpretation_rows();
     let screenful = rows.saturating_mul(cols).max(1);
     let first = params.window_start.max(0) as usize;
     (
@@ -3493,15 +3493,8 @@ impl LayoutEngine {
         let accessible_start = params.accessible_start_charpos().get();
         let accessible_end = params.accessible_end_charpos().get();
         let window_start = params.window_start_charpos().get().max(accessible_start);
-        let text_height = params.bounds.height - params.mode_line_height;
-        let max_rows = if let Some(count) = params.measurement_rows {
-            count.get() as i64
-        } else if params.char_height > 0.0 {
-            (text_height / params.char_height).ceil() as i64
-        } else {
-            50
-        };
-        let fontify_end = (window_start + max_rows * 200).min(accessible_end);
+        let max_rows = i64::try_from(params.source_interpretation_rows()).unwrap_or(i64::MAX);
+        let fontify_end = window_start.saturating_add(max_rows.saturating_mul(200)).min(accessible_end);
         let Some(freshness_before_fontification) =
             evaluator.window_layout_attempt_freshness(frame_id, window_id, buf_id)
         else {

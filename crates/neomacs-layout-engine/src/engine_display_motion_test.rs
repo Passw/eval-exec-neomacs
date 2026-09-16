@@ -4,6 +4,29 @@ use super::*;
 use neovm_core::window::WindowLayoutQueryOutcome;
 
 #[test]
+fn offscreen_row_queries_preserve_automatic_composition_metrics() {
+    use neovm_core::window::{DisplayPointRole, WindowLayoutQueryScope};
+    use std::num::NonZeroUsize;
+    let mut eval = Context::new();
+    crate::test_composition::install_rules(&mut eval);
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    let text = format!("{}👩‍💻Z\n", format!("{}\n", "a".repeat(40)).repeat(240));
+    eval.buffer_manager_mut().get_mut(buffer).expect("buffer").insert(&text);
+    let frame = eval.frame_manager_mut().create_frame("offscreen-composition", 400, 160, buffer);
+    let window = eval.frame_manager().get(frame).expect("frame").selected_window;
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    let mut widths = Vec::new();
+    for (start, count) in [(9841, 2), (1, 256)] {
+        let snapshot = query.query_window_layout(&mut eval, frame, window,
+            WindowLayoutQueryScope::Rows { start: LispCharPos1::new(start), count: NonZeroUsize::new(count).expect("row budget") })
+            .expect("canonical row query").into_geometry().expect("geometry");
+        widths.push(snapshot.points.iter().find(|point| point.role == DisplayPointRole::Glyph && point.buffer_pos == LispCharPos1::new(9841))
+            .expect("emoji source position in measured rows").width);
+    }
+    assert_eq!(widths, vec![32, 32], "query distance must not change composition");
+}
+
+#[test]
 fn scrolling_restarts_after_fontification_moves_source_positions() {
     let mut eval = Context::new();
     let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
