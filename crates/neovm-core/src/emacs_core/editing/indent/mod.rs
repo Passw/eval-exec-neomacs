@@ -363,17 +363,19 @@ fn previous_screen_line_target(
             }
         }
 
-        let anchor_is_invisible = crate::emacs_core::xdisp::invisible_source_run_end_byte(
-            eval,
-            buffer_id,
-            anchor.get(),
-            crate::emacs_core::xdisp::InvisibleRunContext::DisplayMotion,
-        )?
-        .is_some_and(|next_visible| next_visible > anchor.get());
-        if anchor_is_invisible {
-            if anchor <= point_min {
-                return Ok((current, 0));
-            }
+        // GNU accepts BEGV before testing invisibility (xdisp.c:
+        // back_to_previous_visible_line_start). Even a hidden accessible
+        // beginning is a valid anchor: measure forward from it to retain
+        // the actual row count and position reached by backward motion.
+        if anchor > point_min
+            && crate::emacs_core::xdisp::invisible_source_run_end_byte(
+                eval,
+                buffer_id,
+                anchor.get(),
+                crate::emacs_core::xdisp::InvisibleRunContext::DisplayMotion,
+            )?
+            .is_some_and(|next_visible| next_visible > anchor.get())
+        {
             logical_lines_to_back = logical_lines_to_back.saturating_mul(2);
             continue;
         }

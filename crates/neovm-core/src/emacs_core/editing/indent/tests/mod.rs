@@ -254,6 +254,59 @@ fn current_column_counts_source_text_when_invisibility_requests_an_ellipsis() {
 }
 
 #[test]
+fn backward_vertical_motion_reaches_buffer_start_with_hidden_prefix() {
+    crate::test_utils::init_test_tracing();
+    let mut ev = crate::test_utils::runtime_startup_context();
+    let value = ev
+        .eval_str(
+            r#"(with-temp-buffer
+                 (dotimes (i 80) (insert (format "line %02d\n" i)))
+                 (setq buffer-invisibility-spec '(hidden))
+                 (put-text-property 1 3 'invisible 'hidden)
+                 (goto-char 401)
+                 (let ((moved (vertical-motion -60)))
+                   (list moved (point))))"#,
+        )
+        .expect("backward motion past a hidden buffer prefix");
+    // GNU Emacs 31.1, src/indent.c:vmotion: reaching BEGV preserves
+    // the position reached and the actual row count, even if BEGV is hidden.
+    assert_eq!(super::super::print::print_value(&value), "(-50 1)");
+}
+
+#[test]
+fn backward_vertical_motion_counts_hidden_prefix_rows_with_narrowing() {
+    crate::test_utils::init_test_tracing();
+    let mut ev = crate::test_utils::runtime_startup_context();
+    let value = ev
+        .eval_str(
+            r#"(mapcar
+                 (lambda (case)
+                   (with-temp-buffer
+                     (dotimes (i 80) (insert (format "line %02d\n" i)))
+                     (setq buffer-invisibility-spec (nth 0 case))
+                     (when (nth 1 case) (narrow-to-region 81 641))
+                     (let ((beg (point-min)))
+                       (put-text-property beg (+ beg (nth 2 case))
+                                          'invisible 'hidden))
+                     (goto-char 401)
+                     (let ((moved (vertical-motion -60)))
+                       (list moved (point)))))
+                 '(((hidden) nil 2)
+                   ((hidden) t 2)
+                   ((hidden) nil 80)
+                   (((hidden . t)) nil 80)
+                   ((hidden) t 80)))"#,
+        )
+        .expect("backward motion counts displayed, not hidden, rows");
+    // GNU Emacs 31.1: a partially hidden first line still occupies a row;
+    // whole hidden lines do not. Narrowing changes the accessible boundary.
+    assert_eq!(
+        super::super::print::print_value(&value),
+        "((-50 1) (-40 81) (-40 1) (-40 1) (-30 81))"
+    );
+}
+
+#[test]
 fn vertical_motion_skips_ellipsis_bearing_invisible_runs() {
     crate::test_utils::init_test_tracing();
     let mut ev = crate::test_utils::runtime_startup_context();
