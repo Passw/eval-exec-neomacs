@@ -2136,17 +2136,17 @@ impl BufferSourceLineBreakSourceAction {
         box_face.continue_on_row(row_geometry.current_row_marker(), content_x);
         progress.set_charpos(self.next_charpos());
         *progress.row_progress_mut().x_mut() = content_x;
-        // `next_charpos` is the zero-based position AFTER the consumed newline,
-        // which is the newline's own ONE-based Lisp position -- the row's last
-        // display position and, for a buffer newline, the position that owns
-        // every screen column past the row's last glyph.
-        let row_end_pos = LispCharPos1::new(progress.charpos());
+        // The newline's source position is zero-based in BOTH cases. A buffer
+        // newline advances the source; a display-string newline does not.
+        // Converting the post-step cursor as though it were already one-based
+        // manufactured position 0 for a replacement at the buffer beginning.
+        let row_end_pos = layout_i64_char_pos_to_lisp_char_pos(self.charpos);
         match row_end {
             DisplayRowEnd::BufferNewline { cell } => {
                 output_emitter.note_row_terminator(DisplayRowTerminator::new(row_end_pos, cell))
             }
             DisplayRowEnd::DisplayStringNewline => {
-                output_emitter.note_display_buffer_pos(row_end_pos)
+                output_emitter.note_display_string_row_end(row_end_pos)
             }
         }
     }

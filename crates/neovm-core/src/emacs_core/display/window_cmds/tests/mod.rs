@@ -9544,6 +9544,7 @@ fn window_end_reads_the_atomic_record_when_a_snapshot_disagrees() {
                 end_col: 0,
                 start_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
                 end_buffer_pos: Some(crate::buffer::LispCharPos1::new(12)),
+                end_source: Default::default(),
                 fringe: Default::default(),
             }],
             ..crate::window::WindowDisplaySnapshot::default()

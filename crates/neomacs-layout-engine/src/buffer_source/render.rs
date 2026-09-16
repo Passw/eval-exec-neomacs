@@ -14,6 +14,7 @@ use crate::buffer_source::loop_state::BufferSourceLoopMutableState;
 use crate::buffer_source::row_prelude::BufferSourceRowPreludeRequestContext;
 use crate::buffer_source::text_source::BufferOverlayStringsItem;
 use crate::buffer_source::walk::BufferSourceWalk;
+use crate::coords::layout_i64_char_pos_to_lisp_char_pos;
 use crate::display_face_ref::render_face_ref_id;
 use crate::display_item::BufferDisplayPropertyReplacementItem;
 use crate::display_row::face_state::DisplayRowActiveFaceState;
@@ -356,6 +357,13 @@ impl<'rows, 'request, 'emit, 'surface, 'face>
         &mut self,
         buffer: &B,
     ) -> DisplayRowTransitionContinuation {
+        // Wrapping a replacement, like its explicit newline, ends a visual
+        // row without consuming the buffer character that owns the string.
+        let anchor = layout_i64_char_pos_to_lisp_char_pos(self.state.progress.charpos());
+        self.state
+            .source_render
+            .output_emitter()
+            .note_display_string_row_end(anchor);
         let continuation = emit_nested_source_visual_wrap(self.loop_context, self.state.reborrow());
         if !continuation.should_break() {
             self.render_pending_row_prelude(buffer);

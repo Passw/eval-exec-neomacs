@@ -263,6 +263,7 @@ fn emitted_row(
         end_col: 0,
         start_buffer_pos: Some(LispCharPos1::new(start_lisp)),
         end_buffer_pos: Some(LispCharPos1::new(end_lisp)),
+        end_source: Default::default(),
         fringe: Default::default(),
     }
 }

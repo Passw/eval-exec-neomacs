@@ -89,6 +89,7 @@ fn install_mouse_help_echo_snapshot_with_value(eval: &mut Context, help: Value) 
             end_col: 0,
             start_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
             end_buffer_pos: Some(crate::buffer::LispCharPos1::new(3)),
+            end_source: Default::default(),
             fringe: Default::default(),
         }],
         ..crate::window::WindowDisplaySnapshot::default()

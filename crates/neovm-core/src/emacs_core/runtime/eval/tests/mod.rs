@@ -4356,6 +4356,7 @@ fn read_char_mouse_press_uses_clicked_window_geometry() {
                 end_col: 0,
                 start_buffer_pos: Some(crate::buffer::LispCharPos1::new(77)),
                 end_buffer_pos: Some(crate::buffer::LispCharPos1::new(77)),
+                end_source: Default::default(),
                 fringe: Default::default(),
             }],
         }]);
@@ -4479,6 +4480,7 @@ fn read_key_sequence_uses_clicked_window_local_map_for_mouse_event() {
                 end_col: 0,
                 start_buffer_pos: Some(crate::buffer::LispCharPos1::new(77)),
                 end_buffer_pos: Some(crate::buffer::LispCharPos1::new(77)),
+                end_source: Default::default(),
                 fringe: Default::default(),
             }],
         }]);
@@ -4587,6 +4589,7 @@ fn read_key_sequence_drops_unbound_down_mouse_before_bound_click() {
                 end_col: 0,
                 start_buffer_pos: Some(crate::buffer::LispCharPos1::new(77)),
                 end_buffer_pos: Some(crate::buffer::LispCharPos1::new(77)),
+                end_source: Default::default(),
                 fringe: Default::default(),
             }],
         }]);
@@ -5166,6 +5169,7 @@ fn read_key_sequence_uses_clicked_window_buffer_local_minor_mode_maps() {
                 end_col: 0,
                 start_buffer_pos: Some(crate::buffer::LispCharPos1::new(77)),
                 end_buffer_pos: Some(crate::buffer::LispCharPos1::new(77)),
+                end_source: Default::default(),
                 fringe: Default::default(),
             }],
         }]);

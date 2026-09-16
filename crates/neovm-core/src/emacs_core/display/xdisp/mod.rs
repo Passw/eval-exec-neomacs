@@ -15,6 +15,9 @@
 //! - `line-number-display-width` — get line number display width
 //! - `long-line-optimizations-p` — check if long-line optimizations are enabled
 
+pub(crate) mod motion;
+
+use self::motion::MotionEngine;
 use super::buffer::resolve_buffer_designator_allow_nil_current_in_manager;
 use super::chartable::{make_char_table_value, make_char_table_with_extra_slots};
 use super::display_spec;
@@ -30,7 +33,6 @@ use crate::buffer::{
 };
 use crate::emacs_core::error::LispCondition;
 use crate::emacs_core::error::{expect_args, expect_args_range};
-use crate::emacs_core::indent::MotionEngine;
 use crate::window::{
     DisplayRowSnapshot, FrameId, FrameManager, Window, WindowDisplaySnapshot, WindowId,
 };

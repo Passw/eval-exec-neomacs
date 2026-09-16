@@ -51,9 +51,9 @@ use neovm_core::buffer::{CharPos0, EmacsBytePos, LispCharPos1, TextPositionAncho
 use neovm_core::emacs_core::Context;
 use neovm_core::window::geometry::CellOrigin;
 use neovm_core::window::{
-    DisplayPointSnapshot, DisplayRowSnapshot, MatrixRow0, PresentedWindowChromeArea,
-    PresentedWindowChromeString, PresentedWindowRegions, WindowCursorKind, WindowCursorPos,
-    WindowCursorSnapshot, WindowDisplaySnapshot,
+    DisplayPointSnapshot, DisplayRowEndSource, DisplayRowSnapshot, MatrixRow0,
+    PresentedWindowChromeArea, PresentedWindowChromeString, PresentedWindowRegions,
+    WindowCursorKind, WindowCursorPos, WindowCursorSnapshot, WindowDisplaySnapshot,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -1255,6 +1255,7 @@ pub(crate) struct WindowOutputEmitter {
     row_metrics: Vec<RowMetricsSnapshot>,
     current_row_first_display_pos: Option<LispCharPos1>,
     current_row_last_display_pos: Option<LispCharPos1>,
+    current_row_end_source: DisplayRowEndSource,
     /// The end this row was closed at, when it is a position that draws no
     /// glyph of its own. Recorded rather than published on the spot so that
     /// closing the row is the only thing that can publish it.
@@ -1367,6 +1368,7 @@ impl WindowOutputEmitter {
             row_metrics: Vec::new(),
             current_row_first_display_pos: None,
             current_row_last_display_pos: None,
+            current_row_end_source: DisplayRowEndSource::Buffer,
             current_row_terminator: None,
             current_row_progress: None,
         }
@@ -1536,6 +1538,11 @@ impl WindowOutputEmitter {
             self.current_row_first_display_pos = Some(buffer_pos);
         }
         self.current_row_last_display_pos = Some(buffer_pos);
+    }
+
+    pub(crate) fn note_display_string_row_end(&mut self, buffer_pos: LispCharPos1) {
+        self.note_display_buffer_pos(buffer_pos);
+        self.current_row_end_source = DisplayRowEndSource::DisplayString;
     }
 
     /// Record where this row's WALK began, for a row whose first drawn glyph is
@@ -1895,6 +1902,7 @@ impl WindowOutputEmitter {
             end_col: row_progress.col,
             start_buffer_pos: self.current_row_first_display_pos.take(),
             end_buffer_pos: self.current_row_last_display_pos.take(),
+            end_source: std::mem::take(&mut self.current_row_end_source),
             // Fringe bitmaps are stamped onto the matrix row after the walk
             // that pushes this snapshot row, so they are filled in later from
             // the finished matrix (`fringe_snapshot::publish_row_fringe_bitmaps`).
@@ -1951,6 +1959,7 @@ impl WindowOutputEmitter {
             end_col: row_progress.col,
             start_buffer_pos: None,
             end_buffer_pos: None,
+            end_source: DisplayRowEndSource::Buffer,
             fringe: Default::default(),
         });
     }

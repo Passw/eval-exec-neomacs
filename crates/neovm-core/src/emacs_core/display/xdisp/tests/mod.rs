@@ -3464,6 +3464,7 @@ fn test_window_line_height_eval_returns_live_gui_row_metrics() {
             end_col: 3,
             start_buffer_pos: Some(crate::buffer::LispCharPos1::from_one_based_usize(start)),
             end_buffer_pos: Some(crate::buffer::LispCharPos1::from_one_based_usize(end)),
+            end_source: Default::default(),
             fringe: Default::default(),
         };
         let frame = eval.frames.get_mut(frame_id).expect("frame");
@@ -3524,6 +3525,7 @@ fn test_window_line_height_eval_uses_exact_chrome_rows() {
                             end_col: 2,
                             start_buffer_pos: None,
                             end_buffer_pos: None,
+                            end_source: Default::default(),
                             fringe: Default::default(),
                         },
                         crate::window::DisplayRowSnapshot {
@@ -3536,6 +3538,7 @@ fn test_window_line_height_eval_uses_exact_chrome_rows() {
                             end_col: 2,
                             start_buffer_pos: None,
                             end_buffer_pos: None,
+                            end_source: Default::default(),
                             fringe: Default::default(),
                         },
                         crate::window::DisplayRowSnapshot {
@@ -3548,6 +3551,7 @@ fn test_window_line_height_eval_uses_exact_chrome_rows() {
                             end_col: 2,
                             start_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
                             end_buffer_pos: Some(crate::buffer::LispCharPos1::new(3)),
+                            end_source: Default::default(),
                             fringe: Default::default(),
                         },
                         crate::window::DisplayRowSnapshot {
@@ -3560,6 +3564,7 @@ fn test_window_line_height_eval_uses_exact_chrome_rows() {
                             end_col: 2,
                             start_buffer_pos: None,
                             end_buffer_pos: None,
+                            end_source: Default::default(),
                             fringe: Default::default(),
                         },
                     ],
@@ -3625,6 +3630,7 @@ fn test_window_line_height_eval_reports_text_rows_relative_to_text_area() {
                     end_col: 2,
                     start_buffer_pos: None,
                     end_buffer_pos: None,
+                    end_source: Default::default(),
                     fringe: Default::default(),
                 },
                 crate::window::DisplayRowSnapshot {
@@ -3637,6 +3643,7 @@ fn test_window_line_height_eval_reports_text_rows_relative_to_text_area() {
                     end_col: 2,
                     start_buffer_pos: None,
                     end_buffer_pos: None,
+                    end_source: Default::default(),
                     fringe: Default::default(),
                 },
                 crate::window::DisplayRowSnapshot {
@@ -3649,6 +3656,7 @@ fn test_window_line_height_eval_reports_text_rows_relative_to_text_area() {
                     end_col: 2,
                     start_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
                     end_buffer_pos: Some(crate::buffer::LispCharPos1::new(3)),
+                    end_source: Default::default(),
                     fringe: Default::default(),
                 },
                 crate::window::DisplayRowSnapshot {
@@ -3661,6 +3669,7 @@ fn test_window_line_height_eval_reports_text_rows_relative_to_text_area() {
                     end_col: 2,
                     start_buffer_pos: Some(crate::buffer::LispCharPos1::new(4)),
                     end_buffer_pos: Some(crate::buffer::LispCharPos1::new(6)),
+                    end_source: Default::default(),
                     fringe: Default::default(),
                 },
             ],
@@ -3754,6 +3763,7 @@ fn test_posn_at_point_eval_uses_exact_redisplay_snapshot() {
                         end_col: 0,
                         start_buffer_pos: Some(crate::buffer::LispCharPos1::new(5)),
                         end_buffer_pos: Some(crate::buffer::LispCharPos1::new(5)),
+                        end_source: Default::default(),
                         fringe: Default::default(),
                     }],
                     ..crate::window::WindowDisplaySnapshot::default()
@@ -3812,6 +3822,7 @@ fn test_posn_at_point_reports_text_area_relative_y_below_window_chrome() {
                 end_col: 1,
                 start_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
                 end_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
+                end_source: Default::default(),
                 fringe: Default::default(),
             }],
             ..crate::window::WindowDisplaySnapshot::default()
@@ -3901,6 +3912,7 @@ fn posn_at_point_recomputes_a_terminal_window_redisplay_has_not_drawn_yet() {
                     end_col: 1,
                     start_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
                     end_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
+                    end_source: Default::default(),
                     fringe: Default::default(),
                 }],
                 ..crate::window::WindowDisplaySnapshot::default()
@@ -4345,6 +4357,7 @@ fn test_posn_at_x_y_eval_uses_exact_redisplay_snapshot() {
                 end_col: 0,
                 start_buffer_pos: Some(crate::buffer::LispCharPos1::new(5)),
                 end_buffer_pos: Some(crate::buffer::LispCharPos1::new(5)),
+                end_source: Default::default(),
                 fringe: Default::default(),
             }],
             ..crate::window::WindowDisplaySnapshot::default()
@@ -4430,6 +4443,7 @@ fn fixture_text_row(
             end_col: 0,
             start_buffer_pos: Some(crate::buffer::LispCharPos1::new(pos)),
             end_buffer_pos: Some(crate::buffer::LispCharPos1::new(pos)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
     )
@@ -4448,6 +4462,7 @@ fn fixture_chrome_row(row: i64, y: i64, width: i64) -> crate::window::DisplayRow
         end_col: width / 8,
         start_buffer_pos: None,
         end_buffer_pos: None,
+        end_source: Default::default(),
         fringe: Default::default(),
     }
 }
@@ -4905,6 +4920,7 @@ fn test_posn_at_point_eval_returns_nil_outside_visible_snapshot_span() {
                 end_col: 0,
                 start_buffer_pos: Some(crate::buffer::LispCharPos1::new(10)),
                 end_buffer_pos: Some(crate::buffer::LispCharPos1::new(14)),
+                end_source: Default::default(),
                 fringe: Default::default(),
             }],
             ..crate::window::WindowDisplaySnapshot::default()
@@ -4997,6 +5013,7 @@ fn test_posn_at_point_eval_returns_nil_for_positions_missing_entire_visible_row(
                     end_col: 0,
                     start_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
                     end_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
+                    end_source: Default::default(),
                     fringe: Default::default(),
                 },
                 crate::window::DisplayRowSnapshot {
@@ -5009,6 +5026,7 @@ fn test_posn_at_point_eval_returns_nil_for_positions_missing_entire_visible_row(
                     end_col: 0,
                     start_buffer_pos: Some(crate::buffer::LispCharPos1::new(4)),
                     end_buffer_pos: Some(crate::buffer::LispCharPos1::new(4)),
+                    end_source: Default::default(),
                     fringe: Default::default(),
                 },
             ],
@@ -5060,6 +5078,7 @@ fn test_vertical_motion_eval_uses_live_redisplay_rows() {
                     end_col: 1,
                     start_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
                     end_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
+                    end_source: Default::default(),
                     fringe: Default::default(),
                 },
                 crate::window::DisplayRowSnapshot {
@@ -5072,6 +5091,7 @@ fn test_vertical_motion_eval_uses_live_redisplay_rows() {
                     end_col: 1,
                     start_buffer_pos: Some(crate::buffer::LispCharPos1::new(40)),
                     end_buffer_pos: Some(crate::buffer::LispCharPos1::new(40)),
+                    end_source: Default::default(),
                     fringe: Default::default(),
                 },
                 crate::window::DisplayRowSnapshot {
@@ -5084,6 +5104,7 @@ fn test_vertical_motion_eval_uses_live_redisplay_rows() {
                     end_col: 1,
                     start_buffer_pos: Some(crate::buffer::LispCharPos1::new(80)),
                     end_buffer_pos: Some(crate::buffer::LispCharPos1::new(80)),
+                    end_source: Default::default(),
                     fringe: Default::default(),
                 },
             ],
@@ -5178,6 +5199,7 @@ fn test_vertical_motion_eval_uses_live_redisplay_goal_column() {
                     end_col: 1,
                     start_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
                     end_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
+                    end_source: Default::default(),
                     fringe: Default::default(),
                 },
                 crate::window::DisplayRowSnapshot {
@@ -5190,6 +5212,7 @@ fn test_vertical_motion_eval_uses_live_redisplay_goal_column() {
                     end_col: 6,
                     start_buffer_pos: Some(crate::buffer::LispCharPos1::new(40)),
                     end_buffer_pos: Some(crate::buffer::LispCharPos1::new(45)),
+                    end_source: Default::default(),
                     fringe: Default::default(),
                 },
             ],
@@ -5269,6 +5292,7 @@ fn test_vertical_motion_goal_column_past_row_end_lands_on_the_row_end_like_gnu()
                 end_col: 11,
                 start_buffer_pos: Some(crate::buffer::LispCharPos1::new(1)),
                 end_buffer_pos: Some(crate::buffer::LispCharPos1::new(12)),
+                end_source: Default::default(),
                 fringe: Default::default(),
             }],
             ..crate::window::WindowDisplaySnapshot::default()
@@ -5985,6 +6009,7 @@ fn fringe_bitmaps_at_pos_fixture() -> (Context, crate::window::FrameId) {
             end_col: 5,
             start_buffer_pos: Some(LispCharPos1::new(start as i64)),
             end_buffer_pos: Some(LispCharPos1::new(end as i64)),
+            end_source: Default::default(),
             fringe,
         }
     };

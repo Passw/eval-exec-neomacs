@@ -27,6 +27,9 @@ mod face_identity;
 #[path = "engine_line_spacing_test.rs"]
 mod line_spacing;
 
+#[path = "engine_display_motion_test.rs"]
+mod display_motion;
+
 fn test_image_load(id: u32) -> neomacs_display_protocol::ImageLoadToken {
     neomacs_display_protocol::ImageLoadToken::new(
         neomacs_display_protocol::ImageId::new(id),
@@ -18531,6 +18534,7 @@ fn next_window_start_from_visible_rows_uses_visual_row_boundaries() {
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(1)),
             end_buffer_pos: Some(LispCharPos1::new(8)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
@@ -18543,6 +18547,7 @@ fn next_window_start_from_visible_rows_uses_visual_row_boundaries() {
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(9)),
             end_buffer_pos: Some(LispCharPos1::new(16)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
@@ -18555,6 +18560,7 @@ fn next_window_start_from_visible_rows_uses_visual_row_boundaries() {
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(17)),
             end_buffer_pos: Some(LispCharPos1::new(24)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
@@ -18567,6 +18573,7 @@ fn next_window_start_from_visible_rows_uses_visual_row_boundaries() {
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(25)),
             end_buffer_pos: Some(LispCharPos1::new(32)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
     ];
@@ -18611,6 +18618,7 @@ fn next_window_start_for_partially_visible_point_row_scrolls_enough_to_fit_row()
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(1)),
             end_buffer_pos: Some(LispCharPos1::new(10)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
@@ -18623,6 +18631,7 @@ fn next_window_start_for_partially_visible_point_row_scrolls_enough_to_fit_row()
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(11)),
             end_buffer_pos: Some(LispCharPos1::new(20)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
@@ -18635,6 +18644,7 @@ fn next_window_start_for_partially_visible_point_row_scrolls_enough_to_fit_row()
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(21)),
             end_buffer_pos: Some(LispCharPos1::new(30)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
     ];
@@ -18680,6 +18690,7 @@ fn next_window_start_for_point_line_continuation_advances_last_visible_row() {
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(1)),
             end_buffer_pos: Some(LispCharPos1::new(10)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
@@ -18692,6 +18703,7 @@ fn next_window_start_for_point_line_continuation_advances_last_visible_row() {
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(11)),
             end_buffer_pos: Some(LispCharPos1::new(20)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
@@ -18704,6 +18716,7 @@ fn next_window_start_for_point_line_continuation_advances_last_visible_row() {
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(21)),
             end_buffer_pos: Some(LispCharPos1::new(25)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
     ];
@@ -18725,6 +18738,7 @@ fn next_window_start_for_point_line_continuation_advances_last_visible_row() {
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(1)),
             end_buffer_pos: Some(LispCharPos1::new(10)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
@@ -18737,6 +18751,7 @@ fn next_window_start_for_point_line_continuation_advances_last_visible_row() {
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(11)),
             end_buffer_pos: Some(LispCharPos1::new(27)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
     ];
@@ -18781,6 +18796,7 @@ fn next_window_start_for_point_line_continuation_ignores_newline_terminated_rows
         end_col: 0,
         start_buffer_pos: Some(LispCharPos1::new(1)),
         end_buffer_pos: Some(LispCharPos1::new(14)),
+        end_source: Default::default(),
         fringe: Default::default(),
     }];
 
@@ -18821,6 +18837,7 @@ fn next_window_start_for_point_line_continuation_ignores_tail_clipping_when_poin
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(1)),
             end_buffer_pos: Some(LispCharPos1::new(10)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
@@ -18833,6 +18850,7 @@ fn next_window_start_for_point_line_continuation_ignores_tail_clipping_when_poin
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(11)),
             end_buffer_pos: Some(LispCharPos1::new(20)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
@@ -18845,6 +18863,7 @@ fn next_window_start_for_point_line_continuation_ignores_tail_clipping_when_poin
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(21)),
             end_buffer_pos: Some(LispCharPos1::new(30)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
@@ -18857,6 +18876,7 @@ fn next_window_start_for_point_line_continuation_ignores_tail_clipping_when_poin
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(31)),
             end_buffer_pos: Some(LispCharPos1::new(40)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
@@ -18869,6 +18889,7 @@ fn next_window_start_for_point_line_continuation_ignores_tail_clipping_when_poin
             end_col: 0,
             start_buffer_pos: Some(LispCharPos1::new(41)),
             end_buffer_pos: Some(LispCharPos1::new(50)),
+            end_source: Default::default(),
             fringe: Default::default(),
         },
     ];

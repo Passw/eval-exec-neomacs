@@ -1278,9 +1278,17 @@ fn row_end_charpos(row: &DisplayRowSnapshot) -> Option<i64> {
 
 #[inline]
 pub(crate) fn row_next_window_start_charpos(row: &DisplayRowSnapshot) -> Option<i64> {
-    row.end_buffer_pos
-        .map(LispCharPos1::as_i64)
-        .or_else(|| row_start_charpos(row))
+    use neovm_core::window::DisplayRowEndSource;
+    match row.end_source {
+        DisplayRowEndSource::Buffer => row
+            .end_buffer_pos
+            .map(LispCharPos1::as_i64)
+            .or_else(|| row_start_charpos(row)),
+        // The display string's row break consumed no buffer character. Resume
+        // at its source anchor, not at an invented anchor + 1 inside the
+        // replacement. Visible row positions stay valid one-based positions.
+        DisplayRowEndSource::DisplayString => row_end_charpos(row),
+    }
 }
 
 pub(crate) fn next_window_start_for_partially_visible_point_row(

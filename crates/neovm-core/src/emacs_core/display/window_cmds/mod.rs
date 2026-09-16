@@ -16,8 +16,8 @@ use crate::emacs_core::error::LispCondition;
 pub(crate) use crate::emacs_core::error::{
     expect_args, expect_fixnum, expect_max_args, expect_min_args,
 };
-use crate::emacs_core::indent::MotionEngine;
 use crate::emacs_core::xdisp::LineWrap;
+use crate::emacs_core::xdisp::motion::MotionEngine;
 use crate::window::WindowChromeLine;
 use crate::window::body::{WindowBodyAxis, WindowBodyCellSize, WindowBodyUnit};
 use crate::window::{

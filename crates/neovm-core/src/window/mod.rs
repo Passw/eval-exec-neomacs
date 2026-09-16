@@ -2309,8 +2309,19 @@ pub struct DisplayRowSnapshot {
     pub start_buffer_pos: Option<LispCharPos1>,
     /// Last visible/source position associated with this row, if any.
     pub end_buffer_pos: Option<LispCharPos1>,
+    /// Whether the row ended in buffer text or in pushed display text. A
+    /// newline or wrap in a display string does not consume its buffer anchor.
+    pub end_source: DisplayRowEndSource,
     /// Fringe bitmaps redisplay laid out on this row.
     pub fringe: RowFringeBitmaps,
+}
+
+/// Source consumed at a row end, independent of its visible buffer anchor.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DisplayRowEndSource {
+    #[default]
+    Buffer,
+    DisplayString,
 }
 
 /// Registry index of a fringe bitmap, as handed out by `define-fringe-bitmap`

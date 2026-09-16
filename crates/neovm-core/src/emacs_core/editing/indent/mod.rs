@@ -27,111 +27,11 @@ use crate::emacs_core::error::{
     expect_args, expect_args_range, expect_fixnum, expect_max_args, expect_min_args,
 };
 use crate::emacs_core::value::ValueKind;
+use crate::emacs_core::xdisp::motion::{self, MotionEngine, MotionRequest};
 use crate::heap_types::LispString;
-use crate::window::{
-    DisplayPointRole, DisplayRowSnapshot, Window, WindowDisplaySnapshot, WindowId,
-};
+use crate::window::{Window, WindowId};
 use std::cell::Cell;
 use std::collections::VecDeque;
-
-/// Which of GNU's TWO screen-line engines answers a motion question.
-///
-/// `Fvertical_motion` is not one algorithm with a display switch inside it:
-/// its body is an `if` over `noninteractive` choosing between two
-/// implementations that share no code (`src/indent.c:2280-2287`):
-///
-/// ```c
-///   if (noninteractive)
-///     {
-///       struct position pos;
-///       pos = *vmotion (PT, PT_BYTE, XFIXNUM (lines), w);
-///       SET_PT_BOTH (pos.bufpos, pos.bytepos);
-///       it.vpos = pos.vpos;
-///     }
-///   else
-///     { ... start_display / move_it_by_lines / move_it_in_display_line ... }
-/// ```
-///
-/// The batch arm is `vmotion` -> `compute_motion` (`src/indent.c:1963-1964`,
-/// `:1253-1254`).  Two things follow from that being a different program rather
-/// than a different setting:
-///
-/// * `compute_motion` has **no word-wrap concept at all**.  Its only line-end
-///   decision is truncate-or-continue at `width` (`src/indent.c:1474-1527`);
-///   the identifier `word_wrap` does not occur anywhere in `src/indent.c`.
-///   So `LineWrap::WordWrap` is not reachable from the batch engine.
-/// * The `(COLS . LINES)` goal column is never applied: the `lcols` walk lives
-///   inside the `else` (`src/indent.c:2528-2558`), so a batch
-///   `vertical-motion` answers a cons argument using only its cdr.
-///
-/// Measured under GNU Emacs 31.0.90 over one 201-character line carrying a
-/// single space at column 100, in an 80-column terminal:
-///
-/// ```text
-///   emacs --batch        word-wrap nil -> rows 1 80 159      count-screen-lines 3
-///                        word-wrap t   -> rows 1 80 159      count-screen-lines 3
-///   emacs -nw in a pty   word-wrap nil -> rows 1 80 159      count-screen-lines 3
-///                        word-wrap t   -> rows 1 80 102 181  count-screen-lines 4
-/// ```
-///
-/// and, for the goal column, `(vertical-motion '(40 . 0))` from the start of a
-/// long line answers point 1 under `--batch` and point 41 in a terminal.
-///
-/// This is a type rather than a condition spelled at each site because the two
-/// engines are not interchangeable and their difference is invisible in a
-/// value: ledger 191 gated the goal column on `noninteractive` correctly and
-/// missed that the very same branch also decides whether `word-wrap` exists at
-/// all, which made every batch `count-screen-lines` over a wrapped word answer
-/// one screen line too many.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum MotionEngine {
-    /// GNU `vmotion` -> `compute_motion` (`src/indent.c:1963-1964`): the engine
-    /// `Fvertical_motion` uses under `noninteractive`.
-    ComputeMotion,
-    /// GNU's display iterator (`start_display` / `move_it_by_lines` /
-    /// `move_it_in_display_line`): the engine `Fvertical_motion` uses when a
-    /// terminal or window system is live.
-    DisplayIterator,
-}
-
-impl MotionEngine {
-    /// GNU's own branch, `if (noninteractive)` (`src/indent.c:2280`).
-    pub(crate) fn for_context(eval: &super::eval::Context) -> Self {
-        if eval.noninteractive() {
-            Self::ComputeMotion
-        } else {
-            Self::DisplayIterator
-        }
-    }
-
-    /// The wrap method a NON-truncating display line uses under this engine.
-    ///
-    /// This is the ONLY producer of [`LineWrap::WordWrap`] in the port.
-    /// `init_iterator` reaches `WORD_WRAP` from the buffer's `word-wrap`
-    /// (`src/xdisp.c:3425-3426`), and `init_iterator` runs only in the
-    /// interactive arm; `compute_motion` continues at `width` whatever the
-    /// buffer asks for.
-    pub(crate) fn continuation_wrap(self, word_wrap: bool) -> LineWrap {
-        match self {
-            Self::ComputeMotion => LineWrap::WindowWrap,
-            Self::DisplayIterator if word_wrap => LineWrap::WordWrap,
-            Self::DisplayIterator => LineWrap::WindowWrap,
-        }
-    }
-
-    /// Whether `(COLS . LINES)`'s COLS is applied at all
-    /// (`src/indent.c:2528-2558`, inside the interactive arm).
-    pub(crate) fn honors_goal_column(self) -> bool {
-        matches!(self, Self::DisplayIterator)
-    }
-
-    /// Whether realized display rows may answer the question.  GNU's batch
-    /// engine walks buffer text and never consults a glyph matrix, so a
-    /// retained redisplay snapshot is not an input to it.
-    pub(crate) fn uses_display_rows(self) -> bool {
-        matches!(self, Self::DisplayIterator)
-    }
-}
 
 fn next_visible_line_start(
     eval: &mut super::eval::Context,
@@ -869,184 +769,15 @@ fn truncated_logical_line_step(
     })
 }
 
-#[derive(Clone, Copy, Debug)]
-struct LiveSnapshotVerticalMotion {
-    target: LispCharPos1,
-    moved: i64,
-}
-
-fn live_vertical_motion_snapshot(
-    eval: &super::eval::Context,
-    window: Option<Value>,
-    current_buffer: BufferId,
-) -> Option<&WindowDisplaySnapshot> {
-    let window = window.filter(|value| !value.is_nil());
-    let (frame_id, window_id) = if let Some(window) = window {
-        let window_id = WindowId(window.as_window_id()?);
-        let frame_id = eval.frames.find_window_frame_id(window_id)?;
-        (frame_id, window_id)
-    } else {
-        let frame = eval.frames.selected_frame()?;
-        (frame.id, frame.selected_window)
-    };
-    eval.fresh_window_display_snapshot(frame_id, window_id, current_buffer)
-}
-
-fn snapshot_text_rows(snapshot: &WindowDisplaySnapshot) -> Vec<&DisplayRowSnapshot> {
-    let mut rows: Vec<_> = snapshot
-        .rows
-        .iter()
-        .filter(|row| row.start_buffer_pos.is_some() && row.end_buffer_pos.is_some())
-        .collect();
-    rows.sort_by_key(|row| row.row);
-    rows
-}
-
-fn snapshot_row_index_for_pos(rows: &[&DisplayRowSnapshot], pos: LispCharPos1) -> Option<usize> {
-    rows.iter().position(|row| {
-        let Some(start) = row.start_buffer_pos else {
-            return false;
-        };
-        let Some(end) = row.end_buffer_pos else {
-            return false;
-        };
-        start <= pos && pos <= end
-    })
-}
-
-/// One place on a screen row where GNU's goal-column walk can come to rest.
-///
-/// GNU reaches a `vertical-motion` goal column with
-/// `move_it_in_display_line (&it, ZV, first_x + to_x, MOVE_TO_X)`
-/// (src/indent.c:2540), and `move_it_in_display_line_to` has TWO ways to stop:
-/// at a glyph that reaches the goal x, or -- when the goal is past everything
-/// the row draws -- where the DISPLAY LINE itself ends. Naming both as stops
-/// keeps that second exit from being an afterthought: a row's end is a
-/// position in its own right, and on a newline-terminated row it is the
-/// newline, which sits one column past the last glyph because it draws none.
-#[derive(Clone, Copy)]
-struct RowGoalStop {
-    col: i64,
-    x: i64,
-    pos: LispCharPos1,
-}
-
-impl RowGoalStop {
-    /// Ordering key for "the LAST stop that does not pass the goal column".
-    ///
-    /// GNU's `MOVE_TO_X` walk places a glyph only while it still fits before
-    /// the goal, and backs up to `x_before_this_char` as soon as one would
-    /// pass it (src/xdisp.c:10385-10400), so the answer is the greatest stop
-    /// column that is `<= goal` -- never the nearer stop beyond it.  Measured
-    /// under GNU Emacs 31.0.90 on a 24-column window whose row starts with a
-    /// TAB: goal columns 1 through 7 all answer the TAB's own position at
-    /// column 0, and only goal 8 reaches the glyph after it.
-    fn reach_key(self, target_col: i64) -> (i64, i64, i64, i64) {
-        let reached = self.col <= target_col;
-        // Among reachable stops take the greatest column; among unreachable
-        // ones (a goal before the row's first stop) take the smallest.
-        let order = if reached { self.col } else { -self.col };
-        (i64::from(reached), order, self.x, self.pos.as_i64())
-    }
-}
-
-/// Every stop the goal-column walk may land on for one row: the drawn glyphs,
-/// then the row's own end boundary.
-fn row_goal_stops(
-    snapshot: &WindowDisplaySnapshot,
-    row: &DisplayRowSnapshot,
-    wrap: LineWrap,
-) -> impl Iterator<Item = RowGoalStop> {
-    let admit_edge = wrap.goal_stops_at_row_edge();
-    let glyphs = snapshot
-        .points
-        .iter()
-        .filter(|point| point.row == row.row)
-        // A marker column IS a goal stop, except under WORD_WRAP.  See
-        // [`LineWrap::goal_stops_at_row_edge`] for GNU's mechanism and the
-        // measurement; ledger 212 section 5 declined this without the gate and
-        // recorded the 45 probes it cost, and ledger 212 residual 1 named the
-        // reading it could not make come out -- it was reading
-        // `move_it_in_display_line_to`, and the deciding code is its CALLER.
-        .filter(move |point| admit_edge || point.role == DisplayPointRole::Glyph)
-        .map(|point| RowGoalStop {
-            col: point.col,
-            x: point.x,
-            pos: point.buffer_pos,
-        });
-    let row_end = row.end_buffer_pos.map(|pos| RowGoalStop {
-        col: row.end_col,
-        x: row.end_x,
-        pos,
-    });
-    glyphs.chain(row_end)
-}
-
-/// The position a `(COLS . LINES)` goal lands on within one published row.
-///
-/// `cols` stays exactly as Lisp wrote it: the snapshot's columns are
-/// WINDOW-relative (`DisplayPointSnapshot::col` is measured from the text
-/// area's left edge), which is the space GNU's goal is already expressed in.
-/// GNU has to add `it->first_visible_x` (`src/indent.c:2540`) only because its
-/// walk counts from the LINE start; the scanner in this file does the same for
-/// the same reason (`ScreenLineExtent::goal_col_in_line_space`), and doing it
-/// here as well would apply the hscroll twice.
-fn snapshot_target_pos_on_row(
-    snapshot: &WindowDisplaySnapshot,
-    row: &DisplayRowSnapshot,
-    cols: Option<i64>,
-    wrap: LineWrap,
-) -> Option<LispCharPos1> {
-    let Some(target_col) = cols.map(|col| col.max(0)) else {
-        return row.start_buffer_pos;
-    };
-    row_goal_stops(snapshot, row, wrap)
-        .max_by_key(|stop| stop.reach_key(target_col))
-        .map(|stop| stop.pos)
-        .or(row.start_buffer_pos)
-}
-
-fn vertical_motion_from_live_snapshot(
-    eval: &mut super::eval::Context,
-    window: Option<Value>,
-    current_buffer: BufferId,
-    point: LispCharPos1,
-    cols: Option<i64>,
-    lines: i64,
-) -> Option<LiveSnapshotVerticalMotion> {
-    let engine = MotionEngine::for_context(eval);
-    if !engine.uses_display_rows() {
-        return None;
-    }
-    // Only a goal column reads this, and resolving it costs several window and
-    // buffer lookups, so a plain `(vertical-motion N)` does not pay for it.
-    let wrap = match cols {
-        Some(_) => super::window_cmds::window_line_wrap(eval, window, current_buffer, engine),
-        None => LineWrap::Truncate,
-    };
-    let snapshot = live_vertical_motion_snapshot(eval, window, current_buffer)?;
-    let rows = snapshot_text_rows(snapshot);
-    let current_idx = snapshot_row_index_for_pos(&rows, point)?;
-    let target_idx = current_idx as i64 + lines;
-    if !(0..rows.len() as i64).contains(&target_idx) {
-        return None;
-    }
-    let target_idx = target_idx as usize;
-    let target = snapshot_target_pos_on_row(snapshot, rows[target_idx], cols, wrap)?;
-    Some(LiveSnapshotVerticalMotion {
-        target,
-        moved: target_idx as i64 - current_idx as i64,
-    })
-}
-
 /// `(vertical-motion LINES &optional WINDOW CUR-COL)` -> integer
 ///
 /// Move point to the start of the screen line LINES lines down (or up if
 /// negative).  Returns the number of lines actually moved.
 ///
 /// In GNU Emacs this uses the full display engine to handle word-wrap,
-/// display properties, etc.  In live frames, use the last redisplay snapshot
-/// for visible rows; otherwise approximate with buffer scanning.
+/// display properties, etc. In live frames, use fresh measured rows, querying
+/// the canonical producer when necessary. Until offscreen queries are supported,
+/// motion outside measured coverage still falls back to buffer scanning.
 pub(crate) fn vertical_motion(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
     expect_args_range("vertical-motion", &args, 1, 3)?;
     // First arg can be LINES (integer) or (COLS . LINES) cons pair.
@@ -1108,14 +839,19 @@ pub(crate) fn vertical_motion(eval: &mut super::eval::Context, args: Vec<Value>)
         return Ok(Value::fixnum(moved));
     }
 
-    if let Some(snapshot_motion) = vertical_motion_from_live_snapshot(
+    if let Some(snapshot_motion) = motion::resolve(
         eval,
-        args.get(1).copied(),
-        current_id,
-        pt_lisp,
-        cols,
-        lines,
-    ) {
+        MotionRequest {
+            buffer: current_id,
+            window: args
+                .get(1)
+                .and_then(|value| value.as_window_id())
+                .map(WindowId),
+            origin: pt_lisp,
+            rows: lines,
+            goal_column: cols,
+        },
+    )? {
         let target = eval
             .buffers
             .get(current_id)
@@ -1337,9 +1073,16 @@ pub(crate) fn screen_line_motion_target(
     let point = accessible.clamp(point);
     let point_lisp = buf.emacs_byte_pos_to_lisp_char_pos(point);
 
-    if let Some(snapshot_motion) =
-        vertical_motion_from_live_snapshot(eval, window, current_buffer, point_lisp, None, lines)
-    {
+    if let Some(snapshot_motion) = motion::resolve(
+        eval,
+        MotionRequest {
+            buffer: current_buffer,
+            window: window.and_then(|value| value.as_window_id()).map(WindowId),
+            origin: point_lisp,
+            rows: lines,
+            goal_column: None,
+        },
+    )? {
         let target = eval
             .buffers
             .get(current_buffer)
