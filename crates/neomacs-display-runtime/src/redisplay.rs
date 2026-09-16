@@ -201,11 +201,12 @@ impl RedisplayRuntime {
         evaluator: &mut Context,
         frame_id: FrameId,
         window_id: WindowId,
+        scope: neovm_core::window::WindowLayoutQueryScope,
     ) -> WindowLayoutQueryOutcome {
         // The common path reuses the warm presentation engine while it is
         // idle. A nested callback takes the explicitly disjoint path below.
         if let Ok(mut engine) = self.engine.try_borrow_mut() {
-            return match engine.query_window_layout(evaluator, frame_id, window_id) {
+            return match engine.query_window_layout(evaluator, frame_id, window_id, scope) {
                 Ok(query) => WindowLayoutQueryOutcome::Ready(query),
                 Err(failure) => WindowLayoutQueryOutcome::Failed(failure),
             };
@@ -229,7 +230,7 @@ impl RedisplayRuntime {
             engine.synchronize(self.query_seed.borrow().clone());
             engine
         });
-        match query_engine.query_window_layout(evaluator, frame_id, window_id) {
+        match query_engine.query_window_layout(evaluator, frame_id, window_id, scope) {
             Ok(query) => WindowLayoutQueryOutcome::Ready(query),
             Err(failure) => WindowLayoutQueryOutcome::Failed(failure),
         }

@@ -204,6 +204,7 @@ pub(crate) enum LayoutPurpose {
     Snapshot,
     SynchronousQuery {
         window_id: neovm_core::window::WindowId,
+        scope: neovm_core::window::WindowLayoutQueryScope,
     },
 }
 
@@ -211,7 +212,7 @@ impl LayoutPurpose {
     const fn query_window(self) -> Option<neovm_core::window::WindowId> {
         match self {
             Self::Redisplay | Self::Snapshot => None,
-            Self::SynchronousQuery { window_id } => Some(window_id),
+            Self::SynchronousQuery { window_id, .. } => Some(window_id),
         }
     }
 }
@@ -275,10 +276,11 @@ impl WindowLayoutQueryEngine {
         evaluator: &mut neovm_core::emacs_core::Context,
         frame_id: neovm_core::window::FrameId,
         window_id: neovm_core::window::WindowId,
+        scope: neovm_core::window::WindowLayoutQueryScope,
     ) -> Result<neovm_core::window::WindowLayoutQuery, neovm_core::window::WindowLayoutQueryFailure>
     {
         self.inner
-            .query_window_layout(evaluator, frame_id, window_id)
+            .query_window_layout(evaluator, frame_id, window_id, scope)
     }
 }
 
@@ -321,7 +323,7 @@ fn uses_adhoc_minibuffer_resize_scroll(
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum WindowLayoutWalkPurpose {
     Redisplay,
-    SynchronousQuery,
+    SynchronousQuery(neovm_core::window::WindowLayoutQueryScope),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -341,7 +343,7 @@ fn window_position_publication(
     purpose: WindowLayoutWalkPurpose,
     source: WindowDisplaySource,
 ) -> WindowPositionPublication {
-    if purpose == WindowLayoutWalkPurpose::SynchronousQuery {
+    if matches!(purpose, WindowLayoutWalkPurpose::SynchronousQuery(_)) {
         return WindowPositionPublication::SynchronousQueryEnd;
     }
     if source == WindowDisplaySource::InactiveEchoArea {
@@ -455,6 +457,18 @@ fn resolve_window_display_source_params(
     // (GNU resolves it inline with `lookup_image`). This is the single point
     // every window's params pass through that also holds the evaluator.
     let mut params = params.clone();
+    if let WindowLayoutWalkPurpose::SynchronousQuery(
+        neovm_core::window::WindowLayoutQueryScope::Rows { start, count },
+    ) = purpose
+    {
+        params.window_start = start
+            .as_i64()
+            .saturating_sub(1)
+            .clamp(params.buffer_begv, params.buffer_size);
+        params.measurement_rows = Some(count);
+        params.vscroll = 0;
+        params.previous_visible_end = None;
+    }
     params.space_image_catalog = evaluator
         .display_host
         .as_ref()
@@ -462,7 +476,7 @@ fn resolve_window_display_source_params(
         .map(crate::types::SharedImageCatalog);
     let params = &params;
 
-    if purpose == WindowLayoutWalkPurpose::SynchronousQuery
+    if matches!(purpose, WindowLayoutWalkPurpose::SynchronousQuery(_))
         || !params.is_minibuffer()
         || evaluator.minibuffer_window_is_active(window_id)
     {
@@ -572,7 +586,9 @@ fn collect_live_window_layout_inputs(
                 super::neovm_bridge::redisplay_cursor_target(evaluator, frame_id)
                     .role_for(window_id)
             }
-            WindowLayoutWalkPurpose::SynchronousQuery => WindowCursorRole::from_active(is_selected),
+            WindowLayoutWalkPurpose::SynchronousQuery(_) => {
+                WindowCursorRole::from_active(is_selected)
+            }
         };
         let mode_line_active = frame_is_selected
             && (is_selected || evaluator.minibuffer_selected_window_id() == Some(window_id));
@@ -1631,10 +1647,13 @@ impl LayoutEngine {
             .unwrap_or_default();
         let mut minibuffer_measurement_needs_begv = query_window.is_none();
         let mut frame_window_end_attempts = FrameWindowEndAttempts::default();
-        let layout_walk_purpose = if query_window.is_some() {
-            WindowLayoutWalkPurpose::SynchronousQuery
-        } else {
-            WindowLayoutWalkPurpose::Redisplay
+        let layout_walk_purpose = match purpose {
+            LayoutPurpose::SynchronousQuery { scope, .. } => {
+                WindowLayoutWalkPurpose::SynchronousQuery(scope)
+            }
+            LayoutPurpose::Redisplay | LayoutPurpose::Snapshot => {
+                WindowLayoutWalkPurpose::Redisplay
+            }
         };
 
         let (
@@ -3027,12 +3046,13 @@ impl LayoutEngine {
         evaluator: &mut neovm_core::emacs_core::Context,
         frame_id: neovm_core::window::FrameId,
         window_id: neovm_core::window::WindowId,
+        scope: neovm_core::window::WindowLayoutQueryScope,
     ) -> Result<neovm_core::window::WindowLayoutQuery, neovm_core::window::WindowLayoutQueryFailure>
     {
         self.layout_frame_rust_for_purpose_inner(
             evaluator,
             frame_id,
-            LayoutPurpose::SynchronousQuery { window_id },
+            LayoutPurpose::SynchronousQuery { window_id, scope },
         )
         .ok_or(neovm_core::window::WindowLayoutQueryFailure::DidNotConverge)
     }
@@ -3474,7 +3494,9 @@ impl LayoutEngine {
         let accessible_end = params.accessible_end_charpos().get();
         let window_start = params.window_start_charpos().get().max(accessible_start);
         let text_height = params.bounds.height - params.mode_line_height;
-        let max_rows = if params.char_height > 0.0 {
+        let max_rows = if let Some(count) = params.measurement_rows {
+            count.get() as i64
+        } else if params.char_height > 0.0 {
             (text_height / params.char_height).ceil() as i64
         } else {
             50

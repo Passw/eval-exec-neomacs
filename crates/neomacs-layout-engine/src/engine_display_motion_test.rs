@@ -4,6 +4,284 @@ use super::*;
 use neovm_core::window::WindowLayoutQueryOutcome;
 
 #[test]
+fn scrolling_restarts_after_fontification_moves_source_positions() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .expect("buffer")
+        .insert(&"row\n".repeat(40));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("scroll-fontification", 400, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .expect("frame")
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str(
+        "(progn (set-window-buffer nil (current-buffer)) (goto-char 5) (set-window-start nil 5 t))",
+    )
+    .expect("initial marker-backed viewport");
+    let mut display = LayoutEngine::new_without_font_metrics();
+    display.layout_frame_rust(&mut eval, frame);
+    activate_last_engine_presentation(&mut eval, &display, frame);
+    eval.eval_str(
+        r#"(progn (setq motion-fontified nil)
+        (setq fontification-functions
+          (list (lambda (_start)
+            (if motion-fontified nil
+              (progn (setq motion-fontified t)
+                (save-excursion (goto-char 1) (insert "new\n"))))
+            (put-text-property (point-min) (point-max) 'fontified t)))))"#,
+    )
+    .expect("fontification edits source");
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let result = eval
+        .eval_str(
+            r#"(let ((noninteractive nil))
+        (scroll-up 0) (list motion-fontified (window-start) (point)))"#,
+        )
+        .expect("scroll survives fontification");
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "(t 9 9)"
+    );
+}
+
+#[test]
+fn measured_motion_distinguishes_overlay_insertions_from_replacements() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .expect("buffer")
+        .insert("AAA\n\nBBB\n");
+    eval.frame_manager_mut()
+        .create_frame("overlay-motion", 400, 240, buffer);
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let result = eval.eval_str(r#"(let ((noninteractive nil))
+        (mapcar (lambda (property)
+          (let ((overlay (make-overlay 1 2)))
+            (overlay-put overlay property "X\nY\n")
+            (prog1
+              (list
+                (mapcar (lambda (n) (goto-char 1) (list (vertical-motion n) (point))) '(0 1 2 3 4 5))
+                (mapcar (lambda (n) (goto-char 10) (list (vertical-motion n) (point))) '(-1 -2 -3 -4 -5)))
+              (delete-overlay overlay)))) '(before-string after-string)))"#).expect("motion through overlay insertions");
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "((((0 1) (1 5) (2 6) (3 10) (3 10) (3 10)) ((-1 6) (-2 5) (-3 1) (-4 1) (-5 1))) (((0 1) (2 2) (3 5) (4 6) (5 10) (5 10)) ((-1 6) (-2 5) (-3 2) (-4 2) (-5 1))))"
+    );
+}
+
+#[test]
+fn measured_motion_reaches_an_invisible_accessible_beginning() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .expect("buffer")
+        .insert(&"row\n".repeat(100));
+    eval.frame_manager_mut()
+        .create_frame("hidden-beginning", 400, 160, buffer);
+    eval.eval_str(
+        r#"(progn (setq buffer-invisibility-spec '(hidden))
+        (put-text-property 1 3 'invisible 'hidden) (goto-char 101))"#,
+    )
+    .expect("hidden prefix");
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let result = eval
+        .eval_str(
+            r#"(let ((noninteractive nil))
+        (list (vertical-motion -1000) (point)))"#,
+        )
+        .expect("back past beginning");
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "(-25 1)"
+    );
+}
+
+#[test]
+fn page_scrolling_back_to_a_tall_row_keeps_point_in_the_new_viewport() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .expect("buffer")
+        .insert(&"row\n".repeat(40));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("pixel-paging", 400, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .expect("frame")
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str(
+        r#"(progn
+        (setq auto-window-vscroll nil scroll-preserve-screen-position nil)
+        (put-text-property 1 2 'display '(space :height 20))
+        (goto-char 5) (set-window-start nil 5 t))"#,
+    )
+    .expect("start below a tall row");
+    let mut display = LayoutEngine::new_without_font_metrics();
+    display.layout_frame_rust(&mut eval, frame);
+    activate_last_engine_presentation(&mut eval, &display, frame);
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let result = eval
+        .eval_str(
+            r#"(let ((noninteractive nil))
+        (scroll-down)
+        (list (window-start) (point) (window-vscroll nil t)))"#,
+        )
+        .expect("back over tall row");
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "(1 1 0)"
+    );
+    display.layout_frame_rust(&mut eval, frame);
+    activate_last_engine_presentation(&mut eval, &display, frame);
+    let result = eval
+        .eval_str(
+            r#"(let ((noninteractive nil))
+        (list (condition-case nil (scroll-down) (beginning-of-buffer 'at-start))
+              (window-start) (point)))"#,
+        )
+        .expect("stay at beginning after redisplay");
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "(at-start 1 1)"
+    );
+}
+
+#[test]
+fn page_scrolling_a_tall_first_row_uses_pixels_and_returns_to_the_same_viewport() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .expect("buffer")
+        .insert(&"row\n".repeat(40));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("pixel-paging", 400, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .expect("frame")
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str(
+        r#"(progn
+        (setq auto-window-vscroll t scroll-preserve-screen-position nil)
+        (put-text-property 1 2 'display '(space :height 20))
+        (goto-char 1) (set-window-start nil 1 t))"#,
+    )
+    .expect("tall row");
+    let mut display = LayoutEngine::new_without_font_metrics();
+    display.layout_frame_rust(&mut eval, frame);
+    activate_last_engine_presentation(&mut eval, &display, frame);
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let result = eval
+        .eval_str(
+            r#"(let ((noninteractive nil))
+        (scroll-up)
+        (let ((forward (list (window-start) (> (window-vscroll nil t) 0))))
+          (scroll-down)
+          (list forward (window-start) (window-vscroll nil t) (point))))"#,
+        )
+        .expect("page inside a tall row and back");
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "((1 t) 1 0 1)"
+    );
+}
+
+#[test]
+fn vertical_motion_measures_replacements_outside_the_presented_viewport() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .expect("buffer")
+        .insert(&"line\n".repeat(100));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("offscreen-motion", 400, 80, buffer);
+    eval.eval_str(
+        r#"(progn
+        (put-text-property 201 206 'display "X\nY\n")
+        (goto-char 1) (set-window-start nil 1 t))"#,
+    )
+    .expect("offscreen replacement");
+    let mut display = LayoutEngine::new_without_font_metrics();
+    display.layout_frame_rust(&mut eval, frame);
+    let presentation = activate_last_engine_presentation(&mut eval, &display, frame);
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    // GNU -nw in a real PTY: the first step leaves both replacement rows;
+    // the second reaches source line 43, with three physical rows crossed.
+    let result = eval
+        .eval_str(
+            r#"(progn (goto-char 201)
+        (let ((noninteractive nil))
+          (list (vertical-motion 2) (point) (window-start))))"#,
+        )
+        .expect("offscreen motion");
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "(3 211 1)"
+    );
+    assert_eq!(
+        eval.frame_manager()
+            .get(frame)
+            .expect("frame")
+            .active_presentation(),
+        Some(presentation)
+    );
+    let zero = eval
+        .eval_str(
+            r#"(progn (goto-char 201)
+        (let ((noninteractive nil)) (list (vertical-motion 0) (point))))"#,
+        )
+        .expect("zero motion at a replacement following a buffer newline");
+    assert_eq!(neovm_core::emacs_core::print::print_value(&zero), "(0 201)");
+}
+
+#[test]
 fn vertical_motion_leaves_a_wrapped_replacement_before_taking_another_step() {
     let mut eval = Context::new();
     let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
@@ -18,8 +296,8 @@ fn vertical_motion_leaves_a_wrapped_replacement_before_taking_another_step() {
     )
     .expect("wrapped replacement");
     let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
-    eval.install_window_layout_query(move |eval, frame, window| {
-        match query.query_window_layout(eval, frame, window) {
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
             Ok(query) => WindowLayoutQueryOutcome::Ready(query),
             Err(error) => WindowLayoutQueryOutcome::Failed(error),
         }
@@ -30,12 +308,12 @@ fn vertical_motion_leaves_a_wrapped_replacement_before_taking_another_step() {
                  (mapcar (lambda (n)
                            (goto-char 1)
                            (list (vertical-motion n) (point)))
-                         '(1 2)))"#,
+                         '(0 1 2)))"#,
         )
         .expect("motion leaves a wrapped replacement");
     assert_eq!(
         neovm_core::emacs_core::print::print_value(&result),
-        "((2 2) (3 5))"
+        "((0 5) (2 2) (3 5))"
     );
 }
 
@@ -59,8 +337,8 @@ fn vertical_motion_remeasures_display_rows_after_a_display_property_change() {
     let retained = presented_frame.redisplay_snapshot(window).cloned();
 
     let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
-    eval.install_window_layout_query(move |eval, frame, window| {
-        match query.query_window_layout(eval, frame, window) {
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
             Ok(query) => WindowLayoutQueryOutcome::Ready(query),
             Err(error) => WindowLayoutQueryOutcome::Failed(error),
         }
@@ -174,8 +452,8 @@ fn vertical_motion_counts_measured_rows_at_accessible_boundaries() {
     eval.eval_str(r#"(put-text-property 1 5 'display "X\n")"#)
         .expect("display replacement");
     let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
-    eval.install_window_layout_query(move |eval, frame, window| {
-        match query.query_window_layout(eval, frame, window) {
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
             Ok(query) => WindowLayoutQueryOutcome::Ready(query),
             Err(error) => WindowLayoutQueryOutcome::Failed(error),
         }
@@ -252,8 +530,8 @@ fn vertical_motion_preserves_a_labeled_accessible_region_during_measurement() {
     eval.frame_manager_mut()
         .create_frame("display-motion", 400, 240, buffer);
     let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
-    eval.install_window_layout_query(move |eval, frame, window| {
-        match query.query_window_layout(eval, frame, window) {
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
             Ok(query) => WindowLayoutQueryOutcome::Ready(query),
             Err(error) => WindowLayoutQueryOutcome::Failed(error),
         }

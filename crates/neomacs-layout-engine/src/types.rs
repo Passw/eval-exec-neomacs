@@ -240,6 +240,9 @@ pub struct WindowParams {
     /// First visible buffer position in layout 0-based char coordinates.
     /// Derived from GNU `marker_position (w->start)`.
     pub window_start: i64,
+    /// A stack-local measurement is bounded by rows, not viewport pixels.
+    /// Redisplay leaves this absent and uses the physical window extent.
+    pub measurement_rows: Option<std::num::NonZeroUsize>,
     /// GNU `w->force_start`: `window_start` was set explicitly (scroll /
     /// set-window-start), so layout must display from it and move POINT into
     /// the window when point ended up outside — never recompute the start

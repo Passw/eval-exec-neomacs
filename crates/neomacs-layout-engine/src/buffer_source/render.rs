@@ -363,7 +363,7 @@ impl<'rows, 'request, 'emit, 'surface, 'face>
         self.state
             .source_render
             .output_emitter()
-            .note_display_string_row_end(anchor);
+            .note_display_string_wrap(anchor);
         let continuation = emit_nested_source_visual_wrap(self.loop_context, self.state.reborrow());
         if !continuation.should_break() {
             self.render_pending_row_prelude(buffer);

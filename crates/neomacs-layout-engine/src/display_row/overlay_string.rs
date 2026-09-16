@@ -650,6 +650,13 @@ fn render_overlay_string<B: LayoutBufferView>(
         *state.col = end.col();
 
         if matches!(stop, DisplayRowRenderStop::RowBreak(_)) {
+            state
+                .source_render
+                .output_emitter()
+                .note_overlay_string_row_end(
+                    crate::coords::layout_i64_char_pos_to_lisp_char_pos(anchor_charpos),
+                    source_request.kind,
+                );
             let continuation = row_break_context.finish_row(state);
             if continuation.should_break() {
                 return continuation;
@@ -660,6 +667,13 @@ fn render_overlay_string<B: LayoutBufferView>(
             DisplayRowRenderStop::SourceExhausted => break,
             DisplayRowRenderStop::Clipped => {
                 if source_context.discard_pending_until_row_break() {
+                    state
+                        .source_render
+                        .output_emitter()
+                        .note_overlay_string_row_end(
+                            crate::coords::layout_i64_char_pos_to_lisp_char_pos(anchor_charpos),
+                            source_request.kind,
+                        );
                     let continuation = row_break_context.finish_row(state);
                     if continuation.should_break() {
                         return continuation;

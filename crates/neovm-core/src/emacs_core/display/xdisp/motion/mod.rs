@@ -4,6 +4,9 @@
 //! redisplay. Retained rows are a fast path, not a substitute for measurement.
 //! GNU's intentionally different batch engine stays in `editing/indent`.
 
+mod measurement;
+pub(crate) mod paging;
+
 use crate::buffer::{AccessibleCharRange, BufferId, LispCharPos1};
 use crate::emacs_core::Context;
 use crate::emacs_core::Value;
@@ -324,52 +327,16 @@ pub(crate) fn resolve(
     };
     if let Some(snapshot) = eval.fresh_window_display_snapshot(frame_id, window_id, request.buffer)
     {
-        // An identical viewport query cannot extend fresh retained coverage.
-        return Ok(vertical_motion_on_rows(snapshot, request, accessible, wrap).settled());
+        if let Some(motion) = vertical_motion_on_rows(snapshot, request, accessible, wrap).settled()
+        {
+            return Ok(Some(motion));
+        }
     }
 
     // GNU reruns the display iterator when redisplay's rows are unavailable.
     // The column scanner cannot substitute for that walk: display strings,
     // proportional faces and replacements can change the row boundaries.
-    use crate::window::WindowLayoutQueryOutcome;
-    match eval.query_window_layout(frame_id, window_id) {
-        WindowLayoutQueryOutcome::Ready(query) => {
-            // Fontification may run Lisp. Do not combine rows for a replaced
-            // window buffer with source positions from the original request.
-            if motion_window(eval, request.window, request.buffer) != Some((frame_id, window_id)) {
-                return Ok(None);
-            }
-            Ok(query.into_geometry().and_then(|snapshot| {
-                // Geometric queries widen labeled restrictions for redisplay.
-                // Motion must not consume those rows after the inner region
-                // has been restored. Use the same complete validity token as
-                // retained rows rather than checking only text modification.
-                if snapshot.layout_freshness.is_some_and(|recorded| {
-                    Some(recorded)
-                        != eval.window_display_snapshot_freshness(
-                            frame_id,
-                            window_id,
-                            request.buffer,
-                        )
-                }) {
-                    return None;
-                }
-                let (accessible, wrap) = motion_parameters(eval, request)?;
-                vertical_motion_on_rows(&snapshot, request, accessible, wrap).settled()
-            }))
-        }
-        WindowLayoutQueryOutcome::Unavailable => Ok(None),
-        WindowLayoutQueryOutcome::LayoutBusy => Err(signal(
-            LispCondition::Error,
-            vec![Value::string(
-                "Window layout query reentered an active layout callback",
-            )],
-        )),
-        WindowLayoutQueryOutcome::Failed(failure) => Err(signal(
-            LispCondition::Error,
-            vec![Value::string(failure.message())],
-        )),
-    }
+    measurement::resolve(eval, frame_id, window_id, request)
 }
 
 fn motion_parameters(
@@ -402,9 +369,20 @@ fn vertical_motion_on_rows(
     use crate::window::DisplayRowEndSource;
 
     let rows = snapshot_text_rows(snapshot);
-    let Some(current_idx) = snapshot_row_index_for_pos(&rows, request.origin) else {
+    let Some(mut current_idx) = snapshot_row_index_for_pos(&rows, request.origin) else {
         return RowMotion::NeedsMoreRows;
     };
+    // A before-string inserts rows before the source cursor; positive motion
+    // begins where its buffer character resumes. Backwards motion still
+    // counts every inserted physical row.
+    if request.rows >= 0 {
+        while current_idx + 1 < rows.len()
+            && rows[current_idx].end_source == DisplayRowEndSource::OverlayBeforeString
+            && rows[current_idx].end_buffer_pos == Some(request.origin)
+        {
+            current_idx += 1;
+        }
+    }
     let mut target_idx = (current_idx as i64).saturating_add(request.rows);
     let mut source_floor = None;
 
@@ -412,8 +390,33 @@ fn vertical_motion_on_rows(
     // remaining steps advance from that valid source position. Keep the
     // original physical index so traversed replacement rows remain counted.
     let current = rows[current_idx];
+    if request.rows > 0 && current.end_source.is_overlay_string() {
+        let mut first_step = current_idx + 1;
+        while first_step < rows.len() && rows[first_step].end_source.is_overlay_string() {
+            first_step += 1;
+        }
+        if first_step == rows.len() {
+            return RowMotion::NeedsMoreRows;
+        }
+        target_idx = (first_step as i64).saturating_add(request.rows - 1);
+    }
+    // Zero motion reseats before the current logical line. Reaching an
+    // anchor from the preceding buffer newline is a valid source cursor;
+    // starting at BEGV already inside pushed text is not. Query the missing
+    // predecessor rather than treating the retained viewport edge as BEGV.
+    let zero_at_source_boundary = request.rows == 0
+        && current_idx > 0
+        && rows[current_idx - 1].end_source == DisplayRowEndSource::Buffer;
+    if request.rows == 0
+        && current_idx == 0
+        && request.origin > accessible.start_lisp()
+        && current.end_source.is_display_string()
+    {
+        return RowMotion::NeedsMoreRows;
+    }
     if request.rows >= 0
-        && current.end_source == DisplayRowEndSource::DisplayString
+        && !zero_at_source_boundary
+        && current.end_source.is_display_string()
         && current.end_buffer_pos == Some(request.origin)
     {
         let Some((after_idx, after_pos)) =
@@ -421,7 +424,19 @@ fn vertical_motion_on_rows(
         else {
             return RowMotion::NeedsMoreRows;
         };
-        target_idx = (after_idx as i64).saturating_add(request.rows.saturating_sub(1).max(0));
+        let steps = if request.rows == 0 {
+            // GNU move_it_vertically_backward(dy=0) probes until the source
+            // cursor is valid, or until an explicit newline in a pushed
+            // string, then replays that many physical rows. A visual wrap is
+            // not the same cursor state as a string newline.
+            rows[current_idx..after_idx]
+                .iter()
+                .position(|row| row.end_source == DisplayRowEndSource::DisplayStringNewline)
+                .map_or(after_idx - current_idx, |index| index + 1) as i64
+        } else {
+            request.rows
+        };
+        target_idx = (after_idx as i64).saturating_add(steps.saturating_sub(1).max(0));
         source_floor = Some((after_idx, after_pos));
     }
 
@@ -450,9 +465,17 @@ fn vertical_motion_on_rows(
         });
     }
     let mut target_idx = target_idx as usize;
+    if request.rows > 0 {
+        while target_idx + 1 < rows.len() && rows[target_idx].end_source.is_overlay_string() {
+            target_idx += 1;
+        }
+        if rows[target_idx].end_source.is_overlay_string() {
+            return RowMotion::NeedsMoreRows;
+        }
+    }
     if request.rows >= 0 && target_idx > 0 {
         let previous = rows[target_idx - 1];
-        if previous.end_source == DisplayRowEndSource::DisplayString
+        if previous.end_source.is_display_string()
             && previous.end_buffer_pos == rows[target_idx].start_buffer_pos
         {
             let anchor = previous.end_buffer_pos.expect("source row");

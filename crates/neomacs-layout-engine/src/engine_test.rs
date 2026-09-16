@@ -1665,6 +1665,7 @@ fn test_window_params() -> WindowParams {
         left_col: 0,
         top_line: 0,
         window_start: 1,
+        measurement_rows: None,
         force_start: false,
         previous_visible_end: None,
         point: 1,
@@ -28119,7 +28120,12 @@ fn synchronous_window_end_query_observes_only_the_target_without_publishing_a_pr
         .and_then(neovm_core::window::Window::window_end_state);
 
     let _record = engine
-        .query_window_layout(&mut eval, frame_id, target)
+        .query_window_layout(
+            &mut eval,
+            frame_id,
+            target,
+            neovm_core::window::WindowLayoutQueryScope::Viewport,
+        )
         .expect("targeted query should converge")
         .end();
 
@@ -28236,7 +28242,12 @@ fn synchronous_window_end_query_on_child_frame_does_not_touch_parent_frame() {
         .and_then(|frame| frame.find_window(child_window))
         .and_then(neovm_core::window::Window::window_end_state);
     let _child_record = engine
-        .query_window_layout(&mut eval, child_frame, child_window)
+        .query_window_layout(
+            &mut eval,
+            child_frame,
+            child_window,
+            neovm_core::window::WindowLayoutQueryScope::Viewport,
+        )
         .expect("child query should converge")
         .end();
 
@@ -28319,7 +28330,12 @@ fn synchronous_window_end_query_preserves_redisplay_only_window_state() {
 
     let mut engine = LayoutEngine::new();
     let end_with_point_before_start = engine
-        .query_window_layout(&mut eval, frame_id, window_id)
+        .query_window_layout(
+            &mut eval,
+            frame_id,
+            window_id,
+            neovm_core::window::WindowLayoutQueryScope::Viewport,
+        )
         .expect("exact query should converge")
         .end();
 
@@ -28355,7 +28371,12 @@ fn synchronous_window_end_query_preserves_redisplay_only_window_state() {
         .expect("move selected buffer point to window start");
     eval.set_window_point_for_redisplay(frame_id, window_id, start);
     let end_with_point_at_start = engine
-        .query_window_layout(&mut eval, frame_id, window_id)
+        .query_window_layout(
+            &mut eval,
+            frame_id,
+            window_id,
+            neovm_core::window::WindowLayoutQueryScope::Viewport,
+        )
         .expect("control query should converge")
         .end();
     assert_eq!(
@@ -32825,23 +32846,10 @@ fn overlay_string_newline_behaves_identically_under_truncation() {
     }
 }
 
-/// Row BOUNDS across a string newline, and the deliberate divergence.
-///
-/// A row's published bounds are built by `note_display_buffer_pos`, which only
-/// BUFFER characters call: overlay-string glyphs contribute none, so the row
-/// that ends in the string's newline is bounded by the last buffer character
-/// before the anchor and the next row starts at the anchor itself. (Verified by
-/// mutation, and worth stating because the intuitive guess is wrong - the
-/// anchor-boundary hit range that `finish_row` maintains is a separate,
-/// hit-testing observable and does NOT feed these numbers.)
-///
-/// GNU instead fabricates one past the end for such a row ("Line ends in a
-/// newline from string: max_pos + 1", xdisp.c:25248-25263), because its rows
-/// carry the string's own positions. Glyphs now retain those string indices,
-/// but row bounds remain the independent buffer-scan track: adopting the
-/// provenance pair does not by itself implement GNU's once-per-string `+1`
-/// synthesis for a string-supplied newline. This test records that separate
-/// row-lifecycle divergence.
+/// A string newline ends at its unconsumed buffer anchor, including rows
+/// made entirely of inserted text. These source bounds are independent of
+/// glyph string indices and hit ranges. Dropping string-only rows used to
+/// lose their physical distance in backward motion (GNU move_it_by_lines).
 #[test]
 fn overlay_string_newline_leaves_row_bounds_on_the_anchor_boundary() {
     fn bounds(anchor_charpos0: usize) -> Vec<(Option<usize>, Option<usize>)> {
@@ -32893,19 +32901,21 @@ fn overlay_string_newline_leaves_row_bounds_on_the_anchor_boundary() {
     assert_eq!(
         bounds(3),
         vec![
-            (Some(1), Some(3)),
+            (Some(1), Some(4)),
             (Some(4), Some(12)),
             (Some(13), Some(19)),
         ]
     );
 
-    // A row made ENTIRELY of string glyphs carries no buffer bounds at all.
-    // GNU's degenerate answer is min_pos == max_pos; this engine's Option says
-    // the same thing without inventing a position, and a consumer that needs
-    // one falls back to the following row's start.
+    // An inserted-text-only row has a degenerate source range at its anchor;
+    // it still occupies a real row and must not disappear from motion.
     assert_eq!(
         bounds(0),
-        vec![(None, None), (Some(1), Some(12)), (Some(13), Some(19))]
+        vec![
+            (Some(1), Some(1)),
+            (Some(1), Some(12)),
+            (Some(13), Some(19))
+        ]
     );
 }
 

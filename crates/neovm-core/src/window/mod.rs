@@ -915,6 +915,18 @@ pub struct WindowLayoutQuery {
     geometry: Option<WindowDisplaySnapshot>,
 }
 
+/// The display walk's extent, independent of the live viewport. Measurement
+/// never changes window-start, point, vscroll or the accepted presentation.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum WindowLayoutQueryScope {
+    #[default]
+    Viewport,
+    Rows {
+        start: LispCharPos1,
+        count: std::num::NonZeroUsize,
+    },
+}
+
 /// Why an installed frontend query could not produce a coherent row walk.
 ///
 /// This is distinct from [`WindowLayoutQueryOutcome::Unavailable`], which
@@ -2321,7 +2333,20 @@ pub struct DisplayRowSnapshot {
 pub enum DisplayRowEndSource {
     #[default]
     Buffer,
-    DisplayString,
+    DisplayStringNewline,
+    DisplayStringWrap,
+    OverlayBeforeString,
+    OverlayAfterString,
+}
+
+impl DisplayRowEndSource {
+    pub const fn is_display_string(self) -> bool {
+        matches!(self, Self::DisplayStringNewline | Self::DisplayStringWrap)
+    }
+
+    pub const fn is_overlay_string(self) -> bool {
+        matches!(self, Self::OverlayBeforeString | Self::OverlayAfterString)
+    }
 }
 
 /// Registry index of a fringe bitmap, as handed out by `define-fringe-bitmap`

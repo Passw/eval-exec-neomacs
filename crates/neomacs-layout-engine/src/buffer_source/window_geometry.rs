@@ -35,6 +35,7 @@ pub(crate) struct BufferWindowGeometryRequest {
     /// clips the result to this ceiling, so the walk must be allowed to emit
     /// up to this many rows even when the window is currently one row tall.
     max_mini_window_rows: Option<usize>,
+    measurement_rows: Option<std::num::NonZeroUsize>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -158,6 +159,7 @@ impl BufferWindowGeometryRequest {
             char_width,
             char_height,
             max_mini_window_rows: None,
+            measurement_rows: params.measurement_rows,
         }
     }
 
@@ -225,7 +227,11 @@ impl BufferWindowGeometryRequest {
         // to the real text area (`text_y .. text_y + text_height`).  Otherwise the
         // physical text-area bottom is the limit.
         let physical_bottom_y = self.text_y + self.text_height;
-        let visibility_bottom_y = if self.kind.is_minibuffer() {
+        let visibility_bottom_y = if self.measurement_rows.is_some() {
+            // A tall image is still one row. A pixel-height estimate cannot
+            // bound a row query; the independent row budget bounds this walk.
+            f32::INFINITY
+        } else if self.kind.is_minibuffer() {
             physical_bottom_y.max(self.text_y + max_rows as f32 * self.char_height)
         } else if row_shift > 0.0 {
             (self.text_y - row_shift) + max_rows as f32 * self.char_height
@@ -258,6 +264,9 @@ impl BufferWindowGeometryRequest {
     }
 
     fn visible_max_rows(self) -> usize {
+        if let Some(count) = self.measurement_rows {
+            return count.get();
+        }
         // GNU `resize_mini_window` measures the mini-window's full content
         // height with an unclamped `move_it_to(ZV)` and clips it only to the
         // `max-mini-window-height` ceiling.  Mirror that: when the ceiling is

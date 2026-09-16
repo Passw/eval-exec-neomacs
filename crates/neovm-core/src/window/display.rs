@@ -21,6 +21,7 @@ pub(crate) enum WindowLayoutQueryAdapter {
                 &mut crate::emacs_core::eval::Context,
                 FrameId,
                 WindowId,
+                crate::window::WindowLayoutQueryScope,
             ) -> crate::window::WindowLayoutQueryOutcome,
         >,
     ),
@@ -444,7 +445,13 @@ impl crate::emacs_core::eval::Context {
     /// Install the frontend half of the synchronous layout-query boundary.
     pub fn install_window_layout_query<F>(&mut self, query: F)
     where
-        F: FnMut(&mut Self, FrameId, WindowId) -> crate::window::WindowLayoutQueryOutcome + 'static,
+        F: FnMut(
+                &mut Self,
+                FrameId,
+                WindowId,
+                crate::window::WindowLayoutQueryScope,
+            ) -> crate::window::WindowLayoutQueryOutcome
+            + 'static,
     {
         self.window_layout_query_adapter = WindowLayoutQueryAdapter::Ready(Box::new(query));
     }
@@ -460,6 +467,19 @@ impl crate::emacs_core::eval::Context {
         &mut self,
         frame_id: FrameId,
         window_id: WindowId,
+    ) -> crate::window::WindowLayoutQueryOutcome {
+        self.query_window_layout_scope(
+            frame_id,
+            window_id,
+            crate::window::WindowLayoutQueryScope::Viewport,
+        )
+    }
+
+    pub(crate) fn query_window_layout_scope(
+        &mut self,
+        frame_id: FrameId,
+        window_id: WindowId,
+        scope: crate::window::WindowLayoutQueryScope,
     ) -> crate::window::WindowLayoutQueryOutcome {
         self.sync_pending_resize_events();
         if let Some(buffer_id) = self
@@ -489,10 +509,15 @@ impl crate::emacs_core::eval::Context {
             }
             WindowLayoutQueryAdapter::Ready(query) => query,
         };
-        let saved_restrictions = self.buffers.reset_outermost_restrictions();
-        let record = query(self, frame_id, window_id);
-        self.buffers
-            .restore_outermost_restrictions(saved_restrictions);
+        // Redisplay observes the outermost restriction; motion observes the
+        // caller's accessible region. Do not widen a measured motion query.
+        let saved_restrictions = matches!(scope, crate::window::WindowLayoutQueryScope::Viewport)
+            .then(|| self.buffers.reset_outermost_restrictions());
+        let record = query(self, frame_id, window_id, scope);
+        if let Some(saved_restrictions) = saved_restrictions {
+            self.buffers
+                .restore_outermost_restrictions(saved_restrictions);
+        }
         self.window_layout_query_adapter = WindowLayoutQueryAdapter::Ready(query);
         record
     }

@@ -5772,6 +5772,10 @@ fn scroll_lines_in_state(
 pub(crate) fn builtin_scroll_up(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
     expect_max_args("scroll-up", &args, 1)?;
     let arg = args.first().cloned();
+    if crate::emacs_core::xdisp::motion::paging::try_scroll(eval, arg, 1)? {
+        eval.invalidate_redisplay();
+        return Ok(Value::NIL);
+    }
     let lines = scroll_lines_in_state(
         &eval.obarray,
         &mut eval.frames,
@@ -5790,6 +5794,10 @@ pub(crate) fn builtin_scroll_up(eval: &mut super::eval::Context, args: Vec<Value
 pub(crate) fn builtin_scroll_down(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
     expect_max_args("scroll-down", &args, 1)?;
     let arg = args.first().cloned();
+    if crate::emacs_core::xdisp::motion::paging::try_scroll(eval, arg, -1)? {
+        eval.invalidate_redisplay();
+        return Ok(Value::NIL);
+    }
     let lines = scroll_lines_in_state(
         &eval.obarray,
         &mut eval.frames,

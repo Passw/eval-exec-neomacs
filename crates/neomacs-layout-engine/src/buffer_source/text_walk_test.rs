@@ -23,6 +23,7 @@ fn window_params() -> WindowParams {
         left_col: 0,
         top_line: 0,
         window_start: 17,
+        measurement_rows: None,
         force_start: false,
         previous_visible_end: None,
         point: 17,

@@ -3884,7 +3884,7 @@ fn posn_at_point_recomputes_a_terminal_window_redisplay_has_not_drawn_yet() {
 
     let calls = std::rc::Rc::new(std::cell::Cell::new(0));
     let observed = std::rc::Rc::clone(&calls);
-    eval.install_window_layout_query(move |_eval, queried_frame, queried_window| {
+    eval.install_window_layout_query(move |_eval, queried_frame, queried_window, _scope| {
         assert_eq!(queried_frame, frame_id);
         assert_eq!(queried_window, window_id);
         observed.set(observed.get() + 1);

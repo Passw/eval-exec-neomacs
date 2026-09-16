@@ -1398,7 +1398,7 @@ fn current_fresh_window_end_does_not_reenter_the_layout_adapter() {
 
     let calls = std::rc::Rc::new(std::cell::Cell::new(0));
     let observed_calls = std::rc::Rc::clone(&calls);
-    eval.install_window_layout_query(move |_eval, _frame_id, _window_id| {
+    eval.install_window_layout_query(move |_eval, _frame_id, _window_id, _scope| {
         observed_calls.set(observed_calls.get() + 1);
         neovm_core::window::WindowLayoutQueryOutcome::Failed(
             neovm_core::window::WindowLayoutQueryFailure::DidNotConverge,

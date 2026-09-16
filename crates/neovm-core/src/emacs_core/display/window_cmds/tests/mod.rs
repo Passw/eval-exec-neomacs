@@ -9677,7 +9677,7 @@ fn window_end_update_returns_the_query_record_without_publishing_it() {
 
     let calls = Rc::new(Cell::new(0));
     let observed_calls = Rc::clone(&calls);
-    ev.install_window_layout_query(move |_eval, frame_id, window_id| {
+    ev.install_window_layout_query(move |_eval, frame_id, window_id, _scope| {
         assert_eq!(frame_id, fid);
         assert_eq!(window_id, wid);
         observed_calls.set(observed_calls.get() + 1);
@@ -9717,7 +9717,7 @@ fn window_end_update_signals_when_installed_layout_query_does_not_converge() {
         .insert("one\ntwo\n");
     let fid = ev.frames.create_frame("F1", 800, 600, buf);
     ev.frames.get_mut(fid).expect("frame").initial = false;
-    ev.install_window_layout_query(|_eval, _frame_id, _window_id| {
+    ev.install_window_layout_query(|_eval, _frame_id, _window_id, _scope| {
         crate::window::WindowLayoutQueryOutcome::Failed(
             crate::window::WindowLayoutQueryFailure::DidNotConverge,
         )

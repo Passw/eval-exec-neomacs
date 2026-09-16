@@ -1185,6 +1185,12 @@ impl<'a> BufferSourceInvisibleTextRenderContext<'a> {
             return BufferSourceInvisibleTextRenderOutcome::RenderBoundaryOverlayStrings;
         }
 
+        // A hidden prefix belongs to the source coverage of this row even
+        // though it contributes no glyph. Preserve the walk's start before
+        // advancing the source, just as for horizontally clipped text.
+        source_render
+            .output_emitter()
+            .note_row_walk_start(layout_i64_char_pos_to_lisp_char_pos(progress.charpos()));
         let action = source_walk
             .consume_invisible_checkpoint(
                 buffer,

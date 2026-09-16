@@ -1287,7 +1287,10 @@ pub(crate) fn row_next_window_start_charpos(row: &DisplayRowSnapshot) -> Option<
         // The display string's row break consumed no buffer character. Resume
         // at its source anchor, not at an invented anchor + 1 inside the
         // replacement. Visible row positions stay valid one-based positions.
-        DisplayRowEndSource::DisplayString => row_end_charpos(row),
+        DisplayRowEndSource::DisplayStringNewline
+        | DisplayRowEndSource::DisplayStringWrap
+        | DisplayRowEndSource::OverlayBeforeString
+        | DisplayRowEndSource::OverlayAfterString => row_end_charpos(row),
     }
 }
 

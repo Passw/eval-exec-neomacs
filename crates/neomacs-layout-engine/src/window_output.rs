@@ -1542,7 +1542,28 @@ impl WindowOutputEmitter {
 
     pub(crate) fn note_display_string_row_end(&mut self, buffer_pos: LispCharPos1) {
         self.note_display_buffer_pos(buffer_pos);
-        self.current_row_end_source = DisplayRowEndSource::DisplayString;
+        self.current_row_end_source = DisplayRowEndSource::DisplayStringNewline;
+    }
+
+    pub(crate) fn note_display_string_wrap(&mut self, buffer_pos: LispCharPos1) {
+        self.note_display_buffer_pos(buffer_pos);
+        self.current_row_end_source = DisplayRowEndSource::DisplayStringWrap;
+    }
+
+    pub(crate) fn note_overlay_string_row_end(
+        &mut self,
+        buffer_pos: LispCharPos1,
+        kind: crate::display_origin::OverlayStringKind,
+    ) {
+        self.note_display_buffer_pos(buffer_pos);
+        self.current_row_end_source = match kind {
+            crate::display_origin::OverlayStringKind::Before => {
+                DisplayRowEndSource::OverlayBeforeString
+            }
+            crate::display_origin::OverlayStringKind::After => {
+                DisplayRowEndSource::OverlayAfterString
+            }
+        };
     }
 
     /// Record where this row's WALK began, for a row whose first drawn glyph is
