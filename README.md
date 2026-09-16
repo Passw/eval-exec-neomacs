@@ -84,18 +84,6 @@ Watch more demos and development updates on [Eval Exec's YouTube channel](https:
     <img src="https://ytcards.demolab.com/?id=Q97LoqYSikg&title=NEO+Emacs+%28WIP%29+is+developing+GPU+Shader&lang=en&timestamp=1784577839&background_color=%23ffffff&title_color=%2324292f&stats_color=%2357606a&max_title_lines=2&width=250&border_radius=5" alt="NEO Emacs (WIP) is developing GPU Shader" title="NEO Emacs (WIP) is developing GPU Shader">
   </picture>
 </a>
-<a href="https://www.youtube.com/watch?v=bx2VXG0HEoE">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://ytcards.demolab.com/?id=bx2VXG0HEoE&title=eval+exec+Live+Stream&lang=en&timestamp=1776191197&background_color=%230d1117&title_color=%23ffffff&stats_color=%23dedede&max_title_lines=2&width=250&border_radius=5">
-    <img src="https://ytcards.demolab.com/?id=bx2VXG0HEoE&title=eval+exec+Live+Stream&lang=en&timestamp=1776191197&background_color=%23ffffff&title_color=%2324292f&stats_color=%2357606a&max_title_lines=2&width=250&border_radius=5" alt="eval exec Live Stream" title="eval exec Live Stream">
-  </picture>
-</a>
-<a href="https://www.youtube.com/watch?v=baHyYHC39_U">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://ytcards.demolab.com/?id=baHyYHC39_U&title=Emacs+scratch%2Figc-commit-985247b6+crash+on+LInux&lang=en&timestamp=1725575365&background_color=%230d1117&title_color=%23ffffff&stats_color=%23dedede&max_title_lines=2&width=250&border_radius=5">
-    <img src="https://ytcards.demolab.com/?id=baHyYHC39_U&title=Emacs+scratch%2Figc-commit-985247b6+crash+on+LInux&lang=en&timestamp=1725575365&background_color=%23ffffff&title_color=%2324292f&stats_color=%2357606a&max_title_lines=2&width=250&border_radius=5" alt="Emacs scratch/igc-commit-985247b6 crash on LInux" title="Emacs scratch/igc-commit-985247b6 crash on LInux">
-  </picture>
-</a>
 <!-- END YOUTUBE-CARDS -->
 
 ### Feature demos

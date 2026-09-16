@@ -21,7 +21,7 @@ jobs:
         uses: DenverCoder1/github-readme-youtube-cards@a02c9b2b841c1cae3e8651571c0146a627423dc1
         with:
           channel_id: UCKNaV8uOpx0KgVt-Rw3AvFA
-          max_videos: 6
+          max_videos: 3
           max_title_lines: 2
           output_type: html
           theme_context_light: '{"background_color":"#ffffff","title_color":"#24292f","stats_color":"#57606a"}'
