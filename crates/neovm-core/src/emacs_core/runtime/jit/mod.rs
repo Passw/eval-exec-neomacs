@@ -95,6 +95,7 @@ pub mod compile;
 pub mod cache;
 
 /// Bytecode-level inlining (see the module docs).
+#[cfg(feature = "jit")]
 pub mod inline;
 
 /// MIR: typed SSA IR for the optimizing Tier-2 (above the baseline `compile`).
