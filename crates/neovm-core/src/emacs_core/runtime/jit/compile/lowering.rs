@@ -1739,6 +1739,67 @@ pub(crate) struct MirLeafPlan {
     pub(crate) rooting_sites: usize,
 }
 
+/// Which `Op::Call`/`Apply`/`CallBuiltinSym` a body still has after inlining
+/// (`gate:generic-call`'s census key), or `""`.
+pub(crate) fn mir_generic_call_kinds(m: &mir::MirFunction) -> String {
+    use mir::MirOp;
+    let mut kinds: Vec<&str> = m
+        .blocks
+        .iter()
+        .flat_map(|b| b.insts.iter())
+        .filter_map(|i| match &i.op {
+            MirOp::Opaque {
+                op: Op::Call(_), ..
+            } => Some("call"),
+            MirOp::Opaque {
+                op: Op::Apply(_), ..
+            } => Some("apply"),
+            MirOp::Opaque {
+                op: Op::CallBuiltinSym(..),
+                ..
+            } => Some("cbsym"),
+            _ => None,
+        })
+        .collect();
+    kinds.sort_unstable();
+    kinds.dedup();
+    kinds.join("+")
+}
+
+/// The adapter op that keeps a looping body out of the MIR tier
+/// (`gate:loop-opaque`'s census key): the first one in a block a back edge
+/// can reach, by variant name.
+pub(crate) fn mir_loop_adapter_op(m: &mir::MirFunction) -> String {
+    use mir::MirOp;
+    let loop_head = m
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            mir::successor_edges(&b.term)
+                .map(|(t, _)| m.blocks[t.0 as usize].bytecode_pc)
+                .filter(|&pc| pc <= b.bytecode_pc)
+                .min()
+        })
+        .min();
+    let Some(head) = loop_head else {
+        return String::new();
+    };
+    m.blocks
+        .iter()
+        .filter(|b| b.bytecode_pc >= head)
+        .flat_map(|b| b.insts.iter())
+        .find_map(|i| match &i.op {
+            MirOp::Opaque { op, .. } => Some(op_variant_name(op)),
+            MirOp::Eq(..) => Some("Eq".to_string()),
+            MirOp::Pred(
+                mir::PredKind::Symbolp | mir::PredKind::Integerp | mir::PredKind::Numberp,
+                _,
+            ) => Some("Pred".to_string()),
+            _ => None,
+        })
+        .unwrap_or_default()
+}
+
 /// Decide a MIR leaf's [`MirLeafPlan`].
 pub(crate) fn plan_mir_leaf(m: &mir::MirFunction) -> MirLeafPlan {
     use mir::{MirOp, PredKind as MP};

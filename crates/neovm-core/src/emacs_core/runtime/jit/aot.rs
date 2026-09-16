@@ -1056,6 +1056,13 @@ fn prepare_leaf_emit(
     if uses_mir_adapter(&m) {
         return Ok(None);
     }
+    // NO LOOP WITHOUT A POLL, the same rule the JIT tier gate makes: a MIR
+    // back edge is a bare jump, so a shim-free loop emitted here would run
+    // uninterruptibly and with no GC safe point.
+    let plan = super::compile::lowering::plan_mir_leaf(&m);
+    if plan.has_backedge {
+        return Ok(None);
+    }
     // Reloc consts → rebuild recipe (R1c-3), in the SAME order the lowering
     // assigns reloc indices. Bail if any const is outside the recipe subset.
     let reloc_consts = collect_reloc_consts(&m);
@@ -1069,7 +1076,6 @@ fn prepare_leaf_emit(
     // sizes the per-thread deopt buffers + side-effect flag identically): the
     // same `MirLeafPlan`. A shim-bearing body is ALL-PRECISE deopt +
     // side-effecting → sized deopt_spill.
-    let plan = super::compile::lowering::plan_mir_leaf(&m);
     let meta = super::compile::AotLeafMeta {
         arity: m.arity,
         required: m.arity,

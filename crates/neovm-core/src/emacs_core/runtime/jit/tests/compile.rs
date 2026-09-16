@@ -1390,6 +1390,88 @@ fn mir_allocates_escaping_cons() {
     }
 }
 
+/// The poll is the TIER's to make, not the baseline's alone: a loop body the
+/// MIR tier claims must be as interruptible as the same body on the
+/// baseline. `compile_bytecode_function_with` is the production entry that
+/// picks the tier.
+#[test]
+fn a_compiled_loop_polls_quit_whichever_tier_compiles_it() {
+    use crate::emacs_core::eval::Context;
+    // `(while (> n 0) (setq n (1- n)))`: no shim-lowered op at all, so the
+    // MIR tier's `has_adapter_site` is false and its gate used to admit it.
+    let ops = vec![
+        Op::StackRef(0),
+        Op::Constant(0),
+        Op::Gtr,
+        Op::GotoIfNil(8),
+        Op::StackRef(0),
+        Op::Sub1,
+        Op::StackSet(1),
+        Op::Goto(0),
+        Op::StackRef(0),
+        Op::Return,
+    ];
+    let mut f = ByteCodeFunction::new(LambdaParams {
+        required: vec![crate::emacs_core::intern::SymId(1)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    f.lexical = true;
+    f.ops = ops;
+    f.constants = vec![Value::make_int(0)].into();
+    f.max_stack = 16;
+    let mut ev = Context::new();
+    let ctx_ptr = &mut ev as *mut Context as *mut u8;
+    let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+    assert_eq!(
+        leaf.call(ctx_ptr, &[Value::make_int(1000)]),
+        NativeRun::Ok(Value::make_int(0).bits()),
+        "the loop runs to completion with no quit pending"
+    );
+    ev.set_quit_flag_value(Value::T);
+    let quit = leaf.call(ctx_ptr, &[Value::make_int(1000)]);
+    ev.set_quit_flag_value(Value::NIL);
+    assert_eq!(
+        quit,
+        NativeRun::Signal,
+        "C-g must interrupt a compiled loop whichever tier compiled it"
+    );
+    assert!(take_pending_flow().is_some(), "quit Flow stashed");
+    // The same for a loop that CONSES: its only shim is `neovm_jit_cons`,
+    // which never reaches a safe point, so without a back-edge poll the loop
+    // would allocate forever with no GC.
+    f.ops = vec![
+        Op::StackRef(0),
+        Op::Constant(0),
+        Op::Gtr,
+        Op::GotoIfNil(12),
+        Op::StackRef(0),
+        Op::Constant(0),
+        Op::Cons,
+        Op::Pop,
+        Op::StackRef(0),
+        Op::Sub1,
+        Op::StackSet(1),
+        Op::Goto(0),
+        Op::StackRef(0),
+        Op::Return,
+    ];
+    let consing = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+    assert_eq!(
+        consing.call(ctx_ptr, &[Value::make_int(1000)]),
+        NativeRun::Ok(Value::make_int(0).bits())
+    );
+    ev.set_quit_flag_value(Value::T);
+    let quit = consing.call(ctx_ptr, &[Value::make_int(1000)]);
+    ev.set_quit_flag_value(Value::NIL);
+    assert_eq!(
+        quit,
+        NativeRun::Signal,
+        "a consing loop must reach its safe point too"
+    );
+    assert!(take_pending_flow().is_some(), "quit Flow stashed");
+}
+
 #[test]
 fn backedge_polls_quit_like_the_interpreter() {
     use crate::emacs_core::bytecode::Vm;

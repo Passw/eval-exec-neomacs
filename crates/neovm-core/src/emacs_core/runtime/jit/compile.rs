@@ -1198,20 +1198,36 @@ fn compile_bytecode_function_inner(
         //    no generic call left and keeps the tier.
         let plan = lowering::plan_mir_leaf(&mir);
         let reject = if has_float_site {
-            Some("gate:float-site")
+            Some("gate:float-site".to_string())
         } else if has_generic_arith_site {
-            Some("gate:generic-arith-site")
-        } else if plan.has_backedge && plan.has_adapter_site {
-            Some("gate:loop-opaque")
+            Some("gate:generic-arith-site".to_string())
+        } else if plan.has_backedge {
+            // NO LOOP WITHOUT A POLL. The MIR tier lowers a back edge to a
+            // bare jump: no quit check, no GC safe point (the baseline's
+            // `emit_backedge_jump` makes both). The gate used to ask for an
+            // adapter site as well, but a loop can have none and still need
+            // the poll: `(while (> n 0) (setq n (1- n)))` folds its
+            // `StackSet` into the model stack, so it took the tier and could
+            // not be interrupted by C-g, and a loop whose only shim is
+            // `neovm_jit_cons` allocated with no safe point at all. Keyed by
+            // the op that would have kept it out anyway, so the census still
+            // says which lowering to port next.
+            Some(format!(
+                "gate:loop-nopoll:{}",
+                lowering::mir_loop_adapter_op(&mir)
+            ))
         } else if plan.has_generic_call {
-            Some("gate:generic-call")
+            Some(format!(
+                "gate:generic-call:{}",
+                lowering::mir_generic_call_kinds(&mir)
+            ))
         } else if inline_epoch.is_some() && plan.has_opaque {
-            Some("gate:inline-opaque")
+            Some("gate:inline-opaque".to_string())
         } else {
             None
         };
         if let Some(key) = reject {
-            super::stats::record_mir_bail(key.to_string());
+            super::stats::record_mir_bail(key);
             super::stats::record_mir(super::stats::MirFunnel::TierRejected);
         } else if let Ok(mut leaf) = lower_mir_pure(&mir).inspect_err(|e| {
             super::stats::record_mir(super::stats::MirFunnel::LowerFailed);
