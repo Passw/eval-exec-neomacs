@@ -186,11 +186,36 @@ pub(crate) fn builtin_rassq_2(
     builtin_rassq_values(key, alist, eval.symbols_with_pos_enabled)
 }
 
+/// `rassq`, scanned like `memq`: no cycle bookkeeping until the budget runs
+/// out, then the exact algorithm from the head.
 fn builtin_rassq_values(key: Value, alist: Value, symbols_with_pos_enabled: bool) -> EvalResult {
     if symbols_with_pos_enabled {
         return builtin_rassq_values_swp(key, alist);
     }
+    let key_bits = key.bits();
+    let mut tail = alist;
+    let mut budget = crate::emacs_core::builtins::LIST_SCAN_BUDGET;
+    while budget != 0 {
+        if !tail.is_cons() {
+            if tail.is_nil() {
+                return Ok(Value::NIL);
+            }
+            break;
+        }
+        let pair = tail.cons_car();
+        if pair.is_cons() && pair.cons_cdr().bits() == key_bits {
+            return Ok(pair);
+        }
+        tail = tail.cons_cdr();
+        budget -= 1;
+    }
+    rassq_exact(key, alist)
+}
 
+/// [`builtin_rassq_values`]'s exact algorithm, from the head.
+#[cold]
+#[inline(never)]
+fn rassq_exact(key: Value, alist: Value) -> EvalResult {
     let key_bits = key.bits();
     let mut tail = alist;
     let mut tortoise = alist;
@@ -233,16 +258,40 @@ fn builtin_rassq_values_swp(key: Value, alist: Value) -> EvalResult {
         return builtin_rassq_values(key, alist, false);
     }
     let mut tail = alist;
+    let mut budget = crate::emacs_core::builtins::LIST_SCAN_BUDGET;
+    while budget != 0 {
+        if !tail.is_cons() {
+            if tail.is_nil() {
+                return Ok(Value::NIL);
+            }
+            break;
+        }
+        let pair = tail.cons_car();
+        if pair.is_cons() && crate::emacs_core::builtins::eq_bare_symbol_swp(pair.cons_cdr(), bare)
+        {
+            return Ok(pair);
+        }
+        tail = tail.cons_cdr();
+        budget -= 1;
+    }
+    rassq_swp_exact(bare, alist)
+}
+
+/// [`builtin_rassq_values_swp`]'s exact algorithm, from the head.
+#[cold]
+#[inline(never)]
+fn rassq_swp_exact(bare: Value, alist: Value) -> EvalResult {
+    let mut tail = alist;
     let mut tortoise = alist;
     let mut power = 1usize;
     let mut distance = 0usize;
 
     while tail.is_cons() {
         let pair_car = tail.cons_car();
-        if pair_car.is_cons() {
-            if crate::emacs_core::builtins::eq_bare_symbol_swp(pair_car.cons_cdr(), bare) {
-                return Ok(pair_car);
-            }
+        if pair_car.is_cons()
+            && crate::emacs_core::builtins::eq_bare_symbol_swp(pair_car.cons_cdr(), bare)
+        {
+            return Ok(pair_car);
         }
 
         tail = tail.cons_cdr();
@@ -266,6 +315,16 @@ fn builtin_rassq_values_swp(key: Value, alist: Value) -> EvalResult {
             LispCondition::WrongTypeArgument,
             vec![Value::symbol("listp"), alist],
         ))
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn rassq_exact_for_test(key: Value, alist: Value, swp: bool) -> EvalResult {
+    let bare = key.as_symbol_with_pos_sym().unwrap_or(key);
+    if swp && bare.is_symbol() {
+        rassq_swp_exact(bare, alist)
+    } else {
+        rassq_exact(key, alist)
     }
 }
 

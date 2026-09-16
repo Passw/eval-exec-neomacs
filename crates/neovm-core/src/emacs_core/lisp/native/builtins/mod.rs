@@ -426,6 +426,7 @@ pub(crate) mod types;
 pub(crate) use arithmetic::*;
 pub(crate) use buffer_text_backend::*;
 pub(crate) use collections::*;
+pub(crate) use cons_list::LIST_SCAN_BUDGET;
 pub use cons_list::lambda_params_to_value;
 pub use cons_list::lambda_to_closure_vector;
 pub use cons_list::parse_lambda_params_from_value;

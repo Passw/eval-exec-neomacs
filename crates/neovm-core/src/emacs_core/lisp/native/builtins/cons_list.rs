@@ -1142,7 +1142,7 @@ pub(crate) fn builtin_memq_2(
 /// the first repeated one, which is the only cell a cycle check reacts to.
 /// Only a list with no match that is circular, improper or longer than this
 /// pays the replay.
-const LIST_SCAN_BUDGET: usize = 1 << 16;
+pub(crate) const LIST_SCAN_BUDGET: usize = 1 << 16;
 
 /// `memq`. The scan tests each cell and nothing else, so it needs no stack
 /// frame: the tortoise-and-hare bookkeeping it no longer carries was 4 to 5
@@ -1389,6 +1389,8 @@ pub(crate) fn builtin_assq_2(
     builtin_assq_values(key, list, eval.symbols_with_pos_enabled)
 }
 
+/// `assq`, scanned like [`builtin_memq_values`]: no cycle bookkeeping until
+/// the budget runs out, then the exact algorithm from the head.
 pub(crate) fn builtin_assq_values(
     key: Value,
     list: Value,
@@ -1397,7 +1399,30 @@ pub(crate) fn builtin_assq_values(
     if symbols_with_pos_enabled {
         return builtin_assq_values_swp(key, list);
     }
+    let key_bits = key.bits();
+    let mut tail = list;
+    let mut budget = LIST_SCAN_BUDGET;
+    while budget != 0 {
+        if !tail.is_cons() {
+            if tail.is_nil() {
+                return Ok(Value::NIL);
+            }
+            break;
+        }
+        let pair = tail.cons_car();
+        if pair.is_cons() && pair.cons_car().bits() == key_bits {
+            return Ok(pair);
+        }
+        tail = tail.cons_cdr();
+        budget -= 1;
+    }
+    assq_exact(key, list)
+}
 
+/// [`builtin_assq_values`]'s exact algorithm, from the head.
+#[cold]
+#[inline(never)]
+fn assq_exact(key: Value, list: Value) -> EvalResult {
     let key_bits = key.bits();
     let mut tail = list;
     let mut tortoise = list;
@@ -1417,7 +1442,7 @@ pub(crate) fn builtin_assq_values(
         if tail.is_cons() {
             distance = distance.saturating_add(1);
             if tail.bits() == tortoise.bits() {
-                return Err(signal(LispCondition::CircularList, vec![tail]));
+                return Err(circular_list_error(tail));
             }
             if distance == power {
                 tortoise = tail;
@@ -1430,10 +1455,17 @@ pub(crate) fn builtin_assq_values(
     if tail.is_nil() {
         Ok(Value::NIL)
     } else {
-        Err(signal(
-            LispCondition::WrongTypeArgument,
-            vec![Value::symbol("listp"), list],
-        ))
+        Err(listp_error(list))
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn assq_exact_for_test(key: Value, list: Value, swp: bool) -> EvalResult {
+    let bare = key.as_symbol_with_pos_sym().unwrap_or(key);
+    if swp && bare.is_symbol() {
+        assq_swp_exact(bare, list)
+    } else {
+        assq_exact(key, list)
     }
 }
 
@@ -1443,16 +1475,37 @@ fn builtin_assq_values_swp(key: Value, list: Value) -> EvalResult {
         return builtin_assq_values(key, list, false);
     }
     let mut tail = list;
+    let mut budget = LIST_SCAN_BUDGET;
+    while budget != 0 {
+        if !tail.is_cons() {
+            if tail.is_nil() {
+                return Ok(Value::NIL);
+            }
+            break;
+        }
+        let pair = tail.cons_car();
+        if pair.is_cons() && eq_bare_symbol_swp(pair.cons_car(), bare) {
+            return Ok(pair);
+        }
+        tail = tail.cons_cdr();
+        budget -= 1;
+    }
+    assq_swp_exact(bare, list)
+}
+
+/// [`builtin_assq_values_swp`]'s exact algorithm, from the head.
+#[cold]
+#[inline(never)]
+fn assq_swp_exact(bare: Value, list: Value) -> EvalResult {
+    let mut tail = list;
     let mut tortoise = list;
     let mut power = 1usize;
     let mut distance = 0usize;
 
     while tail.is_cons() {
         let pair_car = tail.cons_car();
-        if pair_car.is_cons() {
-            if eq_bare_symbol_swp(pair_car.cons_car(), bare) {
-                return Ok(pair_car);
-            }
+        if pair_car.is_cons() && eq_bare_symbol_swp(pair_car.cons_car(), bare) {
+            return Ok(pair_car);
         }
 
         tail = tail.cons_cdr();

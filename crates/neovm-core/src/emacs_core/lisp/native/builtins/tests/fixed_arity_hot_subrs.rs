@@ -289,7 +289,8 @@ const THIRD_BATCH_FORM: &str = r#"(list (assoc "b" '(("a" . 1) ("b" . 2))) (asso
 
 const THIRD_BATCH_GNU: &str = r#"(("b" . 2) (2 . b) ("b" . 2) (x . 1) 2 2 nil "abc" [1 2] nil (1 2) 2.0 0.0 1.0 0.0 0.0 0.0 1.0 1.5 (wrong-number-of-arguments sqrt 0) (wrong-number-of-arguments sqrt 2) (wrong-type-argument numberp a) (wrong-type-argument numberp "x") (wrong-number-of-arguments assoc 1) (wrong-number-of-arguments assoc 4) (wrong-number-of-arguments plist-get 1) (wrong-number-of-arguments copy-sequence 0) (wrong-type-argument sequencep 1) (1 . 2) (wrong-type-argument listp ((1 . 2) . 3)) (2 . 3) (2 . 3) (1 . 1) (1 . 1) (2 1 1 1 nil 1 nil 1 2 5 8 nil 1 2 nil 4 (wrong-type-argument listp (1 2 . 3)) (wrong-type-argument listp ((1 . 2) . 3)) (wrong-type-argument listp ((1 . 2) . 3)) circular-list (circular-list circular-list) (foo #<symbol foo at 3>) (foo . 9)))"#;
 
-/// `memq`'s scan with no cycle check answers what the exact algorithm does —
+/// The `memq`, `assq` and `rassq` scans with no cycle check answer what the
+/// exact algorithms do —
 /// the same tail, the same `circular-list` data, the same improper-list
 /// object — for every list shape: a cycle with the match inside it or before
 /// it, a cycle with no match, an improper end, and a list longer than the
@@ -370,16 +371,73 @@ fn memq_scan_answers_as_the_exact_algorithm() {
             Value::NIL,
         ])
         .collect::<Vec<_>>();
+    // The same shapes as alists: each element is `(i . i)`.
+    let pairs = |l: Value| {
+        let mut out = Value::NIL;
+        let mut tail = l;
+        let mut seen = 0;
+        while tail.is_cons() && seen < 200 {
+            let v = tail.cons_car();
+            out = Value::cons(Value::cons(v, v), out);
+            tail = tail.cons_cdr();
+            seen += 1;
+        }
+        out
+    };
+    let alists: Vec<Value> = lists.iter().map(|&l| pairs(l)).collect();
+    let cyclic_alist = {
+        let l = pairs(seq(6));
+        nthcdr(l, 5).set_cdr(nthcdr(l, 2));
+        l
+    };
+    let improper_alist = Value::cons(
+        Value::cons(Value::fixnum(1), Value::fixnum(1)),
+        Value::fixnum(9),
+    );
+    let with_positions_alist = Value::cons(
+        Value::cons(positioned.cons_car(), Value::symbol("a")),
+        Value::cons(
+            Value::cons(Value::symbol("c"), positioned.cons_cdr().cons_car()),
+            Value::NIL,
+        ),
+    );
+    for &list in &alists {
+        crate::emacs_core::eval::push_scratch_gc_root(list);
+    }
+    for &list in &[cyclic_alist, improper_alist, with_positions_alist] {
+        crate::emacs_core::eval::push_scratch_gc_root(list);
+    }
     let mut checked = 0;
     for &list in &lists {
         for &target in &targets {
             for swp in [false, true] {
                 let got = builtin_memq_values(target, list, swp);
                 let want = memq_exact_for_test(target, list, swp);
-                assert_eq!(describe(&got), describe(&want), "swp {swp}");
+                assert_eq!(describe(&got), describe(&want), "memq swp {swp}");
                 checked += 1;
             }
         }
     }
-    assert_eq!(checked, 12 * 15 * 2);
+    for list in alists
+        .iter()
+        .copied()
+        .chain([cyclic_alist, improper_alist, with_positions_alist])
+    {
+        for &target in &targets {
+            for swp in [false, true] {
+                let got =
+                    crate::emacs_core::builtins::cons_list::builtin_assq_values(target, list, swp);
+                let want =
+                    crate::emacs_core::builtins::cons_list::assq_exact_for_test(target, list, swp);
+                assert_eq!(describe(&got), describe(&want), "assq swp {swp}");
+                eval.symbols_with_pos_enabled = swp;
+                let got = crate::emacs_core::misc::builtin_rassq_2(&mut eval, target, list);
+                let want = crate::emacs_core::misc::rassq_exact_for_test(target, list, swp);
+                assert_eq!(describe(&got), describe(&want), "rassq swp {swp}");
+                eval.symbols_with_pos_enabled = false;
+                checked += 2;
+            }
+        }
+    }
+    assert_eq!(checked, 12 * 15 * 2 + 15 * 15 * 2 * 2);
 }
