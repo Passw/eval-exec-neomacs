@@ -2509,30 +2509,29 @@ fn mir_hoists_the_root_window_across_shim_sites() {
     }
 }
 
-/// `RootWinCarry` rule 1 at a count of ZERO: a call whose live residual is
-/// all type-skipped stores nothing, runs its callee with `top` at the frame
-/// base, and so must empty the store record. `k` is a fixnum constant: the
-/// adapter's `set` sites store it (it is a retagged value, not a literal
-/// immediate), but the MIR call arm skips it by type.
+/// A residual value the SSA proves is a tagged fixnum — a constant, or a
+/// retag of one — is never stored into the root window: it is not a pointer,
+/// so no GC can free it. Every rooting site here skips its whole residual,
+/// which also empties the store record (`RootWinCarry` rule 1, kept under
+/// test by `mir_store_record_is_truncated_to_each_sites_count`, whose
+/// residuals are arguments).
 ///
 ///     (let ((k 7)) (set 'L 'L) (f) (set 'L 'L) k)
 ///
-/// The second `set` must store `k` again — a nested activation inside
-/// `(f)` may have overwritten the slot. Before the fix it was elided.
 #[test]
-fn mir_call_that_roots_nothing_forgets_the_store_record() {
+fn mir_fixnum_residual_is_never_root_stored() {
     let ops = vec![
         Op::Constant(0), // k = 7        [k]
         Op::Constant(1), // L            [k L]
         Op::Dup,         //              [k L L]
-        Op::Set,         // residual [k]: stores k
+        Op::Set,         // residual [k]
         Op::Pop,         //              [k]
         Op::Constant(2), // f            [k f]
-        Op::Call(0),     // residual [k]: Fixnum, skipped -> stores nothing
+        Op::Call(0),     // residual [k]
         Op::Pop,         //              [k]
         Op::Constant(1), // L            [k L]
         Op::Dup,         //              [k L L]
-        Op::Set,         // residual [k]: must store k again
+        Op::Set,         // residual [k]
         Op::Pop,         //              [k]
         Op::Return,
     ];
@@ -2546,8 +2545,8 @@ fn mir_call_that_roots_nothing_forgets_the_store_record() {
     lower_mir_pure(&mir).expect("lowers");
     assert_eq!(
         super::lowering::rootwin_counters(),
-        (2, 0),
-        "both set sites store k; (1, 1) means the call left a stale record"
+        (0, 0),
+        "a fixnum residual is never a root: three rooting sites, no stores"
     );
 }
 
@@ -4151,6 +4150,82 @@ fn gate_relax_lets_user_call_heavy_bodies_tier() {
         "relax ON: builtin-call-heavy still declines (font-lock ~1.0x, correctly declined)"
     );
     force_gate_relax_for_test(false);
+}
+
+/// A `pcase`-shaped body keeps its known-fixnum elision: the switch's edges
+/// carry the entry set to every arm. Unmodelled, `Op::Switch` made
+/// `compute_known_fixnum_slots` bail for the WHOLE function, so no guard
+/// anywhere in a body with a jump table was elided.
+#[test]
+fn a_switch_carries_known_fixnum_slots_to_its_arms() {
+    use crate::emacs_core::value::HashTableTest;
+    let mut ev = crate::emacs_core::eval::Context::new_minimal_vm_harness();
+    let ctx_ptr = &mut ev as *mut crate::emacs_core::eval::Context as *mut u8;
+    let table = Value::hash_table(HashTableTest::Eq);
+    let _ = table.with_hash_table_mut(|ht| {
+        let key = Value::symbol("jit-sw2-foo").to_hash_key(&ht.test);
+        ht.insert(key, Value::symbol("jit-sw2-foo"), Value::fixnum(16));
+    });
+    // (let ((k (1+ x))) (pcase 'foo (...)) (1+ k)) in both arms: only the
+    // first `1+` needs a fixnum guard.
+    let ops = [
+        Op::StackRef(0), // [x x]
+        Op::Add1,        // [x k]        guard on x
+        Op::Constant(1), // [x k 'foo]
+        Op::Constant(0), // [x k 'foo table]
+        Op::Switch,      // [x k]        -> 8 on a hit, 5 on a miss
+        Op::StackRef(0), // 5: [x k k]
+        Op::Add1,        // [x k k+1]    k is known fixnum: no guard
+        Op::Return,
+        Op::StackRef(0), // 8: [x k k]
+        Op::Add1,        // [x k k+1]    no guard
+        Op::Return,
+    ];
+    let constants = [table, Value::symbol("jit-sw2-foo")];
+    let map = vec![GnuByteOffsetMapEntry::new(16, 8)];
+    // The analysis itself: every block's entry set exists (an unmodelled op
+    // would make the whole map empty) and both arms know slot 1 is a fixnum.
+    let cfg = super::analyze_cfg(&ops, &constants, Some(&map), 1).expect("cfg");
+    let known = super::compute_known_fixnum_slots(&ops, &constants, &cfg);
+    assert!(
+        !known.is_empty(),
+        "a switch must not bail the known-fixnum analysis"
+    );
+    for arm in [5usize, 8] {
+        assert_eq!(
+            known.get(&arm).map(|k| k.as_slice()),
+            Some([false, true].as_slice()),
+            "arm at {arm}: [x unknown, k fixnum]"
+        );
+    }
+    let leaf = lower_leaf_with_map(&ops, &constants, 1, Some(&map)).expect("compiles");
+    // The answers still match the interpreter, for a fixnum and for a
+    // non-fixnum argument (which must deopt, not compute).
+    let mut f = ByteCodeFunction::new(LambdaParams {
+        required: vec![crate::emacs_core::intern::SymId(1)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    f.lexical = true;
+    f.ops = ops.to_vec();
+    f.constants = constants.to_vec().into();
+    f.max_stack = 8;
+    f.gnu_byte_offset_map = Some(map.clone());
+    for arg in [Value::make_int(5), Value::make_int(-3)] {
+        let native = leaf.call(ctx_ptr, &[arg]);
+        let interp = {
+            let mut vm = crate::emacs_core::bytecode::Vm::from_context(&mut ev);
+            vm.execute(&f, vec![arg]).expect("interprets")
+        };
+        assert_eq!(native, NativeRun::Ok(interp.bits()), "arg {arg:?}");
+    }
+    assert!(
+        matches!(
+            leaf.call(ctx_ptr, &[Value::symbol("x")]),
+            NativeRun::Deopt | NativeRun::DeoptAt(_)
+        ),
+        "a non-fixnum argument deopts at the first guard"
+    );
 }
 
 #[test]

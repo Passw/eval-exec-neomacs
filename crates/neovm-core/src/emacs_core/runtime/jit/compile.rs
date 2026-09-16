@@ -2847,9 +2847,29 @@ fn compute_known_fixnum_slots(
                         terminated = true;
                         break;
                     }
+                    Op::Switch => {
+                        // `[value table]` -> a static target, or the
+                        // fall-through on a miss. Both operands are popped and
+                        // every edge sees the same set. Unmodelled, this op
+                        // used to bail the whole function, so a `pcase` body
+                        // elided no guard anywhere.
+                        let Some(targets) = cfg.switch_targets.get(&(l + off)) else {
+                            return empty;
+                        };
+                        if k.len() < 2 {
+                            return empty;
+                        }
+                        k.truncate(k.len() - 2);
+                        for &(_, t) in targets {
+                            edges.push((t, k.clone()));
+                        }
+                        edges.push((end, k.clone()));
+                        terminated = true;
+                        break;
+                    }
                     other => {
                         if apply_known_fixnum_op(l + off, other, constants, &mut k).is_err() {
-                            // Unmodeled op (Switch / handler / ...): bail entirely.
+                            // Unmodeled op (a handler op, ...): bail entirely.
                             return empty;
                         }
                     }

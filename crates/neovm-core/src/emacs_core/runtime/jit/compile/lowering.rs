@@ -1316,8 +1316,11 @@ pub(crate) fn emit_cond_residual_roots_pre(
     let on = jit_lever1_on();
     let mut to_root: Vec<ClifValue> = Vec::with_capacity(values.len());
     for &v in values {
-        if on && is_nonheap_const(fb, v) {
-            continue; // provably non-heap immediate: nothing to root.
+        // A provably non-heap immediate needs no root: a constant, or a value
+        // the SSA shows is `(x << >=2) | 0b10` — a tagged fixnum, never a
+        // pointer (`is_known_fixnum`, the same proof the guard elision uses).
+        if on && (is_nonheap_const(fb, v) || is_known_fixnum(fb, v)) {
+            continue;
         }
         to_root.push(v);
     }
