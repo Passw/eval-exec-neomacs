@@ -8,11 +8,55 @@ use std::num::NonZeroUsize;
 
 fn source_line_start(buffer: &Buffer, pos: EmacsBytePos) -> EmacsBytePos {
     let region = buffer.accessible_emacs_byte_region();
-    buffer
-        .prev_newline_emacs_byte(region.clamp(pos), region.start())
-        .map_or(region.start(), |newline| {
-            newline.add_len(EmacsByteLen::new(1))
-        })
+    let raw_line_start = |position| {
+        buffer
+            .prev_newline_emacs_byte(position, region.start())
+            .map_or(region.start(), |newline| {
+                newline.add_len(EmacsByteLen::new(1))
+            })
+    };
+    let mut start = raw_line_start(region.clamp(pos));
+    // A source newline is not necessarily a display boundary. A replacing
+    // or invisible property may consume it. Retreat to the owning span and
+    // measure forward; never start a fresh interpretation in its middle.
+    // Conservatively include all overlay carriers: over-measuring is safe,
+    // choosing a boundary based on a lower-priority carrier is not.
+    let properties = [Value::symbol("display"), Value::symbol("invisible")];
+    while start > region.start() {
+        let newline = start.saturating_sub_len(EmacsByteLen::new(1));
+        let mut owner_start = start;
+        for property in properties {
+            if buffer
+                .text_props_get_property_at_emacs_byte_pos(newline, property)
+                .is_some_and(|value| value.is_truthy())
+            {
+                owner_start = owner_start.min(
+                    buffer
+                        .text_props_previous_single_change_before_emacs_byte_pos(start, property)
+                        .unwrap_or(region.start()),
+                );
+            }
+            for overlay in buffer.overlays().iter_overlays_at_emacs_byte_pos(newline) {
+                if buffer
+                    .overlays()
+                    .overlay_get_named(overlay, property)
+                    .is_some_and(|value| value.is_truthy())
+                {
+                    owner_start = owner_start.min(
+                        buffer
+                            .overlays()
+                            .overlay_start_emacs_byte_pos(overlay)
+                            .unwrap_or(start),
+                    );
+                }
+            }
+        }
+        if owner_start >= start {
+            break;
+        }
+        start = raw_line_start(region.clamp(owner_start));
+    }
+    start
 }
 
 pub(super) fn backtrack(buffer: &Buffer, start: LispCharPos1, count: usize) -> LispCharPos1 {

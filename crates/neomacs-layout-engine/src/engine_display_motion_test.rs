@@ -4,6 +4,34 @@ use super::*;
 use neovm_core::window::WindowLayoutQueryOutcome;
 
 #[test]
+fn motion_backtracking_does_not_reseat_inside_a_multiline_replacement() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .expect("buffer")
+        .insert("AAA\n\nBBB\nCCC\n");
+    eval.frame_manager_mut()
+        .create_frame("source-boundary", 400, 160, buffer);
+    eval.eval_str(r#"(put-text-property 1 7 'display "X")"#)
+        .expect("replacement covers newlines");
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let result = eval
+        .eval_str(
+            r#"(progn (goto-char 8)
+        (let ((noninteractive nil)) (list (vertical-motion 0) (point))))"#,
+        )
+        .expect("backtrack over replacement owner");
+    assert_eq!(neovm_core::emacs_core::print::print_value(&result), "(0 1)");
+}
+
+#[test]
 fn offscreen_row_queries_preserve_automatic_composition_metrics() {
     use neovm_core::window::{DisplayPointRole, WindowLayoutQueryScope};
     use std::num::NonZeroUsize;
@@ -11,19 +39,51 @@ fn offscreen_row_queries_preserve_automatic_composition_metrics() {
     crate::test_composition::install_rules(&mut eval);
     let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
     let text = format!("{}👩‍💻Z\n", format!("{}\n", "a".repeat(40)).repeat(240));
-    eval.buffer_manager_mut().get_mut(buffer).expect("buffer").insert(&text);
-    let frame = eval.frame_manager_mut().create_frame("offscreen-composition", 400, 160, buffer);
-    let window = eval.frame_manager().get(frame).expect("frame").selected_window;
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .expect("buffer")
+        .insert(&text);
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("offscreen-composition", 400, 160, buffer);
+    let window = eval
+        .frame_manager()
+        .get(frame)
+        .expect("frame")
+        .selected_window;
     let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
     let mut widths = Vec::new();
     for (start, count) in [(9841, 2), (1, 256)] {
-        let snapshot = query.query_window_layout(&mut eval, frame, window,
-            WindowLayoutQueryScope::Rows { start: LispCharPos1::new(start), count: NonZeroUsize::new(count).expect("row budget") })
-            .expect("canonical row query").into_geometry().expect("geometry");
-        widths.push(snapshot.points.iter().find(|point| point.role == DisplayPointRole::Glyph && point.buffer_pos == LispCharPos1::new(9841))
-            .expect("emoji source position in measured rows").width);
+        let snapshot = query
+            .query_window_layout(
+                &mut eval,
+                frame,
+                window,
+                WindowLayoutQueryScope::Rows {
+                    start: LispCharPos1::new(start),
+                    count: NonZeroUsize::new(count).expect("row budget"),
+                },
+            )
+            .expect("canonical row query")
+            .into_geometry()
+            .expect("geometry");
+        widths.push(
+            snapshot
+                .points
+                .iter()
+                .find(|point| {
+                    point.role == DisplayPointRole::Glyph
+                        && point.buffer_pos == LispCharPos1::new(9841)
+                })
+                .expect("emoji source position in measured rows")
+                .width,
+        );
     }
-    assert_eq!(widths, vec![32, 32], "query distance must not change composition");
+    assert_eq!(
+        widths,
+        vec![32, 32],
+        "query distance must not change composition"
+    );
 }
 
 #[test]
