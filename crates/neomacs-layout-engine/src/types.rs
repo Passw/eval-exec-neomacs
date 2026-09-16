@@ -428,7 +428,11 @@ impl WindowParams {
     /// the physical viewport is only the default for a presentation walk.
     pub(crate) fn source_interpretation_rows(&self) -> usize {
         self.measurement_rows.map_or_else(
-            || (self.text_bounds.height / self.char_height.max(1.0)).ceil().max(1.0) as usize,
+            || {
+                (self.text_bounds.height / self.char_height.max(1.0))
+                    .ceil()
+                    .max(1.0) as usize
+            },
             std::num::NonZeroUsize::get,
         )
     }

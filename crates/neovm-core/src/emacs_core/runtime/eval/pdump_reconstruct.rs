@@ -142,6 +142,7 @@ impl Context {
             redisplay_fn: None,
             frame_snapshot_fn: None,
             window_layout_query_adapter: WindowLayoutQueryAdapter::Unavailable,
+            scroll_goal: None,
             pending_pixel_scroll: None,
             display_host: None,
             tty_frame_host_factory: None,

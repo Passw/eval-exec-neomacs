@@ -3132,6 +3132,9 @@ pub struct Context {
     /// while invoking it is tracked explicitly: recursive/exclusively-borrowed
     /// queries report `LayoutBusy` instead of silently returning stale state.
     pub(crate) window_layout_query_adapter: WindowLayoutQueryAdapter,
+    /// Consecutive graphical scroll commands retain a pixel goal, not a
+    /// possibly clipped buffer column. Owned exclusively by this VM.
+    pub(crate) scroll_goal: Option<crate::emacs_core::xdisp::motion::ScrollGoal>,
     /// Smooth scroll accumulated for the next input-consuming redisplay.
     pub(crate) pending_pixel_scroll: Option<crate::keyboard::PendingPixelScroll>,
     /// Host-display bridge for GUI frame realization.

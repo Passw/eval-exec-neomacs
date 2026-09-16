@@ -3494,7 +3494,9 @@ impl LayoutEngine {
         let accessible_end = params.accessible_end_charpos().get();
         let window_start = params.window_start_charpos().get().max(accessible_start);
         let max_rows = i64::try_from(params.source_interpretation_rows()).unwrap_or(i64::MAX);
-        let fontify_end = window_start.saturating_add(max_rows.saturating_mul(200)).min(accessible_end);
+        let fontify_end = window_start
+            .saturating_add(max_rows.saturating_mul(200))
+            .min(accessible_end);
         let Some(freshness_before_fontification) =
             evaluator.window_layout_attempt_freshness(frame_id, window_id, buf_id)
         else {

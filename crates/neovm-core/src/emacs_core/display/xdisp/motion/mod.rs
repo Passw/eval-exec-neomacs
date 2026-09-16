@@ -6,6 +6,8 @@
 
 mod measurement;
 pub(crate) mod paging;
+mod policy;
+pub(crate) use policy::ScrollGoal;
 
 use crate::buffer::{AccessibleCharRange, BufferId, LispCharPos1};
 use crate::emacs_core::Context;

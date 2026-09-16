@@ -1,9 +1,25 @@
 //! Graphical scrolling: measure first, choose a viewport, then commit its
 //! start, point and pixel offset together. GNU: window_scroll_pixel_based.
 
+use super::policy::{PreservePoint, ScrollPolicy};
 use super::*;
-use crate::window::Window;
+use crate::window::{Window, WindowScrollUpdate};
 use std::num::NonZeroUsize;
+
+/// The goal is committed with the viewport, never during speculative layout.
+pub(crate) struct ScrollPlan {
+    viewport: WindowScrollUpdate,
+    goal: Option<ScrollGoal>,
+}
+
+impl From<WindowScrollUpdate> for ScrollPlan {
+    fn from(viewport: WindowScrollUpdate) -> Self {
+        Self {
+            viewport,
+            goal: None,
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 enum ScrollAmount {
@@ -30,70 +46,6 @@ impl ScrollAmount {
                     .saturating_mul(line_height),
             ),
         }
-    }
-}
-
-/// A complete candidate, never a series of mutations visible to Lisp callbacks.
-struct ScrollPlan {
-    frame: FrameId,
-    window: WindowId,
-    buffer: BufferId,
-    start: LispCharPos1,
-    point: LispCharPos1,
-    hidden_top_pixels: i32,
-}
-
-impl ScrollPlan {
-    fn commit(self, eval: &mut Context) -> Result<(), Flow> {
-        let frame = eval
-            .frames
-            .get_mut(self.frame)
-            .ok_or_else(|| failure("Scroll frame was deleted"))?;
-        let window = frame
-            .find_window_mut(self.window)
-            .ok_or_else(|| failure("Scroll window was deleted"))?;
-        if window.buffer_id() != Some(self.buffer) || eval.buffers.get(self.buffer).is_none() {
-            return Err(failure("Scroll window buffer changed during measurement"));
-        }
-        let position = eval
-            .buffers
-            .get(self.buffer)
-            .expect("validated buffer")
-            .lisp_pos_to_emacs_byte_pos(self.point);
-        let adjust_old_point =
-            matches!(window, Window::Leaf { point, old_point, .. } if point == old_point);
-        eval.buffers
-            .goto_buffer_emacs_byte_pos(self.buffer, position);
-        crate::window::window_markers::set_window_point_with_marker(
-            &mut eval.buffers,
-            window,
-            self.point,
-        );
-        crate::window::window_markers::set_window_start_with_marker(
-            &mut eval.buffers,
-            window,
-            self.start,
-        );
-        if adjust_old_point {
-            crate::window::window_markers::set_window_old_point_with_marker(
-                &mut eval.buffers,
-                window,
-                self.point,
-            );
-        }
-        window.invalidate_window_end();
-        if let Window::Leaf {
-            vscroll,
-            preserve_vscroll_p,
-            force_start,
-            ..
-        } = window
-        {
-            *vscroll = -self.hidden_top_pixels.max(0);
-            *preserve_vscroll_p = false;
-            *force_start = true;
-        }
-        Ok(())
     }
 }
 
@@ -237,6 +189,15 @@ pub(crate) fn try_scroll(
     argument: Option<Value>,
     direction: i64,
 ) -> Result<bool, Flow> {
+    commit_scroll_plan(eval, |eval| plan_scroll(eval, argument, direction))
+}
+
+/// Both graphical and terminal planners cross Lisp-bearing measurement.
+/// Keep one transaction boundary around the entire plan, not each query.
+pub(crate) fn commit_scroll_plan<Plan: Into<ScrollPlan>>(
+    eval: &mut Context,
+    mut measure: impl FnMut(&mut Context) -> Result<Option<Plan>, Flow>,
+) -> Result<bool, Flow> {
     // Fontification is Lisp and may edit the source, resize a window, or
     // change its restrictions. Per-query freshness is insufficient: all
     // measurements in a plan must belong to one coherent input state.
@@ -258,14 +219,17 @@ pub(crate) fn try_scroll(
             frame_id,
         );
         let before = eval.window_layout_attempt_freshness(frame_id, window_id, buffer_id);
-        let plan = plan_scroll(eval, argument, direction);
+        let policy = ScrollPolicy::capture(eval);
+        let plan = measure(eval);
         let after = eval.window_layout_attempt_freshness(frame_id, window_id, buffer_id);
-        if before != after {
+        if before != after || policy != ScrollPolicy::capture(eval) {
             continue;
         }
         return match plan? {
             Some(plan) => {
-                plan.commit(eval)?;
+                let plan = plan.into();
+                plan.viewport.commit(eval)?;
+                eval.scroll_goal = plan.goal;
                 Ok(true)
             }
             None => Ok(false),
@@ -315,14 +279,9 @@ fn plan_scroll(
     .as_fixnum()
     .unwrap_or(1)
     .max(1);
-    let context = eval
-        .obarray
-        .symbol_value("next-screen-context-lines")
-        .and_then(|value| value.as_fixnum())
-        .unwrap_or(2)
-        .max(0);
+    let policy = ScrollPolicy::capture(eval);
     let amount = ScrollAmount::from_argument(argument, direction);
-    let delta = amount.pixels(height, line_height, context);
+    let delta = amount.pixels(height, line_height, policy.context_lines);
     let measurer = RowMeasurer {
         frame: frame_id,
         window: window_id,
@@ -340,10 +299,7 @@ fn plan_scroll(
         let top = row.y - rows[0].y - hidden_top;
         (index, top, top + row.height)
     });
-    let auto_vscroll = eval
-        .obarray
-        .symbol_value("auto-window-vscroll")
-        .is_none_or(|value| value.is_truthy());
+    let auto_vscroll = policy.auto_vscroll;
     let next_offset = point_geometry
         .filter(|(_, top, bottom)| *top < height && *bottom > 0)
         .and_then(|(point_index, top, bottom)| {
@@ -361,12 +317,37 @@ fn plan_scroll(
         });
     if let Some(offset) = next_offset {
         return Ok(Some(ScrollPlan {
-            frame: frame_id,
-            window: window_id,
-            buffer: buffer_id,
-            start,
-            point,
-            hidden_top_pixels: offset.min(i32::MAX as i64) as i32,
+            goal: eval.scroll_goal,
+            viewport: WindowScrollUpdate {
+                frame: frame_id,
+                window: window_id,
+                buffer: buffer_id,
+                start,
+                point,
+                hidden_top_pixels: offset.min(i32::MAX as i64) as i32,
+            },
+        }));
+    }
+    if auto_vscroll
+        && delta > 0
+        && let Some((index, top, bottom)) = point_geometry
+        && top < height
+        && bottom > height
+        && index > 0
+    {
+        // GNU first promotes a bottom-clipped point row past ordinary rows
+        // above it. Do not lose point by treating that row as invisible; the
+        // following command can then scroll within its pixel extent.
+        return Ok(Some(ScrollPlan {
+            goal: eval.scroll_goal,
+            viewport: WindowScrollUpdate {
+                frame: frame_id,
+                window: window_id,
+                buffer: buffer_id,
+                start: rows[index].start_buffer_pos.expect("source row"),
+                point,
+                hidden_top_pixels: 0,
+            },
         }));
     }
     if point_geometry.is_none_or(|(_, top, bottom)| top >= height || bottom <= 0) {
@@ -400,31 +381,76 @@ fn plan_scroll(
         .ok_or_else(|| failure("Scroll row producer disappeared"))?;
     let candidate_rows = snapshot_text_rows(&candidate);
     let first_y = candidate_rows[0].y;
+    let margin = policy.margin_pixels(height, line_height);
+    let goal = (policy.preserve != PreservePoint::KeepVisible).then(|| {
+        eval.scroll_goal
+            .filter(|goal| {
+                policy.continues_scroll
+                    && goal.frame == frame_id
+                    && goal.window == window_id
+                    && goal.buffer == buffer_id
+            })
+            .unwrap_or_else(|| ScrollGoal {
+                frame: frame_id,
+                window: window_id,
+                buffer: buffer_id,
+                y: point_geometry.map_or(0, |(_, top, _)| top),
+                x: snapshot
+                    .points
+                    .iter()
+                    .find(|stop| stop.buffer_pos == point && stop.role == DisplayPointRole::Glyph)
+                    .map_or(0, |stop| stop.x),
+            })
+    });
     // A backwards scroll must not leave point on a partially visible bottom
     // row. A row taller than the entire body is the unavoidable exception.
     let mut visible = candidate_rows.iter().filter(|row| {
         let top = row.y - first_y;
-        top >= 0 && (top + row.height <= height || top == 0)
+        top >= margin && top + row.height <= height - margin
     });
-    let first = *visible
-        .next()
-        .ok_or_else(|| failure("Scroll viewport has no visible source row"))?;
+    let first = *visible.next().unwrap_or(&candidate_rows[0]);
     let last = visible.last().copied().unwrap_or(first);
-    let next_point = match snapshot_row_index_for_pos(&candidate_rows, point) {
-        Some(index)
-            if candidate_rows[index].row >= first.row && candidate_rows[index].row <= last.row =>
-        {
-            point
-        }
-        _ if point < new_start || delta >= 0 => first.start_buffer_pos.expect("source row"),
-        _ => last.start_buffer_pos.expect("source row"),
+    let point_stays_visible =
+        snapshot_row_index_for_pos(&candidate_rows, point).is_some_and(|index| {
+            candidate_rows[index].row >= first.row && candidate_rows[index].row <= last.row
+        });
+    let next_point = if point_stays_visible && policy.preserve != PreservePoint::Always {
+        point
+    } else if let Some(goal) = goal {
+        let goal_y = goal.y.clamp(margin, (height - margin - 1).max(margin));
+        let goal_x = goal.x;
+        let row = candidate_rows
+            .iter()
+            .copied()
+            .filter(|row| row.row >= first.row && row.row <= last.row && row.y - first_y <= goal_y)
+            .last()
+            .unwrap_or(first);
+        row_goal_stops(&candidate, row, LineWrap::Truncate)
+            .max_by_key(|stop| {
+                (
+                    stop.x <= goal_x,
+                    if stop.x <= goal_x { stop.x } else { -stop.x },
+                    stop.pos,
+                )
+            })
+            .map_or_else(
+                || row.start_buffer_pos.expect("source row"),
+                |stop| stop.pos,
+            )
+    } else if point < new_start || delta >= 0 {
+        first.start_buffer_pos.expect("source row")
+    } else {
+        last.start_buffer_pos.expect("source row")
     };
     Ok(Some(ScrollPlan {
-        frame: frame_id,
-        window: window_id,
-        buffer: buffer_id,
-        start: new_start,
-        point: next_point,
-        hidden_top_pixels: 0,
+        goal,
+        viewport: WindowScrollUpdate {
+            frame: frame_id,
+            window: window_id,
+            buffer: buffer_id,
+            start: new_start,
+            point: next_point,
+            hidden_top_pixels: 0,
+        },
     }))
 }

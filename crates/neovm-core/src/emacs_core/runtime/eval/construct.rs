@@ -88,6 +88,7 @@ impl Context {
         ev.redisplay_fn = None;
         ev.frame_snapshot_fn = None;
         ev.window_layout_query_adapter = WindowLayoutQueryAdapter::Unavailable;
+        ev.scroll_goal = None;
         ev.display_host = None;
         ev.coding_systems = CodingSystemManager::new();
         ev.face_table = FaceTable::new();
@@ -2190,6 +2191,7 @@ impl Context {
             redisplay_fn: None,
             frame_snapshot_fn: None,
             window_layout_query_adapter: WindowLayoutQueryAdapter::Unavailable,
+            scroll_goal: None,
             pending_pixel_scroll: None,
             display_host: None,
             tty_frame_host_factory: None,

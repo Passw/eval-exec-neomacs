@@ -7,6 +7,80 @@ use crate::buffer::{BufferId, LispCharPos1};
 use crate::emacs_core::value::Value;
 use std::cell::Cell;
 
+/// One complete marker-backed viewport transition chosen by a scroll engine.
+/// Row-based terminal and pixel-based graphical scrolling share its commit;
+/// neither may leave point, start and the partial-row offset out of sync.
+pub(crate) struct WindowScrollUpdate {
+    pub frame: FrameId,
+    pub window: WindowId,
+    pub buffer: BufferId,
+    pub start: LispCharPos1,
+    pub point: LispCharPos1,
+    pub hidden_top_pixels: i32,
+}
+
+impl WindowScrollUpdate {
+    /// No Lisp callbacks occur between validating the target and updating all
+    /// markers and redisplay flags. Callers validate their measurement inputs
+    /// before entering this commit boundary.
+    pub(crate) fn commit(
+        self,
+        eval: &mut crate::emacs_core::Context,
+    ) -> Result<(), crate::emacs_core::error::Flow> {
+        use crate::emacs_core::error::{LispCondition, signal};
+        let invalid = || {
+            signal(
+                LispCondition::Error,
+                vec![Value::string("Scroll window changed during measurement")],
+            )
+        };
+        let window = eval
+            .frames
+            .get_mut(self.frame)
+            .and_then(|frame| frame.find_window_mut(self.window))
+            .ok_or_else(invalid)?;
+        if window.buffer_id() != Some(self.buffer) {
+            return Err(invalid());
+        }
+        let buffer = eval.buffers.get(self.buffer).ok_or_else(invalid)?;
+        let region = buffer.accessible_char_region();
+        if self.start < region.start_lisp()
+            || self.start > region.end_lisp()
+            || self.point < region.start_lisp()
+            || self.point > region.end_lisp()
+        {
+            return Err(invalid());
+        }
+        let position = buffer.lisp_pos_to_emacs_byte_pos(self.point);
+        let adjust_old_point =
+            matches!(window, Window::Leaf { point, old_point, .. } if point == old_point);
+        eval.buffers
+            .goto_buffer_emacs_byte_pos(self.buffer, position);
+        super::window_markers::set_window_point_with_marker(&mut eval.buffers, window, self.point);
+        super::window_markers::set_window_start_with_marker(&mut eval.buffers, window, self.start);
+        if adjust_old_point {
+            super::window_markers::set_window_old_point_with_marker(
+                &mut eval.buffers,
+                window,
+                self.point,
+            );
+        }
+        window.invalidate_window_end();
+        if let Window::Leaf {
+            vscroll,
+            preserve_vscroll_p,
+            force_start,
+            ..
+        } = window
+        {
+            *vscroll = -self.hidden_top_pixels.max(0);
+            *preserve_vscroll_p = false;
+            *force_start = true;
+        }
+        Ok(())
+    }
+}
+
 /// Frontend-owned synchronous layout-query callback state.
 ///
 /// Keeping the active call as an enum makes reentrant entry explicit and

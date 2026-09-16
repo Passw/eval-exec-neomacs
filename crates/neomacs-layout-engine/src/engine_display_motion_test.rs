@@ -4,6 +4,89 @@ use super::*;
 use neovm_core::window::WindowLayoutQueryOutcome;
 
 #[test]
+fn consecutive_scroll_commands_preserve_the_original_goal_past_short_rows() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .expect("buffer")
+        .insert(&"abcdefghij\nx\nabcdefghij\n".repeat(10));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("scroll-goal", 400, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .expect("frame")
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let result = eval
+        .eval_str(
+            r#"(let ((noninteractive nil)
+      (scroll-preserve-screen-position 'always) (last-command nil))
+      (put 'scroll-up 'scroll-command t)
+      (goto-char 6) (set-window-start nil 1 t)
+      (scroll-up 1)
+      (let ((short-row (list (window-start) (point))))
+        (setq last-command 'scroll-up)
+        (scroll-up 1)
+        (let ((long-row (list (window-start) (point))))
+          (goto-char 16) (setq last-command 'forward-char)
+          (scroll-up 1)
+          (list short-row long-row (list (window-start) (point))))))"#,
+        )
+        .expect("retain the original pixel goal across scroll commands");
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "((12 13) (14 19) (25 27))"
+    );
+}
+
+#[test]
+fn graphical_scrolling_honors_screen_position_and_scroll_margin() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .expect("buffer")
+        .insert(&"row\n".repeat(40));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("scroll-policy", 400, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .expect("frame")
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let result = eval
+        .eval_str(
+            r#"(let ((noninteractive nil))
+      (setq scroll-preserve-screen-position 'always scroll-margin 0)
+      (goto-char 10) (set-window-start nil 1 t) (scroll-up 1)
+      (let ((preserved (list (window-start) (point))))
+        (setq scroll-preserve-screen-position nil scroll-margin 2 maximum-scroll-margin 0.5)
+        (goto-char 1) (set-window-start nil 1 t) (scroll-up 1)
+        (list preserved (list (window-start) (point)))))"#,
+        )
+        .expect("scroll policy");
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "((5 14) (5 13))"
+    );
+}
+
+#[test]
 fn motion_backtracking_does_not_reseat_inside_a_multiline_replacement() {
     let mut eval = Context::new();
     let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
@@ -88,53 +171,55 @@ fn offscreen_row_queries_preserve_automatic_composition_metrics() {
 
 #[test]
 fn scrolling_restarts_after_fontification_moves_source_positions() {
-    let mut eval = Context::new();
-    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
-    eval.buffer_manager_mut()
-        .get_mut(buffer)
-        .expect("buffer")
-        .insert(&"row\n".repeat(40));
-    let frame = eval
-        .frame_manager_mut()
-        .create_frame("scroll-fontification", 400, 160, buffer);
-    eval.frame_manager_mut()
-        .get_mut(frame)
-        .expect("frame")
-        .window_system = Some(Value::symbol("neomacs"));
-    eval.eval_str(
+    for window_system in [None, Some(Value::symbol("neomacs"))] {
+        let mut eval = Context::new();
+        let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+        eval.buffer_manager_mut()
+            .get_mut(buffer)
+            .expect("buffer")
+            .insert(&"row\n".repeat(40));
+        let frame = eval
+            .frame_manager_mut()
+            .create_frame("scroll-fontification", 400, 160, buffer);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .expect("frame")
+            .window_system = window_system;
+        eval.eval_str(
         "(progn (set-window-buffer nil (current-buffer)) (goto-char 5) (set-window-start nil 5 t))",
     )
     .expect("initial marker-backed viewport");
-    let mut display = LayoutEngine::new_without_font_metrics();
-    display.layout_frame_rust(&mut eval, frame);
-    activate_last_engine_presentation(&mut eval, &display, frame);
-    eval.eval_str(
-        r#"(progn (setq motion-fontified nil)
+        let mut display = LayoutEngine::new_without_font_metrics();
+        display.layout_frame_rust(&mut eval, frame);
+        activate_last_engine_presentation(&mut eval, &display, frame);
+        eval.eval_str(
+            r#"(progn (setq motion-fontified nil)
         (setq fontification-functions
           (list (lambda (_start)
             (if motion-fontified nil
               (progn (setq motion-fontified t)
                 (save-excursion (goto-char 1) (insert "new\n"))))
             (put-text-property (point-min) (point-max) 'fontified t)))))"#,
-    )
-    .expect("fontification edits source");
-    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
-    eval.install_window_layout_query(move |eval, frame, window, scope| {
-        match query.query_window_layout(eval, frame, window, scope) {
-            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
-            Err(error) => WindowLayoutQueryOutcome::Failed(error),
-        }
-    });
-    let result = eval
-        .eval_str(
-            r#"(let ((noninteractive nil))
-        (scroll-up 0) (list motion-fontified (window-start) (point)))"#,
         )
-        .expect("scroll survives fontification");
-    assert_eq!(
-        neovm_core::emacs_core::print::print_value(&result),
-        "(t 9 9)"
-    );
+        .expect("fontification edits source");
+        let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+        eval.install_window_layout_query(move |eval, frame, window, scope| {
+            match query.query_window_layout(eval, frame, window, scope) {
+                Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+                Err(error) => WindowLayoutQueryOutcome::Failed(error),
+            }
+        });
+        let result = eval
+            .eval_str(
+                r#"(let ((noninteractive nil))
+        (scroll-up 0) (list motion-fontified (window-start) (point)))"#,
+            )
+            .expect("scroll survives fontification");
+        assert_eq!(
+            neovm_core::emacs_core::print::print_value(&result),
+            "(t 9 9)"
+        );
+    }
 }
 
 #[test]
@@ -258,6 +343,52 @@ fn page_scrolling_back_to_a_tall_row_keeps_point_in_the_new_viewport() {
     assert_eq!(
         neovm_core::emacs_core::print::print_value(&result),
         "(at-start 1 1)"
+    );
+}
+
+#[test]
+fn scrolling_promotes_a_bottom_clipped_point_row_before_pixel_scrolling() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .expect("buffer")
+        .insert(&"row\n".repeat(40));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("clipped-point-row", 400, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .expect("frame")
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str(
+        r#"(progn
+      (setq auto-window-vscroll t scroll-preserve-screen-position nil)
+      (put-text-property 9 10 'display '(space :height 20))
+      (goto-char 9) (set-window-start nil 1 t))"#,
+    )
+    .expect("point on clipped third row");
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let result = eval
+        .eval_str(
+            r#"(let ((noninteractive nil))
+      (scroll-up 1)
+      (let ((promoted (list (window-start) (point) (window-vscroll nil t))))
+        (scroll-up 1)
+        (list promoted (window-start) (point) (> (window-vscroll nil t) 0))))"#,
+        )
+        .expect("promote then pixel-scroll the tall point row");
+    // GNU window_scroll_pixel_based first moves start to the clipped point
+    // row, keeping point; only the next scroll changes its pixel offset.
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "((9 9 0) 9 9 t)"
     );
 }
 

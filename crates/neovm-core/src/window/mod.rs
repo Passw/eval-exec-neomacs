@@ -23,6 +23,7 @@ pub(crate) mod body;
 mod chrome;
 pub use chrome::WindowChromePresence;
 mod display;
+pub(crate) use display::WindowScrollUpdate;
 mod frame_params;
 pub mod geometry;
 mod history;

@@ -5938,6 +5938,16 @@ fn scroll_origin(
 
 fn scroll_by_screen_lines(eval: &mut super::eval::Context, lines: i64) -> EvalResult {
     let _ = ensure_selected_frame_id_in_state(&mut eval.frames, &mut eval.buffers);
+    crate::emacs_core::xdisp::motion::paging::commit_scroll_plan(eval, |eval| {
+        plan_scroll_by_screen_lines(eval, lines)
+    })?;
+    Ok(Value::NIL)
+}
+
+fn plan_scroll_by_screen_lines(
+    eval: &mut super::eval::Context,
+    lines: i64,
+) -> Result<Option<crate::window::WindowScrollUpdate>, super::error::Flow> {
     let (fid, wid) = resolve_window_id_in_state(&mut eval.frames, &mut eval.buffers, None)?;
     let body_height = window_body_height_impl(&mut eval.frames, &mut eval.buffers, vec![])
         .ok()
@@ -5951,10 +5961,10 @@ fn scroll_by_screen_lines(eval: &mut super::eval::Context, lines: i64) -> EvalRe
             window_start,
             ..
         } => (*buffer_id, *point, *window_start),
-        _ => return Ok(Value::NIL),
+        _ => return Ok(None),
     };
     let Some(buf) = eval.buffers.get(buffer_id) else {
-        return Ok(Value::NIL);
+        return Ok(None);
     };
     let accessible = buf.accessible_emacs_byte_region();
     let selected_live_window = eval
@@ -6046,45 +6056,18 @@ fn scroll_by_screen_lines(eval: &mut super::eval::Context, lines: i64) -> EvalRe
     }
 
     let Some(buf) = eval.buffers.get(buffer_id) else {
-        return Ok(Value::NIL);
+        return Ok(None);
     };
     let start_lisp = buf.emacs_byte_pos_to_lisp_char_pos(EmacsBytePos::new(pos));
     let point_lisp = buf.emacs_byte_pos_to_lisp_char_pos(EmacsBytePos::new(next_point));
-    let _ = eval
-        .buffers
-        .goto_buffer_emacs_byte_pos(buffer_id, EmacsBytePos::new(next_point));
-    if let Some(window) = eval
-        .frames
-        .get_mut(fid)
-        .and_then(|frame| frame.find_window_mut(wid))
-    {
-        crate::window::window_markers::set_window_point_with_marker(
-            &mut eval.buffers,
-            window,
-            point_lisp,
-        );
-        crate::window::window_markers::set_window_start_with_marker(
-            &mut eval.buffers,
-            window,
-            start_lisp,
-        );
-        window.invalidate_window_end();
-        if let Window::Leaf {
-            vscroll,
-            preserve_vscroll_p,
-            force_start,
-            ..
-        } = window
-        {
-            *vscroll = 0;
-            *preserve_vscroll_p = false;
-            // GNU window_scroll sets w->force_start: the next redisplay must
-            // display from this start and move point into the window if it
-            // ended up outside, never recompute the start around point.
-            *force_start = true;
-        }
-    }
-    Ok(Value::NIL)
+    Ok(Some(crate::window::WindowScrollUpdate {
+        frame: fid,
+        window: wid,
+        buffer: buffer_id,
+        start: start_lisp,
+        point: point_lisp,
+        hidden_top_pixels: 0,
+    }))
 }
 
 /// `(recenter &optional ARG REDISPLAY)` — center point in window.
