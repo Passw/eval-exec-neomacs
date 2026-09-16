@@ -4779,60 +4779,6 @@ impl Context {
         &mut self.frames
     }
 
-    /// Move a window's point marker during redisplay (GNU force_start branch
-    /// moving point into the window). The buffer point for the selected
-    /// window is the caller's responsibility.
-    pub fn set_window_point_for_redisplay(
-        &mut self,
-        frame_id: crate::window::FrameId,
-        window_id: crate::window::WindowId,
-        point_lisp: LispCharPos1,
-    ) {
-        let buffers = &mut self.buffers;
-        if let Some(window) = self
-            .frames
-            .get_mut(frame_id)
-            .and_then(|frame| frame.find_window_mut(window_id))
-        {
-            crate::window::window_markers::set_window_point_with_marker(
-                buffers, window, point_lisp,
-            );
-        }
-    }
-
-    pub fn create_window_markers_for_root(
-        &mut self,
-        frame_id: crate::window::FrameId,
-        buffer_id: crate::buffer::BufferId,
-    ) {
-        let root = &mut self.frames.get_mut(frame_id).unwrap().root_window_mut();
-        debug_assert_eq!(root.buffer_id(), Some(buffer_id));
-        crate::window::window_markers::attach_window_position_markers(&mut self.buffers, root);
-    }
-
-    pub fn create_window_markers_for_minibuffer(
-        &mut self,
-        frame_id: crate::window::FrameId,
-        buffer_id: crate::buffer::BufferId,
-    ) {
-        let mini = self
-            .frames
-            .get_mut(frame_id)
-            .unwrap()
-            .minibuffer_leaf
-            .as_mut();
-        if let Some(mini) = mini {
-            debug_assert_eq!(mini.buffer_id(), Some(buffer_id));
-            crate::window::window_markers::attach_window_position_markers(&mut self.buffers, mini);
-        }
-    }
-
-    pub fn sync_window_positions(&mut self, buffer_id: crate::buffer::BufferId) {
-        for frame in self.frames.frames_mut() {
-            crate::window::window_markers::sync_window_positions_from_markers(frame, buffer_id);
-        }
-    }
-
     pub fn current_message_text(&self) -> Option<String> {
         self.current_message
             .as_ref()

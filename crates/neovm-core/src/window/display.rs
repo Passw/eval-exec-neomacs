@@ -474,6 +474,50 @@ impl Frame {
 }
 
 impl crate::emacs_core::eval::Context {
+    /// Move a window's point marker during redisplay (GNU force_start branch
+    /// moving point into the window). The buffer point for the selected
+    /// window is the caller's responsibility.
+    pub fn set_window_point_for_redisplay(
+        &mut self,
+        frame_id: FrameId,
+        window_id: WindowId,
+        point_lisp: LispCharPos1,
+    ) {
+        let buffers = &mut self.buffers;
+        if let Some(window) = self
+            .frames
+            .get_mut(frame_id)
+            .and_then(|frame| frame.find_window_mut(window_id))
+        {
+            super::window_markers::set_window_point_with_marker(buffers, window, point_lisp);
+        }
+    }
+
+    pub fn create_window_markers_for_root(&mut self, frame_id: FrameId, buffer_id: BufferId) {
+        let root = &mut self.frames.get_mut(frame_id).unwrap().root_window_mut();
+        debug_assert_eq!(root.buffer_id(), Some(buffer_id));
+        super::window_markers::attach_window_position_markers(&mut self.buffers, root);
+    }
+
+    pub fn create_window_markers_for_minibuffer(&mut self, frame_id: FrameId, buffer_id: BufferId) {
+        let mini = self
+            .frames
+            .get_mut(frame_id)
+            .unwrap()
+            .minibuffer_leaf
+            .as_mut();
+        if let Some(mini) = mini {
+            debug_assert_eq!(mini.buffer_id(), Some(buffer_id));
+            super::window_markers::attach_window_position_markers(&mut self.buffers, mini);
+        }
+    }
+
+    pub fn sync_window_positions(&mut self, buffer_id: BufferId) {
+        for frame in self.frames.frames_mut() {
+            super::window_markers::sync_window_positions_from_markers(frame, buffer_id);
+        }
+    }
+
     /// Capture both the live window and semantic source-buffer identity used by
     /// one speculative leaf layout.
     pub fn window_layout_attempt_freshness(
