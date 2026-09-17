@@ -81,10 +81,12 @@ the evaluation flag as well. Its list walk has allocation-free cycle detection.
 Mutating a width, arithmetic operand or container element therefore no longer
 relies on the string property revision changing. This is conservative capture
 of syntactic inputs, not evaluation of which spec wins. Unrelated property
-payloads are not traversed. Nested payloads of non-space specs (including
-replacement strings and conditions), face-property payloads and image/resource
-expressions remain audit items, not a claim of complete mutable-Lisp-graph
-invalidation.
+payloads are not traversed. Replacement strings share `StringContentInput` with
+top-level prefixes: identity, bytes, multibyteness and property revision are
+captured by value. Capture does not follow replacement strings' own `display`
+properties recursively, matching GNU's suppression of recursive replacement.
+Conditions, mutable face-property payloads and image/resource expressions remain
+audit items, not a claim of complete mutable-Lisp-graph invalidation.
 
 `LayoutInvisibilityInput` captures the effective buffer's ordered invisibility
 membership, including each cons entry's category and ellipsis truthiness.

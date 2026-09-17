@@ -644,10 +644,7 @@ enum LayoutPrefixInput {
     #[default]
     Missing,
     String {
-        identity: usize,
-        bytes: std::sync::Arc<[u8]>,
-        multibyte: bool,
-        properties_tick: u64,
+        content: string_property_input::StringContentInput,
         display_properties: string_property_input::StringDisplayInputs,
     },
     Space(pixel_input::SpaceInput),
@@ -666,10 +663,7 @@ impl LayoutPrefixInput {
         }
         match value.as_lisp_string() {
             Some(string) => Self::String {
-                identity: value.bits(),
-                bytes: string.as_bytes().into(),
-                multibyte: string.is_multibyte(),
-                properties_tick: string.intervals().mutation_tick(),
+                content: string_property_input::StringContentInput::capture(value.bits(), string),
                 display_properties: string_property_input::StringDisplayInputs::capture(
                     string.intervals(),
                 ),

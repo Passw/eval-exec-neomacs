@@ -94,6 +94,55 @@ fn assert_layout_mutation_invalidates_geometry(setup: &str, mutation: &str) {
 }
 
 #[test]
+fn retained_geometry_rejects_mutated_prefix_replacement_string() {
+    assert_prefix_spec_mutation_invalidates_geometry(
+        "line-prefix",
+        r##"(progn (setq replacement (copy-sequence " ") prefix-text (copy-sequence " ")) (put-text-property 0 1 'display replacement prefix-text) prefix-text)"##,
+        "(aset replacement 0 9)",
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_wrapped_replacement_string() {
+    assert_prefix_spec_mutation_invalidates_geometry(
+        "wrap-prefix",
+        r##"(progn (setq replacement (copy-sequence " ") prefix-text (copy-sequence " ")) (put-text-property 0 1 'display (list 'disable-eval (vector replacement)) prefix-text) prefix-text)"##,
+        "(aset replacement 0 9)",
+    );
+}
+
+#[test]
+fn replacement_string_freshness_does_not_recurse_through_display_properties() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("replacement-inputs", 160, 160, buffer);
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.eval_str(r##"(progn (setq replacement (copy-sequence " ") line-prefix (copy-sequence " ")) (put-text-property 0 1 'display replacement line-prefix) (put-text-property 0 1 'display replacement replacement))"##).unwrap();
+    let before = eval
+        .window_layout_attempt_freshness(frame, window, buffer)
+        .unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(aset replacement 0 9)").unwrap();
+    assert_ne!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(aset replacement 0 32)").unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+}
+
+#[test]
 fn retained_geometry_rejects_mutated_list_display_space() {
     assert_prefix_spec_mutation_invalidates_geometry(
         "wrap-prefix",

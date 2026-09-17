@@ -1,9 +1,31 @@
-//! Geometry-bearing space properties in prefix strings. Capturing interval
+//! Geometry-bearing display properties in prefix strings. Capturing interval
 //! revisions alone cannot detect mutation inside a property's Lisp value.
 use super::pixel_input::SpaceInput;
 use crate::buffer::{CharPos0, text_props::TextPropertyTable};
 use crate::emacs_core::{display_spec::DisplayPropertySpecs, plist::plist_get, value::Value};
 use std::{ops::ControlFlow, sync::Arc};
+
+/// String storage inputs shared by prefix strings and replacement strings.
+/// Deliberately does not follow display properties recursively: GNU suppresses
+/// recursive string-display replacement. Mutable face payloads remain separate.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct StringContentInput {
+    identity: usize,
+    bytes: Arc<[u8]>,
+    multibyte: bool,
+    properties_tick: u64,
+}
+
+impl StringContentInput {
+    pub(super) fn capture(identity: usize, string: &crate::heap_types::LispString) -> Self {
+        Self {
+            identity,
+            bytes: string.as_bytes().into(),
+            multibyte: string.is_multibyte(),
+            properties_tick: string.intervals().mutation_tick(),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct StringDisplayInputs(Arc<[DisplayRun]>);
@@ -19,8 +41,9 @@ struct DisplayRun {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum SpecInput {
     Space(SpaceInput),
+    Text(StringContentInput),
     // Preserve order and identity of surrounding specs. Their nested payloads
-    // (faces, replacement strings, resources, conditions) need separate capture.
+    // (faces, resources, conditions) need separate capture.
     Other(usize),
 }
 
@@ -35,7 +58,12 @@ impl StringDisplayInputs {
                 decoded.for_each(|spec| {
                     specs.push(match SpaceInput::capture(spec) {
                         Some(space) => SpecInput::Space(space),
-                        None => SpecInput::Other(spec.bits()),
+                        None => match spec.as_lisp_string() {
+                            Some(string) => {
+                                SpecInput::Text(StringContentInput::capture(spec.bits(), string))
+                            }
+                            None => SpecInput::Other(spec.bits()),
+                        },
                     });
                     ControlFlow::Continue(())
                 });
