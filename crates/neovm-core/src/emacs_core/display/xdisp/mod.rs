@@ -4518,8 +4518,8 @@ pub(crate) fn builtin_pos_visible_in_window_p(args: Vec<Value>) -> EvalResult {
 
 /// `(pos-visible-in-window-p &optional POS WINDOW PARTIALLY)` evaluator-backed variant.
 ///
-/// Mirror GNU Emacs: return t if POS is visible in WINDOW, nil otherwise.
-/// Checks if position is between window-start and an estimated window-end.
+/// Mirror GNU Emacs using current logical rows, including top/bottom clipping.
+/// The last renderer presentation is not authoritative for a live-state query.
 pub(crate) fn builtin_pos_visible_in_window_p_ctx(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -4550,20 +4550,12 @@ pub(crate) fn builtin_pos_visible_in_window_p_ctx(
         }
         return Ok(Value::NIL);
     }
-    // GNU BUILDS `posn-at-point` out of this call with PARTIALLY non-nil
-    // (src/keyboard.c:13073), so the two must not answer from different
-    // geometry. Give this the same exact source, on-demand recomputation
-    // included, before anything else runs.
-    if let Some((_, metrics)) =
-        resolve_exact_visible_metrics_with_layout(eval, args.get(1), args.first())?
-    {
-        if !args.get(2).is_some_and(|value| value.is_truthy()) {
-            return Ok(Value::T);
-        }
-        return Ok(Value::list(vec![
-            Value::fixnum(metrics.x),
-            Value::fixnum(metrics.y),
-        ]));
+    // GNU pos_visible_p walks from the LIVE window start, not the renderer's
+    // last presentation. A scroll command asks this before redisplay in order
+    // to keep point visible; answering from the old presentation creates a
+    // circular dependency and makes redisplay undo the scroll.
+    if let Some(visibility) = live_position_visibility(eval, args.get(1), args.first())? {
+        return Ok(visibility.into_lisp(args.get(2).is_some_and(|value| value.is_truthy())));
     }
     pos_visible_in_window_p_impl(&mut eval.frames, &mut eval.buffers, args)
 }
@@ -4580,17 +4572,6 @@ fn pos_visible_in_window_p_impl(
         crate::emacs_core::window_cmds::WindowDomain::Live,
     )?;
     let partially = args.get(2).is_some_and(|v| v.is_truthy());
-    if let Some((_, metrics)) =
-        resolve_exact_visible_metrics(frames, buffers, args.get(1), args.first())?
-    {
-        if !partially {
-            return Ok(Value::T);
-        }
-        return Ok(Value::list(vec![
-            Value::fixnum(metrics.x),
-            Value::fixnum(metrics.y),
-        ]));
-    }
     let Some(ctx) = resolve_live_window_display_context(frames, buffers, args.get(1))? else {
         return Ok(Value::NIL);
     };
@@ -5929,6 +5910,160 @@ fn window_row_metrics(ctx: &ApproxWindowDisplayContext, row: i64) -> WindowLineM
         vpos: row,
         ypos,
         offbot,
+    }
+}
+
+/// A completed logical visibility query. Missing layout is represented by
+/// `None` at the query seam, never by `NotVisible`, so an authoritative negative
+/// answer cannot fall through to stale presented geometry or an approximation.
+enum PositionVisibility {
+    NotVisible,
+    Fully {
+        x: i64,
+        y: i64,
+    },
+    Partially {
+        x: i64,
+        y: i64,
+        top: i64,
+        bottom: i64,
+        height: i64,
+        row: i64,
+    },
+}
+
+impl PositionVisibility {
+    fn into_lisp(self, partially: bool) -> Value {
+        match (self, partially) {
+            (Self::NotVisible, _) | (Self::Partially { .. }, false) => Value::NIL,
+            (Self::Fully { .. }, false) => Value::T,
+            (Self::Fully { x, y }, true) => Value::list(vec![Value::fixnum(x), Value::fixnum(y)]),
+            (
+                Self::Partially {
+                    x,
+                    y,
+                    top,
+                    bottom,
+                    height,
+                    row,
+                },
+                true,
+            ) => Value::list(
+                vec![x, y, top, bottom, height, row]
+                    .into_iter()
+                    .map(Value::fixnum)
+                    .collect(),
+            ),
+        }
+    }
+}
+
+fn live_position_visibility(
+    eval: &mut super::eval::Context,
+    window: Option<&Value>,
+    position: Option<&Value>,
+) -> Result<Option<PositionVisibility>, Flow> {
+    let Some((fid, wid)) = resolve_live_window_identity(&eval.frames, window)? else {
+        return Ok(Some(PositionVisibility::NotVisible));
+    };
+    let frame = eval.frames.get(fid).expect("resolved live frame");
+    let Some(Window::Leaf {
+        buffer_id,
+        window_start,
+        point,
+        bounds,
+        ..
+    }) = frame.find_window(wid)
+    else {
+        return Ok(Some(PositionVisibility::NotVisible));
+    };
+    let buffer_id = *buffer_id;
+    let buffer = eval.buffers.get(buffer_id).expect("live window buffer");
+    let start = *window_start;
+    let beg = buffer.point_min_lisp_char_pos();
+    let end = buffer.point_max_lisp_char_pos();
+    let fallback_height = bounds.height.round() as i64;
+    let last_row = position.is_some_and(|value| value.is_t());
+    let pos = if last_row {
+        None
+    } else if let Some(value) = position.filter(|value| !value.is_nil()) {
+        let raw = super::buffer::expect_integer_or_marker_in_buffers(&eval.buffers, value)?;
+        if raw < start.as_i64() || raw < beg.as_i64() || raw > end.as_i64() {
+            return Ok(Some(PositionVisibility::NotVisible));
+        }
+        Some(LispCharPos1::new(raw))
+    } else {
+        Some(
+            if eval
+                .frames
+                .selected_frame()
+                .is_some_and(|selected| selected.selected_window == wid)
+            {
+                buffer.point_lisp_char_pos()
+            } else {
+                *point
+            },
+        )
+    };
+    if start < beg || start > end || pos.is_some_and(|pos| pos < start || pos < beg || pos > end) {
+        return Ok(Some(PositionVisibility::NotVisible));
+    }
+    let measure = |snapshot: &WindowDisplaySnapshot| {
+        let pos = pos.or_else(|| {
+            snapshot
+                .rows
+                .iter()
+                .rev()
+                .find_map(|row| row.start_buffer_pos)
+        });
+        let Some(point) = pos.and_then(|pos| snapshot.point_for_buffer_pos(pos)) else {
+            return PositionVisibility::NotVisible;
+        };
+        let (row, y) = snapshot.text_body_position(point.row, point.y);
+        let row_height = snapshot
+            .row_metrics(point.row)
+            .map_or(point.height, |row| row.height);
+        let body_height = if snapshot.regions_materialized {
+            snapshot.regions.text_body.height.round() as i64
+        } else {
+            fallback_height - snapshot.top_chrome_height() - snapshot.mode_line_height
+        };
+        let top = (-y).max(0);
+        let bottom = (y + row_height - body_height).max(0);
+        let height = (row_height - top - bottom).max(0);
+        if height == 0 {
+            PositionVisibility::NotVisible
+        } else if top == 0 && bottom == 0 {
+            PositionVisibility::Fully { x: point.x, y }
+        } else {
+            PositionVisibility::Partially {
+                x: point.x,
+                y: y.max(0),
+                top,
+                bottom,
+                height,
+                row,
+            }
+        }
+    };
+    if let Some(snapshot) = eval.fresh_window_display_snapshot(fid, wid, buffer_id) {
+        return Ok(Some(measure(snapshot)));
+    }
+    match eval.query_window_layout(fid, wid) {
+        crate::window::WindowLayoutQueryOutcome::Ready(query) => {
+            Ok(query.into_geometry().as_ref().map(measure))
+        }
+        crate::window::WindowLayoutQueryOutcome::Unavailable => Ok(None),
+        crate::window::WindowLayoutQueryOutcome::LayoutBusy => Err(signal(
+            LispCondition::Error,
+            vec![Value::string(
+                "Window layout query reentered an active layout callback",
+            )],
+        )),
+        crate::window::WindowLayoutQueryOutcome::Failed(failure) => Err(signal(
+            LispCondition::Error,
+            vec![Value::string(failure.message())],
+        )),
     }
 }
 
