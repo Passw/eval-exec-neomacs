@@ -228,9 +228,9 @@ malachite = "0.9"
 itoa = "1.0"
 
 # GPU / windowing
-# Upstream a98b2b2 plus destroyed-popup event retirement and inner size hints.
-# Keep immutable until upstream contains the fix; see the fork's NEOMACS_FORK.md.
-winit = { git = "https://github.com/eval-exec/winit", branch = "neomacs-x11-event-delivery" }
+# Fork integration includes Wayland popup/size fixes and coordinated X11 event delivery.
+# Select master by name; Cargo.lock pins the tested commit for reproducible builds.
+winit = { git = "https://github.com/eval-exec/winit", branch = "master" }
 # "glsl" gates ShaderSource::Glsl, which the render thread needs to compile
 # composed Shadertoy-dialect surface shaders (shader_surface.rs).
 wgpu = { version = "30", features = ["glsl"] }
