@@ -924,36 +924,7 @@ fn parse_boolish(value: Value) -> bool {
     !value.is_nil()
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, EnumString, IntoStaticStr)]
-#[strum(prefix = ":", serialize_all = "kebab-case")]
-pub(crate) enum DisplaySpaceKey {
-    Width,
-    RelativeWidth,
-    AlignTo,
-    Height,
-    RelativeHeight,
-    Ascent,
-}
-
-impl DisplaySpaceKey {
-    pub(crate) fn from_lisp_value(value: Value) -> Option<Self> {
-        Self::from_keyword(value.as_symbol_name()?)
-    }
-
-    pub(crate) fn from_keyword(name: &str) -> Option<Self> {
-        name.strip_prefix(':')?.parse().ok()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn keyword(self) -> &'static str {
-        self.into()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn value(self) -> Value {
-        Value::keyword(self.keyword())
-    }
-}
+pub(crate) use neovm_core::emacs_core::display_spec::DisplaySpaceKey;
 
 pub(crate) fn is_display_space_spec(value: &Value) -> bool {
     value.is_cons() && value.cons_car().is_symbol_named("space")

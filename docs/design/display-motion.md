@@ -66,8 +66,13 @@ in-flight validation and incremental row reuse all include that projection.
 Changing a prefix with `aset` or changing its text properties need not modify
 the buffer itself, but can still change every row's source-to-pixel mapping.
 Owned bytes are shared on clone; no mutable Lisp string is retained by this
-projection. Non-string display specs still use identity here: this does not
-claim complete invalidation for arbitrary nested mutable Lisp graphs.
+projection. Stretch-space prefixes also capture the first direct operand of
+each supported geometry property, using the same `DisplaySpaceKey` enum as
+geometry evaluation. In-place plist changes therefore invalidate layout even
+when the prefix cons retains its identity. Unknown keys and shadowed duplicate
+operands do not affect this projection. Compound operands still use identity:
+mutations *inside* a nested pixel expression or a string's property value remain
+an audit item, not a claim of complete mutable-Lisp-graph invalidation.
 
 Source backtracking retreats past display/invisibility spans covering a
 newline before measuring forward. Producer-owned row metadata distinguishes

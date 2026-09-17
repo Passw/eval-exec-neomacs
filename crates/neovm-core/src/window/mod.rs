@@ -637,7 +637,12 @@ enum LayoutPrefixInput {
         multibyte: bool,
         properties_tick: u64,
     },
-    // Non-string display specs retain the existing identity contract. This
+    Space {
+        identity: usize,
+        operands: [Option<usize>;
+            <crate::emacs_core::display_spec::DisplaySpaceKey as strum::EnumCount>::COUNT],
+    },
+    // Unsupported display specs retain the existing identity contract. This
     // snapshot does not claim to detect mutations inside arbitrary Lisp graphs.
     Other(usize),
 }
@@ -647,6 +652,24 @@ impl LayoutPrefixInput {
         let Some(value) = value else {
             return Self::Missing;
         };
+        if value.is_cons() && value.cons_car().is_symbol_named("space") {
+            use crate::emacs_core::display_spec::DisplaySpaceKey;
+            if let Some(items) = crate::emacs_core::value::list_to_vec(&value) {
+                let mut operands = [None; <DisplaySpaceKey as strum::EnumCount>::COUNT];
+                for pair in items[1..].chunks_exact(2) {
+                    if let Some(key) = DisplaySpaceKey::from_lisp_value(pair[0]) {
+                        // Like geometry evaluation, use the first occurrence.
+                        // This captures direct operands, not mutable subgraphs
+                        // inside compound pixel expressions.
+                        operands[key as usize].get_or_insert(pair[1].bits());
+                    }
+                }
+                return Self::Space {
+                    identity: value.bits(),
+                    operands,
+                };
+            }
+        }
         match value.as_lisp_string() {
             Some(string) => Self::String {
                 identity: value.bits(),

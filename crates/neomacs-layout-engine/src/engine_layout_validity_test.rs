@@ -2,6 +2,10 @@
 use super::*;
 
 fn assert_prefix_mutation_invalidates_geometry(variable: &str, mutation: &str) {
+    assert_prefix_spec_mutation_invalidates_geometry(variable, r#"(copy-sequence "  ")"#, mutation);
+}
+
+fn assert_prefix_spec_mutation_invalidates_geometry(variable: &str, initial: &str, mutation: &str) {
     let mut eval = Context::new();
     let buffer = eval.buffer_manager().current_buffer().unwrap().id();
     eval.buffer_manager_mut()
@@ -13,7 +17,7 @@ fn assert_prefix_mutation_invalidates_geometry(variable: &str, mutation: &str) {
         .create_frame("prefix-freshness", 160, 160, buffer);
     let window = eval.frame_manager().get(frame).unwrap().selected_window;
     eval.eval_str(&format!(
-        r#"(progn (goto-char 1) (setq {variable} (copy-sequence "  ")))"#
+        r#"(progn (goto-char 1) (setq {variable} {initial}))"#
     ))
     .unwrap();
     let mut engine = LayoutEngine::new_without_font_metrics();
@@ -36,10 +40,6 @@ fn assert_prefix_mutation_invalidates_geometry(variable: &str, mutation: &str) {
     let after = eval
         .window_layout_attempt_freshness(frame, window, buffer)
         .unwrap();
-    assert_ne!(
-        before, after,
-        "in-flight attempts detect the same prefix mutation"
-    );
     let stale_accepted = eval
         .fresh_window_display_snapshot(frame, window, buffer)
         .is_some();
@@ -56,10 +56,7 @@ fn assert_prefix_mutation_invalidates_geometry(variable: &str, mutation: &str) {
         .unwrap()
         .points;
     engine.layout_frame_rust(&mut eval, frame);
-    assert!(
-        engine.last_layout_stats().full_windows > 0,
-        "prefix changes invalidate row reuse"
-    );
+    let full_windows = engine.last_layout_stats().full_windows;
     let incremental = eval
         .fresh_window_display_snapshot(frame, window, buffer)
         .unwrap()
@@ -79,6 +76,11 @@ fn assert_prefix_mutation_invalidates_geometry(variable: &str, mutation: &str) {
         &incremental, reference,
         "retained engine agrees with a fresh full layout"
     );
+    assert_ne!(
+        before, after,
+        "in-flight attempts detect the same prefix mutation"
+    );
+    assert!(full_windows > 0, "prefix changes invalidate row reuse");
     assert_eq!(
         &measured, reference,
         "synchronous query agrees with redisplay"
@@ -92,6 +94,62 @@ fn assert_prefix_mutation_invalidates_geometry(variable: &str, mutation: &str) {
 #[test]
 fn retained_geometry_rejects_in_place_line_prefix_changes() {
     assert_prefix_mutation_invalidates_geometry("line-prefix", "(aset line-prefix 0 9)");
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_space_prefix_width() {
+    assert_prefix_spec_mutation_invalidates_geometry(
+        "line-prefix",
+        "(list 'space :width 2)",
+        "(setcar (cdr (cdr line-prefix)) 6)",
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_wrap_space_prefix_width() {
+    assert_prefix_spec_mutation_invalidates_geometry(
+        "wrap-prefix",
+        "(list 'space :width 2)",
+        "(setcar (cdr (cdr wrap-prefix)) 6)",
+    );
+}
+
+#[test]
+fn space_prefix_freshness_ignores_shadowed_and_unknown_operands() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("space-prefix", 160, 160, buffer);
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.eval_str("(setq tail (list :width 8 :unknown 9) line-prefix (cons 'space (cons :width (cons 2 tail))))").unwrap();
+    let before = eval
+        .window_layout_attempt_freshness(frame, window, buffer)
+        .unwrap();
+    eval.eval_str("(setcar (cdr tail) 20)").unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(setcar (cdr (cdr (cdr tail))) 30)").unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(setcar (cdr (cdr line-prefix)) 6)").unwrap();
+    assert_ne!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(setcar (cdr (cdr line-prefix)) 2)").unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
 }
 
 #[test]
