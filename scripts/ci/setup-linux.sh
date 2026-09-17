@@ -78,9 +78,12 @@ case "$profile" in
             xdotool
             imagemagick
             weston
+            sway
             fonts-noto-core
+            fonts-dejavu-core
+            fonts-ubuntu
         )
-        required_commands=(gpg Xvfb xauth xdpyinfo xdotool import weston)
+        required_commands=(gpg Xvfb xauth xdpyinfo xdotool import weston sway)
         requires_libfaketime=true
         ;;
     release)
