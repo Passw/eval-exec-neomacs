@@ -73,8 +73,12 @@ when the prefix cons retains its identity. Unknown keys and shadowed duplicate
 operands do not affect this projection. Arithmetic pixel expressions, absolute
 pixel lengths and scaled lengths are captured as an immutable token stream,
 with an iterative, cycle-aware traversal. No live Lisp references are retained.
-Image/resource expressions and mutations inside a string's property value remain
-audit items, not a claim of complete mutable-Lisp-graph invalidation.
+Prefix strings also capture direct `(space ...)` display-property payloads by
+interval, using the same `SpaceInput` as non-string prefixes. Mutating a width or
+nested arithmetic operand no longer relies on the string property revision
+changing. Unrelated property payloads are not traversed. This does not yet cover
+display-spec lists/vectors, face-property payloads, or image/resource expressions;
+those remain audit items, not a claim of complete mutable-Lisp-graph invalidation.
 
 `LayoutInvisibilityInput` captures the effective buffer's ordered invisibility
 membership, including each cons entry's category and ellipsis truthiness.

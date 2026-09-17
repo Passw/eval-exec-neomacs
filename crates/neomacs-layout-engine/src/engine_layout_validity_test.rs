@@ -94,6 +94,56 @@ fn assert_layout_mutation_invalidates_geometry(setup: &str, mutation: &str) {
 }
 
 #[test]
+fn retained_geometry_rejects_mutated_prefix_string_display_space() {
+    assert_prefix_spec_mutation_invalidates_geometry(
+        "line-prefix",
+        r##"(progn (setq prefix-space (list 'space :width 2) prefix-text (copy-sequence " ")) (put-text-property 0 1 'display prefix-space prefix-text) prefix-text)"##,
+        "(setcar (cdr (cdr prefix-space)) 6)",
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_wrap_string_space_expression() {
+    assert_prefix_spec_mutation_invalidates_geometry(
+        "wrap-prefix",
+        r##"(progn (setq dimension (list 16) prefix-space (list 'space :width (list '+ dimension 1)) prefix-text (copy-sequence " ")) (put-text-property 0 1 'display prefix-space prefix-text) prefix-text)"##,
+        "(setcar dimension 48)",
+    );
+}
+
+#[test]
+fn prefix_string_space_freshness_ignores_unrelated_property_payloads() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("string-space", 160, 160, buffer);
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.eval_str(r##"(progn (setq space (list 'space :width 2) unrelated (list 1) line-prefix (copy-sequence " ")) (put-text-property 0 1 'display space line-prefix) (put-text-property 0 1 'help-echo unrelated line-prefix))"##).unwrap();
+    let before = eval
+        .window_layout_attempt_freshness(frame, window, buffer)
+        .unwrap();
+    eval.eval_str("(setcar unrelated 6)").unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(setcar (cdr (cdr space)) 6)").unwrap();
+    assert_ne!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(setcar (cdr (cdr space)) 2)").unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+}
+
+#[test]
 fn retained_geometry_rejects_mutated_display_table_glyph_vector() {
     assert_layout_mutation_invalidates_geometry(
         "(setq glyphs (vector 97) buffer-display-table (make-char-table 'display-table nil)) (aset buffer-display-table 97 glyphs)",

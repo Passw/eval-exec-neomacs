@@ -8,6 +8,35 @@ use crate::emacs_core::value::Value;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
+/// The supported geometry operands of one stretch-space display spec.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct SpaceInput {
+    identity: usize,
+    operands: [Option<PixelInput>;
+        <crate::emacs_core::display_spec::DisplaySpaceKey as strum::EnumCount>::COUNT],
+}
+
+impl SpaceInput {
+    pub(super) fn capture(value: Value) -> Option<Self> {
+        use crate::emacs_core::display_spec::DisplaySpaceKey;
+        if !value.is_cons() || !value.cons_car().is_symbol_named("space") {
+            return None;
+        }
+        let items = crate::emacs_core::value::list_to_vec(&value)?;
+        let mut operands = std::array::from_fn(|_| None);
+        for pair in items[1..].chunks_exact(2) {
+            if let Some(key) = DisplaySpaceKey::from_lisp_value(pair[0]) {
+                // Geometry evaluation uses the first occurrence.
+                operands[key as usize].get_or_insert_with(|| PixelInput::capture(pair[1]));
+            }
+        }
+        Some(Self {
+            identity: value.bits(),
+            operands,
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum PixelInput {
     Atom(usize),

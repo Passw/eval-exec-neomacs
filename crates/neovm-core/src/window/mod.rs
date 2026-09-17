@@ -37,6 +37,7 @@ mod pixel_input;
 mod scroll_bar;
 mod sibling_layout;
 pub mod split;
+mod string_property_input;
 pub mod window_markers;
 
 pub use part::{
@@ -647,12 +648,9 @@ enum LayoutPrefixInput {
         bytes: std::sync::Arc<[u8]>,
         multibyte: bool,
         properties_tick: u64,
+        display_spaces: string_property_input::StringDisplaySpaces,
     },
-    Space {
-        identity: usize,
-        operands: [Option<pixel_input::PixelInput>;
-            <crate::emacs_core::display_spec::DisplaySpaceKey as strum::EnumCount>::COUNT],
-    },
+    Space(pixel_input::SpaceInput),
     // Unsupported display specs retain the existing identity contract. This
     // snapshot does not claim to detect mutations inside arbitrary Lisp graphs.
     Other(usize),
@@ -663,22 +661,8 @@ impl LayoutPrefixInput {
         let Some(value) = value else {
             return Self::Missing;
         };
-        if value.is_cons() && value.cons_car().is_symbol_named("space") {
-            use crate::emacs_core::display_spec::DisplaySpaceKey;
-            if let Some(items) = crate::emacs_core::value::list_to_vec(&value) {
-                let mut operands = std::array::from_fn(|_| None);
-                for pair in items[1..].chunks_exact(2) {
-                    if let Some(key) = DisplaySpaceKey::from_lisp_value(pair[0]) {
-                        // Like geometry evaluation, use the first occurrence.
-                        operands[key as usize]
-                            .get_or_insert_with(|| pixel_input::PixelInput::capture(pair[1]));
-                    }
-                }
-                return Self::Space {
-                    identity: value.bits(),
-                    operands,
-                };
-            }
+        if let Some(space) = pixel_input::SpaceInput::capture(value) {
+            return Self::Space(space);
         }
         match value.as_lisp_string() {
             Some(string) => Self::String {
@@ -686,6 +670,9 @@ impl LayoutPrefixInput {
                 bytes: string.as_bytes().into(),
                 multibyte: string.is_multibyte(),
                 properties_tick: string.intervals().mutation_tick(),
+                display_spaces: string_property_input::StringDisplaySpaces::capture(
+                    string.intervals(),
+                ),
             },
             None => Self::Other(value.bits()),
         }
