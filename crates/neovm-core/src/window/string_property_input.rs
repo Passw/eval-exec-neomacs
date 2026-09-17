@@ -3,7 +3,9 @@
 use super::pixel_input::SpaceInput;
 use crate::buffer::{CharPos0, text_props::TextPropertyTable};
 use crate::emacs_core::{
-    display_spec::DisplayPropertySpecs, image_catalog::ImageSpecIdentity, plist::plist_get,
+    display_spec::{DisplayPropertySpecs, display_spec_when_parts},
+    image_catalog::ImageSpecIdentity,
+    plist::plist_get,
     value::Value,
 };
 use std::{ops::ControlFlow, sync::Arc};
@@ -45,12 +47,18 @@ struct DisplayRun {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum SpecInput {
+struct SpecInput {
+    condition: Option<usize>,
+    payload: SpecPayload,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum SpecPayload {
     Space(SpaceInput),
     Text(StringContentInput),
     Image(ImageSpecIdentity),
     // Preserve order and identity of surrounding specs. Their nested payloads
-    // (faces, resources, conditions) need separate capture.
+    // (modifiers and other resource types) need separate capture.
     Other(usize),
 }
 
@@ -63,18 +71,26 @@ impl StringDisplayInputs {
                 let decoded = DisplayPropertySpecs::of(value);
                 let mut specs = Vec::new();
                 decoded.for_each(|spec| {
-                    specs.push(match SpaceInput::capture(spec) {
-                        Some(space) => SpecInput::Space(space),
+                    // GNU and the classifier unwrap WHEN exactly once. The
+                    // condition is not evaluated here; dynamic conditions have
+                    // their own pre-walk evaluation/reuse policy.
+                    let (condition, spec) = match display_spec_when_parts(spec) {
+                        Some((form, payload)) => (Some(form.bits()), payload),
+                        None => (None, spec),
+                    };
+                    let payload = match SpaceInput::capture(spec) {
+                        Some(space) => SpecPayload::Space(space),
                         None => match spec.as_lisp_string() {
                             Some(string) => {
-                                SpecInput::Text(StringContentInput::capture(spec.bits(), string))
+                                SpecPayload::Text(StringContentInput::capture(spec.bits(), string))
                             }
                             None => match ImageSpecIdentity::from_lisp_spec(&spec) {
-                                Some(image) => SpecInput::Image(image),
-                                None => SpecInput::Other(spec.bits()),
+                                Some(image) => SpecPayload::Image(image),
+                                None => SpecPayload::Other(spec.bits()),
                             },
                         },
-                    });
+                    };
+                    specs.push(SpecInput { condition, payload });
                     ControlFlow::Continue(())
                 });
                 runs.push(DisplayRun {

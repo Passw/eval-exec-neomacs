@@ -393,6 +393,40 @@ fn retained_geometry_rejects_mutated_image_operand_in_wrap_prefix_string() {
 }
 
 #[test]
+fn retained_geometry_rejects_mutated_literal_when_payload() {
+    assert_prefix_spec_mutation_invalidates_geometry(
+        "line-prefix",
+        r##"(progn (setq prefix-space (list 'space :width 2) prefix-text (copy-sequence " "))
+             (put-text-property 0 1 'display (cons 'when (cons t prefix-space)) prefix-text)
+             prefix-text)"##,
+        "(setcar (cdr (cdr prefix-space)) 6)",
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_literal_when_condition() {
+    assert_prefix_spec_mutation_invalidates_geometry(
+        "line-prefix",
+        r##"(progn (setq conditional (list 'when t 'space :width 6)
+                           prefix-text (copy-sequence " "))
+             (put-text-property 0 1 'display conditional prefix-text) prefix-text)"##,
+        "(setcar (cdr conditional) nil)",
+    );
+}
+
+#[test]
+fn retained_geometry_tracks_literal_when_payload_under_disable_eval() {
+    assert_prefix_spec_mutation_invalidates_geometry(
+        "wrap-prefix",
+        r##"(progn (setq prefix-space (list 'space :width 2) prefix-text (copy-sequence " "))
+             (put-text-property 0 1 'display
+               (list 'disable-eval (vector (cons 'when (cons t prefix-space)))) prefix-text)
+             prefix-text)"##,
+        "(setcar (cdr (cdr prefix-space)) 6)",
+    );
+}
+
+#[test]
 fn retained_geometry_tracks_prefix_image_vertical_margin() {
     for variable in ["line-prefix", "wrap-prefix"] {
         assert_layout_mutation_with_host(

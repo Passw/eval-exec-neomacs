@@ -78,6 +78,14 @@ using the same `SpaceInput` as non-string prefixes. The shared
 `DisplayPropertySpecs` decoder handles single specs, lists, vectors and outer
 `disable-eval` wrappers; capture retains spec order, other-spec identities and
 the evaluation flag as well. Its list walk has allocation-free cycle detection.
+Each captured spec separates an optional `when` condition identity from its
+payload. The shared `display_spec_when_parts` decoder unwraps exactly once,
+matching GNU `xdisp.c:handle_single_display_spec`; capture then uses the existing
+space/string/image input projections. Literal `t`/`nil` changes and mutable
+wrapped payloads therefore participate in freshness, including literal `t`
+under `disable-eval`. No Lisp runs during capture. Arbitrary condition results
+remain the responsibility of pre-walk evaluation and its existing no-body-reuse
+policy, not a claim that condition identity describes every Lisp dependency.
 Mutating a width, arithmetic operand or container element therefore no longer
 relies on the string property revision changing. This is conservative capture
 of syntactic inputs, not evaluation of which spec wins. Unrelated property
