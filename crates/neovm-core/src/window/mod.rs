@@ -26,6 +26,7 @@ mod display;
 mod display_table_input;
 pub(crate) use display::WindowScrollUpdate;
 pub use display_table_input::LayoutDisplayTableInput;
+mod face_input;
 mod frame_params;
 pub mod geometry;
 mod history;

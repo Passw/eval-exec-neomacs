@@ -85,7 +85,13 @@ payloads are not traversed. Replacement strings share `StringContentInput` with
 top-level prefixes: identity, bytes, multibyteness and property revision are
 captured by value. Capture does not follow replacement strings' own `display`
 properties recursively, matching GNU's suppression of recursive replacement.
-Conditions, mutable face-property payloads and image/resource expressions remain
+Face and font-lock-face properties on both kinds of strings capture ordered face
+lists, known attributes (using `LFaceAttr`), scalar/string operands and `:inherit`
+references. The iterative capture records shared/cyclic inheritance without
+resolving named faces or evaluating filters. Named-face definitions still use the
+existing face revision. GUI-measured regressions cover height changes; terminal
+cell geometry is not evidence for font-size invalidation. Compound decoration
+and font operands, filtered-face conditions and image/resource expressions remain
 audit items, not a claim of complete mutable-Lisp-graph invalidation.
 
 `LayoutInvisibilityInput` captures the effective buffer's ordered invisibility

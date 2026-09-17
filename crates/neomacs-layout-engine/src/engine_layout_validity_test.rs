@@ -10,6 +10,10 @@ fn assert_prefix_spec_mutation_invalidates_geometry(variable: &str, initial: &st
 }
 
 fn assert_layout_mutation_invalidates_geometry(setup: &str, mutation: &str) {
+    assert_layout_mutation_with_measurement(setup, mutation, false);
+}
+
+fn assert_layout_mutation_with_measurement(setup: &str, mutation: &str, graphical: bool) {
     let mut eval = Context::new();
     let buffer = eval.buffer_manager().current_buffer().unwrap().id();
     eval.buffer_manager_mut()
@@ -20,9 +24,19 @@ fn assert_layout_mutation_invalidates_geometry(setup: &str, mutation: &str) {
         .frame_manager_mut()
         .create_frame("prefix-freshness", 160, 160, buffer);
     let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    if graphical {
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+    }
     eval.eval_str(&format!(r#"(progn (goto-char 1) {setup})"#))
         .unwrap();
-    let mut engine = LayoutEngine::new_without_font_metrics();
+    let mut engine = if graphical {
+        LayoutEngine::new()
+    } else {
+        LayoutEngine::new_without_font_metrics()
+    };
     engine.layout_frame_rust(&mut eval, frame);
     let original = eval
         .fresh_window_display_snapshot(frame, window, buffer)
@@ -45,7 +59,11 @@ fn assert_layout_mutation_invalidates_geometry(setup: &str, mutation: &str) {
     let stale_accepted = eval
         .fresh_window_display_snapshot(frame, window, buffer)
         .is_some();
-    let mut query_engine = WindowLayoutQueryEngine::new_without_font_metrics();
+    let mut query_engine = if graphical {
+        WindowLayoutQueryEngine::new()
+    } else {
+        WindowLayoutQueryEngine::new_without_font_metrics()
+    };
     let measured = query_engine
         .query_window_layout(
             &mut eval,
@@ -64,7 +82,11 @@ fn assert_layout_mutation_invalidates_geometry(setup: &str, mutation: &str) {
         .unwrap()
         .points
         .clone();
-    let mut full = LayoutEngine::new_without_font_metrics();
+    let mut full = if graphical {
+        LayoutEngine::new()
+    } else {
+        LayoutEngine::new_without_font_metrics()
+    };
     full.layout_frame_rust(&mut eval, frame);
     let reference = &eval
         .fresh_window_display_snapshot(frame, window, buffer)
@@ -90,6 +112,90 @@ fn assert_layout_mutation_invalidates_geometry(setup: &str, mutation: &str) {
     assert!(
         !stale_accepted,
         "geometry from before a layout input change must not be reported fresh"
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_prefix_face_height() {
+    assert_layout_mutation_with_measurement(
+        r##"(setq prefix-face (list :height 1.0) line-prefix (copy-sequence "xx")) (put-text-property 0 2 'face prefix-face line-prefix)"##,
+        "(setcar (cdr prefix-face) 2.0)",
+        true,
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_inherited_prefix_face_height() {
+    assert_layout_mutation_with_measurement(
+        r##"(setq parent-face (list :height 1.0) wrap-prefix (copy-sequence "xx")) (put-text-property 0 2 'face (list (list :inherit parent-face)) wrap-prefix)"##,
+        "(setcar (cdr parent-face) 2.0)",
+        true,
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_replacement_face_height() {
+    assert_layout_mutation_with_measurement(
+        r##"(setq replacement-face (list :height 1.0) replacement (copy-sequence "xx") line-prefix (copy-sequence " ")) (put-text-property 0 2 'face replacement-face replacement) (put-text-property 0 1 'display replacement line-prefix)"##,
+        "(setcar (cdr replacement-face) 2.0)",
+        true,
+    );
+}
+
+#[test]
+fn cyclic_face_inheritance_capture_tracks_other_attributes() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("face-cycle", 160, 160, buffer);
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.eval_str(r##"(progn (setq height-tail (list :height 1) cyclic-face (cons :inherit (cons nil height-tail)) line-prefix (copy-sequence "x")) (setcar (cdr cyclic-face) cyclic-face) (put-text-property 0 1 'face cyclic-face line-prefix))"##).unwrap();
+    let before = eval
+        .window_layout_attempt_freshness(frame, window, buffer)
+        .unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(setcar (cdr height-tail) 2)").unwrap();
+    assert_ne!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(setcar (cdr height-tail) 1)").unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+}
+
+#[test]
+fn string_face_freshness_tracks_mutable_color_bytes() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("face-inputs", 160, 160, buffer);
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.eval_str(r##"(progn (setq color (copy-sequence "#ff0000") line-prefix (copy-sequence "x")) (put-text-property 0 1 'face (list :foreground color) line-prefix))"##).unwrap();
+    let before = eval
+        .window_layout_attempt_freshness(frame, window, buffer)
+        .unwrap();
+    eval.eval_str("(aset color 1 48)").unwrap();
+    assert_ne!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(aset color 1 102)").unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
     );
 }
 

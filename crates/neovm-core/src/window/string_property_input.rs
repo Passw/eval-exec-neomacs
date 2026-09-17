@@ -7,13 +7,15 @@ use std::{ops::ControlFlow, sync::Arc};
 
 /// String storage inputs shared by prefix strings and replacement strings.
 /// Deliberately does not follow display properties recursively: GNU suppresses
-/// recursive string-display replacement. Mutable face payloads remain separate.
+/// recursive string-display replacement. Face inputs are captured separately
+/// from display properties because replacement strings can still carry faces.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct StringContentInput {
     identity: usize,
     bytes: Arc<[u8]>,
     multibyte: bool,
     properties_tick: u64,
+    faces: super::face_input::StringFaceInputs,
 }
 
 impl StringContentInput {
@@ -23,6 +25,7 @@ impl StringContentInput {
             bytes: string.as_bytes().into(),
             multibyte: string.is_multibyte(),
             properties_tick: string.intervals().mutation_tick(),
+            faces: super::face_input::StringFaceInputs::capture(string.intervals()),
         }
     }
 }
