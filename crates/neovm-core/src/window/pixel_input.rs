@@ -1,9 +1,10 @@
 //! Owned dependencies of pixel expressions, not an evaluator or a Lisp clone.
 //!
 //! Follows the arithmetic/number forms consumed by display_pixel_calc and GNU
-//! xdisp.c's calc_pixel_width_or_height. Image/resource operands remain opaque;
-//! resource-content revisions belong to their own dependency contract.
+//! xdisp.c's calc_pixel_width_or_height. Image operands share the catalog's
+//! owned identity; resource-content revisions have a separate contract.
 
+use crate::emacs_core::image_catalog::ImageSpecIdentity;
 use crate::emacs_core::value::Value;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
@@ -52,6 +53,7 @@ pub(super) enum Token {
     Difference,
     AbsolutePixels(usize),
     Scale(usize),
+    Image(ImageSpecIdentity),
     End,
     Reference(usize),
     Opaque(usize),
@@ -107,6 +109,13 @@ impl PixelInput {
                         tokens.push(Token::Scale(car.bits()));
                         pending.push((cdr, Role::Expression));
                     }
+                }
+                Role::Expression if car.is_symbol_named("image") => {
+                    tokens.push(
+                        ImageSpecIdentity::from_lisp_spec(&value)
+                            .map(Token::Image)
+                            .unwrap_or(Token::Opaque(value.bits())),
+                    );
                 }
                 Role::Expression => tokens.push(Token::Opaque(value.bits())),
             }

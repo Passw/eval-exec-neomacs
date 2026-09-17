@@ -1,6 +1,38 @@
 //! Freshness must agree with the geometry produced by a full layout.
 use super::*;
 
+/// Host boundary fixture: pending images reserve their explicitly requested
+/// extent. Pixel arithmetic and ordinary layout receive the same catalog.
+struct ExplicitExtentImageHost;
+
+impl DisplayHost for ExplicitExtentImageHost {
+    fn realize_gui_frame(&mut self, _: GuiFrameHostRequest) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn resize_gui_frame(&mut self, _: GuiFrameHostRequest) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn image_catalog(&self) -> Option<&dyn ImageCatalog> {
+        Some(self)
+    }
+
+    fn image_catalog_shared(&self) -> Option<std::rc::Rc<dyn ImageCatalog>> {
+        Some(std::rc::Rc::new(Self))
+    }
+}
+
+impl ImageCatalog for ExplicitExtentImageHost {
+    fn lookup(&self, request: ImageResolveRequest) -> ImageLookup {
+        let (width, height) = request.size.placeholder_extent().expect("explicit extent");
+        ImageLookup::Pending(PendingImage::new(
+            test_image_load(77),
+            neomacs_display_protocol::ImageLayoutExtent::new(width, height),
+        ))
+    }
+}
+
 fn assert_prefix_mutation_invalidates_geometry(variable: &str, mutation: &str) {
     assert_prefix_spec_mutation_invalidates_geometry(variable, r#"(copy-sequence "  ")"#, mutation);
 }
@@ -181,6 +213,44 @@ fn assert_decoration_mutation_invalidates_presentation(setup: &str, mutation: &s
     assert_eq!(
         incremental, reference,
         "retained decoration agrees with fresh layout"
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_pixel_arithmetic_image_width() {
+    assert_layout_mutation_with_host(
+        r##"(setq image-dimensions (list :width 20 :height 24)
+                   image-spec (cons 'image (cons :file (cons "prefix.png" image-dimensions)))
+                   line-prefix (list 'space :width (list '+ (list 5) (cons 0.5 image-spec))))"##,
+        "(setcar (cdr image-dimensions) 60)",
+        true,
+        Some(Box::new(ExplicitExtentImageHost)),
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_direct_pixel_image_width() {
+    assert_layout_mutation_with_host(
+        r##"(setq image-dimensions (list :width 24 :height 20)
+                   image-spec (cons 'image (cons :file (cons "prefix.png" image-dimensions)))
+                   line-prefix (list 'space :width image-spec))"##,
+        "(setcar (cdr image-dimensions) 48)",
+        true,
+        Some(Box::new(ExplicitExtentImageHost)),
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_image_operand_in_wrap_prefix_string() {
+    assert_layout_mutation_with_host(
+        r##"(setq image-dimensions (list :width 20 :height 24)
+                   image-spec (cons 'image (cons :file (cons "prefix.png" image-dimensions)))
+                   wrap-prefix (copy-sequence " "))
+             (put-text-property 0 1 'display
+               (list 'space :width (list '- (list 80) (cons 0.5 image-spec))) wrap-prefix)"##,
+        "(setcar (cdr image-dimensions) 60)",
+        true,
+        Some(Box::new(ExplicitExtentImageHost)),
     );
 }
 
