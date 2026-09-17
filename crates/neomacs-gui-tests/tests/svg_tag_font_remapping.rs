@@ -7,7 +7,8 @@ use neomacs_gui_tests::{
 use std::{path::PathBuf, time::Duration};
 
 #[test]
-// Prerequisites: requires a built binary/pdump, Weston, DejaVu Sans Mono, svg-lib and svg-tag-mode.
+// Prerequisites: fresh binary/runtime, Weston, DejaVu Sans Mono, and
+// `bash scripts/ci/setup-gui-test-packages.sh` (or explicit SVG directory overrides).
 fn svg_tag_box_follows_remapped_window_font_without_scaling_its_text_font() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let binary = std::env::var_os("NEOMACS_GUI_TEST_BINARY")
@@ -32,8 +33,11 @@ fn svg_tag_box_follows_remapped_window_font_without_scaling_its_text_font() {
         plan = plan.with_env(key.clone(), value.clone());
     }
     for key in ["NEOMACS_GUI_SVG_LIB_DIR", "NEOMACS_GUI_SVG_TAG_MODE_DIR"] {
-        plan = plan.with_env(key, std::env::var(key).expect("set SVG package directory"));
+        if let Ok(value) = std::env::var(key) {
+            plan = plan.with_env(key, value);
+        }
     }
+    plan = plan.with_svg_packages();
     let result = plan
         .run_with(
             &mut ProcessGuiCommandRunner,

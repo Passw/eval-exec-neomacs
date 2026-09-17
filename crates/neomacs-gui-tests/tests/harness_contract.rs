@@ -213,6 +213,28 @@ fn display_harness_reports_missing_linux_display_inputs() {
     );
 }
 
+#[test]
+fn svg_package_defaults_are_checkout_relative_and_preserve_explicit_overrides() {
+    let plan = GuiTestPlan::new(
+        GuiBackend::LinuxWayland,
+        "checkout",
+        "artifacts",
+        GuiScenario::new("svg", "fixture.el"),
+    )
+    .with_env("NEOMACS_GUI_SVG_LIB_DIR", "custom-svg-lib")
+    .with_svg_packages();
+    let command = plan.command_spec();
+    assert_eq!(
+        command.env_value("NEOMACS_GUI_SVG_LIB_DIR"),
+        Some("custom-svg-lib")
+    );
+    let expected = PathBuf::from("checkout").join("target/neomacs-gui-tests/packages/svg-tag-mode");
+    assert_eq!(
+        command.env_value("NEOMACS_GUI_SVG_TAG_MODE_DIR"),
+        expected.to_str()
+    );
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn wayland_session_owns_runtime_below_long_artifact_root() {

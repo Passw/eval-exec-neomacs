@@ -301,6 +301,30 @@ impl GuiTestPlan {
         self
     }
 
+    /// Use packages prepared by `bash scripts/ci/setup-gui-test-packages.sh`.
+    /// Explicit `with_env` package paths supplied before this call win.
+    /// Preparing dependencies is separate from running tests: no hidden network
+    /// access or mutable package versions are introduced by a GUI scenario.
+    pub fn with_svg_packages(mut self) -> Self {
+        for (variable, package) in [
+            ("NEOMACS_GUI_SVG_LIB_DIR", "svg-lib"),
+            ("NEOMACS_GUI_SVG_TAG_MODE_DIR", "svg-tag-mode"),
+        ] {
+            if !self.extra_env.iter().any(|(key, _)| key == variable) {
+                self.extra_env.push((
+                    variable.into(),
+                    path_to_string(
+                        &self
+                            .workspace_root
+                            .join("target/neomacs-gui-tests/packages")
+                            .join(package),
+                    ),
+                ));
+            }
+        }
+        self
+    }
+
     pub fn command_spec(&self) -> CommandSpec {
         let artifacts = GuiArtifactSet::new(
             &self.artifact_root,

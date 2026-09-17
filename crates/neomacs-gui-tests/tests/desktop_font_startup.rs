@@ -265,6 +265,7 @@ fn check_fixture_with_font(
             plan = plan.with_env(key, value);
         }
     }
+    plan = plan.with_svg_packages();
     let result = plan
         .run_with(
             &mut ProcessGuiCommandRunner,

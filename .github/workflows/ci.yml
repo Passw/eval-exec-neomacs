@@ -928,6 +928,9 @@ jobs:
       - *unpack_test_runtime
       - *download_workspace_test_archive
 
+      - name: Prepare pinned GUI package fixtures
+        run: bash scripts/ci/setup-gui-test-packages.sh
+
       - name: Run real GUI tests
         run: |
           cargo nextest run \
