@@ -137,8 +137,25 @@ expression stream. This covers direct image dimensions and images nested under
 addition, subtraction or dotted scaling, both in stretch-space prefixes and in
 prefix-string display properties. Capture does not resolve images: a catalog
 fixture supplies pending extents while geometry regressions exercise retained,
-full and query layout. External resource changes remain separate work; changing
-a file's contents is not a mutation of its Lisp image specification.
+full and query layout. Changing a file's contents is not a mutation of its Lisp
+image specification. GNU `image.c:Fimage_flush` explicitly promises rereading
+the file on the next redisplay after a flush; `uncache_image` also marks the
+frame garbaged when entries are removed. This is not an automatic file-watch
+contract.
+
+Neomacs' corresponding lifecycle is already separate from spec identity:
+catalog invalidation reports `ImageInvalidationResult::Changed`, and the Lisp
+image builtins synchronously advance `media_generation`. This generation enters
+both snapshot freshness and retained-window keys. Renderer decode/eviction
+events reconcile catalog state before advancing the same generation. Decode
+completion carries a load-attempt token so a stale completion cannot promote
+a replacement attempt. The GUI catalog's existing tests cover eviction and
+stale decode completion. A layout characterization test additionally checks
+`image-flush`, clear-all, and filename-filtered clearing through real Lisp
+builtins, retained/full layout and synchronous geometry queries, with unchanged
+Lisp image specs. Its deterministic catalog models changed file dimensions;
+it does not exercise disk reloads, decode workers or GPU texture retirement.
+No extra invalidation counter or automatic file watcher is introduced.
 This is not a claim of complete mutable-Lisp-graph invalidation.
 
 `LayoutInvisibilityInput` captures the effective buffer's ordered invisibility

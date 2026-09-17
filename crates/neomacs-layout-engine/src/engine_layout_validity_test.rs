@@ -1,6 +1,57 @@
 //! Freshness must agree with the geometry produced by a full layout.
 use super::*;
 
+/// A single cached file whose replacement has a different decoded extent.
+/// Only explicit cache invalidation exposes the replacement to layout.
+#[derive(Clone, Default)]
+struct ReloadingImageHost(std::rc::Rc<std::cell::Cell<bool>>);
+
+impl DisplayHost for ReloadingImageHost {
+    fn realize_gui_frame(&mut self, _: GuiFrameHostRequest) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn resize_gui_frame(&mut self, _: GuiFrameHostRequest) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn image_catalog(&self) -> Option<&dyn ImageCatalog> {
+        Some(self)
+    }
+
+    fn image_catalog_shared(&self) -> Option<std::rc::Rc<dyn ImageCatalog>> {
+        Some(std::rc::Rc::new(self.clone()))
+    }
+}
+
+impl ImageCatalog for ReloadingImageHost {
+    fn lookup(&self, _: ImageResolveRequest) -> ImageLookup {
+        ImageLookup::Ready(ReadyImage {
+            load: test_image_load(if self.0.get() { 78 } else { 77 }),
+            metadata:
+                neovm_core::emacs_core::image_catalog::ResolvedImageMetadata::layout_is_image_pixels(
+                    if self.0.get() { 60 } else { 20 },
+                    24,
+                    0,
+                    false,
+                    Default::default(),
+                ),
+        })
+    }
+
+    fn invalidate(
+        &self,
+        _: neovm_core::emacs_core::image_catalog::ImageInvalidation,
+    ) -> neovm_core::emacs_core::image_catalog::ImageInvalidationResult {
+        use neovm_core::emacs_core::image_catalog::ImageInvalidationResult;
+        if self.0.replace(true) {
+            ImageInvalidationResult::Unchanged
+        } else {
+            ImageInvalidationResult::Changed
+        }
+    }
+}
+
 /// Host boundary fixture: pending images reserve their explicitly requested
 /// extent. Pixel arithmetic and ordinary layout receive the same catalog.
 struct ExplicitExtentImageHost;
@@ -214,6 +265,23 @@ fn assert_decoration_mutation_invalidates_presentation(setup: &str, mutation: &s
         incremental, reference,
         "retained decoration agrees with fresh layout"
     );
+}
+
+#[test]
+fn image_cache_flush_rebuilds_retained_prefix_geometry() {
+    for flush in [
+        "(image-flush image-spec t)",
+        "(clear-image-cache t)",
+        r##"(clear-image-cache "prefix.png")"##,
+    ] {
+        assert_layout_mutation_with_host(
+            r##"(setq image-spec (list 'image :type 'png :file "prefix.png")
+                       line-prefix (list 'space :width image-spec))"##,
+            flush,
+            true,
+            Some(Box::new(ReloadingImageHost::default())),
+        );
+    }
 }
 
 #[test]
