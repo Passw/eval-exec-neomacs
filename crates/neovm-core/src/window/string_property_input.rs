@@ -2,7 +2,10 @@
 //! revisions alone cannot detect mutation inside a property's Lisp value.
 use super::pixel_input::SpaceInput;
 use crate::buffer::{CharPos0, text_props::TextPropertyTable};
-use crate::emacs_core::{display_spec::DisplayPropertySpecs, plist::plist_get, value::Value};
+use crate::emacs_core::{
+    display_spec::DisplayPropertySpecs, image_catalog::ImageSpecIdentity, plist::plist_get,
+    value::Value,
+};
 use std::{ops::ControlFlow, sync::Arc};
 
 /// String storage inputs shared by prefix strings and replacement strings.
@@ -45,6 +48,7 @@ struct DisplayRun {
 enum SpecInput {
     Space(SpaceInput),
     Text(StringContentInput),
+    Image(ImageSpecIdentity),
     // Preserve order and identity of surrounding specs. Their nested payloads
     // (faces, resources, conditions) need separate capture.
     Other(usize),
@@ -65,7 +69,10 @@ impl StringDisplayInputs {
                             Some(string) => {
                                 SpecInput::Text(StringContentInput::capture(spec.bits(), string))
                             }
-                            None => SpecInput::Other(spec.bits()),
+                            None => match ImageSpecIdentity::from_lisp_spec(&spec) {
+                                Some(image) => SpecInput::Image(image),
+                                None => SpecInput::Other(spec.bits()),
+                            },
                         },
                     });
                     ControlFlow::Continue(())

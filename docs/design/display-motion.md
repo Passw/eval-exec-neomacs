@@ -112,8 +112,19 @@ Compound `:font`/`:fontset` operands are not currently consumed by the inline
 face plist resolver (`Face::from_plist_realized`), unlike GNU's `merge_face_ref`.
 That is a separate compatibility gap, not an observable stale-input bug on this
 path; adding that support must also define its owned dependencies. Other
-image/resource expressions remain audit items. This is not a claim of complete
-mutable-Lisp-graph invalidation.
+image/resource expressions remain audit items. Image specs in prefix-string
+display properties now reuse the catalog's `ImageSpecIdentity`, rather than
+maintaining a second list of image attributes in freshness capture. Geometry
+regressions cover in-place margin-pair mutations, including vector display
+containers on wrap prefixes. A deterministic host catalog supplies image extents;
+the tests exercise real layout and query paths, not image decoding.
+
+This is not complete image invalidation: pixel-arithmetic image operands and
+external resource changes remain separate work. The existing catalog identity
+also inherits the generic equal-key implementation's depth limit and identity
+fallback for non-UTF-8 strings; binary image data and deeply nested specs need a
+catalog-level identity audit rather than a second, divergent freshness key.
+This is not a claim of complete mutable-Lisp-graph invalidation.
 
 `LayoutInvisibilityInput` captures the effective buffer's ordered invisibility
 membership, including each cons entry's category and ellipsis truthiness.

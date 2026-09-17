@@ -14,7 +14,19 @@ fn assert_layout_mutation_invalidates_geometry(setup: &str, mutation: &str) {
 }
 
 fn assert_layout_mutation_with_measurement(setup: &str, mutation: &str, graphical: bool) {
+    assert_layout_mutation_with_host(setup, mutation, graphical, None);
+}
+
+fn assert_layout_mutation_with_host(
+    setup: &str,
+    mutation: &str,
+    graphical: bool,
+    host: Option<Box<dyn DisplayHost>>,
+) {
     let mut eval = Context::new();
+    if let Some(host) = host {
+        eval.set_display_host(host);
+    }
     let buffer = eval.buffer_manager().current_buffer().unwrap().id();
     eval.buffer_manager_mut()
         .get_mut(buffer)
@@ -169,6 +181,34 @@ fn assert_decoration_mutation_invalidates_presentation(setup: &str, mutation: &s
     assert_eq!(
         incremental, reference,
         "retained decoration agrees with fresh layout"
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_prefix_image_margin() {
+    assert_layout_mutation_with_host(
+        r##"(setq image-margin (cons 0 0)
+                   line-prefix (copy-sequence " "))
+             (put-text-property 0 1 'display
+               (list 'image :type 'png :file "prefix.png" :margin image-margin)
+               line-prefix)"##,
+        "(setcar image-margin 20)",
+        true,
+        Some(Box::new(RecordingImageDisplayHost::default())),
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_wrap_prefix_image_margin() {
+    assert_layout_mutation_with_host(
+        r##"(setq image-margin (cons 0 0)
+                   wrap-prefix (copy-sequence " "))
+             (put-text-property 0 1 'display
+               (vector (list 'image :type 'png :file "prefix.png" :margin image-margin))
+               wrap-prefix)"##,
+        "(setcar image-margin 10)",
+        true,
+        Some(Box::new(RecordingImageDisplayHost::default())),
     );
 }
 
