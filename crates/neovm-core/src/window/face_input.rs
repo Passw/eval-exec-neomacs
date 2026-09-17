@@ -38,6 +38,7 @@ enum Token {
     Decoration,
     DecorationProperty(DecorationProperty),
     WidthPair,
+    InlineBitmap,
     End,
     Reference(usize),
 }
@@ -95,6 +96,8 @@ fn capture_face(value: Value) -> Arc<[Token]> {
                     pending.push(Work::Face(value));
                 } else if matches!(key, LFaceAttr::Box | LFaceAttr::Underline) {
                     capture_decoration(key, value, &mut tokens);
+                } else if key == LFaceAttr::Stipple {
+                    capture_stipple(value, &mut tokens);
                 } else {
                     // Scalar/string operands are owned; compound font/resource
                     // payloads retain identity pending their audit.
@@ -185,4 +188,23 @@ fn capture_decoration(attribute: LFaceAttr, value: Value, tokens: &mut Vec<Token
         }
     }
     tokens.push(Token::End);
+}
+
+fn capture_stipple(value: Value, tokens: &mut Vec<Token>) {
+    if let Some(items) = list_to_vec(&value)
+        && let [width, height, data] = items.as_slice()
+    {
+        // The resolver consumes exactly (WIDTH HEIGHT DATA). Capture even
+        // invalid operands so a mutation that makes them valid is observable.
+        // Bitmap bytes are owned, not the string's text-property graph.
+        tokens.push(Token::InlineBitmap);
+        tokens.push(atom(*width));
+        tokens.push(atom(*height));
+        tokens.push(atom(*data));
+        tokens.push(Token::End);
+    } else {
+        // File/builtin names use string contents; unsupported compound forms
+        // retain identity. External file changes need resource invalidation.
+        tokens.push(atom(value));
+    }
 }

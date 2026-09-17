@@ -152,6 +152,7 @@ fn assert_decoration_mutation_invalidates_presentation(setup: &str, mutation: &s
             face.underline_style,
             face.underline_placement,
             face.underline_color,
+            face.stipple.clone(),
         )
     };
     let mut engine = LayoutEngine::new();
@@ -168,6 +169,44 @@ fn assert_decoration_mutation_invalidates_presentation(setup: &str, mutation: &s
     assert_eq!(
         incremental, reference,
         "retained decoration agrees with fresh layout"
+    );
+}
+
+#[test]
+fn retained_presentation_rejects_mutated_prefix_stipple_bytes() {
+    assert_decoration_mutation_invalidates_presentation(
+        r##"(setq bitmap-data (copy-sequence "A"))
+             (put-text-property 0 2 'face
+               (list :stipple (list 8 1 bitmap-data)) line-prefix)"##,
+        "(aset bitmap-data 0 66)",
+    );
+}
+
+#[test]
+fn retained_presentation_rejects_mutated_stipple_dimensions() {
+    for mutation in [
+        "(setcar bitmap 4)",
+        "(setcar (cdr bitmap) 2)",
+        "(setcdr bitmap (list 2 (copy-sequence \"CD\")))",
+    ] {
+        assert_decoration_mutation_invalidates_presentation(
+            r##"(setq bitmap (list 8 1 (copy-sequence "AB")))
+                 (put-text-property 0 2 'face (list :stipple bitmap) line-prefix)"##,
+            mutation,
+        );
+    }
+}
+
+#[test]
+fn retained_presentation_rejects_mutated_replacement_stipple_bytes() {
+    assert_decoration_mutation_invalidates_presentation(
+        r##"(setq bitmap-data (copy-sequence "A")
+                   replacement (copy-sequence "xx")
+                   line-prefix (copy-sequence " "))
+             (put-text-property 0 2 'face
+               (list :stipple (list 8 1 bitmap-data)) replacement)
+             (put-text-property 0 1 'display replacement line-prefix)"##,
+        "(aset bitmap-data 0 66)",
     );
 }
 

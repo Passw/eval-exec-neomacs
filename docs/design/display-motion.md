@@ -101,8 +101,19 @@ the wrapped face tail with the same cycle-safe face capture. This includes the
 current resolver's window-system extension without evaluating predicates during
 capture or changing its filter semantics. Prefix and replacement-string tests
 cover both nested face mutations and changes to the filter's operands.
-Compound font operands and image/resource expressions remain
-audit items, not a claim of complete mutable-Lisp-graph invalidation.
+Inline stipple bitmaps capture their three `(WIDTH HEIGHT DATA)` operands,
+including owned data bytes. Published-face tests compare retained and fresh
+bitmap patterns; pixel geometry alone cannot detect stale bitmap contents.
+This follows the input shape documented by GNU `xfaces.c:Fbitmap_spec_p` without
+changing Neomacs' current bitmap validation. Bitmap-file content changes still
+need resource invalidation rather than Lisp input capture.
+
+Compound `:font`/`:fontset` operands are not currently consumed by the inline
+face plist resolver (`Face::from_plist_realized`), unlike GNU's `merge_face_ref`.
+That is a separate compatibility gap, not an observable stale-input bug on this
+path; adding that support must also define its owned dependencies. Other
+image/resource expressions remain audit items. This is not a claim of complete
+mutable-Lisp-graph invalidation.
 
 `LayoutInvisibilityInput` captures the effective buffer's ordered invisibility
 membership, including each cons entry's category and ellipsis truthiness.
