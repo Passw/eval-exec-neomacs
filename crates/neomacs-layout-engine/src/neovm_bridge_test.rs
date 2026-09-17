@@ -399,10 +399,12 @@ fn frame_params_from_neovm_ignores_stored_tty_divider_parameters() {
 
 #[test]
 fn chrome_face_pixel_height_uses_ceil_for_fractional_metrics() {
-    let mut face = ResolvedFace::default();
-    face.font_line_height = 17.2;
-    face.box_type = 1;
-    face.box_line_width = 1.into();
+    let mut face = ResolvedFace {
+        font_line_height: 17.2,
+        box_type: 1,
+        box_line_width: 1.into(),
+        ..Default::default()
+    };
 
     assert_eq!(
         chrome_face_pixel_height(&face, 14.1, neomacs_display_protocol::DeviceScale::ONE),
@@ -427,8 +429,10 @@ fn chrome_face_pixel_height_uses_ceil_for_fractional_metrics() {
 
 #[test]
 fn chrome_face_pixel_height_uses_smaller_realized_face_like_gnu() {
-    let mut face = ResolvedFace::default();
-    face.font_line_height = 12.0;
+    let face = ResolvedFace {
+        font_line_height: 12.0,
+        ..Default::default()
+    };
 
     assert_eq!(
         chrome_face_pixel_height(&face, 14.1, neomacs_display_protocol::DeviceScale::ONE),
@@ -525,7 +529,7 @@ fn test_window_params_from_neovm_internal_returns_none() {
 
     let result = window_params_from_neovm(
         &internal,
-        &buf,
+        buf,
         frame,
         evaluator.obarray(),
         evaluator.face_table(),
@@ -1402,15 +1406,14 @@ fn test_window_params_fringes_and_margins() {
     if let Some(frame) = evaluator.frame_manager_mut().get_mut(frame_id) {
         frame.set_window_system(Some(Value::symbol("x")));
         frame.char_width = 8.0;
-        if let Some(win) = frame.selected_window_mut() {
-            if let Window::Leaf {
+        if let Some(win) = frame.selected_window_mut()
+            && let Window::Leaf {
                 display, margins, ..
             } = win
-            {
-                *margins = WindowMargins::new(2, 3);
-                display.left_fringe_width = 10;
-                display.right_fringe_width = 12;
-            }
+        {
+            *margins = WindowMargins::new(2, 3);
+            display.left_fringe_width = 10;
+            display.right_fringe_width = 12;
         }
     }
 
@@ -1439,15 +1442,14 @@ fn test_window_params_tty_ignores_fringes_keeps_margins() {
     // WINDOW_FRINGES_WIDTH only when FRAME_WINDOW_P is true.
     if let Some(frame) = evaluator.frame_manager_mut().get_mut(frame_id) {
         frame.char_width = 8.0;
-        if let Some(win) = frame.selected_window_mut() {
-            if let Window::Leaf {
+        if let Some(win) = frame.selected_window_mut()
+            && let Window::Leaf {
                 display, margins, ..
             } = win
-            {
-                *margins = WindowMargins::new(2, 3);
-                display.left_fringe_width = 10;
-                display.right_fringe_width = 12;
-            }
+        {
+            *margins = WindowMargins::new(2, 3);
+            display.left_fringe_width = 10;
+            display.right_fringe_width = 12;
         }
     }
 
@@ -3795,8 +3797,8 @@ fn face_resolver_honors_overlay_window_property() {
         serial: 0,
         plist: Value::NIL,
         buffer: None,
-        start: buf.point_min_emacs_byte_pos().get() as usize,
-        end: buf.point_max_emacs_byte_pos().get() as usize,
+        start: buf.point_min_emacs_byte_pos().get(),
+        end: buf.point_max_emacs_byte_pos().get(),
         front_advance: false,
         rear_advance: false,
     });

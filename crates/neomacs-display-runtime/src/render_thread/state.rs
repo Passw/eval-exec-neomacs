@@ -1,4 +1,3 @@
-use neomacs_display_protocol::FrameFaceMap;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
@@ -9,7 +8,6 @@ use neomacs_display_protocol::frame_time::EventTime;
 use winit::dpi::{LogicalSize, PhysicalSize, Size};
 
 use crate::clipboard::ClipboardService;
-use crate::core::face::Face;
 pub use crate::thread_comm::MonitorInfo;
 use crate::thread_comm::{FrameShaderAvailability, RenderComms};
 pub(super) use neomacs_display_protocol::PointerAppearancePhase;
@@ -473,6 +471,9 @@ pub(super) struct PresentedPressCapture {
 }
 
 impl PresentedPressCapture {
+    // Only `GuiFrameWindowState::capture_presented`, itself `#[cfg(test)]`,
+    // captures a press without a surface origin.
+    #[cfg(test)]
     pub(super) const fn new(target: Option<PresentedInteractionKey>) -> Self {
         Self {
             target,

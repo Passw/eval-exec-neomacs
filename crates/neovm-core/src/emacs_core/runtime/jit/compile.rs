@@ -808,7 +808,7 @@ pub fn compile_bytecode_function_with(
 
 /// [`compile_bytecode_function_with`] with the register allocator chosen by
 /// `policy` and the body's shape (`lowering::choose_regalloc`).
-pub fn compile_bytecode_function_tiered(
+pub(crate) fn compile_bytecode_function_tiered(
     f: &ByteCodeFunction,
     obarray: Option<&Obarray>,
     policy: lowering::RegallocPolicy,
@@ -827,7 +827,7 @@ pub fn compile_bytecode_function_tiered(
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CompileRequest {
     /// The register allocator policy (`lowering::choose_regalloc`).
-    pub regalloc: lowering::RegallocPolicy,
+    pub(crate) regalloc: lowering::RegallocPolicy,
     /// Compile a body the profitability gate would refuse: the deferred
     /// re-attempt of a call-heavy body that has since proven hot enough to
     /// amortize its compile (`RuntimeState::profit_deferred_heat`).
@@ -874,7 +874,6 @@ pub(crate) fn profit_gate_bypassed_now() -> bool {
     BYPASS_PROFIT_GATE.with(|b| b.get())
 }
 
-/// [`compile_bytecode_function_tiered`] with the full [`CompileRequest`].
 thread_local! {
     /// Per-pc operand-type feedback for the body being compiled.
     ///
@@ -980,6 +979,7 @@ pub(crate) fn publish_numeric_feedback(f: &ByteCodeFunction) -> NumericFeedbackS
     ))
 }
 
+/// [`compile_bytecode_function_tiered`] with the full [`CompileRequest`].
 pub fn compile_bytecode_function_requested(
     f: &ByteCodeFunction,
     obarray: Option<&Obarray>,
@@ -3023,7 +3023,7 @@ pub(crate) fn baseline_has_backedge(ops: &[Op], cfg: &Cfg) -> bool {
 /// symbols-with-pos slow path; VarRef/VarSet/VarBind/Unbind hit the variable
 /// machinery; Call/Apply/named-builtins/handlers re-enter elisp. Single source of
 /// truth for both the JIT and the baseline-AOT emit (R2-E).
-/// Whether the body has a residual-rooting site: an op whose lowering stores
+/// How many residual-rooting sites the body has: ops whose lowering stores
 /// live operands into the Context root window before a shim call (calls,
 /// dynamic-variable ops, unbind, window excursion, aset, list, builtin
 /// calls). Every such op dereferences the vmctx, so a body with one is
@@ -3031,16 +3031,12 @@ pub(crate) fn baseline_has_backedge(ops: &[Op], cfg: &Cfg) -> bool {
 /// capacity check be hoisted to the entry (`lowering::HoistedRootWin`). A
 /// body without one (a pure loop, run with a null vmctx in tests) keeps the
 /// per-site sequence it never executes.
-pub(crate) fn body_has_rooting_sites(ops: &[Op]) -> bool {
-    count_rooting_sites(ops) > 0
-}
-
-/// How many residual-rooting sites the body has (see
-/// [`body_has_rooting_sites`]). The hoisted root-window prologue costs about
-/// what one site's inline sequence does, so it pays from two sites up, or
-/// from one site inside a loop (measured: hoisting single-site straight-line
-/// bodies cost the 200-function compile fixture +0.34%; not hoisting the
-/// 3M-call benchmark's one-site loop body forfeited its −2.4%).
+///
+/// The hoisted root-window prologue costs about what one site's inline
+/// sequence does, so it pays from two sites up, or from one site inside a
+/// loop (measured: hoisting single-site straight-line bodies cost the
+/// 200-function compile fixture +0.34%; not hoisting the 3M-call benchmark's
+/// one-site loop body forfeited its −2.4%).
 pub(crate) fn count_rooting_sites(ops: &[Op]) -> usize {
     ops.iter().filter(|o| is_rooting_site_op(o)).count()
 }
@@ -3624,23 +3620,12 @@ fn build_leaf_fn<M: Module>(
             ));
             let call_result_slot =
                 fb.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
-            // Lever 2: residual gather buffer, sized to the operand-stack depth
-            // (an upper bound on any site's residual count).
-            let residual_buf_slot = fb.create_sized_stack_slot(StackSlotData::new(
-                StackSlotKind::ExplicitSlot,
-                (cfg.max_depth.max(1) * 8) as u32,
-                3,
-            ));
-            let gc_saved_slot =
-                fb.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
             Some(RtCtx {
                 refs,
                 vmctx_var,
                 ptr_ty,
                 call_args_slot,
                 call_result_slot,
-                residual_buf_slot,
-                gc_saved_slot,
                 rootwin: None,
             })
         } else {

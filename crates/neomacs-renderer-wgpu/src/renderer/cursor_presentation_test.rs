@@ -30,10 +30,12 @@ fn color_cycle_origin_inherits_the_gnu_resolved_cursor_paint() {
 
 #[test]
 fn color_cycle_depends_on_target_time_not_delivered_tick_count() {
-    let mut cycle = CursorColorCycleConfig::default();
-    cycle.speed = 0.5;
-    cycle.saturation = 1.0;
-    cycle.lightness = 0.5;
+    let cycle = CursorColorCycleConfig {
+        speed: 0.5,
+        saturation: 1.0,
+        lightness: 0.5,
+        ..Default::default()
+    };
     let resolved = ResolvedCursorPaint::new(Color::BLACK, Color::WHITE);
     let origin = observe_platform_now();
     let target = origin.plus(std::time::Duration::from_millis(500));
@@ -57,10 +59,12 @@ fn color_cycle_depends_on_target_time_not_delivered_tick_count() {
 
 #[test]
 fn color_cycle_retains_frame_scale_precision_after_a_year() {
-    let mut cycle = CursorColorCycleConfig::default();
-    cycle.speed = 0.5;
-    cycle.saturation = 1.0;
-    cycle.lightness = 0.5;
+    let cycle = CursorColorCycleConfig {
+        speed: 0.5,
+        saturation: 1.0,
+        lightness: 0.5,
+        ..Default::default()
+    };
     let resolved = ResolvedCursorPaint::new(Color::WHITE, Color::BLACK);
     let origin = observe_platform_now();
     let after_a_year = origin.plus(std::time::Duration::from_secs(365 * 24 * 60 * 60));

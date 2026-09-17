@@ -384,8 +384,11 @@ pub(crate) struct EditorWorkloadResult {
     schema_version: u32,
     /// How much collection each engine actually did for this row, so a
     /// comparison can say whether the two did comparable work.
+    #[allow(dead_code)] // deliberate reporting surface, not read by the harness
     pub(crate) gcs_done: u64,
+    #[allow(dead_code)] // deliberate reporting surface, not read by the harness
     pub(crate) gc_elapsed_us: u64,
+    #[allow(dead_code)] // deliberate reporting surface, not read by the harness
     pub(crate) max_rss_kb: u64,
     scenario: ScenarioId,
     outcome: ScenarioOutcome,

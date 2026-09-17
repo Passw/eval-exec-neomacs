@@ -221,7 +221,6 @@ impl Context {
         interactive_spec: Option<crate::emacs_core::interactive::BuiltinInteractiveSpec>,
     ) {
         let sym_id = intern(name);
-        let name_id = symbol_name_id(sym_id);
 
         register_global_subr_entry(
             sym_id,
@@ -230,7 +229,6 @@ impl Context {
                 min_args: arity.min(),
                 max_args: arity.max(),
                 dispatch_kind,
-                name_id,
                 interactive_spec,
             },
         );

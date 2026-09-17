@@ -767,9 +767,11 @@ fn print_integers_as_characters_uses_char_syntax_like_gnu() {
     // princ-style output (no escapeflag): the self-delimiting `;` is NOT
     // backslash-escaped, but named escapes and `?` still apply. Exercise the
     // printer directly with `print_noescape` (the C `escapeflag = false` path).
-    let mut princ_opts = PrintOptions::default();
-    princ_opts.print_integers_as_characters = true;
-    princ_opts.print_noescape = true;
+    let princ_opts = PrintOptions {
+        print_integers_as_characters: true,
+        print_noescape: true,
+        ..PrintOptions::default()
+    };
     let list = Value::list(vec![
         Value::fixnum(65),
         Value::fixnum(9),

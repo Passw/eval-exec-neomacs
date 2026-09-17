@@ -24,7 +24,9 @@ pub(crate) struct OutputCompleteRowInstallRequest {
     row: usize,
     role: GlyphRowRole,
     mode_line: bool,
-    glyph_row: GlyphRow,
+    /// Boxed so the lifecycle request enum stays the size of its small
+    /// variants; a complete row is installed once, so the box is per row.
+    glyph_row: Box<GlyphRow>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -123,7 +125,7 @@ impl OutputCompleteRowInstallRequest {
             row,
             role,
             mode_line,
-            glyph_row,
+            glyph_row: Box::new(glyph_row),
         }
     }
 
@@ -151,7 +153,7 @@ impl OutputCompleteRowInstallRequest {
     }
 
     pub(crate) fn into_glyph_row(self) -> GlyphRow {
-        self.glyph_row
+        *self.glyph_row
     }
 }
 

@@ -1,5 +1,5 @@
-//! Combo: cl-eieio cl-labels/cl-flet closures inside EIEIO methods
-//! + overlays + markers + textprop + buflocal + narrow + undo.
+//! Combo: cl-eieio cl-labels/cl-flet closures inside EIEIO methods +
+//! overlays + markers + textprop + buflocal + narrow + undo.
 //! Tests closure capture of EIEIO object state combined with overlay
 //! manipulation and editing operations.
 

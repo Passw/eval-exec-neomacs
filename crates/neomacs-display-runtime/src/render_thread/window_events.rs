@@ -60,13 +60,12 @@ impl RenderApp {
         ) {
             return;
         }
-        if let (Some(gpu), Some(renderer)) = (&self.gpu, &mut self.renderer) {
-            if self
+        if let (Some(gpu), Some(renderer)) = (&self.gpu, &mut self.renderer)
+            && self
                 .tooltips
                 .event(window_id, &event, &gpu.device, &gpu.queue, renderer)
-            {
-                return;
-            }
+        {
+            return;
         }
         let live_owner = self.frame_windows.get_by_winit(window_id).is_some();
         let dismiss = match &event {
@@ -96,22 +95,21 @@ impl RenderApp {
         {
             return;
         }
-        if let (Some(gpu), Some(renderer)) = (&self.gpu, &mut self.renderer) {
-            if self
+        if let (Some(gpu), Some(renderer)) = (&self.gpu, &mut self.renderer)
+            && self
                 .menus
                 .event(window_id, &event, &gpu.device, &gpu.queue, renderer)
-            {
-                // Reconcile native hierarchy changes after this event batch,
-                // never while winit is dispatching a borrowed update batch.
-                while let Some(index) = self.menus.take_result() {
-                    self.comms.send_input(InputEvent::MenuSelection {
-                        index: index.index(),
-                        token: Some(index.token),
-                    });
-                }
-                self.sync_menu_heading();
-                return;
+        {
+            // Reconcile native hierarchy changes after this event batch,
+            // never while winit is dispatching a borrowed update batch.
+            while let Some(index) = self.menus.take_result() {
+                self.comms.send_input(InputEvent::MenuSelection {
+                    index: index.index(),
+                    token: Some(index.token),
+                });
             }
+            self.sync_menu_heading();
+            return;
         }
         // Ignore late events from destroyed native popups or frame windows.
         if self.frame_windows.get_by_winit(window_id).is_none() {
@@ -644,15 +642,15 @@ impl RenderApp {
                 }
             }
             WindowEvent::DataTransferReceived { serial, value, .. } => {
-                if self.pending_file_drops.remove(&serial) {
-                    if let Ok(paths) = value.try_as_file_paths() {
-                        let paths = paths
-                            .into_iter()
-                            .filter_map(|path| path.to_str().map(str::to_owned))
-                            .collect::<Vec<_>>();
-                        if !paths.is_empty() {
-                            self.comms.send_input(InputEvent::FileDrop { paths });
-                        }
+                if self.pending_file_drops.remove(&serial)
+                    && let Ok(paths) = value.try_as_file_paths()
+                {
+                    let paths = paths
+                        .into_iter()
+                        .filter_map(|path| path.to_str().map(str::to_owned))
+                        .collect::<Vec<_>>();
+                    if !paths.is_empty() {
+                        self.comms.send_input(InputEvent::FileDrop { paths });
                     }
                 }
             }

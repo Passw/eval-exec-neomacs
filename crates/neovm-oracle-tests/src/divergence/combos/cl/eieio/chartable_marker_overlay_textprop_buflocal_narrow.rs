@@ -1,5 +1,5 @@
-//! Combo: cl-eieio char-table / category-table manipulation + overlays
-//! + markers + textprop + buflocal + narrow + undo.
+//! Combo: cl-eieio char-table / category-table manipulation + overlays +
+//! markers + textprop + buflocal + narrow + undo.
 //! Tests character category tables, syntax class lookups, and char-table
 //! interactions with overlays, markers, and editing.
 

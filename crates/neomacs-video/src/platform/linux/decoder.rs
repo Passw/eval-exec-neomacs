@@ -966,6 +966,7 @@ fn advertise_required_video_meta(query: &mut gst::query::Allocation) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn decode_sample(
     sample: gst::Sample,
     shutting_down: &AtomicBool,

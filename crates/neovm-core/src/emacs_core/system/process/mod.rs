@@ -509,7 +509,6 @@ use crate::buffer::{
 };
 use crate::gc_trace::GcTrace;
 use crate::heap_types::LispString;
-use crate::window::FrameManager;
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -519,13 +518,13 @@ use crate::window::FrameManager;
 mod raw_bytes_tests;
 
 mod builtins;
-pub use builtins::*;
+pub(crate) use builtins::*;
 
 mod bootstrap_vars;
 pub use bootstrap_vars::*;
 
 mod helpers;
-pub use helpers::*;
+pub(crate) use helpers::*;
 
 mod types;
 pub use types::*;

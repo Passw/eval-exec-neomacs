@@ -1437,7 +1437,7 @@ fn encode_utf8_emacs_text(s: &str) -> Vec<u8> {
     out
 }
 
-pub fn encode_lisp_string(
+pub(crate) fn encode_lisp_string(
     s: &crate::heap_types::LispString,
     coding_system: &str,
     eol_conversion: crate::emacs_core::coding::EolConversion,
@@ -1549,8 +1549,6 @@ fn encode_lisp_string_eol_spent(
         push_encoded(code);
     }
 
-    // Release the closure's mutable borrow of `out` so it can be returned.
-    drop(push_encoded);
     out
 }
 
@@ -1560,7 +1558,7 @@ fn encode_lisp_string_eol_spent(
 
 /// Encode a string to bytes using the specified coding system.
 /// Currently only UTF-8 is supported.
-pub fn encode_string(
+pub(crate) fn encode_string(
     s: &str,
     coding_system: &str,
     eol_conversion: crate::emacs_core::coding::EolConversion,
@@ -1603,7 +1601,7 @@ pub fn encode_string(
 
 /// Decode bytes to a string using the specified coding system.
 /// Currently only UTF-8 is supported.
-pub fn decode_bytes(
+pub(crate) fn decode_bytes(
     bytes: &[u8],
     coding_system: &str,
     eol_conversion: crate::emacs_core::coding::EolConversion,
@@ -2412,10 +2410,6 @@ impl<'a> CodingRun<'a> {
             state: Some(state),
             consumed: None,
         }
-    }
-
-    fn block(&self) -> crate::emacs_core::coding::SourceBlock {
-        self.block
     }
 
     /// Whether the tail no decoder consumed is flushed here or waits for the
@@ -5136,10 +5130,8 @@ fn builtin_coding_string_in_context(
                 charset_list,
                 dos_eol,
             ))
-        } else if let Some(decoded) = decode_fallthrough_source(&source_bytes, &coding, dos_eol) {
-            Some(decoded)
         } else {
-            None
+            decode_fallthrough_source(&source_bytes, &coding, dos_eol)
         };
         match decoded {
             Some(mut decoded) => {

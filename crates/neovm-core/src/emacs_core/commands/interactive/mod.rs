@@ -4355,10 +4355,10 @@ fn where_is_sequence_preference(
     result
 }
 
-fn select_where_is_preferred_sequence<'a>(
+fn select_where_is_preferred_sequence(
     preferred_modifier: WhereIsPreferredModifier,
-    sequences: &'a [Vec<Value>],
-) -> &'a Vec<Value> {
+    sequences: &[Vec<Value>],
+) -> &Vec<Value> {
     if let Some(seq) = sequences.iter().find(|seq| {
         where_is_sequence_preference(preferred_modifier, seq)
             == WhereIsSequencePreference::Preferred

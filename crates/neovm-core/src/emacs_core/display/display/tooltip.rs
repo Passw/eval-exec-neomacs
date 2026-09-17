@@ -181,27 +181,26 @@ pub(crate) fn builtin_x_show_tip_eval(ctx: &mut Context, args: Vec<Value>) -> Ev
     let mut params = args.get(2).copied().unwrap_or(Value::NIL);
     while params.is_cons() {
         let entry = params.cons_car();
-        if entry.is_cons() {
-            if let Some(parameter) = entry
+        if entry.is_cons()
+            && let Some(parameter) = entry
                 .cons_car()
                 .as_symbol_name()
                 .and_then(|name| name.parse::<TooltipParameter>().ok())
-            {
-                parameter.apply(entry.cons_cdr(), &mut request)?;
-            }
+        {
+            parameter.apply(entry.cons_cdr(), &mut request)?;
         }
         params = params.cons_cdr();
     }
     let size = ctx.visible_variable_value_or_nil("x-max-tooltip-size");
-    if size.is_cons() {
-        if let (Some(w), Some(h)) = (size.cons_car().as_fixnum(), size.cons_cdr().as_fixnum()) {
-            if w > 0 && h > 0 {
-                request.max_size = neomacs_display_protocol::tooltip::TooltipLimits::new(
-                    w.min(u32::MAX as i64) as u32,
-                    h.min(u32::MAX as i64) as u32,
-                );
-            }
-        }
+    if size.is_cons()
+        && let (Some(w), Some(h)) = (size.cons_car().as_fixnum(), size.cons_cdr().as_fixnum())
+        && w > 0
+        && h > 0
+    {
+        request.max_size = neomacs_display_protocol::tooltip::TooltipLimits::new(
+            w.min(u32::MAX as i64) as u32,
+            h.min(u32::MAX as i64) as u32,
+        );
     }
     request.runs = text_runs(ctx, frame, args[0], &request)?;
     let host = ctx

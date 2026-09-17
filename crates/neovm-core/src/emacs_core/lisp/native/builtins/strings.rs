@@ -538,10 +538,10 @@ pub(crate) fn builtin_concat_slice(args: &[Value]) -> EvalResult {
         });
 
         // Preserve text properties from string sources
-        if new_val.is_string() {
-            if let Some(combined_table) = concatenated_string_text_properties(&string_sources) {
-                set_string_text_properties_table_for_value(new_val, combined_table);
-            }
+        if new_val.is_string()
+            && let Some(combined_table) = concatenated_string_text_properties(&string_sources)
+        {
+            set_string_text_properties_table_for_value(new_val, combined_table);
         }
 
         Ok(new_val)
@@ -760,6 +760,7 @@ pub(crate) fn builtin_number_to_string(
 }
 
 /// Dispatched form: honors the current buffer's case table (`set-case-table`).
+#[cfg(test)]
 pub(crate) fn builtin_upcase_in_state(
     eval: &mut crate::emacs_core::eval::Context,
     args: Vec<Value>,
@@ -784,7 +785,7 @@ fn upcase_with_override(
     args: &[Value],
     casetab: super::super::casetab::CaseTableOverride,
 ) -> EvalResult {
-    expect_args("upcase", &args, 1)?;
+    expect_args("upcase", args, 1)?;
     match args[0].kind() {
         ValueKind::String => {
             let source = args[0];
@@ -1077,7 +1078,7 @@ fn downcase_with_word_pred(
     is_word: impl Fn(u32) -> bool,
     casetab: super::super::casetab::CaseTableOverride,
 ) -> EvalResult {
-    expect_args("downcase", &args, 1)?;
+    expect_args("downcase", args, 1)?;
     match args[0].kind() {
         ValueKind::String => {
             let source = args[0];
@@ -1128,6 +1129,7 @@ pub(crate) fn builtin_downcase(args: Vec<Value>) -> EvalResult {
 
 /// Dispatched form: applies the Greek final-sigma rule via the buffer syntax
 /// table (honoring `case-symbols-as-words`) and the current case table.
+#[cfg(test)]
 pub(crate) fn builtin_downcase_in_state(
     eval: &mut crate::emacs_core::eval::Context,
     args: Vec<Value>,
@@ -2254,12 +2256,11 @@ fn do_format(
                     && !spec.space
                     && !spec.zero
                     && !spec.sharp
+                    && let ValueKind::Fixnum(n) = args[this_arg_idx].kind()
                 {
-                    if let ValueKind::Fixnum(n) = args[this_arg_idx].kind() {
-                        push_i64_decimal(&mut result, n);
-                        arg_idx = this_arg_idx + 1;
-                        continue;
-                    }
+                    push_i64_decimal(&mut result, n);
+                    arg_idx = this_arg_idx + 1;
+                    continue;
                 }
                 let formatted = match args[this_arg_idx].kind() {
                     ValueKind::Fixnum(i) => format_int_spec(i, &spec),

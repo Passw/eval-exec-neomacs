@@ -177,7 +177,7 @@ fn eval_one_with_frame(src: &str) -> String {
 fn eval_all_with_subr(src: &str) -> Vec<String> {
     let mut ev = Context::new();
     load_minimal_gnu_backquote_runtime(&mut ev);
-    ev.eval_str_each(&src)
+    ev.eval_str_each(src)
         .iter()
         .map(format_eval_result)
         .collect()
@@ -21827,7 +21827,7 @@ fn evaluator_face_table_has_standard_faces() {
         "bold foreground should remain unspecified"
     );
     assert!(
-        bold.weight.map_or(false, |w| w.is_bold()),
+        bold.weight.is_some_and(|w| w.is_bold()),
         "bold face should have bold weight",
     );
 }
@@ -23021,7 +23021,7 @@ fn bench_jit_vs_vm_loop() {
     // real anti-deopt guard is the per-iter ratio + gate 2 above. We assert the
     // value here so a miscompile can never masquerade as a fast result. ---
     let jit_fn = build(true);
-    let jit_result = ev.funcall_general_untraced(jit_fn.clone(), vec![]).unwrap();
+    let jit_result = ev.funcall_general_untraced(jit_fn, vec![]).unwrap();
     assert_eq!(
         jit_result, expected,
         "JIT-native result must equal the VM result"
@@ -23035,7 +23035,7 @@ fn bench_jit_vs_vm_loop() {
     // Warm up each path once more (caches, branch predictor).
     let warm_cold = build(false);
     let _ = ev.funcall_general_untraced(warm_cold, vec![]).unwrap();
-    let _ = ev.funcall_general_untraced(jit_fn.clone(), vec![]).unwrap();
+    let _ = ev.funcall_general_untraced(jit_fn, vec![]).unwrap();
 
     // --- Time the VM path. A fresh cold function per outer iter would re-pay
     // make_bytecode; instead build ONE cold function and reuse it (it never
@@ -23044,9 +23044,7 @@ fn bench_jit_vs_vm_loop() {
     let t0 = Instant::now();
     let mut vm_acc = 0i64;
     for _ in 0..M {
-        let r = ev
-            .funcall_general_untraced(vm_timed.clone(), vec![])
-            .unwrap();
+        let r = ev.funcall_general_untraced(vm_timed, vec![]).unwrap();
         vm_acc = vm_acc.wrapping_add(r.xfixnum());
     }
     let vm_elapsed = t0.elapsed();
@@ -23055,7 +23053,7 @@ fn bench_jit_vs_vm_loop() {
     let t1 = Instant::now();
     let mut jit_acc = 0i64;
     for _ in 0..M {
-        let r = ev.funcall_general_untraced(jit_fn.clone(), vec![]).unwrap();
+        let r = ev.funcall_general_untraced(jit_fn, vec![]).unwrap();
         jit_acc = jit_acc.wrapping_add(r.xfixnum());
     }
     let jit_elapsed = t1.elapsed();
@@ -24977,7 +24975,7 @@ fn jit_closure_prototype(
     use crate::emacs_core::bytecode::ByteCodeFunction;
     use crate::emacs_core::value::LambdaParams;
     let mut consts: Vec<Value> = (0..placeholders)
-        .map(|i| Value::symbol(&format!("V{i}")))
+        .map(|i| Value::symbol(format!("V{i}")))
         .collect();
     consts.extend(tail);
     let mut f = ByteCodeFunction::new(LambdaParams {

@@ -112,7 +112,14 @@ impl Context {
         let (redirect, forwarded) = match self.obarray.get_by_id(resolved) {
             Some(sym) => {
                 let redirect = sym.redirect();
-                let fwd = (redirect == SymbolRedirect::Forwarded).then(|| unsafe { sym.val.fwd });
+                // The union read must stay behind the redirect test: the
+                // `alias` arm writes a narrower `SymId`, so reading `fwd`
+                // for a non-forwarded symbol would read uninitialized bytes.
+                let fwd = if redirect == SymbolRedirect::Forwarded {
+                    Some(unsafe { sym.val.fwd })
+                } else {
+                    None
+                };
                 (redirect, fwd)
             }
             None => (SymbolRedirect::Plainval, None),

@@ -1,5 +1,5 @@
-//! Combo: cl-eieio deep undo chains + overlays + markers + textprop
-//! + buflocal + narrow + undo.
+//! Combo: cl-eieio deep undo chains + overlays + markers + textprop +
+//! buflocal + narrow + undo.
 //! Tests complex multi-step undo sequences with interleaved edits,
 //! overlay changes, text property changes, and narrowing.
 

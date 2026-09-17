@@ -3512,8 +3512,7 @@ fn oracle_prop_combination_fset_alias_unlink_under_stacked_advice_matrix() {
 fn oracle_prop_combination_before_while_after_until_alias_rebind_matrix() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(
-        "(progn
+    let form = "(progn
            (defmacro neovm--combo-bwau-call-a (x)
              `(neovm--combo-bwau-a ,x))
            (defmacro neovm--combo-bwau-call-t (x)
@@ -3603,8 +3602,7 @@ fn oracle_prop_combination_before_while_after_until_alias_rebind_matrix() {
                (fmakunbound 'neovm--combo-bwau-guard)
                (fmakunbound 'neovm--combo-bwau-fallback)
                (fmakunbound 'neovm--combo-bwau-call-a)
-               (fmakunbound 'neovm--combo-bwau-call-t))))",
-    );
+               (fmakunbound 'neovm--combo-bwau-call-t))))".to_string();
     crate::common::assert_oracle_parity(&form);
 }
 
@@ -3612,8 +3610,7 @@ fn oracle_prop_combination_before_while_after_until_alias_rebind_matrix() {
 fn oracle_prop_combination_before_until_after_while_alias_switch_matrix() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(
-        "(progn
+    let form = "(progn
            (defmacro neovm--combo-buaw-call-a (x)
              `(neovm--combo-buaw-a ,x))
            (defmacro neovm--combo-buaw-call-t (x)
@@ -3709,8 +3706,7 @@ fn oracle_prop_combination_before_until_after_while_alias_switch_matrix() {
                (fmakunbound 'neovm--combo-buaw-before-until)
                (fmakunbound 'neovm--combo-buaw-after-while)
                (fmakunbound 'neovm--combo-buaw-call-a)
-               (fmakunbound 'neovm--combo-buaw-call-t))))",
-    );
+               (fmakunbound 'neovm--combo-buaw-call-t))))".to_string();
     crate::common::assert_oracle_parity(&form);
 }
 

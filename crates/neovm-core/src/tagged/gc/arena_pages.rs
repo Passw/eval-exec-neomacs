@@ -81,13 +81,13 @@ pub(super) trait PagedObject: Sized {
 // LispValueVec 24 — the 24 relies on the Owned(Vec)/Mapped niche packing; the
 // const assert below is the compile-time proof) → shares the 64B class, link
 // in bytes 56..64.
-pub(super) const _: () = assert!(size_of::<FloatObj>() == 24, "FloatObj must stay 24 bytes");
-pub(super) const _: () = assert!(
+const _: () = assert!(size_of::<FloatObj>() == 24, "FloatObj must stay 24 bytes");
+const _: () = assert!(
     size_of::<StringObj>() <= 56,
     "StringObj must fit a 64-byte slot with its trailing free-list link \
      (bytes 56..64 — zero slack)",
 );
-pub(super) const _: () = assert!(
+const _: () = assert!(
     size_of::<VectorObj>() <= 48,
     "VectorObj must stay <= 48 bytes (VecLikeHeader 24 + niche-packed \
      LispValueVec 24); if this fails the niche packing broke — give Vector \
@@ -101,7 +101,7 @@ pub(super) const _: () = assert!(
 // the slot index explicitly so a stride-aligned tail address answers
 // NOT-owned). If this assert fails the ByteCodeFunction grew — BUMP THE
 // STRIDE (and say so in the commit); never squeeze the link into live bytes.
-pub(super) const _: () = assert!(
+const _: () = assert!(
     size_of::<ByteCodeObj>() <= 376,
     "ByteCodeObj must fit a 384-byte slot with its trailing free-list link \
      (bytes 376..384); bump the bytecode stride if the struct grew",
@@ -115,12 +115,12 @@ pub(super) const _: () = assert!(
 // registries never merge; a page hit is never a cross-class collision). If
 // either assert fails the struct grew — BUMP THE STRIDE; never squeeze the
 // link into live bytes.
-pub(super) const _: () = assert!(
+const _: () = assert!(
     size_of::<LambdaObj>() <= 120,
     "LambdaObj must fit a 128-byte slot with its trailing free-list link \
      (bytes 120..128); bump the lambda/macro stride if the struct grew",
 );
-pub(super) const _: () = assert!(
+const _: () = assert!(
     size_of::<MacroObj>() <= 120,
     "MacroObj must fit a 128-byte slot with its trailing free-list link \
      (bytes 120..128); bump the lambda/macro stride if the struct grew",
@@ -131,7 +131,7 @@ pub(super) const _: () = assert!(
 // `WindowConfiguration` type tags (`alloc_record` / `alloc_window_configuration`
 // — same Rust type, distinct tag), so both funnel to `record_arena`. If this
 // assert fails the struct grew — bump the stride; never squeeze the link.
-pub(super) const _: () = assert!(
+const _: () = assert!(
     size_of::<RecordObj>() <= 56,
     "RecordObj must fit a 64-byte slot with its trailing free-list link \
      (bytes 56..64); bump the record stride if the struct grew",
@@ -144,7 +144,7 @@ pub(super) const _: () = assert!(
 // no payload to free. 64B (vs a tighter 48B) keeps the class power-of-two /
 // page-dividing (no page tail) and leaves comfortable headroom for a
 // low-volume type; if this assert fails the struct grew — bump the stride.
-pub(super) const _: () = assert!(
+const _: () = assert!(
     size_of::<SymbolWithPosObj>() <= 56,
     "SymbolWithPosObj must fit a 64-byte slot with its trailing free-list \
      link (bytes 56..64); bump the symbol-with-pos stride if the struct grew",

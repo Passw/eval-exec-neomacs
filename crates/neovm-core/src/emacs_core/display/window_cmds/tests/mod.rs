@@ -3230,7 +3230,7 @@ fn live_frame_subrs_reject_a_deleted_frame_like_gnu() {
     let buf = ev.buffers.current_buffer().expect("current buffer").id;
     let doomed = ev.frames.create_frame("doomed", 800, 600, buf);
     let dead = Value::make_frame(doomed.0);
-    ev.frames.delete_frame(doomed);
+    assert!(ev.frames.delete_frame(doomed).was_deleted());
     assert!(
         ev.frames.get(doomed).is_none(),
         "precondition: the frame must really be gone from the table"
@@ -6736,7 +6736,7 @@ fn x_create_frame_root_window_positions_follow_buffer_edits() {
         let child = ev.frames.get_mut(child_id).expect("child frame");
         crate::window::window_markers::set_window_point_with_marker(
             &mut ev.buffers,
-            &mut child.root_window_mut(),
+            child.root_window_mut(),
             old_end,
         );
     }

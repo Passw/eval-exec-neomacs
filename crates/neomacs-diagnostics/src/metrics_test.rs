@@ -77,7 +77,7 @@ fn snapshot_serializes_per_window_demand_shape() {
         4
     );
     // The extension leaves the default shape present-and-empty, not absent.
-    let empty: serde_json::Value = serde_json::to_value(&MetricsSnapshot::default()).unwrap();
+    let empty: serde_json::Value = serde_json::to_value(MetricsSnapshot::default()).unwrap();
     assert!(empty["frame"]["windows"].is_object());
     assert!(empty["frame"]["active_reasons"].is_array());
 }

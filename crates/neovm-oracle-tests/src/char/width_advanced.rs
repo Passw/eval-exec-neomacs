@@ -41,7 +41,7 @@ fn oracle_prop_char_width_ascii_exhaustive() {
     (setq results (cons consistent results)))
   (nreverse results))"#;
     let expect = expect_test::expect![r#""OK (t 1 1 1 1 1 1 1 t)""#];
-    crate::common::assert_oracle_parity_expect(&form, expect);
+    crate::common::assert_oracle_parity_expect(form, expect);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ fn oracle_prop_char_width_cjk_wide() {
           (string-width s)
           (= (string-width s) (* 2 (length s))))))"#;
     let expect = expect_test::expect![r#""OK (2 2 2 2 2 2 2 2 2 2 2 2 t (4 8 t))""#];
-    crate::common::assert_oracle_parity_expect(&form, expect);
+    crate::common::assert_oracle_parity_expect(form, expect);
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +125,7 @@ fn oracle_prop_char_width_combining_marks() {
   ;; Multiple combining marks stacked
   (string-width (string ?x #x0300 #x0301 #x0302 #x0303)))"#;
     let expect = expect_test::expect![r#""OK (0 0 0 0 0 0 1 1 (1 1 t) 2 1)""#];
-    crate::common::assert_oracle_parity_expect(&form, expect);
+    crate::common::assert_oracle_parity_expect(form, expect);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +173,7 @@ fn oracle_prop_char_width_control_and_tab() {
     let expect = expect_test::expect![
         r#""OK (8 2 2 2 0 2 2 2 2 2 2 2 2 8 (2 2 2 2 2 2 2 2 2 8 0 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2))""#
     ];
-    crate::common::assert_oracle_parity_expect(&form, expect);
+    crate::common::assert_oracle_parity_expect(form, expect);
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +208,7 @@ fn oracle_prop_char_width_emoji_variation() {
   (string-width (string #x1f600))
   (string-width (string #x1f4a9)))"#;
     let expect = expect_test::expect![r#""OK (1 1 2 1 0 0 0 0 1 1 2 2 2 2 2)""#];
-    crate::common::assert_oracle_parity_expect(&form, expect);
+    crate::common::assert_oracle_parity_expect(form, expect);
 }
 
 // ---------------------------------------------------------------------------
@@ -303,7 +303,7 @@ fn oracle_prop_char_width_truncation_algorithm() {
     let expect = expect_test::expect![[
         r#""OK ((\"Name        |City    |Pts   \" \"Alice       |Boston  |100   \" \"张三丰      |东京都  |88    \" \"LongNameHere|Xyzzy   |42    \" \"A中文Test   |北京    |7     \") (28 t) (\"hello\") (\"世界你..\" . t) (\"A中B..\" . t) (\"世界\") (\"..\" . t))""#
     ]];
-    crate::common::assert_oracle_parity_expect(&form, expect);
+    crate::common::assert_oracle_parity_expect(form, expect);
 }
 
 // ---------------------------------------------------------------------------

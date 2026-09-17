@@ -299,6 +299,7 @@ fn commit_buffer_search_success(
     Ok(point)
 }
 
+#[cfg(test)]
 pub(crate) fn builtin_search_forward(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -969,6 +970,7 @@ fn resolve_regexp_search_prep(
 /// committed re-run reads only propertized text and returns the identical
 /// result. Failures widen the window ×4 until it covers the region — at
 /// which point behavior equals the old conservative full propertize.
+#[allow(clippy::too_many_arguments)]
 fn propertize_window_for_forward_regexp(
     eval: &mut super::eval::Context,
     args: &[Value],
@@ -1123,6 +1125,7 @@ pub(crate) fn builtin_search_backward_with_state(
     buffer_byte_to_char_result_in_manager(buffers, current_id, end)
 }
 
+#[cfg(test)]
 pub(crate) fn builtin_re_search_forward(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -1464,6 +1467,7 @@ pub(crate) fn builtin_posix_search_backward(
     )
 }
 
+#[cfg(test)]
 pub(crate) fn builtin_looking_at(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
     expect_args_range("looking-at", &args, 1, 2)?;
     let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
@@ -2167,6 +2171,7 @@ pub(crate) fn builtin_match_beginning_with_state(
     )
 }
 
+#[cfg(test)]
 pub(crate) fn builtin_match_beginning(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -2218,6 +2223,7 @@ pub(crate) fn builtin_match_end_with_state(
     )
 }
 
+#[cfg(test)]
 pub(crate) fn builtin_match_end(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
     expect_args("match-end", &args, 1)?;
     let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);

@@ -7,7 +7,8 @@ use neomacs_display_protocol::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TerminalRuntimeConfig {
     Bootstrap,
-    Tty(TtyTerminalConfig),
+    /// Boxed: the TTY capability table dwarfs the other two variants.
+    Tty(Box<TtyTerminalConfig>),
     Graphical(GraphicalDisplayIdentity),
 }
 
@@ -54,6 +55,6 @@ impl TtyTerminalConfig {
 
 impl From<TtyTerminalConfig> for TerminalRuntimeConfig {
     fn from(config: TtyTerminalConfig) -> Self {
-        Self::Tty(config)
+        Self::Tty(Box::new(config))
     }
 }

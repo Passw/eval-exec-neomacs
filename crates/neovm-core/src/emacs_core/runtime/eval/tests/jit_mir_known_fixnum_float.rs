@@ -82,7 +82,7 @@ fn a_mir_eligible_float_loop_keeps_the_guard_on_its_cold_add1() {
         .map(|pc| bc.jit_runtime().numeric_feedback(pc))
         .collect();
     assert!(
-        snapshot.iter().any(|s| *s == NumericFeedback::Float),
+        snapshot.contains(&NumericFeedback::Float),
         "warm-up must have recorded Float somewhere, or the probe is vacuous"
     );
 

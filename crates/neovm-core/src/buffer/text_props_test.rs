@@ -165,8 +165,7 @@ fn get_property_returns_correct_value() {
     let val = get_at_char(&table, 5, Value::symbol("face")).unwrap();
     assert!(
         val.as_symbol_id()
-            .map_or(false, |id| crate::emacs_core::intern::resolve_sym(id)
-                == "bold")
+            .is_some_and(|id| crate::emacs_core::intern::resolve_sym(id) == "bold")
     );
 }
 
@@ -286,23 +285,20 @@ fn overlapping_put_splits_intervals() {
     let val = get_at_char(&table, 3, Value::symbol("face")).unwrap();
     assert!(
         val.as_symbol_id()
-            .map_or(false, |id| crate::emacs_core::intern::resolve_sym(id)
-                == "bold")
+            .is_some_and(|id| crate::emacs_core::intern::resolve_sym(id) == "bold")
     );
 
     // [5, 15) should have "italic" (overwritten)
     let val = get_at_char(&table, 7, Value::symbol("face")).unwrap();
     assert!(
         val.as_symbol_id()
-            .map_or(false, |id| crate::emacs_core::intern::resolve_sym(id)
-                == "italic")
+            .is_some_and(|id| crate::emacs_core::intern::resolve_sym(id) == "italic")
     );
 
     let val = get_at_char(&table, 12, Value::symbol("face")).unwrap();
     assert!(
         val.as_symbol_id()
-            .map_or(false, |id| crate::emacs_core::intern::resolve_sym(id)
-                == "italic")
+            .is_some_and(|id| crate::emacs_core::intern::resolve_sym(id) == "italic")
     );
 }
 
@@ -351,22 +347,19 @@ fn put_property_inner_range() {
     let val = get_at_char(&table, 3, Value::symbol("face")).unwrap();
     assert!(
         val.as_symbol_id()
-            .map_or(false, |id| crate::emacs_core::intern::resolve_sym(id)
-                == "default")
+            .is_some_and(|id| crate::emacs_core::intern::resolve_sym(id) == "default")
     );
 
     let val = get_at_char(&table, 10, Value::symbol("face")).unwrap();
     assert!(
         val.as_symbol_id()
-            .map_or(false, |id| crate::emacs_core::intern::resolve_sym(id)
-                == "bold")
+            .is_some_and(|id| crate::emacs_core::intern::resolve_sym(id) == "bold")
     );
 
     let val = get_at_char(&table, 17, Value::symbol("face")).unwrap();
     assert!(
         val.as_symbol_id()
-            .map_or(false, |id| crate::emacs_core::intern::resolve_sym(id)
-                == "default")
+            .is_some_and(|id| crate::emacs_core::intern::resolve_sym(id) == "default")
     );
 }
 
@@ -1603,8 +1596,7 @@ fn put_property_overwrites_same_name() {
     let val = get_at_char(&table, 5, Value::symbol("face")).unwrap();
     assert!(
         val.as_symbol_id()
-            .map_or(false, |id| crate::emacs_core::intern::resolve_sym(id)
-                == "italic")
+            .is_some_and(|id| crate::emacs_core::intern::resolve_sym(id) == "italic")
     );
 }
 
@@ -2477,7 +2469,7 @@ fn local_merge_matches_the_whole_buffer_reference_on_random_layouts() {
         for _ in 0..(lcg(&mut rng) % 3) {
             let at = (lcg(&mut rng) as usize) % len;
             let width = 1 + (lcg(&mut rng) as usize) % 8;
-            let plist = if lcg(&mut rng) % 2 == 0 {
+            let plist = if lcg(&mut rng).is_multiple_of(2) {
                 bold_plist()
             } else {
                 italic_plist()

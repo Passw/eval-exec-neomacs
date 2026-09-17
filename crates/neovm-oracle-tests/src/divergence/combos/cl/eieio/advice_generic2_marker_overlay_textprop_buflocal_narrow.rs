@@ -1,5 +1,5 @@
-//! Combo: advice-add/advice-remove on EIEIO generic functions (round 2)
-//! + overlays + markers + textprop + buflocal + narrow + undo.
+//! Combo: advice-add/advice-remove on EIEIO generic functions (round 2) +
+//! overlays + markers + textprop + buflocal + narrow + undo.
 //! Tests :before/:after/:around/:override/:filter-args advice on generics
 //! with complex multi-method dispatch and buffer editing.
 

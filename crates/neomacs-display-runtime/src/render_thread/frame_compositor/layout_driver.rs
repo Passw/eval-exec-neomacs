@@ -64,7 +64,9 @@ pub(in crate::render_thread) enum LayoutDriver {
     Settled,
     /// The panes are travelling between two layouts.
     Animating {
-        morph: PaneLayoutMorph,
+        /// Boxed so the settled state stays a bare tag; a morph is built once
+        /// per rearrangement, not per frame.
+        morph: Box<PaneLayoutMorph>,
         /// The composed picture as it was *before* this rearrangement.
         ///
         /// A morph fades the old frame out over the new one, so it needs the
@@ -146,7 +148,7 @@ impl LayoutDriver {
             // pane moved.
             Self::Settled => PaneLayoutMorph::try_new(delta.previous, delta.next, specs, at)
                 .map_or(Self::Settled, |morph| Self::Animating {
-                    morph,
+                    morph: Box::new(morph),
                     outgoing: OutgoingPicture::Unpinned,
                 }),
             Self::Animating {
@@ -187,7 +189,7 @@ impl LayoutDriver {
                 // Apply any retarget recorded since the last frame, starting the
                 // new motion from where these panes actually are.
                 let morph = match morph.spliced(frame) {
-                    Some(spliced) => spliced,
+                    Some(spliced) => Box::new(spliced),
                     None if morph.has_pending_retarget() => {
                         // The retarget left nothing to animate: the panes are
                         // already where the new layout wants them. Settle, but

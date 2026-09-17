@@ -1173,7 +1173,7 @@ mod tests {
             return;
         }
 
-        print!("fixture-ready\n");
+        println!("fixture-ready");
         std::io::stdout().flush().expect("flush fixture readiness");
         let mut input = [0_u8; 1];
         std::io::stdin()

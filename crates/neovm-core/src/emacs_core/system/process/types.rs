@@ -1754,6 +1754,7 @@ pub(crate) struct PendingProcessRun {
 impl PendingProcessRun {
     /// The undecoded bytes, for the one caller that must not decode: a unit
     /// fixture with no `Context` in reach.
+    #[cfg(test)]
     pub(crate) fn undecoded_bytes(&self) -> &[u8] {
         &self.bytes
     }
@@ -5368,6 +5369,7 @@ impl ProcessManager {
     }
 
     /// Create a new process record.  Returns the process id.
+    #[cfg(test)]
     pub(crate) fn create_process(
         &mut self,
         name: String,
@@ -5387,6 +5389,7 @@ impl ProcessManager {
         )
     }
 
+    #[cfg(test)]
     pub(crate) fn create_process_lisp(
         &mut self,
         name: LispString,
@@ -5426,6 +5429,7 @@ impl ProcessManager {
     }
 
     /// Create a new process record with an explicit process kind.
+    #[cfg(test)]
     pub(crate) fn create_process_with_kind(
         &mut self,
         name: String,
@@ -5459,6 +5463,7 @@ impl ProcessManager {
         self.create_process_with_kind_lisp_resolved(name, buffer, command, args, kind, None, coding)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn create_process_with_kind_lisp_resolved(
         &mut self,
         name: LispString,
@@ -5505,6 +5510,7 @@ impl ProcessManager {
         id
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn create_process_record(
         &mut self,
         name: LispString,
@@ -5916,10 +5922,10 @@ impl ProcessManager {
             .as_ref()
             .map(|p| Value::heap_string(os_str_to_lisp_string(p.as_os_str())))
             .unwrap_or(Value::NIL);
-        if let Some(tty_path) = tty_name_path.as_ref() {
-            if let Err(error) = sys::configure_child_pty_tty(tty_path.as_os_str()) {
-                return Err(format!("Failed to configure PTY child tty: {error}"));
-            }
+        if let Some(tty_path) = tty_name_path.as_ref()
+            && let Err(error) = sys::configure_child_pty_tty(tty_path.as_os_str())
+        {
+            return Err(format!("Failed to configure PTY child tty: {error}"));
         }
 
         // GNU's `emacs_perror` names the program that could not be exec'd, so
@@ -6231,15 +6237,14 @@ impl ProcessManager {
         };
         #[cfg(not(windows))]
         let result = stdout.read(&mut buf);
-        let read = process_output_read_from_io_result(
+        process_output_read_from_io_result(
             proc,
             coding_systems,
             destination,
             ProcessReadOutcome::from_stream_read(&result),
             &buf,
             full_read_len,
-        );
-        read
+        )
     }
 
     /// Read available output from a serial process's device.
@@ -6265,15 +6270,14 @@ impl ProcessManager {
         let mut buf = vec![0u8; read_len];
         let full_read_len = buf.len();
         let result = port.read(&mut buf);
-        let read = process_output_read_from_io_result(
+        process_output_read_from_io_result(
             proc,
             coding_systems,
             destination,
             ProcessReadOutcome::from_stream_read(&result),
             &buf,
             full_read_len,
-        );
-        read
+        )
     }
 
     /// Read available output from a PTY master reader.
@@ -6296,15 +6300,14 @@ impl ProcessManager {
         let mut buf = vec![0u8; read_len];
         let full_read_len = buf.len();
         let result = reader.read(&mut buf);
-        let read = process_output_read_from_io_result(
+        process_output_read_from_io_result(
             proc,
             coding_systems,
             destination,
             ProcessReadOutcome::from_pty_read(&result),
             &buf,
             full_read_len,
-        );
-        read
+        )
     }
 
     pub(super) fn read_network_output_result(
@@ -7778,6 +7781,7 @@ impl ProcessManager {
     /// no `Context` in reach can pass `&CodingSystemManager::new()`, which is
     /// the honest statement that no coding system is defined and therefore
     /// nothing detects -- not a silent inheritance of one.
+    #[cfg(test)]
     pub(crate) fn read_process_output_without_decoding(
         &mut self,
         id: ProcessId,

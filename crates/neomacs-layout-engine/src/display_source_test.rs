@@ -3288,7 +3288,7 @@ fn line_spacing_uses_gnu_numeric_and_cons_scaling_rules() {
     assert!(matches!(
         current,
         DisplayLineSpacingPolicy::Scale {
-            reference: DisplayLineSpacingReference::CurrentFace,
+            reference: DisplayLineSpacingReference::Current,
             ..
         }
     ));
@@ -3301,7 +3301,7 @@ fn line_spacing_uses_gnu_numeric_and_cons_scaling_rules() {
     assert!(matches!(
         named,
         DisplayLineSpacingPolicy::Scale {
-            reference: DisplayLineSpacingReference::NamedFace(face),
+            reference: DisplayLineSpacingReference::Named(face),
             ..
         } if face.is_symbol_named("mode-line")
     ));

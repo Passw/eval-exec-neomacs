@@ -825,10 +825,10 @@ impl DisplayRowGlyphCheckpoint {
         row.displays_text = false;
     }
 
-    pub(crate) fn first_new_text_glyph<'a>(
+    pub(crate) fn first_new_text_glyph(
         self,
-        row: &'a GlyphRow,
-    ) -> Option<&'a neomacs_display_protocol::glyph_matrix::Glyph> {
+        row: &GlyphRow,
+    ) -> Option<&neomacs_display_protocol::glyph_matrix::Glyph> {
         row.glyphs[GlyphArea::Text.index()].get(self.area_lengths[GlyphArea::Text.index()])
     }
 
@@ -2078,18 +2078,16 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
         let mut remaining_px = available_px.max(0.0);
         let mut keep_len = before_len;
 
-        for index in before_len..glyphs.len() {
+        for (index, glyph) in glyphs.iter_mut().enumerate().skip(before_len) {
             if remaining_px <= 0.0 {
                 break;
             }
-            let width = DisplayRowWriteMetrics::from_glyphs(
-                std::slice::from_ref(&glyphs[index]),
-                char_width_px,
-            )
-            .width_px();
+            let width =
+                DisplayRowWriteMetrics::from_glyphs(std::slice::from_ref(glyph), char_width_px)
+                    .width_px();
             keep_len = index + 1;
             if width > remaining_px {
-                glyphs[index].pixel_width = remaining_px;
+                glyph.pixel_width = remaining_px;
                 break;
             }
             remaining_px -= width;

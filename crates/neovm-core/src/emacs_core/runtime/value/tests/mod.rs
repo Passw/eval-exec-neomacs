@@ -163,19 +163,13 @@ fn eql_compares_bignums_by_numeric_value() {
     crate::test_utils::init_test_tracing();
     with_test_heap(|| {
         let left = Value::make_integer(
-            Integer::from_str("1000000000000000000000001")
-                .expect("valid bignum")
-                .into(),
+            Integer::from_str("1000000000000000000000001").expect("valid bignum"),
         );
         let right = Value::make_integer(
-            Integer::from_str("1000000000000000000000001")
-                .expect("valid bignum")
-                .into(),
+            Integer::from_str("1000000000000000000000001").expect("valid bignum"),
         );
         let different = Value::make_integer(
-            Integer::from_str("1000000000000000000000002")
-                .expect("valid bignum")
-                .into(),
+            Integer::from_str("1000000000000000000000002").expect("valid bignum"),
         );
 
         assert!(left.is_bignum());
@@ -191,19 +185,13 @@ fn equal_compares_bignums_by_numeric_value() {
     crate::test_utils::init_test_tracing();
     with_test_heap(|| {
         let left = Value::make_integer(
-            Integer::from_str("1267650600228229401496703205376")
-                .expect("valid bignum")
-                .into(),
+            Integer::from_str("1267650600228229401496703205376").expect("valid bignum"),
         );
         let right = Value::make_integer(
-            Integer::from_str("1267650600228229401496703205376")
-                .expect("valid bignum")
-                .into(),
+            Integer::from_str("1267650600228229401496703205376").expect("valid bignum"),
         );
         let different = Value::make_integer(
-            Integer::from_str("1267650600228229401496703205377")
-                .expect("valid bignum")
-                .into(),
+            Integer::from_str("1267650600228229401496703205377").expect("valid bignum"),
         );
 
         assert!(left.is_bignum());

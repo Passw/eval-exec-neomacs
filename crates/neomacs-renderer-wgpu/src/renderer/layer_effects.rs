@@ -7,10 +7,7 @@
 //! invocations; the order is the z-order and must not be reordered.
 
 use neomacs_display_protocol::FrameFaceMap;
-use neomacs_display_protocol::types::FaceId;
-use std::collections::HashMap;
 
-use neomacs_display_protocol::face::Face;
 use neomacs_display_protocol::types::Color;
 
 use super::super::vertex::{RectVertex, RoundedRectVertex};

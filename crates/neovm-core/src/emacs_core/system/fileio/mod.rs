@@ -4138,7 +4138,7 @@ pub(crate) fn builtin_verify_visited_file_modtime(
     // (lisp/net/tramp.el:5938-5967), which compares the recorded time against
     // the REMOTE attributes with a two-second tolerance.
     let operation = Value::symbol("verify-visited-file-modtime");
-    let handler = find_file_name_handler_lisp_for_eval(eval, &file_name, operation);
+    let handler = find_file_name_handler_lisp_for_eval(eval, file_name, operation);
     if !handler.is_nil() {
         return eval.funcall_general(handler, vec![operation, Value::make_buffer(buffer_id)]);
     }

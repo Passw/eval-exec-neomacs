@@ -113,7 +113,7 @@ pub(crate) fn prepare(
         )
     })?;
     let video_file_sha256 = sha256_file(&video_file)?;
-    let harness = collect_harness_provenance(&workspace_root)?;
+    let harness = collect_harness_provenance(workspace_root)?;
     if harness.source_tree_dirty {
         return Err(
             "sustained native-video acceptance requires a clean tracked source tree".to_owned(),
@@ -156,7 +156,7 @@ pub(crate) fn prepare(
         terminal_bytes: run_directory.join("terminal.ansi"),
         gui_app_log: run_directory.join("gui-app.log"),
         gui_weston_log: run_directory.join("weston.log"),
-        gui_runtime_directory: prepare_gui_runtime_directory(&workspace_root)?,
+        gui_runtime_directory: prepare_gui_runtime_directory(workspace_root)?,
         sandbox,
         workload: PreparedWorkload::NativeVideo {
             video_file,

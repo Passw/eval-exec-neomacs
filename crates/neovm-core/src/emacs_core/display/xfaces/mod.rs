@@ -1149,10 +1149,6 @@ fn compute_face_names_sorted_by_id_desc() -> Vec<String> {
     keyed.into_iter().map(|(_, name)| name).collect()
 }
 
-fn is_selected_created_lisp_face(name: &str) -> bool {
-    is_selected_created_lisp_face_id(face_symbol_id(name))
-}
-
 fn is_selected_created_lisp_face_id(id: SymId) -> bool {
     FACE_ATTR_STATE.with(|slot| slot.borrow().selected_created.contains(&id))
 }
@@ -2463,7 +2459,7 @@ pub(crate) fn derived_face_attrs_from_font_value(value: &Value) -> Vec<(LFaceAtt
         ("family", LFaceAttr::Family),
         ("foundry", LFaceAttr::Foundry),
     ] {
-        if let Some(v) = font_vector_get_flexible(&elems, field)
+        if let Some(v) = font_vector_get_flexible(elems, field)
             && let Some(text) = font_value_text(&v)
         {
             derived.push((attr, Value::string(text)));
@@ -2475,14 +2471,14 @@ pub(crate) fn derived_face_attrs_from_font_value(value: &Value) -> Vec<(LFaceAtt
         ("slant", LFaceAttr::Slant),
         ("width", LFaceAttr::Width),
     ] {
-        if let Some(v) = font_vector_get_flexible(&elems, field) {
+        if let Some(v) = font_vector_get_flexible(elems, field) {
             derived.push((attr, v));
         }
     }
 
-    if let Some(v) = font_vector_get_flexible(&elems, "height") {
+    if let Some(v) = font_vector_get_flexible(elems, "height") {
         derived.push((LFaceAttr::Height, v));
-    } else if let Some(v) = font_vector_get_flexible(&elems, "size") {
+    } else if let Some(v) = font_vector_get_flexible(elems, "size") {
         match v.kind() {
             // An integer selector size is still in pixels. It has no
             // frame-independent face height; the opened font object supplies

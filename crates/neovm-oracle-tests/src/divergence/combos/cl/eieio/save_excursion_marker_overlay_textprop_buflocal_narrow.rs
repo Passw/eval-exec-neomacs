@@ -1,7 +1,7 @@
 //! Combo: cl-eieio save-excursion / save-restriction / save-window-excursion
 //! + overlays + markers + textprop + buflocal + narrow + undo.
-//! Tests complex nesting of save-excursion/save-restriction with EIEIO objects,
-//! overlays, markers, and editing operations.
+//!   Tests complex nesting of save-excursion/save-restriction with EIEIO objects,
+//!   overlays, markers, and editing operations.
 
 use crate::common::assert_oracle_parity;
 use crate::common::return_if_neovm_enable_oracle_proptest_not_set;

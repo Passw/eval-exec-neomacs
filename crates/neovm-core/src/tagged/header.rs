@@ -470,7 +470,11 @@ impl LispByteVec {
         }
     }
 
-    /// SAFETY: `ptr..ptr+len` must stay valid and immutable for the
+    /// Wrap a byte range that lives in a mapped image.
+    ///
+    /// # Safety
+    ///
+    /// `ptr..ptr+len` must stay valid and immutable for the
     /// process lifetime (the mapped dump image satisfies this).
     pub unsafe fn mapped(ptr: *const u8, len: usize) -> Self {
         Self {

@@ -1,5 +1,5 @@
-//! Combo: cl-eieio replace-regexp / replace-string + overlay interaction
-//! + markers + textprop + buflocal + narrow + undo.
+//! Combo: cl-eieio replace-regexp / replace-string + overlay interaction +
+//! markers + textprop + buflocal + narrow + undo.
 //! Tests complex replacement operations with overlays that have modification
 //! hooks, invisible properties, and face properties during replacement.
 

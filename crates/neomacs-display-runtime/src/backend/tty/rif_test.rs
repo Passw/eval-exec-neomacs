@@ -14,7 +14,6 @@ use neomacs_display_protocol::tty_capabilities::{
 };
 use neomacs_display_protocol::types::Px;
 use neomacs_display_protocol::types::{Color, DisplayFrameId, DisplayWindowId, Rect};
-use std::collections::HashMap;
 
 /// GNU `turn_on_face` against the capabilities registered for this terminal,
 /// starting from the state GNU leaves the terminal in between runs: no face on.
@@ -617,8 +616,10 @@ fn tty_line_end_filler_with_default_sgr_still_preserves_nondefault_face_identity
         selected: true,
     });
 
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(5, 1, caps);
     rif.rasterize(&state);
 
@@ -664,8 +665,10 @@ fn tty_line_end_filler_from_a_nonzero_default_style_face_remains_erasable() {
         selected: true,
     });
 
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(5, 1, caps);
     rif.rasterize(&state);
 
@@ -1703,8 +1706,10 @@ fn first_diff_repaints_unknown_terminal() {
 
 #[test]
 fn magic_wrap_normalizes_a_full_width_run_before_the_adjacent_row_like_gnu() {
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(4, 2, caps);
     for (column, character) in "ABCD".chars().enumerate() {
         rif.desired
@@ -1736,9 +1741,11 @@ fn magic_wrap_normalizes_a_full_width_run_before_the_adjacent_row_like_gnu() {
 
 #[test]
 fn no_autowrap_addresses_the_adjacent_row_explicitly() {
-    let mut caps = TermCaps::default();
-    caps.right_margin = RightMarginBehavior::NoAutoWrap;
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        right_margin: RightMarginBehavior::NoAutoWrap,
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(4, 2, caps);
     for (column, character) in "ABCD".chars().enumerate() {
         rif.desired
@@ -1760,8 +1767,10 @@ fn no_autowrap_addresses_the_adjacent_row_explicitly() {
 
 #[test]
 fn first_diff_writes_content_then_erases_the_default_blank_tail() {
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(5, 1, caps);
     rif.desired.set(0, 0, 'A', CellAttrs::default(), false);
 
@@ -1792,8 +1801,10 @@ fn first_diff_erases_wholly_blank_rows_instead_of_writing_spaces() {
     // pty capture sees " " where GNU's screen has never-written cells
     // (the magit_log_buffer_file_margin_columns_match_gnu_full_screen
     // fixture compares exactly this below-content region).
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(5, 3, caps);
     rif.desired.set(0, 0, 'A', CellAttrs::default(), false);
 
@@ -1827,8 +1838,10 @@ fn first_diff_erases_wholly_blank_rows_instead_of_writing_spaces() {
 
 #[test]
 fn first_content_written_into_an_erased_row_keeps_its_erased_tail() {
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(8, 1, caps);
 
     // The initial blank repaint uses EL, leaving the physical cells
@@ -1853,8 +1866,10 @@ fn first_content_written_into_an_erased_row_keeps_its_erased_tail() {
 
 #[test]
 fn erased_row_gaining_content_up_to_its_last_column_writes_its_interior_gap() {
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(20, 1, caps);
 
     // Blank repaint first: every cell of the row is physically erased.
@@ -1887,8 +1902,10 @@ fn erased_row_gaining_content_up_to_its_last_column_writes_its_interior_gap() {
 
 #[test]
 fn changed_row_writes_the_erased_cells_inside_its_changed_span() {
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(20, 1, caps);
 
     // Leftover content keeps the row out of GNU's `!olen` path.
@@ -1926,8 +1943,10 @@ fn changed_row_writes_the_erased_cells_inside_its_changed_span() {
 
 #[test]
 fn written_default_blanks_inside_a_changed_row_are_not_treated_as_erased() {
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(8, 1, caps);
 
     rif.desired.set(0, 0, 'A', CellAttrs::default(), false);
@@ -1955,8 +1974,10 @@ fn written_default_blanks_inside_a_changed_row_are_not_treated_as_erased() {
 
 #[test]
 fn relocated_content_keeps_its_unwritten_tail_when_repainted() {
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(8, 3, caps);
     for (col, ch) in "MOVED".chars().enumerate() {
         rif.desired.set(2, col, ch, CellAttrs::default(), false);
@@ -1989,8 +2010,10 @@ fn relocated_content_keeps_its_unwritten_tail_when_repainted() {
 
 #[test]
 fn copied_content_uses_the_same_erased_tail_rule() {
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(8, 3, caps);
     for (col, ch) in "COPY".chars().enumerate() {
         rif.desired.set(2, col, ch, CellAttrs::default(), false);
@@ -2018,8 +2041,10 @@ fn copied_content_uses_the_same_erased_tail_rule() {
 
 #[test]
 fn copied_content_in_two_destinations_uses_the_same_erased_tail_rule() {
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(8, 3, caps);
     for (col, ch) in "COPY".chars().enumerate() {
         rif.desired.set(2, col, ch, CellAttrs::default(), false);
@@ -2059,8 +2084,10 @@ fn copied_content_in_two_destinations_uses_the_same_erased_tail_rule() {
 
 #[test]
 fn equal_length_changed_row_preserves_its_default_blank_tail() {
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(8, 1, caps);
     for (col, ch) in "OLD".chars().enumerate() {
         rif.desired.set(0, col, ch, CellAttrs::default(), false);
@@ -2086,8 +2113,10 @@ fn equal_length_changed_row_preserves_its_default_blank_tail() {
 
 #[test]
 fn erase_to_eol_preserves_a_colored_foreground_space_at_the_boundary() {
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(8, 1, caps);
     for (col, ch) in "ABCDEFGH".chars().enumerate() {
         rif.desired.set(0, col, ch, CellAttrs::default(), false);
@@ -2222,9 +2251,11 @@ fn diff_and_render_rewrites_changed_row_span_contiguously() {
 
 #[test]
 fn equal_logical_row_lengths_do_not_request_a_tail_erase() {
-    let mut caps = TermCaps::default();
-    caps.insert_delete_char = false;
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        insert_delete_char: false,
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(16, 1, caps);
     let attrs = CellAttrs::default();
 
@@ -2273,8 +2304,10 @@ fn equal_length_composite_rewrite_does_not_preclear_the_row() {
 
 #[test]
 fn equal_length_composite_repaint_does_not_touch_its_unchanged_tail() {
-    let mut caps = TermCaps::default();
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(16, 2, caps);
     let attrs = CellAttrs::default();
 
@@ -2305,9 +2338,11 @@ fn equal_length_composite_repaint_does_not_touch_its_unchanged_tail() {
 
 #[test]
 fn equal_length_composite_plan_is_independent_of_el_capability() {
-    let mut caps = TermCaps::default();
-    caps.blank_tail = BlankTailMethod::WriteSpaces;
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        blank_tail: BlankTailMethod::WriteSpaces,
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(16, 2, caps);
     let attrs = CellAttrs::default();
 
@@ -2331,9 +2366,11 @@ fn equal_length_composite_plan_is_independent_of_el_capability() {
 
 #[test]
 fn width_sensitive_row_rewrite_is_one_logical_terminal_run() {
-    let mut caps = TermCaps::default();
-    caps.insert_delete_char = false;
-    caps.synchronized_output = false;
+    let caps = TermCaps {
+        insert_delete_char: false,
+        synchronized_output: false,
+        ..TermCaps::default()
+    };
     let mut rif = TtyRif::new_with_caps(32, 1, caps);
     let attrs = CellAttrs::default();
 
@@ -4544,10 +4581,10 @@ fn reused_damage_rows_carry_verbatim_and_plan_nothing() {
                 row.glyphs[GlyphArea::Text as usize].push(Glyph::char(ch, FaceId::new(0), i));
             }
             matrix.rows[r] = neomacs_display_protocol::glyph_matrix::MatrixRow::new(row);
-            if let Some(damage) = damage {
-                if edited_row != Some(r) {
-                    matrix.set_row_damage(r, damage);
-                }
+            if let Some(damage) = damage
+                && edited_row != Some(r)
+            {
+                matrix.set_row_damage(r, damage);
             }
         }
         state.window_matrices.push(WindowMatrixEntry {

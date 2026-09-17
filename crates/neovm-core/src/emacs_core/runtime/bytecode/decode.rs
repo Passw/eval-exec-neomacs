@@ -431,10 +431,8 @@ pub(crate) fn seal_ops(mut ops: Vec<Op>, constants_len: usize) -> Vec<Op> {
                     *target = last;
                 }
             }
-            Op::Constant(idx) => {
-                if *idx as usize >= constants_len {
-                    *op = Op::TrapOutOfRangeConstant(*idx);
-                }
+            Op::Constant(idx) if *idx as usize >= constants_len => {
+                *op = Op::TrapOutOfRangeConstant(*idx);
             }
             _ => {}
         }

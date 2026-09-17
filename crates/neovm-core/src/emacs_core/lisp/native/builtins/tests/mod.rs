@@ -3310,7 +3310,7 @@ fn kill_all_local_variables_clears_buffer_locals() {
     assert!(buf.get_buffer_local("fill-column").is_none());
     // buffer-read-only is a BUFFER_OBJFWD-style slot now: it always
     // resolves through the slot, never goes void, and starts at nil.
-    assert_eq!(buf.get_read_only(), false);
+    assert!(!buf.get_read_only());
     assert_eq!(
         buf.get_buffer_local("major-mode"),
         Some(Value::symbol("fundamental-mode"))
@@ -4360,7 +4360,7 @@ fn barf_bury_char_equal_cl_type_and_cancel_semantics() {
     );
     let lambda = Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![intern("x")]),
-        body: Vec::new().into(),
+        body: Vec::new(),
         env: None,
         docstring: None,
         doc_form: None,
@@ -5637,7 +5637,7 @@ fn pure_dispatch_typed_hash_table_extended_builtins_round_trip() {
     let index_size = dispatch_builtin_pure("internal--hash-table-index-size", vec![table])
         .expect("internal--hash-table-index-size should resolve")
         .expect("internal--hash-table-index-size should evaluate");
-    assert!(index_size.as_fixnum().map_or(false, |n| n >= 1));
+    assert!(index_size.as_fixnum().is_some_and(|n| n >= 1));
 
     let copied = dispatch_builtin_pure("copy-hash-table", vec![table])
         .expect("copy-hash-table should resolve")
@@ -5675,7 +5675,7 @@ fn pure_dispatch_typed_define_hash_table_test_registers_alias() {
         panic!("expected hash table");
     };
     assert!(matches!(
-        table.as_hash_table().unwrap().test.clone(),
+        table.as_hash_table().unwrap().test,
         HashTableTest::Eq
     ));
 }
@@ -5714,7 +5714,7 @@ fn pure_dispatch_typed_define_hash_table_test_accepts_equal_including_properties
         panic!("expected hash table");
     };
     assert!(matches!(
-        table.as_hash_table().unwrap().test.clone(),
+        table.as_hash_table().unwrap().test,
         HashTableTest::Equal
     ));
 }
@@ -5770,7 +5770,7 @@ fn define_hash_table_test_alias_redefinition_updates_mapping() {
         panic!("expected hash table");
     };
     assert!(matches!(
-        first.as_hash_table().unwrap().test.clone(),
+        first.as_hash_table().unwrap().test,
         HashTableTest::Eq
     ));
 
@@ -5798,7 +5798,7 @@ fn define_hash_table_test_alias_redefinition_updates_mapping() {
         panic!("expected hash table");
     };
     assert!(matches!(
-        second.as_hash_table().unwrap().test.clone(),
+        second.as_hash_table().unwrap().test,
         HashTableTest::Equal
     ));
 }
@@ -6237,7 +6237,7 @@ fn pure_dispatch_minibuffer_and_frame_placeholders_match_compat_contracts() {
         "minibuffer-prompt-end should use eval-aware minibuffer state"
     );
 
-    for (name, args) in vec![
+    for (name, args) in [
         ("next-frame", vec![]),
         ("next-frame", vec![Value::NIL, Value::NIL]),
         ("previous-frame", vec![]),
@@ -7981,7 +7981,7 @@ fn pure_dispatch_memory_module_placeholder_cluster_matches_compat_contracts() {
             assert_eq!(sig.symbol_name(), "module-open-failed");
             assert_eq!(sig.data.first(), Some(&Value::string(module_path)));
             assert!(
-                sig.data.get(1).map_or(false, |v| v.is_string()),
+                sig.data.get(1).is_some_and(|v| v.is_string()),
                 "module-open-failed should include string error message payload"
             );
         }
@@ -10070,7 +10070,7 @@ fn replace_match_string_preserves_source_and_replacement_text_properties_like_gn
 
     fn put_face(value: Value, start: usize, end: usize, face: &str) {
         let mut table = crate::emacs_core::value::get_string_text_properties_table_for_value(value)
-            .unwrap_or_else(crate::buffer::text_props::TextPropertyTable::new);
+            .unwrap_or_default();
         let _ = put_string_property(
             &mut table,
             start,
@@ -11558,7 +11558,7 @@ fn dispatch_builtin_pure_handles_frame_placeholder_accessors() {
         panic!("expected hash table");
     };
     assert!(matches!(
-        face_table.as_hash_table().unwrap().test.clone(),
+        face_table.as_hash_table().unwrap().test,
         HashTableTest::Eq
     ));
 
@@ -14233,11 +14233,11 @@ fn message_nil_runs_clear_message_function_after_suppressed_minibuffer_message()
     builtin_message(&mut eval, vec![Value::string("Making completion list...")])
         .expect("set-message-function should handle message");
     assert_eq!(eval.current_message_text(), None);
-    assert_eq!(
-        eval.eval_str("(overlay-buffer neomacs-minibuffer-message-overlay)")
+    assert!(
+        !eval
+            .eval_str("(overlay-buffer neomacs-minibuffer-message-overlay)")
             .expect("overlay should exist")
-            .is_nil(),
-        false
+            .is_nil()
     );
 
     builtin_message(&mut eval, vec![Value::NIL]).expect("message nil should clear");

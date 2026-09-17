@@ -537,7 +537,7 @@ fn format_time_string_subsecond_flags_match_gnu() {
     // `(1 . 4)` = 1/4 s = 0.25 s, i.e. 250_000_000 ns.
     let quarter = Value::cons(Value::fixnum(1), Value::fixnum(4));
     let fts_n = |fmt: &str| -> String {
-        builtin_format_time_string(vec![Value::string(fmt), quarter.clone(), Value::T])
+        builtin_format_time_string(vec![Value::string(fmt), quarter, Value::T])
             .unwrap()
             .as_utf8_str()
             .unwrap()

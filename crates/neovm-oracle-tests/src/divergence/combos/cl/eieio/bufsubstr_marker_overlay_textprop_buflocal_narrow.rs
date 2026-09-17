@@ -1,5 +1,5 @@
-//! Combo: cl-eieio buffer-substring composition + overlays + markers
-//! + textprop + buflocal + narrow + undo.
+//! Combo: cl-eieio buffer-substring composition + overlays + markers +
+//! textprop + buflocal + narrow + undo.
 //! Tests buffer-substring, filter-buffer-substring, and insert-buffer-substring
 //! with complex overlay and text property interactions.
 

@@ -925,7 +925,7 @@ fn display_row_source_state_reuses_face_cache_across_items() {
             StringTextPropertyRun {
                 start: 0,
                 end: 1,
-                plist: Value::list(vec![Value::symbol("face"), face_value.clone()]),
+                plist: Value::list(vec![Value::symbol("face"), face_value]),
             },
             StringTextPropertyRun {
                 start: 2,
@@ -2100,7 +2100,7 @@ fn display_row_buffer_and_lisp_sources_share_display_space_semantics() {
             vec![neovm_core::emacs_core::value::StringTextPropertyRun {
                 start: 1,
                 end: 2,
-                plist: Value::list(vec![Value::symbol("display"), display_space.clone()]),
+                plist: Value::list(vec![Value::symbol("display"), display_space]),
             }],
         ),
         GlyphRowRole::HeaderLine,
@@ -2176,7 +2176,7 @@ fn display_row_buffer_and_lisp_sources_share_face_property_semantics() {
             vec![neovm_core::emacs_core::value::StringTextPropertyRun {
                 start: 1,
                 end: 2,
-                plist: Value::list(vec![Value::symbol("face"), face.clone()]),
+                plist: Value::list(vec![Value::symbol("face"), face]),
             }],
         ),
         GlyphRowRole::ModeLine,
@@ -2209,7 +2209,7 @@ fn display_row_buffer_and_lisp_sources_share_raise_property_semantics() {
             vec![neovm_core::emacs_core::value::StringTextPropertyRun {
                 start: 1,
                 end: 2,
-                plist: Value::list(vec![Value::symbol("display"), raise.clone()]),
+                plist: Value::list(vec![Value::symbol("display"), raise]),
             }],
         ),
         GlyphRowRole::ModeLine,
@@ -2252,7 +2252,7 @@ fn display_row_buffer_and_lisp_sources_share_height_property_semantics() {
             vec![neovm_core::emacs_core::value::StringTextPropertyRun {
                 start: 1,
                 end: 2,
-                plist: Value::list(vec![Value::symbol("display"), height.clone()]),
+                plist: Value::list(vec![Value::symbol("display"), height]),
             }],
         ),
         GlyphRowRole::ModeLine,
@@ -4165,10 +4165,12 @@ fn measured_display_row_content_policy_ignores_allocated_row_height() {
     row.enabled = true;
     row.height_px = 120.0;
     row.ascent_px = 13.0;
-    let mut face = neomacs_display_protocol::face::Face::default();
-    face.id = FaceId::new(8);
-    face.font_ascent = 13;
-    face.font_descent = 4;
+    let face = neomacs_display_protocol::face::Face {
+        id: FaceId::new(8),
+        font_ascent: 13,
+        font_descent: 4,
+        ..Default::default()
+    };
     let image_margins = row
         .intern_image_margins(neomacs_display_protocol::ImageMargins::default())
         .expect("image-margin token");

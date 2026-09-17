@@ -123,14 +123,16 @@ mod tests {
     #[test]
     fn display_result_ok() {
         let result: DisplayResult<i32> = Ok(42);
-        assert_eq!(result.unwrap(), 42);
+        assert!(matches!(result, Ok(42)));
     }
 
     #[test]
     fn display_result_err() {
         let result: DisplayResult<i32> = Err(DisplayError::Backend("fail".into()));
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), "Backend error: fail");
+        let Err(err) = result else {
+            panic!("expected Err");
+        };
+        assert_eq!(err.to_string(), "Backend error: fail");
     }
 
     #[test]

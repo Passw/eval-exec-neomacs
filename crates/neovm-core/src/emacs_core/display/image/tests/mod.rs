@@ -1714,7 +1714,7 @@ fn image_size_pixels_t_converts_logical_layout_to_device_pixels() {
         Value::keyword("scale"),
         Value::symbol("default"),
     ]);
-    let in_pixels = builtin_image_size_in_context(&mut eval, vec![spec.clone(), Value::T]).unwrap();
+    let in_pixels = builtin_image_size_in_context(&mut eval, vec![spec, Value::T]).unwrap();
     assert_eq!(in_pixels.cons_car(), Value::fixnum(333)); // ceil(266*1.25)
     assert_eq!(in_pixels.cons_cdr(), Value::fixnum(233)); // ceil(186*1.25)
 
@@ -1776,12 +1776,11 @@ fn image_size_pixels_nil_returns_character_units_as_floats() {
     ]);
 
     // Recording host returns 40×30 metadata.
-    let in_chars = builtin_image_size_in_context(&mut eval, vec![spec.clone()]).unwrap();
+    let in_chars = builtin_image_size_in_context(&mut eval, vec![spec]).unwrap();
     assert_eq!(in_chars.cons_car(), Value::make_float(4.0)); // 40 / 10
     assert_eq!(in_chars.cons_cdr(), Value::make_float(1.5)); // 30 / 20
 
-    let explicit_nil =
-        builtin_image_size_in_context(&mut eval, vec![spec.clone(), Value::NIL]).unwrap();
+    let explicit_nil = builtin_image_size_in_context(&mut eval, vec![spec, Value::NIL]).unwrap();
     assert_eq!(explicit_nil.cons_car(), Value::make_float(4.0));
     assert_eq!(explicit_nil.cons_cdr(), Value::make_float(1.5));
 

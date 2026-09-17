@@ -42,8 +42,8 @@ pub(crate) fn builtin_get_pos_property_impl(
     buffers: &crate::buffer::BufferManager,
     args: &[Value],
 ) -> EvalResult {
-    expect_min_args("get-pos-property", &args, 2)?;
-    expect_max_args("get-pos-property", &args, 3)?;
+    expect_min_args("get-pos-property", args, 2)?;
+    expect_max_args("get-pos-property", args, 3)?;
     let pos = crate::emacs_core::buffer::expect_integer_or_marker_in_buffers(buffers, &args[0])?;
     let prop = super::textprop::expect_property_key(&args[1])?;
 
@@ -106,14 +106,8 @@ pub(crate) fn builtin_next_char_property_change_in_buffers(
     )
 }
 
-pub(crate) fn builtin_pos_bol(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
-    crate::emacs_core::error::expect_args_range("pos-bol", &args, 0, 1)?;
-    let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
-    builtin_pos_bol_1(eval, arg(0))
-}
 /// `pos-bol` as registered: fixed arity 1, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a1` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
 pub(crate) fn builtin_pos_bol_1(eval: &mut super::eval::Context, n: Value) -> EvalResult {
     let args: [Value; 1] = [n];
     expect_max_args("pos-bol", &args, 1)?;
@@ -124,14 +118,8 @@ pub(crate) fn builtin_pos_bol_1(eval: &mut super::eval::Context, n: Value) -> Ev
     Ok(Value::fixnum(bol_charpos))
 }
 
-pub(crate) fn builtin_pos_eol(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
-    crate::emacs_core::error::expect_args_range("pos-eol", &args, 0, 1)?;
-    let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
-    builtin_pos_eol_1(eval, arg(0))
-}
 /// `pos-eol` as registered: fixed arity 1, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a1` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
 pub(crate) fn builtin_pos_eol_1(eval: &mut super::eval::Context, n: Value) -> EvalResult {
     let args: [Value; 1] = [n];
     expect_max_args("pos-eol", &args, 1)?;
@@ -413,15 +401,12 @@ pub(crate) fn builtin_next_single_char_property_change_in_buffers(
     buffers: &crate::buffer::BufferManager,
     args: &[Value],
 ) -> EvalResult {
-    expect_min_args("next-single-char-property-change", &args, 2)?;
-    expect_max_args("next-single-char-property-change", &args, 4)?;
+    expect_min_args("next-single-char-property-change", args, 2)?;
+    expect_max_args("next-single-char-property-change", args, 4)?;
 
     if let Some(str_val) = args.get(2).filter(|v| v.is_string()) {
-        let result = super::textprop::builtin_next_single_property_change_in_state(
-            obarray,
-            buffers,
-            &args.clone(),
-        )?;
+        let result =
+            super::textprop::builtin_next_single_property_change_in_state(obarray, buffers, args)?;
         if !result.is_nil() {
             return Ok(result);
         }
@@ -1234,10 +1219,10 @@ fn print_target_buffer_id(
 /// bindings that apply and the caller's buffer-local `print-level` is swapped
 /// out; a function / `t` / echo-area stream performs no switch, so the caller's
 /// buffer stays current and its bindings do apply. Ledger 196.
-fn print_target_current_buffer<'a>(
-    ctx: &'a crate::emacs_core::eval::Context,
+fn print_target_current_buffer(
+    ctx: &crate::emacs_core::eval::Context,
     target: Value,
-) -> Option<&'a crate::buffer::Buffer> {
+) -> Option<&crate::buffer::Buffer> {
     match print_target_buffer_id(ctx, target) {
         Some(id) => ctx.buffers.get(id),
         None => ctx.buffers.current_buffer(),

@@ -33,7 +33,6 @@ use regex_automata::util::prefilter::Prefilter as RaPrefilter;
 use regex_automata::{MatchKind, Span};
 use smallvec::SmallVec;
 
-const INLINE_REGEX_REGISTERS: usize = 8;
 /// Plain `Vec`: the register arrays live in the reusable `MatchScratch`, so
 /// they never reallocate after warm-up, and a SmallVec's spilled-check on
 /// every register access cost ~6% of the matcher loop on the org op.
@@ -479,10 +478,6 @@ impl CaseTranslation {
         };
         slot.set(translated);
         Some(translated)
-    }
-
-    pub(crate) fn cache_key(&self) -> usize {
-        self.table.map_or(0, |table| table.bits())
     }
 
     pub(crate) fn translate(&self, c: u32) -> u32 {
@@ -4231,9 +4226,7 @@ fn match_charset_at(
     // the slow path exactly: classes test the UNTRANSLATED character.
     // (`stop` may exceed `text.len()`; a past-the-end read is a plain
     // no-match, matching `re_text_char`'s bounds behavior.)
-    let Some(&first_byte) = text.get(d) else {
-        return None;
-    };
+    let &first_byte = text.get(d)?;
     if first_byte < 0x80 {
         let translated = re_tr(translate, first_byte as u32);
         if translated < 0x80 {
@@ -5028,9 +5021,11 @@ fn re_match_loop<const SEALED: bool>(
                     // beats the current finishing position.  Restore
                     // it before finalizing.
                     d = best_match_end;
-                    for i in 1..num_regs {
-                        regstart[i] = best_regstart[i];
-                        regend[i] = best_regend[i];
+                    // A pattern without groups keeps zero-length register vectors
+                    // (`num_regs` is 1): the old index loop never touched them.
+                    if num_regs > 1 {
+                        regstart[1..num_regs].copy_from_slice(&best_regstart[1..num_regs]);
+                        regend[1..num_regs].copy_from_slice(&best_regend[1..num_regs]);
                     }
                 }
             }
@@ -5105,9 +5100,11 @@ fn re_match_loop<const SEALED: bool>(
                         // beats the current finishing position.  Restore
                         // it before finalizing.
                         d = best_match_end;
-                        for i in 1..num_regs {
-                            regstart[i] = best_regstart[i];
-                            regend[i] = best_regend[i];
+                        // A pattern without groups keeps zero-length register vectors
+                        // (`num_regs` is 1): the old index loop never touched them.
+                        if num_regs > 1 {
+                            regstart[1..num_regs].copy_from_slice(&best_regstart[1..num_regs]);
+                            regend[1..num_regs].copy_from_slice(&best_regend[1..num_regs]);
                         }
                     }
                 }
@@ -5903,9 +5900,11 @@ fn re_match_loop<const SEALED: bool>(
     if total_failure {
         if best_regs_set {
             d = best_match_end;
-            for i in 1..num_regs {
-                regstart[i] = best_regstart[i];
-                regend[i] = best_regend[i];
+            // A pattern without groups keeps zero-length register vectors
+            // (`num_regs` is 1): the old index loop never touched them.
+            if num_regs > 1 {
+                regstart[1..num_regs].copy_from_slice(&best_regstart[1..num_regs]);
+                regend[1..num_regs].copy_from_slice(&best_regend[1..num_regs]);
             }
         } else {
             return None;
@@ -6587,10 +6586,10 @@ pub(crate) fn pattern_max_match_chars(pattern: &CompiledPattern) -> Option<usize
             | RegexOp::OnFailureKeepStringJump
             | RegexOp::OnFailureJumpLoop
             | RegexOp::OnFailureJumpNastyloop
-            | RegexOp::OnFailureJumpSmart => {
-                if extract_number(bytecode, pc + 1) < 0 {
-                    return None;
-                }
+            | RegexOp::OnFailureJumpSmart
+                if extract_number(bytecode, pc + 1) < 0 =>
+            {
+                return None;
             }
             _ => {}
         }

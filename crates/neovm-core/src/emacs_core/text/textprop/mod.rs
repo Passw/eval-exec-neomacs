@@ -511,40 +511,12 @@ impl<'a> CharPropertyResolver<'a> {
         }
     }
 
-    /// Whether the snapshot carries `char-property-alias-alist` aliases for
-    /// the property (rare) — the fast presence-bit coalescing is only sound
-    /// without them.
-    pub(crate) fn has_aliases(&self) -> bool {
-        self.aliases.is_cons()
-    }
-
     /// Whether run coalescing is sound for this snapshot: no aliases (they
     /// widen the watched-key set) and no `default-text-properties` fallback
     /// (a key-free INTERVAL resolves to the default while a GAP resolves to
     /// nothing, so merging across that edge would blur two values).
     pub(crate) fn supports_presence_coalescing(&self) -> bool {
         !self.aliases.is_cons() && self.default.is_none()
-    }
-
-    /// Every plist key whose value can influence [`Self::resolve_interval_plist`]:
-    /// the property itself, `category` (a category symbol's plist can supply
-    /// it), and each snapshot alias. Two intervals whose plists agree (`eq`)
-    /// on all of these resolve identically — the run-coalescing scanners use
-    /// this with `next_watched_property_change` to skip boundaries that only
-    /// split other properties (font-lock `face` churn).
-    pub(crate) fn watched_keys(&self) -> smallvec::SmallVec<[Value; 4]> {
-        // Interned-once `category` id: this runs per coalescing scan, and
-        // `Value::symbol(&str)` pays string compares plus a thread-local
-        // intern probe per call.
-        let mut keys = smallvec::SmallVec::new();
-        keys.push(self.prop);
-        keys.push(Value::symbol(category_sym_id()));
-        let mut alias = self.aliases;
-        while alias.is_cons() {
-            keys.push(alias.cons_car());
-            alias = alias.cons_cdr();
-        }
-        keys
     }
 
     /// Resolve the property from one interval's plist.
@@ -1800,8 +1772,8 @@ pub(crate) fn builtin_put_text_property_in_buffers(
     buffers: &mut BufferManager,
     args: &[Value],
 ) -> EvalResult {
-    expect_min_args("put-text-property", &args, 4)?;
-    expect_max_args("put-text-property", &args, 5)?;
+    expect_min_args("put-text-property", args, 4)?;
+    expect_max_args("put-text-property", args, 5)?;
     let beg = expect_integer_or_marker_in_buffers(buffers, &args[0])?;
     let end = expect_integer_or_marker_in_buffers(buffers, &args[1])?;
     let prop = expect_property_key(&args[2])?;
@@ -1852,6 +1824,7 @@ fn put_text_property_in_buffer_byte_range(
 }
 
 /// (get-text-property POS PROP &optional OBJECT)
+#[cfg(test)]
 pub(crate) fn builtin_get_text_property(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -1878,8 +1851,8 @@ pub(crate) fn builtin_get_text_property_in_state(
     buffers: &BufferManager,
     args: &[Value],
 ) -> EvalResult {
-    expect_min_args("get-text-property", &args, 2)?;
-    expect_max_args("get-text-property", &args, 3)?;
+    expect_min_args("get-text-property", args, 2)?;
+    expect_max_args("get-text-property", args, 3)?;
     let pos = expect_integer_or_marker_in_buffers(buffers, &args[0])?;
     let prop = expect_property_key(&args[1])?;
 
@@ -2286,13 +2259,13 @@ pub(crate) fn builtin_get_char_property_with_frames(
     frames: Option<&FrameManager>,
     args: &[Value],
 ) -> EvalResult {
-    expect_min_args("get-char-property", &args, 2)?;
-    expect_max_args("get-char-property", &args, 3)?;
+    expect_min_args("get-char-property", args, 2)?;
+    expect_max_args("get-char-property", args, 3)?;
     let pos = expect_integer_or_marker_in_buffers(buffers, &args[0])?;
     let prop = expect_property_key(&args[1])?;
 
     if is_string_object(args.get(2)).is_some() {
-        return builtin_get_text_property_in_state(obarray, buffers, &args);
+        return builtin_get_text_property_in_state(obarray, buffers, args);
     }
 
     let (buf_id, window_id) = resolve_char_property_target_in_state(frames, buffers, args.get(2))?;
@@ -2332,6 +2305,7 @@ pub(crate) fn builtin_get_char_property_with_frames(
 }
 
 /// (add-text-properties BEG END PROPS &optional OBJECT)
+#[cfg(test)]
 pub(crate) fn builtin_add_text_properties(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -2382,8 +2356,8 @@ pub(crate) fn builtin_add_text_properties_in_buffers(
     buffers: &mut BufferManager,
     args: &[Value],
 ) -> EvalResult {
-    expect_min_args("add-text-properties", &args, 3)?;
-    expect_max_args("add-text-properties", &args, 4)?;
+    expect_min_args("add-text-properties", args, 3)?;
+    expect_max_args("add-text-properties", args, 4)?;
     let beg = expect_integer_or_marker_in_buffers(buffers, &args[0])?;
     let end = expect_integer_or_marker_in_buffers(buffers, &args[1])?;
     let pairs = plist_pairs(&args[2])?;
@@ -2804,6 +2778,7 @@ pub(crate) fn builtin_set_text_properties_in_buffers(
 }
 
 /// (remove-list-of-text-properties BEG END LIST &optional OBJECT)
+#[cfg(test)]
 pub(crate) fn builtin_remove_list_of_text_properties(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -2853,8 +2828,8 @@ pub(crate) fn builtin_remove_list_of_text_properties_in_buffers(
     buffers: &mut BufferManager,
     args: &[Value],
 ) -> EvalResult {
-    expect_min_args("remove-list-of-text-properties", &args, 3)?;
-    expect_max_args("remove-list-of-text-properties", &args, 4)?;
+    expect_min_args("remove-list-of-text-properties", args, 3)?;
+    expect_max_args("remove-list-of-text-properties", args, 4)?;
     let beg = expect_integer_or_marker_in_buffers(buffers, &args[0])?;
     let end = expect_integer_or_marker_in_buffers(buffers, &args[1])?;
     let names = list_names_for_remove(args[2]);
@@ -2909,6 +2884,7 @@ pub(crate) fn builtin_remove_list_of_text_properties_in_buffers(
 }
 
 /// (text-properties-at POS &optional OBJECT)
+#[cfg(test)]
 pub(crate) fn builtin_text_properties_at(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -2933,8 +2909,8 @@ pub(crate) fn builtin_text_properties_at_in_buffers(
     buffers: &BufferManager,
     args: &[Value],
 ) -> EvalResult {
-    expect_min_args("text-properties-at", &args, 1)?;
-    expect_max_args("text-properties-at", &args, 2)?;
+    expect_min_args("text-properties-at", args, 1)?;
+    expect_max_args("text-properties-at", args, 2)?;
     let pos = expect_integer_or_marker_in_buffers(buffers, &args[0])?;
 
     if let Some(str_val) = is_string_object(args.get(1)) {
@@ -2991,8 +2967,8 @@ pub(crate) fn builtin_next_single_property_change_in_state(
     buffers: &BufferManager,
     args: &[Value],
 ) -> EvalResult {
-    expect_min_args("next-single-property-change", &args, 2)?;
-    expect_max_args("next-single-property-change", &args, 4)?;
+    expect_min_args("next-single-property-change", args, 2)?;
+    expect_max_args("next-single-property-change", args, 4)?;
     let pos = expect_integer_or_marker_in_buffers(buffers, &args[0])?;
     let prop = expect_property_key(&args[1])?;
     let limit = match args.get(3) {
@@ -3141,6 +3117,7 @@ pub(crate) fn emacs_byte_pos_of_preceding_char(
 }
 
 /// (previous-single-property-change POS PROP &optional OBJECT LIMIT)
+#[cfg(test)]
 pub(crate) fn builtin_previous_single_property_change(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -3168,8 +3145,8 @@ pub(crate) fn builtin_previous_single_property_change_in_state(
     buffers: &BufferManager,
     args: &[Value],
 ) -> EvalResult {
-    expect_min_args("previous-single-property-change", &args, 2)?;
-    expect_max_args("previous-single-property-change", &args, 4)?;
+    expect_min_args("previous-single-property-change", args, 2)?;
+    expect_max_args("previous-single-property-change", args, 4)?;
     let pos = expect_integer_or_marker_in_buffers(buffers, &args[0])?;
     let prop = expect_property_key(&args[1])?;
 
@@ -3501,6 +3478,7 @@ pub(crate) fn builtin_text_property_any_in_state(
 }
 
 /// (text-property-not-all BEG END PROP VAL &optional OBJECT)
+#[cfg(test)]
 pub(crate) fn builtin_text_property_not_all(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -3529,8 +3507,8 @@ pub(crate) fn builtin_text_property_not_all_in_state(
     buffers: &BufferManager,
     args: &[Value],
 ) -> EvalResult {
-    expect_min_args("text-property-not-all", &args, 4)?;
-    expect_max_args("text-property-not-all", &args, 5)?;
+    expect_min_args("text-property-not-all", args, 4)?;
+    expect_max_args("text-property-not-all", args, 5)?;
     let beg = expect_integer_or_marker_in_buffers(buffers, &args[0])?;
     let end = expect_integer_or_marker_in_buffers(buffers, &args[1])?;
     let prop = expect_property_key(&args[2])?;

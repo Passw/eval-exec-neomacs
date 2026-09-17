@@ -360,16 +360,8 @@ fn implemented_backends_match_gap_for_scripted_unibyte_edits() {
         delete_byte_range(&mut gap, EmacsByteRange::from_usize(2, 5));
         assert_backend_matches_gap(kind, &backend, &gap);
 
-        replace_byte_range(
-            &mut backend,
-            EmacsByteRange::from_usize(1, 3),
-            &[b'R', b'S', b'T', b'U'],
-        );
-        replace_byte_range(
-            &mut gap,
-            EmacsByteRange::from_usize(1, 3),
-            &[b'R', b'S', b'T', b'U'],
-        );
+        replace_byte_range(&mut backend, EmacsByteRange::from_usize(1, 3), b"RSTU");
+        replace_byte_range(&mut gap, EmacsByteRange::from_usize(1, 3), b"RSTU");
         assert_backend_matches_gap(kind, &backend, &gap);
 
         replace_same_len(

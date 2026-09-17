@@ -978,6 +978,10 @@ impl DisplayPropertyReplacementAppendOutcome {
 /// A replacement either completed atomically on the current row or opened a
 /// stateful string iterator.  Callers must handle both variants explicitly;
 /// there is no lossy "append and forget a clipped suffix" representation.
+// The `String` payload is moved unboxed into the sibling render/apply outcome
+// enums of `buffer_source::display_property_render`; boxing it here alone would
+// only add a box/unbox round trip at that seam.
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum DisplayPropertyReplacementRowRender {
     Applied(DisplayPropertyReplacementAppendOutcome),
     String(DisplayPropertyReplacementStringRender),

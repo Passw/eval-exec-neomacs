@@ -231,7 +231,7 @@ fn test_builtin_make_thread_runs_function() {
         "thread-test-fn",
         Value::make_lambda(super::super::value::LambdaData {
             params: super::super::value::LambdaParams::simple(vec![]),
-            body: vec![].into(), // empty body → nil
+            body: vec![], // empty body → nil
             env: None,
             docstring: None,
             doc_form: None,
@@ -257,7 +257,7 @@ fn test_builtin_make_thread_accepts_buffer_disposition_arg() {
         vec![
             Value::make_lambda(super::super::value::LambdaData {
                 params: super::super::value::LambdaParams::simple(vec![]),
-                body: vec![].into(),
+                body: vec![],
                 env: None,
                 docstring: None,
                 doc_form: None,
@@ -286,7 +286,7 @@ fn test_builtin_make_thread_rejects_more_than_three_args() {
         vec![
             Value::make_lambda(super::super::value::LambdaData {
                 params: super::super::value::LambdaParams::simple(vec![]),
-                body: vec![].into(),
+                body: vec![],
                 env: None,
                 docstring: None,
                 doc_form: None,
@@ -613,7 +613,7 @@ fn test_builtin_all_threads_includes_finished_unjoined_worker() {
         &mut eval,
         vec![Value::make_lambda(super::super::value::LambdaData {
             params: super::super::value::LambdaParams::simple(vec![]),
-            body: vec![].into(),
+            body: vec![],
             env: None,
             docstring: None,
             doc_form: None,
@@ -640,7 +640,7 @@ fn test_builtin_thread_join_finished() {
         &mut eval,
         vec![Value::make_lambda(super::super::value::LambdaData {
             params: super::super::value::LambdaParams::simple(vec![]),
-            body: vec![].into(),
+            body: vec![],
             env: None,
             docstring: None,
             doc_form: None,
@@ -681,7 +681,7 @@ fn test_builtin_thread_signal_non_current_is_noop() {
         &mut eval,
         vec![Value::make_lambda(super::super::value::LambdaData {
             params: super::super::value::LambdaParams::simple(vec![]),
-            body: vec![].into(),
+            body: vec![],
             env: None,
             docstring: None,
             doc_form: None,
@@ -803,7 +803,7 @@ fn test_builtin_thread_buffer_disposition_round_trips() {
         &mut eval,
         vec![Value::make_lambda(super::super::value::LambdaData {
             params: super::super::value::LambdaParams::simple(vec![]),
-            body: vec![].into(),
+            body: vec![],
             env: None,
             docstring: None,
             doc_form: None,
@@ -1001,7 +1001,7 @@ fn thread_mutex_and_condition_names_preserve_raw_unibyte_payloads() {
         vec![
             Value::make_lambda(super::super::value::LambdaData {
                 params: super::super::value::LambdaParams::simple(vec![]),
-                body: vec![].into(),
+                body: vec![],
                 env: None,
                 docstring: None,
                 doc_form: None,

@@ -379,7 +379,7 @@ fn documentation_lambda_with_docstring() {
     // Set up a lambda with a docstring in the function cell.
     let lambda = Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![intern("x")]),
-        body: vec![].into(),
+        body: vec![],
         env: None,
         docstring: Some(crate::heap_types::LispString::from_utf8("Add one to X.")),
         doc_form: None,
@@ -399,7 +399,7 @@ fn documentation_lambda_no_docstring() {
 
     let lambda = Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![]),
-        body: vec![].into(),
+        body: vec![],
         env: None,
         docstring: None,
         doc_form: None,
@@ -454,7 +454,7 @@ fn documentation_lambda_preserves_raw_unibyte_docstring() {
     let raw_doc = crate::heap_types::LispString::from_unibyte(vec![0xFF, b'X']);
     let lambda = Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![]),
-        body: vec![].into(),
+        body: vec![],
         env: None,
         docstring: Some(raw_doc.clone()),
         doc_form: None,

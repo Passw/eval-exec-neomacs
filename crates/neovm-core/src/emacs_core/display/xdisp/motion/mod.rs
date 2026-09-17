@@ -328,11 +328,9 @@ pub(crate) fn resolve(
         return Ok(None);
     };
     if let Some(snapshot) = eval.fresh_window_display_snapshot(frame_id, window_id, request.buffer)
+        && let Some(motion) = vertical_motion_on_rows(snapshot, request, accessible, wrap).settled()
     {
-        if let Some(motion) = vertical_motion_on_rows(snapshot, request, accessible, wrap).settled()
-        {
-            return Ok(Some(motion));
-        }
+        return Ok(Some(motion));
     }
 
     // GNU reruns the display iterator when redisplay's rows are unavailable.

@@ -348,7 +348,7 @@ pub(crate) fn generate_synthetic_journal(year: i64, days: u32) -> (String, u64) 
         let (_, month, mday) = civil_from_days(day);
         // 1970-01-01 was a Thursday.
         let weekday = DAY_NAMES[(((day + 4) % 7 + 7) % 7) as usize];
-        let _ = write!(journal, "* {year:04}-{month:02}-{mday:02}, {weekday}\n");
+        let _ = writeln!(journal, "* {year:04}-{month:02}-{mday:02}, {weekday}");
         for _ in 0..(3 + next() % 2) {
             let hour = 7 + next() % 13;
             let minute = next() % 60;

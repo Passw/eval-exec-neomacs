@@ -1,5 +1,5 @@
-//! Combo: cl-eieio hash-table with EIEIO object keys/values + overlays
-//! + markers + textprop + buflocal + narrow + undo.
+//! Combo: cl-eieio hash-table with EIEIO object keys/values + overlays +
+//! markers + textprop + buflocal + narrow + undo.
 //! Tests hash table operations with EIEIO objects as keys and values,
 //! including sxhash, object-equal, and hash table mutation during editing.
 

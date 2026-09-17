@@ -2625,7 +2625,7 @@ mod tests {
             set_pending_signal(env, "wrong-type-argument", Value::NIL);
         }
 
-        let _ = module_guard(env, (), || panic!("later panic"));
+        module_guard(env, (), || panic!("later panic"));
 
         let priv_ = unsafe { &*fixture.priv_ptr() };
         assert_eq!(

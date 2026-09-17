@@ -145,7 +145,9 @@ pub struct ReferenceManifest {
 pub struct AttestedReference {
     executable: PathBuf,
     pdmp: PathBuf,
-    manifest: ReferenceManifest,
+    // Boxed: the manifest is the bulk of this struct, and it rides inside
+    // `ReferenceUse` next to a variant that is a single `PathBuf`.
+    manifest: Box<ReferenceManifest>,
     depth: AttestationDepth,
 }
 
@@ -438,7 +440,7 @@ pub fn attest_against(
     Ok(AttestedReference {
         executable,
         pdmp,
-        manifest: manifest.clone(),
+        manifest: Box::new(manifest.clone()),
         depth,
     })
 }

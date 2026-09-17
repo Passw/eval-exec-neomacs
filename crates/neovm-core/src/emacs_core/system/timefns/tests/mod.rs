@@ -1649,7 +1649,7 @@ fn encode_time_nil_second_returns_ticks_hz_like_gnu() {
         result.cons_car()
     );
     let hz = value_to_integer(&result.cons_cdr()).expect("HZ is an integer");
-    assert!(hz > Integer::from(0), "HZ must be positive, got {hz}");
+    assert!(hz > 0, "HZ must be positive, got {hz}");
     reset_tz_rule();
 }
 

@@ -1870,10 +1870,10 @@ fn test_measure_current_process_final_pdump_performance() {
     let fixture = current_process_pdump_fixture();
     let final_path = &fixture.final_path;
     let bootstrap_path = &fixture.bootstrap_path;
-    let final_size = std::fs::metadata(&final_path)
+    let final_size = std::fs::metadata(final_path)
         .expect("stat final pdump")
         .len();
-    let bootstrap_size = std::fs::metadata(&bootstrap_path)
+    let bootstrap_size = std::fs::metadata(bootstrap_path)
         .expect("stat bootstrap pdump")
         .len();
     eprintln!(
@@ -1889,7 +1889,7 @@ fn test_measure_current_process_final_pdump_performance() {
 
     let iterations = 5;
     let final_raw_load = measure_timings(iterations, || {
-        load_from_dump(&final_path).expect("raw final load should succeed")
+        load_from_dump(final_path).expect("raw final load should succeed")
     });
     summarize_timings("raw final load_from_dump", &final_raw_load);
 
@@ -1897,13 +1897,13 @@ fn test_measure_current_process_final_pdump_performance() {
         crate::emacs_core::load::load_runtime_image_with_features(
             crate::emacs_core::load::RuntimeImageRole::Final,
             &[],
-            Some(&final_path),
+            Some(final_path),
         )
         .expect("final runtime image load should succeed")
     });
     summarize_timings("final load+finalize", &finalized_runtime_load);
 
-    let loaded_final = load_from_dump(&final_path).expect("prepare final eval for dump bench");
+    let loaded_final = load_from_dump(final_path).expect("prepare final eval for dump bench");
     let dump_dir = tempfile::tempdir().expect("dump tempdir");
     let mut dump_sizes = Vec::with_capacity(iterations);
     let dump_samples = measure_timings(iterations, || {
@@ -1928,7 +1928,7 @@ fn test_measure_current_process_bootstrap_pdump_raw_load() {
     crate::test_utils::init_test_tracing();
     let fixture = current_process_pdump_fixture();
     let bootstrap_path = &fixture.bootstrap_path;
-    let bootstrap_size = std::fs::metadata(&bootstrap_path)
+    let bootstrap_size = std::fs::metadata(bootstrap_path)
         .expect("stat bootstrap pdump")
         .len();
     eprintln!(
@@ -1938,7 +1938,7 @@ fn test_measure_current_process_bootstrap_pdump_raw_load() {
     );
 
     let bootstrap_raw_load = measure_timings(5, || {
-        load_from_dump(&bootstrap_path).expect("raw bootstrap load should succeed")
+        load_from_dump(bootstrap_path).expect("raw bootstrap load should succeed")
     });
     summarize_timings("raw bootstrap load_from_dump", &bootstrap_raw_load);
 }

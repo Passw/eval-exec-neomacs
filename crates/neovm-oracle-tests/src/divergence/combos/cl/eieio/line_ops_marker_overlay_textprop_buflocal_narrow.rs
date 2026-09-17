@@ -1,6 +1,6 @@
 //! Combo: cl-eieio line-boundary operations (line-beginning-position,
-//! line-end-position, forward-line, count-lines) + overlays + markers
-//! + textprop + buflocal + narrow + undo.
+//! line-end-position, forward-line, count-lines) + overlays + markers +
+//! textprop + buflocal + narrow + undo.
 //! Tests line operations in complex states with narrowing, overlays, and edits.
 
 use crate::common::assert_oracle_parity;

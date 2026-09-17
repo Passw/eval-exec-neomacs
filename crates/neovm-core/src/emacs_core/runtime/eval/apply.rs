@@ -322,6 +322,7 @@ impl Context {
         }
     }
 
+    #[cfg(test)]
     pub(super) fn evaluated_backtrace_from_slice(
         &mut self,
         function: Value,
@@ -342,31 +343,6 @@ impl Context {
             _ => SpecBinding::Backtrace {
                 function,
                 args: self.backtrace_args_from_slice(args),
-                debug_on_exit,
-            },
-        }
-    }
-
-    pub(super) fn evaluated_backtrace_from_owned(
-        &mut self,
-        function: Value,
-        debug_on_exit: bool,
-        args: LispArgVec,
-    ) -> SpecBinding {
-        match args.as_slice() {
-            [arg] => SpecBinding::Backtrace1 {
-                function,
-                arg: *arg,
-                debug_on_exit,
-            },
-            [arg0, arg1] if !debug_on_exit => SpecBinding::Backtrace2 {
-                function,
-                arg0: *arg0,
-                arg1: *arg1,
-            },
-            _ => SpecBinding::Backtrace {
-                function,
-                args: self.backtrace_args_from_owned(args),
                 debug_on_exit,
             },
         }
@@ -407,16 +383,6 @@ impl Context {
     #[cfg(test)]
     pub(crate) fn backtrace_args_stack_len_for_test(&self) -> usize {
         self.backtrace_args_stack.len()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn eval_temp_roots_len_for_test(&self) -> usize {
-        self.eval_temp_roots.len()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn eval_call_roots_len_for_test(&self) -> usize {
-        self.eval_call_roots.len()
     }
 
     pub(crate) fn backtrace_args_values(&self, args: &BacktraceArgs) -> LispArgVec {
@@ -670,6 +636,11 @@ impl Context {
     /// Panics if the slot is not an UNEVALLED backtrace frame. Callers
     /// must keep the invariant that every `set_backtrace_args_evalled`
     /// matches exactly one prior `push_unevalled_backtrace_frame`.
+    ///
+    /// Production callers promote over the VM operand stack through
+    /// `set_backtrace_args_evalled_bc_span`; only the unit test exercises
+    /// this slice-argument form.
+    #[cfg(test)]
     pub(crate) fn set_backtrace_args_evalled(&mut self, count: usize, evaluated: &[Value]) {
         let (function, debug_on_exit) = match self.specpdl.get(count) {
             Some(SpecBinding::Backtrace {
@@ -715,21 +686,6 @@ impl Context {
             args,
             debug_on_exit,
         };
-    }
-
-    pub(crate) fn set_backtrace_args_evalled_owned(&mut self, count: usize, evaluated: LispArgVec) {
-        let (function, debug_on_exit) = match self.specpdl.get(count) {
-            Some(SpecBinding::Backtrace {
-                function,
-                args,
-                debug_on_exit,
-            }) if args.is_unevalled() => (*function, *debug_on_exit),
-            other => panic!(
-                "set_backtrace_args_evalled_owned: expected UNEVALLED Backtrace at specpdl[{count}], got {other:?}"
-            ),
-        };
-        let replacement = self.evaluated_backtrace_from_owned(function, debug_on_exit, evaluated);
-        self.specpdl[count] = replacement;
     }
 
     pub(crate) fn save_specpdl_roots(&self) -> SpecpdlRootScopeState {
@@ -2390,68 +2346,10 @@ impl Context {
     }
 
     #[inline]
-    pub(super) fn backtrace_arg_or_nil(&self, args: &BacktraceArgs, index: usize) -> Value {
-        match args.view() {
-            BacktraceArgsView::Unevalled(_) | BacktraceArgsView::Evaluated0 => Value::NIL,
-            BacktraceArgsView::Evaluated(args_index) => self
-                .backtrace_args_stack
-                .get(args_index)
-                .and_then(|args| args.get(index).copied())
-                .unwrap_or(Value::NIL),
-            BacktraceArgsView::EvaluatedBcStack(span) => {
-                if index < span.len() {
-                    self.bc_buf
-                        .get(span.start().saturating_add(index))
-                        .copied()
-                        .unwrap_or(Value::NIL)
-                } else {
-                    Value::NIL
-                }
-            }
-        }
-    }
-
-    #[inline]
-    pub(super) fn backtrace_evaluated_arg_or_nil(&self, count: usize, index: usize) -> Value {
-        match self.specpdl.get(count) {
-            Some(SpecBinding::Backtrace { args, .. }) if args.is_evaluated() => {
-                self.backtrace_arg_or_nil(args, index)
-            }
-            Some(SpecBinding::Backtrace1 { arg, .. }) => {
-                if index == 0 {
-                    *arg
-                } else {
-                    Value::NIL
-                }
-            }
-            Some(SpecBinding::Backtrace2 { arg0, arg1, .. }) => match index {
-                0 => *arg0,
-                1 => *arg1,
-                _ => Value::NIL,
-            },
-            Some(SpecBinding::BacktraceNative {
-                args_ptr, nargs, ..
-            }) => {
-                if index < *nargs as usize {
-                    // SAFETY: variant contract — the caller's call-args
-                    // slot outlives this entry.
-                    Value::from_bits(unsafe { *args_ptr.add(index) } as usize)
-                } else {
-                    Value::NIL
-                }
-            }
-            Some(other) => panic!(
-                "backtrace_evaluated_arg_or_nil: expected EVALD Backtrace at specpdl[{count}], got {other:?}"
-            ),
-            None => panic!("backtrace_evaluated_arg_or_nil: specpdl index out of range"),
-        }
-    }
-
-    #[inline]
-    /// [`Self::dispatch_subr_entry_from_backtrace_unchecked`] for a frame
-    /// whose arguments lie on the VM operand stack at `args_start`: the
-    /// fixed-arity call reads them there, missing optionals are nil, as GNU
-    /// `eval_sub` fills `argvals` with `Qnil` up to `maxargs`.
+    /// Dispatch a fixed-arity subr entry for a frame whose arguments lie on
+    /// the VM operand stack at `args_start`: the call reads them there, and
+    /// missing optionals are nil, as GNU `eval_sub` fills `argvals` with
+    /// `Qnil` up to `maxargs`.
     pub(crate) fn dispatch_subr_entry_from_bc_stack(
         &mut self,
         entry: SubrEntry,
@@ -2528,77 +2426,6 @@ impl Context {
                     arg(self, 7),
                 );
                 Some(func(self, a0, a1, a2, a3, a4, a5, a6, a7))
-            }
-            SubrFn::Many(_) | SubrFn::ManyNoContext(_) | SubrFn::ManySlice(_) => None,
-        }
-    }
-
-    pub(crate) fn dispatch_subr_entry_from_backtrace_unchecked(
-        &mut self,
-        entry: SubrEntry,
-        backtrace_count: usize,
-    ) -> Option<EvalResult> {
-        match entry.function? {
-            SubrFn::A0(func) => Some(func(self)),
-            SubrFn::A1(func) => {
-                let arg0 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 0);
-                Some(func(self, arg0))
-            }
-            SubrFn::A2(func) => {
-                let arg0 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 0);
-                let arg1 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 1);
-                Some(func(self, arg0, arg1))
-            }
-            SubrFn::A3(func) => {
-                let arg0 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 0);
-                let arg1 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 1);
-                let arg2 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 2);
-                Some(func(self, arg0, arg1, arg2))
-            }
-            SubrFn::A4(func) => {
-                let arg0 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 0);
-                let arg1 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 1);
-                let arg2 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 2);
-                let arg3 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 3);
-                Some(func(self, arg0, arg1, arg2, arg3))
-            }
-            SubrFn::A5(func) => {
-                let arg0 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 0);
-                let arg1 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 1);
-                let arg2 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 2);
-                let arg3 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 3);
-                let arg4 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 4);
-                Some(func(self, arg0, arg1, arg2, arg3, arg4))
-            }
-            SubrFn::A6(func) => {
-                let arg0 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 0);
-                let arg1 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 1);
-                let arg2 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 2);
-                let arg3 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 3);
-                let arg4 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 4);
-                let arg5 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 5);
-                Some(func(self, arg0, arg1, arg2, arg3, arg4, arg5))
-            }
-            SubrFn::A7(func) => {
-                let arg0 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 0);
-                let arg1 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 1);
-                let arg2 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 2);
-                let arg3 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 3);
-                let arg4 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 4);
-                let arg5 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 5);
-                let arg6 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 6);
-                Some(func(self, arg0, arg1, arg2, arg3, arg4, arg5, arg6))
-            }
-            SubrFn::A8(func) => {
-                let arg0 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 0);
-                let arg1 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 1);
-                let arg2 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 2);
-                let arg3 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 3);
-                let arg4 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 4);
-                let arg5 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 5);
-                let arg6 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 6);
-                let arg7 = self.backtrace_evaluated_arg_or_nil(backtrace_count, 7);
-                Some(func(self, arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7))
             }
             SubrFn::Many(_) | SubrFn::ManyNoContext(_) | SubrFn::ManySlice(_) => None,
         }

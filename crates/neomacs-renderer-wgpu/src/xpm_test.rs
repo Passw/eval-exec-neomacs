@@ -21,7 +21,7 @@ static char * test[] = {
     // Top-left pixel should be red
     assert_eq!(&rgba[0..4], &[255, 0, 0, 255]);
     // Second pixel in second row should be transparent
-    assert_eq!(&rgba[(1 * 4 + 1) * 4..(1 * 4 + 1) * 4 + 4], &[0, 0, 0, 0]);
+    assert_eq!(&rgba[(4 + 1) * 4..(4 + 1) * 4 + 4], &[0, 0, 0, 0]);
 }
 
 #[test]

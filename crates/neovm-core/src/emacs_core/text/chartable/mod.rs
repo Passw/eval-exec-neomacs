@@ -18,7 +18,7 @@
 
 use super::error::{EvalResult, Flow, signal};
 use super::eval::{Context, push_scratch_gc_root, restore_scratch_gc_roots, save_scratch_gc_roots};
-use super::intern::{NIL_SYM_ID, SymId, T_SYM_ID, intern, resolve_sym};
+use super::intern::{NIL_SYM_ID, SymId, T_SYM_ID, intern};
 use super::value::*;
 use crate::emacs_core::error::LispCondition;
 use crate::emacs_core::error::{expect_args, expect_max_args, expect_min_args};
@@ -2500,9 +2500,9 @@ pub(crate) fn display_dependency_children(table: Value) -> Option<Vec<Value>> {
     }
     let slots = table.as_vector_data()?;
     let mut values = vec![slots[CT_DEFAULT], slots[CT_PARENT]];
-    values.extend_from_slice(&slots[CT_EXTRA_START..ct_data_start(&slots)]);
+    values.extend_from_slice(&slots[CT_EXTRA_START..ct_data_start(slots)]);
     values.extend(
-        ct_collect_raw_entries(&slots, false)
+        ct_collect_raw_entries(slots, false)
             .into_iter()
             .map(|entry| entry.value),
     );

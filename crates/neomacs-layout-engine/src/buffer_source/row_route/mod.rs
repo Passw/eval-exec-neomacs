@@ -330,7 +330,6 @@ pub(crate) struct RowRouteRowStart<'a> {
 /// Pixel-fit inputs. A whole-line plan must hold the line WITHOUT
 /// continuation or truncation, applied strictly (a line exactly filling the
 /// row is NOT eligible — its line end interacts with continuation policy);
-
 /// an overflow-prefix plan (phase 2f) covers the maximal fitting prefix of
 /// an over-wide line instead. Either way the routed render re-verifies with
 /// the same natural measurement the buffer pipeline uses before committing.

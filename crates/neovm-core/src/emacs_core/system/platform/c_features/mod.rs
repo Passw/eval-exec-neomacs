@@ -81,7 +81,11 @@ impl HereDecision {
 pub(crate) struct GnuCFeature {
     pub(crate) name: &'static str,
     /// `file:line` of the `Fprovide` (or of the seed, for `emacs`).
+    #[cfg_attr(not(test), allow(dead_code))]
+    // read only by tests/surface.rs: the citation is the row's evidence
     pub(crate) gnu_site: &'static str,
+    #[cfg_attr(not(test), allow(dead_code))]
+    // read only by tests/surface.rs: the guard is the row's evidence
     pub(crate) gnu_guard: GnuGuard,
     pub(crate) here: HereDecision,
 }

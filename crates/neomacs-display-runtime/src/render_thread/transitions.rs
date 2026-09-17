@@ -119,6 +119,7 @@ pub(super) struct ActiveTransition {
 /// Window transition state.
 ///
 /// Groups configuration, the composition ring, and active transition maps.
+#[derive(Default)]
 pub(crate) struct TransitionState {
     // Configuration
     pub(super) policy: TransitionPolicy,
@@ -129,16 +130,6 @@ pub(crate) struct TransitionState {
 
     // Active transitions
     active: HashMap<TransitionKey, ActiveTransition>,
-}
-
-impl Default for TransitionState {
-    fn default() -> Self {
-        Self {
-            policy: TransitionPolicy::default(),
-            compositions: None,
-            active: HashMap::new(),
-        }
-    }
 }
 
 impl TransitionState {

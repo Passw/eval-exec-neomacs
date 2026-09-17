@@ -1,7 +1,7 @@
 //! Combo: cl-eieio syntax-table + parse-partial-sexp + overlays + markers
 //! + textprop + buflocal + narrow + undo.
-//! Tests syntax table manipulation, sexp parsing, and scan-lists with
-//! EIEIO objects, overlays, and complex editing.
+//!   Tests syntax table manipulation, sexp parsing, and scan-lists with
+//!   EIEIO objects, overlays, and complex editing.
 
 use crate::common::assert_oracle_parity;
 use crate::common::return_if_neovm_enable_oracle_proptest_not_set;

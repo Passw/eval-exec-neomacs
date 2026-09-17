@@ -458,7 +458,6 @@ pub(crate) struct SubrEntry {
     pub(crate) min_args: u16,
     pub(crate) max_args: Option<u16>,
     pub(crate) dispatch_kind: crate::tagged::header::SubrDispatchKind,
-    pub(crate) name_id: crate::emacs_core::intern::NameId,
     pub(crate) interactive_spec: Option<super::interactive::BuiltinInteractiveSpec>,
 }
 
@@ -721,7 +720,6 @@ pub(crate) fn subr_entry_from_value(function: Value) -> Option<(SymId, SubrEntry
             min_args: subr.min_args,
             max_args: subr.max_args,
             dispatch_kind: subr.dispatch_kind,
-            name_id: subr.name,
             interactive_spec: lookup_global_subr_entry(subr.sym_id)
                 .and_then(|entry| entry.interactive_spec),
         },
@@ -755,7 +753,6 @@ pub(crate) fn subr_call_entry_from_value(function: Value) -> Option<(SymId, Subr
             min_args: subr.min_args,
             max_args: subr.max_args,
             dispatch_kind: subr.dispatch_kind,
-            name_id: subr.name,
             interactive_spec: None,
         },
     ))
@@ -1246,11 +1243,6 @@ impl BacktraceArgs {
     }
 
     #[inline]
-    fn is_evaluated(self) -> bool {
-        !self.is_unevalled()
-    }
-
-    #[inline]
     fn is_bytecode_storage(self) -> bool {
         matches!(
             self.view(),
@@ -1297,7 +1289,7 @@ impl BytecodeBacktraceFrame {
             0,
             "a Vec length cannot occupy the bytecode-frame ownership bit"
         );
-        Self(base | usize::from(owns_args) * Self::OWNED_ARGS_FLAG)
+        Self(base | (usize::from(owns_args) * Self::OWNED_ARGS_FLAG))
     }
 
     #[inline]
@@ -2289,6 +2281,7 @@ impl ResolvedOpenedFont {
 }
 
 #[cfg(test)]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn test_resolved_opened_font(
     family: &str,
     foundry: Option<&str>,
@@ -6306,17 +6299,17 @@ impl Context {
                 // directly). `read_localized`'s same-buffer epoch check makes
                 // the common read one compare + one cdr.
                 crate::emacs_core::symbol::SymbolRedirect::Localized => {
-                    if let Some(buf) = self.buffers.current_buffer() {
-                        if let Some(value) = self.obarray.read_localized_for_buffer(
+                    if let Some(buf) = self.buffers.current_buffer()
+                        && let Some(value) = self.obarray.read_localized_for_buffer(
                             sym_id,
                             buf.id,
                             buf.local_var_alist_value(),
-                        ) {
-                            if value.is_unbound() {
-                                return Ok(SymbolValueLookup::Unbound);
-                            }
-                            return Ok(SymbolValueLookup::Bound(value));
+                        )
+                    {
+                        if value.is_unbound() {
+                            return Ok(SymbolValueLookup::Unbound);
                         }
+                        return Ok(SymbolValueLookup::Bound(value));
                     }
                 }
                 crate::emacs_core::symbol::SymbolRedirect::Forwarded => {
@@ -6356,17 +6349,17 @@ impl Context {
                 // redirect tag and only walks `local_var_alist` for
                 // `SYMBOL_LOCALIZED`.
                 SymbolRedirect::Localized => {
-                    if let Some(buf) = self.buffers.current_buffer() {
-                        if let Some(value) = self.obarray.read_localized_for_buffer(
+                    if let Some(buf) = self.buffers.current_buffer()
+                        && let Some(value) = self.obarray.read_localized_for_buffer(
                             resolved,
                             buf.id,
                             buf.local_var_alist_value(),
-                        ) {
-                            if value.is_unbound() {
-                                return Ok(SymbolValueLookup::Unbound);
-                            }
-                            return Ok(SymbolValueLookup::Bound(value));
+                        )
+                    {
+                        if value.is_unbound() {
+                            return Ok(SymbolValueLookup::Unbound);
                         }
+                        return Ok(SymbolValueLookup::Bound(value));
                     }
                 }
                 SymbolRedirect::Forwarded => {
@@ -7623,17 +7616,17 @@ impl Context {
         if let Some(sym) = self.obarray.get_by_id(resolved) {
             match sym.redirect() {
                 SymbolRedirect::Localized => {
-                    if let Some(buf) = self.buffers.current_buffer() {
-                        if let Some(value) = self.obarray.read_localized_for_buffer(
+                    if let Some(buf) = self.buffers.current_buffer()
+                        && let Some(value) = self.obarray.read_localized_for_buffer(
                             resolved,
                             buf.id,
                             buf.local_var_alist_value(),
-                        ) {
-                            if value.is_unbound() {
-                                return None;
-                            }
-                            return Some(value);
+                        )
+                    {
+                        if value.is_unbound() {
+                            return None;
                         }
+                        return Some(value);
                     }
                 }
                 SymbolRedirect::Forwarded => {

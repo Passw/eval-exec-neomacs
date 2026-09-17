@@ -45,7 +45,7 @@ pub(crate) struct SyntheticTextAppendRequest {
 enum SyntheticTextAppendFace {
     ActiveFace,
     TextRowMetrics {
-        face: ResolvedFrameFace,
+        face: Box<ResolvedFrameFace>,
         metrics: DisplayRowFallbackMetrics,
     },
 }
@@ -195,7 +195,10 @@ impl SyntheticTextAppendRequest {
         Self {
             position,
             source,
-            face: SyntheticTextAppendFace::TextRowMetrics { face, metrics },
+            face: SyntheticTextAppendFace::TextRowMetrics {
+                face: Box::new(face),
+                metrics,
+            },
         }
     }
 
@@ -209,7 +212,7 @@ impl SyntheticTextAppendRequest {
             position,
             source: SyntheticTextSource::marker(marker),
             face: SyntheticTextAppendFace::TextRowMetrics {
-                face: default_face,
+                face: Box::new(default_face),
                 metrics,
             },
         }
@@ -335,7 +338,7 @@ impl<'a> SyntheticTextRowAppendContext<'a> {
             }
             SyntheticTextAppendFace::TextRowMetrics { face, metrics } => self
                 .text_row(
-                    face,
+                    *face,
                     metrics.row_height(),
                     metrics.ascent(),
                     metrics.char_width(),

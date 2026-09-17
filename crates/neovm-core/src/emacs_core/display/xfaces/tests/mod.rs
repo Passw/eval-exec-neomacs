@@ -268,7 +268,7 @@ fn register_bootstrap_vars_matches_gnu_defaults() {
     if !table.is_hash_table() {
         panic!("face--new-frame-defaults must be a hash table");
     };
-    let test = table.as_hash_table().unwrap().test.clone();
+    let test = table.as_hash_table().unwrap().test;
     assert_eq!(test, HashTableTest::Eq);
 }
 

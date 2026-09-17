@@ -192,17 +192,6 @@ pub(super) fn char_equal_folded(code: i64) -> Option<String> {
 ///
 /// GNU Emacs accepts marker designators anywhere `integer-or-marker-p`
 /// is allowed, using the marker's current position.
-pub(super) fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
-    match value.kind() {
-        ValueKind::Fixnum(n) => Ok(n),
-        _ if super::marker::is_marker(value) => super::marker::marker_position_as_int(value),
-        _ => Err(signal(
-            LispCondition::WrongTypeArgument,
-            vec![Value::symbol("integer-or-marker-p"), *value],
-        )),
-    }
-}
-
 pub(super) fn expect_integer_or_marker_eval(
     eval: &super::eval::Context,
     value: &Value,

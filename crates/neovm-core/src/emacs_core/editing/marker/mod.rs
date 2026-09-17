@@ -356,6 +356,7 @@ pub(crate) fn builtin_markerp(args: Vec<Value>) -> EvalResult {
 }
 
 /// Eval-dependent marker-position that reads adjusted positions from the buffer.
+#[cfg(test)]
 pub(crate) fn builtin_marker_position(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -366,7 +367,7 @@ pub(crate) fn builtin_marker_position(
 }
 /// `marker-position` as registered: fixed arity 1, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a1` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
+/// The `Vec` entry point above serves the unit tests.
 pub(crate) fn builtin_marker_position_1(
     eval: &mut super::eval::Context,
     marker: Value,
@@ -379,7 +380,7 @@ pub(crate) fn builtin_marker_position_in_buffers(
     _buffers: &BufferManager,
     args: &[Value],
 ) -> EvalResult {
-    expect_args("marker-position", &args, 1)?;
+    expect_args("marker-position", args, 1)?;
     expect_marker("marker-position", &args[0])?;
     Ok(marker_position_value(&args[0]))
 }
@@ -521,14 +522,9 @@ pub(crate) fn builtin_copy_marker_in_buffers(
 /// Set the position and (optionally) the buffer of MARKER.  If POSITION is
 /// nil, the marker is unset (points nowhere).  BUFFER defaults to the current
 /// buffer.
-pub(crate) fn builtin_set_marker(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
-    crate::emacs_core::error::expect_args_range("set-marker", &args, 2, 3)?;
-    let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
-    builtin_set_marker_3(eval, arg(0), arg(1), arg(2))
-}
-/// `set-marker` as registered: fixed arity 3, called straight off the bytecode
-/// stack like GNU `funcall_subr`'s `a3` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
+///
+/// Registered with fixed arity 3 and called straight off the bytecode stack
+/// like GNU `funcall_subr`'s `a3` case (absent optionals arrive as nil).
 pub(crate) fn builtin_set_marker_3(
     eval: &mut super::eval::Context,
     marker: Value,
@@ -543,7 +539,7 @@ pub(crate) fn builtin_set_marker_in_buffers(
     buffers: &mut BufferManager,
     args: &[Value],
 ) -> EvalResult {
-    expect_args_range("set-marker", &args, 2, 3)?;
+    expect_args_range("set-marker", args, 2, 3)?;
     expect_marker("set-marker", &args[0])?;
 
     let targets_current_mark = marker_targets_current_mark(&args[0]);

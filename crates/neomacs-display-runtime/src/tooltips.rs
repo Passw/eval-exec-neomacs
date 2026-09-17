@@ -71,7 +71,7 @@ struct MappedTooltip {
 enum Presentation {
     #[default]
     Hidden,
-    Ready(ReadyTooltip),
+    Ready(Box<ReadyTooltip>),
     Mapped(Box<MappedTooltip>),
 }
 
@@ -93,37 +93,36 @@ impl Tooltips {
             return;
         }
         let expires = now.checked_add(request.timeout).unwrap_or(now);
-        if let Presentation::Mapped(mapped) = &mut self.state {
-            if mapped.ready.owner.parent.id() == owner.parent.id()
-                && mapped.ready.request.same_content(&request)
+        if let Presentation::Mapped(mapped) = &mut self.state
+            && mapped.ready.owner.parent.id() == owner.parent.id()
+            && mapped.ready.request.same_content(&request)
+        {
+            mapped.ready.expires = expires;
+            if mapped.ready.owner.anchor != owner.anchor
+                || mapped.ready.request.offset != request.offset
             {
-                mapped.ready.expires = expires;
-                if mapped.ready.owner.anchor != owner.anchor
-                    || mapped.ready.request.offset != request.offset
-                {
-                    mapped.reposition = Some(placement(&owner, &request));
-                }
-                mapped.ready.owner = owner;
-                mapped.ready.request = request;
-                if let TooltipSource::Lisp(ticket) = &mapped.ready.source {
-                    ticket.cancel();
-                }
-                if let TooltipSource::Lisp(ticket) = &source
-                    && mapped.host.submitted_window(0).is_some()
-                {
-                    ticket.mark_visible();
-                }
-                mapped.ready.source = source;
-                return;
+                mapped.reposition = Some(placement(&owner, &request));
             }
+            mapped.ready.owner = owner;
+            mapped.ready.request = request;
+            if let TooltipSource::Lisp(ticket) = &mapped.ready.source {
+                ticket.cancel();
+            }
+            if let TooltipSource::Lisp(ticket) = &source
+                && mapped.host.submitted_window(0).is_some()
+            {
+                ticket.mark_visible();
+            }
+            mapped.ready.source = source;
+            return;
         }
         self.hide();
-        self.state = Presentation::Ready(ReadyTooltip {
+        self.state = Presentation::Ready(Box::new(ReadyTooltip {
             owner,
             request,
             expires,
             source,
-        });
+        }));
     }
 
     pub fn hide(&mut self) -> bool {
@@ -150,7 +149,7 @@ impl Tooltips {
     fn ready(&self) -> Option<&ReadyTooltip> {
         match &self.state {
             Presentation::Hidden => None,
-            Presentation::Ready(ready) => Some(ready),
+            Presentation::Ready(ready) => Some(&**ready),
             Presentation::Mapped(mapped) => Some(&mapped.ready),
         }
     }
@@ -191,7 +190,7 @@ impl Tooltips {
         self.commit_retirements(commit);
         self.state = match std::mem::take(&mut self.state) {
             Presentation::Ready(ready) => Presentation::Mapped(Box::new(MappedTooltip::create(
-                ready, commit, instance, adapter, device, queue, format,
+                *ready, commit, instance, adapter, device, queue, format,
             )?)),
             state @ (Presentation::Hidden | Presentation::Mapped(_)) => state,
         };
@@ -239,10 +238,10 @@ impl Tooltips {
                 mapped.host.draw(depth, device, queue, |target| {
                     renderer.render_native_tooltip(target, &mapped.paint, &mut mapped.atlas)
                 });
-                if mapped.host.submitted_window(depth).is_some() {
-                    if let TooltipSource::Lisp(ticket) = &mapped.ready.source {
-                        ticket.mark_visible();
-                    }
+                if mapped.host.submitted_window(depth).is_some()
+                    && let TooltipSource::Lisp(ticket) = &mapped.ready.source
+                {
+                    ticket.mark_visible();
                 }
             }
             _ => {}

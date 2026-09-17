@@ -1,5 +1,5 @@
-//! Strict combo oracle probes, batch 319: multi-subsystem combo -- buffer edit
-//! + marker tracking + overlay + text-property + undo, all interacting.
+//! Strict combo oracle probes, batch 319: multi-subsystem combo -- buffer
+//! edit + marker tracking + overlay + text-property + undo, all interacting.
 //! Uses assert_oracle_parity_expect format.
 
 use crate::common::return_if_neovm_enable_oracle_proptest_not_set;

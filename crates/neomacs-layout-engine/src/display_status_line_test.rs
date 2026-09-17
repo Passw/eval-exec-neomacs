@@ -565,9 +565,11 @@ fn tab_bar_image_relief_styles_resolve_color_source_per_image_slot() {
         image(1, face_box, Some(0x22_33_44)),
         image(2, face_background, None),
     ];
-    let mut background = neomacs_display_protocol::face::Face::default();
-    background.id = face_background;
-    background.background = Color::BLUE;
+    let background = neomacs_display_protocol::face::Face {
+        id: face_background,
+        background: Color::BLUE,
+        ..Default::default()
+    };
     let mut boxed = background.clone();
     boxed.id = face_box;
     boxed.box_color = Some(Color::RED);
@@ -619,9 +621,11 @@ fn tab_bar_image_relief_uses_glyph_at_visual_column_after_wide_stretch() {
     };
     row.glyphs[GlyphArea::Text.index()] = vec![Glyph::stretch(3, fallback_face), image_glyph];
 
-    let mut fallback = neomacs_display_protocol::face::Face::default();
-    fallback.id = fallback_face;
-    fallback.background = Color::BLUE;
+    let fallback = neomacs_display_protocol::face::Face {
+        id: fallback_face,
+        background: Color::BLUE,
+        ..Default::default()
+    };
     let mut image = fallback.clone();
     image.id = image_face;
     image.box_color = Some(Color::RED);

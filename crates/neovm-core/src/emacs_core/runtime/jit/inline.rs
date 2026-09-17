@@ -37,7 +37,7 @@
 //! caller's feedback vector says nothing about a spliced op, and reading the
 //! wrong one is the mistake that made `(1+ 3.0)` return a shifted pointer.
 
-use super::compile::{CompileError, analyze_cfg};
+use super::compile::analyze_cfg;
 use crate::emacs_core::bytecode::ByteCodeFunction;
 use crate::emacs_core::bytecode::chunk::GnuByteOffsetMapEntry;
 use crate::emacs_core::bytecode::opcode::Op;
@@ -84,8 +84,6 @@ pub(crate) struct FusedBody {
     pub(crate) regions: Vec<InlineRegion>,
     /// Fused pc -> the region it belongs to, or `None` for caller code.
     pub(crate) region_of: Vec<Option<usize>>,
-    /// Original caller pc -> fused pc.
-    pub(crate) fused_of_caller: Vec<usize>,
     /// Fused pc -> the ORIGINAL caller pc it came from (a region's ops all map
     /// to the call they replaced). A deopt resumes the interpreter in the
     /// UNFUSED body, so every pc that escapes into deopt metadata has to come
@@ -378,7 +376,7 @@ pub(crate) fn fuse_calls(
                 && let Some(cidx) = tags[tags.len() - 1 - nargs]
                 && let Some(callee) = constants.get(cidx as usize)
                 && let Some(bc) = callee.get_bytecode_data()
-                && caller_depth[i] >= nargs + 1
+                && caller_depth[i] > nargs
             {
                 match site_verdict(bc, nargs, pool_len) {
                     Ok(depths) => {
@@ -583,7 +581,6 @@ fn splice_sites(
         offset_map: fused_map,
         regions,
         region_of,
-        fused_of_caller,
         caller_of_fused,
     })
 }

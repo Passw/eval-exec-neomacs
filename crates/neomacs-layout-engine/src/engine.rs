@@ -218,6 +218,9 @@ impl LayoutPurpose {
 }
 
 /// Exhaustive result of one renderer-facing frame attempt.
+// Built and consumed once per layout attempt on the frame hot path; boxing
+// the large variant would add a heap allocation per attempt.
+#[allow(clippy::large_enum_variant)]
 #[must_use = "a frame attempt must be prepared or discarded"]
 pub enum FrameLayoutAttempt {
     Prepared(neomacs_display_protocol::SealedFramePresentation),
@@ -240,6 +243,12 @@ pub struct WindowLayoutQuerySeed {
 /// from mutating or preparing the renderer transaction that invoked Lisp.
 pub struct WindowLayoutQueryEngine {
     inner: LayoutEngine,
+}
+
+impl Default for WindowLayoutQueryEngine {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl WindowLayoutQueryEngine {
@@ -841,9 +850,11 @@ impl PreparedGuiChromeSemantics {
             .frame_manager()
             .get(frame_id)
             .is_some_and(|frame| frame.compact_bar_height > 0 || frame.menu_bar_height > 0);
-        let menu_items = needs_menu_items
-            .then(|| collect_gui_menu_bar_items_for_frame(evaluator, frame_id))
-            .unwrap_or_default();
+        let menu_items = if needs_menu_items {
+            collect_gui_menu_bar_items_for_frame(evaluator, frame_id)
+        } else {
+            Default::default()
+        };
         let needs_tab_bar = evaluator
             .frame_manager()
             .get(frame_id)
@@ -867,9 +878,11 @@ impl PreparedGuiChromeSemantics {
                         .known_frame_parameter_int(FrameParam::ToolBarLines)
                         .is_some_and(|lines| lines > 0)
             });
-        let tool_items = needs_tool_items
-            .then(|| collect_gui_tool_bar_items_for_frame(evaluator, frame_id))
-            .unwrap_or_default();
+        let tool_items = if needs_tool_items {
+            collect_gui_tool_bar_items_for_frame(evaluator, frame_id)
+        } else {
+            Default::default()
+        };
         Some(Self {
             menu_items,
             built_tab_bar,
@@ -882,6 +895,9 @@ impl PreparedGuiChromeSemantics {
 ///
 /// `Effect` is affine work: the row producer cannot proceed until the caller
 /// executes it and recollects the leaf's complete live input projection.
+// Built and consumed once per layout attempt on the frame hot path; boxing
+// the large variant would add a heap allocation per attempt.
+#[allow(clippy::large_enum_variant)]
 enum LeafLayoutAttempt {
     Completed {
         outcome: WindowLayoutOutcome,
@@ -1689,7 +1705,7 @@ impl LayoutEngine {
             // Lisp boundaries.
             let (frame_params, mut window_params_list, query_main_area_bottom) =
                 if let Some(target) = query_window {
-                    let target = neovm_core::window::WindowId(target.0 as u64);
+                    let target = neovm_core::window::WindowId(target.0);
                     let Some(path) = window_paths.get(&target) else {
                         evaluator.retire_interaction_presentation(presentation_id);
                         self.reset_frame_attempt_state();
@@ -3135,12 +3151,11 @@ impl LayoutEngine {
             }
         };
         if prev.chrome_reusable_after_cursor_move(&replay, chrome_reuse_context(params, evaluator))
+            && let Some(chrome) = prev.retained_chrome()
         {
-            if let Some(chrome) = prev.retained_chrome() {
-                crate::neovm_bridge::CHROME_ROWS_REUSED
-                    .fetch_add(chrome.rows.len(), std::sync::atomic::Ordering::Relaxed);
-                replay.chrome = Some(chrome);
-            }
+            crate::neovm_bridge::CHROME_ROWS_REUSED
+                .fetch_add(chrome.rows.len(), std::sync::atomic::Ordering::Relaxed);
+            replay.chrome = Some(chrome);
         }
         Some(replay)
     }
@@ -3322,12 +3337,11 @@ impl LayoutEngine {
                     buffer.char_at_emacs_byte_pos(byte) == Some('\n')
                 })
             },
-        ) {
-            if let Some(chrome) = prev.retained_chrome() {
-                crate::neovm_bridge::CHROME_ROWS_REUSED
-                    .fetch_add(chrome.rows.len(), std::sync::atomic::Ordering::Relaxed);
-                replay.chrome = Some(chrome);
-            }
+        ) && let Some(chrome) = prev.retained_chrome()
+        {
+            crate::neovm_bridge::CHROME_ROWS_REUSED
+                .fetch_add(chrome.rows.len(), std::sync::atomic::Ordering::Relaxed);
+            replay.chrome = Some(chrome);
         }
         Some(replay)
     }

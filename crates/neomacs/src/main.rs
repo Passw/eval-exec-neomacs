@@ -2139,11 +2139,7 @@ impl DisplayHost for PrimaryWindowDisplayHost {
             .synchronized_font_metrics()
             .open_font_entity(&query, pixel_size)
         {
-            let file = opened
-                .entity
-                .matched
-                .file_path()
-                .map(|file| LispString::from_utf8(file));
+            let file = opened.entity.matched.file_path().map(LispString::from_utf8);
             let capability = font_otf_capability_for_asset(&opened.entity.matched.asset);
             return Ok(Some(ResolvedFontEntityMetrics {
                 metrics: core_font_px_metrics(opened.metrics),
@@ -3787,12 +3783,11 @@ fn run_gui_evaluator_worker(
                 if evaluator_disconnected {
                     break;
                 }
-                if queued_input {
-                    if let Some(notifier) = &input_notifier
-                        && let Err(error) = notifier.notify()
-                    {
-                        tracing::error!(%error, "input bridge failed to wake evaluator");
-                    }
+                if queued_input
+                    && let Some(notifier) = &input_notifier
+                    && let Err(error) = notifier.notify()
+                {
+                    tracing::error!(%error, "input bridge failed to wake evaluator");
                 }
             }
         })
@@ -4452,12 +4447,11 @@ pub fn run(mode: RuntimeMode) {
                     if evaluator_disconnected {
                         break; // Context dropped
                     }
-                    if queued_input {
-                        if let Some(notifier) = &input_notifier
-                            && let Err(error) = notifier.notify()
-                        {
-                            tracing::error!(%error, "input bridge failed to wake evaluator");
-                        }
+                    if queued_input
+                        && let Some(notifier) = &input_notifier
+                        && let Err(error) = notifier.notify()
+                    {
+                        tracing::error!(%error, "input bridge failed to wake evaluator");
                     }
                 }
             })
@@ -4890,7 +4884,7 @@ fn bootstrap_buffers_with_font(
     let (bootstrap_font, bootstrap_font_name) = match font {
         startup_font::BootstrapFont::Tty => (Value::NIL, Value::string("fixed")),
         startup_font::BootstrapFont::Gui(font) => {
-            let selected = font.into_selected();
+            let selected = (*font).into_selected();
             let name = Value::string(format!(
                 "-*-{}-{}-{}-*-*-{}-*-*-*-*-*-*-*",
                 selected.resolved.family,

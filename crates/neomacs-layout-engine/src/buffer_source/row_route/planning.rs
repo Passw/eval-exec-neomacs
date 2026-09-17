@@ -70,10 +70,9 @@ pub(crate) fn plan_plain_row_classified<B: LayoutBufferView>(
         .count();
     if policy.point_charpos >= row.charpos
         && policy.point_charpos <= row.charpos + line_byte_len as i64
+        && policy.point_charpos <= row.charpos + line_char_len as i64
     {
-        if policy.point_charpos <= row.charpos + line_char_len as i64 {
-            return Err(RouteRefusal::PointInRow);
-        }
+        return Err(RouteRefusal::PointInRow);
     }
     let row_char_start = CharPos0::new(row.charpos.max(0) as usize);
     let row_char_end = row_char_start.add_len(neovm_core::buffer::CharLen::new(line_char_len));

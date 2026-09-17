@@ -369,7 +369,7 @@ fn defvar_local_marks_buffer_local() {
     assert!(ev.obarray().is_buffer_local("my-local"));
     // Phase D: is_auto_buffer_local mirror removed; verify via BLV local_if_set.
     let id = crate::emacs_core::intern::intern("my-local");
-    assert!(ev.obarray().blv(id).map_or(false, |b| b.local_if_set));
+    assert!(ev.obarray().blv(id).is_some_and(|b| b.local_if_set));
 }
 
 #[test]
@@ -1151,8 +1151,8 @@ fn defvar_local_then_buffer_local_check() {
     // Phase D: is_auto_buffer_local mirror removed; verify via BLV local_if_set.
     let id_local = crate::emacs_core::intern::intern("my-local-var");
     let id_other = crate::emacs_core::intern::intern("other-var");
-    assert!(ev.obarray().blv(id_local).map_or(false, |b| b.local_if_set));
-    assert!(ev.obarray().blv(id_other).map_or(false, |b| b.local_if_set));
+    assert!(ev.obarray().blv(id_local).is_some_and(|b| b.local_if_set));
+    assert!(ev.obarray().blv(id_other).is_some_and(|b| b.local_if_set));
 }
 
 #[test]

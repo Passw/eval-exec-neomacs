@@ -981,7 +981,7 @@ impl SymbolRegistry {
             |slot: usize, runtime_name: NameId, is_canonical: bool| -> Option<SymId> {
                 let (live_name, live_canonical) = *seed_prefix.get(slot)?;
                 (live_name == runtime_name && live_canonical == is_canonical)
-                    .then(|| SymId(slot as u32))
+                    .then_some(SymId(slot as u32))
             };
 
         let symbol_remap = symbol_names

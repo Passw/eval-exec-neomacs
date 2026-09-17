@@ -4434,9 +4434,7 @@ impl FaceResolver {
             return Some(self.resolve_named_face_overlay_spec(name, depth, diagnostics));
         }
 
-        let Some(items) = list_to_vec(&face_ref) else {
-            return None;
-        };
+        let items = list_to_vec(&face_ref)?;
         if items.is_empty() {
             return None;
         }

@@ -1,5 +1,5 @@
-//! Combo: cl-eieio obarray / intern / unintern / mapatoms + overlays
-//! + markers + textprop + buflocal + narrow + undo.
+//! Combo: cl-eieio obarray / intern / unintern / mapatoms + overlays +
+//! markers + textprop + buflocal + narrow + undo.
 //! Tests symbol table manipulation with EIEIO objects, intern-soft,
 //! obarray operations, and mapatoms with editing.
 

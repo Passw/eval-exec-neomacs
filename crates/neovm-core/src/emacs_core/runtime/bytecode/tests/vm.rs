@@ -7,7 +7,7 @@ use crate::emacs_core::value::HashTableTest;
 use crate::window::{SplitDirection, SplitPlacement};
 use std::cell::RefCell;
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 fn new_vm(eval: &mut Context) -> Vm<'_> {
@@ -646,7 +646,7 @@ fn vm_raw_parent_bridge_helper_is_gone() {
                 if !line.contains("with_extra_gc_roots_ptr(") {
                     continue;
                 }
-                if rel == PathBuf::from("src/emacs_core/runtime/bytecode/tests/vm.rs") {
+                if rel == Path::new("src/emacs_core/runtime/bytecode/tests/vm.rs") {
                     continue;
                 }
                 unexpected.push(format!("{}:{}", rel.display(), lineno + 1));
@@ -689,7 +689,7 @@ fn vm_parent_evaluator_bridge_is_limited_to_semantic_boundaries() {
                 if !line.contains("with_extra_gc_roots(") {
                     continue;
                 }
-                let allowed = rel == PathBuf::from("src/emacs_core/runtime/bytecode/tests/vm.rs");
+                let allowed = rel == Path::new("src/emacs_core/runtime/bytecode/tests/vm.rs");
                 if !allowed {
                     unexpected.push(format!("{}:{}", rel.display(), lineno + 1));
                 }
@@ -1256,7 +1256,7 @@ fn execute_manual_vm_built<T>(
             .expect("manual bytecode should execute")
     };
 
-    let buffers = std::mem::replace(&mut eval.buffers, crate::buffer::BufferManager::new());
+    let buffers = std::mem::take(&mut eval.buffers);
     (result, buffers, init_state)
 }
 
@@ -2713,7 +2713,6 @@ fn vm_eval_shared_runtime_path_preserves_active_shared_catches() {
             if thrown.tag == Value::symbol("vm-bridge-catch")
                 && thrown.value == Value::fixnum(7)
     ));
-    drop(vm);
     eval.pop_condition_frame();
     assert_eq!(eval.condition_stack_depth_for_test(), 0);
 }

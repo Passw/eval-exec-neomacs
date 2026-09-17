@@ -805,7 +805,7 @@ impl ActivePropertyOverlays {
         window_id: Option<u64>,
         property_value: &mut impl OverlayPropertyResolver,
     ) {
-        if !overlay_range(endpoint.overlay).is_some_and(|range| !range.is_empty())
+        if overlay_range(endpoint.overlay).is_none_or(|range| range.is_empty())
             || !overlay_applies_to_window(endpoint.overlay, window_id)
         {
             return;

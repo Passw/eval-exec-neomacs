@@ -393,8 +393,8 @@ impl LoadedMmapImage {
 }
 
 /// Rewrite each relocation target word from its heap-relative target to the
-/// absolute pointer valid at [`PLANNED_MAP_BASE`]: planned + heap_file_offset
-/// + target + tag-addend. The relocation section itself is unchanged — it
+/// absolute pointer valid at [`PLANNED_MAP_BASE`]: planned + heap_file_offset +
+/// target + tag-addend. The relocation section itself is unchanged — it
 /// remains the fallback's worklist (which then delta-applies) and the audit
 /// surface.
 fn bake_relocations_at_planned_base(

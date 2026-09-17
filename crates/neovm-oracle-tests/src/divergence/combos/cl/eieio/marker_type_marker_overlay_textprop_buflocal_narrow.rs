@@ -1,5 +1,5 @@
-//! Combo: cl-eieio marker insertion types (advance/stay) + overlays + textprop
-//! + buflocal + narrow + undo.
+//! Combo: cl-eieio marker insertion types (advance/stay) + overlays +
+//! textprop + buflocal + narrow + undo.
 //! Tests marker insertion-type behavior under complex editing scenarios.
 
 use crate::common::assert_oracle_parity;

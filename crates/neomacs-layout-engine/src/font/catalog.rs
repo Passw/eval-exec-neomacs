@@ -48,7 +48,6 @@ pub struct FontCatalogChangeCursor {
 }
 
 impl FontCatalogChangeCursor {
-    #[must_use]
     pub fn poll(&mut self, counter: &FontCatalogChangeCounter) -> FontCatalogChange {
         let current = counter.0.load(Ordering::Acquire);
         if current != self.observed {
@@ -93,7 +92,6 @@ impl RateLimitedFontCatalogPoller {
         }
     }
 
-    #[must_use]
     pub(crate) fn begin(&mut self, counter: &FontCatalogChangeCounter) -> FontCatalogPollAction {
         let now = Instant::now();
         if let FontCatalogChange::Changed = self.changes.poll(counter) {
@@ -107,7 +105,6 @@ impl RateLimitedFontCatalogPoller {
         FontCatalogPollAction::ProbeNativeCatalog
     }
 
-    #[must_use]
     pub(crate) fn publish_detected(
         &mut self,
         counter: &FontCatalogChangeCounter,

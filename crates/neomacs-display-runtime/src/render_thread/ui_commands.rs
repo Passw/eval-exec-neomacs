@@ -127,30 +127,29 @@ impl RenderApp {
                         .primary_window()
                         .filter(|_| self.frame_windows.is_primary_frame_id(frame))
                 });
-                if let Some(owner) = owner {
-                    if let Some(parent) = owner.window() {
-                        let mut fonts =
-                            neomacs_display_protocol::frame_glyphs::FrameGlyphBuffer::with_size(
-                                0.0, 0.0,
-                            );
-                        if let Some(frame) = owner.render.compositor.current_frame.as_ref() {
-                            fonts.clone_font_bindings_from(frame);
-                        }
-                        let (x, y) = owner.render.mouse_pos;
-                        self.tooltips.show(
-                            crate::tooltips::TooltipOwner {
-                                frame,
-                                parent: parent.clone(),
-                                anchor: neomacs_display_protocol::Rect::new(x, y, 1.0, 1.0),
-                                metrics: owner.render.font_metrics(),
-                                fonts,
-                            },
-                            request,
-                            crate::tooltips::TooltipSource::Lisp(ticket),
-                            neomacs_display_protocol::frame_time::observe_platform_now()
-                                .into_instant(),
+                if let Some(owner) = owner
+                    && let Some(parent) = owner.window()
+                {
+                    let mut fonts =
+                        neomacs_display_protocol::frame_glyphs::FrameGlyphBuffer::with_size(
+                            0.0, 0.0,
                         );
+                    if let Some(frame) = owner.render.compositor.current_frame.as_ref() {
+                        fonts.clone_font_bindings_from(frame);
                     }
+                    let (x, y) = owner.render.mouse_pos;
+                    self.tooltips.show(
+                        crate::tooltips::TooltipOwner {
+                            frame,
+                            parent: parent.clone(),
+                            anchor: neomacs_display_protocol::Rect::new(x, y, 1.0, 1.0),
+                            metrics: owner.render.font_metrics(),
+                            fonts,
+                        },
+                        request,
+                        crate::tooltips::TooltipSource::Lisp(ticket),
+                        neomacs_display_protocol::frame_time::observe_platform_now().into_instant(),
+                    );
                 }
             }
             UiCommand::DismissTooltip { ticket } => {

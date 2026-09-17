@@ -53,7 +53,7 @@ impl TaggedHeap {
     /// during the concurrent first cycle; blackening makes the marked-based
     /// sums whole). No-op on every later cycle and on dump-less heaps.
     pub fn finish_first_partition_cycle(&mut self) {
-        if !(self.partition_dump && !self.dump_blackened) {
+        if !self.partition_dump || self.dump_blackened {
             self.first_cycle_concurrent = false;
             return;
         }

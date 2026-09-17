@@ -2279,7 +2279,9 @@ fn mir_pure_lowering_matches_interpreter() {
     use crate::emacs_core::bytecode::ByteCodeFunction;
     use crate::emacs_core::value::LambdaParams;
 
-    let cases: Vec<(Vec<Op>, Vec<Value>, usize, Vec<Value>)> = vec![
+    // (ops, constants, arity, args).
+    type Case = (Vec<Op>, Vec<Value>, usize, Vec<Value>);
+    let cases: Vec<Case> = vec![
         // (lambda (a b) (+ a b)) on (40, 2) -> 42.
         (
             vec![Op::StackRef(1), Op::StackRef(1), Op::Add, Op::Return],
@@ -4102,7 +4104,6 @@ fn gate_relax_lets_user_call_heavy_bodies_tier() {
     // builtin-heavy = neutral, e.g. font-lock). Default OFF preserves
     // `calls <= arith`.
     use crate::emacs_core::eval::Context;
-    use crate::emacs_core::intern::intern;
     let _ev = Context::new(); // subr table for cbsym_spec_kind
     force_profit_gate_for_test(true);
     // 4 user calls, 0 arith.
@@ -5553,7 +5554,7 @@ fn jit_bench_countdown_loop() {
 /// subset, run each through BOTH tiers, and hold the tiering contract:
 /// - `Ok(bits)`  -> the interpreter must produce exactly those bits;
 /// - `Deopt`     -> the seam reruns the interpreter (sound by the poisoning
-///                  analysis), so any interpreter outcome is acceptable;
+///   analysis), so any interpreter outcome is acceptable;
 /// - `Signal`    -> the interpreter must also signal.
 #[test]
 fn fuzz_straightline_bodies_match_interpreter() {
@@ -5733,22 +5734,22 @@ fn fuzz_straightline_bodies_match_interpreter() {
         // Also exercise the typed-MIR Tier-2 path (build_mir + lower_mir_pure)
         // on the same body, skipping bodies the pure subset bails on. Localizes
         // lower_mir_pure miscompiles (the module-test failures under MIR wiring).
-        if let Ok(mir) = mir::build_mir(&ops, &constants, 0) {
-            if let Ok(mleaf) = lower_mir_pure(&mir) {
-                match mleaf.call(ctx_ptr, &[]) {
-                    NativeRun::Ok(bits) => {
-                        if let Ok(want) = &interp {
-                            assert_eq!(
-                                bits,
-                                want.bits(),
-                                "seed {seed}: MIR/interpreter mismatch on {ops:?}"
-                            );
-                        }
+        if let Ok(mir) = mir::build_mir(&ops, &constants, 0)
+            && let Ok(mleaf) = lower_mir_pure(&mir)
+        {
+            match mleaf.call(ctx_ptr, &[]) {
+                NativeRun::Ok(bits) => {
+                    if let Ok(want) = &interp {
+                        assert_eq!(
+                            bits,
+                            want.bits(),
+                            "seed {seed}: MIR/interpreter mismatch on {ops:?}"
+                        );
                     }
-                    NativeRun::Deopt | NativeRun::DeoptAt(_) => {}
-                    NativeRun::Signal => {
-                        let _ = take_pending_flow();
-                    }
+                }
+                NativeRun::Deopt | NativeRun::DeoptAt(_) => {}
+                NativeRun::Signal => {
+                    let _ = take_pending_flow();
                 }
             }
         }
@@ -5792,7 +5793,7 @@ fn fuzz_varset_bodies_match_interpreter_state() {
     const VARS: usize = 3;
     let var_vals: Vec<Value> = ["fuzz-jit-var-a", "fuzz-jit-var-b", "fuzz-jit-var-c"]
         .iter()
-        .map(|n| Value::symbol(n))
+        .map(Value::symbol)
         .collect();
     let var_ids: Vec<SymId> = var_vals
         .iter()
@@ -6476,7 +6477,7 @@ fn contained_shim_panic_is_caught_by_leaf_local_condition_case() {
     };
     let err = Value::from_bits(bits);
     assert_eq!(
-        err.cons_car().as_symbol_name().as_deref(),
+        err.cons_car().as_symbol_name(),
         Some("error"),
         "binding is (error ...)"
     );
@@ -6556,7 +6557,7 @@ fn contained_shim_panic_with_leaked_callee_handler_still_matches_leaf_handler() 
         };
         let err = Value::from_bits(bits);
         assert_eq!(
-            err.cons_car().as_symbol_name().as_deref(),
+            err.cons_car().as_symbol_name(),
             Some("error"),
             "binding is (error ...)"
         );
@@ -6785,7 +6786,7 @@ fn parked_panic_survives_leaf_exit_cleanup_running_compiled_code() {
         .cloned()
         .unwrap_or(Value::NIL);
     assert_eq!(
-        witness.cons_car().as_symbol_name().as_deref(),
+        witness.cons_car().as_symbol_name(),
         Some("arith-error"),
         "inner handler must catch its own arith-error, not the parked panic"
     );

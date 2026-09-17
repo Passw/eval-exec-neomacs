@@ -272,11 +272,10 @@ impl PresentationObserver {
                 Err(error) => tracing::warn!(%error, "native presentation feedback unavailable"),
             }
         }
-        if let ObserverState::Active(session) = &mut self.state {
-            if let Err(error) = session.request(window, frame, size, scale) {
+        if let ObserverState::Active(session) = &mut self.state
+            && let Err(error) = session.request(window, frame, size, scale) {
                 tracing::warn!(%error, "cannot request native presentation feedback");
             }
-        }
     }
 
     pub(crate) fn dispatch_pending(&mut self) {

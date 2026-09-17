@@ -929,7 +929,7 @@ pub(crate) fn builtin_cl_union(args: Vec<Value>) -> EvalResult {
     let right = seq_position_elements(&args[1])?;
 
     let mut out = Vec::new();
-    for item in left.into_iter().chain(right.into_iter()) {
+    for item in left.into_iter().chain(right) {
         let already_in_out = out.iter().any(|seen| equal_value(&item, seen, 0));
         if !already_in_out {
             out.push(item);

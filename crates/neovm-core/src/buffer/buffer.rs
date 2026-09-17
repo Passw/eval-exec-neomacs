@@ -4845,8 +4845,6 @@ impl Buffer {
 // BufferManager
 // ---------------------------------------------------------------------------
 
-/// Owns every live buffer, tracks the current buffer, and hands out ids.
-
 /// The outcome of `BufferManager::add_undo_boundary`, mirroring the two paths
 /// through GNU's `Fundo_boundary' (src/undo.c:251-282).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -4964,6 +4962,7 @@ impl LiveBuffers {
     }
 }
 
+/// Owns every live buffer, tracks the current buffer, and hands out ids.
 #[derive(Clone)]
 pub struct BufferManager {
     // Dense-id slab (was FxHashMap, before that SipHash): `buffers` is looked
@@ -7057,6 +7056,7 @@ impl BufferManager {
     pub(crate) fn dump_next_marker_id(&self) -> u64 {
         self.next_marker_id
     }
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn from_dump(
         mut buffers: FxHashMap<BufferId, Buffer>,
         current: Option<BufferId>,

@@ -48,7 +48,7 @@ fn div_t7_char_width_unusual_unicode() {
       (char-width 12288)
       (char-width 65279)
       (string-width (string 65 160 66))
-      (string-width "a​b")
+      (string-width "a\u200Bb")
       (string-width "a‌b")
       (string-width "a‍b")
       (string-width (string 65 8237 66))

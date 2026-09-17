@@ -1,7 +1,7 @@
-//! Strict combo oracle probes, batch 166: pcase deep. or/and patterns, pred
-//! + guard predicates with binding, backquote destructuring (proper + dotted),
-//! app (transform) pattern, pcase-let / pcase-let*, and rx-pattern inside
-//! pcase.
+//! Strict combo oracle probes, batch 166: pcase deep. or/and patterns,
+//! pred + guard predicates with binding, backquote destructuring (proper +
+//! dotted), app (transform) pattern, pcase-let / pcase-let*, and rx-pattern
+//! inside pcase.
 //! Uses assert_oracle_parity_expect format.
 
 use crate::common::return_if_neovm_enable_oracle_proptest_not_set;

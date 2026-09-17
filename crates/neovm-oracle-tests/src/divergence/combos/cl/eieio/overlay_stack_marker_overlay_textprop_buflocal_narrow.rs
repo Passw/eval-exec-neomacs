@@ -1,5 +1,5 @@
-//! Combo: cl-eieio overlay stacking/merging with priorities, invisible, faces
-//! + markers + textprop + buflocal + narrow + undo.
+//! Combo: cl-eieio overlay stacking/merging with priorities, invisible,
+//! faces + markers + textprop + buflocal + narrow + undo.
 //! Tests deeply nested overlapping overlays where priority resolution matters.
 
 use crate::common::assert_oracle_parity;

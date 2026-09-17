@@ -233,10 +233,10 @@ impl RowTessellator for FakeTessellator<'_> {
             if self.config.gradient_faces.contains(face_id) {
                 tessellation.verbatim_only = true;
             }
-            if let Some((top, bottom)) = self.config.clip_band {
-                if glyph_extent_touches_band(*y, 12.0, top, bottom) {
-                    tessellation.verbatim_only = true;
-                }
+            if let Some((top, bottom)) = self.config.clip_band
+                && glyph_extent_touches_band(*y, 12.0, top, bottom)
+            {
+                tessellation.verbatim_only = true;
             }
             let entry = fake_entry(*c);
             let fg = [face_id.get() as f32 / 255.0, 0.25, 0.5, 1.0];

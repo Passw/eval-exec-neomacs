@@ -167,15 +167,6 @@ impl ConsBlock {
         true
     }
 
-    #[inline]
-    pub(super) fn mark_ptr(&mut self, ptr: *const ConsCell) {
-        let index = Self::index_of_ptr(ptr);
-        let mark = Self::mark_bit(index);
-        debug_assert!(mark.word_index < CONS_MARK_WORDS);
-        self.mark_word(mark.word_index)
-            .fetch_or(mark.mask, Ordering::Relaxed);
-    }
-
     /// Take the next never-used cell from this block's bump cursor, or None
     /// when the block is full.  The cursor only: `alloc_cons` writes car and
     /// cdr once, for cells from all three sources (GNU's `cons_block_index`

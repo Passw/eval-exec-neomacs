@@ -1301,6 +1301,9 @@ pub(crate) fn builtin_macroexpand_slice(
     builtin_macroexpand_slice_with_runtime(eval, args)
 }
 
+/// `Vec` entry point for the Rust-side tests; production dispatch enters
+/// [`builtin_indirect_function_2`] directly.
+#[cfg(test)]
 pub(crate) fn builtin_indirect_function(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -1311,7 +1314,7 @@ pub(crate) fn builtin_indirect_function(
 }
 /// `indirect-function` as registered: fixed arity 2, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a2` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
+/// The `Vec` entry point above serves the Rust-side tests.
 pub(crate) fn builtin_indirect_function_2(
     eval: &mut super::eval::Context,
     object: Value,
@@ -1332,8 +1335,8 @@ pub(crate) fn indirect_function_impl_checked(
     args: &[Value],
     symbols_with_pos_enabled: bool,
 ) -> EvalResult {
-    expect_min_args("indirect-function", &args, 1)?;
-    expect_max_args("indirect-function", &args, 2)?;
+    expect_min_args("indirect-function", args, 1)?;
+    expect_max_args("indirect-function", args, 2)?;
 
     if let Some(symbol) = symbol_id_checked(&args[0], symbols_with_pos_enabled) {
         if let Some(function) = resolve_indirect_symbol_by_id_in_obarray_checked(
@@ -1713,14 +1716,8 @@ pub(crate) fn builtin_intern_fn(eval: &mut super::eval::Context, args: Vec<Value
     Ok(Value::from_sym_id(sym))
 }
 
-pub(crate) fn builtin_intern_soft(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
-    crate::emacs_core::error::expect_args_range("intern-soft", &args, 1, 2)?;
-    let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
-    builtin_intern_soft_2(eval, arg(0), arg(1))
-}
 /// `intern-soft` as registered: fixed arity 2, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a2` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
 pub(crate) fn builtin_intern_soft_2(
     eval: &mut super::eval::Context,
     name: Value,
@@ -1731,10 +1728,10 @@ pub(crate) fn builtin_intern_soft_2(
 }
 
 pub(crate) fn intern_soft_impl(eval: &super::eval::Context, args: &[Value]) -> EvalResult {
-    expect_min_args("intern-soft", &args, 1)?;
-    expect_max_args("intern-soft", &args, 2)?;
+    expect_min_args("intern-soft", args, 1)?;
+    expect_max_args("intern-soft", args, 2)?;
 
-    let effective_obarray = effective_obarray_arg(eval, &args);
+    let effective_obarray = effective_obarray_arg(eval, args);
 
     // Custom obarray path
     if !is_global_obarray_proxy(eval, &effective_obarray) {

@@ -1052,7 +1052,7 @@ fn gnu_subr_x_string_chop_newline_loads_without_rust_builtin() {
         "load-path",
         Value::list(bootstrap_load_path_entries(&lisp_dir)),
     );
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let bindings_path =
         bootstrap_fixture_path(&load_path, "bindings", true).expect("bindings fixture path");
     load_file(&mut eval, &bindings_path).unwrap_or_else(|err| {
@@ -1125,7 +1125,7 @@ fn load_bindings_source_survives_gc_stress_after_custom_runtime() {
     eval.gc_stress = true;
     eval.tagged_heap.set_gc_threshold(1);
 
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let bindings_path =
         bootstrap_fixture_path(&load_path, "bindings", false).expect("bindings.el fixture path");
     load_file(&mut eval, &bindings_path).unwrap_or_else(|err| {
@@ -1278,7 +1278,7 @@ fn load_subr_survives_exact_post_form_gc_after_byte_run() {
     eval.set_variable("purify-flag", Value::NIL);
     eval.set_variable("max-lisp-eval-depth", Value::fixnum(1600));
 
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     for name in &[
         "emacs-lisp/debug-early",
         "emacs-lisp/byte-run",
@@ -2064,10 +2064,10 @@ fn partial_bootstrap_eval_until(stop_before: &str, prefer_compiled: bool) -> Con
         "(set-char-table-extra-slot glyphless-char-display 0 'empty-box)",
     ];
     for stub in &glyphless_stubs {
-        let _ = eval.eval_str_each(&stub);
+        let _ = eval.eval_str_each(stub);
     }
 
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     for name in BOOTSTRAP_LOAD_SEQUENCE {
         if *name == stop_before {
             break;
@@ -2139,7 +2139,7 @@ fn build_pre_macroexp_reload_eval() -> Context {
         Value::list(vec![Value::symbol("skip")]),
     );
 
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     for name in &[
         "emacs-lisp/debug-early",
         "emacs-lisp/byte-run",
@@ -2173,7 +2173,7 @@ fn build_pre_macroexp_reload_eval() -> Context {
 
 fn minimal_eager_macroexpand_eval() -> Context {
     let mut eval = build_pre_macroexp_reload_eval();
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let macroexp_path = bootstrap_fixture_path(&load_path, "emacs-lisp/macroexp", false)
         .expect("macroexp source fixture path");
     load_file(&mut eval, &macroexp_path).unwrap_or_else(|err| {
@@ -3902,7 +3902,10 @@ fn bootstrap_runtime_rejected_nested_mx_leaves_outer_mx_usable() {
     .expect("install nested M-x recovery probe");
 
     let (tx, rx) = crossbeam_channel::unbounded();
-    let send = |event| tx.send(crate::keyboard::InputEvent::key_press(event));
+    let send = |event| {
+        tx.send(crate::keyboard::InputEvent::key_press(event))
+            .map_err(Box::new)
+    };
     send(crate::keyboard::KeyEvent::char_with_mods(
         'x',
         crate::keyboard::Modifiers::meta(),
@@ -8650,7 +8653,7 @@ fn profile_single_bootstrap_file_load() {
     let lisp_dir = project_root.join("lisp");
 
     let mut eval = partial_bootstrap_eval_until(&stop_before, prefer_compiled);
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let path = bootstrap_fixture_path(&load_path, &target, prefer_compiled)
         .unwrap_or_else(|| panic!("bootstrap file not found: {target}"));
     let path = if std::env::var("NEOVM_PROFILE_BOOTSTRAP_DISABLE_NEOBC").as_deref() == Ok("1") {
@@ -9611,7 +9614,7 @@ fn load_file_records_gnu_style_defalias_provide_and_require_history_items() {
     let main = dir.join("main.el");
     fs::write(
         &main,
-        &format!(
+        format!(
             "(require 'vm-loadhist-dep {:?})\n\
          (defalias 'vm-loadhist-main-fn #'ignore)\n\
          (provide 'vm-loadhist-main)\n",
@@ -9755,7 +9758,7 @@ fn builtin_load_records_preloaded_files_only_while_purifying() {
     let load_path = Value::list(vec![Value::string(dir.to_string_lossy().to_string())]);
 
     let mut purifying = super::super::eval::Context::new();
-    purifying.set_variable("load-path", load_path.clone());
+    purifying.set_variable("load-path", load_path);
     purifying.set_variable("purify-flag", Value::T);
     crate::emacs_core::builtins::builtin_load(&mut purifying, vec![Value::string("probe")])
         .expect("load under purify-flag");
@@ -11089,7 +11092,7 @@ fn compiled_bootstrap_cl_preload_stubs_work_after_faces() {
 
     let mut failures = Vec::new();
     for stub in stubs {
-        for result in eval.eval_str_each(&stub) {
+        for result in eval.eval_str_each(stub) {
             if let Err(err) = result {
                 failures.push(format!("{stub} => {}", format_eval_error(&eval, &err)));
             }
@@ -11452,7 +11455,7 @@ fn source_cl_lib_loads_after_early_gv_without_bootstrap_gv_stubs() {
 fn compiled_cl_preloaded_loads_after_faces() {
     crate::test_utils::init_test_tracing();
     let mut eval = create_bootstrap_evaluator_cached().expect("bootstrap evaluator");
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let path = bootstrap_fixture_path(&load_path, "emacs-lisp/cl-preloaded", true)
         .expect("compiled cl-preloaded fixture path");
 
@@ -11490,7 +11493,7 @@ fn compiled_custom_declare_face_call_before_faces_succeeds() {
 fn source_cycle_spacing_form_loads_after_bootstrap_prefix() {
     crate::test_utils::init_test_tracing();
     let mut eval = partial_bootstrap_eval_until("simple", false);
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let path = bootstrap_fixture_path(&load_path, "simple", false).expect("simple.el path");
     let content = std::fs::read_to_string(&path).expect("read simple.el");
     let forms =
@@ -11762,7 +11765,7 @@ fn partial_bootstrap_looking_back_matches_empty_suffix_at_line_end() {
 fn compiled_characters_loads_after_case_table() {
     crate::test_utils::init_test_tracing();
     let mut eval = partial_bootstrap_eval_until("international/characters", true);
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let path = bootstrap_fixture_path(&load_path, "international/characters", true)
         .expect("compiled international/characters fixture path");
 
@@ -11779,7 +11782,7 @@ fn compiled_characters_loads_after_case_table() {
 fn source_characters_loads_after_generated_charprop() {
     crate::test_utils::init_test_tracing();
     let mut eval = partial_bootstrap_eval_until("international/characters", false);
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let Some(charprop) = bootstrap_fixture_path(&load_path, "international/charprop", false) else {
         return;
     };
@@ -11806,7 +11809,7 @@ fn source_characters_loads_after_generated_charprop() {
 fn set_case_syntax_preserves_outer_lexical_c_after_charprop() {
     crate::test_utils::init_test_tracing();
     let mut eval = partial_bootstrap_eval_until("international/characters", false);
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let Some(charprop) = bootstrap_fixture_path(&load_path, "international/charprop", false) else {
         return;
     };
@@ -11853,7 +11856,7 @@ fn source_chinese_loads_after_composite() {
     crate::test_utils::init_test_tracing();
 
     let mut eval = partial_bootstrap_eval_until("language/chinese", false);
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let path = bootstrap_fixture_path(&load_path, "language/chinese", false)
         .expect("source language/chinese fixture path");
 
@@ -11988,7 +11991,7 @@ fn bootstrap_load_sequence_includes_gnu_x_term_layer_after_tool_bar() {
 fn partial_bootstrap_fill_delete_newlines_matches_gnu_trailing_space_behavior() {
     crate::test_utils::init_test_tracing();
     let mut eval = partial_bootstrap_eval_until("tool-bar", false);
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let fill_path =
         bootstrap_fixture_path(&load_path, "textmodes/fill", false).expect("fill fixture path");
     load_file(&mut eval, &fill_path).unwrap_or_else(|err| {
@@ -12023,7 +12026,7 @@ fn bootstrap_tool_bar_mode_comes_from_gnu_mode_macro_path() {
     tracing::info!("tool-bar probe: begin partial bootstrap");
     let mut eval = partial_bootstrap_eval_until("tool-bar", false);
     tracing::info!("tool-bar probe: partial bootstrap complete");
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let easy_mmode_path = bootstrap_fixture_path(&load_path, "emacs-lisp/easy-mmode", false)
         .expect("easy-mmode fixture path");
     tracing::info!("tool-bar probe: loading {}", easy_mmode_path.display());
@@ -12978,7 +12981,7 @@ conveniently adding tool bar items."
         .expect("macroexpand tool-bar define-minor-mode");
     tracing::info!("tool-bar probe: macroexpand complete");
     if let Some(forms) = list_to_vec(&expanded) {
-        if forms.first().map_or(false, |v| v.is_symbol_named("progn")) {
+        if forms.first().is_some_and(|v| v.is_symbol_named("progn")) {
             for (idx, form) in forms.iter().enumerate().skip(1) {
                 tracing::info!("tool-bar probe: eval expanded subform {}", idx);
                 eval.eval_form(*form).unwrap_or_else(|err| {
@@ -14112,7 +14115,7 @@ fn macroexpand_all_pcase_terminates() {
     eval.set_variable("purify-flag", Value::NIL);
     eval.set_variable("max-lisp-eval-depth", Value::fixnum(1600));
 
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let load_and_report = |eval: &mut crate::emacs_core::eval::Context,
                            name: &str,
                            load_path: &[crate::heap_types::LispString]| {
@@ -14206,7 +14209,7 @@ fn macroexp_eager_reload_preserves_symbol_identity() {
         Value::list(vec![Value::symbol("skip")]),
     );
 
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let load = |eval: &mut crate::emacs_core::eval::Context, name: &str| {
         let path = find_file_in_load_path(name, &load_path).expect(name);
         load_file(eval, &path).unwrap_or_else(|e| panic!("failed to load {name}: {e:?}"));
@@ -14345,7 +14348,7 @@ fn function_get_only_exposes_cxxr_compiler_macro_on_cxxr_symbols() {
     }
     eval.set_variable("load-path", Value::list(load_path_entries));
 
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     for name in &[
         "emacs-lisp/debug-early",
         "emacs-lisp/byte-run",
@@ -14395,7 +14398,7 @@ fn pcase_integer_literal_pattern() {
     eval.set_variable("purify-flag", Value::NIL);
     eval.set_variable("max-lisp-eval-depth", Value::fixnum(1600));
 
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let load_and_report = |eval: &mut crate::emacs_core::eval::Context,
                            name: &str,
                            load_path: &[crate::heap_types::LispString]| {
@@ -14543,7 +14546,7 @@ fn key_parse_modifier_bits() {
     eval.set_variable("purify-flag", Value::NIL);
 
     // Load the minimum bootstrap: debug-early, byte-run, backquote, subr, keymap
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     for name in &[
         "emacs-lisp/debug-early",
         "emacs-lisp/byte-run",
@@ -14823,7 +14826,7 @@ fn bootstrap_macroexpand_functions_are_compiled() {
 fn bootstrap_load_uniquify_after_float_sup() {
     crate::test_utils::init_test_tracing();
     let mut eval = partial_bootstrap_eval_until("uniquify", true);
-    let load_path = get_load_path(&eval.obarray(), eval.buffers.current_buffer());
+    let load_path = get_load_path(eval.obarray(), eval.buffers.current_buffer());
     let path = bootstrap_fixture_path(&load_path, "uniquify", true)
         .expect("bootstrap file not found: uniquify");
     load_file(&mut eval, &path).unwrap_or_else(|err| {

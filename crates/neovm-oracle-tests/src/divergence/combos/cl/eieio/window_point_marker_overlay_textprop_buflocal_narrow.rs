@@ -1,7 +1,7 @@
 //! Combo: window-point + save-window-excursion + EIEIO state + overlays
 //! + markers + textprop + buflocal + narrow + undo.
-//! Tests window configuration management with EIEIO objects tracking
-//! window-local state through editing and narrowing operations.
+//!   Tests window configuration management with EIEIO objects tracking
+//!   window-local state through editing and narrowing operations.
 
 use crate::common::assert_oracle_parity;
 use crate::common::return_if_neovm_enable_oracle_proptest_not_set;

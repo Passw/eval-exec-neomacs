@@ -3329,7 +3329,7 @@ impl Obarray {
     ///
     /// Returns the updated alist (consed if a new cell was created;
     /// unchanged otherwise).
-    pub fn set_internal_localized(
+    pub(crate) fn set_internal_localized(
         &mut self,
         sym_id: SymId,
         value: Value,

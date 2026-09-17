@@ -3270,7 +3270,7 @@ fn prune_bootstrap_cache_generations(dump_path: &Path, keep: usize) {
     if images.len() <= keep {
         return;
     }
-    images.sort_by(|a, b| b.0.cmp(&a.0));
+    images.sort_by_key(|(modified, _)| std::cmp::Reverse(*modified));
     for (_, path) in images.into_iter().skip(keep) {
         let _ = std::fs::remove_file(&path);
     }
@@ -6267,7 +6267,7 @@ pub(crate) fn create_runtime_startup_evaluator_at_path(
     if let Err(err) = apply_runtime_startup_state(&mut eval) {
         // Render while the evaluator heap is still alive: the caller's
         // cleanup purges the heap, leaving the signal payload unprintable.
-        let rendered = format_eval_error_in_state(&mut eval, &err);
+        let rendered = format_eval_error_in_state(&eval, &err);
         tracing::error!("runtime startup after bootstrap failed: {rendered}");
         return Err(err);
     }

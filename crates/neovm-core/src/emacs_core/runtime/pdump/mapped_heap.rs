@@ -433,41 +433,6 @@ impl MappedHeapView {
         )
     }
 
-    pub(crate) fn write_value_word(self, offset: u64, value: TaggedValue) -> Result<(), DumpError> {
-        if !self.writable {
-            return Err(DumpError::ImageFormatError(
-                "mapped heap view is not writable".to_string(),
-            ));
-        }
-        let start = usize::try_from(offset).map_err(|_| {
-            DumpError::ImageFormatError("mapped value fixup offset overflows usize".into())
-        })?;
-        let end = start
-            .checked_add(std::mem::size_of::<TaggedValue>())
-            .ok_or_else(|| {
-                DumpError::ImageFormatError("mapped value fixup range overflow".into())
-            })?;
-        if end > self.len {
-            return Err(DumpError::ImageFormatError(format!(
-                "mapped value fixup {start}..{end} exceeds heap section length {}",
-                self.len
-            )));
-        }
-        if start % std::mem::align_of::<TaggedValue>() != 0 {
-            return Err(DumpError::ImageFormatError(format!(
-                "mapped value fixup offset {start} is not {}-byte aligned",
-                std::mem::align_of::<TaggedValue>()
-            )));
-        }
-        unsafe {
-            self.ptr
-                .add(start)
-                .cast::<usize>()
-                .write_unaligned(value.bits());
-        }
-        Ok(())
-    }
-
     /// Validate a value-word offset ONCE and hand back the raw word pointer
     /// for a read-modify-write. The value-fixup loop used to pay the full
     /// validation twice per fixup (read_value_word then write_value_word on
@@ -511,31 +476,6 @@ impl MappedHeapView {
             )));
         }
         Ok(unsafe { self.ptr.add(start).cast::<usize>() })
-    }
-
-    #[inline]
-    pub(crate) fn read_value_word(self, offset: u64) -> Result<usize, DumpError> {
-        let start = usize::try_from(offset).map_err(|_| {
-            DumpError::ImageFormatError("mapped value fixup offset overflows usize".into())
-        })?;
-        let end = start
-            .checked_add(std::mem::size_of::<TaggedValue>())
-            .ok_or_else(|| {
-                DumpError::ImageFormatError("mapped value fixup range overflow".into())
-            })?;
-        if end > self.len {
-            return Err(DumpError::ImageFormatError(format!(
-                "mapped value fixup {start}..{end} exceeds heap section length {}",
-                self.len
-            )));
-        }
-        if start % std::mem::align_of::<TaggedValue>() != 0 {
-            return Err(DumpError::ImageFormatError(format!(
-                "mapped value fixup offset {start} is not {}-byte aligned",
-                std::mem::align_of::<TaggedValue>()
-            )));
-        }
-        Ok(unsafe { self.ptr.add(start).cast::<usize>().read_unaligned() })
     }
 }
 
@@ -800,7 +740,8 @@ pub(crate) fn bytecode_extras_len(function: &super::types::DumpByteCodeFunction)
 /// One fixed obarray symbol row (see `DumpObarray::plain_rows`).
 pub(crate) const OBARRAY_ROW_SIZE: usize = 32;
 
-/// The canonical bytes of `ByteCodeFunction::pdump_stub(extras_len)`, built
+/// The canonical bytes of a pdump stub `ByteCodeFunction` whose extras
+/// region holds `extras_len` slots (`ByteCodeFunction::is_pdump_stub`), built
 /// field by field in a ZEROED template — never a whole-struct copy, which
 /// would memcpy the stack temporary's uninitialized padding into the image
 /// (nondeterministic bytes, and a leak of dumper memory into a distributable
@@ -870,7 +811,8 @@ pub(crate) fn baked_stub_template(extras_len: usize) -> Box<[u8]> {
         write_canonical_none(addr_of_mut!((*p).interactive), None, Option::is_none);
 
         // Full semantic readback: the template bytes must reconstruct the
-        // exact stub `pdump_stub(extras_len)` would build, field by field.
+        // exact stub shape (`is_pdump_stub`, every other field at its empty
+        // value, `closure_slot_count` = `extras_len`), field by field.
         // This is the runtime proof behind every zeros-are-None assumption
         // above, and it runs on every bake (trivial next to the image
         // checksum), so no compiler/layout change can bake invalid bytes.
@@ -1372,7 +1314,7 @@ impl MappedHeapBuilder {
                             // writes NOTHING into this span (the per-object
                             // ptr::write used to COW ~1,187 image pages per
                             // startup). closure_slot_count carries the extras
-                            // length, exactly as pdump_stub would set it.
+                            // length, exactly as the stub template sets it.
                             let extras_len = span.len as usize - std::mem::size_of::<ByteCodeObj>();
                             self.write_baked_stub(
                                 span.offset as usize + std::mem::offset_of!(ByteCodeObj, data),
@@ -1587,7 +1529,7 @@ impl MappedHeapBuilder {
         self.write_bytes(offset, bytemuck::bytes_of(&raw));
     }
 
-    /// Bake the exact bytes of `ByteCodeFunction::pdump_stub(extras_len)`
+    /// Bake the exact bytes of a pdump stub (`baked_stub_template(extras_len)`)
     /// into the (pre-zeroed) struct region of a bytecode span, so the loader
     /// writes NOTHING there — the mapped bytes ARE the stub.
     fn write_baked_stub(&mut self, offset: usize, extras_len: usize) {

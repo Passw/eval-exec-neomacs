@@ -8,6 +8,7 @@
 //! GNU `ITERATOR_AT_END_OF_LINE_P` = the char AT point is a newline):
 //!   * point at EOB, no trailing newline  -> centering, `text_cols/2`  (hscroll 220)
 //!   * point before a trailing newline    -> end-of-line, `text_cols-4` (hscroll 144)
+//!
 //! Both must equal live GNU's `window-hscroll`.
 use crate::support;
 

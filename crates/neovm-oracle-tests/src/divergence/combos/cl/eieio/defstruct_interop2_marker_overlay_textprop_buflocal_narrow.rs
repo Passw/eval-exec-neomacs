@@ -1,5 +1,5 @@
-//! Combo: cl-defstruct + EIEIO interop + overlays + markers + textprop
-//! + buflocal variables + narrow + undo.
+//! Combo: cl-defstruct + EIEIO interop + overlays + markers + textprop +
+//! buflocal variables + narrow + undo.
 //! Tests complex interactions between defstruct instances and defclass objects
 //! sharing state through editing operations.
 

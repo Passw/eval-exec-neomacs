@@ -1,5 +1,5 @@
-//! Combo: buffer-swap-text + EIEIO multi-buffer state tracking + overlays
-//! + markers + textprop + buflocal + narrow + undo.
+//! Combo: buffer-swap-text + EIEIO multi-buffer state tracking + overlays +
+//! markers + textprop + buflocal + narrow + undo.
 //! Tests cross-buffer text swapping with EIEIO objects managing state.
 
 use crate::common::assert_oracle_parity;

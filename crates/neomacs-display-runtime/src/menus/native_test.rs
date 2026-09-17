@@ -251,31 +251,29 @@ impl ApplicationHandler for Smoke {
         }
         if self.parent.as_ref().is_some_and(|p| p.id() == id)
             && matches!(event, WindowEvent::RedrawRequested)
-        {
-            if let wgpu::CurrentSurfaceTexture::Success(output)
+            && let wgpu::CurrentSurfaceTexture::Success(output)
             | wgpu::CurrentSurfaceTexture::Suboptimal(output) = gpu.surface.get_current_texture()
+        {
+            let view = output.texture.create_view(&Default::default());
+            let mut encoder = gpu.device.create_command_encoder(&Default::default());
             {
-                let view = output.texture.create_view(&Default::default());
-                let mut encoder = gpu.device.create_command_encoder(&Default::default());
-                {
-                    let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("smoke parent"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
-                            resolve_target: None,
-                            depth_slice: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::BLUE),
-                                store: wgpu::StoreOp::Store,
-                            },
-                        })],
-                        ..Default::default()
-                    });
-                }
-                gpu.queue.submit(Some(encoder.finish()));
-                self.parent.as_ref().unwrap().pre_present_notify();
-                gpu.queue.present(output);
+                let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("smoke parent"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        depth_slice: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color::BLUE),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    ..Default::default()
+                });
             }
+            gpu.queue.submit(Some(encoder.finish()));
+            self.parent.as_ref().unwrap().pre_present_notify();
+            gpu.queue.present(output);
         }
     }
 
@@ -380,32 +378,32 @@ impl ApplicationHandler for Smoke {
                 self.menus.select_heading(heading, false),
                 super::HeadingAction::Keep
             );
-            if self.with_tooltips {
-                if let Some(id) = self.submenu {
-                    let gpu = self.graphics.as_mut().unwrap();
-                    self.menus.event(
-                        id,
-                        &WindowEvent::PointerMoved {
-                            device_id: None,
-                            position: winit::dpi::PhysicalPosition::new(10.0, 10.0),
-                            primary: true,
-                            source: winit::event::PointerSource::Mouse,
-                        },
+            if self.with_tooltips
+                && let Some(id) = self.submenu
+            {
+                let gpu = self.graphics.as_mut().unwrap();
+                self.menus.event(
+                    id,
+                    &WindowEvent::PointerMoved {
+                        device_id: None,
+                        position: winit::dpi::PhysicalPosition::new(10.0, 10.0),
+                        primary: true,
+                        source: winit::event::PointerSource::Mouse,
+                    },
+                    &gpu.device,
+                    &gpu.queue,
+                    &mut gpu.renderer,
+                );
+                self.menus
+                    .sync(
+                        &commit,
+                        &gpu.instance,
+                        &gpu.adapter,
                         &gpu.device,
                         &gpu.queue,
-                        &mut gpu.renderer,
-                    );
-                    self.menus
-                        .sync(
-                            &commit,
-                            &gpu.instance,
-                            &gpu.adapter,
-                            &gpu.device,
-                            &gpu.queue,
-                            gpu.renderer.surface_format(),
-                        )
-                        .unwrap();
-                }
+                        gpu.renderer.surface_format(),
+                    )
+                    .unwrap();
             }
         }
         let gpu = self.graphics.as_ref().unwrap();

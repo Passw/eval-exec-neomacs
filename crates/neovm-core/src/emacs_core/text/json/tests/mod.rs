@@ -493,7 +493,7 @@ fn parse_rejects_excessive_nesting_without_stack_overflow() {
     crate::test_utils::init_test_tracing();
     // Far beyond MAX_PARSE_DEPTH: a naive recursive-descent parser would
     // overflow the stack here. We must instead signal a catchable error.
-    let s: String = std::iter::repeat('[').take(MAX_PARSE_DEPTH + 50).collect();
+    let s: String = "[".repeat(MAX_PARSE_DEPTH + 50);
     match builtin_json_parse_string(vec![Value::string(s)]) {
         Err(Flow::Signal(sig)) => {
             assert_eq!(sig.symbol_name(), "json-object-too-deep");

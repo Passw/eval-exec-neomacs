@@ -57,21 +57,13 @@ thread_local! {
     static FILE_NOTIFY_STATE: RefCell<FileNotifyState> = RefCell::new(FileNotifyState::default());
 }
 
+#[derive(Default)]
 struct FileNotifyState {
     backend: PlatformBackend,
     registry: WatchRegistry,
 }
 
 type PlatformBackend = platform::Backend;
-
-impl Default for FileNotifyState {
-    fn default() -> Self {
-        Self {
-            backend: PlatformBackend::default(),
-            registry: WatchRegistry::default(),
-        }
-    }
-}
 
 pub(crate) fn reset_file_notify_thread_locals() {
     FILE_NOTIFY_STATE.with(|slot| *slot.borrow_mut() = FileNotifyState::default());

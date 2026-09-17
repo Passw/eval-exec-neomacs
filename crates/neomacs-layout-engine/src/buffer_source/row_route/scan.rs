@@ -30,20 +30,16 @@ pub(super) enum RoutedRowCharAdvance {
 ///   (`^X` caret runs, `\`+octal escapes, glyphless boxes — this arm also
 ///   catches the zero-width chars the glyphless policy does NOT preserve
 ///   for composition, e.g. ZWSP);
-
 /// * regional indicators — the shared writer's width model
 ///   (`composition::base_width_cols`) forces them to 2 columns in
 ///   anticipation of flag-pair composition, diverging from the plain
 ///   `char_width` cell model this classifier fits with;
-
 /// * contextual-shaping script chars (Arabic, Indic, …) — every such char
 ///   can START a run the pipeline shapes as a unit
 ///   (`composition::continues_complex_run` decides membership only at the
 ///   NEXT char), so run entry refuses here;
-
 /// * nobreak spaces/hyphens — their display consults the
 ///   `nobreak-char-display` setting per char (GNU xdisp.c:8594);
-
 /// * anything the shared width table does not size at exactly 1 or 2 cols
 ///   (which also refuses zero-width cluster extenders defensively — the
 ///   scan's compose branch normally intercepts them first).
@@ -141,7 +137,6 @@ pub(super) struct RoutedLineScan {
 /// pipeline's fit rule (`x + advance <= right_edge` fits), with one
 /// deliberate conservatism: a TAB whose expansion crosses the edge ends the
 /// prefix too (the pipeline treats a tab as always fitting and clips it;
-
 /// handing the tab back keeps that clip on the pipeline's own append).
 ///
 /// The walk advances the pen exactly as the pipeline's natural advance does
@@ -507,10 +502,7 @@ pub(super) fn routed_row_overlay_scan<B: LayoutBufferView + ?Sized>(
                 return None;
             }
             let name = prop.as_symbol_name()?;
-            if !ROUTE_SAFE_OVERLAY_PROPS
-                .iter()
-                .any(|allowed| *allowed == name)
-            {
+            if !ROUTE_SAFE_OVERLAY_PROPS.contains(&name) {
                 return None;
             }
             tail = rest.cons_cdr();
@@ -563,7 +555,6 @@ pub(super) fn routed_lisp_string_advance_cols(value: Value) -> Option<usize> {
 ///
 /// Anchor positions are the endpoints of the intersecting overlays that carry
 /// a string property (before-string at the start, after-string at the end);
-
 /// the CONTENT at each position comes from `overlay_strings_at`, the same
 /// producer-side collection the pipeline renders, so the two can never
 /// disagree about which strings are there, in which order, or whether a
@@ -1021,16 +1012,13 @@ pub(super) fn routed_composition_prop_replaces<B: LayoutBufferView>(
 /// `None`, refusing the route, when a hidden run:
 /// * shows an ellipsis (the pipeline appends `...` glyphs with their own
 ///   face/provenance rules, GNU `setup_for_ellipsis`);
-
 /// * starts AT the row start (the visible loop's invisible checkpoint
 ///   consumes it BEFORE the route attempt; the walk then resumes mid-line —
 ///   classifying it here keeps direct classification aligned with the
 ///   production ordering);
-
 /// * covers the newline (hiding the line end joins buffer lines into one
 ///   display row — a line-structure change; a run ending exactly AT the
 ///   newline keeps it visible and is fine);
-
 /// * fails to advance (defensive: a skip that does not move would loop).
 ///
 /// The scan walks exactly the checkpoint cadence: probe, jump to the

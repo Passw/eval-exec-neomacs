@@ -194,7 +194,7 @@ fn linux_release_links_gstreamer_without_a_private_adapter() {
         env!("CARGO_WORKSPACE_DIR"),
         "/scripts/package-deb.sh"
     ));
-    let ci = include_str!(concat!(
+    let _ci = include_str!(concat!(
         env!("CARGO_WORKSPACE_DIR"),
         "/.github/workflows/ci.yml"
     ));
@@ -3342,7 +3342,7 @@ fn motion_parity_audit_run_fails_when_the_sweep_wrote_no_probes() {
 
 #[test]
 #[cfg(unix)]
-fn motion_parity_audit_run_says_when_the_editor_itself_could_not_be_RUN() {
+fn motion_parity_audit_run_says_when_the_editor_itself_could_not_be_run() {
     // Ledger 211, from a real incident.  A rebuild in the SHARED GNU mirror
     // deleted `src/emacs' mid-session, so `/home/exec/.local/bin/emacs' became
     // a broken symlink and the sweep's GNU side exited 127 with an EMPTY pty

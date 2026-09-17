@@ -318,22 +318,22 @@ fn frame_font_request_from_value(value: &Value) -> Option<FrameFontRequest> {
     let elems = font_value_fields(value)?;
     let mut face = RuntimeFace::new("default");
 
-    face.family = font_vector_get_flexible(&elems, "family")
+    face.family = font_vector_get_flexible(elems, "family")
         .and_then(|value| font_value_text(&value))
         .map(Value::string);
-    face.foundry = font_vector_get_flexible(&elems, "foundry")
+    face.foundry = font_vector_get_flexible(elems, "foundry")
         .and_then(|value| font_value_text(&value))
         .map(Value::string);
-    face.weight = font_vector_get_flexible(&elems, "weight").and_then(font_weight_from_value);
-    face.slant = font_vector_get_flexible(&elems, "slant").and_then(font_slant_from_value);
-    face.width = font_vector_get_flexible(&elems, "width").and_then(|value| match value.kind() {
+    face.weight = font_vector_get_flexible(elems, "weight").and_then(font_weight_from_value);
+    face.slant = font_vector_get_flexible(elems, "slant").and_then(font_slant_from_value);
+    face.width = font_vector_get_flexible(elems, "width").and_then(|value| match value.kind() {
         ValueKind::Symbol(id) => FontWidth::from_symbol(resolve_sym(id)),
         _ => None,
     });
-    let size = if let Some(value) = font_vector_get_flexible(&elems, "height") {
+    let size = if let Some(value) = font_vector_get_flexible(elems, "height") {
         face.height = face_height_from_value(value);
         None
-    } else if let Some(value) = font_vector_get_flexible(&elems, "size") {
+    } else if let Some(value) = font_vector_get_flexible(elems, "size") {
         match value.kind() {
             ValueKind::Fixnum(px) if pixel_sized_selector => FrameFontSize::pixels(px),
             ValueKind::Float => FrameFontSize::points(value.xfloat()),
@@ -2023,7 +2023,7 @@ pub(crate) fn font_face_attributes(args: Vec<Value>) -> EvalResult {
     let mut plist: Vec<Value> = Vec::with_capacity(10);
 
     // :family (symbol name -> string).
-    if let Some(family) = font_vector_get_flexible(&elems, "family")
+    if let Some(family) = font_vector_get_flexible(elems, "family")
         && !family.is_nil()
     {
         let family_str = match family.kind() {
@@ -2041,7 +2041,7 @@ pub(crate) fn font_face_attributes(args: Vec<Value>) -> EvalResult {
     // A fixnum size is a pixel size converted via PIXEL_TO_POINT; with no
     // display DPI here we follow GNU's float path (point size) for parsed
     // names, where size is stored as a float.
-    if let Some(size) = font_vector_get_flexible(&elems, "size") {
+    if let Some(size) = font_vector_get_flexible(elems, "size") {
         match size.kind() {
             ValueKind::Float => {
                 let pts = size.xfloat();
@@ -2068,7 +2068,7 @@ pub(crate) fn font_face_attributes(args: Vec<Value>) -> EvalResult {
     // storage path keeps the alias verbatim (matching `font-get`), so the
     // canonicalization happens here, at the face-read boundary.
     for key in ["weight", "slant", "width"] {
-        if let Some(val) = font_vector_get_flexible(&elems, key)
+        if let Some(val) = font_vector_get_flexible(elems, key)
             && !val.is_nil()
         {
             let canonical = val
@@ -2212,13 +2212,13 @@ pub(crate) fn font_get(args: Vec<Value>) -> EvalResult {
         ValueKind::Veclike(VecLikeType::Vector | VecLikeType::Font) => {
             let elems =
                 font_value_fields(&args[0]).expect("validated font value exposes properties");
-            let exact = font_vector_get(&elems, &args[1]);
+            let exact = font_vector_get(elems, &args[1]);
             if !exact.is_nil() {
                 return Ok(exact);
             }
 
             if let Some(id) = args[1].as_keyword_id() {
-                return Ok(font_vector_get_flexible(&elems, resolve_sym(id)).unwrap_or(Value::NIL));
+                return Ok(font_vector_get_flexible(elems, resolve_sym(id)).unwrap_or(Value::NIL));
             }
 
             Ok(Value::NIL)
@@ -2796,6 +2796,7 @@ fn build_font_object_with_pixel_size(face: &RuntimeFace, pixel_size: Option<i64>
 
 /// Render an unresolved face request to its public XLFD without pretending
 /// that the request is an opened font object.
+#[cfg(test)]
 pub(crate) fn font_name_for_face(face: &RuntimeFace) -> Value {
     let mut fields = font_object_property_fields(face, None);
     fields[0] = Value::keyword(FONT_ENTITY_TAG);
@@ -3010,7 +3011,7 @@ pub(crate) fn font_name_value(font_like: &Value) -> Option<Value> {
         ValueKind::String => Some(*font_like),
         ValueKind::Veclike(VecLikeType::Vector | VecLikeType::Font) if is_font(font_like) => {
             let elems = font_value_fields(font_like)?;
-            if let Some(value) = font_vector_get_flexible(&elems, "name") {
+            if let Some(value) = font_vector_get_flexible(elems, "name") {
                 return match value.kind() {
                     ValueKind::String => Some(value),
                     ValueKind::Symbol(sym) => Some(Value::string(resolve_sym(sym).to_owned())),

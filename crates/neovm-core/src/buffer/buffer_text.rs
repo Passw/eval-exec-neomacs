@@ -2565,7 +2565,7 @@ impl BufferText {
             let mut i = 0usize;
             cache.retain(|_| {
                 i += 1;
-                i % 2 == 0
+                i.is_multiple_of(2)
             });
             let idx = cache.partition_point(|a| a.emacs_byte_pos().get() < byte);
             cache.insert(idx, anchor);
@@ -3266,13 +3266,6 @@ fn scan_backward_bytes(
         .emacs_byte_at_pos(target)
         .is_some_and(|b| (b & 0xC0) == 0x80);
     cp.saturating_sub_len(CharLen::new(starts + usize::from(inside_char)))
-}
-fn previous_multibyte_char_start(backend: &TextBackend, pos: EmacsBytePos) -> EmacsBytePos {
-    let mut prev = pos.saturating_sub_len(EmacsByteLen::new(1));
-    while prev > EmacsBytePos::ZERO && (backend.byte_at_emacs_byte_pos(prev) & 0xC0) == 0x80 {
-        prev = prev.saturating_sub_len(EmacsByteLen::new(1));
-    }
-    prev
 }
 
 #[cfg(test)]

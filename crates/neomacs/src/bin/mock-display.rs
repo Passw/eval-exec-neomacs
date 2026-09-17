@@ -23,7 +23,6 @@ use neomacs_layout_engine::engine::LayoutEngine;
 use neomacs_layout_engine::mock_frame::{
     MockChildFrameContent, MockFrameContent, MockStyledLine, MockWindowContent,
 };
-use std::collections::HashMap;
 use std::io::{self, Read, Write};
 
 // ===================================================================

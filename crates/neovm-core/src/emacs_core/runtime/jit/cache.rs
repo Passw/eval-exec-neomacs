@@ -24,9 +24,7 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
-use super::compile::{
-    CompiledLeaf, NativeRun, compile_bytecode_function_with, stash_pending_flow, take_pending_flow,
-};
+use super::compile::{CompiledLeaf, NativeRun, stash_pending_flow, take_pending_flow};
 use super::stats;
 use crate::emacs_core::bytecode::ByteCodeFunction;
 use crate::emacs_core::error::Flow;
@@ -1050,7 +1048,7 @@ pub(crate) fn armed_leaf_for_stack_call(
     // tiered up: its threshold/deferral/cap math is settled), so it advances
     // the heat itself and steps aside on the re-tier crossing.
     let now = rt.bump_heat();
-    (!super::retier_heat().is_some_and(|at| now == at)).then_some((
+    super::retier_heat().is_none_or(|at| now != at).then_some((
         leaf,
         arity - usize::from(has_rest),
         has_rest,
@@ -1252,7 +1250,7 @@ pub(crate) fn run_resolved_leaf_native(
             stash_pending_flow(flow);
             NativeCallOutcome::FlowStashed
         }
-        NativeRun::DeoptAt(resume) => deopt_resume_outcome(ctx, func, func_value, resume),
+        NativeRun::DeoptAt(resume) => deopt_resume_outcome(ctx, func, func_value, *resume),
     }
 }
 
@@ -1262,7 +1260,7 @@ fn deopt_resume_outcome(
     ctx: *mut Context,
     func: &ByteCodeFunction,
     func_value: Value,
-    resume: Box<crate::emacs_core::jit::compile::DeoptResume>,
+    resume: crate::emacs_core::jit::compile::DeoptResume,
 ) -> NativeCallOutcome {
     let crate::emacs_core::jit::compile::DeoptResume {
         pc,
@@ -1271,7 +1269,7 @@ fn deopt_resume_outcome(
         binds,
         spec_base,
         cond_base,
-    } = *resume;
+    } = resume;
     if ctx.is_null() {
         return NativeCallOutcome::Fallback;
     }
@@ -1314,7 +1312,7 @@ fn direct_call_cold(
         // Precise deopt: no bind/cond frames exist on the direct path (the
         // eligibility gate excludes them).
         return match leaf.deopt_at_outcome(ctx as *mut u8, None, None) {
-            NativeRun::DeoptAt(resume) => deopt_resume_outcome(ctx, func, func_value, resume),
+            NativeRun::DeoptAt(resume) => deopt_resume_outcome(ctx, func, func_value, *resume),
             // deopt_at_outcome only degrades to plain Deopt with a null vmctx.
             _ => NativeCallOutcome::Fallback,
         };

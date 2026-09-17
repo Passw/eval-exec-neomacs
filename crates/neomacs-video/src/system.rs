@@ -718,10 +718,7 @@ impl<P: Platform> VideoSystemImpl<P> {
             if session.state == VideoSessionState::Failed {
                 continue;
             }
-            loop {
-                let Some(timing) = session.mailbox.timing() else {
-                    break;
-                };
+            while let Some(timing) = session.mailbox.timing() {
                 let Some(clock) = session.clock else {
                     break;
                 };

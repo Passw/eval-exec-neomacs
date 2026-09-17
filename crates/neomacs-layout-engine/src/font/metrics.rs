@@ -805,7 +805,6 @@ impl FontMetricsService {
     /// point. Rebuilding `FontSystem` is intentional: fontdb only appends when
     /// asked to load system fonts, which would keep removed/replaced files and
     /// stale generation-local ids alive indefinitely.
-    #[must_use]
     pub fn synchronize_font_catalog(&mut self) -> crate::font::catalog::FontCatalogUpdate {
         let change = self.font_resolver.poll_catalog_change();
         let update = self.font_catalog.observe(change);
@@ -847,11 +846,11 @@ impl FontMetricsService {
         if self.symbol_font_policy.key == key {
             return SymbolFontPolicyUpdate::Unchanged;
         }
-        let symbol_ranges = use_primary_font
-            .then(|| {
-                neovm_core::emacs_core::fontset::symbol_script_ranges(char_script_table.as_ref())
-            })
-            .unwrap_or_default();
+        let symbol_ranges = if use_primary_font {
+            neovm_core::emacs_core::fontset::symbol_script_ranges(char_script_table.as_ref())
+        } else {
+            Default::default()
+        };
         let selection_changed = self.symbol_font_policy.key.use_primary_font != use_primary_font
             || self.symbol_font_policy.symbol_ranges != symbol_ranges;
         self.symbol_font_policy = SymbolFontPolicy { key, symbol_ranges };

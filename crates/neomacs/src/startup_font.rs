@@ -15,14 +15,16 @@ pub(super) struct StartupFont {
 /// A GUI bootstrap always owns an opened font. TTY bootstrap never scans the
 /// font catalog and cannot accidentally seed a graphical Lisp font object.
 pub(super) enum BootstrapFont {
-    Gui(StartupFont),
+    Gui(Box<StartupFont>),
     Tty,
 }
 
 impl BootstrapFont {
     pub(super) fn select(display: &BootstrapDisplayConfig) -> Option<Self> {
         match display.frontend() {
-            FrontendKind::Gui => StartupFont::select(display, None).map(Self::Gui),
+            FrontendKind::Gui => {
+                StartupFont::select(display, None).map(|font| Self::Gui(Box::new(font)))
+            }
             FrontendKind::Tty => Some(Self::Tty),
         }
     }

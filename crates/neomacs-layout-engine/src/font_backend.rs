@@ -514,6 +514,9 @@ pub struct FontCandidate {
 /// A driver-selected entity must not pass through the list operation's
 /// style filters again. Backends using shared selection provide candidates
 /// instead, preserving their platform-specific enumeration policy.
+// Built and consumed once per layout attempt on the frame hot path; boxing
+// the large variant would add a heap allocation per attempt.
+#[allow(clippy::large_enum_variant)]
 pub enum FontDriverMatch {
     Native(Option<FontCandidate>),
     Enumerated(Vec<FontCandidate>),

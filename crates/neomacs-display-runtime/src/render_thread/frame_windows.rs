@@ -8,10 +8,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use winit::dpi::{PhysicalPosition, PhysicalSize};
+use winit::dpi::{PhysicalPosition, PhysicalSize, Position, Size};
 use winit::event_loop::ActiveEventLoop;
 use winit::monitor::Fullscreen;
-use winit::window::{Window, WindowId};
+use winit::window::{
+    ImeCapabilities, ImeEnableRequest, ImeHint, ImePurpose, ImeRequest, ImeRequestData, Window,
+    WindowId,
+};
 
 use super::cursor::{CursorState, CursorTarget};
 pub(crate) use super::frame_compositor::{FrameCompositor, RetainedCursorCell, RetainedStatic};
@@ -114,19 +117,49 @@ impl NativeTextInputPolicy {
 
     pub(super) fn apply_to_window(self, window: &dyn Window) {
         apply_option_key_policy(window, self.option_key_is_meta);
-        window.set_ime_allowed(self.ime_allowed_on_create);
-        window.set_ime_cursor_area(
-            PhysicalPosition::new(
-                self.initial_cursor_area.x as f64,
-                self.initial_cursor_area.y as f64,
-            )
-            .into(),
-            PhysicalSize::new(
-                self.initial_cursor_area.width as f64,
-                self.initial_cursor_area.height as f64,
-            )
-            .into(),
-        );
+        let request = if self.ime_allowed_on_create {
+            // Enabling declares the capabilities the IME may drive from here
+            // on, so the initial cursor area rides along with the request that
+            // enables the cursor-area capability instead of trailing it.
+            let capabilities = ImeCapabilities::new()
+                .with_hint_and_purpose()
+                .with_cursor_area();
+            let data = ImeRequestData::default()
+                .with_hint_and_purpose(ImeHint::NONE, ImePurpose::Normal)
+                .with_cursor_area(
+                    PhysicalPosition::new(
+                        self.initial_cursor_area.x as f64,
+                        self.initial_cursor_area.y as f64,
+                    )
+                    .into(),
+                    PhysicalSize::new(
+                        self.initial_cursor_area.width as f64,
+                        self.initial_cursor_area.height as f64,
+                    )
+                    .into(),
+                );
+            let enable = ImeEnableRequest::new(capabilities, data)
+                .expect("every requested IME capability carries its initial value");
+            ImeRequest::Enable(enable)
+        } else {
+            ImeRequest::Disable
+        };
+        let _ = window.request_ime_update(request);
+    }
+}
+
+/// Move the IME candidate box, which is what the deprecated
+/// `Window::set_ime_cursor_area` did: the update only means something once
+/// the IME is enabled with the cursor-area capability, and its outcome is
+/// nothing this side can act on.
+fn request_ime_cursor_area(window: &dyn Window, position: Position, size: Size) {
+    if window
+        .ime_capabilities()
+        .is_some_and(|capabilities| capabilities.cursor_area())
+    {
+        let _ = window.request_ime_update(ImeRequest::Update(
+            ImeRequestData::default().with_cursor_area(position, size),
+        ));
     }
 }
 
@@ -291,30 +324,19 @@ impl InputMethodState {
 }
 
 impl ChromeState {
-    pub fn dismiss_menus(&mut self) {
-        self.interaction.menu_bar_active = None;
-        self.interaction.compact_bar_menu_active = None;
-    }
-
     /// Apply a mouse press on a chrome hit during a popup interaction.
     /// Dismisses popup-related state and records the interaction.
     pub fn press_with_popup(&mut self, press: &ChromePress) {
         self.interaction.menu_bar_active = None;
         self.interaction.compact_bar_menu_active = None;
-        match press {
-            ChromePress::MenuBar(idx) => self.interaction.menu_bar_active = Some(*idx),
-            ChromePress::ToolBar(idx) => self.interaction.toolbar_pressed = Some(*idx),
-        }
+        let ChromePress::ToolBar(idx) = press;
+        self.interaction.toolbar_pressed = Some(*idx);
     }
 }
 
 /// Result of a chrome interaction press.
 #[derive(Debug, Clone, Copy)]
-// The shared `Bar` suffix is domain-meaningful (menu/tool/tab BARS); renaming the
-// variants would obscure intent, so the naming lint is allowed here.
-#[allow(clippy::enum_variant_names)]
 pub(crate) enum ChromePress {
-    MenuBar(u32),
     ToolBar(u32),
 }
 
@@ -847,6 +869,7 @@ impl GuiFrameRenderState {
         self.pending_pointer_damage.iter().any(Option::is_some)
     }
 
+    #[cfg(test)]
     pub(super) fn capture_presented(&mut self, target: Option<PresentedInteractionKey>) {
         self.presented_press = Some(PresentedPressCapture::new(target));
     }
@@ -957,12 +980,6 @@ impl GuiFrameRenderState {
 
     pub(super) fn has_ime_preedit(&self) -> bool {
         self.input_method.has_preedit()
-    }
-
-    pub(super) fn dismiss_all_chrome_menus(&mut self) {
-        self.chrome.interaction.menu_bar_active = None;
-        self.chrome.interaction.compact_bar_menu_active = None;
-        self.mark_dirty();
     }
 
     pub(super) fn mark_dirty(&mut self) {
@@ -1159,6 +1176,7 @@ impl GuiFrameRenderState {
         transition
     }
 
+    #[cfg(test)]
     pub(super) fn with_chrome_interaction_mut(
         &mut self,
         f: impl FnOnce(&mut GuiChromeInteractionState),
@@ -1539,7 +1557,8 @@ impl GuiFrameWindowState {
                 ..
             } => {
                 *last_ime_cursor_area = None;
-                native.window.set_ime_cursor_area(
+                request_ime_cursor_area(
+                    native.window.as_ref(),
                     PhysicalPosition::new(0.0, 0.0).into(),
                     PhysicalSize::new(1.0, 1.0).into(),
                 );
@@ -1563,7 +1582,8 @@ impl GuiFrameWindowState {
                 if *last_ime_cursor_area == Some(area) {
                     return;
                 }
-                native.window.set_ime_cursor_area(
+                request_ime_cursor_area(
+                    native.window.as_ref(),
                     PhysicalPosition::new(area.x as f64, area.y as f64).into(),
                     PhysicalSize::new(area.width as f64, area.height as f64).into(),
                 );
@@ -2328,12 +2348,6 @@ impl GuiFrameWindowManager {
         self.chrome_defaults.decorations_enabled = decorated;
         self.for_each_top_level_window_mut(|window_state| {
             window_state.set_decorations(decorated);
-        });
-    }
-
-    pub(super) fn hide_top_level_popup_menus(&mut self) {
-        self.for_each_top_level_window_mut(|window_state| {
-            window_state.render.dismiss_all_chrome_menus();
         });
     }
 

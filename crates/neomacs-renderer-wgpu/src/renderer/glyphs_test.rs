@@ -134,7 +134,6 @@ fn rounded_box_background_suppression_matches_exact_face_paint() {
     use crate::renderer::frame_pass::{BoxPaintPolicy, BoxSpan};
     use neomacs_display_protocol::face::{BoxType, Face};
     use neomacs_display_protocol::types::Rect;
-    use std::collections::HashMap;
 
     let face_id = FaceId::new(7);
     let mut face = Face::new(face_id);

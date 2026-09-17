@@ -65,6 +65,9 @@ fn document_geometry_converts_page_regions_to_pixels_and_crop_coordinates() -> P
     )
 }
 
+// The probe and its snapshot need a literal U+00AD soft hyphen inside raw
+// strings, where a `\u{AD}` escape would be six ASCII characters instead.
+#[allow(clippy::invisible_characters)]
 fn search_queries_quote_pcre_and_preserve_word_and_hyphenation_intent() -> ParityBatchCase {
     let elisp_form = r##"
 (let ((queries

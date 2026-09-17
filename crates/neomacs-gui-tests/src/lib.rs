@@ -641,7 +641,7 @@ pub fn start_weston_with_desktop(
         .arg(format!("--scale={scale}"))
         .arg("--fake-seat")
         .arg(format!("--log={}", log_path.display()))
-        .env("XDG_RUNTIME_DIR", &runtime_dir)
+        .env("XDG_RUNTIME_DIR", runtime_dir)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()?;
@@ -651,7 +651,7 @@ pub fn start_weston_with_desktop(
         Ok(DisplaySession {
             child: Some(child),
             env: vec![
-                ("XDG_RUNTIME_DIR".to_string(), path_to_string(&runtime_dir)),
+                ("XDG_RUNTIME_DIR".to_string(), path_to_string(runtime_dir)),
                 ("WAYLAND_DISPLAY".to_string(), socket),
             ],
             cleanup_dir: None,

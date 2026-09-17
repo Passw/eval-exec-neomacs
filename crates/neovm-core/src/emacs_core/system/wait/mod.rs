@@ -109,6 +109,7 @@ impl WaitStatusNotifySite {
     }
 
     /// The GNU line this drain stands for, so a log or a panic can name it.
+    #[allow(dead_code)] // citation surface: the GNU line each constructor stands for; nothing logs it yet
     pub(crate) fn gnu(self) -> &'static str {
         self.gnu
     }

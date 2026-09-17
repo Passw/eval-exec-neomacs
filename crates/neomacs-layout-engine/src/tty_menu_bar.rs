@@ -302,11 +302,11 @@ fn move_final_items_to_end(eval: &Context, items: &mut Vec<TtyMenuBarItem>) {
     let mut tail = final_items;
     while tail.is_cons() {
         let head = tail.cons_car();
-        if let Some(name) = head.as_symbol_name() {
-            if let Some(index) = items.iter().position(|item| item.key == name) {
-                let item = items.remove(index);
-                items.push(item);
-            }
+        if let Some(name) = head.as_symbol_name()
+            && let Some(index) = items.iter().position(|item| item.key == name)
+        {
+            let item = items.remove(index);
+            items.push(item);
         }
         tail = tail.cons_cdr();
     }

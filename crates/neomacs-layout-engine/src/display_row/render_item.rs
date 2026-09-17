@@ -106,6 +106,18 @@ fn clipped_display_item_remainder_after_chars(
     }
 }
 
+fn clipped_text_remainder(text: &str, emitted_chars: usize) -> Option<(usize, String)> {
+    if emitted_chars >= text.chars().count() {
+        return None;
+    }
+    let split_byte = text
+        .char_indices()
+        .nth(emitted_chars)
+        .map(|(byte, _)| byte)
+        .unwrap_or(text.len());
+    Some((split_byte, text[split_byte..].to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,16 +210,4 @@ mod tests {
             "the next row must continue in the same string coordinate space"
         );
     }
-}
-
-fn clipped_text_remainder(text: &str, emitted_chars: usize) -> Option<(usize, String)> {
-    if emitted_chars >= text.chars().count() {
-        return None;
-    }
-    let split_byte = text
-        .char_indices()
-        .nth(emitted_chars)
-        .map(|(byte, _)| byte)
-        .unwrap_or(text.len());
-    Some((split_byte, text[split_byte..].to_string()))
 }

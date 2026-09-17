@@ -676,7 +676,7 @@ pub(super) fn concurrent_trace_mapped_veclike(
     job: &mut ConcurrentMarkJob,
     seen_symbols: &mut FxHashSet<usize>,
 ) {
-    let mut route =
+    let route =
         |child: TaggedValue, job: &mut ConcurrentMarkJob, seen_symbols: &mut FxHashSet<usize>| {
             if child.is_cons() {
                 let addr = child.xcons_ptr() as usize;
@@ -684,13 +684,13 @@ pub(super) fn concurrent_trace_mapped_veclike(
                     job.gray.push(child);
                 }
             } else if child.is_symbol() {
-                if seen_symbols.insert(child.bits() as usize) {
+                if seen_symbols.insert(child.bits()) {
                     job.deferred.lock().unwrap().push(child);
                 }
-            } else if child.is_heap_object() {
-                if !concurrent_try_mark_owned(child, &job.claims, &mut job.gray) {
-                    job.deferred.lock().unwrap().push(child);
-                }
+            } else if child.is_heap_object()
+                && !concurrent_try_mark_owned(child, &job.claims, &mut job.gray)
+            {
+                job.deferred.lock().unwrap().push(child);
             }
         };
     match unsafe { (*ptr).type_tag } {
@@ -849,7 +849,7 @@ pub(super) fn run_concurrent_mark(mut job: ConcurrentMarkJob) {
                         // mutator-only, and an uninterned dumped symbol is
                         // reachable only through image data, so each UNIQUE
                         // symbol must reach the termination exactly once.
-                        if seen_symbols.insert(child.bits() as usize) {
+                        if seen_symbols.insert(child.bits()) {
                             job.deferred.lock().unwrap().push(child);
                         }
                     } else if child.is_heap_object() {

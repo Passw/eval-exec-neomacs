@@ -3438,7 +3438,6 @@ impl FrameDisplayState {
         // face and can smear the last item's background across the band.
         let final_x = x_cursor.min(win_x + win_w);
         let right_edge = win_x + win_w;
-        drop(push);
         if final_x < right_edge
             && col > 0
             && row_role.is_chrome()

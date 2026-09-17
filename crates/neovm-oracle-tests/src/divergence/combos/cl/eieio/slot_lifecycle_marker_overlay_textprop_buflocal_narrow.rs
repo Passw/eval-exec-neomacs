@@ -1,5 +1,5 @@
-//! Combo: cl-eieio slot lifecycle (slot-boundp, slot-makeunbound, slot-missing)
-//! + overlays + markers + textprop + buflocal + narrow + undo.
+//! Combo: cl-eieio slot lifecycle (slot-boundp, slot-makeunbound,
+//! slot-missing) + overlays + markers + textprop + buflocal + narrow + undo.
 //! Tests slot binding state tracking through editing operations with EIEIO.
 
 use crate::common::assert_oracle_parity;

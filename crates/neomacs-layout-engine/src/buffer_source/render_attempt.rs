@@ -130,6 +130,9 @@ pub(crate) struct BufferSourceRedisplayPublishRequest {
     publication: WindowPositionPublication,
 }
 
+// Built and consumed once per layout attempt on the frame hot path; boxing
+// the large variant would add a heap allocation per attempt.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq)]
 pub(crate) enum BufferSourceRenderAttemptOutcome {
     Skipped,

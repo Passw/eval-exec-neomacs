@@ -240,6 +240,7 @@ pub(crate) enum UpdateStatusSite {
     /// produced between :1136 and :1140.  Measured, a child that exited 7
     /// with nobody waiting: both editors answer `signal` / 9, because GNU
     /// discards the 7 and this port never recorded it.
+    #[allow(dead_code)] // GNU's line, in the table for parity; only `ALL` names it
     DeleteProcess = 0,
     /// `Fprocess_status` (:1189).  Also `process-live-p`, which is
     /// `(memq (process-status process) '(run open listen connect stop))`
@@ -256,11 +257,14 @@ pub(crate) enum UpdateStatusSite {
     ProcessSendEof,
     /// `wait_reading_process_output` (:5562), on the process being waited
     /// for.
+    #[allow(dead_code)] // GNU's line, in the table for parity; only `ALL` names it
     WaitReadingProcessOutput,
     /// `read_process_output`'s pipe-connection EOF arm (:6087).
+    #[allow(dead_code)] // GNU's line, in the table for parity; only `ALL` names it
     ReadProcessOutputPipeEof,
     /// `status_notify` (:7915), immediately before `status_message` and the
     /// removal decision.
+    #[allow(dead_code)] // GNU's line, in the table for parity; only `ALL` names it
     StatusNotify,
 }
 
@@ -272,6 +276,7 @@ pub(crate) enum Recording {
     /// that has just done the discovery itself.
     AlreadyRecorded {
         /// Where this port made the record, so the claim is checkable.
+        #[allow(dead_code)] // a citation: read only by the table test in process/tests
         by: &'static str,
     },
     /// GNU reaches this site with the record already made because
@@ -302,8 +307,10 @@ pub(crate) enum Recording {
     /// module docs for the 294/294 against 261/300.
     AsynchronouslyRecorded {
         /// GNU's line that makes the record for this site.
+        #[allow(dead_code)] // a citation: read only by the table test in process/tests
         by: &'static str,
         /// Where this port makes it, so the claim is checkable.
+        #[allow(dead_code)] // a citation: read only by the table test in process/tests
         here: &'static str,
     },
 }
@@ -311,8 +318,10 @@ pub(crate) enum Recording {
 impl UpdateStatusSite {
     /// Derived from the last discriminant, so a new variant that is not added
     /// to [`Self::ALL`] is a compile error.
+    #[cfg(test)]
     pub(crate) const COUNT: usize = Self::StatusNotify as usize + 1;
 
+    #[cfg(test)]
     pub(crate) const ALL: [Self; Self::COUNT] = [
         Self::DeleteProcess,
         Self::ProcessStatus,
@@ -325,6 +334,7 @@ impl UpdateStatusSite {
     ];
 
     /// `file:line` of the `update_status` call in the GNU tree.
+    #[cfg(test)]
     pub(crate) fn gnu(self) -> &'static str {
         match self {
             Self::DeleteProcess => "src/process.c:1143",
@@ -335,20 +345,6 @@ impl UpdateStatusSite {
             Self::WaitReadingProcessOutput => "src/process.c:5562",
             Self::ReadProcessOutputPipeEof => "src/process.c:6087",
             Self::StatusNotify => "src/process.c:7915",
-        }
-    }
-
-    /// The Lisp entry point, or `""` for a site with no Lisp name of its own.
-    pub(crate) fn lisp(self) -> &'static str {
-        match self {
-            Self::DeleteProcess => "delete-process",
-            Self::ProcessStatus => "process-status",
-            Self::ProcessExitStatus => "process-exit-status",
-            Self::SendProcess => "process-send-string",
-            Self::ProcessSendEof => "process-send-eof",
-            Self::WaitReadingProcessOutput => "accept-process-output",
-            Self::ReadProcessOutputPipeEof => "",
-            Self::StatusNotify => "",
         }
     }
 
@@ -496,7 +492,7 @@ impl ProcessManager {
         if population.is_empty() {
             return 0;
         }
-        population.sort_unstable_by(|a, b| b.id().cmp(&a.id()));
+        population.sort_unstable_by_key(|child| std::cmp::Reverse(child.id()));
         let mut stamped = 0;
         for child in population {
             if self.check_child_status_change(child.id()) {
@@ -558,15 +554,19 @@ pub(crate) enum UnrecordedStatusRead {
 }
 
 impl UnrecordedStatusRead {
+    #[cfg(test)]
     pub(crate) const COUNT: usize = Self::ModeLinePercentS as usize + 1;
+    #[cfg(test)]
     pub(crate) const ALL: [Self; Self::COUNT] = [Self::ModeLinePercentS];
 
+    #[cfg(test)]
     pub(crate) fn gnu(self) -> &'static str {
         match self {
             Self::ModeLinePercentS => "src/xdisp.c:29723",
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn why(self) -> &'static str {
         match self {
             Self::ModeLinePercentS => {

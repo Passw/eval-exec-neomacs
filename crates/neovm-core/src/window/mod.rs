@@ -977,7 +977,9 @@ pub struct WindowLayoutQuery {
     /// source buffer. Keeping this conversion inside the layout transaction
     /// prevents a caller from combining a new end record with an old buffer Z.
     end: LispCharPos1,
-    geometry: Option<WindowDisplaySnapshot>,
+    /// Boxed so the query stays pointer-sized: a snapshot is over a kilobyte
+    /// and would otherwise dominate every enum that carries this query.
+    geometry: Option<Box<WindowDisplaySnapshot>>,
 }
 
 /// The display walk's extent, independent of the live viewport. Measurement
@@ -1025,8 +1027,11 @@ pub enum WindowLayoutQueryOutcome {
 }
 
 impl WindowLayoutQuery {
-    pub const fn new(end: LispCharPos1, geometry: Option<WindowDisplaySnapshot>) -> Self {
-        Self { end, geometry }
+    pub fn new(end: LispCharPos1, geometry: Option<WindowDisplaySnapshot>) -> Self {
+        Self {
+            end,
+            geometry: geometry.map(Box::new),
+        }
     }
 
     pub const fn end(&self) -> LispCharPos1 {
@@ -1034,7 +1039,7 @@ impl WindowLayoutQuery {
     }
 
     pub fn into_geometry(self) -> Option<WindowDisplaySnapshot> {
-        self.geometry
+        self.geometry.map(|geometry| *geometry)
     }
 }
 
@@ -2131,10 +2136,10 @@ impl Window {
     /// This is used when a buffer is killed; any window still attached to the
     /// dead buffer is moved back to a replacement buffer (typically `*scratch*`).
     pub fn replace_buffer_id(&mut self, old_id: BufferId, new_id: BufferId) {
-        if let Window::Leaf { buffer_id, .. } = self {
-            if *buffer_id == old_id {
-                self.set_buffer(new_id);
-            }
+        if let Window::Leaf { buffer_id, .. } = self
+            && *buffer_id == old_id
+        {
+            self.set_buffer(new_id);
         }
     }
 

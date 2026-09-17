@@ -1,5 +1,5 @@
-//! Combo: cl-eieio buffer-list / get-buffer-create / kill-buffer + overlays
-//! + markers + textprop + buflocal + narrow + undo.
+//! Combo: cl-eieio buffer-list / get-buffer-create / kill-buffer + overlays +
+//! markers + textprop + buflocal + narrow + undo.
 //! Tests multi-buffer operations with shared markers, overlays that reference
 //! other buffers, and buffer lifecycle interactions.
 

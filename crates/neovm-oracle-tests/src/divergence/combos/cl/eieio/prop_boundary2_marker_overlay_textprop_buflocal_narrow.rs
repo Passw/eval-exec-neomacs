@@ -1,5 +1,5 @@
-//! Combo: char-property-boundary scanning (round 2) + EIEIO state tracking
-//! + overlays + markers + textprop + buflocal + narrow + undo.
+//! Combo: char-property-boundary scanning (round 2) + EIEIO state tracking +
+//! overlays + markers + textprop + buflocal + narrow + undo.
 //! Tests property boundary scanning with EIEIO objects recording transitions,
 //! overlay stacking effects, undo impact on boundaries, and multi-property scans.
 

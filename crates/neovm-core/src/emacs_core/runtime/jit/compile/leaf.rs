@@ -106,7 +106,7 @@ impl LeafSidecar {
 }
 
 // Compile-time assertion that the hand-written offsets match the actual layout.
-pub(crate) const _: () = {
+const _: () = {
     assert!(core::mem::size_of::<LeafSidecar>() == 56);
     assert!(core::mem::offset_of!(LeafSidecar, reloc_base) == LeafSidecar::OFF_RELOC_BASE as usize);
     assert!(core::mem::offset_of!(LeafSidecar, spill_base) == LeafSidecar::OFF_SPILL_BASE as usize);
@@ -398,7 +398,7 @@ pub struct DeoptResume {
     pub cond_base: usize,
 }
 
-pub(crate) const _: () = {
+const _: () = {
     // The hot-path contract this Box exists for: a NativeRun return must
     // stay two words.
     assert!(std::mem::size_of::<NativeRun>() <= 16);
@@ -426,12 +426,6 @@ impl CompiledLeaf {
     /// independent of the source function (mandatory once an AOT leaf outlives it).
     pub(crate) fn reloc_values(&self) -> &[Value] {
         &self.reloc_data
-    }
-
-    /// See the `dynamic_prefix` field: > 0 iff this leaf needs the executing
-    /// callee's constant base on entry (`call_consts` & co.).
-    pub(crate) fn dynamic_prefix(&self) -> usize {
-        self.dynamic_prefix as usize
     }
 
     /// Construct a `CompiledLeaf` from a LOADED AOT unit (R1c-5).
@@ -625,7 +619,7 @@ impl CompiledLeaf {
     }
 
     /// [`call`](Self::call) with the executing callee's constant base
-    /// (`callee.constants.as_ptr()`), REQUIRED when `dynamic_prefix() > 0`:
+    /// (`callee.constants.as_ptr()`), REQUIRED when `dynamic_prefix > 0`:
     /// the leaf loads the `make-closure`-patched slots through it. Null is
     /// accepted only for an unpatched leaf (the JIT ignores the param then).
     pub fn call_consts(&self, vmctx: *mut u8, consts: *const Value, args: &[Value]) -> NativeRun {
@@ -678,21 +672,12 @@ impl CompiledLeaf {
     /// `invoke_native` published its bases; this callee runs inside that
     /// extent). The caller must route non-OK statuses through the same
     /// machinery `invoke_native` would (see `run_resolved_leaf_native`).
+    /// `consts` is the executing callee's constant base (see
+    /// [`call_consts`](Self::call_consts)).
     ///
-    /// SAFETY: same contract as [`Self::call_premarshaled`] — `args_ptr`
+    /// SAFETY: same contract as [`Self::call_premarshaled_consts`] — `args_ptr`
     /// addresses `self.arity` live tagged words, `vmctx` is the dormant
     /// seam Context.
-    pub(crate) unsafe fn entry_call_raw(
-        &self,
-        vmctx: *mut u8,
-        args_ptr: *const i64,
-        out: &mut i64,
-    ) -> i64 {
-        unsafe { self.entry_call_raw_consts(vmctx, core::ptr::null(), args_ptr, out) }
-    }
-
-    /// [`entry_call_raw`](Self::entry_call_raw) with the executing callee's
-    /// constant base (see [`call_consts`](Self::call_consts)).
     pub(crate) unsafe fn entry_call_raw_consts(
         &self,
         vmctx: *mut u8,
@@ -729,9 +714,18 @@ impl CompiledLeaf {
         );
     }
 
+    /// [`call_premarshaled_consts`](Self::call_premarshaled_consts) for an
+    /// unpatched leaf (null constant base); only the JIT tests call it.
+    #[cfg(test)]
+    pub(crate) fn call_premarshaled(&self, vmctx: *mut u8, args_ptr: *const i64) -> NativeRun {
+        self.call_premarshaled_consts(vmctx, core::ptr::null(), args_ptr)
+    }
+
     /// Native-to-native fast path: invoke the body with `args_ptr` addressing
     /// EXACTLY `self.arity` pre-marshaled argument words (the caller's native
-    /// call-args slot). Valid only when [`is_pure_passthrough`](Self::is_pure_passthrough)
+    /// call-args slot) and `consts` the executing callee's constant base (see
+    /// [`call_consts`](Self::call_consts)). Valid only when
+    /// [`is_pure_passthrough`](Self::is_pure_passthrough)
     /// holds for the call's argument count — no nil-pad / rest-list step. Skips
     /// the `LispArgVec` build and the `arg_bits` re-marshal that [`call`](Self::call)
     /// pays, which is the per-call cost that dominates call-heavy compiled code.
@@ -741,12 +735,6 @@ impl CompiledLeaf {
     /// path guarantees no GC safepoint runs in between: `maybe_quit` already
     /// returned `Ok` (which does not collect) and nothing allocates on a lisp
     /// heap before the entry consumes its args.
-    pub(crate) fn call_premarshaled(&self, vmctx: *mut u8, args_ptr: *const i64) -> NativeRun {
-        self.call_premarshaled_consts(vmctx, core::ptr::null(), args_ptr)
-    }
-
-    /// [`call_premarshaled`](Self::call_premarshaled) with the executing
-    /// callee's constant base (see [`call_consts`](Self::call_consts)).
     pub(crate) fn call_premarshaled_consts(
         &self,
         vmctx: *mut u8,
@@ -758,7 +746,7 @@ impl CompiledLeaf {
     }
 
     /// The post-marshaling tail shared by [`call`](Self::call) and
-    /// [`call_premarshaled`](Self::call_premarshaled): invoke the native entry
+    /// [`call_premarshaled_consts`](Self::call_premarshaled_consts): invoke the native entry
     /// with `args_ptr` (exactly `self.arity` words) and handle the `STATUS_*`
     /// outcome — precise-deopt capture (no frame unwind, ownership transfers to
     /// the resumed interpreter frame) or the `cleanup_bytecode_frame`-parity
@@ -891,7 +879,7 @@ impl CompiledLeaf {
             status =
                 self.cold_frame_exit(vmctx, status, out, bind_frame, cond_base, bases.as_ref());
         }
-        return match status {
+        match status {
             STATUS_OK => NativeRun::Ok(out as usize),
             STATUS_SIGNAL => NativeRun::Signal,
             _ => {
@@ -905,7 +893,7 @@ impl CompiledLeaf {
                 );
                 NativeRun::Deopt
             }
-        };
+        }
     }
 
     /// Precise-deopt outcome construction — cold by definition (a failed

@@ -485,7 +485,7 @@ fn non_gap_position_conversion_uses_backend_index_without_anchor_scan() {
     crate::test_utils::init_test_tracing();
     let mut s = String::new();
     for _ in 0..20_000 {
-        s.push_str("日");
+        s.push('日');
     }
 
     for kind in BufferTextBackendKind::non_gap_implemented_variants() {
@@ -875,7 +875,7 @@ fn long_scan_populates_anchor_cache() {
     // Query at the midpoint so the walk from either BEG or Z is >5000.
     let mut s = String::new();
     for _ in 0..20_000 {
-        s.push_str("日");
+        s.push('日');
     }
     let text = BufferText::from_str(&s);
 
@@ -895,7 +895,7 @@ fn long_scan_populates_anchor_cache() {
 fn set_multibyte_invalidates_position_caches() {
     let mut s = String::new();
     for _ in 0..20_000 {
-        s.push_str("日");
+        s.push('日');
     }
     let text = BufferText::from_str(&s);
 

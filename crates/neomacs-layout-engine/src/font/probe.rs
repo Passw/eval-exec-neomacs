@@ -414,7 +414,7 @@ pub fn otf_capability(file: &str, face_index: u32) -> Option<OtfCapability> {
 }
 
 pub fn otf_capability_from_bytes(data: &[u8], face_index: u32) -> Option<OtfCapability> {
-    let face = ttf_parser::Face::parse(&data, face_index).ok()?;
+    let face = ttf_parser::Face::parse(data, face_index).ok()?;
     let tables = face.tables();
     Some(OtfCapability {
         gsub: tables.gsub.map(otf_table_scripts).unwrap_or_default(),

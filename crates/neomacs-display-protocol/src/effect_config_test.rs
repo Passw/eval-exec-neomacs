@@ -336,7 +336,7 @@ fn assert_clone_debug<T: Clone + std::fmt::Debug>(v: &T) {
 #[test]
 fn accent_strip_defaults() {
     let c = AccentStripConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.width, 3.0);
     assert_clone_debug(&c);
 }
@@ -345,7 +345,7 @@ fn accent_strip_defaults() {
 #[test]
 fn argyle_pattern_defaults() {
     let c = ArgylePatternConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.5, 0.3, 0.3));
     assert_eq!(c.diamond_size, 30.0);
     assert_eq!(c.line_width, 1.0);
@@ -357,7 +357,7 @@ fn argyle_pattern_defaults() {
 #[test]
 fn aurora_defaults() {
     let c = AuroraConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color1, (0.2, 0.8, 0.4));
     assert_eq!(c.color2, (0.3, 0.4, 0.9));
     assert_eq!(c.height, 60.0);
@@ -370,7 +370,7 @@ fn aurora_defaults() {
 #[test]
 fn basket_weave_defaults() {
     let c = BasketWeaveConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.55, 0.4, 0.25));
     assert_eq!(c.strip_width, 6.0);
     assert_eq!(c.strip_spacing, 20.0);
@@ -382,7 +382,7 @@ fn basket_weave_defaults() {
 #[test]
 fn bg_gradient_defaults() {
     let c = BgGradientConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.top, (0.0, 0.0, 0.0));
     assert_eq!(c.bottom, (0.0, 0.0, 0.0));
     assert_clone_debug(&c);
@@ -403,7 +403,7 @@ fn bg_pattern_defaults() {
 #[test]
 fn border_transition_defaults() {
     let c = BorderTransitionConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.active_color, (0.4, 0.6, 1.0));
     assert_eq!(c.duration_ms, 200);
     assert_clone_debug(&c);
@@ -413,7 +413,7 @@ fn border_transition_defaults() {
 #[test]
 fn breadcrumb_defaults() {
     let c = BreadcrumbConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.opacity, 0.7);
     assert_clone_debug(&c);
 }
@@ -422,7 +422,7 @@ fn breadcrumb_defaults() {
 #[test]
 fn breathing_border_defaults() {
     let c = BreathingBorderConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.5, 0.5, 0.5));
     assert_eq!(c.min_opacity, 0.05);
     assert_eq!(c.max_opacity, 0.3);
@@ -434,7 +434,7 @@ fn breathing_border_defaults() {
 #[test]
 fn brick_wall_defaults() {
     let c = BrickWallConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.6, 0.4, 0.3));
     assert_eq!(c.width, 40.0);
     assert_eq!(c.height, 20.0);
@@ -446,7 +446,7 @@ fn brick_wall_defaults() {
 #[test]
 fn celtic_knot_defaults() {
     let c = CelticKnotConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.0, 0.6, 0.3));
     assert_eq!(c.scale, 60.0);
     assert_eq!(c.weave_speed, 1.0);
@@ -458,7 +458,7 @@ fn celtic_knot_defaults() {
 #[test]
 fn chevron_pattern_defaults() {
     let c = ChevronPatternConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.7, 0.5));
     assert_eq!(c.spacing, 40.0);
     assert_eq!(c.speed, 0.5);
@@ -470,7 +470,7 @@ fn chevron_pattern_defaults() {
 #[test]
 fn circuit_trace_defaults() {
     let c = CircuitTraceConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.2, 0.8, 0.4));
     assert_eq!(c.width, 2.0);
     assert_eq!(c.speed, 1.0);
@@ -482,7 +482,7 @@ fn circuit_trace_defaults() {
 #[test]
 fn click_halo_defaults() {
     let c = ClickHaloConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.6, 1.0));
     assert_eq!(c.duration_ms, 300);
     assert_eq!(c.max_radius, 30.0);
@@ -493,7 +493,7 @@ fn click_halo_defaults() {
 #[test]
 fn concentric_rings_defaults() {
     let c = ConcentricRingsConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.6, 1.0));
     assert_eq!(c.spacing, 30.0);
     assert_eq!(c.expansion_speed, 1.0);
@@ -505,7 +505,7 @@ fn concentric_rings_defaults() {
 #[test]
 fn constellation_defaults() {
     let c = ConstellationConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.7, 0.8, 1.0));
     assert_eq!(c.star_count, 50);
     assert_eq!(c.connect_dist, 80.0);
@@ -518,7 +518,7 @@ fn constellation_defaults() {
 #[test]
 fn corner_fold_defaults() {
     let c = CornerFoldConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.size, 20.0);
     assert_eq!(c.color, (0.6, 0.4, 0.2));
     assert_eq!(c.opacity, 0.5);
@@ -529,7 +529,7 @@ fn corner_fold_defaults() {
 #[test]
 fn crosshatch_pattern_defaults() {
     let c = CrosshatchPatternConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.5, 0.6, 0.4));
     assert_eq!(c.line_spacing, 20.0);
     assert_eq!(c.angle, 45.0);
@@ -542,7 +542,7 @@ fn crosshatch_pattern_defaults() {
 #[test]
 fn cursor_aurora_borealis_defaults() {
     let c = CursorAuroraBorealisConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.2, 0.9, 0.5));
     assert_eq!(c.band_count, 5);
     assert_eq!(c.shimmer_speed, 1.0);
@@ -554,7 +554,7 @@ fn cursor_aurora_borealis_defaults() {
 #[test]
 fn cursor_bubble_defaults() {
     let c = CursorBubbleConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.8, 1.0));
     assert_eq!(c.count, 6);
     assert_eq!(c.rise_speed, 80.0);
@@ -566,7 +566,7 @@ fn cursor_bubble_defaults() {
 #[test]
 fn cursor_candle_flame_defaults() {
     let c = CursorCandleFlameConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.7, 0.2));
     assert_eq!(c.height, 20);
     assert_eq!(c.flicker_speed, 1.0);
@@ -578,7 +578,7 @@ fn cursor_candle_flame_defaults() {
 #[test]
 fn cursor_color_cycle_defaults() {
     let c = CursorColorCycleConfig::default();
-    assert_eq!(c.enabled, true);
+    assert!(c.enabled);
     // The rate is what makes default-on affordable: 24 Hz, not the display
     // rate. Raising it re-creates the idle-present cost P6.1 removed. See
     // `default_enabled_fields_match_product_defaults` for the full history.
@@ -593,7 +593,7 @@ fn cursor_color_cycle_defaults() {
 #[test]
 fn cursor_comet_defaults() {
     let c = CursorCometConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.trail_length, 5);
     assert_eq!(c.fade_ms, 300);
     assert_eq!(c.color, (0.5, 0.7, 1.0));
@@ -605,7 +605,7 @@ fn cursor_comet_defaults() {
 #[test]
 fn cursor_compass_defaults() {
     let c = CursorCompassConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.9, 0.6, 0.2));
     assert_eq!(c.size, 20.0);
     assert_eq!(c.speed, 1.0);
@@ -617,7 +617,7 @@ fn cursor_compass_defaults() {
 #[test]
 fn cursor_compass_needle_defaults() {
     let c = CursorCompassNeedleConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.3, 0.3));
     assert_eq!(c.length, 20.0);
     assert_eq!(c.spin_speed, 2.0);
@@ -629,7 +629,7 @@ fn cursor_compass_needle_defaults() {
 #[test]
 fn cursor_crosshair_defaults() {
     let c = CursorCrosshairConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.5, 0.5, 0.5));
     assert_eq!(c.opacity, 0.15);
     assert_clone_debug(&c);
@@ -639,7 +639,7 @@ fn cursor_crosshair_defaults() {
 #[test]
 fn cursor_crystal_defaults() {
     let c = CursorCrystalConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.7, 0.9, 1.0));
     assert_eq!(c.facet_count, 6);
     assert_eq!(c.radius, 25.0);
@@ -651,7 +651,7 @@ fn cursor_crystal_defaults() {
 #[test]
 fn cursor_dna_helix_defaults() {
     let c = CursorDnaHelixConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color1, (0.3, 0.9, 0.5));
     assert_eq!(c.color2, (0.5, 0.3, 0.9));
     assert_eq!(c.radius, 12.0);
@@ -664,7 +664,7 @@ fn cursor_dna_helix_defaults() {
 #[test]
 fn cursor_elastic_snap_defaults() {
     let c = CursorElasticSnapConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.overshoot, 0.15);
     assert_eq!(c.duration_ms, 200);
     assert_clone_debug(&c);
@@ -674,7 +674,7 @@ fn cursor_elastic_snap_defaults() {
 #[test]
 fn cursor_error_pulse_defaults() {
     let c = CursorErrorPulseConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.2, 0.2));
     assert_eq!(c.duration_ms, 250);
     assert_clone_debug(&c);
@@ -684,7 +684,7 @@ fn cursor_error_pulse_defaults() {
 #[test]
 fn cursor_feather_defaults() {
     let c = CursorFeatherConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.9, 0.85, 0.7));
     assert_eq!(c.count, 4);
     assert_eq!(c.drift_speed, 1.0);
@@ -696,7 +696,7 @@ fn cursor_feather_defaults() {
 #[test]
 fn cursor_firework_defaults() {
     let c = CursorFireworkConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.6, 0.2));
     assert_eq!(c.particle_count, 16);
     assert_eq!(c.burst_radius, 60.0);
@@ -708,7 +708,7 @@ fn cursor_firework_defaults() {
 #[test]
 fn cursor_flame_defaults() {
     let c = CursorFlameConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.5, 0.1));
     assert_eq!(c.particle_count, 10);
     assert_eq!(c.height, 40.0);
@@ -720,7 +720,7 @@ fn cursor_flame_defaults() {
 #[test]
 fn cursor_galaxy_defaults() {
     let c = CursorGalaxyConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.8, 0.8, 1.0));
     assert_eq!(c.star_count, 30);
     assert_eq!(c.radius, 30.0);
@@ -732,7 +732,7 @@ fn cursor_galaxy_defaults() {
 #[test]
 fn cursor_ghost_defaults() {
     let c = CursorGhostConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.5, 0.5, 1.0));
     assert_eq!(c.count, 4);
     assert_eq!(c.fade_ms, 600);
@@ -745,7 +745,7 @@ fn cursor_ghost_defaults() {
 #[test]
 fn cursor_glow_defaults() {
     let c = CursorGlowConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.6, 1.0));
     assert_eq!(c.radius, 30.0);
     assert_eq!(c.opacity, 0.15);
@@ -756,7 +756,7 @@ fn cursor_glow_defaults() {
 #[test]
 fn cursor_gravity_well_defaults() {
     let c = CursorGravityWellConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.3, 0.6, 1.0));
     assert_eq!(c.field_radius, 80.0);
     assert_eq!(c.line_count, 8);
@@ -768,7 +768,7 @@ fn cursor_gravity_well_defaults() {
 #[test]
 fn cursor_heartbeat_defaults() {
     let c = CursorHeartbeatConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.3, 0.3));
     assert_eq!(c.bpm, 72.0);
     assert_eq!(c.max_radius, 50.0);
@@ -780,7 +780,7 @@ fn cursor_heartbeat_defaults() {
 #[test]
 fn cursor_lighthouse_defaults() {
     let c = CursorLighthouseConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.9, 0.3));
     assert_eq!(c.beam_width, 15.0);
     assert_eq!(c.rotation_speed, 0.5);
@@ -793,7 +793,7 @@ fn cursor_lighthouse_defaults() {
 #[test]
 fn cursor_lightning_defaults() {
     let c = CursorLightningConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.6, 0.8, 1.0));
     assert_eq!(c.bolt_count, 4);
     assert_eq!(c.max_length, 50.0);
@@ -805,7 +805,7 @@ fn cursor_lightning_defaults() {
 #[test]
 fn cursor_magnetism_defaults() {
     let c = CursorMagnetismConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.7, 1.0));
     assert_eq!(c.ring_count, 3);
     assert_eq!(c.duration_ms, 300);
@@ -817,7 +817,7 @@ fn cursor_magnetism_defaults() {
 #[test]
 fn cursor_metronome_defaults() {
     let c = CursorMetronomeConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.9, 0.5, 0.2));
     assert_eq!(c.tick_height, 20.0);
     assert_eq!(c.fade_ms, 300);
@@ -829,7 +829,7 @@ fn cursor_metronome_defaults() {
 #[test]
 fn cursor_moth_defaults() {
     let c = CursorMothConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.9, 0.8, 0.5));
     assert_eq!(c.count, 5);
     assert_eq!(c.wing_size, 8.0);
@@ -841,7 +841,7 @@ fn cursor_moth_defaults() {
 #[test]
 fn cursor_moth_flame_defaults() {
     let c = CursorMothFlameConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.8, 0.7, 0.5));
     assert_eq!(c.moth_count, 5);
     assert_eq!(c.orbit_speed, 1.0);
@@ -853,7 +853,7 @@ fn cursor_moth_flame_defaults() {
 #[test]
 fn cursor_orbit_particles_defaults() {
     let c = CursorOrbitParticlesConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.8, 0.3));
     assert_eq!(c.count, 6);
     assert_eq!(c.radius, 25.0);
@@ -866,7 +866,7 @@ fn cursor_orbit_particles_defaults() {
 #[test]
 fn cursor_particles_defaults() {
     let c = CursorParticlesConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.6, 0.2));
     assert_eq!(c.count, 6);
     assert_eq!(c.lifetime_ms, 800);
@@ -878,7 +878,7 @@ fn cursor_particles_defaults() {
 #[test]
 fn cursor_pendulum_defaults() {
     let c = CursorPendulumConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.9, 0.7, 0.3));
     assert_eq!(c.arc_length, 40.0);
     assert_eq!(c.damping, 0.5);
@@ -890,7 +890,7 @@ fn cursor_pendulum_defaults() {
 #[test]
 fn cursor_pixel_dust_defaults() {
     let c = CursorPixelDustConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.8, 0.8, 0.6));
     assert_eq!(c.count, 15);
     assert_eq!(c.scatter_speed, 1.0);
@@ -902,7 +902,7 @@ fn cursor_pixel_dust_defaults() {
 #[test]
 fn cursor_plasma_ball_defaults() {
     let c = CursorPlasmaBallConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.7, 0.3, 1.0));
     assert_eq!(c.tendril_count, 6);
     assert_eq!(c.arc_speed, 1.0);
@@ -914,7 +914,7 @@ fn cursor_plasma_ball_defaults() {
 #[test]
 fn cursor_portal_defaults() {
     let c = CursorPortalConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.6, 0.2, 0.9));
     assert_eq!(c.radius, 30.0);
     assert_eq!(c.speed, 2.0);
@@ -926,7 +926,7 @@ fn cursor_portal_defaults() {
 #[test]
 fn cursor_prism_defaults() {
     let c = CursorPrismConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 1.0, 1.0));
     assert_eq!(c.ray_count, 7);
     assert_eq!(c.spread, 30.0);
@@ -938,7 +938,7 @@ fn cursor_prism_defaults() {
 #[test]
 fn cursor_pulse_defaults() {
     let c = CursorPulseConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.speed, 1.0);
     assert_eq!(c.min_opacity, 0.3);
     assert_clone_debug(&c);
@@ -948,7 +948,7 @@ fn cursor_pulse_defaults() {
 #[test]
 fn cursor_quill_pen_defaults() {
     let c = CursorQuillPenConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.3, 0.15, 0.05));
     assert_eq!(c.trail_length, 8);
     assert_eq!(c.ink_speed, 1.0);
@@ -960,7 +960,7 @@ fn cursor_quill_pen_defaults() {
 #[test]
 fn cursor_radar_defaults() {
     let c = CursorRadarConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.2, 0.9, 0.4));
     assert_eq!(c.radius, 40.0);
     assert_eq!(c.speed, 1.5);
@@ -972,7 +972,7 @@ fn cursor_radar_defaults() {
 #[test]
 fn cursor_ripple_ring_defaults() {
     let c = CursorRippleRingConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.3, 0.8, 1.0));
     assert_eq!(c.max_radius, 60.0);
     assert_eq!(c.count, 3);
@@ -985,7 +985,7 @@ fn cursor_ripple_ring_defaults() {
 #[test]
 fn cursor_ripple_wave_defaults() {
     let c = CursorRippleWaveConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.6, 1.0));
     assert_eq!(c.ring_count, 3);
     assert_eq!(c.max_radius, 80.0);
@@ -998,7 +998,7 @@ fn cursor_ripple_wave_defaults() {
 #[test]
 fn cursor_scope_defaults() {
     let c = CursorScopeConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.8, 0.2));
     assert_eq!(c.thickness, 1.0);
     assert_eq!(c.gap, 10.0);
@@ -1010,7 +1010,7 @@ fn cursor_scope_defaults() {
 #[test]
 fn cursor_shadow_defaults() {
     let c = CursorShadowConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.offset_x, 2.0);
     assert_eq!(c.offset_y, 2.0);
     assert_eq!(c.opacity, 0.3);
@@ -1021,7 +1021,7 @@ fn cursor_shadow_defaults() {
 #[test]
 fn cursor_shockwave_defaults() {
     let c = CursorShockwaveConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.6, 0.2));
     assert_eq!(c.radius, 80.0);
     assert_eq!(c.decay, 2.0);
@@ -1033,7 +1033,7 @@ fn cursor_shockwave_defaults() {
 #[test]
 fn cursor_snowflake_defaults() {
     let c = CursorSnowflakeConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.8, 0.9, 1.0));
     assert_eq!(c.count, 8);
     assert_eq!(c.fall_speed, 30.0);
@@ -1045,7 +1045,7 @@ fn cursor_snowflake_defaults() {
 #[test]
 fn cursor_sonar_ping_defaults() {
     let c = CursorSonarPingConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.3, 0.7, 1.0));
     assert_eq!(c.ring_count, 3);
     assert_eq!(c.max_radius, 60.0);
@@ -1058,7 +1058,7 @@ fn cursor_sonar_ping_defaults() {
 #[test]
 fn cursor_sparkle_burst_defaults() {
     let c = CursorSparkleBurstConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.85, 0.3));
     assert_eq!(c.count, 12);
     assert_eq!(c.radius, 30.0);
@@ -1070,7 +1070,7 @@ fn cursor_sparkle_burst_defaults() {
 #[test]
 fn cursor_sparkler_defaults() {
     let c = CursorSparklerConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.85, 0.3));
     assert_eq!(c.spark_count, 12);
     assert_eq!(c.burn_speed, 1.0);
@@ -1082,7 +1082,7 @@ fn cursor_sparkler_defaults() {
 #[test]
 fn cursor_spotlight_defaults() {
     let c = CursorSpotlightConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.radius, 200.0);
     assert_eq!(c.intensity, 0.15);
     assert_eq!(c.color, (1.0, 1.0, 0.9));
@@ -1093,7 +1093,7 @@ fn cursor_spotlight_defaults() {
 #[test]
 fn cursor_stardust_defaults() {
     let c = CursorStardustConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.9, 0.5));
     assert_eq!(c.particle_count, 20);
     assert_eq!(c.fall_speed, 1.0);
@@ -1105,7 +1105,7 @@ fn cursor_stardust_defaults() {
 #[test]
 fn cursor_tornado_defaults() {
     let c = CursorTornadoConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.5, 0.7, 1.0));
     assert_eq!(c.radius, 40.0);
     assert_eq!(c.particle_count, 12);
@@ -1117,7 +1117,7 @@ fn cursor_tornado_defaults() {
 #[test]
 fn cursor_trail_fade_defaults() {
     let c = CursorTrailFadeConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.length, 8);
     assert_eq!(c.ms, 300);
     assert_clone_debug(&c);
@@ -1127,7 +1127,7 @@ fn cursor_trail_fade_defaults() {
 #[test]
 fn cursor_wake_defaults() {
     let c = CursorWakeConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.duration_ms, 120);
     assert_eq!(c.scale, 1.3);
     assert_clone_debug(&c);
@@ -1137,7 +1137,7 @@ fn cursor_wake_defaults() {
 #[test]
 fn cursor_water_drop_defaults() {
     let c = CursorWaterDropConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.3, 0.6, 0.9));
     assert_eq!(c.ripple_count, 4);
     assert_eq!(c.expand_speed, 1.0);
@@ -1149,7 +1149,7 @@ fn cursor_water_drop_defaults() {
 #[test]
 fn depth_shadow_defaults() {
     let c = DepthShadowConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.layers, 3);
     assert_eq!(c.offset, 2.0);
     assert_eq!(c.color, (0.0, 0.0, 0.0));
@@ -1161,7 +1161,7 @@ fn depth_shadow_defaults() {
 #[test]
 fn diamond_lattice_defaults() {
     let c = DiamondLatticeConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.7, 0.5, 0.9));
     assert_eq!(c.cell_size, 30.0);
     assert_eq!(c.shimmer_speed, 0.8);
@@ -1173,7 +1173,7 @@ fn diamond_lattice_defaults() {
 #[test]
 fn dot_matrix_defaults() {
     let c = DotMatrixConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.3, 1.0, 0.3));
     assert_eq!(c.spacing, 12.0);
     assert_eq!(c.pulse_speed, 1.0);
@@ -1185,7 +1185,7 @@ fn dot_matrix_defaults() {
 #[test]
 fn edge_glow_defaults() {
     let c = EdgeGlowConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.6, 1.0));
     assert_eq!(c.height, 40.0);
     assert_eq!(c.opacity, 0.3);
@@ -1197,7 +1197,7 @@ fn edge_glow_defaults() {
 #[test]
 fn edge_snap_defaults() {
     let c = EdgeSnapConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.5, 0.2));
     assert_eq!(c.duration_ms, 200);
     assert_clone_debug(&c);
@@ -1207,7 +1207,7 @@ fn edge_snap_defaults() {
 #[test]
 fn fish_scale_defaults() {
     let c = FishScaleConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.3, 0.6, 0.7));
     assert_eq!(c.size, 16.0);
     assert_eq!(c.row_offset, 0.5);
@@ -1219,7 +1219,7 @@ fn fish_scale_defaults() {
 #[test]
 fn focus_gradient_border_defaults() {
     let c = FocusGradientBorderConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.top_color, (0.3, 0.6, 1.0));
     assert_eq!(c.bot_color, (0.6, 0.3, 1.0));
     assert_eq!(c.width, 2.0);
@@ -1231,7 +1231,7 @@ fn focus_gradient_border_defaults() {
 #[test]
 fn focus_mode_defaults() {
     let c = FocusModeConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.opacity, 0.4);
     assert_clone_debug(&c);
 }
@@ -1240,7 +1240,7 @@ fn focus_mode_defaults() {
 #[test]
 fn focus_ring_defaults() {
     let c = FocusRingConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.6, 1.0));
     assert_eq!(c.opacity, 0.5);
     assert_eq!(c.dash_length, 8.0);
@@ -1252,7 +1252,7 @@ fn focus_ring_defaults() {
 #[test]
 fn frost_border_defaults() {
     let c = FrostBorderConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.7, 0.85, 1.0));
     assert_eq!(c.width, 6.0);
     assert_eq!(c.opacity, 0.2);
@@ -1263,7 +1263,7 @@ fn frost_border_defaults() {
 #[test]
 fn frosted_border_defaults() {
     let c = FrostedBorderConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.width, 4.0);
     assert_eq!(c.opacity, 0.15);
     assert_eq!(c.color, (1.0, 1.0, 1.0));
@@ -1274,7 +1274,7 @@ fn frosted_border_defaults() {
 #[test]
 fn frosted_glass_defaults() {
     let c = FrostedGlassConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.opacity, 0.3);
     assert_eq!(c.blur, 4.0);
     assert_clone_debug(&c);
@@ -1284,7 +1284,7 @@ fn frosted_glass_defaults() {
 #[test]
 fn guilloche_defaults() {
     let c = GuillocheConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.6, 0.4, 0.7));
     assert_eq!(c.curve_count, 8);
     assert_eq!(c.wave_freq, 1.0);
@@ -1296,7 +1296,7 @@ fn guilloche_defaults() {
 #[test]
 fn header_shadow_defaults() {
     let c = HeaderShadowConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.intensity, 0.3);
     assert_eq!(c.size, 6.0);
     assert_clone_debug(&c);
@@ -1306,7 +1306,7 @@ fn header_shadow_defaults() {
 #[test]
 fn heat_distortion_defaults() {
     let c = HeatDistortionConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.intensity, 0.3);
     assert_eq!(c.speed, 1.0);
     assert_eq!(c.edge_width, 30.0);
@@ -1318,7 +1318,7 @@ fn heat_distortion_defaults() {
 #[test]
 fn herringbone_pattern_defaults() {
     let c = HerringbonePatternConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.6, 0.5, 0.4));
     assert_eq!(c.tile_width, 20.0);
     assert_eq!(c.tile_height, 10.0);
@@ -1330,7 +1330,7 @@ fn herringbone_pattern_defaults() {
 #[test]
 fn hex_grid_defaults() {
     let c = HexGridConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.3, 0.6, 0.9));
     assert_eq!(c.cell_size, 40.0);
     assert_eq!(c.pulse_speed, 1.0);
@@ -1342,7 +1342,7 @@ fn hex_grid_defaults() {
 #[test]
 fn honeycomb_dissolve_defaults() {
     let c = HoneycombDissolveConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.8, 0.6, 0.2));
     assert_eq!(c.cell_size, 30.0);
     assert_eq!(c.speed, 0.8);
@@ -1354,7 +1354,7 @@ fn honeycomb_dissolve_defaults() {
 #[test]
 fn idle_dim_defaults() {
     let c = IdleDimConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.delay, Duration::from_secs(60));
     assert_eq!(c.opacity, 0.4);
     assert_eq!(c.fade_duration, Duration::from_millis(500));
@@ -1365,7 +1365,7 @@ fn idle_dim_defaults() {
 #[test]
 fn inactive_dim_defaults() {
     let c = InactiveDimConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.opacity, 0.15);
     assert_clone_debug(&c);
 }
@@ -1374,7 +1374,7 @@ fn inactive_dim_defaults() {
 #[test]
 fn inactive_tint_defaults() {
     let c = InactiveTintConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.2, 0.1, 0.0));
     assert_eq!(c.opacity, 0.1);
     assert_clone_debug(&c);
@@ -1384,9 +1384,9 @@ fn inactive_tint_defaults() {
 #[test]
 fn indent_guides_defaults() {
     let c = IndentGuidesConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.3, 0.3, 0.3, 0.3));
-    assert_eq!(c.rainbow_enabled, false);
+    assert!(!c.rainbow_enabled);
     assert!(c.rainbow_colors.is_empty());
     assert_clone_debug(&c);
 }
@@ -1395,7 +1395,7 @@ fn indent_guides_defaults() {
 #[test]
 fn kaleidoscope_defaults() {
     let c = KaleidoscopeConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.6, 0.3, 0.9));
     assert_eq!(c.segments, 6);
     assert_eq!(c.speed, 0.5);
@@ -1407,7 +1407,7 @@ fn kaleidoscope_defaults() {
 #[test]
 fn lightning_bolt_defaults() {
     let c = LightningBoltConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.7, 0.8, 1.0));
     assert_eq!(c.frequency, 1.0);
     assert_eq!(c.intensity, 0.8);
@@ -1419,7 +1419,7 @@ fn lightning_bolt_defaults() {
 #[test]
 fn line_animation_defaults() {
     let c = LineAnimationConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.duration_ms, 150);
     assert_clone_debug(&c);
 }
@@ -1428,7 +1428,7 @@ fn line_animation_defaults() {
 #[test]
 fn line_highlight_defaults() {
     let c = LineHighlightConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.2, 0.2, 0.3, 0.15));
     assert_clone_debug(&c);
 }
@@ -1437,7 +1437,7 @@ fn line_highlight_defaults() {
 #[test]
 fn line_number_pulse_defaults() {
     let c = LineNumberPulseConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.6, 1.0));
     assert_eq!(c.intensity, 0.3);
     assert_eq!(c.cycle_ms, 2000);
@@ -1448,7 +1448,7 @@ fn line_number_pulse_defaults() {
 #[test]
 fn matrix_rain_defaults() {
     let c = MatrixRainConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.0, 0.8, 0.2));
     assert_eq!(c.column_count, 40);
     assert_eq!(c.speed, 150.0);
@@ -1460,7 +1460,7 @@ fn matrix_rain_defaults() {
 #[test]
 fn minibuffer_highlight_defaults() {
     let c = MinibufferHighlightConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.6, 1.0));
     assert_eq!(c.opacity, 0.25);
     assert_clone_debug(&c);
@@ -1470,7 +1470,7 @@ fn minibuffer_highlight_defaults() {
 #[test]
 fn minimap_defaults() {
     let c = MinimapConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.width, 80.0);
     assert_clone_debug(&c);
 }
@@ -1479,7 +1479,7 @@ fn minimap_defaults() {
 #[test]
 fn mode_line_gradient_defaults() {
     let c = ModeLineGradientConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.left_color, (0.2, 0.3, 0.5));
     assert_eq!(c.right_color, (0.5, 0.3, 0.2));
     assert_eq!(c.opacity, 0.3);
@@ -1500,7 +1500,7 @@ fn mode_line_separator_defaults() {
 #[test]
 fn mode_line_transition_defaults() {
     let c = ModeLineTransitionConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.duration_ms, 200);
     assert_clone_debug(&c);
 }
@@ -1509,7 +1509,7 @@ fn mode_line_transition_defaults() {
 #[test]
 fn modified_indicator_defaults() {
     let c = ModifiedIndicatorConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.6, 0.2));
     assert_eq!(c.width, 3.0);
     assert_eq!(c.opacity, 0.8);
@@ -1520,7 +1520,7 @@ fn modified_indicator_defaults() {
 #[test]
 fn moire_pattern_defaults() {
     let c = MoirePatternConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.5, 0.5, 0.8));
     assert_eq!(c.line_spacing, 8.0);
     assert_eq!(c.angle_offset, 5.0);
@@ -1533,7 +1533,7 @@ fn moire_pattern_defaults() {
 #[test]
 fn neon_border_defaults() {
     let c = NeonBorderConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.0, 1.0, 0.8));
     assert_eq!(c.intensity, 0.6);
     assert_eq!(c.flicker, 0.1);
@@ -1546,7 +1546,7 @@ fn neon_border_defaults() {
 #[test]
 fn noise_field_defaults() {
     let c = NoiseFieldConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.5, 0.7, 0.3));
     assert_eq!(c.scale, 50.0);
     assert_eq!(c.speed, 0.5);
@@ -1558,7 +1558,7 @@ fn noise_field_defaults() {
 #[test]
 fn noise_grain_defaults() {
     let c = NoiseGrainConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.intensity, 0.03);
     assert_eq!(c.size, 2.0);
     assert_clone_debug(&c);
@@ -1568,7 +1568,7 @@ fn noise_grain_defaults() {
 #[test]
 fn padding_gradient_defaults() {
     let c = PaddingGradientConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.0, 0.0, 0.0));
     assert_eq!(c.opacity, 0.15);
     assert_eq!(c.width, 8.0);
@@ -1579,7 +1579,7 @@ fn padding_gradient_defaults() {
 #[test]
 fn plaid_pattern_defaults() {
     let c = PlaidPatternConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.7, 0.3, 0.3));
     assert_eq!(c.band_width, 4.0);
     assert_eq!(c.band_spacing, 30.0);
@@ -1591,7 +1591,7 @@ fn plaid_pattern_defaults() {
 #[test]
 fn plasma_border_defaults() {
     let c = PlasmaBorderConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color1, (1.0, 0.2, 0.5));
     assert_eq!(c.color2, (0.2, 0.5, 1.0));
     assert_eq!(c.width, 4.0);
@@ -1604,7 +1604,7 @@ fn plasma_border_defaults() {
 #[test]
 fn prism_edge_defaults() {
     let c = PrismEdgeConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.width, 6.0);
     assert_eq!(c.speed, 1.0);
     assert_eq!(c.saturation, 0.8);
@@ -1616,7 +1616,7 @@ fn prism_edge_defaults() {
 #[test]
 fn rain_effect_defaults() {
     let c = RainEffectConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.5, 0.6, 0.8));
     assert_eq!(c.drop_count, 30);
     assert_eq!(c.speed, 120.0);
@@ -1628,7 +1628,7 @@ fn rain_effect_defaults() {
 #[test]
 fn region_glow_defaults() {
     let c = RegionGlowConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.face_id, FaceId::new(0));
     assert_eq!(c.radius, 6.0);
     assert_eq!(c.opacity, 0.3);
@@ -1639,7 +1639,7 @@ fn region_glow_defaults() {
 #[test]
 fn resize_padding_defaults() {
     let c = ResizePaddingConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.duration_ms, 200);
     assert_eq!(c.max, 12.0);
     assert_clone_debug(&c);
@@ -1649,7 +1649,7 @@ fn resize_padding_defaults() {
 #[test]
 fn rotating_gear_defaults() {
     let c = RotatingGearConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.6, 0.7, 0.8));
     assert_eq!(c.size, 40.0);
     assert_eq!(c.speed, 0.5);
@@ -1661,7 +1661,7 @@ fn rotating_gear_defaults() {
 #[test]
 fn scanlines_defaults() {
     let c = ScanlinesConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.spacing, 2);
     assert_eq!(c.opacity, 0.08);
     assert_eq!(c.color, (0.0, 0.0, 0.0));
@@ -1683,7 +1683,7 @@ fn scroll_bar_defaults() {
 #[test]
 fn scroll_line_spacing_defaults() {
     let c = ScrollLineSpacingConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.max, 6.0);
     assert_eq!(c.duration_ms, 200);
     assert_clone_debug(&c);
@@ -1693,7 +1693,7 @@ fn scroll_line_spacing_defaults() {
 #[test]
 fn scroll_momentum_defaults() {
     let c = ScrollMomentumConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.fade_ms, 300);
     assert_eq!(c.width, 3.0);
     assert_clone_debug(&c);
@@ -1703,7 +1703,7 @@ fn scroll_momentum_defaults() {
 #[test]
 fn scroll_progress_defaults() {
     let c = ScrollProgressConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.height, 2.0);
     assert_eq!(c.color, (0.4, 0.6, 1.0));
     assert_eq!(c.opacity, 0.8);
@@ -1714,7 +1714,7 @@ fn scroll_progress_defaults() {
 #[test]
 fn scroll_velocity_fade_defaults() {
     let c = ScrollVelocityFadeConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.max_opacity, 0.15);
     assert_eq!(c.ms, 300);
     assert_clone_debug(&c);
@@ -1724,7 +1724,7 @@ fn scroll_velocity_fade_defaults() {
 #[test]
 fn search_pulse_defaults() {
     let c = SearchPulseConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.face_id, FaceId::new(0));
     assert_clone_debug(&c);
 }
@@ -1733,7 +1733,7 @@ fn search_pulse_defaults() {
 #[test]
 fn show_whitespace_defaults() {
     let c = ShowWhitespaceConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.4, 0.4, 0.3));
     assert_clone_debug(&c);
 }
@@ -1742,7 +1742,7 @@ fn show_whitespace_defaults() {
 #[test]
 fn sine_wave_defaults() {
     let c = SineWaveConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.3, 0.7, 1.0));
     assert_eq!(c.amplitude, 20.0);
     assert_eq!(c.wavelength, 80.0);
@@ -1755,7 +1755,7 @@ fn sine_wave_defaults() {
 #[test]
 fn spiral_vortex_defaults() {
     let c = SpiralVortexConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.2, 0.8));
     assert_eq!(c.arms, 4);
     assert_eq!(c.speed, 0.5);
@@ -1767,7 +1767,7 @@ fn spiral_vortex_defaults() {
 #[test]
 fn stained_glass_defaults() {
     let c = StainedGlassConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.opacity, 0.08);
     assert_eq!(c.saturation, 0.6);
     assert_clone_debug(&c);
@@ -1777,7 +1777,7 @@ fn stained_glass_defaults() {
 #[test]
 fn sunburst_pattern_defaults() {
     let c = SunburstPatternConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.8, 0.3));
     assert_eq!(c.ray_count, 12);
     assert_eq!(c.speed, 0.5);
@@ -1789,7 +1789,7 @@ fn sunburst_pattern_defaults() {
 #[test]
 fn target_reticle_defaults() {
     let c = TargetReticleConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.2, 0.8, 0.2));
     assert_eq!(c.ring_count, 3);
     assert_eq!(c.pulse_speed, 1.0);
@@ -1801,7 +1801,7 @@ fn target_reticle_defaults() {
 #[test]
 fn tessellation_defaults() {
     let c = TessellationConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.5, 0.5, 0.7));
     assert_eq!(c.tile_size, 40.0);
     assert_eq!(c.rotation, 0.0);
@@ -1813,7 +1813,7 @@ fn tessellation_defaults() {
 #[test]
 fn text_fade_in_defaults() {
     let c = TextFadeInConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.duration_ms, 150);
     assert_clone_debug(&c);
 }
@@ -1822,7 +1822,7 @@ fn text_fade_in_defaults() {
 #[test]
 fn theme_transition_defaults() {
     let c = ThemeTransitionConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.duration, Duration::from_millis(300));
     assert_eq!(c.easing, TransitionEasing::EaseOutQuad);
     assert_clone_debug(&c);
@@ -1832,7 +1832,7 @@ fn theme_transition_defaults() {
 #[test]
 fn title_fade_defaults() {
     let c = TitleFadeConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.duration_ms, 300);
     assert_clone_debug(&c);
 }
@@ -1841,7 +1841,7 @@ fn title_fade_defaults() {
 #[test]
 fn topo_contour_defaults() {
     let c = TopoContourConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.7, 0.5));
     assert_eq!(c.spacing, 30.0);
     assert_eq!(c.speed, 1.0);
@@ -1853,7 +1853,7 @@ fn topo_contour_defaults() {
 #[test]
 fn trefoil_knot_defaults() {
     let c = TrefoilKnotConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.6, 0.9));
     assert_eq!(c.size, 80.0);
     assert_eq!(c.rotation_speed, 1.0);
@@ -1865,7 +1865,7 @@ fn trefoil_knot_defaults() {
 #[test]
 fn typing_heatmap_defaults() {
     let c = TypingHeatmapConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (1.0, 0.4, 0.1));
     assert_eq!(c.fade_ms, 2000);
     assert_eq!(c.opacity, 0.15);
@@ -1876,7 +1876,7 @@ fn typing_heatmap_defaults() {
 #[test]
 fn typing_ripple_defaults() {
     let c = TypingRippleConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.max_radius, 40.0);
     assert_eq!(c.duration_ms, 300);
     assert_clone_debug(&c);
@@ -1886,7 +1886,7 @@ fn typing_ripple_defaults() {
 #[test]
 fn typing_speed_defaults() {
     let c = TypingSpeedConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_clone_debug(&c);
 }
 
@@ -1894,7 +1894,7 @@ fn typing_speed_defaults() {
 #[test]
 fn vignette_defaults() {
     let c = VignetteConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.intensity, 0.3);
     assert_eq!(c.radius, 50.0);
     assert_clone_debug(&c);
@@ -1904,7 +1904,7 @@ fn vignette_defaults() {
 #[test]
 fn warp_grid_defaults() {
     let c = WarpGridConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.3, 0.5, 0.9));
     assert_eq!(c.density, 20);
     assert_eq!(c.amplitude, 5.0);
@@ -1917,7 +1917,7 @@ fn warp_grid_defaults() {
 #[test]
 fn wave_interference_defaults() {
     let c = WaveInterferenceConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.3, 0.5, 0.9));
     assert_eq!(c.wavelength, 30.0);
     assert_eq!(c.source_count, 3);
@@ -1930,7 +1930,7 @@ fn wave_interference_defaults() {
 #[test]
 fn window_border_radius_defaults() {
     let c = WindowBorderRadiusConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.radius, 8.0);
     assert_eq!(c.width, 1.0);
     assert_eq!(c.color, (0.5, 0.5, 0.5));
@@ -1942,7 +1942,7 @@ fn window_border_radius_defaults() {
 #[test]
 fn window_content_shadow_defaults() {
     let c = WindowContentShadowConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.size, 6.0);
     assert_eq!(c.opacity, 0.15);
     assert_clone_debug(&c);
@@ -1952,7 +1952,7 @@ fn window_content_shadow_defaults() {
 #[test]
 fn window_glow_defaults() {
     let c = WindowGlowConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.4, 0.6, 1.0));
     assert_eq!(c.radius, 8.0);
     assert_eq!(c.intensity, 0.4);
@@ -1963,7 +1963,7 @@ fn window_glow_defaults() {
 #[test]
 fn window_mode_tint_defaults() {
     let c = WindowModeTintConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.opacity, 0.03);
     assert_clone_debug(&c);
 }
@@ -1972,7 +1972,7 @@ fn window_mode_tint_defaults() {
 #[test]
 fn window_switch_fade_defaults() {
     let c = WindowSwitchFadeConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.duration_ms, 200);
     assert_eq!(c.intensity, 0.15);
     assert_clone_debug(&c);
@@ -1982,7 +1982,7 @@ fn window_switch_fade_defaults() {
 #[test]
 fn window_watermark_defaults() {
     let c = WindowWatermarkConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.opacity, 0.08);
     assert_eq!(c.threshold, 10);
     assert_clone_debug(&c);
@@ -1992,7 +1992,7 @@ fn window_watermark_defaults() {
 #[test]
 fn wrap_indicator_defaults() {
     let c = WrapIndicatorConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.5, 0.6, 0.8));
     assert_eq!(c.opacity, 0.3);
     assert_clone_debug(&c);
@@ -2002,7 +2002,7 @@ fn wrap_indicator_defaults() {
 #[test]
 fn zen_mode_defaults() {
     let c = ZenModeConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.content_width_pct, 60.0);
     assert_eq!(c.margin_opacity, 0.3);
     assert_clone_debug(&c);
@@ -2012,7 +2012,7 @@ fn zen_mode_defaults() {
 #[test]
 fn zigzag_pattern_defaults() {
     let c = ZigzagPatternConfig::default();
-    assert_eq!(c.enabled, false);
+    assert!(!c.enabled);
     assert_eq!(c.color, (0.6, 0.4, 1.0));
     assert_eq!(c.amplitude, 15.0);
     assert_eq!(c.frequency, 0.1);
@@ -2029,7 +2029,7 @@ fn zigzag_pattern_defaults() {
 fn effects_config_default_creates_all_sub_defaults() {
     let ec = EffectsConfig::default();
     // Spot-check that each sub-config has its expected default
-    assert_eq!(ec.accent_strip.enabled, false);
+    assert!(!ec.accent_strip.enabled);
     assert_eq!(ec.accent_strip.width, 3.0);
     assert_eq!(ec.argyle_pattern.diamond_size, 30.0);
     assert_eq!(ec.aurora.color1, (0.2, 0.8, 0.4));
@@ -2166,7 +2166,7 @@ fn effects_config_default_creates_all_sub_defaults() {
     assert_eq!(ec.trefoil_knot.size, 80.0);
     assert_eq!(ec.typing_heatmap.fade_ms, 2000);
     assert_eq!(ec.typing_ripple.max_radius, 40.0);
-    assert_eq!(ec.typing_speed.enabled, false);
+    assert!(!ec.typing_speed.enabled);
     assert_eq!(ec.vignette.intensity, 0.3);
     assert_eq!(ec.warp_grid.density, 20);
     assert_eq!(ec.wave_interference.source_count, 3);
@@ -2190,7 +2190,7 @@ fn effects_config_clone_is_independent() {
     a.indent_guides.rainbow_colors.push((1.0, 0.0, 0.0, 1.0));
 
     let b = a.clone();
-    assert_eq!(b.accent_strip.enabled, true);
+    assert!(b.accent_strip.enabled);
     assert_eq!(b.accent_strip.width, 99.0);
     assert_eq!(b.aurora.opacity, 0.99);
     assert_eq!(b.indent_guides.rainbow_colors.len(), 1);
@@ -2218,11 +2218,13 @@ fn effects_config_debug_format() {
 
 #[test]
 fn individual_config_clone_independence() {
-    let mut a = CursorGlowConfig::default();
-    a.enabled = true;
-    a.radius = 100.0;
+    let a = CursorGlowConfig {
+        enabled: true,
+        radius: 100.0,
+        ..Default::default()
+    };
     let b = a.clone();
-    assert_eq!(b.enabled, true);
+    assert!(b.enabled);
     assert_eq!(b.radius, 100.0);
 }
 
@@ -2244,13 +2246,14 @@ fn indent_guides_clone_with_vec() {
 #[test]
 fn config_fields_are_mutable() {
     let mut c = AuroraConfig::default();
+    assert!(!c.enabled);
     c.enabled = true;
     c.color1 = (1.0, 1.0, 1.0);
     c.color2 = (0.0, 0.0, 0.0);
     c.height = 999.0;
     c.speed = 42.0;
     c.opacity = 1.0;
-    assert_eq!(c.enabled, true);
+    assert!(c.enabled);
     assert_eq!(c.color1, (1.0, 1.0, 1.0));
     assert_eq!(c.height, 999.0);
 }
@@ -2574,7 +2577,7 @@ fn default_enabled_fields_match_product_defaults() {
         ec.zigzag_pattern.enabled,
     ];
     for (i, &e) in enabled_flags.iter().enumerate() {
-        assert_eq!(e, false, "enabled flag at index {} was true", i);
+        assert!(!e, "enabled flag at index {} was true", i);
     }
 }
 

@@ -1,6 +1,5 @@
 //! The bytecode fuser: splicing a constant-bytecode callee into its caller
 //! must produce a body the INTERPRETER runs exactly as it ran the call.
-use super::*;
 use crate::emacs_core::bytecode::ByteCodeFunction;
 use crate::emacs_core::bytecode::Vm;
 use crate::emacs_core::bytecode::opcode::Op;
@@ -148,7 +147,7 @@ fn an_inlined_call_runs_and_deopts_as_the_interpreter_does() {
     let callee_value = Value::make_bytecode(callee);
     crate::emacs_core::eval::push_scratch_gc_root(callee_value);
     // (lambda (y) (cons (callee y) 'tail))
-    let mut caller = lexical_fn(
+    let caller = lexical_fn(
         1,
         vec![
             Op::Constant(0),

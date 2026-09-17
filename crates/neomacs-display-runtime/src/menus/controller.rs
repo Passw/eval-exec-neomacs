@@ -96,42 +96,41 @@ impl MenuPresentation {
             let depth = target.panel.0;
             let item = target.item.0 as usize;
             // Never insert a passive sibling beneath an already-open submenu.
-            if depth + 1 == self.panels.len() {
-                if let (Some(parent), Some(request)) =
+            if depth + 1 == self.panels.len()
+                && let (Some(parent), Some(request)) =
                     (self.host.submitted_window(depth), self.request.as_ref())
-                {
-                    let policy = request.tooltips.as_ref().unwrap();
-                    let panel = request.session.panel(depth).unwrap();
-                    if let Some(row) = panel.item_indices.iter().position(|i| *i == item) {
-                        let mut appearance = policy.appearance.clone();
-                        appearance.text = request.session.all_items[item]
-                            .help
-                            .clone()
-                            .unwrap_or_default();
-                        let mut fonts =
-                            neomacs_display_protocol::frame_glyphs::FrameGlyphBuffer::with_size(
-                                0.0, 0.0,
-                            );
-                        fonts.clone_font_bindings_from(&request.fonts);
-                        let (fs, lh) = request.session.metrics();
-                        self.tooltip.show(
-                            crate::tooltips::TooltipOwner {
-                                frame: request.frame_id,
-                                parent,
-                                anchor: Rect::new(
-                                    0.0,
-                                    panel.item_offsets[row] - self.panels[depth].scroll,
-                                    panel.bounds.2,
-                                    panel.item_height,
-                                ),
-                                metrics: (fs, lh, self.panels[depth].atlas.default_char_width()),
-                                fonts,
-                            },
-                            appearance,
-                            crate::tooltips::TooltipSource::NativeMenu,
-                            now,
+            {
+                let policy = request.tooltips.as_ref().unwrap();
+                let panel = request.session.panel(depth).unwrap();
+                if let Some(row) = panel.item_indices.iter().position(|i| *i == item) {
+                    let mut appearance = policy.appearance.clone();
+                    appearance.text = request.session.all_items[item]
+                        .help
+                        .clone()
+                        .unwrap_or_default();
+                    let mut fonts =
+                        neomacs_display_protocol::frame_glyphs::FrameGlyphBuffer::with_size(
+                            0.0, 0.0,
                         );
-                    }
+                    fonts.clone_font_bindings_from(&request.fonts);
+                    let (fs, lh) = request.session.metrics();
+                    self.tooltip.show(
+                        crate::tooltips::TooltipOwner {
+                            frame: request.frame_id,
+                            parent,
+                            anchor: Rect::new(
+                                0.0,
+                                panel.item_offsets[row] - self.panels[depth].scroll,
+                                panel.bounds.2,
+                                panel.item_height,
+                            ),
+                            metrics: (fs, lh, self.panels[depth].atlas.default_char_width()),
+                            fonts,
+                        },
+                        appearance,
+                        crate::tooltips::TooltipSource::NativeMenu,
+                        now,
+                    );
                 }
             }
         }

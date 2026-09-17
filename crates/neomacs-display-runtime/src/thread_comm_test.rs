@@ -1336,7 +1336,7 @@ fn render_command_video_lifecycle() {
             assert_eq!(id, VideoId::new(1));
             assert!(matches!(
                 request.source,
-                VideoSource::File(path) if path == PathBuf::from("/home/user/video.mp4")
+                VideoSource::File(path) if path == *"/home/user/video.mp4"
             ));
             assert_eq!(request.loop_mode, LoopMode::Infinite);
             assert_eq!(request.initial_playback, InitialPlayback::Playing);

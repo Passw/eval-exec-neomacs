@@ -237,26 +237,25 @@ impl FrameFaceAttemptState {
         // Use the content index on the hot path. Only a mismatched/imported ID
         // needs a reverse search to produce a useful conflict diagnostic.
         if face_id.get() >= BasicFaceId::SENTINEL {
-            let identity = face_realization_identity(&face);
+            let identity = face_realization_identity(face);
             let hash = face_identity_hash(&identity);
             let matched = realized_identity_lookup(&self.fresh_realized, hash, &identity)
                 .or_else(|| realized_identity_lookup(&self.realized, hash, &identity));
-            if matched != Some(face_id) {
-                if let Some((bound, _)) = self
+            if matched != Some(face_id)
+                && let Some((bound, _)) = self
                     .fresh_realized
                     .values()
                     .flatten()
                     .chain(self.realized.values().flatten())
                     .find(|(_, id)| *id == face_id)
-                {
-                    let mut existing = bound.clone();
-                    existing.id = face_id;
-                    return Err(FrameFaceConflict {
-                        face_id,
-                        existing: Box::new(existing),
-                        replacement: Box::new(face.clone()),
-                    });
-                }
+            {
+                let mut existing = bound.clone();
+                existing.id = face_id;
+                return Err(FrameFaceConflict {
+                    face_id,
+                    existing: Box::new(existing),
+                    replacement: Box::new(face.clone()),
+                });
             }
         }
         if let Some(existing) = self.faces.get(&face_id) {

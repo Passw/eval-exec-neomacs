@@ -1038,10 +1038,8 @@ impl Context {
                         });
                         let binding = Value::make_cons(lexenv_binding_symbol_value(var_id), value);
                         self.lexenv = Value::make_cons(binding, self.lexenv);
-                    } else if bind_var {
-                        if let Err(flow) = self.try_specbind(var_id, value) {
-                            return self.unbind_to_with_result(specpdl_count, Err(flow));
-                        }
+                    } else if bind_var && let Err(flow) = self.try_specbind(var_id, value) {
+                        return self.unbind_to_with_result(specpdl_count, Err(flow));
                     }
                     let result = self.sf_progn_value(handler.cons_cdr());
                     return self.unbind_to_with_result(specpdl_count, result);
@@ -1081,10 +1079,8 @@ impl Context {
                         let binding =
                             Value::make_cons(lexenv_binding_symbol_value(var_id), binding_value);
                         self.lexenv = Value::make_cons(binding, self.lexenv);
-                    } else if bind_var {
-                        if let Err(flow) = self.try_specbind(var_id, binding_value) {
-                            return self.unbind_to_with_result(specpdl_count, Err(flow));
-                        }
+                    } else if bind_var && let Err(flow) = self.try_specbind(var_id, binding_value) {
+                        return self.unbind_to_with_result(specpdl_count, Err(flow));
                     }
                     let result = self.sf_progn_value(handler.cons_cdr());
                     return self.unbind_to_with_result(specpdl_count, result);

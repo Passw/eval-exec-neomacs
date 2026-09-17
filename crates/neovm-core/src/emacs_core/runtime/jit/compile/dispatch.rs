@@ -989,7 +989,7 @@ pub extern "C" fn neovm_jit_call_spec(
         } else {
             ctx.maybe_quit()
         };
-        let status = match quit {
+        match quit {
             Err(flow) => {
                 stash_pending_flow(flow);
                 STATUS_SIGNAL
@@ -1077,8 +1077,7 @@ pub extern "C" fn neovm_jit_call_spec(
                     }
                 }
             }
-        };
-        status
+        }
     })
 }
 
@@ -2260,9 +2259,10 @@ pub extern "C" fn neovm_jit_match_handler(ctx: *mut u8, ours: i64, out: *mut i64
             heal_shim_panic_residue_before_match(ctx, ours);
         }
         let mut flow = take_pending_flow().expect("match shim runs only after STATUS_SIGNAL");
-        let mut remaining = ours;
         let mut popped_ordinal_base = 0usize;
         'resume: loop {
+            // Frames still ours: `ours` less those popped by earlier passes.
+            let remaining = ours - popped_ordinal_base;
             match flow {
                 Flow::ThreadBlocked(_) | Flow::Shutdown(_) => {
                     stash_pending_flow(flow);
@@ -2302,9 +2302,7 @@ pub extern "C" fn neovm_jit_match_handler(ctx: *mut u8, ours: i64, out: *mut i64
                             ctx.jit_bind_stack.truncate(bind_stack_len);
                             restore_scratch_gc_roots(saved);
                             if let Err(next) = unwind {
-                                let popped = m + 1;
-                                remaining -= popped;
-                                popped_ordinal_base += popped;
+                                popped_ordinal_base += m + 1;
                                 flow = next;
                                 continue 'resume;
                             }
@@ -2383,9 +2381,7 @@ pub extern "C" fn neovm_jit_match_handler(ctx: *mut u8, ours: i64, out: *mut i64
                             ctx.jit_bind_stack.truncate(bind_stack_len);
                             if let Err(next) = unwind {
                                 restore_scratch_gc_roots(saved);
-                                let popped = m + 1;
-                                remaining -= popped;
-                                popped_ordinal_base += popped;
+                                popped_ordinal_base += m + 1;
                                 flow = next;
                                 continue 'resume;
                             }

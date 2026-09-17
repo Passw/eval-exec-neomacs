@@ -285,14 +285,6 @@ impl WindowAnimationSpecs {
         !self.resize.is_instant() || !self.movement.is_instant() || !self.close.is_instant()
     }
 
-    /// Whether anything at all is animated.
-    pub(super) const fn is_instant(self) -> bool {
-        self.resize.is_instant()
-            && self.movement.is_instant()
-            && self.open.is_instant()
-            && self.close.is_instant()
-    }
-
     /// The geometry spec for a morph whose changes ask for `role`.
     pub(super) const fn geometry(self, role: GeometryRole) -> MotionSpec {
         match role {

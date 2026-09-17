@@ -499,6 +499,7 @@ impl TaggedHeap {
     }
 
     /// Allocate an xwidget model object.
+    #[allow(clippy::too_many_arguments)]
     pub fn alloc_xwidget(
         &mut self,
         type_: TaggedValue,

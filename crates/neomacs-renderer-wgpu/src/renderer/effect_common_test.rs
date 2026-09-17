@@ -42,13 +42,13 @@ fn test_push_rect_multiple() {
     assert_eq!(vertices.len(), 12);
 
     // Check first rect has red color
-    for i in 0..6 {
-        assert_eq!(vertices[i].color, [1.0, 0.0, 0.0, 1.0]);
+    for vertex in &vertices[0..6] {
+        assert_eq!(vertex.color, [1.0, 0.0, 0.0, 1.0]);
     }
 
     // Check second rect has green color
-    for i in 6..12 {
-        assert_eq!(vertices[i].color, [0.0, 1.0, 0.0, 1.0]);
+    for vertex in &vertices[6..12] {
+        assert_eq!(vertex.color, [0.0, 1.0, 0.0, 1.0]);
     }
 }
 

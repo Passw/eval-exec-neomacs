@@ -2255,7 +2255,6 @@ fn buffer_text_source_item_can_build_direct_single_char_step() {
 
     let step = typed_item
         .consume_for_render(&mut position)
-        .ok()
         .expect("direct source step");
 
     assert_eq!(position.byte_idx(), 1);
@@ -2409,7 +2408,6 @@ fn buffer_text_source_item_builds_direct_multi_char_runs() {
     }
     let step = typed_item
         .consume_for_render(&mut position)
-        .ok()
         .expect("multi-char text run remains a typed source item");
     assert_eq!(step.source_step_char().expect("source step char").ch(), 'a');
     assert_eq!(position, DisplaySourceTextPosition::new(2, 0));
@@ -6482,7 +6480,7 @@ fn display_row_source_walker_reuses_face_cache_across_items() {
             StringTextPropertyRun {
                 start: 0,
                 end: 1,
-                plist: Value::list(vec![Value::symbol("face"), face_value.clone()]),
+                plist: Value::list(vec![Value::symbol("face"), face_value]),
             },
             StringTextPropertyRun {
                 start: 2,

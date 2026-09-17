@@ -120,7 +120,7 @@ fn decode_constant_range() {
     crate::test_utils::init_test_tracing();
     // byte 192 = constant(0), byte 255 = constant(63)
     let bytecodes = vec![192, 255, 135];
-    let mut constants = (0..64).map(|i| Value::fixnum(i)).collect();
+    let mut constants = (0..64).map(Value::fixnum).collect();
     let ops = decode_gnu_bytecode(&bytecodes, &mut constants).unwrap();
     assert_eq!(ops, vec![Op::Constant(0), Op::Constant(63), Op::Return]);
 }

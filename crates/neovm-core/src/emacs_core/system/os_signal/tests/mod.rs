@@ -434,19 +434,21 @@ fn the_pending_counters_are_lock_free() {
     // `Atomic*::is_lock_free` is still unstable, and `target_has_atomic` is
     // the stable spelling of the same fact: rustc sets it only for widths the
     // target implements natively, and for any other width `core` would fall
-    // back to a lock -- which is the state this asserts against.
-    assert!(
-        cfg!(target_has_atomic = "32"),
+    // back to a lock -- which is the state this refuses to build against. The
+    // fact is fixed at compile time, so it is checked there: a runtime
+    // `assert!` on it would be folded to a constant.
+    #[cfg(not(target_has_atomic = "32"))]
+    compile_error!(
         "AtomicU32 is not native on this target, so the pending-signal counter \
          would take a lock in signal context"
     );
-    assert!(
-        cfg!(target_has_atomic = "8"),
+    #[cfg(not(target_has_atomic = "8"))]
+    compile_error!(
         "AtomicBool is not native on this target, so the pending-signal flag \
          would take a lock in signal context"
     );
 }
-/// The trigger's ENGAGEMENT counter, and the previous disposition it replaced.
+// The trigger's ENGAGEMENT counter, and the previous disposition it replaced.
 
 /// A delivered SIGCHLD does NOT reach `maybe_quit`, and the drain there says
 /// so with a number.

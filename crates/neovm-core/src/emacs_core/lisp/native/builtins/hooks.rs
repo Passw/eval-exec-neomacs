@@ -670,12 +670,12 @@ enum ReusedWindowHistoryTransition {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SavedWindowBufferRestoration {
-    RestoreSavedBuffer,
-    KeepReusedWindowBuffer {
+    RestoreSaved,
+    KeepReusedWindow {
         buffer_id: crate::buffer::BufferId,
         point: LispCharPos1,
     },
-    FindSubstituteBuffer,
+    FindSubstitute,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -710,19 +710,19 @@ fn apply_saved_leaf_buffer_restoration(
             ..
         } => {
             let restoration = if buffers.get(*buffer_id).is_some() {
-                SavedWindowBufferRestoration::RestoreSavedBuffer
+                SavedWindowBufferRestoration::RestoreSaved
             } else if let Some(current) = current_buffers.get(id) {
-                SavedWindowBufferRestoration::KeepReusedWindowBuffer {
+                SavedWindowBufferRestoration::KeepReusedWindow {
                     buffer_id: current.buffer_id,
                     point: current.point,
                 }
             } else {
-                SavedWindowBufferRestoration::FindSubstituteBuffer
+                SavedWindowBufferRestoration::FindSubstitute
             };
 
             match restoration {
-                SavedWindowBufferRestoration::RestoreSavedBuffer => {}
-                SavedWindowBufferRestoration::KeepReusedWindowBuffer {
+                SavedWindowBufferRestoration::RestoreSaved => {}
+                SavedWindowBufferRestoration::KeepReusedWindow {
                     buffer_id: current_buffer_id,
                     point: current_point,
                 } => {
@@ -733,7 +733,7 @@ fn apply_saved_leaf_buffer_restoration(
                     *position_markers = crate::window::WindowPositionMarkerState::Detached;
                     crate::window::window_markers::attach_window_position_markers(buffers, window);
                 }
-                SavedWindowBufferRestoration::FindSubstituteBuffer => {}
+                SavedWindowBufferRestoration::FindSubstitute => {}
             }
         }
         crate::window::Window::Internal { .. } => {}
@@ -1039,14 +1039,6 @@ fn unshow_frame_root_buffers(eval: &mut super::eval::Context, frame_id: crate::w
 }
 
 impl WindowConfigurationSnapshot {
-    fn root_window(&self) -> &crate::window::Window {
-        self.tree.root()
-    }
-
-    fn root_window_mut(&mut self) -> &mut crate::window::Window {
-        self.tree.root_mut()
-    }
-
     fn clone_for_restore(&self, buffers: &mut crate::buffer::BufferManager) -> Self {
         Self {
             frame_id: self.frame_id,
@@ -1596,7 +1588,7 @@ impl LiveCurrentBufferPoint {
         let live_selected_buffer = eval.frames.selected_frame().and_then(|frame| {
             frame
                 .find_window(frame.selected_window)
-                .or_else(|| frame.minibuffer_leaf.as_ref())
+                .or(frame.minibuffer_leaf.as_ref())
                 .and_then(|window| window.buffer_id())
         });
 

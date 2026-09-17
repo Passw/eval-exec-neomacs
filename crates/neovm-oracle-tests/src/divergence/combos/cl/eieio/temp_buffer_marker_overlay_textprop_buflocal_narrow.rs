@@ -1,7 +1,7 @@
 //! Combo: cl-eieio with-temp-buffer + cross-buffer EIEIO operations
 //! + overlays + markers + textprop + buflocal + narrow + undo.
-//! Tests temp buffer lifecycle with EIEIO objects, overlay propagation
-//! across buffers, and marker validity through temp buffer operations.
+//!   Tests temp buffer lifecycle with EIEIO objects, overlay propagation
+//!   across buffers, and marker validity through temp buffer operations.
 
 use crate::common::assert_oracle_parity;
 use crate::common::return_if_neovm_enable_oracle_proptest_not_set;

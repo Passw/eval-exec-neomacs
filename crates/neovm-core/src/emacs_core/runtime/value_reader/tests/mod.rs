@@ -999,10 +999,7 @@ fn hash_skip_doc_string_handles_high_bit_source_bytes() {
 #[test]
 fn hash_caret_reads_char_table_literal() {
     crate::test_utils::init_test_tracing();
-    let contents = std::iter::repeat("nil")
-        .take(64)
-        .collect::<Vec<_>>()
-        .join(" ");
+    let contents = std::iter::repeat_n("nil", 64).collect::<Vec<_>>().join(" ");
     let input = format!("#^[nil nil test ascii {contents}]");
     let table = read1(&input);
 
@@ -1018,10 +1015,7 @@ fn hash_caret_reads_nested_sub_char_table_literal() {
     let mut sub_items = vec!["nil"; 128];
     sub_items[65] = "letter-a";
     let sub_table = format!("#^^[3 0 {}]", sub_items.join(" "));
-    let contents = std::iter::repeat("nil")
-        .take(64)
-        .collect::<Vec<_>>()
-        .join(" ");
+    let contents = std::iter::repeat_n("nil", 64).collect::<Vec<_>>().join(" ");
     let input = format!("#^[nil nil test {sub_table} {contents}]");
     let table = read1(&input);
 

@@ -3157,6 +3157,7 @@ fn backend_composition_layout_trace(
     selected_window_layout_trace(&eval, &engine, frame_id)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn backend_layout_in_context(
     mut eval: Context,
     kind: BufferTextBackendKind,
@@ -9965,7 +9966,7 @@ fn run_describe_char_scenario(
         vec![StringTextPropertyRun {
             start: 0,
             end: 2,
-            plist: Value::list(vec![Value::symbol("display"), image_spec.clone()]),
+            plist: Value::list(vec![Value::symbol("display"), image_spec]),
         }],
     );
     let reply_line = " azz> grok build/grok cli/grok agent/grok bot\n";
@@ -10002,7 +10003,7 @@ fn run_describe_char_scenario(
             image_char,
             image_char + '↩'.len_utf8(),
             Value::symbol("line-prefix"),
-            prefix.clone(),
+            prefix,
         ));
         assert!(buf.put_text_property(
             image_char,
@@ -10109,7 +10110,7 @@ fn run_help_window_scenario(conservatively: i64) -> usize {
             chat_image,
             chat_image + '↩'.len_utf8(),
             Value::symbol("display"),
-            image_spec.clone(),
+            image_spec,
         ));
         buf.goto_emacs_byte_pos(EmacsBytePos::new(chat_image));
     }
@@ -17723,7 +17724,7 @@ fn layout_frame_rust_keeps_mixed_width_positions_correct_after_sequential_window
                 let line_beg = if buf.is_text_empty() {
                     1usize
                 } else {
-                    buf.point_max_char_pos().get() as usize + 1
+                    buf.point_max_char_pos().get() + 1
                 };
                 let prefix = format!("  {:<35} ", format!("h={height} w={weight_name}:"));
                 let sample_pos = line_beg + prefix.chars().count();
@@ -17952,7 +17953,7 @@ fn layout_frame_rust_keeps_mixed_width_positions_correct_across_family_switches(
                     let line_beg = if buf.is_text_empty() {
                         1usize
                     } else {
-                        buf.point_max_char_pos().get() as usize + 1
+                        buf.point_max_char_pos().get() + 1
                     };
                     let prefix = format!("  {:<35} ", format!("h={height} w={weight_name}:"));
                     let sample_pos = line_beg + prefix.chars().count();
@@ -19820,8 +19821,8 @@ fn layout_frame_rust_tab_line_can_be_shorter_than_default_face() {
 /// `format-mode-line` run. The expensive elisp (~4.3ms in a Doom config) must
 /// not be doubled on every keystroke.
 ///
-/// This test FAILS on the rejected two-pass approach (a separate measure pass
-/// + the render pass each evaluate the format, count == 2) and PASSES on the
+/// This test FAILS on the rejected two-pass approach (a separate measure pass +
+/// the render pass each evaluate the format, count == 2) and PASSES on the
 /// single-layout approach (count == 1). The counter is reset at the start of
 /// `layout_frame_rust`, so it reflects exactly this redisplay.
 #[test]
@@ -21420,7 +21421,7 @@ fn plain_route_layout_engages_segmented_acquisition() {
     let after = crate::buffer_source::row_route::ROUTED_SEGMENTED_ROW_COUNT
         .load(std::sync::atomic::Ordering::Relaxed);
     assert!(
-        after >= before + 1,
+        after > before,
         "expected the face-segmented row to route through the item renderer \
          (before={before}, after={after})"
     );
@@ -23069,7 +23070,7 @@ fn plain_route_layout_engages_overlay_string_acquisition() {
     let after = crate::buffer_source::row_route::ROUTED_OVERLAY_STRING_ROW_COUNT
         .load(std::sync::atomic::Ordering::Relaxed);
     assert!(
-        after >= before + 1,
+        after > before,
         "expected the overlay-string row to route through the item renderer \
          (before={before}, after={after})"
     );
@@ -23132,7 +23133,7 @@ fn plain_route_layout_engages_overlay_face_acquisition() {
     let after = crate::buffer_source::row_route::ROUTED_OVERLAY_ROW_COUNT
         .load(std::sync::atomic::Ordering::Relaxed);
     assert!(
-        after >= before + 1,
+        after > before,
         "expected the overlay-faced row to route through the item renderer \
          (before={before}, after={after})"
     );
@@ -23429,7 +23430,7 @@ fn plain_route_layout_engages_composed_cluster_acquisition() {
     let after = crate::buffer_source::row_route::ROUTED_COMPOSED_ROW_COUNT
         .load(std::sync::atomic::Ordering::Relaxed);
     assert!(
-        after >= before + 1,
+        after > before,
         "expected the combining-mark row to route through the item renderer \
          (before={before}, after={after})"
     );
@@ -23525,7 +23526,7 @@ fn plain_route_layout_engages_elided_row_acquisition() {
     let after = crate::buffer_source::row_route::ROUTED_ELIDED_ROW_COUNT
         .load(std::sync::atomic::Ordering::Relaxed);
     assert!(
-        after >= before + 1,
+        after > before,
         "expected the elided row to route through the item renderer \
          (before={before}, after={after})"
     );
@@ -24680,8 +24681,8 @@ fn overlay_cursor_property_does_not_override_visible_point_outside_attachment_co
         .expect("closing paren display point");
     let cursor = snapshot.phys_cursor.as_ref().expect("cursor");
 
-    assert_eq!(cursor.row as i64, closing_paren.row);
-    assert_eq!(cursor.col as i64, closing_paren.col);
+    assert_eq!(cursor.row, closing_paren.row);
+    assert_eq!(cursor.col, closing_paren.col);
     assert_eq!(cursor.x, closing_paren.x);
     assert_eq!(cursor.width, closing_paren.width);
 }
@@ -24749,8 +24750,8 @@ fn integer_overlay_cursor_property_covers_overlay_start_not_after_string_attachm
         .expect("closing paren display point");
     let cursor = snapshot.phys_cursor.as_ref().expect("cursor");
 
-    assert_eq!(cursor.row as i64, closing_paren.row);
-    assert_eq!(cursor.col as i64, closing_paren.col + 1);
+    assert_eq!(cursor.row, closing_paren.row);
+    assert_eq!(cursor.col, closing_paren.col + 1);
     assert_eq!(cursor.x, closing_paren.x + closing_paren.width);
 }
 
@@ -24816,8 +24817,8 @@ fn integer_overlay_cursor_coverage_does_not_cross_the_point_row() {
         .expect("point glyph");
     let cursor = snapshot.phys_cursor.as_ref().expect("cursor");
 
-    assert_eq!(cursor.row as i64, point.row);
-    assert_eq!(cursor.col as i64, point.col);
+    assert_eq!(cursor.row, point.row);
+    assert_eq!(cursor.col, point.col);
     assert_eq!(cursor.x, point.x);
 }
 
@@ -24883,8 +24884,8 @@ fn noninteger_overlay_cursor_marker_yields_to_visible_point_glyph() {
         .expect("visible x point");
     let cursor = snapshot.phys_cursor.as_ref().expect("cursor");
 
-    assert_eq!(cursor.row as i64, point.row);
-    assert_eq!(cursor.col as i64, point.col);
+    assert_eq!(cursor.row, point.row);
+    assert_eq!(cursor.col, point.col);
     assert_eq!(cursor.x, point.x);
 }
 
@@ -30016,8 +30017,7 @@ fn edit_below_reuse_shifts_trailing_placeholder_to_new_zv() {
         let placeholder = trace
             .matrix_rows
             .iter()
-            .filter(|r| r.role == GlyphRowRole::Text && r.ends_at_zv)
-            .next_back()
+            .rfind(|r| r.role == GlyphRowRole::Text && r.ends_at_zv)
             .unwrap_or_else(|| panic!("{label}: no ends_at_zv row: {:#?}", trace.matrix_rows));
         assert!(
             !placeholder.displays_text,
@@ -34560,7 +34560,9 @@ fn a_coordinate_below_every_row_answers_the_end_of_the_buffer() {
         rows: trace.output_rows,
         ..WindowDisplaySnapshot::default()
     };
-    let rows: Vec<(i64, i64, i64, Option<i64>, Option<i64>)> = snapshot
+    // One published row for the failure message: (row, y, height, start, end).
+    type RowGeometry = (i64, i64, i64, Option<i64>, Option<i64>);
+    let rows: Vec<RowGeometry> = snapshot
         .rows
         .iter()
         .map(|row| {

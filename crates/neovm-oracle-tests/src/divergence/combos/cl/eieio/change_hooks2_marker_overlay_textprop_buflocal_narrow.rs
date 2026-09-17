@@ -1,5 +1,5 @@
-//! Combo: change-hooks (round 2) + EIEIO state tracking + overlays
-//! + markers + textprop + buflocal + narrow + undo.
+//! Combo: change-hooks (round 2) + EIEIO state tracking + overlays +
+//! markers + textprop + buflocal + narrow + undo.
 //! Tests before/after-change-functions with EIEIO recording combined
 //! with overlay interaction, multi-handler dispatch, and before/after pairs.
 

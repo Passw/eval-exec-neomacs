@@ -1,7 +1,7 @@
 //! Combo: text-property-search-forward/backward + EIEIO state tracking
 //! + overlays + markers + textprop + buflocal + narrow + undo.
-//! Tests the newer text-property-search API with EIEIO objects recording
-//! search results through editing and narrowing operations.
+//!   Tests the newer text-property-search API with EIEIO objects recording
+//!   search results through editing and narrowing operations.
 
 use crate::common::assert_oracle_parity;
 use crate::common::return_if_neovm_enable_oracle_proptest_not_set;

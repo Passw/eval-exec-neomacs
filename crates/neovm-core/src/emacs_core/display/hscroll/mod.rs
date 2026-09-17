@@ -383,7 +383,7 @@ pub(crate) fn update_auto_hscroll_before_redisplay(ctx: &mut Context) {
         }
         let selected_window_id = frame.selected_window;
 
-        let mut leaf_ids = frame.all_leaf_ids();
+        let leaf_ids = frame.all_leaf_ids();
 
         for win_id in leaf_ids {
             let window = frame

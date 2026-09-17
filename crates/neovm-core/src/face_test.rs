@@ -503,7 +503,7 @@ fn specified_color_spec_string_round_trip() {
     crate::test_utils::init_test_tracing();
     for spec in ["unspecified", "unspecified-fg", "unspecified-bg", "gold"] {
         assert_eq!(
-            SpecifiedColor::parse(spec).spec_string().as_deref(),
+            SpecifiedColor::parse(spec).spec_string(),
             Some(spec),
             "{spec}"
         );

@@ -76,6 +76,18 @@ impl<'chrome> From<Option<&'chrome RetainedChrome>> for WindowChromeRowSource<'c
     }
 }
 
+/// The one way chrome preparation fails: Lisp run by a display source changed
+/// the window's projection. The containing attempt reports it as
+/// [`BufferSourceRenderAttemptOutcome::LogicalInputsChanged`] through `From`.
+#[derive(Debug)]
+struct LogicalInputsChanged;
+
+impl From<LogicalInputsChanged> for BufferSourceRenderAttemptOutcome {
+    fn from(_: LogicalInputsChanged) -> Self {
+        Self::LogicalInputsChanged
+    }
+}
+
 /// Resolve chrome production and translate an invalidated Lisp source into the
 /// containing buffer attempt's retry contract in exactly one place.
 fn render_or_retain_window_chrome(
@@ -85,7 +97,7 @@ fn render_or_retain_window_chrome(
     request: WindowChromeRowsRenderRequest<'_, '_>,
     render_services: ChromeRowRenderServices<'_, '_>,
     source: WindowChromeRowSource<'_>,
-) -> Result<WindowChromeMetrics, BufferSourceRenderAttemptOutcome> {
+) -> Result<WindowChromeMetrics, LogicalInputsChanged> {
     match source {
         WindowChromeRowSource::Recompute => match render_window_chrome_rows(
             output,
@@ -95,9 +107,7 @@ fn render_or_retain_window_chrome(
             render_services,
         ) {
             WindowChromeRowsRenderOutcome::Rendered(metrics) => Ok(metrics),
-            WindowChromeRowsRenderOutcome::SourceInvalidated => {
-                Err(BufferSourceRenderAttemptOutcome::LogicalInputsChanged)
-            }
+            WindowChromeRowsRenderOutcome::SourceInvalidated => Err(LogicalInputsChanged),
         },
         WindowChromeRowSource::Retained(chrome) => Ok(
             crate::window_output::install_retained_window_chrome(output, output_emitter, chrome),
@@ -110,14 +120,14 @@ fn freshness_before_window_chrome(
     evaluator: &neovm_core::emacs_core::Context,
     frame_id: FrameId,
     params: &WindowParams,
-) -> Result<neovm_core::window::WindowLayoutAttemptFreshness, BufferSourceRenderAttemptOutcome> {
+) -> Result<neovm_core::window::WindowLayoutAttemptFreshness, LogicalInputsChanged> {
     evaluator
         .window_layout_attempt_freshness(
             frame_id,
             WindowId(params.window_id as u64),
             BufferId(params.buffer_id),
         )
-        .ok_or(BufferSourceRenderAttemptOutcome::LogicalInputsChanged)
+        .ok_or(LogicalInputsChanged)
 }
 
 pub(crate) struct BufferSourceOutputSetup {
@@ -184,23 +194,23 @@ pub(crate) struct BufferSourceDefaultFacePlan {
 /// replayed.  Encoding that distinction here prevents an incremental path from
 /// returning before it has restored the window-level paint contract.
 #[derive(Clone, Debug)]
-enum BufferWindowBackground {
+enum BufferWindowBackground<'a> {
     TerminalDefault,
     Resolved {
         face_id: neomacs_display_protocol::types::FaceId,
-        face: ResolvedFace,
+        face: &'a ResolvedFace,
     },
 }
 
-impl BufferWindowBackground {
-    fn from_default_face(default_face: &EffectiveWindowDefaultFace) -> Self {
+impl<'a> BufferWindowBackground<'a> {
+    fn from_default_face(default_face: &'a EffectiveWindowDefaultFace) -> Self {
         let face = default_face.face();
         if face.use_default_background {
             Self::TerminalDefault
         } else {
             Self::Resolved {
                 face_id: default_face.face_id(),
-                face: face.clone(),
+                face,
             }
         }
     }
@@ -948,7 +958,7 @@ impl BufferSourceOutputSetup {
                 match freshness_before_window_chrome(evaluator, publish_request.frame_id(), params)
                 {
                     Ok(freshness) => freshness,
-                    Err(outcome) => return outcome,
+                    Err(changed) => return changed.into(),
                 };
             let measured_chrome_heights = match render_or_retain_window_chrome(
                 output.reborrow(),
@@ -959,7 +969,7 @@ impl BufferSourceOutputSetup {
                 retained_chrome.as_ref().into(),
             ) {
                 Ok(metrics) => metrics,
-                Err(outcome) => return outcome,
+                Err(changed) => return changed.into(),
             };
             tail_context.finish_and_install(
                 TextWindowFinishState::new(output, output_emitter, evaluator),
@@ -1178,7 +1188,7 @@ impl BufferSourceOutputSetup {
                 match freshness_before_window_chrome(evaluator, publish_request.frame_id(), params)
                 {
                     Ok(freshness) => freshness,
-                    Err(outcome) => return outcome,
+                    Err(changed) => return changed.into(),
                 };
             let measured_chrome_heights = match render_or_retain_window_chrome(
                 output.reborrow(),
@@ -1189,7 +1199,7 @@ impl BufferSourceOutputSetup {
                 retained_chrome.as_ref().into(),
             ) {
                 Ok(metrics) => metrics,
-                Err(outcome) => return outcome,
+                Err(changed) => return changed.into(),
             };
 
             tail_context.finish_and_install(
@@ -1378,7 +1388,7 @@ impl BufferSourceOutputSetup {
         let freshness_before_chrome =
             match freshness_before_window_chrome(evaluator, publish_request.frame_id(), params) {
                 Ok(freshness) => freshness,
-                Err(outcome) => return outcome,
+                Err(changed) => return changed.into(),
             };
         let measured_chrome_heights = match render_or_retain_window_chrome(
             output.reborrow(),
@@ -1389,7 +1399,7 @@ impl BufferSourceOutputSetup {
             chrome_source,
         ) {
             Ok(metrics) => metrics,
-            Err(outcome) => return outcome,
+            Err(changed) => return changed.into(),
         };
         tail_context.finish_and_install(
             TextWindowFinishState::new(output, output_emitter, evaluator),

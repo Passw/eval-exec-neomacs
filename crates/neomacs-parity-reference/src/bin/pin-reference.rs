@@ -432,6 +432,16 @@ fn mirror_commit(executable: &Path) -> Result<String> {
     Ok(commit)
 }
 
+fn main() -> std::process::ExitCode {
+    match run(std::env::args_os().skip(1)) {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{error}");
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -550,15 +560,5 @@ mod tests {
             "2026-06-10T02:39:56+00:00"
         );
         assert_eq!(insert_offset_colon("no offset"), "no offset");
-    }
-}
-
-fn main() -> std::process::ExitCode {
-    match run(std::env::args_os().skip(1)) {
-        Ok(()) => std::process::ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("{error}");
-            std::process::ExitCode::FAILURE
-        }
     }
 }

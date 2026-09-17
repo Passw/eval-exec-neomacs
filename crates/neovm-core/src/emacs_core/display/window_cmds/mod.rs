@@ -1007,7 +1007,6 @@ fn get_leaf(frames: &FrameManager, fid: FrameId, wid: WindowId) -> Result<&Windo
         .ok_or_else(|| signal("error", vec![Value::string("Window not found")]))
 }
 
-/// Look up any window (leaf or internal) by id, including the root window.
 // ---------------------------------------------------------------------------
 // Proof-carrying window tokens
 //
@@ -1046,18 +1045,10 @@ pub(crate) struct ValidWindow {
 
 /// A window that passed GNU's `decode_any_window` (`CHECK_WINDOW`); a DELETED
 /// window qualifies, so this carries no frame -- a deleted window has none.
+#[allow(dead_code)] // parity surface: GNU's third decoder domain (lattice above); no subr decodes into it yet
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct AnyWindow {
     window: WindowId,
-}
-
-impl LiveWindow {
-    pub(crate) fn frame(self) -> FrameId {
-        self.frame
-    }
-    pub(crate) fn window(self) -> WindowId {
-        self.window
-    }
 }
 
 impl ValidWindow {
@@ -1070,6 +1061,7 @@ impl ValidWindow {
 }
 
 impl AnyWindow {
+    #[allow(dead_code)] // parity surface: accessor of the `AnyWindow` token, see above
     pub(crate) fn window(self) -> WindowId {
         self.window
     }
@@ -1135,7 +1127,8 @@ pub(crate) fn decode_valid_window_in_state(
     Ok(ValidWindow { frame, window })
 }
 
-/// Read a window out of the tree.
+/// Read a window (leaf or internal, including the root window) out of the
+/// tree.
 ///
 /// Takes a [`ValidWindow`] rather than a bare id: reaching a window at all
 /// means it passed `decode_valid_window` or stronger, which is exactly GNU's
@@ -2305,7 +2298,7 @@ pub(crate) fn builtin_set_window_parameter(
     // needs no equivalent; here it is a window-scoped dirty event, the same
     // shape as `set-window-start`.
     if let Some(name) = args[1].as_symbol_name()
-        && crate::buffer::buffer::variable_affects_chrome(&name)
+        && crate::buffer::buffer::variable_affects_chrome(name)
     {
         eval.mark_chrome_dirty_window(wid);
     }
@@ -4274,27 +4267,8 @@ pub(crate) fn builtin_window_at(eval: &mut super::eval::Context, args: Vec<Value
 // Window manipulation
 // ===========================================================================
 
-pub(crate) fn split_window_internal_impl_in_state(
-    frames: &mut FrameManager,
-    buffers: &mut BufferManager,
-    window: Value,
-    size: Value,
-    side: Value,
-    combination_limit: CombinationLimit,
-) -> EvalResult {
-    split_window_internal_impl_in_state_with_normal(
-        frames,
-        buffers,
-        window,
-        size,
-        side,
-        Value::NIL,
-        combination_limit,
-    )
-}
-
-/// Variant of [`split_window_internal_impl_in_state`] that also
-/// honors the NORMAL-SIZE argument from `split-window-internal`.
+/// Split WINDOW, honoring the NORMAL-SIZE argument from
+/// `split-window-internal`.
 ///
 /// Mirrors GNU `src/window.c::Fsplit_window_internal` (lines
 /// 5374-5644). The fourth argument NORMAL-SIZE seeds the new
@@ -6123,10 +6097,10 @@ impl RecenterRedraw {
             return Self::Window;
         }
         if policy.as_symbol_name() == Some("tty")
-            && !eval
+            && eval
                 .frames
                 .selected_frame()
-                .is_some_and(|frame| frame.effective_window_system().is_none())
+                .is_none_or(|frame| frame.effective_window_system().is_some())
         {
             return Self::Window;
         }

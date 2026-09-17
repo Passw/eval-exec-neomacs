@@ -516,6 +516,7 @@ thread_local! {
     // Boxed so the move-to-front on a hit (GNU `compile_pattern` relinks a
     // list pointer) rotates 8-byte pointers, not ~80-byte entries; the hot
     // ~20 font-lock patterns then stay in the first slots and a scan is short.
+    #[allow(clippy::vec_box)] // boxed for the cheap MRU rotation above, not for heap placement
     static LISP_REGEX_PATTERN_CACHE: RefCell<Vec<Box<LispRegexPatternCacheEntry>>> =
         const { RefCell::new(Vec::new()) };
 }
@@ -725,13 +726,6 @@ impl SearchedString {
             Self::Heap(val) => val.as_lisp_string(),
             Self::Owned(text) => Some(text),
         }
-    }
-
-    fn byte_to_char_pos(&self, byte_pos: usize) -> usize {
-        let Some(string) = self.as_lisp_string() else {
-            return 0;
-        };
-        string.byte_to_char_pos(byte_pos)
     }
 
     #[allow(dead_code)] // grandfathered when dead_code lint was enabled; delete or wire up
@@ -1541,6 +1535,7 @@ fn pattern_for_compile(pattern: &LispString) -> LispString {
     }
 }
 
+#[cfg(test)]
 fn compile_search_pattern(
     pattern: &LispString,
     case_fold: bool,
@@ -1777,27 +1772,19 @@ fn compile_lisp_pattern_with_posix_translation(
 }
 
 /// Classify a Lisp regexp using the same compilation and cache path as a
-/// subsequent buffer search.
+/// subsequent buffer search, returned together with the compiled pattern
+/// the classification was read from.
 ///
 /// GNU's matcher can call `internal--syntax-propertize` lazily from
 /// `UPDATE_SYNTAX_TABLE_*`.  Neomacs cannot run re-entrant Lisp while its Rust
 /// matcher holds a buffer borrow, so evaluator-facing search builtins use this
 /// classification to prepare syntax properties before entering the matcher.
-pub(crate) fn buffer_regexp_syntax_dependency(
-    buf: &Buffer,
-    pattern: &LispString,
-    case_fold: bool,
-    posix: bool,
-) -> Result<BufferRegexpSyntaxDependency, String> {
-    buffer_regexp_syntax_dependency_compiled(buf, pattern, case_fold, posix)
-        .map(|(dependency, _)| dependency)
-}
-
-/// The dependency together with the compiled pattern it was read from, so a
-/// caller that goes on to match can hand the compiled pattern straight to
-/// `looking_at_compiled` instead of probing the pattern cache a second time
-/// (~300 Ir per probe; `looking-at` did it twice per call).  GNU's
-/// `Flooking_at` compiles once (`compile_pattern`) and matches with that.
+///
+/// Handing back the compiled pattern lets a caller that goes on to match pass
+/// it straight to `looking_at_compiled` instead of probing the pattern cache
+/// a second time (~300 Ir per probe; `looking-at` did it twice per call).
+/// GNU's `Flooking_at` compiles once (`compile_pattern`) and matches with
+/// that.
 pub(crate) fn buffer_regexp_syntax_dependency_compiled(
     buf: &Buffer,
     pattern: &LispString,
@@ -1821,9 +1808,10 @@ pub(crate) fn buffer_regexp_syntax_dependency_compiled(
     Ok((dependency, compiled))
 }
 
-/// [`buffer_regexp_syntax_dependency`] plus the pattern's finite maximum
-/// per-attempt span in characters (`None` when unbounded), for callers
-/// that can propertize a bounded window instead of the whole tail.
+/// The [`buffer_regexp_syntax_dependency_compiled`] classification plus the
+/// pattern's finite maximum per-attempt span in characters (`None` when
+/// unbounded), for callers that can propertize a bounded window instead of
+/// the whole tail.
 pub(crate) fn buffer_regexp_syntax_dependency_and_span(
     buf: &Buffer,
     pattern: &LispString,
@@ -2201,13 +2189,12 @@ fn canon_fold_literal_find(
                 let mut wat = at;
                 while wat < wend {
                     let b = text[wat];
-                    if b >= 0x80
+                    if (b >= 0x80
                         || (n_anchors >= 1 && b == anchors[0])
-                        || (n_anchors == 2 && b == anchors[1])
+                        || (n_anchors == 2 && b == anchors[1]))
+                        && let Some(end) = canon_fold_match_at(text, wat, &pat, multibyte, trt)
                     {
-                        if let Some(end) = canon_fold_match_at(text, wat, &pat, multibyte, trt) {
-                            return Some(MatchGroup::new(wat, end));
-                        }
+                        return Some(MatchGroup::new(wat, end));
                     }
                     let (_code, len) = next_char_at(text, wat, multibyte);
                     wat += len;
@@ -2465,6 +2452,7 @@ fn literal_rfind_emacs_bytes(
     )
 }
 
+#[cfg(test)]
 fn next_search_char_boundary(text: &[u8], pos: usize) -> Option<usize> {
     if pos >= text.len() {
         return None;
@@ -4196,6 +4184,7 @@ pub(crate) mod match_stats {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn reset() {
         for counter in [
             &PUBLISHES,

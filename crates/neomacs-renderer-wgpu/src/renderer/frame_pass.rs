@@ -18,7 +18,7 @@ use std::collections::HashMap;
 
 use neomacs_display_protocol::DeviceScale;
 use neomacs_display_protocol::PresentedPrimitiveKind;
-use neomacs_display_protocol::face::{BoxType, BoxVerticalEdges, Face};
+use neomacs_display_protocol::face::{BoxType, BoxVerticalEdges};
 use neomacs_display_protocol::frame_glyphs::{
     FrameGlyph, FrameGlyphBuffer, GlyphRowRole, ScrollBarIdentity,
 };

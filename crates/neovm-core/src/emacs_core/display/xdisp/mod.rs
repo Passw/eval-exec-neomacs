@@ -66,13 +66,10 @@ impl super::eval::Context {
         point: CharPos0,
         rows: i64,
     ) -> Option<CharPos0> {
-        let Some(point_byte) = self
+        let point_byte = self
             .buffers
             .get(buffer_id)
-            .map(|buffer| buffer.char_pos_to_emacs_byte_pos_clamped(point))
-        else {
-            return None;
-        };
+            .map(|buffer| buffer.char_pos_to_emacs_byte_pos_clamped(point))?;
         let saved_buffer_id = self.buffers.current_buffer_id();
         if saved_buffer_id != Some(buffer_id)
             && let Err(flow) = self.set_current_buffer_unrecorded(buffer_id)
@@ -4228,7 +4225,7 @@ fn live_window_text_pixel_offset(
 
     let char_height = f64::from(char_height.max(1.0));
     if y_offset > 0 {
-        let last_row = snapshot.rows.iter().filter(is_text_row).next_back()?;
+        let last_row = snapshot.rows.iter().rfind(is_text_row)?;
         let last_bottom = last_row.y.saturating_add(last_row.height.max(1));
         if target_y < last_bottom {
             return None;
@@ -4249,7 +4246,7 @@ fn live_window_text_pixel_offset(
         ));
     }
 
-    let first_row = snapshot.rows.iter().filter(is_text_row).next()?;
+    let first_row = snapshot.rows.iter().find(is_text_row)?;
     if target_y >= first_row.y {
         return None;
     }
@@ -4267,6 +4264,7 @@ fn live_window_text_pixel_offset(
     ))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn window_text_pixel_offset_target(
     eval: &mut super::eval::Context,
     frame_id: FrameId,
@@ -6272,8 +6270,7 @@ fn resolve_exact_visible_metrics_with_layout(
         return Ok(None);
     };
     if let Some(geometry) = compute_terminal_window_geometry(eval, fid, wid)? {
-        let Some(ctx) =
-            resolve_live_window_display_context(&mut eval.frames, &mut eval.buffers, window)?
+        let Some(ctx) = resolve_live_window_display_context(&eval.frames, &eval.buffers, window)?
         else {
             return Ok(None);
         };

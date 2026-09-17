@@ -216,7 +216,7 @@ fn test_cursor_glow_with_animated_cursor() {
 
     let verts = emit_cursor_glow(&ctx, &cursor_pulse_start);
 
-    assert!(verts.len() > 0, "glow should produce vertices");
+    assert!(!verts.is_empty(), "glow should produce vertices");
     validate_vertex_count(&verts);
     validate_vertices(&verts);
 
@@ -242,7 +242,7 @@ fn test_cursor_glow_with_pulse() {
 
     let verts = emit_cursor_glow(&ctx, &cursor_pulse_start);
 
-    assert!(verts.len() > 0, "glow with pulse should produce vertices");
+    assert!(!verts.is_empty(), "glow with pulse should produce vertices");
     validate_vertex_count(&verts);
     validate_vertices(&verts);
 }
@@ -381,7 +381,7 @@ fn test_cursor_magnetism_disabled() {
 
     let (verts, needs_redraw) = emit_cursor_magnetism(&ctx, &mut entries);
     assert_eq!(verts.len(), 0);
-    assert_eq!(needs_redraw, false);
+    assert!(!needs_redraw);
 }
 
 #[test]
@@ -399,8 +399,8 @@ fn test_cursor_magnetism_no_entries() {
 
     // First call should create initial entry
     assert_eq!(entries.len(), 1);
-    assert!(verts.len() > 0, "magnetism should produce vertices");
-    assert_eq!(needs_redraw, true);
+    assert!(!verts.is_empty(), "magnetism should produce vertices");
+    assert!(needs_redraw);
     validate_vertex_count(&verts);
     validate_vertices(&verts);
 }
@@ -454,7 +454,7 @@ fn test_line_number_pulse_disabled() {
 
     let (verts, needs_redraw) = emit_line_number_pulse(&ctx);
     assert_eq!(verts.len(), 0);
-    assert_eq!(needs_redraw, false);
+    assert!(!needs_redraw);
 }
 
 /// The band must cover the line-number field the window actually reserved.
@@ -478,7 +478,7 @@ fn the_line_number_pulse_spans_the_measured_field_starting_at_the_text_area_orig
 
     let (verts, needs_redraw) = emit_line_number_pulse(&ctx);
 
-    assert_eq!(needs_redraw, true);
+    assert!(needs_redraw);
     assert_eq!(verts.len(), 6, "the pulse draws exactly one band");
     validate_vertex_count(&verts);
     validate_vertices(&verts);
@@ -516,8 +516,8 @@ fn the_line_number_pulse_draws_nothing_for_a_window_that_reserved_no_field() {
 
     let (verts, needs_redraw) = emit_line_number_pulse(&ctx);
     assert_eq!(verts.len(), 0);
-    assert_eq!(
-        needs_redraw, false,
+    assert!(
+        !needs_redraw,
         "a window with no band to light has no standing animation demand"
     );
 }
@@ -599,7 +599,7 @@ fn test_cursor_comet_disabled() {
 
     let (verts, needs_redraw) = emit_cursor_comet(&ctx, &mut positions);
     assert_eq!(verts.len(), 0);
-    assert_eq!(needs_redraw, false);
+    assert!(!needs_redraw);
 }
 
 // ========================================================================
@@ -620,7 +620,7 @@ fn test_cursor_particles_disabled() {
 
     let (verts, needs_redraw) = emit_cursor_particles(&ctx, &mut particles, &mut prev_pos);
     assert_eq!(verts.len(), 0);
-    assert_eq!(needs_redraw, false);
+    assert!(!needs_redraw);
 }
 
 #[test]
@@ -644,7 +644,7 @@ fn test_cursor_particles_emits_on_movement() {
         particles.len() >= 5,
         "should emit at least 5 particles on movement"
     );
-    if verts.len() > 0 {
+    if !verts.is_empty() {
         validate_vertex_count(&verts);
         validate_vertices(&verts);
     }
@@ -686,7 +686,7 @@ fn test_cursor_trail_fade_disabled() {
 
     let (verts, needs_redraw) = emit_cursor_trail_fade(&ctx, &mut positions, &fade_dur);
     assert_eq!(verts.len(), 0);
-    assert_eq!(needs_redraw, false);
+    assert!(!needs_redraw);
 }
 
 #[test]

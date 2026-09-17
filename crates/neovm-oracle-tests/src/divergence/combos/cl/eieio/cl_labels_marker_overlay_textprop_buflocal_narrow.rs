@@ -1,5 +1,5 @@
-//! Combo: cl-labels + closures + EIEIO interop + overlays + markers
-//! + textprop + buflocal + narrow + undo.
+//! Combo: cl-labels + closures + EIEIO interop + overlays + markers +
+//! textprop + buflocal + narrow + undo.
 //! Tests complex local function definitions interacting with EIEIO objects,
 //! closures over mutable state, and higher-order function chains.
 

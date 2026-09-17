@@ -795,9 +795,7 @@ impl Context {
             // history finalization do not run) and lets `command_loop_2' make
             // the exhaustive Flow decision. In particular, a Signal must not
             // be flattened into a plain echo-area `message' here.
-            if exec_result.is_err() {
-                return exec_result;
-            }
+            exec_result?;
 
             // Run post-command-hook via safe-run-hooks (Finding 7).
             // GNU `command_loop_1` calls `safe_run_hooks (Qpost_command_hook)`
@@ -888,8 +886,7 @@ impl Context {
             // GNU's clear at the bottom of command_loop_1).
             self.assign("this-original-command", Value::NIL);
 
-            if exec_result.is_ok()
-                && self.command_loop.keyboard.kboard.defining_kbd_macro
+            if self.command_loop.keyboard.kboard.defining_kbd_macro
                 && self
                     .eval_symbol("prefix-arg")
                     .unwrap_or(Value::NIL)

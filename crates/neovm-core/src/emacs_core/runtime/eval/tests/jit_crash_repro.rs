@@ -780,6 +780,7 @@ fn diag_repro_bodies_compile() {
 /// bare `Context::new()` lacks. Run this both ways:
 ///   * `NEOVM_JIT_THRESHOLD=1 NEOVM_GC_STRESS=1` (JIT on)  -> expect PASS
 ///   * `NEOVM_JIT=0 NEOVM_GC_STRESS=1`            (JIT off) -> expect PASS
+///
 /// If the JIT-on run crashed while JIT-off passed, that would be the real JIT
 /// bug. (Ignored by default: `runtime_startup_context` is heavy and this is a
 /// manual diagnosis probe.)

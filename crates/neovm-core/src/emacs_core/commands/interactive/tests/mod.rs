@@ -778,9 +778,8 @@ fn subr_registration_refreshes_an_existing_objects_interactivity() {
         Some(crate::tagged::header::SubrInteractivity::NonInteractive)
     );
 
-    let mut entry = crate::emacs_core::eval::lookup_global_subr_entry(intern("forward-char"))
+    let entry = crate::emacs_core::eval::lookup_global_subr_entry(intern("forward-char"))
         .expect("forward-char should have registered primitive metadata");
-    entry.name_id = crate::emacs_core::intern::symbol_name_id(symbol);
     crate::emacs_core::eval::register_global_subr_entry(symbol, entry);
 
     assert_eq!(

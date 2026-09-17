@@ -1,5 +1,5 @@
-//! Combo: cl-eieio overlay before-string/after-string + markers + textprop
-//! + buflocal + narrow + undo.
+//! Combo: cl-eieio overlay before-string/after-string + markers + textprop +
+//! buflocal + narrow + undo.
 //! Tests overlay before-string and after-string display properties with
 //! complex editing, narrowing, and undo interactions.
 

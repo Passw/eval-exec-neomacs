@@ -2746,6 +2746,9 @@ enum LispStringAction {
 /// and can only finish through [`LispStringSourceFrame::resolved_action`], so
 /// the compiler enforces it and the P4.7 nested-ban pins pin behaviour the
 /// type already guarantees.
+// Like `LispStringAction`, this carries one complete display item per glyph of
+// the string-source walk; boxing it would allocate on that hot path.
+#[allow(clippy::large_enum_variant)]
 enum LispStringResolvedAction {
     PopFrame,
     Emit(DisplayItem),

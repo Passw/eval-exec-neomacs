@@ -120,6 +120,6 @@ impl ChildStatusSource {
 /// Snapshot of the host's network interfaces for `network-interface-list` /
 /// `network-interface-info`. Linux uses native `getifaddrs`+ioctls; other
 /// platforms use the portable `network_interface` crate (see the backends).
-pub fn interface_snapshot() -> Option<Vec<HostInterfaceEntry>> {
+pub(super) fn interface_snapshot() -> Option<Vec<HostInterfaceEntry>> {
     backend::interface_snapshot()
 }

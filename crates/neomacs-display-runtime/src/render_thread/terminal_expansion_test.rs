@@ -1,4 +1,5 @@
 use super::*;
+use crate::core::face::Face;
 use crate::core::frame_glyphs::{DisplaySlotId, GlyphRowRole};
 use crate::core::types::{Color, DisplayWindowId, Px};
 use neomacs_display_protocol::FrameFaceMap;

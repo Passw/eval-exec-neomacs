@@ -1642,9 +1642,9 @@ pub(crate) enum DisplayLineSpacingPolicy {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) enum DisplayLineSpacingReference {
     #[default]
-    DefaultFace,
-    CurrentFace,
-    NamedFace(Value),
+    Default,
+    Current,
+    Named(Value),
 }
 
 impl DisplayLineSpacingPolicy {
@@ -1655,7 +1655,7 @@ impl DisplayLineSpacingPolicy {
             }
             Some(value) if value.is_float() => Self::Scale {
                 factor: value.xfloat() as f32,
-                reference: DisplayLineSpacingReference::DefaultFace,
+                reference: DisplayLineSpacingReference::Default,
             },
             Some(value) if value.is_cons() => {
                 let face = value.cons_car();
@@ -1668,9 +1668,9 @@ impl DisplayLineSpacingPolicy {
                     1.0
                 };
                 let reference = if face.is_nil() {
-                    DisplayLineSpacingReference::CurrentFace
+                    DisplayLineSpacingReference::Current
                 } else {
-                    DisplayLineSpacingReference::NamedFace(face)
+                    DisplayLineSpacingReference::Named(face)
                 };
                 Self::Scale { factor, reference }
             }

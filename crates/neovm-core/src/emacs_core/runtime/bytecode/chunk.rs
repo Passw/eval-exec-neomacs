@@ -249,7 +249,7 @@ pub struct ByteCodeFunction {
     /// state, started cold each session. Present only under the `jit`
     /// feature. See `jit::Runtime`.
     ///
-    /// `None` ONLY on a pdump stub (see [`Self::pdump_stub`]): stubs are
+    /// `None` ONLY on a pdump stub (see [`Self::is_pdump_stub`]): stubs are
     /// baked byte-for-byte into the dump image, and `None` is the one
     /// process-independent bit pattern an `Arc`-backed handle has. Every
     /// executable function carries `Some`; read through
@@ -410,7 +410,8 @@ impl ByteCodeFunction {
     /// trailing `Return` unconditionally (decode.rs), so every genuinely
     /// sealed function has at least one op; the lazy-GNU arms leave
     /// `ops_sealed` false. `ops_sealed && ops.is_empty()` is therefore
-    /// unconstructible except through [`Self::pdump_stub`]. Two plain field
+    /// unconstructible except by the dump's baked stub template
+    /// (`baked_stub_template` in `pdump::mapped_heap`). Two plain field
     /// loads — cheap enough for the `get_bytecode_data` chokepoint, and safe
     /// under the GC's plain reads because the concurrent tracer never touches
     /// mapped bytecode data (its arm defers to the mutator-side legs).
@@ -419,40 +420,16 @@ impl ByteCodeFunction {
     /// materializer and the GC stub walker need it; a stub has no observable
     /// closure slots — every reader goes through the chokepoint, which
     /// materializes first).
+    ///
+    /// The stub is the form of a mapped `ByteCodeObj` carrying an extras
+    /// region: no per-function allocations, no decoded state, and — since
+    /// the dump-time bake — no process-specific bit pattern at all
+    /// (`runtime` is `None`), so the dump writes those exact bytes into the
+    /// image and the loader writes NOTHING into bytecode struct spans.
+    /// `source_id` 0 is a debug second-witness (real ids start at 1).
     #[inline]
     pub(crate) fn is_pdump_stub(&self) -> bool {
         self.ops_sealed && self.ops.is_empty()
-    }
-
-    /// The stub form of a mapped `ByteCodeObj` carrying an extras region:
-    /// no per-function allocations, no decoded state, and — since the
-    /// dump-time bake — no process-specific bit pattern at all (`runtime` is
-    /// `None`), so the dump writes these exact bytes into the image and the
-    /// loader writes NOTHING into bytecode struct spans. `source_id` 0 is a
-    /// debug second-witness (real ids start at 1).
-    pub(crate) fn pdump_stub(extras_len: usize) -> Self {
-        Self {
-            source_id: 0,
-            ops: Vec::new(),
-            ops_sealed: true,
-            stack_verified: false,
-            constants: Vec::new().into(),
-            max_stack: 0,
-            params: super::super::builtins::LambdaParams::simple(Vec::new()),
-            arglist: crate::emacs_core::value::Value::NIL,
-            lexical: false,
-            env: None,
-            gnu_byte_offset_map: None,
-            gnu_bytecode_bytes: None,
-            docstring: None,
-            doc_form: None,
-            interactive: None,
-            closure_slot_count: extras_len,
-            extra_slots: Vec::new(),
-            #[cfg(feature = "jit")]
-            runtime: None,
-            lazy_gnu_code: None,
-        }
     }
 
     /// Operand-stack entry depth the verifier must assume, mirroring

@@ -359,7 +359,7 @@ fn help_describe_function_lambda() {
             optional: vec![],
             rest: None,
         },
-        body: vec![].into(),
+        body: vec![],
         env: None,
         docstring: Some(crate::heap_types::LispString::from_utf8("Add X and Y.")),
         doc_form: None,
@@ -377,7 +377,7 @@ fn help_describe_function_with_docstore() {
     init_test_heap();
     let lam = Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![intern("x")]),
-        body: vec![].into(),
+        body: vec![],
         env: None,
         docstring: Some(crate::heap_types::LispString::from_utf8("Inline doc.")),
         doc_form: None,
@@ -412,7 +412,7 @@ fn help_describe_function_closure() {
     init_test_heap();
     let lam = Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![intern("x")]),
-        body: vec![].into(),
+        body: vec![],
         env: Some(Value::NIL),
         docstring: None,
         doc_form: None,
@@ -605,7 +605,7 @@ fn help_formatter_with_optional_and_rest() {
             optional: vec![intern("y")],
             rest: Some(intern("args")),
         },
-        body: vec![].into(),
+        body: vec![],
         env: None,
         docstring: Some(crate::heap_types::LispString::from_utf8(
             "A function with complex params.",
@@ -624,7 +624,7 @@ fn help_formatter_macro() {
     init_test_heap();
     let mac = Value::make_macro(LambdaData {
         params: LambdaParams::simple(vec![intern("body")]),
-        body: vec![].into(),
+        body: vec![],
         env: None,
         docstring: Some(crate::heap_types::LispString::from_utf8("A test macro.")),
         doc_form: None,

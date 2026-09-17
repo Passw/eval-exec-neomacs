@@ -3,6 +3,8 @@ use expect_test::expect;
 use super::ParityBatchCase;
 
 /// The mode and the indent command align pipeline continuation lines.
+// Parked out of the batch; registering it is a test-set change, not a lint fix.
+#[allow(dead_code)]
 fn the_mode_and_indent_command_align_pipeline_lines() -> ParityBatchCase {
     ParityBatchCase::value(
         "the_mode_and_indent_command_align_pipeline_lines",
@@ -38,6 +40,8 @@ fn the_mode_and_indent_command_align_pipeline_lines() -> ParityBatchCase {
 
 /// Quoting and unquoting a selection doubles and undoubles embedded
 /// single quotes.
+// Parked out of the batch; registering it is a test-set change, not a lint fix.
+#[allow(dead_code)]
 fn the_quote_and_unquote_selection_round_trip() -> ParityBatchCase {
     ParityBatchCase::value(
         "the_quote_and_unquote_selection_round_trip",
@@ -60,6 +64,8 @@ fn the_quote_and_unquote_selection_round_trip() -> ParityBatchCase {
 
 /// The mode's auxiliary setups: imenu expressions, the eldoc function,
 /// and the font-lock keywords.
+// Parked out of the batch; registering it is a test-set change, not a lint fix.
+#[allow(dead_code)]
 fn the_mode_auxiliary_setups_are_registered() -> ParityBatchCase {
     ParityBatchCase::value(
         "the_mode_auxiliary_setups_are_registered",
@@ -81,6 +87,9 @@ fn the_mode_auxiliary_setups_are_registered() -> ParityBatchCase {
 
 /// Escaping a selection backtick-escapes existing backticks and
 /// variables.
+// Parked: its expectation was never captured; it joins the batch after an
+// UPDATE_EXPECT pass against GNU.
+#[allow(dead_code)]
 fn the_escape_selection_backtick_escapes_variables() -> ParityBatchCase {
     ParityBatchCase::value(
         "the_escape_selection_backtick_escapes_variables",
@@ -98,6 +107,9 @@ fn the_escape_selection_backtick_escapes_variables() -> ParityBatchCase {
 
 /// Double-quoting doubles embedded quotes and backtick-quotes, and the
 /// dollar-paren wrapper wraps the selection.
+// Parked: its expectation was never captured; it joins the batch after an
+// UPDATE_EXPECT pass against GNU.
+#[allow(dead_code)]
 fn the_doublequote_and_dollarparen_selections_wrap() -> ParityBatchCase {
     ParityBatchCase::value(
         "the_doublequote_and_dollarparen_selections_wrap",
@@ -120,6 +132,9 @@ fn the_doublequote_and_dollarparen_selections_wrap() -> ParityBatchCase {
 }
 
 /// The regexp conversion unwraps the `regexp-opt' escapes.
+// Parked: its expectation was never captured; it joins the batch after an
+// UPDATE_EXPECT pass against GNU.
+#[allow(dead_code)]
 fn the_regexp_conversion_unwraps_the_escapes() -> ParityBatchCase {
     ParityBatchCase::value(
         "the_regexp_conversion_unwraps_the_escapes",

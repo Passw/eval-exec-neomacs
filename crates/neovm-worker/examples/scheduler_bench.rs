@@ -34,10 +34,10 @@ fn parse_config() -> BenchConfig {
             if let Ok(parsed) = value.parse::<u64>() {
                 cfg.channel_ops = parsed.max(1);
             }
-        } else if let Some(value) = arg.strip_prefix("--threads=") {
-            if let Ok(parsed) = value.parse::<usize>() {
-                cfg.threads = parsed.max(1);
-            }
+        } else if let Some(value) = arg.strip_prefix("--threads=")
+            && let Ok(parsed) = value.parse::<usize>()
+        {
+            cfg.threads = parsed.max(1);
         }
     }
 

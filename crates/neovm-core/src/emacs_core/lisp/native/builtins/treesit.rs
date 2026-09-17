@@ -1377,7 +1377,7 @@ fn first_child_for_search(
         } else if forward {
             node.child(0)
         } else {
-            node.child((count - 1) as u32)
+            node.child(count - 1)
         }
     }
 }
@@ -1508,7 +1508,7 @@ fn subtree_stats(node: tree_sitter::Node<'_>) -> (i64, i64, i64) {
     let mut max_width = child_count;
     let mut count = 1;
     for idx in 0..node.child_count() {
-        if let Some(child) = node.child(idx as u32) {
+        if let Some(child) = node.child(idx) {
             let (child_depth, child_width, child_count) = subtree_stats(child);
             max_depth = max_depth.max(child_depth + 1);
             max_width = max_width.max(child_width);
@@ -1532,7 +1532,7 @@ fn build_sparse_tree(
     let mut children = Vec::new();
     if depth != 0 {
         for idx in 0..node.child_count() {
-            if let Some(child) = node.child(idx as u32)
+            if let Some(child) = node.child(idx)
                 && let Some(item) = build_sparse_tree(
                     eval,
                     parser_id,

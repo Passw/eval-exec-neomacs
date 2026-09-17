@@ -836,6 +836,12 @@ impl From<EmacsByteLen> for usize {
     }
 }
 
+// Transitional aliases for older call sites. New code should use the explicit
+// coordinate-space names above.
+pub type CharPos = CharPos0;
+pub type BytePos = EmacsBytePos;
+pub type LispPos = LispCharPos1;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -894,9 +900,3 @@ mod tests {
         assert_eq!(byte_bounds.above(), TextPositionAnchor::from_usize(8, 12));
     }
 }
-
-// Transitional aliases for older call sites. New code should use the explicit
-// coordinate-space names above.
-pub type CharPos = CharPos0;
-pub type BytePos = EmacsBytePos;
-pub type LispPos = LispCharPos1;

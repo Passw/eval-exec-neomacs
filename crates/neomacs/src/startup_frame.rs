@@ -54,7 +54,7 @@ impl PreparedGuiFrame {
             self.size.width,
             self.size.height,
             self.display,
-            BootstrapFont::Gui(self.font),
+            BootstrapFont::Gui(Box::new(self.font)),
         )
     }
 }

@@ -2856,7 +2856,7 @@ thread_local! {
     static SYNTAX_FLAT_ASCII_CACHE: std::cell::Cell<Option<(usize, u64)>> =
         const { std::cell::Cell::new(None) };
     static SYNTAX_FLAT_ASCII_ENTRIES: std::cell::RefCell<[ParseSyntaxEntry; 128]> =
-        std::cell::RefCell::new([ParseSyntaxEntry::WHITESPACE; 128]);
+        const { std::cell::RefCell::new([ParseSyntaxEntry::WHITESPACE; 128]) };
 }
 
 /// The parser never consults a syntax entry's matching character.  Keeping its
@@ -3078,9 +3078,12 @@ impl<'a> SyntaxProperties<'a> {
     }
 
     /// The resolved `syntax-table` property at a buffer byte, with no run
-    /// cache. Used by the scanners that address text by byte (regexp matching,
-    /// `forward-comment`, `backward-prefix-chars`); the char-addressed scanners
-    /// go through [`SyntaxPropRange`], which caches the same resolution.
+    /// cache. The byte-addressed scanners (regexp matching, `forward-comment`,
+    /// `backward-prefix-chars`) go through [`SyntaxPropByteRun`] and the
+    /// char-addressed ones through [`SyntaxPropRange`], both of which cache
+    /// this resolution; the uncached form is the reference the byte-run
+    /// cache is checked against.
+    #[cfg(test)]
     fn syntax_table_prop_at_emacs_byte(
         self,
         buf: &Buffer,
@@ -3945,6 +3948,7 @@ pub(crate) fn builtin_syntax_table_p(args: Vec<Value>) -> EvalResult {
 ///
 /// Returns the buffer-local syntax-table object, defaulting to the standard
 /// syntax-table object.
+#[cfg(test)]
 pub(crate) fn builtin_syntax_table(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -3977,6 +3981,7 @@ pub(crate) fn builtin_syntax_table_in_buffers(
 ///
 /// NeoVM currently stores syntax behavior on `Buffer.syntax_table` internals;
 /// this installs the exposed syntax-table object for compatibility and returns it.
+#[cfg(test)]
 pub(crate) fn builtin_set_syntax_table(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -4091,6 +4096,7 @@ pub(crate) fn modify_syntax_entry_in_buffers(
 }
 
 /// `(char-syntax CHAR)` — return the syntax class designator char.
+#[cfg(test)]
 pub(crate) fn builtin_char_syntax(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
     crate::emacs_core::error::expect_args("char-syntax", &args, 1)?;
     let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
@@ -4643,29 +4649,27 @@ fn scan_forward_comment_body(
 
         // Two-character enders precede two-character nested openers.  A
         // single nested opener above has already affected `nesting`.
-        if flags.contains(SyntaxFlags::COMMENT_END_FIRST) {
-            if let Some((unit2, capabilities)) = pair
-                && capabilities.ender == Some(flavor)
-            {
-                buf.goto_emacs_byte_pos(unit2.end);
-                nesting -= 1;
-                if nesting <= 0 {
-                    return true;
-                }
-                continue;
+        if flags.contains(SyntaxFlags::COMMENT_END_FIRST)
+            && let Some((unit2, capabilities)) = pair
+            && capabilities.ender == Some(flavor)
+        {
+            buf.goto_emacs_byte_pos(unit2.end);
+            nesting -= 1;
+            if nesting <= 0 {
+                return true;
             }
+            continue;
         }
 
         // Two-character nested comment start.
-        if flavor.nesting.is_nested() {
-            if flags.contains(SyntaxFlags::COMMENT_START_FIRST)
-                && let Some((unit2, capabilities)) = pair
-                && capabilities.opener == Some(flavor)
-            {
-                buf.goto_emacs_byte_pos(unit2.end);
-                nesting += 1;
-                continue;
-            }
+        if flavor.nesting.is_nested()
+            && flags.contains(SyntaxFlags::COMMENT_START_FIRST)
+            && let Some((unit2, capabilities)) = pair
+            && capabilities.opener == Some(flavor)
+        {
+            buf.goto_emacs_byte_pos(unit2.end);
+            nesting += 1;
+            continue;
         }
 
         buf.goto_emacs_byte_pos(unit.end);
@@ -5699,6 +5703,7 @@ pub(crate) fn builtin_backward_sexp(
 /// `(scan-lists FROM COUNT DEPTH)` — scan across balanced expressions.
 ///
 /// This uses the same core scanner as `forward-sexp`/`backward-sexp`.
+#[cfg(test)]
 pub(crate) fn builtin_scan_lists(ctx: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
     crate::emacs_core::error::expect_args("scan-lists", &args, 3)?;
     let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
@@ -5794,6 +5799,7 @@ pub(crate) fn builtin_scan_lists_3(
 }
 
 /// `(scan-sexps FROM COUNT)` — scan over COUNT sexps from FROM.
+#[cfg(test)]
 pub(crate) fn builtin_scan_sexps(ctx: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
     crate::emacs_core::error::expect_args("scan-sexps", &args, 2)?;
     let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
@@ -6933,17 +6939,17 @@ fn parse_state_from_range_recording<const RECORD: bool>(
                         continue;
                     }
 
-                    if flavor.nesting.is_nested() {
-                        if pair.is_some_and(|capabilities| capabilities.opener == Some(flavor)) {
-                            state.in_comment = Some(ParseCommentState::Syntax {
-                                depth: effective_comment_depth + 1,
-                                flavor,
-                            });
-                            chars.skip();
-                            idx += 2;
-                            state.prev_syntax = PARSE_PREV_SYNTAX_SMAX;
-                            continue;
-                        }
+                    if flavor.nesting.is_nested()
+                        && pair.is_some_and(|capabilities| capabilities.opener == Some(flavor))
+                    {
+                        state.in_comment = Some(ParseCommentState::Syntax {
+                            depth: effective_comment_depth + 1,
+                            flavor,
+                        });
+                        chars.skip();
+                        idx += 2;
+                        state.prev_syntax = PARSE_PREV_SYNTAX_SMAX;
+                        continue;
                     }
 
                     idx += 1;
@@ -7144,6 +7150,7 @@ fn parse_state_from_range_recording<const RECORD: bool>(
 
 /// `(parse-partial-sexp FROM TO &optional TARGETDEPTH STOPBEFORE STATE COMMENTSTOP)`
 /// Baseline parser-state implementation for structural Lisp motion/state queries.
+#[cfg(test)]
 pub(crate) fn builtin_parse_partial_sexp(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -7230,7 +7237,7 @@ pub(crate) fn builtin_parse_partial_sexp_6(
         && let Ok(mut f) = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&stats_path)
+            .open(stats_path)
     {
         use std::io::Write as _;
         let _ = writeln!(f, "pps from={from} to={to} span={}", to - from);
@@ -7274,6 +7281,7 @@ fn lisp_pos_to_byte(buf: &Buffer, pos: LispCharPos1) -> EmacsBytePos {
 
 /// `(skip-syntax-forward SYNTAX &optional LIMIT)` — skip forward over chars
 /// matching the given syntax classes.
+#[cfg(test)]
 pub(crate) fn builtin_skip_syntax_forward(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -7401,17 +7409,9 @@ pub(crate) fn builtin_skip_syntax_forward_2(
 
 /// `(skip-syntax-backward SYNTAX &optional LIMIT)` — skip backward over chars
 /// matching the given syntax classes.
-pub(crate) fn builtin_skip_syntax_backward(
-    eval: &mut super::eval::Context,
-    args: Vec<Value>,
-) -> EvalResult {
-    crate::emacs_core::error::expect_args_range("skip-syntax-backward", &args, 1, 2)?;
-    let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
-    builtin_skip_syntax_backward_2(eval, arg(0), arg(1))
-}
-/// `skip-syntax-backward` as registered: fixed arity 2, called straight off the bytecode
-/// stack like GNU `funcall_subr`'s `a2` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
+///
+/// Registered at fixed arity 2, called straight off the bytecode stack like
+/// GNU `funcall_subr`'s `a2` case (absent optionals arrive as nil).
 pub(crate) fn builtin_skip_syntax_backward_2(
     eval: &mut super::eval::Context,
     syntax: Value,

@@ -1037,13 +1037,13 @@ fn tick_animation_spring_moves_toward_target() {
 
     // Initialize corner springs away from target
     let target_corners = CursorState::target_corners(state.target.as_ref().unwrap());
-    for i in 0..4 {
-        state.corner_springs[i].x = 0.0;
-        state.corner_springs[i].y = 0.0;
-        state.corner_springs[i].vx = 0.0;
-        state.corner_springs[i].vy = 0.0;
-        state.corner_springs[i].target_x = target_corners[i].0;
-        state.corner_springs[i].target_y = target_corners[i].1;
+    for (spring, corner) in state.corner_springs.iter_mut().zip(&target_corners) {
+        spring.x = 0.0;
+        spring.y = 0.0;
+        spring.vx = 0.0;
+        spring.vy = 0.0;
+        spring.target_x = corner.0;
+        spring.target_y = corner.1;
     }
     state.last_anim_time = base;
 
@@ -1068,13 +1068,13 @@ fn tick_animation_spring_settles_at_target() {
 
     // Set corner springs very close to target with tiny velocity
     let target_corners = CursorState::target_corners(&target);
-    for i in 0..4 {
-        state.corner_springs[i].x = target_corners[i].0 + 0.1;
-        state.corner_springs[i].y = target_corners[i].1 + 0.1;
-        state.corner_springs[i].vx = 0.1;
-        state.corner_springs[i].vy = 0.1;
-        state.corner_springs[i].target_x = target_corners[i].0;
-        state.corner_springs[i].target_y = target_corners[i].1;
+    for (spring, corner) in state.corner_springs.iter_mut().zip(&target_corners) {
+        spring.x = corner.0 + 0.1;
+        spring.y = corner.1 + 0.1;
+        spring.vx = 0.1;
+        spring.vy = 0.1;
+        spring.target_x = corner.0;
+        spring.target_y = corner.1;
     }
     state.last_anim_time = base;
 
@@ -1099,13 +1099,13 @@ fn tick_animation_spring_resets_velocities_on_settle() {
     state.target = Some(target.clone());
 
     let target_corners = CursorState::target_corners(&target);
-    for i in 0..4 {
-        state.corner_springs[i].x = target_corners[i].0 + 0.01;
-        state.corner_springs[i].y = target_corners[i].1 + 0.01;
-        state.corner_springs[i].vx = 0.01;
-        state.corner_springs[i].vy = 0.01;
-        state.corner_springs[i].target_x = target_corners[i].0;
-        state.corner_springs[i].target_y = target_corners[i].1;
+    for (spring, corner) in state.corner_springs.iter_mut().zip(&target_corners) {
+        spring.x = corner.0 + 0.01;
+        spring.y = corner.1 + 0.01;
+        spring.vx = 0.01;
+        spring.vy = 0.01;
+        spring.target_x = corner.0;
+        spring.target_y = corner.1;
     }
     state.last_anim_time = base;
 

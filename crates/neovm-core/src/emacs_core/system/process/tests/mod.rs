@@ -174,18 +174,9 @@ fn process_finite_domains_match_gnu_symbols() {
         ProcessConnectionType::from_symbol_value(&Value::symbol("pty")),
         Some(ProcessConnectionType::Pty)
     );
-    assert_eq!(
-        resolve_process_connection_type_use_pty(None, true).unwrap(),
-        true
-    );
-    assert_eq!(
-        resolve_process_connection_type_use_pty(Some(&Value::NIL), true).unwrap(),
-        true
-    );
-    assert_eq!(
-        resolve_process_connection_type_use_pty(Some(&Value::symbol("pipe")), true).unwrap(),
-        false
-    );
+    assert!(resolve_process_connection_type_use_pty(None, true).unwrap());
+    assert!(resolve_process_connection_type_use_pty(Some(&Value::NIL), true).unwrap());
+    assert!(!resolve_process_connection_type_use_pty(Some(&Value::symbol("pipe")), true).unwrap());
     assert!(resolve_process_connection_type_use_pty(Some(&Value::T), true).is_err());
 }
 
@@ -298,13 +289,13 @@ fn find_bin_if_available(name: &str) -> Option<String> {
         }
     }
     let locator = if cfg!(windows) { "where.exe" } else { "which" };
-    if let Ok(output) = std::process::Command::new(locator).arg(name).output() {
-        if output.status.success() {
-            return String::from_utf8_lossy(&output.stdout)
-                .lines()
-                .find(|line| !line.trim().is_empty())
-                .map(|line| line.trim().to_string());
-        }
+    if let Ok(output) = std::process::Command::new(locator).arg(name).output()
+        && output.status.success()
+    {
+        return String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .find(|line| !line.trim().is_empty())
+            .map(|line| line.trim().to_string());
     }
     None
 }
@@ -13378,7 +13369,7 @@ fn the_notification_walk_permutes_only_the_pending_entries() {
     let ids: Vec<ProcessId> = (0..4)
         .map(|i| {
             pm.create_process_with_kind(
-                format!("pw175-order-{i}").into(),
+                format!("pw175-order-{i}"),
                 Value::NIL,
                 String::new(),
                 vec![],

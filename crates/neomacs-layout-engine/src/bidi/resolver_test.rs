@@ -19,12 +19,12 @@ fn test_mixed_ltr_rtl() {
     let text = "Hello \u{05E9}\u{05DC}\u{05D5}\u{05DD}";
     let levels = resolve_levels(text, BidiDir::LTR);
     // First 6 chars (Hello + space) should be level 0
-    for i in 0..6 {
-        assert_eq!(levels[i], 0, "pos {}: expected 0, got {}", i, levels[i]);
+    for (i, &level) in levels[..6].iter().enumerate() {
+        assert_eq!(level, 0, "pos {}: expected 0, got {}", i, level);
     }
     // Hebrew should be level 1
-    for i in 6..10 {
-        assert_eq!(levels[i], 1, "pos {}: expected 1, got {}", i, levels[i]);
+    for (i, &level) in levels[..10].iter().enumerate().skip(6) {
+        assert_eq!(level, 1, "pos {}: expected 1, got {}", i, level);
     }
 }
 

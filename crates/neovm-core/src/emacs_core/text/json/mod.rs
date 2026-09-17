@@ -552,6 +552,7 @@ fn symbol_object_key(value: &Value) -> Result<(SymId, &'static str), Flow> {
 }
 
 /// Encode a Rust string as a JSON string with proper escaping.
+#[cfg(test)]
 fn json_encode_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     json_encode_string_into(&mut out, s);
@@ -882,7 +883,7 @@ impl<'a> JsonParser<'a> {
             let run_start = self.pos;
             let mut end = run_start;
             while let Some(&byte) = self.input.get(end) {
-                if byte < 0x20 || byte >= 0x80 || byte == b'"' || byte == b'\\' {
+                if !(0x20..0x80).contains(&byte) || byte == b'"' || byte == b'\\' {
                     break;
                 }
                 end += 1;

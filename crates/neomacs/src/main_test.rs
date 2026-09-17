@@ -20,7 +20,9 @@ use super::{
     runtime_mode_from_program_name, source_bootstrap_loadup_invocation, startup_dimensions,
     sync_live_gui_frame_titles, sync_selected_gui_chrome_state,
 };
-use neomacs_display_protocol::{SelectionOwner, VideoId, WebViewId};
+#[cfg(feature = "video")]
+use neomacs_display_protocol::VideoId;
+use neomacs_display_protocol::{SelectionOwner, WebViewId};
 use neomacs_display_runtime::render_thread::{
     ImageDecodeTerminal, ImageRenderState, SharedImageRenderState,
 };
@@ -2206,7 +2208,7 @@ fn eval_after_gnu_gui_startup(source: &str) -> String {
     run_gnu_startup(&mut eval);
 
     let result = eval.eval_str(source).expect("probe should evaluate");
-    print_value_with_eval(&mut eval, &result)
+    print_value_with_eval(&eval, &result)
 }
 
 #[test]
@@ -4165,7 +4167,7 @@ fn gui_startup_terminal_frame_uses_separate_terminal_owner() {
         )
         .expect("terminal-live-p should evaluate for startup frames");
     assert_eq!(
-        print_value_with_eval(&mut eval, &terminal_types),
+        print_value_with_eval(&eval, &terminal_types),
         "(neo t)",
         "hidden startup terminal must stay tty-typed even while GUI frame is selected"
     );
@@ -4201,7 +4203,7 @@ fn gui_startup_hidden_terminal_frame_matches_tty_face_specs() {
         .expect("hidden terminal face probe should evaluate");
 
     assert_eq!(
-        print_value_with_eval(&mut eval, &result),
+        print_value_with_eval(&eval, &result),
         "(neo t t nil 0 (:foreground \"blue\") \"Window system frame should be used\")",
         "hidden startup terminal frame must use tty display queries without weakening explicit X errors"
     );
@@ -4230,7 +4232,7 @@ fn gui_startup_ediff_window_parameters_use_live_display_pixels() {
         .expect("ediff window probe should evaluate");
 
     assert_eq!(
-        print_value_with_eval(&mut eval, &result),
+        print_value_with_eval(&eval, &result),
         "(25 80 26 81)",
         "ediff-wind should load with GUI display pixel queries active"
     );
@@ -4267,7 +4269,7 @@ fn cl_generic_context_dispatch_uses_neo_window_system_method() {
             (neomacs--ctx-probe)))
         "#,
         )
-        .map(|value| print_value_with_eval(&mut eval, &value))
+        .map(|value| print_value_with_eval(&eval, &value))
         .unwrap_or_else(|err| format!("{err:?}"));
     assert_eq!(rendered, "neo");
 }
@@ -4286,7 +4288,7 @@ fn pdump_preserves_neo_term_generic_methods() {
           neomacs-initialized)
         "#,
         )
-        .map(|value| print_value_with_eval(&mut eval, &value))
+        .map(|value| print_value_with_eval(&eval, &value))
         .unwrap_or_else(|err| format!("{err:?}"));
 
     let post = eval
@@ -4300,7 +4302,7 @@ fn pdump_preserves_neo_term_generic_methods() {
             neomacs-initialized))
         "#,
         )
-        .map(|value| print_value_with_eval(&mut eval, &value))
+        .map(|value| print_value_with_eval(&eval, &value))
         .unwrap_or_else(|err| format!("{err:?}"));
 
     assert_eq!(
@@ -4329,7 +4331,7 @@ fn neo_win_registers_neo_display_format() {
            (cdr (car display-format-alist))))
         "#,
         )
-        .map(|value| print_value_with_eval(&mut eval, &value))
+        .map(|value| print_value_with_eval(&eval, &value))
         .unwrap_or_else(|err| format!("{err:?}"));
 
     assert_eq!(rendered, "(neo neo neo)");
@@ -4379,7 +4381,7 @@ fn neo_window_system_initialization_preserves_gnu_clipboard_policy_and_user_cust
                             '((primary "copied") (clipboard "copied"))))))))
         "#,
         )
-        .map(|value| print_value_with_eval(&mut eval, &value))
+        .map(|value| print_value_with_eval(&eval, &value))
         .unwrap_or_else(|err| format!("{err:?}"));
 
     assert_eq!(rendered, "t");
@@ -4407,7 +4409,7 @@ fn neo_selection_backend_forwards_nil_to_disown_clipboard_and_primary() {
             (nreverse calls)))
         "#,
         )
-        .map(|value| print_value_with_eval(&mut eval, &value))
+        .map(|value| print_value_with_eval(&eval, &value))
         .unwrap_or_else(|err| format!("{err:?}"));
 
     assert_eq!(rendered, "((clipboard nil) (primary nil))");
@@ -4444,7 +4446,7 @@ fn neo_selection_backend_uses_backend_owned_primary_ownership_state() {
                  (and (gui-backend-selection-owner-p 'PRIMARY) t))))))
         "#,
         )
-        .map(|value| print_value_with_eval(&mut eval, &value))
+        .map(|value| print_value_with_eval(&eval, &value))
         .unwrap_or_else(|err| format!("{err:?}"));
 
     assert_eq!(rendered, "(t nil nil nil)");
@@ -4467,7 +4469,7 @@ fn neo_selection_backend_treats_an_owned_empty_primary_as_existing() {
               (and (gui-backend-selection-exists-p 'PRIMARY) t))))
         "#,
         )
-        .map(|value| print_value_with_eval(&mut eval, &value))
+        .map(|value| print_value_with_eval(&eval, &value))
         .unwrap_or_else(|err| format!("{err:?}"));
 
     assert_eq!(rendered, "t");
@@ -5072,7 +5074,7 @@ fn gnu_startup_reused_gui_frame_installs_common_window_key_translations() {
         "#,
         )
         .expect("key translation probe should evaluate");
-    let rendered = print_value_with_eval(&mut eval, &result);
+    let rendered = print_value_with_eval(&eval, &result);
     assert_eq!(
         rendered,
         "([134217855] [134217855] t nil nil backward-kill-word)"
@@ -5183,13 +5185,13 @@ fn gnu_startup_keeps_bootstrap_gui_frame_instead_of_creating_replacement_frame()
         frame_ids,
         vec![frame_id],
         "startup probe={} shutdown_request={shutdown_request:?}",
-        print_value_with_eval(&mut eval, &startup_probe),
+        print_value_with_eval(&eval, &startup_probe),
     );
     assert_eq!(
         selected_frame_id,
         frame_id,
         "startup probe={} shutdown_request={shutdown_request:?}",
-        print_value_with_eval(&mut eval, &startup_probe),
+        print_value_with_eval(&eval, &startup_probe),
     );
 }
 
@@ -5233,7 +5235,7 @@ fn gnu_startup_keeps_scratch_text_accessible_under_q_startup() {
         )
         .expect("scratch accessibility probe should evaluate");
     assert_eq!(
-        print_value_with_eval(&mut eval, &result),
+        print_value_with_eval(&eval, &result),
         "(\"*scratch*\" lisp-interaction-mode t t t)"
     );
 }
@@ -5277,7 +5279,7 @@ fn gnu_startup_posts_echo_area_message() {
         )
         .expect("startup echo probe should evaluate");
     assert_eq!(
-        print_value_with_eval(&mut eval, &result),
+        print_value_with_eval(&eval, &result),
         "(#(\"For information about GNU Emacs and the GNU system, type C-h C-a.\" 57 64 (font-lock-face help-key-binding face help-key-binding)) \"For information about GNU Emacs and the GNU system, type C-h C-a.\")"
     );
 }
@@ -5466,7 +5468,7 @@ fn gnu_startup_where_is_internal_finds_about_emacs_on_help_prefix() {
         )
         .expect("startup help-prefix probe should evaluate");
     assert_eq!(
-        print_value_with_eval(&mut eval, &result),
+        print_value_with_eval(&eval, &result),
         "(about-emacs about-emacs help-command about-emacs)"
     );
 }
@@ -5537,7 +5539,7 @@ fn gnu_startup_restores_meta_and_ctl_x_bindings() {
         )
         .expect("startup keybinding probe should evaluate");
     assert_eq!(
-        print_value_with_eval(&mut eval, &result),
+        print_value_with_eval(&eval, &result),
         "(execute-extended-command execute-extended-command split-window-below split-window-below split-window-right split-window-right)"
     );
 }
@@ -5777,7 +5779,7 @@ fn gnu_startup_processes_load_option_from_forwarded_args() {
     assert_eq!(items[0], Value::T);
     assert_eq!(items[1], Value::T);
     assert_eq!(
-        print_value_with_eval(&mut eval, &items[2]),
+        print_value_with_eval(&eval, &items[2]),
         "\"*Neomacs Face Test*\""
     );
 }
@@ -5821,7 +5823,7 @@ fn recursive_edit_processes_load_option_from_forwarded_args_before_first_input()
     assert_eq!(items[0], Value::T);
     assert_eq!(items[1], Value::T);
     assert_eq!(
-        print_value_with_eval(&mut eval, &items[2]),
+        print_value_with_eval(&eval, &items[2]),
         "\"*Neomacs Face Test*\""
     );
 }
@@ -6084,7 +6086,7 @@ fn modify_frame_parameters_updates_live_default_face_colors_for_gui_frames() {
         )
         .expect("modify-frame-parameters face probe should evaluate");
     assert_eq!(
-        print_value_with_eval(&mut eval, &result),
+        print_value_with_eval(&eval, &result),
         "(dark \"white\" \"#000000\" \"white\" \"#000000\")"
     );
 }
@@ -6108,7 +6110,7 @@ fn modify_frame_parameters_background_color_only_completes_for_gui_frames() {
         )
         .expect("background-only modify-frame-parameters should evaluate");
     assert_eq!(
-        print_value_with_eval(&mut eval, &result),
+        print_value_with_eval(&eval, &result),
         "(after-modify dark \"#000000\")"
     );
 }
@@ -6137,7 +6139,7 @@ fn frame_set_background_mode_keep_face_specs_completes_after_dark_background_cha
         )
         .expect("frame-set-background-mode keep-face-specs should evaluate");
     assert_eq!(
-        print_value_with_eval(&mut eval, &result),
+        print_value_with_eval(&eval, &result),
         "(after-frame-set-background-mode dark color)"
     );
 }
@@ -6165,7 +6167,7 @@ fn dark_gui_background_color_values_match_gnu_shape() {
     let result = eval
         .eval_str(r##"(color-values "#000000" (selected-frame))"##)
         .expect("color-values probe should evaluate");
-    assert_eq!(print_value_with_eval(&mut eval, &result), "(0 0 0)");
+    assert_eq!(print_value_with_eval(&eval, &result), "(0 0 0)");
 }
 
 #[test]
@@ -6209,7 +6211,7 @@ fn dark_gui_frame_current_background_mode_completes() {
         )
         .expect("current background mode debug probe should evaluate");
     assert_eq!(
-        print_value_with_eval(&mut eval, &debug_result),
+        print_value_with_eval(&eval, &debug_result),
         "(\"#000000\" light nil nil neo nil (0 0 0) dark)"
     );
     assert_eq!(result, Value::symbol("dark"));
@@ -6235,7 +6237,7 @@ fn modify_frame_parameters_prefers_first_duplicate_frame_parameter_like_gnu() {
         )
         .expect("duplicate frame parameter probe should evaluate");
     assert_eq!(
-        print_value_with_eval(&mut eval, &result),
+        print_value_with_eval(&eval, &result),
         "(\"#000000\" \"#000000\" dark)"
     );
 }
@@ -6300,7 +6302,7 @@ fn gnu_startup_seeds_light_gui_chrome_faces_from_faces_el() {
     assert_eq!(values.len(), 22);
     let rendered: Vec<String> = values
         .iter()
-        .map(|value| print_value_with_eval(&mut eval, value))
+        .map(|value| print_value_with_eval(&eval, value))
         .collect();
     assert_eq!(
         rendered[0], "neo",

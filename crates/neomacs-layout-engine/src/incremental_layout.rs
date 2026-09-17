@@ -996,12 +996,12 @@ impl RetainedWindowMatrix {
         // whole line including its terminator, so it is >= 1 on every ordinary
         // keystroke — using it refused 199 of 199 real edits while reading as
         // a faithful port of `text_outside_line_unchanged_p`.
-        let ok = damage.start() >= start
+
+        damage.start() >= start
             && damage.end_old() <= cursor_row.end_charpos as i64 + 1
             && replay.new_point >= start
             && replay.new_point <= end + 1
-            && !region_contains_newline(start, replay.new_point);
-        ok
+            && !region_contains_newline(start, replay.new_point)
     }
 
     /// Build a [`CursorOnlyReplay`] for this window if it can be reused this
@@ -1940,6 +1940,9 @@ mod scroll_classifier_tests {
         assert!(m.scroll_replay(&curr).is_none());
     }
 
+    /// One named change to a [`RetainedWindowKey`] under test.
+    type KeyMutation = (&'static str, fn(&mut RetainedWindowKey));
+
     /// Adversarial-review fix: each layout-affecting input that does NOT bump a
     /// modification tick (tab-stop-list, line-spacing, selective-display, window
     /// selection, trailing-whitespace, special-char display, fringes, line/wrap
@@ -1954,7 +1957,7 @@ mod scroll_classifier_tests {
             &synthetic_key(0, 7)
         ));
 
-        let mutations: &[(&str, fn(&mut RetainedWindowKey))] = &[
+        let mutations: &[KeyMutation] = &[
             ("display_line_numbers", |k| {
                 k.display_line_numbers = DisplayLineNumbersMode::Relative
             }),

@@ -4131,11 +4131,8 @@ mod literal_search_linear_equivalence {
         check(&text_ab, &needle_ab);
 
         // Period-2 repetition with a mismatching tail.
-        let abab: Vec<u8> = std::iter::repeat([b'a', b'b'])
-            .take(1024)
-            .flatten()
-            .collect();
-        let mut needle_abac: Vec<u8> = std::iter::repeat([b'a', b'b']).take(16).flatten().collect();
+        let abab: Vec<u8> = std::iter::repeat_n([b'a', b'b'], 1024).flatten().collect();
+        let mut needle_abac: Vec<u8> = std::iter::repeat_n([b'a', b'b'], 16).flatten().collect();
         needle_abac.push(b'a');
         needle_abac.push(b'c');
         check(&abab, &needle_abac);

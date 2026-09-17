@@ -726,7 +726,11 @@ fn popup_anchor_translates_with_side_window_without_changing_body_local_cursor_g
     use super::geometry::{PresentationId, WindowGeometryQuery};
     use neomacs_display_protocol::types::Rect as TransportRect;
 
-    fn scenario(body_left: f32) -> ((f32, f32, f32, f32), (f32, f32), (f32, f32)) {
+    /// The body-local cursor `(x, y, width, height)`, the text-body origin
+    /// `(x, y)` in the frame, and the popup's root-relative placement `(x, y)`.
+    type AnchorScenario = ((f32, f32, f32, f32), (f32, f32), (f32, f32));
+
+    fn scenario(body_left: f32) -> AnchorScenario {
         let mut manager = FrameManager::new();
         let root = manager.create_frame("popup-parent", 800, 600, BufferId(1));
         let popup = manager.create_frame("corfu-popup", 240, 160, BufferId(1));
@@ -2209,10 +2213,8 @@ fn window_set_buffer_resets_position() {
 
     // Modify point
     let frame = mgr.get_mut(fid).unwrap();
-    if let Some(w) = frame.find_window_mut(wid) {
-        if let Window::Leaf { point, .. } = w {
-            *point = LispCharPos1::from_one_based_usize(100);
-        }
+    if let Some(Window::Leaf { point, .. }) = frame.find_window_mut(wid) {
+        *point = LispCharPos1::from_one_based_usize(100);
     }
 
     // Set buffer resets point to 1

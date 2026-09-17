@@ -1593,14 +1593,14 @@ fn concurrent_mark_races_interval_flips_and_retains_live_set() {
 ///     Release-stores a freshly-allocated table into the same `AtomicPtr`;
 ///   * vector `aset` — `set_vector_slot` does an atomic slot store + notes
 ///     the remembered set,
-/// while the GC thread concurrently marks a large cons spine and CLAIMS
-/// floats/strings/vectors through the 2026-07 concurrent claim dispatcher
-/// (parity mark bits + `mark_claim_at`). This is the exact overlap the new
-/// machinery must survive with zero data races: the `intervals` AtomicPtr
-/// store/swap vs. the GC's `intervals_ptr` word read, the SATB pre-image
-/// Mutex log vs. the GC drain, and the atomic vector-slot store vs. the GC
-/// Tier B backing scan. Under `-Zsanitizer=thread` this is a race check; the
-/// liveness asserts confirm the last-installed children survive uncorrupted.
+///     while the GC thread concurrently marks a large cons spine and CLAIMS
+///     floats/strings/vectors through the 2026-07 concurrent claim dispatcher
+///     (parity mark bits + `mark_claim_at`). This is the exact overlap the new
+///     machinery must survive with zero data races: the `intervals` AtomicPtr
+///     store/swap vs. the GC's `intervals_ptr` word read, the SATB pre-image
+///     Mutex log vs. the GC drain, and the atomic vector-slot store vs. the GC
+///     Tier B backing scan. Under `-Zsanitizer=thread` this is a race check; the
+///     liveness asserts confirm the last-installed children survive uncorrupted.
 #[test]
 fn concurrent_mark_races_textprop_churn_and_aset_with_claiming() {
     crate::test_utils::init_test_tracing();
@@ -2749,10 +2749,10 @@ fn satb_barrier_on_growing_hash_table_is_linear_not_quadratic() {
 ///   * a value that was OVERWRITTEN before the snapshot-time first mutation is
 ///     retained by the SATB pre-image (Yuasa: it was live at snapshot time);
 ///   * unrooted pre-mark garbage is reclaimed.
-/// If the dedup ever dropped a still-reachable value's pre-image, the sweep
-/// would free a live cons and the readback would observe corruption (and TSan
-/// /ASan would fault). Mirrors `concurrent_mark_overlaps_mutation_and_retains_live_set`
-/// but exercises the deduped multi-child (hash-table) owner path specifically.
+///     If the dedup ever dropped a still-reachable value's pre-image, the sweep
+///     would free a live cons and the readback would observe corruption (and TSan
+///     /ASan would fault). Mirrors `concurrent_mark_overlaps_mutation_and_retains_live_set`
+///     but exercises the deduped multi-child (hash-table) owner path specifically.
 #[test]
 fn concurrent_mark_dedup_retains_hash_table_live_set() {
     use crate::emacs_core::value::{HashKey, HashTableTest, LispHashTable};

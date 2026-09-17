@@ -133,7 +133,7 @@ fn delete_extract_rectangle_from_text_preserves_raw_unibyte_bytes() {
     assert_eq!(extracted[1].as_bytes(), &[0xFE]);
     assert!(!extracted[0].is_multibyte());
     assert!(!rewritten.is_multibyte());
-    assert_eq!(rewritten.as_bytes(), &[b'A', b'\n', b'B']);
+    assert_eq!(rewritten.as_bytes(), b"A\nB");
 }
 
 #[test]

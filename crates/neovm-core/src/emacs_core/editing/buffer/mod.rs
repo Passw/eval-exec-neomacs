@@ -714,6 +714,7 @@ pub(crate) fn builtin_kill_buffer(eval: &mut super::eval::Context, args: Vec<Val
     Ok(Value::T)
 }
 
+#[cfg(test)]
 pub(crate) fn builtin_set_buffer(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
     crate::emacs_core::error::expect_args("set-buffer", &args, 1)?;
     let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
@@ -756,6 +757,7 @@ pub(crate) fn builtin_set_buffer_1(
     Ok(Value::make_buffer(id))
 }
 
+#[cfg(test)]
 pub(crate) fn builtin_current_buffer(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -4288,6 +4290,7 @@ fn accessible_bounds(
     })
 }
 
+#[cfg(test)]
 pub(crate) fn builtin_widen(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
     expect_args("widen", &args, 0)?;
     builtin_widen_0(eval)
@@ -4314,6 +4317,7 @@ pub(crate) fn builtin_widen_0(eval: &mut super::eval::Context) -> EvalResult {
     Ok(Value::NIL)
 }
 
+#[cfg(test)]
 pub(crate) fn builtin_buffer_modified_p(
     eval: &mut super::eval::Context,
     args: Vec<Value>,
@@ -4729,6 +4733,7 @@ pub(crate) fn builtin_bufferp(args: Vec<Value>) -> EvalResult {
     Ok(Value::bool_val(args[0].is_buffer()))
 }
 
+#[cfg(test)]
 pub(crate) fn builtin_char_after(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
     crate::emacs_core::error::expect_args_range("char-after", &args, 0, 1)?;
     let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
@@ -4766,6 +4771,7 @@ pub(crate) fn builtin_char_after_1(eval: &mut super::eval::Context, pos: Value) 
     }
 }
 
+#[cfg(test)]
 pub(crate) fn builtin_char_before(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
     crate::emacs_core::error::expect_args_range("char-before", &args, 0, 1)?;
     let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);

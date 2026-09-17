@@ -640,7 +640,6 @@ const OP_PUSH_CONDITION_CASE: u8 = 75;
 const OP_PUSH_CONDITION_CASE_RAW: u8 = 76;
 const OP_PUSH_CATCH: u8 = 77;
 const OP_POP_HANDLER: u8 = 78;
-const OP_UNWIND_PROTECT: u8 = 79;
 const OP_UNWIND_PROTECT_POP: u8 = 80;
 const OP_THROW: u8 = 81;
 const OP_SAVE_CURRENT_BUFFER: u8 = 82;
@@ -766,16 +765,6 @@ fn write_ops(out: &mut Vec<u8>, ops: &[Op]) {
             ),
         }
     }
-}
-
-fn write_op_u16(out: &mut Vec<u8>, tag: u8, value: u16) {
-    write_u8(out, tag);
-    write_u16(out, value);
-}
-
-fn write_op_u32(out: &mut Vec<u8>, tag: u8, value: u32) {
-    write_u8(out, tag);
-    write_u32(out, value);
 }
 
 fn write_marker(out: &mut Vec<u8>, marker: &DumpMarker) -> Result<(), DumpError> {

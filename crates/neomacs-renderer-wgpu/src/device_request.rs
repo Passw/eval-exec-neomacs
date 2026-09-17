@@ -9,13 +9,19 @@ pub(crate) const LINUX_DMA_BUF_EXTENSIONS: [&std::ffi::CStr; 4] = [
 ];
 
 fn requested_features(adapter: &wgpu::Adapter) -> wgpu::Features {
-    let mut requested = wgpu::Features::TEXTURE_FORMAT_16BIT_NORM
+    let requested = wgpu::Features::TEXTURE_FORMAT_16BIT_NORM
         | wgpu::Features::TEXTURE_FORMAT_NV12
         | wgpu::Features::TEXTURE_FORMAT_P010;
+    // Shadowed rather than `mut`: only the `video` build adds a feature, and a
+    // `mut` binding is an unused-mut warning in every other build.
     #[cfg(feature = "video")]
-    if std::env::var_os("NEOMACS_GPU_FRAME_TIMING").as_deref() == Some(std::ffi::OsStr::new("1")) {
-        requested |= wgpu::Features::TIMESTAMP_QUERY;
-    }
+    let requested = if std::env::var_os("NEOMACS_GPU_FRAME_TIMING").as_deref()
+        == Some(std::ffi::OsStr::new("1"))
+    {
+        requested | wgpu::Features::TIMESTAMP_QUERY
+    } else {
+        requested
+    };
     adapter.features() & requested
 }
 

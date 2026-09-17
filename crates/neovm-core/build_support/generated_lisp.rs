@@ -7,10 +7,10 @@
 //! ```make
 //! # Don't use $^, since that includes the awk script.
 //! ${unidir}/charscript.el: ${blocks_sources}
-//! 	$(AM_V_GEN)$(AWK) -f ${blocks} ${blocks_sources} > $@
+//!     $(AM_V_GEN)$(AWK) -f ${blocks} ${blocks_sources} > $@
 //!
 //! ${unidir}/emoji-zwj.el: ${zwj_sources}
-//! 	$(AM_V_GEN)$(AWK) -f ${zwj} ${zwj_sources} > $@
+//!     $(AM_V_GEN)$(AWK) -f ${zwj} ${zwj_sources} > $@
 //! ```
 //!
 //! One rule per file, no post-processing: **what awk prints is the file.**

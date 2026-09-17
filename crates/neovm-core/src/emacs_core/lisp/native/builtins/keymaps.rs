@@ -12,7 +12,7 @@ use super::keymap::{
     is_list_keymap, key_event_to_emacs_event, list_keymap_accessible, list_keymap_copy,
     list_keymap_define_seq_in_obarray_ex, list_keymap_inherits_from, list_keymap_parent,
     list_keymap_set_parent, lookup_key_in_keymaps_in_obarray_runtime, make_list_keymap,
-    make_sparse_list_keymap, maybe_keymap_in_obarray, maybe_keymap_in_runtime,
+    make_sparse_list_keymap, maybe_keymap_in_runtime,
 };
 use super::symbols::cache_event_symbol_value_properties_in_obarray;
 

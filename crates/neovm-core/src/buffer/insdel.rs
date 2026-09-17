@@ -199,7 +199,7 @@ impl Buffer {
     /// Delete a measured range and return the deleted text with its
     /// properties -- GNU `del_range_1 (..., ret_string = true)`: the one
     /// string that is recorded for undo (when enabled) and handed back.
-    pub fn delete_and_extract_measured_region(
+    pub(in crate::buffer) fn delete_and_extract_measured_region(
         &mut self,
         range: TextEditRange,
     ) -> (MeasuredDeleteEdit, LispString) {

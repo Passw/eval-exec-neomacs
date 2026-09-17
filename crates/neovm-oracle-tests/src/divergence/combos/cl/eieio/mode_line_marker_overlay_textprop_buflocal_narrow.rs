@@ -1,5 +1,5 @@
-//! Combo: format-mode-line + EIEIO objects + overlays + markers + textprop
-//! + buflocal variables + narrow + undo.
+//! Combo: format-mode-line + EIEIO objects + overlays + markers + textprop +
+//! buflocal variables + narrow + undo.
 //! Tests mode-line formatting interplay with EIEIO state and buffer ops.
 
 use crate::common::assert_oracle_parity;

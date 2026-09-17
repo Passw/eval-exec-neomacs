@@ -356,12 +356,9 @@ fn test_scene_build_with_windows() {
             // 1 background + 2 windows = 3 children
             assert_eq!(children.len(), 3);
             // children[1] and children[2] should be window containers with transforms
-            for i in 1..=2 {
-                assert!(
-                    children[i].transform.is_some(),
-                    "Window node must have transform"
-                );
-                assert!(children[i].clip.is_some(), "Window node must have clip");
+            for child in &children[1..=2] {
+                assert!(child.transform.is_some(), "Window node must have transform");
+                assert!(child.clip.is_some(), "Window node must have clip");
             }
         }
         _ => panic!("Expected root Container"),

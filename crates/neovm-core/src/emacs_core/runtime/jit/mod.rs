@@ -843,10 +843,10 @@ impl RuntimeState {
     /// finding was an artifact — the "interpreted" halves of those A/Bs ran
     /// ~99.99% NATIVE, because OSR ignores the cap (this gate covers only
     /// entry dispatch) and, in benches, ignored `force_interpret` (fixed:
-    /// `is_hot` now honors it). With an honest Tier-0 baseline the
-    /// >256-op fixture (`jit_bench_big_body_matcher_shape`) runs 12.6x
-    /// FASTER native. The cap's practical effect is therefore only to delay
-    /// the ENTRY tier for big bodies whose loops OSR anyway; lifting it is
+    /// `is_hot` now honors it). With an honest Tier-0 baseline the >256-op
+    /// fixture (`jit_bench_big_body_matcher_shape`) runs 12.6x FASTER
+    /// native. The cap's practical effect is therefore only to delay the
+    /// ENTRY tier for big bodies whose loops OSR anyway; lifting it is
     /// pending a real-workload A/B (byte-compile watch per the GATE_RELAX
     /// precedent) — see the mid-end campaign notes.
     ///

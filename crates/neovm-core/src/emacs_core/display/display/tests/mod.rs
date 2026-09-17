@@ -3378,7 +3378,7 @@ fn eval_monitor_attributes_include_bootstrapped_frame() {
 
     let frames = list_to_vec(&frames_value).expect("frames list");
     assert_eq!(frames.len(), 1);
-    assert!(frames.first().map_or(false, |v| v.is_frame()));
+    assert!(frames.first().is_some_and(|v| v.is_frame()));
     assert!(!frames[0].is_integer());
     assert_eq!(
         crate::emacs_core::frame::builtin_framep(&mut eval, vec![frames[0]]).unwrap(),

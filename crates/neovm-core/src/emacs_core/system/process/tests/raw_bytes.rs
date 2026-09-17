@@ -11,10 +11,10 @@ fn find_bin(name: &str) -> String {
             return path;
         }
     }
-    if let Ok(output) = std::process::Command::new("which").arg(name).output() {
-        if output.status.success() {
-            return String::from_utf8_lossy(&output.stdout).trim().to_string();
-        }
+    if let Ok(output) = std::process::Command::new("which").arg(name).output()
+        && output.status.success()
+    {
+        return String::from_utf8_lossy(&output.stdout).trim().to_string();
     }
     name.to_string()
 }

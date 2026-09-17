@@ -103,10 +103,8 @@ fn tty_palette_approximates_exactly_as_gnu_does() {
             let got = palette
                 .approximate(channel(0), channel(2), channel(4))
                 .map(|(color, _)| color);
-            if got != Some(TerminalColor::Indexed(expected)) {
-                if mismatches.len() < 8 {
-                    mismatches.push(format!("#{hex}: GNU {expected}, got {got:?}"));
-                }
+            if got != Some(TerminalColor::Indexed(expected)) && mismatches.len() < 8 {
+                mismatches.push(format!("#{hex}: GNU {expected}, got {got:?}"));
             }
         }
         assert_eq!(compared, 5832, "{}: sweep lost samples", recorded.term);

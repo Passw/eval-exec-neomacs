@@ -409,7 +409,7 @@ fn plan_scroll(
         top >= margin && top + row.height <= height - margin
     });
     let first = *visible.next().unwrap_or(&candidate_rows[0]);
-    let last = visible.last().copied().unwrap_or(first);
+    let last = visible.next_back().copied().unwrap_or(first);
     let point_stays_visible =
         snapshot_row_index_for_pos(&candidate_rows, point).is_some_and(|index| {
             candidate_rows[index].row >= first.row && candidate_rows[index].row <= last.row
@@ -422,8 +422,7 @@ fn plan_scroll(
         let row = candidate_rows
             .iter()
             .copied()
-            .filter(|row| row.row >= first.row && row.row <= last.row && row.y - first_y <= goal_y)
-            .last()
+            .rfind(|row| row.row >= first.row && row.row <= last.row && row.y - first_y <= goal_y)
             .unwrap_or(first);
         row_goal_stops(&candidate, row, LineWrap::Truncate)
             .max_by_key(|stop| {

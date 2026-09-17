@@ -89,18 +89,20 @@ impl WindowScrollUpdate {
 /// GNU `eval.c` primitive, so it belongs beside the window display adapter.
 pub(crate) enum WindowLayoutQueryAdapter {
     Unavailable,
-    Ready(
-        Box<
-            dyn FnMut(
-                &mut crate::emacs_core::eval::Context,
-                FrameId,
-                WindowId,
-                crate::window::WindowLayoutQueryScope,
-            ) -> crate::window::WindowLayoutQueryOutcome,
-        >,
-    ),
+    Ready(WindowLayoutQueryCallback),
     Running,
 }
+
+/// The frontend's synchronous layout-query callback held by
+/// [`WindowLayoutQueryAdapter::Ready`].
+pub(crate) type WindowLayoutQueryCallback = Box<
+    dyn FnMut(
+        &mut crate::emacs_core::eval::Context,
+        FrameId,
+        WindowId,
+        crate::window::WindowLayoutQueryScope,
+    ) -> crate::window::WindowLayoutQueryOutcome,
+>;
 
 thread_local! {
     /// Mutation generation for retained-layout inputs that contain char tables.

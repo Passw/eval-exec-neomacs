@@ -3957,7 +3957,7 @@ fn install_elisp_prefix_syntax(eval: &mut crate::emacs_core::eval::Context) {
     let entry = string_to_syntax("'").unwrap();
     let mut table = super::SyntaxTable::isolate_for_buffer(buf);
     for ch in ['\'', '`', ',', '#'] {
-        table.modify_syntax_entry(ch, entry.clone());
+        table.modify_syntax_entry(ch, entry);
     }
 }
 
@@ -4273,6 +4273,10 @@ fn ascii_syntax_memo_decodes_each_char_at_most_once_per_scan() {
     );
 }
 
+/// One resumed-parse oracle case: text, split, end, COMMENTSTOP, whether the
+/// nested-comment syntax entries are installed, and GNU's printed result.
+type ResumedParseCase<'a> = (&'a str, i64, i64, Option<&'a str>, bool, &'a str);
+
 /// A `parse-partial-sexp` RESUMED from OLDSTATE whose element 10 names a
 /// comment-start-first character pairs it with the first character of the new
 /// range, as GNU's `scan_sexps_forward` does at entry
@@ -4284,7 +4288,7 @@ fn ascii_syntax_memo_decodes_each_char_at_most_once_per_scan() {
 fn a_resumed_parse_pairs_a_comment_opener_split_at_its_start_like_gnu() {
     crate::test_utils::init_test_tracing();
     // (text, split, end, commentstop, nested-table?, GNU's printed result)
-    let cases: &[(&str, i64, i64, Option<&str>, bool, &str)] = &[
+    let cases: &[ResumedParseCase<'_>] = &[
         (
             "a /* b */ c",
             4,

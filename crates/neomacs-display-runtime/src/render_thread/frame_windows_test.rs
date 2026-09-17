@@ -1524,8 +1524,8 @@ fn destroy_queue_refill_after_process() {
 #[test]
 fn windows_map_key_is_frame_key() {
     let mgr = GuiFrameWindowManager::new();
-    assert!(mgr.windows.get(&FrameKey::Pending).is_none());
-    assert!(mgr.windows.get(&FrameKey::Adopted(0x1000)).is_none());
+    assert!(!mgr.windows.contains_key(&FrameKey::Pending));
+    assert!(!mgr.windows.contains_key(&FrameKey::Adopted(0x1000)));
 }
 
 // =======================================================================

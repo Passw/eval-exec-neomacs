@@ -2375,6 +2375,9 @@ impl ConservativePropertyNames {
 /// names declare its source.  Pure structural rewrites retain the shared
 /// summary without an O(intervals) recount.
 enum ReplacementPropertyNames<'a> {
+    /// Only the test-only shape-merge helper performs a pure structural
+    /// rewrite today; every production replacement can add names.
+    #[cfg(test)]
     Preserve,
     Include(&'a ConservativePropertyNames),
 }
@@ -2449,6 +2452,11 @@ impl Clone for TextPropertyTable {
         }
     }
 }
+
+/// `(start, end, plist pairs)` of one interval, as
+/// [`TextPropertyTable::interval_plist_runs_for_test`] reports it.
+#[cfg(test)]
+type IntervalPlistRun = (usize, usize, Vec<(Value, Value)>);
 
 impl TextPropertyTable {
     pub fn new() -> Self {
@@ -2693,6 +2701,7 @@ impl TextPropertyTable {
     ) {
         self.mutation_tick += 1;
         match property_names {
+            #[cfg(test)]
             ReplacementPropertyNames::Preserve => {}
             ReplacementPropertyNames::Include(names) => self.property_names.include(names),
         }
@@ -4284,7 +4293,7 @@ impl TextPropertyTable {
 
     /// `(start, end, plist pairs)` of every interval, empty ones included.
     #[cfg(test)]
-    pub(crate) fn interval_plist_runs_for_test(&self) -> Vec<(usize, usize, Vec<(Value, Value)>)> {
+    pub(crate) fn interval_plist_runs_for_test(&self) -> Vec<IntervalPlistRun> {
         self.intervals
             .runs()
             .into_iter()

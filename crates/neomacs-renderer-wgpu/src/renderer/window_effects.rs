@@ -64,7 +64,6 @@ use super::{
     ScrollMomentumEntry, ScrollVelocityFadeEntry, WindowFadeEntry,
 };
 use neomacs_display_protocol::FrameFaceMap;
-use neomacs_display_protocol::face::Face;
 use neomacs_display_protocol::frame_glyphs::{FrameGlyph, MaterializedFaceData};
 use neomacs_display_protocol::frame_time::EventTime;
 use neomacs_display_protocol::types::FaceId;

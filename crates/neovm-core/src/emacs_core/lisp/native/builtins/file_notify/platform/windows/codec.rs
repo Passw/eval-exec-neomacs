@@ -27,7 +27,7 @@ pub(super) fn decode(buffer: &[u8]) -> Result<Vec<(W32Action, PathBuf)>, String>
             action => return Err(format!("unknown Windows file-notify action {action}")),
         };
         let name_len = read_u32(&header[8..12]) as usize;
-        if name_len % 2 != 0 {
+        if !name_len.is_multiple_of(2) {
             return Err("odd FILE_NOTIFY_INFORMATION name length".to_owned());
         }
         let name_bytes = buffer
@@ -48,7 +48,7 @@ pub(super) fn decode(buffer: &[u8]) -> Result<Vec<(W32Action, PathBuf)>, String>
         let next_offset = offset
             .checked_add(next)
             .ok_or_else(|| "FILE_NOTIFY_INFORMATION next offset overflow".to_owned())?;
-        if next % 4 != 0 || next < record_len || next_offset > buffer.len() {
+        if !next.is_multiple_of(4) || next < record_len || next_offset > buffer.len() {
             return Err("invalid FILE_NOTIFY_INFORMATION next offset".to_owned());
         }
         offset = next_offset;

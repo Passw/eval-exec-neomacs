@@ -80,6 +80,7 @@ pub(crate) struct ResetRow {
     pub(crate) name: &'static str,
     pub(crate) value: ResetValue,
     /// `file:line` in the GNU tree for the assignment itself.
+    #[allow(dead_code)] // GNU citation; read only by the cfg(test) screen in tests/mod.rs
     pub(crate) gnu: &'static str,
 }
 
@@ -93,6 +94,7 @@ pub(crate) struct ResetRow {
 /// [`apply_post_image_init`] calls, so a ported derivation with no
 /// implementation is unrepresentable.
 #[derive(Clone, Copy)]
+#[allow(dead_code)] // `what`/`gnu`/`by`/`why` are GNU citations; read only by the cfg(test) screen in tests/mod.rs
 pub(crate) enum Derived {
     /// GNU derives it, and so does this port -- in the function stored here,
     /// which the sequence calls in `main`'s order.
@@ -116,6 +118,9 @@ pub(crate) enum Derived {
     },
 }
 
+/// Accessors the screen in `tests/mod.rs` uses to check every citation; the
+/// runtime walk in [`apply_post_image_init`] matches on `Ported` directly.
+#[cfg(test)]
 impl Derived {
     pub(crate) fn what(self) -> &'static str {
         match self {
@@ -149,6 +154,7 @@ pub(crate) enum Establishes {
     },
     /// Screened and empty: the body assigns no Lisp-visible state at all.
     /// The string is the evidence for that claim, not an apology for it.
+    #[allow(dead_code)] // evidence string; read only by the cfg(test) screen in tests/mod.rs
     NoLispVisibleState(&'static str),
     /// The body assigns no Lisp *value*, but it establishes OS-level
     /// dispositions that decide whether Lisp runs at all.
@@ -163,6 +169,8 @@ pub(crate) enum Establishes {
     OsDispositions {
         /// The evidence that no Lisp value is written, kept from the
         /// `NoLispVisibleState` screen this site used to carry.
+        #[allow(dead_code)]
+        // evidence string; read only by the cfg(test) screen in tests/mod.rs
         no_lisp_state: &'static str,
         /// The dispositions this port installs here, in GNU's own order.
         installs: &'static [crate::emacs_core::os_signal::HandledSignal],
@@ -170,6 +178,7 @@ pub(crate) enum Establishes {
     /// The call site is compiled out of a GNU/Linux build.  Screened for
     /// completeness so the enumeration is the whole of GNU's `main`, not the
     /// convenient part of it.
+    #[allow(dead_code)] // evidence string; read only by the cfg(test) screen in tests/mod.rs
     NotInThisBuild(&'static str),
 }
 
@@ -192,9 +201,12 @@ pub(crate) struct PostImageInitSite {
     pub(crate) c_name: &'static str,
     /// Line of the CALL in `src/emacs.c`.  Strictly increasing across
     /// [`PostImageInit::ALL`]; the test pins that.
+    #[allow(dead_code)] // GNU citation; read only by the cfg(test) screen in tests/mod.rs
     pub(crate) call_line: u32,
     /// `file:first-last` for the function BODY in the GNU tree.
+    #[allow(dead_code)] // GNU citation; read only by the cfg(test) screen in tests/mod.rs
     pub(crate) body: &'static str,
+    #[allow(dead_code)] // classification; read only by the cfg(test) screen in tests/mod.rs
     pub(crate) guard: CallGuard,
     pub(crate) establishes: Establishes,
 }

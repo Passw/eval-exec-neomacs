@@ -154,7 +154,7 @@ impl PendingText {
     /// at `src/xml.c:226-227`).
     fn flush(
         &mut self,
-        stack: &mut Vec<(String, Vec<Value>, Vec<Value>)>,
+        stack: &mut [(String, Vec<Value>, Vec<Value>)],
         top_level: &mut Vec<Value>,
         has_top_level_comments: &mut bool,
     ) {

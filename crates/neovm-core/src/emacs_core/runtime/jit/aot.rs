@@ -3923,41 +3923,6 @@ pub struct PrepopulateStats {
     pub missed: usize,
 }
 
-/// R2-C3: PREPOPULATE the per-thread `COMPILED` cache from the preload `.so`, so
-/// every AOT-eligible loadup function serves NATIVE FROM CALL 1 (no JIT warmup).
-///
-/// Walks `ctx`'s obarray for the SAME AOT-candidate set the dump-time producer
-/// emitted (same enumerate + D0 filter + content hash), loads each leaf from the
-/// single preload unit (eq-identical reloc consts from the LIVE function — #A),
-/// and inserts it into `COMPILED` keyed by that function's `compiled_id`. The 13
-/// dedup'd bodies (distinct fns, one shared `.so` entry) each get their OWN
-/// `CompiledLeaf` (own `reloc_data` + `compiled_id`) pointing at the shared entry.
-///
-/// Task #11: candidates are pre-filtered by the v2 manifest PRE-KEYS (symbol
-/// name → member?/ops-count/arity) so a dump-time-verified non-member skips its
-/// SHA-256 content hash outright; members and anything absent/mismatched take
-/// the exact hash + dlsym path (dlsym stays the membership ground truth).
-///
-/// CRITICAL ordering (R1a heap-identity guard): `cache::prepopulate_aot_leaves`
-/// FIRST syncs `COMPILED_HEAP` to the current heap (clearing the then-empty
-/// cache), THEN inserts — otherwise the first GC's `sync_cache_to_current_heap`
-/// would see `None != current` and CLEAR every prepopulated leaf (working for
-/// call 1, then silently gone). See that function.
-///
-/// Runs ONLY when [`aot_enabled`]; a missing/invalid preload is a clean no-op
-/// (every function just JITs — strictly additive). Returns the stats.
-/// LAZY prewarm (the production path): mark every loadup function the preload
-/// manifest lists as a MEMBER (name + ops_len + arity prekey match) so
-/// `dispatch` serves it via `Plan::Compiled` from call 1 — the leaf itself is
-/// built on the first call by the cache-miss path's `try_load_leaf` AOT
-/// consult (~13µs, paid only for functions actually called). The EAGER
-/// `prepopulate_aot_from_preload` builds all ~1.2k leaves up front
-/// (~16.5ms measured) and is kept for tests/benchmarks.
-///
-/// A marked function whose body hash no longer matches the preload (redefined
-/// between dump and run beyond what the ops_len/arity prekey catches) falls
-/// back to a one-time JIT compile at first call — the same path any hot
-/// function takes.
 std::thread_local! {
     /// compiled_id → preload-manifest content hash, filled at prewarm-marking
     /// time. Lets the cache-miss AOT consult dlsym the entry WITHOUT re-hashing
@@ -3975,6 +3940,18 @@ pub(crate) fn prewarm_hash_for(compiled_id: u64) -> Option<u128> {
     PREWARM_HASHES.with(|m| m.borrow().get(&compiled_id).copied())
 }
 
+/// LAZY prewarm (the production path): mark every loadup function the preload
+/// manifest lists as a MEMBER (name + ops_len + arity prekey match) so
+/// `dispatch` serves it via `Plan::Compiled` from call 1 — the leaf itself is
+/// built on the first call by the cache-miss path's `try_load_leaf` AOT
+/// consult (~13µs, paid only for functions actually called). The EAGER
+/// `prepopulate_aot_from_preload` builds all ~1.2k leaves up front
+/// (~16.5ms measured) and is kept for tests/benchmarks.
+///
+/// A marked function whose body hash no longer matches the preload (redefined
+/// between dump and run beyond what the ops_len/arity prekey catches) falls
+/// back to a one-time JIT compile at first call — the same path any hot
+/// function takes.
 pub fn mark_preload_members_prewarmed(ctx: &crate::emacs_core::eval::Context) -> (usize, usize) {
     if !aot_enabled() {
         return (0, 0);
@@ -4018,6 +3995,29 @@ pub fn mark_preload_members_prewarmed(ctx: &crate::emacs_core::eval::Context) ->
     (candidates, marked)
 }
 
+/// R2-C3: PREPOPULATE the per-thread `COMPILED` cache from the preload `.so`, so
+/// every AOT-eligible loadup function serves NATIVE FROM CALL 1 (no JIT warmup).
+///
+/// Walks `ctx`'s obarray for the SAME AOT-candidate set the dump-time producer
+/// emitted (same enumerate + D0 filter + content hash), loads each leaf from the
+/// single preload unit (eq-identical reloc consts from the LIVE function — #A),
+/// and inserts it into `COMPILED` keyed by that function's `compiled_id`. The 13
+/// dedup'd bodies (distinct fns, one shared `.so` entry) each get their OWN
+/// `CompiledLeaf` (own `reloc_data` + `compiled_id`) pointing at the shared entry.
+///
+/// Task #11: candidates are pre-filtered by the v2 manifest PRE-KEYS (symbol
+/// name → member?/ops-count/arity) so a dump-time-verified non-member skips its
+/// SHA-256 content hash outright; members and anything absent/mismatched take
+/// the exact hash + dlsym path (dlsym stays the membership ground truth).
+///
+/// CRITICAL ordering (R1a heap-identity guard): `cache::prepopulate_aot_leaves`
+/// FIRST syncs `COMPILED_HEAP` to the current heap (clearing the then-empty
+/// cache), THEN inserts — otherwise the first GC's `sync_cache_to_current_heap`
+/// would see `None != current` and CLEAR every prepopulated leaf (working for
+/// call 1, then silently gone). See that function.
+///
+/// Runs ONLY when [`aot_enabled`]; a missing/invalid preload is a clean no-op
+/// (every function just JITs — strictly additive). Returns the stats.
 pub fn prepopulate_aot_from_preload(ctx: &crate::emacs_core::eval::Context) -> PrepopulateStats {
     let mut stats = PrepopulateStats::default();
     if !aot_enabled() {

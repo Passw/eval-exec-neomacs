@@ -1,5 +1,5 @@
-//! Strong combo-complex-77/78 oracle tests — extreme org-agenda
-//! + babel + element probes: org-agenda-todo with batch processing,
+//! Strong combo-complex-77/78 oracle tests — extreme org-agenda +
+//! babel + element probes: org-agenda-todo with batch processing,
 //! org-agenda-redo cycle, org-babel ob-emacs-lisp with :results
 //! replace+raw combo, org-element create+interpret for babel-call,
 //! org-timestamp from time and format roundtrip, org-list-make-

@@ -1080,7 +1080,7 @@ fn destination_buffer_is_multibyte(eval: &super::eval::Context, target: &OutputT
     };
     buffer_id
         .and_then(|id| eval.buffers.get(id))
-        .map_or(true, |buffer| buffer.get_multibyte())
+        .is_none_or(|buffer| buffer.get_multibyte())
 }
 
 /// `(find-operation-coding-system 'call-process PROGRAM ...)`, guarded on a

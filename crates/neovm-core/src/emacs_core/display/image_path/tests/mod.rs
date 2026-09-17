@@ -29,7 +29,7 @@ fn relative_file_found_in_first_search_dir() {
     fs::write(&splash, b"<svg/>").unwrap();
     let dir = images.path().to_string_lossy().into_owned();
 
-    let got = image_find_image_file("splash.svg", &[dir.clone()]);
+    let got = image_find_image_file("splash.svg", std::slice::from_ref(&dir));
     assert_eq!(got.as_deref(), Some(expected(&dir, "splash.svg").as_str()));
 }
 

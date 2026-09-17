@@ -90,6 +90,7 @@ impl SavedPointBeforeCommand {
     }
 
     /// True when both handles name the same editor-global cell.
+    #[cfg(test)]
     pub(crate) fn shares_cell_with(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.cell, &other.cell)
     }

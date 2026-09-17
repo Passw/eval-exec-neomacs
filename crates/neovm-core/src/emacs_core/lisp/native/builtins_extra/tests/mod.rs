@@ -138,11 +138,11 @@ fn string_search_raw_byte_multibyte_conversion() {
     let eacute = Value::string("é");
 
     assert_eq!(
-        builtin_string_search(vec![raw_byte_e9.clone(), unibyte_e9.clone()]).unwrap(),
+        builtin_string_search(vec![raw_byte_e9, unibyte_e9]).unwrap(),
         Value::fixnum(0)
     );
     assert_eq!(
-        builtin_string_search(vec![unibyte_e9.clone(), raw_byte_e9]).unwrap(),
+        builtin_string_search(vec![unibyte_e9, raw_byte_e9]).unwrap(),
         Value::fixnum(0)
     );
     assert!(
@@ -170,7 +170,7 @@ fn closurep_true_for_lambda_values() {
     crate::test_utils::init_test_tracing();
     let lambda = Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![intern("x")]),
-        body: vec![].into(),
+        body: vec![],
         env: None,
         docstring: None,
         doc_form: None,
@@ -682,7 +682,7 @@ fn user_identity_type_contracts() {
 fn emacs_pid() {
     crate::test_utils::init_test_tracing();
     let pid = builtin_emacs_pid(vec![]).unwrap();
-    assert!(pid.as_fixnum().map_or(false, |n| n > 0));
+    assert!(pid.as_fixnum().is_some_and(|n| n > 0));
 }
 
 #[test]

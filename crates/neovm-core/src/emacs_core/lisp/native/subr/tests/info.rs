@@ -6,11 +6,11 @@ use crate::emacs_core::value::{LambdaData, LambdaParams};
 fn make_lambda(required: Vec<&str>, optional: Vec<&str>, rest: Option<&str>) -> Value {
     Value::make_lambda(LambdaData {
         params: LambdaParams {
-            required: required.into_iter().map(|s| intern(s)).collect(),
-            optional: optional.into_iter().map(|s| intern(s)).collect(),
-            rest: rest.map(|s| intern(s)),
+            required: required.into_iter().map(intern).collect(),
+            optional: optional.into_iter().map(intern).collect(),
+            rest: rest.map(intern),
         },
-        body: vec![].into(),
+        body: vec![],
         env: None,
         docstring: None,
         doc_form: None,
@@ -20,8 +20,8 @@ fn make_lambda(required: Vec<&str>, optional: Vec<&str>, rest: Option<&str>) -> 
 
 fn make_macro(required: Vec<&str>) -> Value {
     Value::make_macro(LambdaData {
-        params: LambdaParams::simple(required.into_iter().map(|s| intern(s)).collect()),
-        body: vec![].into(),
+        params: LambdaParams::simple(required.into_iter().map(intern).collect()),
+        body: vec![],
         env: None,
         docstring: None,
         doc_form: None,
@@ -32,9 +32,9 @@ fn make_macro(required: Vec<&str>) -> Value {
 fn make_bytecode(required: Vec<&str>, rest: Option<&str>) -> Value {
     use crate::emacs_core::bytecode::ByteCodeFunction;
     let params = LambdaParams {
-        required: required.into_iter().map(|s| intern(s)).collect(),
+        required: required.into_iter().map(intern).collect(),
         optional: vec![],
-        rest: rest.map(|s| intern(s)),
+        rest: rest.map(intern),
     };
     Value::make_bytecode(ByteCodeFunction::new(params))
 }

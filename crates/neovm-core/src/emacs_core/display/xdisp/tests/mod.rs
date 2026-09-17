@@ -1944,7 +1944,7 @@ fn window_text_pixel_size_counts_tty_wrapped_screen_rows() {
         .get_mut(buf_id)
         .expect("buffer")
         .insert("123456789012\nnext\n");
-    let selected_window = eval.frames.get(frame_id).expect("frame").selected_window.0 as u64;
+    let selected_window = eval.frames.get(frame_id).expect("frame").selected_window.0;
 
     let result = builtin_window_text_pixel_size_ctx(
         &mut eval,
@@ -1988,7 +1988,7 @@ fn window_text_pixel_size_honors_tty_truncate_lines() {
         .get_mut(buf_id)
         .expect("buffer")
         .insert("123456789012345678901234567890\nnext");
-    let selected_window = eval.frames.get(frame_id).expect("frame").selected_window.0 as u64;
+    let selected_window = eval.frames.get(frame_id).expect("frame").selected_window.0;
 
     let result = builtin_window_text_pixel_size_ctx(
         &mut eval,
@@ -5270,12 +5270,12 @@ fn test_vertical_motion_goal_column_past_row_end_lands_on_the_row_end_like_gnu()
             .map(|index| crate::window::DisplayPointSnapshot {
                 role: crate::window::DisplayPointRole::Glyph,
                 buffer_pos: crate::buffer::LispCharPos1::new(1 + index),
-                x: 8 * index as i64,
+                x: 8 * index,
                 y: 0,
                 width: 8,
                 height: 16,
                 row: 0,
-                col: index as i64,
+                col: index,
             })
             .collect::<Vec<_>>();
         let frame = eval.frame_manager_mut().get_mut(frame_id).expect("frame");

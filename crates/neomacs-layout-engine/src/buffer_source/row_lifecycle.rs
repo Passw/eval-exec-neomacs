@@ -262,9 +262,7 @@ impl BufferSourceHscrollSkipAction {
         mut row_progress: DisplaySourceRowProgressState<'_>,
         content_x: f32,
     ) -> Option<DisplayRowPosition> {
-        let Some((target, visible_remainder)) = self.left_truncation_effect() else {
-            return None;
-        };
+        let (target, visible_remainder) = self.left_truncation_effect()?;
         let body_position = row_progress.row_position();
 
         // GNU produces the marker with `CHARPOS (truncate_it.position) = -1`
@@ -1785,7 +1783,7 @@ impl<'a> BufferSourceLineBreakRenderRequest<'a> {
                 pen_col: progress.row_progress().col() as i64,
                 right_edge_x: context.append_surface.full_text_right_edge(),
                 char_width: metrics.char_width(),
-                indicator: (context.fill_column_indicator >= 0).then(|| LineEndIndicator {
+                indicator: (context.fill_column_indicator >= 0).then_some(LineEndIndicator {
                     col: context.fill_column_indicator,
                     ch: context.fill_column_indicator_char,
                 }),
@@ -1975,7 +1973,7 @@ impl<'a> BufferSourceLineBreakRenderRequest<'a> {
                 pen_col: progress.row_progress().col() as i64,
                 right_edge_x: context.append_surface.full_text_right_edge(),
                 char_width: metrics.char_width(),
-                indicator: (context.fill_column_indicator >= 0).then(|| LineEndIndicator {
+                indicator: (context.fill_column_indicator >= 0).then_some(LineEndIndicator {
                     col: context.fill_column_indicator,
                     ch: context.fill_column_indicator_char,
                 }),

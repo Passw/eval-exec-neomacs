@@ -702,8 +702,12 @@ pub struct HashTableStorage {
     /// enumerations that bypass them branch on [`Self::pending_entries`].
     /// Weak tables are hydrated eagerly at load so the weak sweep never
     /// sees a pending table.
-    pending: Option<Box<Vec<(HashKey, Value, Option<Value>)>>>,
+    pending: Option<Box<PendingHashEntries>>,
 }
+
+/// Dump entries parked in `HashTableStorage::pending`: each tuple is
+/// (hash key, value, key snapshot when the key object differs).
+type PendingHashEntries = Vec<(HashKey, Value, Option<Value>)>;
 
 pub struct HashTableIter<'a> {
     index: hashbrown::hash_map::Iter<'a, HashKey, usize>,
@@ -754,11 +758,11 @@ impl HashTableStorage {
         self.index.len()
     }
 
-    fn set_pending(&mut self, entries: Vec<(HashKey, Value, Option<Value>)>) {
+    fn set_pending(&mut self, entries: PendingHashEntries) {
         self.pending = Some(Box::new(entries));
     }
 
-    fn take_pending(&mut self) -> Option<Vec<(HashKey, Value, Option<Value>)>> {
+    fn take_pending(&mut self) -> Option<PendingHashEntries> {
         self.pending.take().map(|b| *b)
     }
 
@@ -1324,7 +1328,6 @@ type HashIndex =
 pub(crate) struct ValueKeyProbe {
     value: Value,
     test: HashTableTest,
-    symbols_with_pos_enabled: bool,
 }
 
 /// Depth beyond which `to_equal_key_depth_swp` degrades to identity keys;
@@ -1343,13 +1346,8 @@ impl ValueKeyProbe {
         symbols_with_pos_enabled: bool,
     ) -> Option<Self> {
         let mut budget = FAST_PROBE_NODE_BUDGET;
-        fast_probe_supported(value, test, symbols_with_pos_enabled, 0, &mut budget).then_some(
-            Self {
-                value,
-                test,
-                symbols_with_pos_enabled,
-            },
-        )
+        fast_probe_supported(value, test, symbols_with_pos_enabled, 0, &mut budget)
+            .then_some(Self { value, test })
     }
 }
 
@@ -2544,10 +2542,7 @@ impl TaggedValue {
     /// — a `Copy` word with no borrow to track. Those need an explicit root
     /// (DIVERGENCES.md 161/162's `InFlightRoots`), not a lifetime.
     #[inline]
-    pub fn lisp_string_in<'a>(
-        self,
-        heap: &'a crate::tagged::gc::TaggedHeap,
-    ) -> Option<&'a LispString> {
+    pub fn lisp_string_in(self, heap: &crate::tagged::gc::TaggedHeap) -> Option<&LispString> {
         let _ = heap;
         // SAFETY: the anchor is `heap`. Reaching a collection needs `&mut
         // Context`, which owns the heap, so this borrow cannot coexist with
@@ -2580,10 +2575,10 @@ impl TaggedValue {
     /// (`builtins/treesit.rs`, `E0502` ×3 on `eval.buffers`), and 185 §2 is
     /// this.
     #[inline]
-    pub fn expect_lisp_string_in<'a>(
+    pub fn expect_lisp_string_in(
         self,
-        heap: &'a crate::tagged::gc::TaggedHeap,
-    ) -> Result<&'a LispString, Flow> {
+        heap: &crate::tagged::gc::TaggedHeap,
+    ) -> Result<&LispString, Flow> {
         self.lisp_string_in(heap).ok_or_else(|| {
             signal(
                 crate::emacs_core::error::LispCondition::WrongTypeArgument,

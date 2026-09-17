@@ -194,7 +194,8 @@ pub(crate) fn route_stats_append_report() {
         let count = ROUTE_STAT_REFUSALS[class.index()].load(std::sync::atomic::Ordering::Relaxed);
         line.push_str(&format!(" refuse_{}={}", class.label(), count));
     }
-    for (label, counter) in [("routed_mid_line", &ROUTE_STAT_ROUTED_MID_LINE)] {
+    {
+        let (label, counter) = ("routed_mid_line", &ROUTE_STAT_ROUTED_MID_LINE);
         line.push_str(&format!(
             " {label}={}",
             counter.load(std::sync::atomic::Ordering::Relaxed)

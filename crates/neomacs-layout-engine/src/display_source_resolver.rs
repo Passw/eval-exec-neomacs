@@ -740,17 +740,13 @@ impl<'a> DisplaySourcePropertyResolver<'a> {
             // GNU's bare float is relative to FRAME_FONT, not the newline's
             // effective face.  Keep the canonical frame face distinct from
             // the source iterator's base face (mode/header lines may differ).
-            DisplayLineSpacingReference::DefaultFace => {
-                face_basis.canonical_face().font_line_height
-            }
+            DisplayLineSpacingReference::Default => face_basis.canonical_face().font_line_height,
             // `(nil . FACTOR)` uses the effective face at the newline.
-            DisplayLineSpacingReference::CurrentFace => current().font_line_height,
+            DisplayLineSpacingReference::Current => current().font_line_height,
             // GNU treats `(t . FACTOR)` as the current font and otherwise
             // performs an exact named-face lookup for the target window.
-            DisplayLineSpacingReference::NamedFace(face) if face.is_t() => {
-                current().font_line_height
-            }
-            DisplayLineSpacingReference::NamedFace(face) => face
+            DisplayLineSpacingReference::Named(face) if face.is_t() => current().font_line_height,
+            DisplayLineSpacingReference::Named(face) => face
                 .as_symbol_name()
                 .map(|name| {
                     self.face_scope

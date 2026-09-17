@@ -22,7 +22,7 @@ use neomacs_display_protocol::frame_glyphs::{
 use neomacs_display_protocol::gradient::{ColorStop, Gradient};
 use neomacs_display_protocol::types::FaceId;
 use neomacs_display_protocol::types::{AnimatedCursor, Color, DisplayWindowId, Rect};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashSet};
 use std::sync::{
     OnceLock,
     atomic::{AtomicU64, Ordering},

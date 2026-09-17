@@ -677,7 +677,7 @@ fn test_srgb_to_linear_output_range() {
         let srgb = i as f32 / 1000.0;
         let lin = Color::srgb_component_to_linear(srgb);
         assert!(
-            lin >= 0.0 && lin <= 1.0,
+            (0.0..=1.0).contains(&lin),
             "sRGB {} mapped to linear {} which is outside [0,1]",
             srgb,
             lin
@@ -740,7 +740,7 @@ fn test_from_pixel_full_alpha_ff() {
 #[test]
 fn test_color_clone_and_copy() {
     let original = Color::new(0.1, 0.2, 0.3, 0.4);
-    let cloned = original.clone();
+    let cloned = original;
     let copied = original; // Copy trait
     assert_eq!(original, cloned);
     assert_eq!(original, copied);

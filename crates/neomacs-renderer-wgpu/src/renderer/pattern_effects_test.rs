@@ -63,7 +63,7 @@ fn test_background_pattern_dots() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_background_pattern(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -79,7 +79,7 @@ fn test_background_pattern_grid() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_background_pattern(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -95,7 +95,7 @@ fn test_background_pattern_crosshatch() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_background_pattern(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -124,7 +124,7 @@ fn test_heat_distortion_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_heat_distortion(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -153,7 +153,7 @@ fn test_neon_border_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_neon_border(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -182,7 +182,7 @@ fn test_plasma_border_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_plasma_border(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -211,7 +211,7 @@ fn test_topographic_contour_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_topographic_contour(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -240,7 +240,7 @@ fn test_constellation_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_constellation(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -269,7 +269,7 @@ fn test_kaleidoscope_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_kaleidoscope(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -298,7 +298,7 @@ fn test_noise_field_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_noise_field(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -327,7 +327,7 @@ fn test_spiral_vortex_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_spiral_vortex(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -356,7 +356,7 @@ fn test_diamond_lattice_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_diamond_lattice(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -385,7 +385,7 @@ fn test_wave_interference_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_wave_interference(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -414,7 +414,7 @@ fn test_chevron_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_chevron(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -443,7 +443,7 @@ fn test_sunburst_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_sunburst(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -472,7 +472,7 @@ fn test_honeycomb_dissolve_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_honeycomb_dissolve(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -501,7 +501,7 @@ fn test_moire_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_moire(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -530,7 +530,7 @@ fn test_dot_matrix_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_dot_matrix(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -559,7 +559,7 @@ fn test_concentric_rings_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_concentric_rings(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -588,7 +588,7 @@ fn test_zigzag_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_zigzag(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -616,7 +616,7 @@ fn test_tessellation_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_tessellation(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -645,7 +645,7 @@ fn test_guilloche_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_guilloche(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -674,7 +674,7 @@ fn test_celtic_knot_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_celtic_knot(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -703,7 +703,7 @@ fn test_argyle_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_argyle(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -732,7 +732,7 @@ fn test_basket_weave_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_basket_weave(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -761,7 +761,7 @@ fn test_fish_scale_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_fish_scale(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -790,7 +790,7 @@ fn test_trefoil_knot_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_trefoil_knot(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -819,7 +819,7 @@ fn test_herringbone_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_herringbone(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -848,7 +848,7 @@ fn test_target_reticle_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_target_reticle(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -877,7 +877,7 @@ fn test_plaid_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_plaid(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -906,7 +906,7 @@ fn test_brick_wall_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_brick_wall(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -935,7 +935,7 @@ fn test_sine_wave_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_sine_wave(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -964,7 +964,7 @@ fn test_rotating_gear_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_rotating_gear(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -993,7 +993,7 @@ fn test_crosshatch_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_crosshatch(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -1022,7 +1022,7 @@ fn test_hex_grid_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_hex_grid(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -1051,7 +1051,7 @@ fn test_circuit_board_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_circuit_board(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -1080,7 +1080,7 @@ fn test_warp_grid_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_warp_grid(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }
@@ -1109,7 +1109,7 @@ fn test_prism_rainbow_edge_enabled() {
     let ctx = make_ctx(&effects, &fgb);
 
     let verts = emit_prism_rainbow_edge(&ctx);
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
     assert_eq!(verts.len() % 6, 0);
     validate_vertices(&verts);
 }

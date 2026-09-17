@@ -6,9 +6,9 @@
 //!
 //! ```make
 //! ${unidir}/charscript.el: ${blocks_sources}
-//! 	$(AM_V_GEN)$(AWK) -f ${blocks} ${blocks_sources} > $@
+//!     $(AM_V_GEN)$(AWK) -f ${blocks} ${blocks_sources} > $@
 //! ${unidir}/emoji-zwj.el: ${zwj_sources}
-//! 	$(AM_V_GEN)$(AWK) -f ${zwj} ${zwj_sources} > $@
+//!     $(AM_V_GEN)$(AWK) -f ${zwj} ${zwj_sources} > $@
 //! ```
 //!
 //! There is exactly one recipe per file and no post-processing, so **what awk

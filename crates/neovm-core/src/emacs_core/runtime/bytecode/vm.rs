@@ -11,13 +11,12 @@ use crate::emacs_core::builtins;
 use crate::emacs_core::error::*;
 use crate::emacs_core::eval::{
     BytecodeBacktraceFrame, BytecodeStackCallDispatch, ConditionFrame, LispArgVec, ResumeTarget,
-    lookup_global_subr_entry, subr_call_entry_from_value, subr_entry_from_value,
+    lookup_global_subr_entry, subr_call_entry_from_value,
 };
 use crate::emacs_core::intern::{SymId, intern, lookup_interned, resolve_sym};
 // storage_char_len and storage_substring no longer needed here — using emacs_char + LispString
 use crate::emacs_core::value::*;
 use crate::tagged::header::{SubrDispatchKind, SubrFn, SubrObj};
-use crate::tagged::value::TAG_MASK;
 use crate::window::FrameId;
 
 /// Dynamic, execution-weighted opcode histogram for the Tier-0 interpreter
@@ -863,7 +862,7 @@ impl InterpreterResumePoint {
             0,
             "a live bytecode instruction index cannot occupy usize's high bit"
         );
-        Self(pc | usize::from(osr_tried) * Self::OSR_TRIED_FLAG)
+        Self(pc | (usize::from(osr_tried) * Self::OSR_TRIED_FLAG))
     }
 
     #[inline(always)]
@@ -1096,13 +1095,14 @@ struct InterpreterFrameAuxStack {
 }
 
 impl InterpreterFrameAuxStack {
+    #[cfg(test)]
     fn new(handlers: HandlerStack, bind_stack: BindStack) -> Self {
         Self::with_suspended(handlers, bind_stack, Vec::new())
     }
     fn into_suspended(self) -> Vec<SuspendedInterpreterFrameAux> {
         self.suspended
     }
-    /// Like [`new`](Self::new) with pooled (emptied) storage for the
+    /// Like the test-only `new` with pooled (emptied) storage for the
     /// suspended frames.
     fn with_suspended(
         handlers: HandlerStack,
@@ -1346,15 +1346,7 @@ impl InterpreterStackPool {
 }
 
 impl InterpreterCallerStack {
-    fn new(entry: InterpreterFrame) -> Self {
-        let mut frames = Vec::with_capacity(8);
-        frames.push(entry);
-        Self {
-            frames,
-            continuations: Vec::with_capacity(8),
-        }
-    }
-    /// Like [`new`](Self::new) on pooled (emptied) storage.
+    /// Build a caller stack holding only `entry`, on pooled (emptied) storage.
     fn with_storage(
         mut frames: Vec<InterpreterFrame>,
         mut continuations: Vec<BytecodeCallContinuation>,
@@ -1659,12 +1651,6 @@ fn logxor_sym_id() -> SymId {
 fn fillarray_sym_id() -> SymId {
     static FILLARRAY: OnceLock<SymId> = OnceLock::new();
     *FILLARRAY.get_or_init(|| intern("fillarray"))
-}
-
-#[inline]
-fn aset_sym_id() -> SymId {
-    static ASET: OnceLock<SymId> = OnceLock::new();
-    *ASET.get_or_init(|| intern("aset"))
 }
 
 /// A tiny direct-mapped cache for symbol function cells proven to contain
@@ -2563,14 +2549,7 @@ impl<'a> Vm<'a> {
             handlers.push(Handler::Condition);
         }
         let mut bind_stack: BindStack = bind_entries.iter().copied().collect();
-        let result = self.run_loop(
-            func,
-            frame_base,
-            frame_limit,
-            &mut pc,
-            &mut handlers,
-            &mut bind_stack,
-        );
+        let result = self.run_loop(func, frame_base, &mut pc, &mut handlers, &mut bind_stack);
         self.cleanup_bytecode_frame(result, condition_stack_base, specpdl_base, frame_base)
     }
 
@@ -2745,14 +2724,8 @@ impl<'a> Vm<'a> {
                     });
                     self.ctx.lexenv = env;
                 }
-                let result = self.run_loop(
-                    func,
-                    frame_base,
-                    frame_limit,
-                    &mut pc,
-                    &mut handlers,
-                    &mut bind_stack,
-                );
+                let result =
+                    self.run_loop(func, frame_base, &mut pc, &mut handlers, &mut bind_stack);
                 #[cfg(debug_assertions)]
                 if func.env.is_none() {
                     debug_assert!(
@@ -2825,14 +2798,7 @@ impl<'a> Vm<'a> {
                     );
                 }
             }
-            let result = self.run_loop(
-                func,
-                frame_base,
-                frame_limit,
-                &mut pc,
-                &mut handlers,
-                &mut bind_stack,
-            );
+            let result = self.run_loop(func, frame_base, &mut pc, &mut handlers, &mut bind_stack);
             return self.cleanup_bytecode_frame(
                 result,
                 condition_stack_base,
@@ -2860,14 +2826,7 @@ impl<'a> Vm<'a> {
             }
         }
 
-        let result = self.run_loop(
-            func,
-            frame_base,
-            frame_limit,
-            &mut pc,
-            &mut handlers,
-            &mut bind_stack,
-        );
+        let result = self.run_loop(func, frame_base, &mut pc, &mut handlers, &mut bind_stack);
         #[cfg(debug_assertions)]
         if func.env.is_none() {
             debug_assert!(
@@ -3227,31 +3186,6 @@ impl<'a> Vm<'a> {
         InterpreterValueCompletion::Resume
     }
 
-    /// Deliver a bytecode return value into the restored caller's stack.
-    ///
-    /// GNU's `Breturn` is `top = fp->saved_top; PUSH (val)`: the result lands
-    /// in the consumed function-designator slot and everything above it is
-    /// discarded.  Fusing the truncate with the push removes both the truncate
-    /// comparison and the push capacity branch — the vector only ever shrinks
-    /// here.
-    #[inline(always)]
-    fn deliver_interpreter_return_value(&mut self, stack_after_call: usize, value: Value) {
-        let buf = &mut self.ctx.bc_buf;
-        debug_assert!(stack_after_call < buf.len());
-        // SAFETY: `stack_after_call` is the caller's consumed function-operand
-        // slot, strictly below the callee's `frame_base`
-        // (`args_start + nargs <= frame_base` held at frame installation), and
-        // the callee was truncated to exactly that `frame_base` immediately
-        // before the caller was restored with no `bc_buf` mutation in between.
-        // The slot is therefore initialized and in bounds, and the new length
-        // only shrinks the vector, so no capacity or drop concerns exist
-        // (`Value` is `Copy`).
-        unsafe {
-            *buf.as_mut_ptr().add(stack_after_call) = value;
-            buf.set_len(stack_after_call + 1);
-        }
-    }
-
     /// Resolve and dispatch one `Op::Call` after the depth guard has entered.
     ///
     /// `Enter` deliberately leaves the backtrace frame open; the iterative
@@ -3368,7 +3302,6 @@ impl<'a> Vm<'a> {
         &mut self,
         entry_func: &ByteCodeFunction,
         frame_base: usize,
-        frame_limit: usize,
         pc: &mut usize,
         handlers: &mut HandlerStack,
         bind_stack: &mut BindStack,
@@ -5590,8 +5523,6 @@ impl<'a> Vm<'a> {
 
     // -- Helper methods --
 
-    #[inline(always)]
-
     /// Same predicate as [`Self::mutates_first_arg_name`] as one SymId
     /// compare — the per-call classification below must not resolve and
     /// string-compare symbol names on the hot path.
@@ -6635,73 +6566,15 @@ impl<'a> Vm<'a> {
     /// call path — keep in sync with the `Op::Call` arm of `run_loop` (which
     /// keeps an in-place stack-args fast path for the no-writeback case).
     ///
+    /// The `nargs` arguments are ALREADY on `bc_buf` at `args_start` — the JIT
+    /// shim pushed them straight from its native call-args slot, skipping a
+    /// `LispArgVec` round-trip + per-arg scratch rooting (`bc_buf` is
+    /// GC-traced, so the args are rooted across the call). The caller
+    /// truncates `bc_buf` back to `args_start` afterwards. The subr fast path
+    /// reads the args in place; only the non-subr fallback materializes a
+    /// `LispArgVec` (for the traced `call_function`).
+    ///
     /// The caller polls `maybe_quit` first (GNU `bytecode.c:Bcall` order).
-    #[cfg(feature = "jit")]
-    pub(crate) fn call_for_jit(&mut self, func_val: Value, args: LispArgVec) -> EvalResult {
-        // GNU `bytecode.c:795-799`.  This is the JIT's lowering of `Bcall`, so
-        // it carries the arm just as the interpreter's `Op::Call` arm does.
-        if self.ctx.debug_on_next_call_is_armed() {
-            return self.with_bytecode_call_depth(|vm| vm.call_function_debugged(func_val, args));
-        }
-        let writeback_names = if args.first().is_some_and(|value| value.is_string()) {
-            self.writeback_mutating_callable_names(&func_val)
-        } else {
-            None
-        };
-        let writeback_args = writeback_names.as_ref().map(|_| args.clone());
-        let result = self.with_bytecode_call_depth(|vm| {
-            // Fast subr path: the JIT routes subr (primitive) calls — 75.4% of
-            // real-elisp calls — through the interpreter's exact direct-subr
-            // dispatch (`try_call_builtin_subr_from_stack_args`), skipping
-            // call_function's kind resolution + wrapper. It reads its args from
-            // the GC-traced `bc_buf`, so push the value args there first (which
-            // also roots them across the subr call, which may GC), try it,
-            // restore. Falls back to the full call_function for non-subr callees
-            // (bytecode/closures/overridden cells). Same depth guard + the
-            // writeback wrapper below — behaviour-preserving, faster dispatch.
-            let args_start = vm.ctx.bc_buf.len();
-            for &a in args.iter() {
-                vm.ctx.bc_buf.push(a);
-            }
-            let nargs = args.len();
-            match vm.try_call_builtin_subr_from_stack_args(func_val, args_start, nargs) {
-                Some(result) => {
-                    vm.ctx.bc_buf.truncate(args_start);
-                    result
-                }
-                None => {
-                    vm.ctx.bc_buf.truncate(args_start);
-                    vm.call_function(func_val, args)
-                }
-            }
-        })?;
-        if let (Some((called_name, alias_target)), Some(writeback_args)) =
-            (writeback_names.as_ref(), writeback_args.as_ref())
-        {
-            let root_scope = self.ctx.save_vm_roots();
-            self.push_dynamic_vm_root(result);
-            for value in writeback_args.iter().copied() {
-                self.push_dynamic_vm_root(value);
-            }
-            self.maybe_writeback_mutating_first_arg(
-                called_name,
-                *alias_target,
-                writeback_args,
-                &result,
-            );
-            self.ctx.restore_vm_roots(root_scope);
-        }
-        Ok(result)
-    }
-
-    /// Like [`call_for_jit`] but the `nargs` arguments are ALREADY on `bc_buf`
-    /// at `args_start` — the JIT shim pushed them straight from its native
-    /// call-args slot, skipping the `LispArgVec` round-trip + per-arg scratch
-    /// rooting (`bc_buf` is GC-traced, so the args are rooted across the call).
-    /// The caller truncates `bc_buf` back to `args_start` afterwards. The subr
-    /// fast path reads the args in place; only the non-subr fallback
-    /// materializes a `LispArgVec` (for the traced `call_function`). Same
-    /// behaviour as `call_for_jit` — fewer copies on the hot path.
     #[cfg(feature = "jit")]
     pub(crate) fn call_for_jit_stack(
         &mut self,
@@ -6709,8 +6582,8 @@ impl<'a> Vm<'a> {
         args_start: usize,
         nargs: usize,
     ) -> EvalResult {
-        // GNU `bytecode.c:795-799`, as in [`Vm::call_for_jit`]: the stack-args
-        // JIT lowering of `Bcall` arms too.
+        // GNU `bytecode.c:795-799`.  This is the JIT's lowering of `Bcall`, so
+        // it carries the arm just as the interpreter's `Op::Call` arm does.
         if self.ctx.debug_on_next_call_is_armed() {
             let args: LispArgVec = self.ctx.bc_buf[args_start..args_start + nargs]
                 .iter()
@@ -6881,7 +6754,7 @@ impl<'a> Vm<'a> {
     /// caller's native call-args slot). Resolve and cache the callee's compiled
     /// leaf in `leaf_slot`, then run it DIRECTLY under the recursion-depth
     /// guard — skipping the `funcall_general` dispatch and the compiled-cache
-    /// hash lookup that `call_for_jit` would pay.
+    /// hash lookup that `call_for_jit_stack` would pay.
     ///
     /// When the callee is a pure pass-through for this argument count (simple
     /// fixed arity, no `&optional` nil-pad / `&rest` list), the args go
@@ -6891,9 +6764,9 @@ impl<'a> Vm<'a> {
     /// (still skipping dispatch + hash lookup). Returns `None` when the callee
     /// can't be fast-pathed (body `NotCompilable`, or an arity mismatch the
     /// strict path must signal), leaving the shim to fall back to
-    /// `call_for_jit`.
+    /// `call_for_jit_stack`.
     ///
-    /// The recursion-depth guard is applied exactly as `call_for_jit` applies
+    /// The recursion-depth guard is applied exactly as `call_for_jit_stack` applies
     /// it (one increment per call) so deeply recursive compiled functions
     /// signal `max-lisp-eval-depth` instead of overflowing the native stack.
     /// The cached leaf handle is sound because the per-thread `COMPILED` cache
@@ -6925,7 +6798,7 @@ impl<'a> Vm<'a> {
         // record a frame and enter the entry debugger.  This native-to-native
         // fast path has no way to run Lisp mid-call, so it deopts exactly the
         // way a wrong arg count does -- `None` sends the call to the strict
-        // `call_for_jit`/`call_for_jit_stack` path, which arms it.  Cold: the
+        // `call_for_jit_stack` path, which arms it.  Cold: the
         // flag is down in every non-debugging process.
         if ctx.debug_on_next_call_is_armed() {
             return None;
@@ -6947,7 +6820,7 @@ impl<'a> Vm<'a> {
         // invariant. (NOT "the cache never evicts" — it can; audit #1.)
         let leaf = unsafe { &*ptr };
         // Test/debug-build evidence that the fast path actually fires (vs silently
-        // falling back to call_for_jit on every call). Counted here rather
+        // falling back to call_for_jit_stack on every call). Counted here rather
         // than in the shared runner below so it stays a count of SPECULATED
         // calls, not of every native-to-native call.
         #[cfg(any(test, debug_assertions))]
@@ -7382,7 +7255,7 @@ impl<'a> Vm<'a> {
     /// nargs)`. Bytecode callees run straight from the span through the
     /// tier-up seam; everything else (subrs, lambdas, aliases) materializes
     /// one `LispArgVec` and takes the generic owned path — those calls
-    /// either already went through `try_call_builtin_subr_from_stack_args`
+    /// either already went through `call_resolved_builtin_from_stack_args`
     /// or are cold.
     fn call_function_untraced_from_stack(
         &mut self,
@@ -7523,21 +7396,6 @@ impl<'a> Vm<'a> {
             Self::call_resolved_builtin_from_stack_args(ctx, func_val, args_start, nargs, callee);
         ctx.depth -= 1;
         Some(result)
-    }
-
-    fn try_call_builtin_subr_from_stack_args(
-        &mut self,
-        func_val: Value,
-        args_start: usize,
-        nargs: usize,
-    ) -> Option<EvalResult> {
-        let ResolvedStackCallTarget::Builtin { callee } = self.resolve_stack_call_target(func_val)
-        else {
-            return None;
-        };
-        Some(Self::call_resolved_builtin_from_stack_args(
-            self.ctx, func_val, args_start, nargs, callee,
-        ))
     }
 
     fn call_resolved_builtin_from_stack_args(
@@ -8515,28 +8373,6 @@ impl<'a> Vm<'a> {
     fn vm_special_builtin_ids() -> &'static [SymId; 13] {
         static IDS: std::sync::OnceLock<[SymId; 13]> = std::sync::OnceLock::new();
         IDS.get_or_init(|| crate::emacs_core::eval::VM_SPECIAL_BUILTIN_NAMES.map(intern))
-    }
-
-    /// `CallBuiltin`/`CallBuiltinSym` dispatch by symbol id: the op's constant IS
-    /// the symbol, so this goes straight to `funcall_general` on the subr for
-    /// every ordinary builtin — GNU's `Bcall` on a subr symbol is exactly
-    /// `funcall_general` → `funcall_subr` — and falls back to the by-name
-    /// `dispatch_vm_builtin_with_frame` only for the VM-level special cases.
-    /// The old path resolved the id to a NAME, walked a 13-way string `match`,
-    /// then `lookup_interned` the name back to an id on every call (13.7K calls
-    /// = 12% of the type window).
-    fn dispatch_vm_builtin_by_id_with_frame(
-        &mut self,
-        func: &ByteCodeFunction,
-        sym: SymId,
-        args: LispArgVec,
-    ) -> EvalResult {
-        if Self::vm_special_builtin_ids().contains(&sym) {
-            return self.dispatch_vm_builtin_with_frame(func, resolve_sym(sym), args);
-        }
-        self.with_frame_arg_roots(func, args, |vm, args| {
-            vm.ctx.funcall_general(Value::subr_from_sym_id(sym), args)
-        })
     }
 
     /// `CallBuiltin`/`CallBuiltinSym` with the arguments still on the operand

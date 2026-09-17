@@ -1,6 +1,6 @@
 //! iso8601 parsing (datetime, zone offset, duration P..., date-only, ISO week)
 //! + decoded-time accessors / make-decoded-time, format argument indices
-//! (%N$s), pp-to-string output, format-time-string of an encoded decoded-time.
+//!   (%N$s), pp-to-string output, format-time-string of an encoded decoded-time.
 
 use crate::common::assert_oracle_parity;
 use crate::common::return_if_neovm_enable_oracle_proptest_not_set;

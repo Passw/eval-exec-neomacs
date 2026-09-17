@@ -1318,17 +1318,6 @@ fn expect_window_live_or_nil(value: &Value) -> Result<(), Flow> {
     }
 }
 
-pub(super) fn expect_window_valid_or_nil(value: &Value) -> Result<(), Flow> {
-    if value.is_nil() || value.is_window() {
-        Ok(())
-    } else {
-        Err(signal(
-            LispCondition::WrongTypeArgument,
-            vec![Value::symbol("window-valid-p"), *value],
-        ))
-    }
-}
-
 /// GNU's two frame decoders differ only in the predicate they name:
 /// `decode_any_frame` signals `framep`, `decode_live_frame` signals
 /// `frame-live-p` (`src/frame.c`).  Taking the domain as an argument keeps the

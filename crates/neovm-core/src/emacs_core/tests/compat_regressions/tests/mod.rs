@@ -289,9 +289,7 @@ fn nthcdr_positive_bignum_reduces_over_circular_list_like_gnu() {
     second.set_cdr(third);
 
     let count = Value::make_integer(
-        Integer::from_str("100000000000000000000000000000000000001")
-            .expect("valid bignum")
-            .into(),
+        Integer::from_str("100000000000000000000000000000000000001").expect("valid bignum"),
     );
     let tail = crate::emacs_core::builtins::builtin_nthcdr(vec![count, list]).unwrap();
 
@@ -366,7 +364,7 @@ fn redirect_debugging_output_captures_external_debugging_output() {
     crate::emacs_core::builtins::builtin_redirect_debugging_output(&mut eval, vec![Value::NIL])
         .expect("reset debug output");
 
-    let contents = std::fs::read_to_string(&path).expect("debug output file contents");
+    let contents = std::fs::read_to_string(path).expect("debug output file contents");
     assert_eq!(contents, "AB");
 }
 
@@ -733,7 +731,7 @@ fn frame_face_hash_table_uses_eq_test() {
         panic!("expected hash table");
     };
     assert!(matches!(
-        out.as_hash_table().unwrap().test.clone(),
+        out.as_hash_table().unwrap().test,
         HashTableTest::Eq
     ));
 }

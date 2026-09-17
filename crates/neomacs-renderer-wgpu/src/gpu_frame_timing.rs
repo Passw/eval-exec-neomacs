@@ -232,10 +232,10 @@ impl GpuFrameTimer {
             video_ids,
             epoch: pending.epoch,
         };
-        if let Err(error) = worker_tx.send(command) {
-            if let WorkerCommand::Read { slot, .. } = error.0 {
-                self.available.push(slot);
-            }
+        if let Err(error) = worker_tx.send(command)
+            && let WorkerCommand::Read { slot, .. } = error.0
+        {
+            self.available.push(slot);
         }
     }
 

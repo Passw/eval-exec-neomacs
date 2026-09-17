@@ -232,7 +232,7 @@ pub(crate) fn builtin_hash_table_p(args: Vec<Value>) -> EvalResult {
 }
 
 pub(crate) fn builtin_type_of(args: &[Value]) -> EvalResult {
-    expect_args("type-of", &args, 1)?;
+    expect_args("type-of", args, 1)?;
     // GNU Emacs `type-of` handles symbol, integer, subr directly,
     // then delegates to `cl-type-of` for everything else.
     match args[0].kind() {
@@ -243,22 +243,13 @@ pub(crate) fn builtin_type_of(args: &[Value]) -> EvalResult {
             Ok(Value::symbol("integer"))
         }
         ValueKind::Subr(_) | ValueKind::Veclike(VecLikeType::Subr) => Ok(Value::symbol("subr")),
-        _ => builtin_cl_type_of(&args),
+        _ => builtin_cl_type_of(args),
     }
 }
 
-/// Context-aware type-of that dumps Lisp backtrace on stale reference.
-pub(crate) fn builtin_type_of_with_ctx(
-    ctx: &mut super::super::eval::Context,
-    args: Vec<Value>,
-) -> EvalResult {
-    crate::emacs_core::error::expect_args("type-of", &args, 1)?;
-    let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
-    builtin_type_of_with_ctx_1(ctx, arg(0))
-}
 /// `type-of` as registered: fixed arity 1, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a1` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
+/// Rust callers use [`builtin_type_of`] directly.
 pub(crate) fn builtin_type_of_with_ctx_1(
     ctx: &mut super::super::eval::Context,
     object: Value,
@@ -293,7 +284,7 @@ pub(crate) fn record_type_of(value: Value) -> Option<Value> {
 }
 
 pub(crate) fn builtin_cl_type_of(args: &[Value]) -> EvalResult {
-    expect_args("cl-type-of", &args, 1)?;
+    expect_args("cl-type-of", args, 1)?;
     // Stale tagged pointer detection is not applicable with tagged pointers.
     if let Some(type_symbol) = record_type_of(args[0]) {
         return Ok(type_symbol);
@@ -456,6 +447,7 @@ fn builtin_symbol_with_pos_pos_1_value(arg: Value) -> EvalResult {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn builtin_char_equal(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
     crate::emacs_core::error::expect_args("char-equal", &args, 2)?;
     let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);

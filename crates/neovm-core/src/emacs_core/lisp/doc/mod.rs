@@ -16,7 +16,7 @@
 //! and therefore the opposite order.
 
 use super::error::{EvalResult, Flow, signal};
-use super::intern::{intern, resolve_sym};
+use super::intern::intern;
 use super::value::*;
 use crate::emacs_core::error::LispCondition;
 use crate::emacs_core::error::expect_args;

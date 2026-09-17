@@ -1,6 +1,6 @@
 //! Strict combo oracle probes, batch 130: variable watcher with buffer-local
-//! dynamics, narrowing + undo + text-property + marker combo, save-restriction
-//! + save-excursion with process output, and cl-loop with destructuring +
+//! dynamics, narrowing + undo + text-property + marker combo, save-restriction +
+//! save-excursion with process output, and cl-loop with destructuring +
 //! hash-table + multiple accumulators.
 //! Uses assert_oracle_parity_expect format.
 

@@ -32,9 +32,7 @@ fn is_switch(argument: &OsStr, letter: char) -> bool {
 }
 
 fn starts_with_switch_marker(argument: &OsStr) -> bool {
-    argument
-        .to_string_lossy()
-        .starts_with(|value| value == '-' || value == '/')
+    argument.to_string_lossy().starts_with(['-', '/'])
 }
 
 fn is_environment_size_switch(argument: &OsStr) -> bool {

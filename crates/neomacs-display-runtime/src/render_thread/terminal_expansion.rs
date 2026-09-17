@@ -1,6 +1,5 @@
 //! Renderer-owned NeoTerm glyphs composed over an immutable editor frame.
 
-use crate::core::face::Face;
 use crate::core::frame_glyphs::{FrameGlyph, FrameGlyphBuffer};
 use crate::core::types::FaceId;
 use neomacs_display_protocol::FrameFaceMap;

@@ -100,7 +100,7 @@ impl AbsRef for Integer {
 }
 
 fn is_fixnum(x: &Integer) -> bool {
-    *x >= Integer::from(-(1i64 << 61)) && *x <= Integer::from((1i64 << 61) - 1)
+    *x >= -(1i64 << 61) && *x < (1i64 << 61)
 }
 
 /// `(let ((x FORM) (y FORM)) (list x (eq x y)))` printed, as the builtins

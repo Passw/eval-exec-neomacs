@@ -783,8 +783,8 @@ impl CodingSystemInfo {
     fn base_name(&self) -> String {
         let name = resolve_sym(self.name);
         for suffix in &["-unix", "-dos", "-mac"] {
-            if name.ends_with(suffix) {
-                return name[..name.len() - suffix.len()].to_string();
+            if let Some(stripped) = name.strip_suffix(suffix) {
+                return stripped.to_string();
             }
         }
         name.to_string()

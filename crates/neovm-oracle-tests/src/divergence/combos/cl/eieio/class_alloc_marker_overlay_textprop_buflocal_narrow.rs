@@ -1,5 +1,5 @@
-//! Combo: cl-eieio :allocation :class (shared slots across instances)
-//! + overlays + markers + textprop + buflocal + narrow.
+//! Combo: cl-eieio :allocation :class (shared slots across instances) +
+//! overlays + markers + textprop + buflocal + narrow.
 //! Tests class-allocated slots shared state through editing operations.
 
 use crate::common::assert_oracle_parity;

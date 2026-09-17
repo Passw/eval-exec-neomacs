@@ -201,7 +201,7 @@ fn small_table_identity_scans_agree_with_hashed_lookups() {
             0 | 1 => Value::fixnum(rng.below(40) as i64 - 5),
             2 | 3 => syms[rng.below(syms.len())],
             4 => Value::make_float(rng.below(4) as f64),
-            5 => Value::string(&format!("k{}", rng.below(4))),
+            5 => Value::string(format!("k{}", rng.below(4))),
             _ => [Value::NIL, Value::T, Value::keyword("small-scan-kw")][rng.below(3)],
         }
     };

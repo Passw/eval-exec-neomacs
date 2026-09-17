@@ -509,13 +509,9 @@ pub(crate) fn adjust_for_intangible(
 // ===========================================================================
 
 /// (bobp) -- at beginning of buffer?
-pub(crate) fn builtin_bobp(ctx: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
-    crate::emacs_core::error::expect_args("bobp", &args, 0)?;
-    builtin_bobp_0(ctx)
-}
+///
 /// `bobp` as registered: fixed arity 0, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a0` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
 pub(crate) fn builtin_bobp_0(ctx: &mut super::eval::Context) -> EvalResult {
     let args: [Value; 0] = [];
     expect_args("bobp", &args, 0)?;
@@ -526,13 +522,9 @@ pub(crate) fn builtin_bobp_0(ctx: &mut super::eval::Context) -> EvalResult {
 }
 
 /// (eobp) -- at end of buffer?
-pub(crate) fn builtin_eobp(ctx: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
-    crate::emacs_core::error::expect_args("eobp", &args, 0)?;
-    builtin_eobp_0(ctx)
-}
+///
 /// `eobp` as registered: fixed arity 0, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a0` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
 pub(crate) fn builtin_eobp_0(ctx: &mut super::eval::Context) -> EvalResult {
     let args: [Value; 0] = [];
     expect_args("eobp", &args, 0)?;
@@ -543,13 +535,9 @@ pub(crate) fn builtin_eobp_0(ctx: &mut super::eval::Context) -> EvalResult {
 }
 
 /// (bolp) -- at beginning of line?
-pub(crate) fn builtin_bolp(ctx: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
-    crate::emacs_core::error::expect_args("bolp", &args, 0)?;
-    builtin_bolp_0(ctx)
-}
+///
 /// `bolp` as registered: fixed arity 0, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a0` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
 pub(crate) fn builtin_bolp_0(ctx: &mut super::eval::Context) -> EvalResult {
     let args: [Value; 0] = [];
     expect_args("bolp", &args, 0)?;
@@ -565,13 +553,9 @@ pub(crate) fn builtin_bolp_0(ctx: &mut super::eval::Context) -> EvalResult {
 }
 
 /// (eolp) -- at end of line?
-pub(crate) fn builtin_eolp(ctx: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
-    crate::emacs_core::error::expect_args("eolp", &args, 0)?;
-    builtin_eolp_0(ctx)
-}
+///
 /// `eolp` as registered: fixed arity 0, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a0` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
 pub(crate) fn builtin_eolp_0(ctx: &mut super::eval::Context) -> EvalResult {
     let args: [Value; 0] = [];
     expect_args("eolp", &args, 0)?;
@@ -832,17 +816,9 @@ pub(crate) fn builtin_count_lines(eval: &mut super::eval::Context, args: Vec<Val
 }
 
 /// (forward-line &optional N) -> integer
-pub(crate) fn builtin_forward_line(
-    eval: &mut super::eval::Context,
-    args: Vec<Value>,
-) -> EvalResult {
-    crate::emacs_core::error::expect_args_range("forward-line", &args, 0, 1)?;
-    let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
-    builtin_forward_line_1(eval, arg(0))
-}
+///
 /// `forward-line` as registered: fixed arity 1, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a1` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
 pub(crate) fn builtin_forward_line_1(eval: &mut super::eval::Context, n: Value) -> EvalResult {
     let args: [Value; 1] = [n];
     let line_arg = optional_line_count_arg(&args, 1)?;
@@ -889,17 +865,9 @@ pub(crate) fn builtin_forward_line_1(eval: &mut super::eval::Context, n: Value) 
 }
 
 /// (beginning-of-line &optional N)
-pub(crate) fn builtin_beginning_of_line(
-    eval: &mut super::eval::Context,
-    args: Vec<Value>,
-) -> EvalResult {
-    crate::emacs_core::error::expect_args_range("beginning-of-line", &args, 0, 1)?;
-    let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
-    builtin_beginning_of_line_1(eval, arg(0))
-}
+///
 /// `beginning-of-line` as registered: fixed arity 1, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a1` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
 pub(crate) fn builtin_beginning_of_line_1(eval: &mut super::eval::Context, n: Value) -> EvalResult {
     let args: [Value; 1] = [n];
     let n = if args.is_empty() || args[0].is_nil() {
@@ -934,14 +902,9 @@ pub(crate) fn builtin_beginning_of_line_1(eval: &mut super::eval::Context, n: Va
 }
 
 /// (end-of-line &optional N)
-pub(crate) fn builtin_end_of_line(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
-    crate::emacs_core::error::expect_args_range("end-of-line", &args, 0, 1)?;
-    let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
-    builtin_end_of_line_1(eval, arg(0))
-}
+///
 /// `end-of-line` as registered: fixed arity 1, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a1` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
 pub(crate) fn builtin_end_of_line_1(eval: &mut super::eval::Context, n: Value) -> EvalResult {
     let args: [Value; 1] = [n];
     let n = if args.is_empty() || args[0].is_nil() {
@@ -1259,17 +1222,9 @@ fn non_ascii_blank(code: u32) -> bool {
 }
 
 /// (skip-chars-forward STRING &optional LIM)
-pub(crate) fn builtin_skip_chars_forward(
-    ctx: &mut super::eval::Context,
-    args: Vec<Value>,
-) -> EvalResult {
-    crate::emacs_core::error::expect_args_range("skip-chars-forward", &args, 1, 2)?;
-    let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
-    builtin_skip_chars_forward_2(ctx, arg(0), arg(1))
-}
+///
 /// `skip-chars-forward` as registered: fixed arity 2, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a2` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
 pub(crate) fn builtin_skip_chars_forward_2(
     ctx: &mut super::eval::Context,
     string: Value,
@@ -1322,17 +1277,9 @@ pub(crate) fn builtin_skip_chars_forward_2(
 }
 
 /// (skip-chars-backward STRING &optional LIM)
-pub(crate) fn builtin_skip_chars_backward(
-    ctx: &mut super::eval::Context,
-    args: Vec<Value>,
-) -> EvalResult {
-    crate::emacs_core::error::expect_args_range("skip-chars-backward", &args, 1, 2)?;
-    let arg = |i: usize| args.get(i).copied().unwrap_or(Value::NIL);
-    builtin_skip_chars_backward_2(ctx, arg(0), arg(1))
-}
+///
 /// `skip-chars-backward` as registered: fixed arity 2, called straight off the bytecode
 /// stack like GNU `funcall_subr`'s `a2` case (absent optionals arrive as nil).
-/// The `Vec` entry point above serves Rust callers.
 pub(crate) fn builtin_skip_chars_backward_2(
     ctx: &mut super::eval::Context,
     string: Value,

@@ -2135,6 +2135,7 @@ fn x_popup_menu_interactive_loop(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn show_popup_menu_selection(
     ctx: &mut Context,
     request_id: Option<neomacs_display_protocol::menu::MenuBarRequestId>,
@@ -2548,12 +2549,20 @@ pub(crate) fn builtin_x_get_modifier_masks(args: Vec<Value>) -> EvalResult {
 }
 
 /// (x-hide-tip) -> nil in batch/no-X context.
+///
+/// The live subr is `builtin_x_hide_tip_eval`; this stub only pins the
+/// batch-context contract in the tests.
+#[cfg(test)]
 pub(crate) fn builtin_x_hide_tip(args: Vec<Value>) -> EvalResult {
     expect_args("x-hide-tip", &args, 0)?;
     Ok(Value::NIL)
 }
 
 /// (x-show-tip STRING &optional FRAME PARMS TIMEOUT DX DY) -> error in batch/no-X context.
+///
+/// The live subr is `builtin_x_show_tip_eval`; this stub only pins the
+/// batch-context contract in the tests.
+#[cfg(test)]
 pub(crate) fn builtin_x_show_tip(args: Vec<Value>) -> EvalResult {
     expect_args_range("x-show-tip", &args, 1, 6)?;
     if !args[0].is_string() {

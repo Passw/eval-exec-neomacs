@@ -1,9 +1,9 @@
 #![cfg(unix)]
-// Face colour comparison test via PTY.
+//! Face colour comparison test via PTY.
 //!
-// Boots neomacs and GNU Emacs side-by-side, opens the Doom help
-// index.org, then compares the rendered screen for coloured cells.
-// Reports whether neomacs has non-default face colours matching GNU.
+//! Boots neomacs and GNU Emacs side-by-side, opens the Doom help
+//! index.org, then compares the rendered screen for coloured cells.
+//! Reports whether neomacs has non-default face colours matching GNU.
 #![allow(dead_code)]
 
 use crate::support;

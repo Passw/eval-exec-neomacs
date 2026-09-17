@@ -214,10 +214,10 @@ pub(crate) fn is_known_fixnum(fb: &FunctionBuilder, v: ClifValue) -> bool {
 /// The float twin of [`guard_fixnum`], and the reason a float operand no
 /// longer has to bail the whole compiled body.
 pub(crate) fn guard_float(fb: &mut FunctionBuilder, deopt: Block, v: ClifValue) {
-    let tag = fb.ins().band_imm(v, TAG_MASK as i64);
+    let tag = fb.ins().band_imm_u(v, TAG_MASK as i64);
     let is_float = fb
         .ins()
-        .icmp_imm(IntCC::Equal, tag, crate::tagged::value::TAG_FLOAT as i64);
+        .icmp_imm_u(IntCC::Equal, tag, crate::tagged::value::TAG_FLOAT as i64);
     let cont = fb.create_block();
     fb.ins().brif(is_float, cont, &[], deopt, &[]);
     fb.switch_to_block(cont);
@@ -229,7 +229,7 @@ pub(crate) fn guard_float(fb: &mut FunctionBuilder, deopt: Block, v: ClifValue) 
 /// Reads at [`FLOAT_VALUE_OFFSET`], the same offset the runtime writes through
 /// `FloatObj`, so the two can never drift.
 pub(crate) fn unbox_float(fb: &mut FunctionBuilder, v: ClifValue) -> ClifValue {
-    let ptr = fb.ins().band_imm(v, !(TAG_MASK as i64));
+    let ptr = fb.ins().band_imm_u(v, !(TAG_MASK as i64));
     fb.ins().load(
         types::F64,
         MemFlagsData::trusted(),
@@ -379,14 +379,6 @@ pub(crate) fn emit_float_arith(
     }
 }
 
-/// `v` carries the FLOAT tag, as an i8 condition (the test `guard_float`
-/// emits, without the deopt edge).
-pub(crate) fn float_tag_test(fb: &mut FunctionBuilder, v: ClifValue) -> ClifValue {
-    let tag = band_imm_p(fb, v, TAG_MASK as i64);
-    fb.ins()
-        .icmp_imm_u(IntCC::Equal, tag, crate::tagged::value::TAG_FLOAT as i64)
-}
-
 /// Run-time "both operands are floats" for model-stack slots `i` and `j`; a
 /// raw slot is a proven fixnum, so the test is constant false. Fused like
 /// [`both_fixnum_test`].
@@ -444,11 +436,11 @@ fn both_tag_test(
     mask: i64,
     tag: i64,
 ) -> ClifValue {
-    let xa = fb.ins().bxor_imm(a, tag);
-    let xb = fb.ins().bxor_imm(b, tag);
+    let xa = fb.ins().bxor_imm_u(a, tag);
+    let xb = fb.ins().bxor_imm_u(b, tag);
     let either = fb.ins().bor(xa, xb);
     let masked = band_imm_p(fb, either, mask);
-    fb.ins().icmp_imm(IntCC::Equal, masked, 0)
+    fb.ins().icmp_imm_u(IntCC::Equal, masked, 0)
 }
 
 /// Box an `f64` result back into a tagged Lisp float.
@@ -796,10 +788,10 @@ fn emit_inline_aref(
         .load(types::I8, MemFlagsData::trusted(), object, type_off as i32);
     let is_vector = fb
         .ins()
-        .icmp_imm(IntCC::Equal, type_tag, VecLikeType::Vector as u8 as i64);
+        .icmp_imm_u(IntCC::Equal, type_tag, VecLikeType::Vector as u8 as i64);
     let is_record = fb
         .ins()
-        .icmp_imm(IntCC::Equal, type_tag, VecLikeType::Record as u8 as i64);
+        .icmp_imm_u(IntCC::Equal, type_tag, VecLikeType::Record as u8 as i64);
     let either = fb.ins().bor(is_vector, is_record);
     let ranged = fb.create_block();
     fb.ins().brif(either, ranged, &[], slow, &[]);
@@ -978,7 +970,7 @@ fn emit_inline_record_type_of(
         .uload8(types::I64, flags, cell, LISP_BOOL_FWD_VALUE_OFFSET as i32);
     let object = band_imm_p(fb, arg, !(TAG_MASK as i64));
     let type_tag = fb.ins().uload8(types::I64, flags, object, type_off as i32);
-    let not_record = fb.ins().bxor_imm(type_tag, record_tag);
+    let not_record = fb.ins().bxor_imm_u(type_tag, record_tag);
     let set = fb.ins().bor(overrides, quit_flag);
     let set = fb.ins().bor(set, throw_on_input);
     let set = fb.ins().bor(set, requested);
@@ -1372,7 +1364,7 @@ pub(crate) fn mir_opaque_enabled() -> bool {
 /// MIR bail census groups by.
 fn op_variant_name(op: &Op) -> String {
     let name = format!("{op:?}");
-    name.split(|c: char| c == '(' || c == '{' || c == ' ')
+    name.split(['(', '{', ' '])
         .next()
         .unwrap_or("?")
         .to_string()
@@ -1713,9 +1705,6 @@ pub(crate) struct MirLeafPlan {
     /// baseline lowers BETTER (speculated native-to-native, CBSym intrinsics),
     /// so the tier gate sends such a body to the baseline.
     pub(crate) has_generic_call: bool,
-    /// Any op that goes through a runtime shim: an `Opaque`, an `Eq` (the
-    /// symbols-with-position slow path), a `symbolp`/`integerp`/`numberp`.
-    pub(crate) has_adapter_site: bool,
     /// A loop (an edge to a block at or before its source).
     pub(crate) has_backedge: bool,
     /// Every guard deopts PRECISELY (`STATUS_DEOPT_AT`), never rerun-from-
@@ -1817,6 +1806,8 @@ pub(crate) fn plan_mir_leaf(m: &mir::MirFunction) -> MirLeafPlan {
             }
         )
     });
+    // Any op that goes through a runtime shim: an `Opaque`, an `Eq` (the
+    // symbols-with-position slow path), a `symbolp`/`integerp`/`numberp`.
     let has_adapter_site = insts().any(|i| {
         matches!(
             i.op,
@@ -1850,7 +1841,6 @@ pub(crate) fn plan_mir_leaf(m: &mir::MirFunction) -> MirLeafPlan {
     MirLeafPlan {
         has_opaque,
         has_generic_call,
-        has_adapter_site,
         has_backedge,
         precise: has_opaque,
         needs_rt: has_adapter_site || has_escaping_cons,
@@ -2301,30 +2291,12 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
             ));
             let call_result_slot =
                 fb.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
-            // Lever 2: residual gather buffer, sized to the max pre-op operand-stack
-            // depth (an upper bound on any site's residual count).
-            let max_residual = m
-                .blocks
-                .iter()
-                .flat_map(|b| b.insts.iter())
-                .map(|i| i.pre_stack.len())
-                .max()
-                .unwrap_or(0);
-            let residual_buf_slot = fb.create_sized_stack_slot(StackSlotData::new(
-                StackSlotKind::ExplicitSlot,
-                (max_residual.max(1) * 8) as u32,
-                3,
-            ));
-            let gc_saved_slot =
-                fb.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3));
             Some(RtCtx {
                 refs,
                 vmctx_var,
                 ptr_ty,
                 call_args_slot,
                 call_result_slot,
-                residual_buf_slot,
-                gc_saved_slot,
                 rootwin: None,
             })
         } else {
@@ -2748,7 +2720,7 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
                             if on && ty.never_needs_gc_root() {
                                 if cfg!(debug_assertions) && ty == mir::LispType::Fixnum {
                                     let tag = band_imm_p(&mut fb, v, FIXNUM_CHECK_MASK as i64);
-                                    let not_fix = fb.ins().icmp_imm(
+                                    let not_fix = fb.ins().icmp_imm_u(
                                         IntCC::NotEqual,
                                         tag,
                                         FIXNUM_CHECK_VALUE as i64,
@@ -2770,9 +2742,7 @@ pub(crate) fn build_mir_leaf_fn<M: Module>(
                         // nothing is heap. `!(is_fixnum | is_symbol)` is the
                         // exact layout-anchored `is_heap_object` (see the
                         // lever-1 correctness note); the shim's own re-test
-                        // keeps any over-approximation harmless. The saved
-                        // depth crosses the callee via `gc_saved_slot`, with
-                        // -1 marking "nothing rooted".
+                        // keeps any over-approximation harmless.
                         let saved = if to_root.is_empty() {
                             // Live residuals, all skipped by type: the callee
                             // runs with `top` at the base and may overwrite
@@ -3026,16 +2996,6 @@ pub(crate) struct RtCtx {
     pub(crate) call_args_slot: StackSlot,
     /// 8-byte result slot the call shim writes through.
     pub(crate) call_result_slot: StackSlot,
-    /// Lever 2: gather buffer for BATCHED residual GC rooting. Sized to the body's
-    /// max operand-stack depth (an upper bound on any site's residual count).
-    /// Reused per residual-rooting site — `neovm_jit_gc_push_many` reads it
-    /// synchronously, so the next site's stores may overwrite it.
-    pub(crate) residual_buf_slot: StackSlot,
-    /// Conditional-rooting saved scratch depth for the current call site:
-    /// `-1` when the site's runtime tag tests found no heap residual (all
-    /// three rooting shims skipped), else the `gc_save` result the post-call
-    /// restore consumes. Written and read within one site — reusable.
-    pub(crate) gc_saved_slot: StackSlot,
     /// Root-window state hoisted to the function entry (baseline leaves;
     /// `None` keeps the per-site sequence): see [`HoistedRootWin`].
     pub(crate) rootwin: Option<HoistedRootWin>,
@@ -3066,7 +3026,7 @@ thread_local! {
     /// lowered have already stored (see [`RootWinCarry`]). Reset per
     /// function and at every bytecode basic-block leader.
     static ROOTWIN_CARRY: std::cell::RefCell<RootWinCarry> =
-        std::cell::RefCell::new(RootWinCarry { stored: Vec::new(), emitted: 0, elided: 0 });
+        const { std::cell::RefCell::new(RootWinCarry { stored: Vec::new(), emitted: 0, elided: 0 }) };
 }
 
 /// The per-window-index SSA value the last hoisted site stored.
@@ -3108,8 +3068,6 @@ struct RootWinCarry {
     elided: u32,
 }
 
-/// Forget the carried record: a new function, a bytecode leader, a MIR block
-/// head, or a site that runs a nested activation without storing anything.
 #[cfg(test)]
 thread_local! {
     static FORCE_SPEC_GUARD_MISS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
@@ -3122,6 +3080,8 @@ pub(crate) fn force_spec_guard_miss_for_test(on: bool) {
     FORCE_SPEC_GUARD_MISS.with(|c| c.set(on));
 }
 
+/// Forget the carried record: a new function, a bytecode leader, a MIR block
+/// head, or a site that runs a nested activation without storing anything.
 pub(crate) fn rootwin_carry_reset() {
     ROOTWIN_CARRY.with(|c| c.borrow_mut().stored.clear());
 }
@@ -3306,10 +3266,6 @@ pub(crate) fn emit_hoisted_root_window_prologue(
 /// Callable references to every runtime shim, declared into one function.
 pub(crate) struct RtRefs {
     pub(crate) rootwin_grow: FuncRef,
-    pub(crate) gc_save: FuncRef,
-    pub(crate) gc_push: FuncRef,
-    pub(crate) gc_push_many: FuncRef,
-    pub(crate) gc_restore: FuncRef,
     pub(crate) cons: FuncRef,
     /// Boxes an `f64` computed in a register (`neovm_jit_make_float`).
     pub(crate) make_float: FuncRef,
@@ -3414,13 +3370,9 @@ pub(crate) fn declare_rt_refs<M: Module>(
     cbsym_spec: bool,
 ) -> Result<RtRefs, CompileError> {
     let i64t = types::I64;
-    let mut sig_ret = Signature::new(call_conv); // () -> i64
-    sig_ret.returns.push(AbiParam::new(i64t));
-    let mut sig_arg = Signature::new(call_conv); // (i64) -> ()
-    sig_arg.params.push(AbiParam::new(i64t));
-    let mut sig_push_many = Signature::new(call_conv); // (ptr, i64) -> ()  (lever 2 batch)
-    sig_push_many.params.push(AbiParam::new(ptr_ty));
-    sig_push_many.params.push(AbiParam::new(i64t));
+    let mut sig_rootwin_grow = Signature::new(call_conv); // (vmctx, need) -> ()
+    sig_rootwin_grow.params.push(AbiParam::new(ptr_ty));
+    sig_rootwin_grow.params.push(AbiParam::new(i64t));
     let mut sig_cons = Signature::new(call_conv); // (i64, i64) -> i64
     sig_cons.params.push(AbiParam::new(i64t));
     sig_cons.params.push(AbiParam::new(i64t));
@@ -3451,12 +3403,7 @@ pub(crate) fn declare_rt_refs<M: Module>(
             .map_err(|e| CompileError::Backend(BackendError::Define(e.to_string())))
     };
 
-    let save_id = declare(module, "neovm_jit_gc_save", &sig_ret)?;
-    let push_id = declare(module, "neovm_jit_gc_push", &sig_arg)?;
-    let push_many_id = declare(module, "neovm_jit_gc_push_many", &sig_push_many)?;
-    let restore_id = declare(module, "neovm_jit_gc_restore", &sig_arg)?;
-    // (vmctx, need) -> (): same param shape as push_many.
-    let rootwin_grow_id = declare(module, "neovm_jit_rootwin_grow", &sig_push_many)?;
+    let rootwin_grow_id = declare(module, "neovm_jit_rootwin_grow", &sig_rootwin_grow)?;
     let cons_id = declare(module, "neovm_jit_cons", &sig_cons)?;
     let mut sig_make_float = Signature::new(call_conv); // (f64) -> i64
     sig_make_float.params.push(AbiParam::new(types::F64));
@@ -3669,10 +3616,6 @@ pub(crate) fn declare_rt_refs<M: Module>(
 
     Ok(RtRefs {
         rootwin_grow: module.declare_func_in_func(rootwin_grow_id, func),
-        gc_save: module.declare_func_in_func(save_id, func),
-        gc_push: module.declare_func_in_func(push_id, func),
-        gc_push_many: module.declare_func_in_func(push_many_id, func),
-        gc_restore: module.declare_func_in_func(restore_id, func),
         cons: module.declare_func_in_func(cons_id, func),
         make_float: module.declare_func_in_func(make_float_id, func),
         arith_generic: module.declare_func_in_func(arith_generic_id, func),
@@ -3900,11 +3843,6 @@ pub(crate) enum DeoptRefs {
     },
 }
 
-/// Fill the precise-deopt blocks queued within one bytecode block: spill the
-/// captured live stack, record pc/depth/handler-count, and return
-/// [`STATUS_DEOPT_AT`]. For `Baked` (JIT) the base addresses are iconst'd HERE in
-/// the cold block (off the hot path); for `Sidecar` (AOT) they are the
-/// entry-block loaded values.
 thread_local! {
     /// IR-size facts of the most recent baseline compile on this thread —
     /// `(clif insts, blocks, deopt sites, deopt snapshot slots)` — read by
@@ -3913,6 +3851,11 @@ thread_local! {
         const { core::cell::Cell::new((0, 0, 0, 0)) };
 }
 
+/// Fill the precise-deopt blocks queued within one bytecode block: spill the
+/// captured live stack, record pc/depth/handler-count, and return
+/// [`STATUS_DEOPT_AT`]. For `Baked` (JIT) the base addresses are iconst'd HERE in
+/// the cold block (off the hot path); for `Sidecar` (AOT) they are the
+/// entry-block loaded values.
 pub(crate) fn emit_pending_deopts(
     fb: &mut FunctionBuilder,
     refs: DeoptRefs,
@@ -4986,7 +4929,7 @@ pub(crate) fn lower_simple_op(
                     .ins()
                     .load(rt.ptr_ty, MemFlagsData::trusted(), chunk_slot, 0);
                 let slot_index = band_imm_p(fb, sym_v, (OBARRAY_CHUNK_SLOTS - 1) as i64);
-                let cell_off = fb.ins().imul_imm(slot_index, LISP_SYMBOL_SIZE as i64);
+                let cell_off = fb.ins().imul_imm_u(slot_index, LISP_SYMBOL_SIZE as i64);
                 let cell = fb.ins().iadd(chunk, cell_off);
                 let flags = fb.ins().uload8(
                     types::I64,

@@ -8,10 +8,10 @@ pub(super) fn file_name_to_lisp(ctx: &crate::emacs_core::eval::Context, path: &P
     {
         use std::os::unix::ffi::OsStrExt;
 
-        return Value::heap_string(crate::emacs_core::fileio::decode_file_name_lisp(
+        Value::heap_string(crate::emacs_core::fileio::decode_file_name_lisp(
             ctx,
             path.as_os_str().as_bytes(),
-        ));
+        ))
     }
     #[cfg(windows)]
     {
@@ -22,11 +22,11 @@ pub(super) fn file_name_to_lisp(ctx: &crate::emacs_core::eval::Context, path: &P
             .encode_wide()
             .flat_map(u16::to_le_bytes)
             .collect::<Vec<_>>();
-        return Value::heap_string(crate::encoding::decode_bytes_to_lisp_string(
+        Value::heap_string(crate::encoding::decode_bytes_to_lisp_string(
             &bytes,
             "utf-16le",
             ctx.eol_conversion(),
-        ));
+        ))
     }
 }
 
@@ -44,7 +44,7 @@ pub(super) fn file_notify_error(
         _ => Value::NIL,
     };
     if let Some(detail) = detail {
-        tail = Value::cons(Value::string(&detail.to_string()), tail);
+        tail = Value::cons(Value::string(detail.to_string()), tail);
     }
     let raw_data = Value::cons(Value::string(message), tail);
     crate::emacs_core::error::signal_with_data("file-notify-error", raw_data)

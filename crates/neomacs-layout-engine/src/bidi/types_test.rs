@@ -585,6 +585,7 @@ fn bidi_class_codes_match_gnu_bidi_type_t() {
 // ===================================================================
 
 #[test]
+#[allow(clippy::clone_on_copy)] // the test exercises Clone::clone, not Copy
 fn bidi_class_clone_and_copy() {
     let a = BidiClass::L;
     let b = a; // Copy

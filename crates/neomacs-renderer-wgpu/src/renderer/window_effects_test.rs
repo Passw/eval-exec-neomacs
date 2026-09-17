@@ -102,14 +102,14 @@ fn test_extension_to_color_known_extensions() {
 fn test_extension_to_color_unknown_extensions() {
     // Test unknown extensions produce valid RGB values
     let (r1, g1, b1) = extension_to_color("xyz");
-    assert!(r1 >= 0.0 && r1 <= 1.0);
-    assert!(g1 >= 0.0 && g1 <= 1.0);
-    assert!(b1 >= 0.0 && b1 <= 1.0);
+    assert!((0.0..=1.0).contains(&r1));
+    assert!((0.0..=1.0).contains(&g1));
+    assert!((0.0..=1.0).contains(&b1));
 
     let (r2, g2, b2) = extension_to_color("unknown");
-    assert!(r2 >= 0.0 && r2 <= 1.0);
-    assert!(g2 >= 0.0 && g2 <= 1.0);
-    assert!(b2 >= 0.0 && b2 <= 1.0);
+    assert!((0.0..=1.0).contains(&r2));
+    assert!((0.0..=1.0).contains(&g2));
+    assert!((0.0..=1.0).contains(&b2));
 }
 
 #[test]
@@ -128,9 +128,9 @@ fn test_extension_to_color_deterministic() {
 fn test_extension_to_color_empty_string() {
     // Empty string should produce valid color
     let (r, g, b) = extension_to_color("");
-    assert!(r >= 0.0 && r <= 1.0);
-    assert!(g >= 0.0 && g <= 1.0);
-    assert!(b >= 0.0 && b <= 1.0);
+    assert!((0.0..=1.0).contains(&r));
+    assert!((0.0..=1.0).contains(&g));
+    assert!((0.0..=1.0).contains(&b));
 }
 
 // ========================================================================
@@ -182,7 +182,7 @@ fn test_emit_modified_indicator_modified_window() {
     let verts = emit_modified_indicator(&ctx);
 
     // Should produce vertices (exact count depends on implementation)
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
 }
 
 #[test]
@@ -267,7 +267,7 @@ fn test_emit_stained_glass_enabled_with_window() {
     let verts = emit_stained_glass(&ctx);
 
     // Should produce vertices
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
 }
 
 #[test]
@@ -378,7 +378,7 @@ fn test_emit_focus_gradient_border_selected() {
     let verts = emit_focus_gradient_border(&ctx);
 
     // Selected window should produce vertices
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
 }
 
 // ========================================================================
@@ -416,7 +416,7 @@ fn test_emit_window_depth_shadow_enabled() {
     let verts = emit_window_depth_shadow(&ctx);
 
     // Should produce shadow vertices
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
 }
 
 #[test]
@@ -503,7 +503,7 @@ fn test_emit_mode_line_gradient_with_mode_line() {
     let verts = emit_mode_line_gradient(&ctx);
 
     // Should produce gradient vertices
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
 }
 
 #[test]
@@ -565,7 +565,7 @@ fn test_emit_window_corner_fold_enabled() {
     let verts = emit_window_corner_fold(&ctx);
 
     // Should produce corner fold vertices
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
 }
 
 #[test]
@@ -626,7 +626,7 @@ fn test_emit_frosted_window_border_enabled() {
     let verts = emit_frosted_window_border(&ctx);
 
     // Should produce border vertices
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
 }
 
 #[test]
@@ -679,7 +679,7 @@ fn test_emit_window_scanline_enabled() {
     let verts = emit_window_scanline(&ctx);
 
     // Should produce scanline vertices (independent of windows)
-    assert!(verts.len() > 0);
+    assert!(!verts.is_empty());
 
     // Should have vertices at regular intervals
     // With spacing=4 and height=600, we expect 150 scanlines
@@ -703,7 +703,7 @@ fn test_emit_cursor_ghost_disabled() {
     let (verts, needs_redraw) = emit_cursor_ghost(&ctx, &mut ghost_entries);
 
     assert_eq!(verts.len(), 0);
-    assert_eq!(needs_redraw, false);
+    assert!(!needs_redraw);
 }
 
 #[test]
@@ -718,7 +718,7 @@ fn test_emit_cursor_ghost_enabled_no_entries() {
 
     // No ghost entries, so no vertices
     assert_eq!(verts.len(), 0);
-    assert_eq!(needs_redraw, false);
+    assert!(!needs_redraw);
 }
 
 // ========================================================================
@@ -736,7 +736,7 @@ fn test_emit_edge_glow_disabled() {
     let (verts, needs_redraw) = emit_edge_glow(&ctx, &mut edge_glow_entries);
 
     assert_eq!(verts.len(), 0);
-    assert_eq!(needs_redraw, false);
+    assert!(!needs_redraw);
 }
 
 #[test]
@@ -751,7 +751,7 @@ fn test_emit_edge_glow_enabled_no_entries() {
 
     // No glow entries, so no vertices
     assert_eq!(verts.len(), 0);
-    assert_eq!(needs_redraw, false);
+    assert!(!needs_redraw);
 }
 
 // ========================================================================
@@ -780,13 +780,13 @@ fn test_multiple_effects_together() {
 
     // Each effect should produce vertices independently
     let mod_verts = emit_modified_indicator(&ctx);
-    assert!(mod_verts.len() > 0);
+    assert!(!mod_verts.is_empty());
 
     let ml_verts = emit_mode_line_gradient(&ctx);
-    assert!(ml_verts.len() > 0);
+    assert!(!ml_verts.is_empty());
 
     let scan_verts = emit_window_scanline(&ctx);
-    assert!(scan_verts.len() > 0);
+    assert!(!scan_verts.is_empty());
 }
 
 #[test]

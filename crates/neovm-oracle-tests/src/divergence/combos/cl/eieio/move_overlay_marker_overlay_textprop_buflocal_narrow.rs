@@ -1,5 +1,5 @@
-//! Combo: cl-eieio overlay move + detach + reattach + markers + textprop
-//! + buflocal + narrow + undo.
+//! Combo: cl-eieio overlay move + detach + reattach + markers + textprop +
+//! buflocal + narrow + undo.
 //! Tests complex move-overlay scenarios including cross-region moves,
 //! overlapping overlays after moves, and marker tracking through moves.
 

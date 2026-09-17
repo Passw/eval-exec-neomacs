@@ -35,7 +35,7 @@ fn seed_long_line(gnu: &mut TuiSession, neo: &mut TuiSession) {
 
     // A line wider than an 80-column window so truncate-lines is visible,
     // then a second line with a leading TAB so tab-width is visible.
-    let long: String = std::iter::repeat('x').take(120).collect();
+    let long: String = std::iter::repeat_n('x', 120).collect();
     let typed = format!("{long}\r\tTABBED-CELL");
     gnu.send(typed.as_bytes());
     neo.send(typed.as_bytes());

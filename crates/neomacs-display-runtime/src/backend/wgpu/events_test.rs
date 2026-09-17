@@ -127,22 +127,24 @@ fn input_event_default_all_zeroed() {
 
 #[test]
 fn input_event_field_mutation() {
-    let mut evt = NeomacsInputEvent::default();
-    evt.kind = NEOMACS_EVENT_KEY_PRESS;
-    evt.window_id = 42;
-    evt.timestamp = 123456789;
-    evt.x = -100;
-    evt.y = 200;
-    evt.keycode = 65; // 'A'
-    evt.keysym = 0x61; // 'a'
-    evt.modifiers = NEOMACS_CTRL_MASK | NEOMACS_SHIFT_MASK;
-    evt.button = 1;
-    evt.scroll_delta_x = 1.5;
-    evt.scroll_delta_y = -2.5;
-    evt.pixel_precise = 1;
-    evt.width = 1920;
-    evt.height = 1080;
-    evt.target_frame_id = 0xDEAD_BEEF;
+    let evt = NeomacsInputEvent {
+        kind: NEOMACS_EVENT_KEY_PRESS,
+        window_id: 42,
+        timestamp: 123456789,
+        x: -100,
+        y: 200,
+        keycode: 65,  // 'A'
+        keysym: 0x61, // 'a'
+        modifiers: NEOMACS_CTRL_MASK | NEOMACS_SHIFT_MASK,
+        button: 1,
+        scroll_delta_x: 1.5,
+        scroll_delta_y: -2.5,
+        pixel_precise: 1,
+        width: 1920,
+        height: 1080,
+        target_frame_id: 0xDEAD_BEEF,
+        ..Default::default()
+    };
 
     assert_eq!(evt.kind, 1);
     assert_eq!(evt.window_id, 42);
@@ -164,6 +166,7 @@ fn input_event_field_mutation() {
 // ---- EventKind traits ----
 
 #[test]
+#[allow(clippy::clone_on_copy)] // the test exercises Clone::clone, not Copy
 fn event_kind_clone_and_copy() {
     let a = EventKind::Scroll;
     let b = a; // Copy
@@ -188,10 +191,12 @@ fn event_kind_debug_format() {
 
 #[test]
 fn input_event_clone() {
-    let mut evt = NeomacsInputEvent::default();
-    evt.kind = NEOMACS_EVENT_SCROLL;
-    evt.scroll_delta_y = -3.0;
-    evt.modifiers = NEOMACS_META_MASK;
+    let evt = NeomacsInputEvent {
+        kind: NEOMACS_EVENT_SCROLL,
+        scroll_delta_y: -3.0,
+        modifiers: NEOMACS_META_MASK,
+        ..Default::default()
+    };
 
     let cloned = evt.clone();
     assert_eq!(cloned.kind, evt.kind);

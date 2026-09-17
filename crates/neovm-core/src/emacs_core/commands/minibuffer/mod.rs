@@ -1635,7 +1635,7 @@ pub(crate) fn builtin_abort_minibuffers_ctx(
         // Aborting this minibuffer also aborts every one nested inside it, so
         // GNU confirms first and then quits that many recursive edits at once.
         let levels = minibuf_level - minibuf_depth + 1;
-        let prompt = Value::string(&format!("Abort {levels} minibuffer levels? "));
+        let prompt = Value::string(format!("Abort {levels} minibuffer levels? "));
         if eval
             .apply(Value::symbol("yes-or-no-p"), vec![prompt])?
             .is_truthy()

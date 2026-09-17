@@ -1,5 +1,5 @@
-//! Combo: compare-buffer-substrings + EIEIO state tracking + overlays
-//! + markers + textprop + buflocal + narrow + undo.
+//! Combo: compare-buffer-substrings + EIEIO state tracking + overlays +
+//! markers + textprop + buflocal + narrow + undo.
 //! Tests cross-buffer comparison with EIEIO objects managing diff state.
 
 use crate::common::assert_oracle_parity;

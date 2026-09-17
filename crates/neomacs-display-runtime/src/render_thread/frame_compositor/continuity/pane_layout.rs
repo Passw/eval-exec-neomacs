@@ -1328,9 +1328,12 @@ fn split_spans_at(spans: Vec<Span>, boundary: f32) -> Vec<Span> {
 }
 
 /// One rectangle of the old picture that a shrinking pane has not vacated.
+///
+/// Only its extent and axis matter: `entry_offset` reads them to slide an
+/// entering pane in through the gap. The old pixels inside the strip are
+/// placed by `place`, which cuts the shrinking pane's picture into bands.
 struct VacatedStrip {
     bounds: Rect,
-    content_origin: (f32, f32),
     axis: StripAxis,
 }
 
@@ -1345,17 +1348,8 @@ enum StripAxis {
 }
 
 /// The strips of `bounds` that lie beyond what the pane will keep.
-///
-/// Anchored to the pane's *old* rect, not to the screen: the strip shows the
-/// picture that was under this pane, so as a pane that both moves and shrinks
-/// travels, the old text travels with it rather than standing still while the
-/// pane slides out from under it.
 fn vacated_strips(from: Rect, to: Rect, bounds: Rect) -> impl Iterator<Item = VacatedStrip> {
-    let strip = move |rect: Rect, axis: StripAxis| VacatedStrip {
-        bounds: rect,
-        content_origin: old_picture_origin(from, bounds, rect),
-        axis,
-    };
+    let strip = |rect: Rect, axis: StripAxis| VacatedStrip { bounds: rect, axis };
     // Gated on the *change* being a shrink, not on the instantaneous width.
     // Reading only `bounds` meant a GROWING pane briefly measured wider than
     // its destination while overshooting, and published an opaque slab of

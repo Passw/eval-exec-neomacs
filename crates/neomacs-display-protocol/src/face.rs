@@ -725,7 +725,7 @@ impl Face {
         self.fontset_base_family
             .as_deref()
             .filter(|family| !family.is_empty())
-            .unwrap_or_else(|| {
+            .unwrap_or({
                 if self.font_family.is_empty() {
                     "monospace"
                 } else {

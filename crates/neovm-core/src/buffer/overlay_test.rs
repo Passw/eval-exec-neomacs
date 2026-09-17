@@ -1605,7 +1605,7 @@ fn content_digest_moves_for_span_property_and_deep_plist_changes() {
         for index in 0..7 {
             list.overlay_put(
                 overlay,
-                Value::symbol(&format!("filler-{index}")),
+                Value::symbol(format!("filler-{index}")),
                 Value::fixnum(index),
             )
             .unwrap();

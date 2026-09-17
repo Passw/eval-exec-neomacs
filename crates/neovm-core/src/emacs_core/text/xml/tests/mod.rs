@@ -399,7 +399,7 @@ fn libxml_parse_html_region_routes_head_elements_and_transitions_to_body() {
         Value::list(vec![
             Value::symbol("html"),
             Value::NIL,
-            head_title.clone(),
+            head_title,
             body(vec![Value::list(vec![
                 Value::symbol("p"),
                 Value::NIL,

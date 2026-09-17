@@ -1,5 +1,5 @@
-//! Combo: cl-eieio region operations + kill-ring + overlays + markers
-//! + textprop + buflocal + narrow + undo.
+//! Combo: cl-eieio region operations + kill-ring + overlays + markers +
+//! textprop + buflocal + narrow + undo.
 //! Tests complex region operations (kill-region, yank, yank-pop, exchange-point-and-mark)
 //! with EIEIO objects, overlays, markers, and narrowing.
 

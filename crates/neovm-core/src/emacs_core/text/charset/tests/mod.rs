@@ -1381,7 +1381,7 @@ fn decode_encode_round_trip() {
     let decoded = builtin_decode_char(vec![Value::symbol("unicode"), Value::fixnum(code)]).unwrap();
     let cp = decoded.as_int().unwrap();
     let encoded = builtin_encode_char(vec![Value::fixnum(cp), Value::symbol("unicode")]).unwrap();
-    assert!(encoded.as_fixnum().map_or(false, |n| n == code));
+    assert!(encoded.as_fixnum().is_some_and(|n| n == code));
 }
 
 #[test]

@@ -2021,7 +2021,7 @@ fn translate_key_modifier_keys_suppressed() {
         NamedKey::Shift,
         NamedKey::Control,
         NamedKey::Alt,
-        NamedKey::Super,
+        NamedKey::Meta,
         NamedKey::CapsLock,
         NamedKey::NumLock,
     ];

@@ -9,8 +9,8 @@
 
 use neomacs_display_protocol::FrameFaceMap;
 use neomacs_display_protocol::TerminalColor;
+use neomacs_display_protocol::face::FaceAttributes;
 use neomacs_display_protocol::face::UnderlineStyle;
-use neomacs_display_protocol::face::{Face, FaceAttributes};
 use neomacs_display_protocol::frame_chrome::FrameChromeContent;
 use neomacs_display_protocol::frame_glyphs::{CursorStyle, GlyphRowRole};
 use neomacs_display_protocol::glyph_matrix::*;
@@ -18,7 +18,6 @@ use neomacs_display_protocol::tty_capabilities::{
     ColorGround, TtyAttributeCapabilities, TtyAttributeExit, TtyFaceAppearance, TtyItalicRendition,
 };
 use neomacs_display_protocol::types::{DisplayWindowId, FaceId, Rect, ResolvedBidiDirection};
-use std::collections::HashMap;
 
 #[path = "painter.rs"]
 pub mod painter;

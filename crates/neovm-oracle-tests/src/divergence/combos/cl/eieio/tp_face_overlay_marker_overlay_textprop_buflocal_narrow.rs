@@ -1,7 +1,7 @@
 //! Combo: cl-eieio text-property face vs overlay face interplay
 //! + markers + buflocal + narrow + undo.
-//! Tests the complex interaction between text property faces and overlay faces,
-//! including priority resolution, face merging, and undo behavior.
+//!   Tests the complex interaction between text property faces and overlay faces,
+//!   including priority resolution, face merging, and undo behavior.
 
 use crate::common::assert_oracle_parity;
 use crate::common::return_if_neovm_enable_oracle_proptest_not_set;

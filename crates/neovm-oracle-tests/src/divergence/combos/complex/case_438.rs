@@ -1,7 +1,7 @@
 //! Complex combo batch 438 — 16 deep characterization probes targeting
 //! known divergence areas: display column + overlay + invisible,
-//! eight-bit + multibyte + coding + comparison, overlay-lists + delete
-//! + create, set-buffer-multibyte + save-restriction + marker,
+//! eight-bit + multibyte + coding + comparison, overlay-lists + delete +
+//! create, set-buffer-multibyte + save-restriction + marker,
 //! case-fold + char-equal + string-equal-ignore-case Greek,
 //! string-collate + locale-coding-system, encode-time + time-add + format,
 //! make-network-process + make-pipe-process + process-id.

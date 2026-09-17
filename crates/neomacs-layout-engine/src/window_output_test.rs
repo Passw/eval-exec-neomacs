@@ -832,8 +832,8 @@ fn publish_text_window_cursor_installs_selected_phys_cursor_without_window_curso
     let phys = state.phys_cursor.expect("selected phys cursor");
     assert_eq!(phys.slot_id.col, 2);
     assert_eq!(state.window_matrices[0].matrix.rows[0].cursor_col, Some(2));
-    assert_eq!(outcome.installed_cursor_artifact, false);
-    assert_eq!(outcome.stored_phys_cursor, true);
+    assert!(!outcome.installed_cursor_artifact);
+    assert!(outcome.stored_phys_cursor);
     assert_eq!(outcome.row, 0);
     assert_eq!(outcome.row_col, 2);
 
@@ -1436,7 +1436,7 @@ fn install_text_window_body_output_records_redisplay_and_installs_rows() {
 
     let positions = install_text_window_body_output(
         TextWindowOutputTarget::from_builder(&mut builder),
-        &mut emitter,
+        &emitter,
         TextWindowBodyOutputInstall {
             window_id: 41,
             window_start: 3,

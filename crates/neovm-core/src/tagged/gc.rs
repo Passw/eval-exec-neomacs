@@ -33,7 +33,7 @@ use super::value::TaggedValue;
 use crate::emacs_core::bytecode::Op;
 use crate::emacs_core::bytecode::chunk::GnuByteOffsetMapEntry;
 use crate::emacs_core::intern::SymId;
-use crate::emacs_core::value::{HashKey, HashTableWeakness};
+use crate::emacs_core::value::HashTableWeakness;
 use crate::heap_types::LispStringStorageKind;
 use crate::tagged::symbol_marks::SymbolMarkBits;
 use malachite::integer::Integer;
@@ -237,8 +237,9 @@ fn next_tagged_heap_identity() -> usize {
 // TaggedHeap — the main GC-managed heap
 // ---------------------------------------------------------------------------
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 enum CanonicalEmptyString {
+    #[default]
     Missing,
     Owned(TaggedValue),
     Mapped(TaggedValue),
@@ -274,12 +275,6 @@ impl CanonicalEmptyString {
             // Keeping the first also makes old non-canonical dumps deterministic.
             Self::Mapped(existing) => existing,
         }
-    }
-}
-
-impl Default for CanonicalEmptyString {
-    fn default() -> Self {
-        Self::Missing
     }
 }
 
@@ -1771,7 +1766,7 @@ impl TaggedHeap {
                 logical_bytes: bytes.len(),
                 capacity_bytes: bytes.owned_bytes(),
                 owned: bytes.owned_bytes() > 0,
-                mapped: bytes.owned_bytes() == 0 && bytes.len() > 0,
+                mapped: bytes.owned_bytes() == 0 && !bytes.is_empty(),
             });
         }
         stats = stats.add(PayloadLayout {
@@ -2313,10 +2308,10 @@ mod concurrent;
 mod incremental;
 
 mod cons_blocks;
-pub use cons_blocks::*;
+use cons_blocks::*;
 
 mod arena_pages;
-pub use arena_pages::*;
+pub(crate) use arena_pages::*;
 
 mod gc_thread;
 pub use gc_thread::*;

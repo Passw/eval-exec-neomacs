@@ -163,12 +163,14 @@ pub(crate) fn aset_string_replacement(
     Ok(*array)
 }
 
-/// `aset` for callers that own their argument vector (the subr table).
+/// `aset` for callers that own their argument vector (now only the unit
+/// tests).
 ///
 /// Delegates to the slice form: nothing in the body needs ownership, and the
 /// VM's hot paths already hold their three arguments on the stack. Requiring a
 /// `Vec` there cost a `SmallVec` clone plus a heap allocation per `aset`
 /// (`dhrystone`: 370,708 clones and 305,131 `Vec::from_iter` calls).
+#[cfg(test)]
 pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
     builtin_aset_args(&args)
 }

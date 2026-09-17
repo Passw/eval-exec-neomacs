@@ -6,6 +6,7 @@
 //! equivalent builtin-only forms are substituted:
 //!   - `with-temp-buffer BODY` → `(save-current-buffer (set-buffer BUF) (unwind-protect BODY (kill-buffer BUF)))`
 //!   - `(setq-default SYM VAL)` → `(set-default 'SYM VAL)`
+//!
 //! The tested semantics are identical; only the syntactic sugar differs.
 
 use crate::emacs_core::eval::Context;

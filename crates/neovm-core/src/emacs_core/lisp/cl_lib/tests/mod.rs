@@ -805,8 +805,8 @@ fn cl_gensym_default_prefix() {
             let name = resolve_sym(id);
             assert!(name.starts_with('G'));
             let eval = super::super::eval::Context::new();
-            assert!(eval.obarray().intern_soft(&name).is_none());
-            let canonical = intern(&name);
+            assert!(eval.obarray().intern_soft(name).is_none());
+            let canonical = intern(name);
             assert_ne!(id, canonical);
             assert_eq!(resolve_sym(canonical), name);
         }
@@ -823,7 +823,7 @@ fn cl_gensym_custom_prefix() {
             let name = resolve_sym(id);
             assert!(name.starts_with("vm-gensym-"));
             let eval = super::super::eval::Context::new();
-            assert!(eval.obarray().intern_soft(&name).is_none());
+            assert!(eval.obarray().intern_soft(name).is_none());
         }
         other => panic!("expected symbol, got {other:?}"),
     }
@@ -838,7 +838,7 @@ fn cl_gensym_integer_uses_explicit_suffix_without_interning() {
             let name = resolve_sym(id);
             assert_eq!(name, "G9");
             let eval = super::super::eval::Context::new();
-            assert!(eval.obarray().intern_soft(&name).is_none());
+            assert!(eval.obarray().intern_soft(name).is_none());
         }
         other => panic!("expected symbol, got {other:?}"),
     }

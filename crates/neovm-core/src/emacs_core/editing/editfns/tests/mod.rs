@@ -231,7 +231,7 @@ fn erase_buffer_widens_before_deleting_current_contents() {
     }
 
     let result = erase_buffer_impl(&obarray, &dynamic, &mut buffers, vec![]);
-    assert!(result.as_ref().map_or(false, |v| v.is_nil()));
+    assert!(result.as_ref().is_ok_and(|v| v.is_nil()));
 
     let buf = buffers.get(current).expect("buffer after erase");
     assert_eq!(buf.buffer_string(), "");

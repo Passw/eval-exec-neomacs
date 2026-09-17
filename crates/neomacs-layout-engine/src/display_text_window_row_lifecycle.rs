@@ -457,15 +457,15 @@ impl<'a> TextWindowFinishState<'a> {
         tab_line_height: i64,
     ) -> WindowDisplaySnapshot {
         close_text_window_output(self.output);
-        let snapshot = self.output_emitter.finish_snapshot_with_geometry(
+
+        self.output_emitter.finish_snapshot_with_geometry(
             self.evaluator,
             cell_origin,
             regions,
             mode_line_height,
             header_line_height,
             tab_line_height,
-        );
-        snapshot
+        )
     }
 }
 

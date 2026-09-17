@@ -671,6 +671,7 @@ fn image_frame_char_cell_pixels(eval: &Context, frame_arg: Option<&Value>) -> Op
 /// - plist includes a supported symbolic `:type`
 /// - plist includes exactly one source key: `:file` or `:data`
 /// - source value is a string
+///
 /// Whether VALUE is an image specification accepted by `imagep`.
 /// Redisplay uses the same validation before accepting a replacement.
 pub fn is_image_spec(value: &Value) -> bool {
@@ -735,11 +736,9 @@ fn image_spec_plist(spec: &Value) -> Value {
     if items.is_empty() {
         return Value::NIL;
     }
-    if let Some(name) = items[0].as_symbol_name() {
-        if name == "image" {
-            // Plist is everything after the `image` symbol.
-            return Value::list(items[1..].to_vec());
-        }
+    if items[0].as_symbol_name() == Some("image") {
+        // Plist is everything after the `image` symbol.
+        return Value::list(items[1..].to_vec());
     }
     // Already a bare plist.
     *spec

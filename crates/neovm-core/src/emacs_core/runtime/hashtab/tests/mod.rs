@@ -12,7 +12,7 @@ fn hash_table_keys_values_basics() {
     let table = Value::hash_table(HashTableTest::Equal);
     if table.is_hash_table() {
         let _ = table.with_hash_table_mut(|raw| {
-            let test = raw.test.clone();
+            let test = raw.test;
             let key_alpha = Value::symbol("alpha").to_hash_key(&test);
             raw.insert(key_alpha, Value::symbol("alpha"), Value::fixnum(1));
             let key_beta = Value::symbol("beta").to_hash_key(&test);
@@ -403,7 +403,7 @@ fn sxhash_float_signed_zero_and_nan_semantics_match_oracle() {
         Value::fixnum(-2_305_843_009_213_693_952)
     );
 
-    let nan = Value::make_float(0.0_f64 / 0.0_f64);
+    let nan = Value::make_float(f64::NAN);
     let nan_eql = builtin_sxhash_eql(vec![nan]).unwrap();
     let nan_equal = builtin_sxhash_equal(vec![nan]).unwrap();
     assert_eq!(nan_eql, nan_equal);
@@ -655,7 +655,7 @@ fn internal_hash_table_buckets_report_hash_diagnostics() {
     .expect("hash table");
     if table.is_hash_table() {
         let _ = table.with_hash_table_mut(|raw| {
-            let test = raw.test.clone();
+            let test = raw.test;
             let key_a = Value::string("a").to_hash_key(&test);
             raw.insert(key_a, Value::string("a"), Value::symbol("value-a"));
             let key_b = Value::string("b").to_hash_key(&test);

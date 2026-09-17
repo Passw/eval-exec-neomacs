@@ -199,6 +199,9 @@ impl Flow {
 /// [`EvalError`]'s variants name it in a public enum's interface; it has all-
 /// private fields and no public constructor.)
 pub(crate) trait InFlightPinned {
+    // Never called: this method is the seal (its return type is only
+    // constructible here), and the compile-time guarantee IS the product.
+    #[allow(dead_code)]
     fn in_flight_roots(&self) -> &InFlightRoots;
 }
 
@@ -208,6 +211,7 @@ pub struct ThrowData {
     pub tag: Value,
     pub value: Value,
     /// See [`SignalData::pin`]. PRIVATE, so `Flow::throw` is the only way in.
+    #[allow(dead_code)] // held for its Drop (the GC pin); read only via the sealed trait
     pin: InFlightRoots,
 }
 
@@ -232,6 +236,7 @@ pub struct ThreadBlockedData {
     pub remaining_forms: Value,
     /// See [`SignalData::pin`]. PRIVATE, so `Flow::thread_blocked` is the only
     /// way in.
+    #[allow(dead_code)] // held for its Drop (the GC pin); read only via the sealed trait
     pin: InFlightRoots,
 }
 
@@ -267,6 +272,7 @@ pub struct SignalData {
     /// private field cannot be built from a literal elsewhere, so every
     /// construction site has to go through [`SignalData::new`], which pins.
     /// See [`InFlightRoots`] for why the pin is needed at all.
+    #[allow(dead_code)] // held for its Drop (the GC pin); read only via the sealed trait
     pin: InFlightRoots,
 }
 

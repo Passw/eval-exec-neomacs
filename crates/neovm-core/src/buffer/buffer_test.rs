@@ -1095,14 +1095,14 @@ fn implemented_text_backends_match_buffer_swap_text_side_effects() {
             assert_eq!(right_marker.as_marker_data().unwrap().buffer, Some(left_id));
             assert_eq!(left_marker.as_marker_data().unwrap().buffer, Some(right_id));
             assert_eq!(
-                marker_chain_lookup_for_test(&left_after, 502).map(|(b, c, _)| (b, c)),
+                marker_chain_lookup_for_test(left_after, 502).map(|(b, c, _)| (b, c)),
                 Some((
                     right_marker_pos,
                     char_pos_for_byte(left_after, right_marker_pos)
                 ))
             );
             assert_eq!(
-                marker_chain_lookup_for_test(&right_after, 501).map(|(b, c, _)| (b, c)),
+                marker_chain_lookup_for_test(right_after, 501).map(|(b, c, _)| (b, c)),
                 Some((
                     left_marker_pos,
                     char_pos_for_byte(right_after, left_marker_pos)
@@ -2379,7 +2379,7 @@ fn run_manager_edit_entrypoint_script(
         point_char: buf.point_char_pos().get(),
         mark_byte: buf.mark_emacs_byte_pos().map(|pos| pos.get()),
         mark_char: buf.mark_char_pos().map(|pos| pos.get()),
-        marker_position: marker_chain_anchor_for_test(&buf, 99),
+        marker_position: marker_chain_anchor_for_test(buf, 99),
         text_properties: buffer_text_property_snapshot(buf),
         undo: undo_list_snapshot(buf.get_undo_list()),
     }

@@ -396,15 +396,14 @@ pub const MOVE_TEXT_MELPA_PIN: (&str, &str) = ("move-text", "20260508.508");
 /// The exact MMM Mode package selected for ERB parsing, submode transitions,
 /// fontification, regexp/region management, narrowing, indentation dispatch,
 /// mode-extension activation, cleanup, and invalid-class errors. MELPA built
+/// this archive from upstream commit `b1f5c7dbdc405e6e10d9ddd99a43a6b2ad61b176`.
+pub const MMM_MODE_MELPA_PIN: (&str, &str) = ("mmm-mode", "20240222.428");
 
 /// The exact multi-term package selected for practical terminal buffer list
 /// management, next/prev switching, dedicated window open/close/toggle, and
 /// buffer naming. MELPA built this archive from upstream commit
 /// `017c77c550115936860e2ea71b88e585371475d5`.
 pub const MULTI_TERM_MELPA_PIN: (&str, &str) = ("multi-term", "20200514.428");
-
-/// this archive from upstream commit `b1f5c7dbdc405e6e10d9ddd99a43a6b2ad61b176`.
-pub const MMM_MODE_MELPA_PIN: (&str, &str) = ("mmm-mode", "20240222.428");
 
 /// The exact modus-themes package selected for practical theme catalog loading,
 /// light/dark toggle, palette lookup, contrast measurement, and background-mode
@@ -545,6 +544,8 @@ pub const PYIM_MELPA_PIN: (&str, &str) = ("pyim", "20251230.809");
 /// The exact pythonic package selected by the practical path-alias, Tramp
 /// connection, Docker Compose, synchronous/asynchronous process, and
 /// virtual-environment parity corpus. MELPA built this archive from upstream
+/// commit f6e0bec552319341f260a5c4740288799c2b3a5b.
+pub const PYTHONIC_MELPA_PIN: (&str, &str) = ("pythonic", "20230821.1733");
 
 /// The exact pyenv-mode package selected for practical version set/unset,
 /// mode-line indication, keymap, and pythonic activation parity. MELPA built
@@ -556,9 +557,6 @@ pub const PYENV_MODE_MELPA_PIN: (&str, &str) = ("pyenv-mode", "20230821.1645");
 /// archive from upstream commit
 /// `dbbfaa9bbfa1e330f4d9ec81b3793fbb2a297ecd`.
 pub const PYTHON_MODE_MELPA_PIN: (&str, &str) = ("python-mode", "20260710.1059");
-
-/// commit f6e0bec552319341f260a5c4740288799c2b3a5b.
-pub const PYTHONIC_MELPA_PIN: (&str, &str) = ("pythonic", "20230821.1733");
 
 /// The exact Pyvenv package selected for practical activation, executable
 /// dispatch, environment restoration, workon discovery, directory tracking,
@@ -2839,15 +2837,14 @@ pub const ORG_REF_MELPA_PIN: (&str, &str) = ("org-ref", "20251206.1422");
 /// synchronization, node metadata and lookup, links and backlinks, node
 /// editing, dedicated buffers, and autosync lifecycle parity. MELPA built
 /// version 2.3.1 from upstream commit
+/// `c54c523dec175695645399705606ea19056a3053`.
+pub const ORG_ROAM_MELPA_PIN: (&str, &str) = ("org-roam", "20260425.1623");
 
 /// The exact orderless package selected for practical multi-component
 /// completion styles, filtering, try-completion, match highlighting, and
 /// affix dispatch. MELPA built this archive from upstream commit
 /// `cebe19e3cf0f30604d1ed1bfaa74fff21a4e89a5`.
 pub const ORDERLESS_MELPA_PIN: (&str, &str) = ("orderless", "20260519.1029");
-
-/// `c54c523dec175695645399705606ea19056a3053`.
-pub const ORG_ROAM_MELPA_PIN: (&str, &str) = ("org-roam", "20260425.1623");
 
 /// The exact Org Superstar package selected for practical headline, TODO,
 /// plain-list, ordered-list, source-block, hook, accessor, restart, and
@@ -3404,13 +3401,12 @@ pub const COLOR_THEME_SANITYINC_TOMORROW_MELPA_PIN: (&str, &str) =
 pub const DEVDOCS_MELPA_PIN: (&str, &str) = ("devdocs", "20251022.1255");
 
 /// The exact f package selected by the comprehensive API parity corpus.
+pub const F_MELPA_PIN: (&str, &str) = ("f", "20241003.1131");
 
 /// The exact fuzzy package selected for practical Jaro-Winkler scoring,
 /// fuzzy completions, search regexps, and isearch activation. MELPA built
 /// this archive from upstream commit `3dc04f0a037d53d1174a1f38dce8a4b3498fa947`.
 pub const FUZZY_MELPA_PIN: (&str, &str) = ("fuzzy", "20251231.1622");
-
-pub const F_MELPA_PIN: (&str, &str) = ("f", "20241003.1131");
 
 /// The exact fringe-helper package selected for practical fringe bitmap
 /// conversion, definition, point/region insertion, removal, and stock library
@@ -3556,13 +3552,12 @@ pub const GPTEL_MELPA_PIN: (&str, &str) = ("gptel", "20260812.1855");
 /// The exact Helm package selected by the practical source, matching, action,
 /// completion, imenu, and occur parity corpus, and as audacious' runtime
 /// user-interface dependency.
+pub const HELM_MELPA_PIN: (&str, &str) = ("helm", "20260728.709");
 
 /// The exact helpful package selected for practical help buffer formatting,
 /// alias resolution, and pretty-print paths. MELPA built this archive from
 /// upstream commit `03756fa6ad4dcca5e0920622b1ee3f70abfc4e39`.
 pub const HELPFUL_MELPA_PIN: (&str, &str) = ("helpful", "20250408.334");
-
-pub const HELM_MELPA_PIN: (&str, &str) = ("helm", "20260728.709");
 
 /// The exact Helm Org Rifle package selected for practical public search,
 /// occur, navigation, timestamp-sort compatibility, directory-discovery, and
@@ -3804,14 +3799,13 @@ pub const PROJECTILE_MELPA_PIN: (&str, &str) = ("projectile", "20260728.945");
 
 /// The exact s package selected by the live lifecycle and comprehensive API
 /// parity corpora.
+pub const S_MELPA_PIN: (&str, &str) = ("s", "20220902.1511");
 
 /// The exact sesman package selected for practical generic session lifecycle,
 /// linking (buffer/directory/project), and multi-system registration parity.
 /// MELPA built this archive from upstream commit
 /// `7eb733acb33e610a53979fa7fc13393eeda3cc53`.
 pub const SESMAN_MELPA_PIN: (&str, &str) = ("sesman", "20260616.1239");
-
-pub const S_MELPA_PIN: (&str, &str) = ("s", "20220902.1511");
 
 /// The exact Shrink Path package selected for practical eshell/modeline
 /// rendering, file labels, real filesystem expansion, ambiguity, and mixed
@@ -3901,6 +3895,7 @@ pub const DIMINISH_MELPA_PIN: (&str, &str) = ("diminish", "20220909.847");
 /// navigation, selective staging, revert, unsaved flydiff, reference-revision,
 /// and mode-lifecycle parity. MELPA built this archive from upstream commit
 /// `91fcd4fa42fef895a754e80c4435ae6314be7822`.
+pub const DIFF_HL_MELPA_PIN: (&str, &str) = ("diff-hl", "20260723.238");
 
 /// The exact dired-quick-sort package selected for practical persistent Dired
 /// listing switch formatting, sort criteria, reverse/group toggles, and setup
@@ -3914,8 +3909,6 @@ pub const DIRED_QUICK_SORT_MELPA_PIN: (&str, &str) = ("dired-quick-sort", "20260
 /// MELPA built this archive from upstream commit
 /// `fe72d2e42ee18bf6228bba9d7086de4098f18a70`.
 pub const DIREDFL_MELPA_PIN: (&str, &str) = ("diredfl", "20241201.1141");
-
-pub const DIFF_HL_MELPA_PIN: (&str, &str) = ("diff-hl", "20260723.238");
 
 /// The exact Dockerfile Mode package selected for practical multi-stage
 /// editing, fontification, Imenu, indentation, comments, image naming, and
@@ -3944,14 +3937,13 @@ pub const DOOM_MODELINE_MELPA_PIN: (&str, &str) = ("doom-modeline", "20260708.82
 /// The exact Doom Themes package selected for practical full-catalog loading,
 /// dark/light switching, code fontification, typography policy, custom face
 /// composition, palette derivation, and Org extension parity. MELPA built this
+/// archive from upstream commit `53645a905dfb3055db52f5d418d5ef612027e062`.
+pub const DOOM_THEMES_MELPA_PIN: (&str, &str) = ("doom-themes", "20260117.2323");
 
 /// The exact drag-stuff package selected for practical line/word/region
 /// dragging vertically and horizontally with minor-mode bindings. MELPA built
 /// this archive from upstream commit `d49fe376d24f0f8ac5ade67b6d7fccc2487c81db`.
 pub const DRAG_STUFF_MELPA_PIN: (&str, &str) = ("drag-stuff", "20161108.749");
-
-/// archive from upstream commit `53645a905dfb3055db52f5d418d5ef612027e062`.
-pub const DOOM_THEMES_MELPA_PIN: (&str, &str) = ("doom-themes", "20260117.2323");
 
 /// The exact Dotenv Mode package selected for practical environment-file
 /// detection, mixed assignment syntax, quote-sensitive interpolation,
@@ -3963,15 +3955,14 @@ pub const DOTENV_MODE_MELPA_PIN: (&str, &str) = ("dotenv-mode", "20191027.2129")
 /// The exact Visual Fill Column package selected for practical soft-wrapping,
 /// centered and right-to-left layouts, text scaling, multi-window resizing,
 /// hook lifecycle, and file-buffer global-mode parity. MELPA built this archive
+/// from upstream commit `9c0ecc2af21d3024a2a838c30d574e86265a52be`.
+pub const VISUAL_FILL_COLUMN_MELPA_PIN: (&str, &str) = ("visual-fill-column", "20251110.1039");
 
 /// The exact Vertico package selected for practical vertical completion UI
 /// mode, candidate cycling/navigation helpers, sorting, and minibuffer
 /// integration. MELPA built this archive from upstream commit
 /// `be96000c2b0b3501723291b3721ceba12f784dcd`.
 pub const VERTICO_MELPA_PIN: (&str, &str) = ("vertico", "20260805.1129");
-
-/// from upstream commit `9c0ecc2af21d3024a2a838c30d574e86265a52be`.
-pub const VISUAL_FILL_COLUMN_MELPA_PIN: (&str, &str) = ("visual-fill-column", "20251110.1039");
 
 /// The exact Column Enforce Mode package selected for practical code-width,
 /// comment policy, incremental editing, contextual limits, interactive rules,
@@ -4081,15 +4072,14 @@ pub const YASNIPPET_MELPA_PIN: (&str, &str) = ("yasnippet", "20250602.1342");
 pub const YASNIPPET_SNIPPETS_MELPA_PIN: (&str, &str) = ("yasnippet-snippets", "20251215.1231");
 
 /// The exact Transient package selected by the comprehensive API parity
+/// corpus.
+pub const TRANSIENT_MELPA_PIN: (&str, &str) = ("transient", "20260725.1105");
 
 /// The exact tagedit package selected for practical HTML tag insertion,
 /// attribute editing, slurp/barf, raise/splice/split/join, and multiline
 /// toggle parity. MELPA built this archive from upstream commit
 /// `b3a70101a0dcf85498c92b7fcfa7fdbac869746c`.
 pub const TAGEDIT_MELPA_PIN: (&str, &str) = ("tagedit", "20161121.855");
-
-/// corpus.
-pub const TRANSIENT_MELPA_PIN: (&str, &str) = ("transient", "20260725.1105");
 
 /// The exact Transpose Frame package selected for practical window-tree
 /// transpose, flip, flop, 180/90-degree rotate, dedicated-window, and

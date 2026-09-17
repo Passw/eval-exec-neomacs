@@ -58,7 +58,7 @@ fn test_media_type_equality() {
 fn test_media_type_clone_copy() {
     let t = MediaType::Image;
     let t2 = t; // Copy
-    let t3 = t.clone(); // Clone
+    let t3 = t; // Clone
     assert_eq!(t, t2);
     assert_eq!(t, t3);
 }
@@ -267,7 +267,7 @@ fn test_touch_reverses_eviction_order_within_same_type() {
 
     let candidates = budget.get_eviction_candidates(30);
     // Should evict 2 first (oldest), then 3
-    assert!(candidates.len() >= 1);
+    assert!(!candidates.is_empty());
     assert_eq!(candidates[0], (MediaType::Image, 2));
     if candidates.len() >= 2 {
         assert_eq!(candidates[1], (MediaType::Image, 3));

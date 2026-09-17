@@ -1173,7 +1173,7 @@ mod tests {
     fn rope_unibyte_raw_bytes_round_trip() {
         let raw = vec![0xFF, b'A', 0x80];
         let mut backend = RopeTextBackend::from_emacs_bytes(&raw, false);
-        insert_rope_bytes_both(&mut backend, 1, &[b'\n'], 1);
+        insert_rope_bytes_both(&mut backend, 1, b"\n", 1);
 
         assert!(!backend.is_multibyte());
         assert_eq!(backend.metrics().chars_usize(), 4);
