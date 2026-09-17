@@ -768,7 +768,24 @@ impl crate::emacs_core::eval::Context {
             total_chars: buffer.total_char_len(),
             total_emacs_bytes: buffer.total_emacs_byte_len(),
             prefixes: self.layout_prefix_inputs(buffer_id)?,
+            invisibility: self.layout_invisibility_input(buffer_id)?,
         })
+    }
+
+    /// Capture ordered invisibility membership and ellipsis selection by value.
+    pub fn layout_invisibility_input(
+        &self,
+        buffer_id: BufferId,
+    ) -> Option<super::LayoutInvisibilityInput> {
+        let buffer = self.buffers.get(buffer_id)?;
+        Some(super::LayoutInvisibilityInput::capture(
+            self.obarray
+                .value_in_buffer_id(
+                    Some(buffer),
+                    super::WindowLayoutVariable::BufferInvisibilitySpec.sym_id(),
+                )
+                .unwrap_or(Value::NIL),
+        ))
     }
 
     /// Capture effective buffer-local prefix values, never references to mutable

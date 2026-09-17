@@ -76,6 +76,13 @@ with an iterative, cycle-aware traversal. No live Lisp references are retained.
 Image/resource expressions and mutations inside a string's property value remain
 audit items, not a claim of complete mutable-Lisp-graph invalidation.
 
+`LayoutInvisibilityInput` captures the effective buffer's ordered invisibility
+membership, including each cons entry's category and ellipsis truthiness.
+In-place `setcar`/`setcdr` changes therefore participate in both the shared
+freshness projection and retained-row key. This follows GNU's identity-based
+membership checks; it does not deep-copy category objects or interpret non-nil
+ellipsis tails beyond their truthiness.
+
 Source backtracking retreats past display/invisibility spans covering a
 newline before measuring forward. Producer-owned row metadata distinguishes
 buffer rows, replacement newlines, replacement wraps, and before/after overlay

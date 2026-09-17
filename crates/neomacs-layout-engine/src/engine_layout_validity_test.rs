@@ -6,6 +6,10 @@ fn assert_prefix_mutation_invalidates_geometry(variable: &str, mutation: &str) {
 }
 
 fn assert_prefix_spec_mutation_invalidates_geometry(variable: &str, initial: &str, mutation: &str) {
+    assert_layout_mutation_invalidates_geometry(&format!("(setq {variable} {initial})"), mutation);
+}
+
+fn assert_layout_mutation_invalidates_geometry(setup: &str, mutation: &str) {
     let mut eval = Context::new();
     let buffer = eval.buffer_manager().current_buffer().unwrap().id();
     eval.buffer_manager_mut()
@@ -16,10 +20,8 @@ fn assert_prefix_spec_mutation_invalidates_geometry(variable: &str, initial: &st
         .frame_manager_mut()
         .create_frame("prefix-freshness", 160, 160, buffer);
     let window = eval.frame_manager().get(frame).unwrap().selected_window;
-    eval.eval_str(&format!(
-        r#"(progn (goto-char 1) (setq {variable} {initial}))"#
-    ))
-    .unwrap();
+    eval.eval_str(&format!(r#"(progn (goto-char 1) {setup})"#))
+        .unwrap();
     let mut engine = LayoutEngine::new_without_font_metrics();
     engine.layout_frame_rust(&mut eval, frame);
     let original = eval
@@ -31,7 +33,7 @@ fn assert_prefix_spec_mutation_invalidates_geometry(variable: &str, initial: &st
     engine.layout_frame_rust(&mut eval, frame);
     assert!(
         engine.last_layout_stats().reused_rows > 0,
-        "unchanged prefixes retain row reuse"
+        "unchanged inputs retain row reuse"
     );
     let before = eval
         .window_layout_attempt_freshness(frame, window, buffer)
@@ -78,16 +80,66 @@ fn assert_prefix_spec_mutation_invalidates_geometry(variable: &str, initial: &st
     );
     assert_ne!(
         before, after,
-        "in-flight attempts detect the same prefix mutation"
+        "in-flight attempts detect the same input mutation"
     );
-    assert!(full_windows > 0, "prefix changes invalidate row reuse");
+    assert!(full_windows > 0, "input changes invalidate row reuse");
     assert_eq!(
         &measured, reference,
         "synchronous query agrees with redisplay"
     );
     assert!(
         !stale_accepted,
-        "geometry from before a prefix width change must not be reported fresh"
+        "geometry from before a layout input change must not be reported fresh"
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_invisibility_membership() {
+    assert_layout_mutation_invalidates_geometry(
+        "(setq buffer-invisibility-spec (list 'hidden)) (put-text-property 1 11 'invisible 'hidden)",
+        "(setcar buffer-invisibility-spec 'visible)",
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_invisibility_ellipsis() {
+    assert_layout_mutation_invalidates_geometry(
+        "(setq category (cons 'hidden nil) buffer-invisibility-spec (list category)) (put-text-property 1 31 'invisible 'hidden)",
+        "(setcdr category t)",
+    );
+}
+
+#[test]
+fn invisibility_freshness_tracks_ellipsis_truthiness_not_identity() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("invisibility", 160, 160, buffer);
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.eval_str("(setq category (cons 'hidden t) buffer-invisibility-spec (list category))")
+        .unwrap();
+    let before = eval
+        .window_layout_attempt_freshness(frame, window, buffer)
+        .unwrap();
+    eval.eval_str("(setcdr category 'another-non-nil-value)")
+        .unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(setcdr category nil)").unwrap();
+    assert_ne!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(setcdr category t)").unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
     );
 }
 

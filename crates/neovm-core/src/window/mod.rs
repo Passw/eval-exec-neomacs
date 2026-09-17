@@ -27,6 +27,8 @@ pub(crate) use display::WindowScrollUpdate;
 mod frame_params;
 pub mod geometry;
 mod history;
+mod invisibility_input;
+pub use invisibility_input::LayoutInvisibilityInput;
 mod parameters;
 pub mod part;
 mod pixel_input;
@@ -618,6 +620,7 @@ pub struct BufferLayoutInputState {
     pub(crate) total_chars: CharLen,
     pub(crate) total_emacs_bytes: EmacsByteLen,
     pub(crate) prefixes: LayoutPrefixInputs,
+    pub(crate) invisibility: LayoutInvisibilityInput,
 }
 
 /// Owned prefix inputs shared by redisplay skipping, geometry freshness and

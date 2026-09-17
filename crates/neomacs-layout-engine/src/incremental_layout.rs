@@ -154,6 +154,7 @@ impl WindowDelta {
 #[derive(Clone, Debug, PartialEq)]
 pub struct RetainedWindowKey {
     pub prefixes: neovm_core::window::LayoutPrefixInputs,
+    pub invisibility: neovm_core::window::LayoutInvisibilityInput,
     /// Generation of asynchronously decoded media (see
     /// `Context::invalidate_media`). An image that finishes decoding changes
     /// none of the buffer ticks or geometry below, so without this term the
@@ -277,6 +278,9 @@ impl RetainedWindowKey {
             prefixes: evaluator
                 .layout_prefix_inputs(neovm_core::buffer::BufferId(p.buffer_id))
                 .unwrap_or_default(),
+            invisibility: evaluator
+                .layout_invisibility_input(neovm_core::buffer::BufferId(p.buffer_id))
+                .unwrap_or_default(),
             buffer_id: p.buffer_id,
             window_start: p.window_start,
             point: p.point,
@@ -392,6 +396,7 @@ impl RetainedWindowKey {
         }
         diff!(
             prefixes,
+            invisibility,
             media_generation,
             buffer_id,
             window_start,
@@ -1717,6 +1722,7 @@ mod scroll_classifier_tests {
     fn synthetic_key(window_start: i64, point: i64) -> RetainedWindowKey {
         RetainedWindowKey {
             prefixes: Default::default(),
+            invisibility: Default::default(),
             media_generation: 0,
             buffer_id: 1,
             window_start,
