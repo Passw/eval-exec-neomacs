@@ -6,6 +6,9 @@ use neomacs_gui_tests::{
     GuiScenario, GuiTestPlan, ProcessGuiCommandRunner,
 };
 
+#[path = "real_gui_smoke/scrolling.rs"]
+mod scrolling;
+
 #[test]
 fn real_gui_smoke_generates_surface_readback_png() {
     let Some(backend) = requested_backend() else {

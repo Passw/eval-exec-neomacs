@@ -124,4 +124,34 @@ NEOMACS_GUI_TEST_BACKEND=x11 cargo nextest run -p neomacs-gui-tests \
   -E 'test(real_gui_smoke)' > tmp/gui-smoke.log 2>&1
 ```
 
-(release binary required: `cargo build --release`.)
+(release binary and matching runtime required: `cargo xtask fresh-build --release`.)
+
+### Org image scrolling regressions
+
+The `real_gui_smoke::scrolling` tests exercise eight `C-v` commands followed
+by eight `M-v` commands in an Org buffer with variable-height text and a
+display-overlay image. One image fits in the window; another is taller than
+the window and must exercise pixel scrolling. Both must return to
+`window-start = 1`, with zero pixel offset, and stay there on repeated `M-v`.
+
+```sh
+NEOMACS_GUI_TEST_BACKEND=x11 cargo nextest run -p neomacs-gui-tests \
+  --test real_gui_smoke -E 'test(scrolling::)'
+```
+
+Set `NEOMACS_GUI_TEST_BINARY` when the fresh-built executable is outside
+`target/release/neomacs`. These tests run in the existing X11 GUI CI job;
+they are not ignored. Their fixture needs no third-party Lisp packages or
+network access.
+
+The test driver acknowledges three presentations: the initial image, the
+image scrolled out of view, and the image after scrolling back. It checks
+both the frame's image glyph and the actual PNG pixels before allowing the
+fixture to advance. This prevents a stale initial screenshot from passing
+the return-to-top assertion. Polling has a deadline; it does not assume the
+renderer finishes within a fixed sleep.
+
+Each run preserves `initial`, `away`, and `returned` JSON/PNG artifacts and
+a per-command point/start/pixel-offset trace under
+`target/neomacs-gui-tests/{org-banner-scroll,tall-org-image-scroll}-<pid>/`.
+The trace also detects scrolling away again after reaching the top.
