@@ -213,6 +213,21 @@ fn retained_geometry_rejects_mutated_wrap_prefix_image_margin() {
 }
 
 #[test]
+fn retained_geometry_rejects_mutation_late_in_long_image_spec() {
+    assert_layout_mutation_with_host(
+        r##"(setq image-margin (cons 0 0)
+                   image-properties (list :type 'png :file "prefix.png" :margin image-margin)
+                   n 0 line-prefix (copy-sequence " "))
+             (while (< n 256)
+               (setq image-properties (cons :unused (cons nil image-properties)) n (+ n 1)))
+             (put-text-property 0 1 'display (cons 'image image-properties) line-prefix)"##,
+        "(setcar image-margin 20)",
+        true,
+        Some(Box::new(RecordingImageDisplayHost::default())),
+    );
+}
+
+#[test]
 fn retained_presentation_rejects_mutated_prefix_stipple_bytes() {
     assert_decoration_mutation_invalidates_presentation(
         r##"(setq bitmap-data (copy-sequence "A"))

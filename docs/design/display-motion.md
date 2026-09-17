@@ -119,11 +119,21 @@ regressions cover in-place margin-pair mutations, including vector display
 containers on wrap prefixes. A deterministic host catalog supplies image extents;
 the tests exercise real layout and query paths, not image decoding.
 
+`ImageSpecIdentity` now owns a flat token stream for conses, ordinary vectors
+and strings. String identity uses character count plus raw bytes, following GNU
+`fns.c:internal_equal`; it does not require UTF-8 or retain text properties.
+Iterative traversal avoids the generic equal-key depth cutoff, and flat storage
+keeps hashing, comparison and destruction independent of list/vector nesting.
+Active-path references terminate cycles while separately allocated acyclic
+copies compare like shared subtrees. Other Lisp object kinds retain the existing
+generic equal-key semantics; this is not a general cyclic-graph equality engine.
+The representation is host-side machinery outside the GNU mirror, re-exported
+through the unchanged catalog API. Catalog-key tests cover binary ownership,
+hash lookup, deep structures and cycles; a layout regression changes a margin
+after 256 image-property pairs.
+
 This is not complete image invalidation: pixel-arithmetic image operands and
-external resource changes remain separate work. The existing catalog identity
-also inherits the generic equal-key implementation's depth limit and identity
-fallback for non-UTF-8 strings; binary image data and deeply nested specs need a
-catalog-level identity audit rather than a second, divergent freshness key.
+external resource changes remain separate work.
 This is not a claim of complete mutable-Lisp-graph invalidation.
 
 `LayoutInvisibilityInput` captures the effective buffer's ordered invisibility

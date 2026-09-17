@@ -6,7 +6,6 @@
 
 use crate::emacs_core::Value;
 use crate::emacs_core::symbol::Obarray;
-use crate::emacs_core::value::{HashKey, HashTableTest, list_to_vec};
 use crate::heap_types::LispString;
 use crate::window::Frame;
 pub use neomacs_display_protocol::ImageRealization as ResolvedImageRealization;
@@ -195,26 +194,7 @@ pub enum ImageResolveSource {
     Data(ImageDataSource),
 }
 
-/// Owned, structural identity of a complete GNU image specification.
-///
-/// The catalog must retain more than the parsed load recipe: type-specific
-/// keys such as `:index`, `:mask`, and `:css` participate in GNU's `equal`
-/// comparison even when a particular decoder does not understand them yet.
-/// Converting the Lisp tree to an equal-hash key snapshots that identity
-/// without retaining unrooted Lisp heap pointers in the host catalog.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ImageSpecIdentity(HashKey);
-
-impl ImageSpecIdentity {
-    /// Snapshot a proper `(image ...)` specification using Lisp `equal`
-    /// semantics, matching GNU `search_image_cache` and `uncache_image`.
-    #[must_use]
-    pub fn from_lisp_spec(spec: &Value) -> Option<Self> {
-        let items = list_to_vec(spec)?;
-        (items.first()?.as_symbol_name() == Some("image"))
-            .then(|| Self(spec.to_hash_key(&HashTableTest::Equal)))
-    }
-}
+pub use crate::image_identity::ImageSpecIdentity;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ImageResolveRequest {
