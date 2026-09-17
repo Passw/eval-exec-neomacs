@@ -657,8 +657,9 @@ impl Drop for FusedScope {
     }
 }
 
-/// `NEOVM_JIT_INLINE=on`: splice constant-bytecode callees into their caller
-/// before lowering. Off by default while the transform is proven out.
+/// Splice constant-bytecode callees into their caller before lowering. On by
+/// default; `NEOVM_JIT_INLINE=off` (or `0`/`false`/`no`) disables it, which is
+/// the A/B switch the measurements use.
 pub(crate) fn jit_inline_on() -> bool {
     #[cfg(test)]
     if let Some(forced) = FORCE_INLINE.with(|f| f.get()) {
@@ -667,9 +668,9 @@ pub(crate) fn jit_inline_on() -> bool {
     use std::sync::OnceLock;
     static ON: OnceLock<bool> = OnceLock::new();
     *ON.get_or_init(|| {
-        matches!(
+        !matches!(
             std::env::var("NEOVM_JIT_INLINE").ok().as_deref(),
-            Some("1" | "on" | "true" | "yes")
+            Some("0" | "off" | "false" | "no")
         )
     })
 }

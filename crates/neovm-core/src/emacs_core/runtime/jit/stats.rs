@@ -255,6 +255,13 @@ pub(super) fn record_compile(
     });
     if summary_enabled() && stats.total_compiles.is_multiple_of(64) {
         eprintln!("[neovm-jit-compile] {}", format_summary(&stats));
+        // The fuser records at compile time, so its census belongs with the
+        // compile summary: the dispatch-cadence print below can miss a body
+        // whose calls the fuser removed, since it then stops dispatching.
+        let inline = inline_census_summary(16);
+        if !inline.is_empty() {
+            eprintln!("[neovm-jit-inline] {inline}");
+        }
     }
 }
 
