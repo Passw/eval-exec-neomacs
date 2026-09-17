@@ -1,7 +1,7 @@
 //! Issue #395: native focus must determine where real keyboard input lands.
 //!
-//! Run explicitly until the bug is fixed:
-//! `cargo nextest run -p neomacs-gui-tests --test native_frame_focus --run-ignored only`
+//! Run against a fresh release runtime:
+//! `NEOMACS_GUI_TEST_BACKEND=x11 cargo nextest run -p neomacs-gui-tests --test native_frame_focus`
 //! `NEOMACS_GUI_TEST_BINARY` can also point to GNU Emacs for the same X11 scenario.
 
 #![cfg(target_os = "linux")]
@@ -20,8 +20,15 @@ use neomacs_gui_tests::{
 use serde_json::Value;
 
 #[test]
-#[ignore = "known bug #395: focus routes input to the old frame; requires Xvfb and xdotool"]
 fn native_x11_focus_routes_typing_to_the_focused_frame() {
+    match std::env::var("NEOMACS_GUI_TEST_BACKEND").ok().as_deref() {
+        Some("x11" | "linux-x11") => {}
+        None | Some("wayland" | "linux-wayland" | "macos" | "windows") => {
+            eprintln!("native focus test requires NEOMACS_GUI_TEST_BACKEND=x11");
+            return;
+        }
+        Some(other) => panic!("unsupported NEOMACS_GUI_TEST_BACKEND={other:?}"),
+    }
     let root = PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
     let artifacts = root.join(format!(
         "target/neomacs-gui-tests/native-frame-focus-{}",
@@ -32,7 +39,7 @@ fn native_x11_focus_routes_typing_to_the_focused_frame() {
     let session = DisplayHarness::Xvfb
         .start_session(&artifacts)
         .expect("isolated headless X11 display");
-    xdotool(session.env(), &["getdisplaygeometry"]).expect("X11 client connection");
+    wait_for_x11(session.env()).expect("X11 client connection");
     let binary = std::env::var_os("NEOMACS_GUI_TEST_BINARY")
         .map(PathBuf::from)
         .unwrap_or_else(|| root.join("target/release/neomacs"));
@@ -104,7 +111,24 @@ fn exercise_native_input(
 
     focus_window(env, &secondary)?;
     type_text(env, "bb")?;
-    expect_buffers(artifacts, "focus-secondary", "paa", "nbb", &finished)
+    expect_buffers(artifacts, "focus-secondary", "paa", "nbb", &finished)?;
+
+    // A held key is keyboard state, not a new press in the next frame.
+    // winit replays it as synthetic input on focus gain. GNU Emacs does not
+    // insert that replay. Keep this deterministic instead of racing a press
+    // against FocusIn and hoping to observe duplicate input.
+    focus_window(env, &primary)?;
+    xdotool(env, &["keydown", "c"])?;
+    expect_buffers(artifacts, "held-key", "paac", "nbb", &finished)?;
+    let result = (|| {
+        focus_window(env, &secondary)?;
+        type_text(env, "d")?;
+        expect_buffers(artifacts, "focus-held-key", "paac", "nbbd", &finished)
+    })();
+    let release = xdotool(env, &["keyup", "c"]);
+    result?;
+    release?;
+    Ok(())
 }
 
 fn expect_buffers(
@@ -176,6 +200,18 @@ fn wait_for_window(
             ));
         }
         thread::sleep(Duration::from_millis(20));
+    }
+}
+
+fn wait_for_x11(env: &[(String, String)]) -> Result<(), String> {
+    // Listening on TCP precedes accepting authenticated X11 clients.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        match xdotool(env, &["getdisplaygeometry"]) {
+            Ok(_) => return Ok(()),
+            Err(error) if Instant::now() >= deadline => return Err(error),
+            Err(_) => thread::sleep(Duration::from_millis(20)),
+        }
     }
 }
 

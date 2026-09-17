@@ -41,6 +41,25 @@ impl RenderApp {
         window_id: WindowId,
         event: WindowEvent,
     ) {
+        // On X11 and Windows, winit replays keys already held when a window
+        // gains focus. That is state synchronization, not another editor or
+        // menu command (GNU xterm.c handles focus separately from KeyPress).
+        // Keep synthetic releases flowing to consumers such as webviews so
+        // they can clear held-key state on focus loss. ModifiersChanged also
+        // remains independent of this text/command admission boundary.
+        if matches!(
+            &event,
+            WindowEvent::KeyboardInput {
+                is_synthetic: true,
+                event: KeyEvent {
+                    state: ElementState::Pressed,
+                    ..
+                },
+                ..
+            }
+        ) {
+            return;
+        }
         if let (Some(gpu), Some(renderer)) = (&self.gpu, &mut self.renderer) {
             if self
                 .tooltips

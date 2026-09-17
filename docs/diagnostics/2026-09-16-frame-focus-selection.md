@@ -29,6 +29,21 @@ now belongs to the shared window-selection transaction. The keyboard reader
 leaves a key (or decoded TTY character) queued while delivering its generated
 switch first, before translation, input-method processing or macro recording.
 
+Repeated native runs then exposed a separate frontend error: occasional extra
+characters, even though the destination buffer was now correct. Winit's X11
+focus handler queries currently held keys and replays them as
+`KeyboardInput { is_synthetic: true, .. }`. The desktop event dispatcher had
+discarded that provenance, interpreting the replay as a fresh press. A
+deterministic regression holds `c` in one frame while moving focus to the
+other: the old dispatcher inserts an extra `c`; GNU Emacs does not (three
+consecutive control runs passed).
+
+The desktop winit boundary now rejects synthetic **presses** before menus,
+tooltips, webviews or editor commands process them. It preserves synthetic
+**releases**, so consumers can clear held-key state, and leaves modifier and
+focus notifications intact. This uses the existing typed `WindowEvent` and
+`ElementState` variants; it does not add a parallel input-state abstraction.
+
 ## GNU reference
 
 Studied GNU `src/keyboard.c`, `src/frame.c`, and `lisp/frame.el` first:
@@ -48,6 +63,11 @@ Studied GNU `src/keyboard.c`, `src/frame.c`, and `lisp/frame.el` first:
 - On a genuine GUI frame change, the cached last input frame is cleared unless
   the destination is an ancestor. GNU avoids that reset on TTYs to prevent
   post-command selection loops.
+
+For the replay failure, GNU `src/xterm.c` handles focus notifications separately
+from key presses. Winit's `WindowEvent::KeyboardInput` contract documents held
+key replay on X11 and Windows; its X11 `xinput2_focused` and
+`handle_pressed_keys` implementations explain the observed duplicate.
 
 ## Ownership and design
 
@@ -82,7 +102,8 @@ Windows or Wayland test run.
 ## Regression coverage
 
 - Real X11 focus and keyboard events through `neomacs-gui-tests`, including
-  switches back and forth between two distinct frame buffers.
+  switches back and forth between two distinct frame buffers and a held-key
+  transfer that must not manufacture a new press in the destination.
 - Public Lisp selection, return value, prefix preservation and old-frame hook.
 - Focus-redirection preservation, both windows' points, and buffer history.
 - Deleted targets, malformed events, and deletion from the leave hook.
@@ -94,3 +115,39 @@ Windows or Wayland test run.
 The five new public Lisp contract forms were also run in GNU Emacs 31.1 under
 Xvfb. Their results matched the regression expectations exactly. The GNU probe
 used GUI `make-frame` instead of the core fixture's usable-terminal constructor.
+
+## Running the native regression
+
+Build the runnable editor and its matching runtime with `cargo xtask fresh-build
+--release`, then run:
+
+```sh
+NEOMACS_GUI_TEST_BACKEND=x11 \
+NEOMACS_GUI_TEST_BINARY="$PWD/target/release/neomacs" \
+cargo nextest run -p neomacs-gui-tests --test native_frame_focus --stress-count 10
+```
+
+The test owns an isolated Xvfb display and requires `Xvfb`, `xauth`, and
+`xdotool`. No desktop window manager is required: it sets and verifies actual
+X11 keyboard focus. It runs automatically with the normal X11 GUI suite, and
+does not run for other backends. To use GNU Emacs as a control, set
+`NEOMACS_GUI_TEST_BINARY` to its executable instead. If fresh-build uses a
+separate runtime root, also export the matching `NEOMACS_RUNTIME_ROOT`.
+
+The final default-feature `neovm-core` library run passed all 10,023 tests
+(53 skipped); the focused input/frame/window run passed all 149 tests. The
+enabled X11 fixture passed five consecutive runs against GNU Emacs 31.1.
+
+After the desktop replay fix, `cargo xtask fresh-build --release --low-memory`
+completed successfully with an isolated runtime root. The expanded native
+regression, including the held-key transfer, passed **20/20** stress runs
+against that executable (and **3/3** GNU control runs).
+
+The full GUI run passed 27 tests, failed two, and skipped 54. The two failures
+were also present in the pre-fix baseline:
+
+- `oversized_xwidget_keeps_its_intrinsic_page_visible_behind_the_window_clip`
+- `static_xwidget_page_survives_renderer_device_replacement`
+
+Thus the focus regression is green; the full GUI suite is not wholly green.
+The native runtime validation here is Linux X11, not native Windows or Wayland.
