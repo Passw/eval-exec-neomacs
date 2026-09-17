@@ -3565,7 +3565,7 @@ impl LayoutEngine {
         // certified as fresh.
         let freshness_after_leaf =
             evaluator.window_layout_attempt_freshness(frame_id, window_id, buf_id);
-        let lisp_boundaries_remain_valid = match (&render_outcome, freshness_after_leaf) {
+        let lisp_boundaries_remain_valid = match (&render_outcome, &freshness_after_leaf) {
             (
                 BufferSourceRenderAttemptOutcome::Finished {
                     freshness_before_chrome,
@@ -3574,7 +3574,7 @@ impl LayoutEngine {
                 Some(freshness_after_leaf),
             ) => {
                 freshness_after_fontification.remains_valid_across(
-                    *freshness_before_chrome,
+                    freshness_before_chrome,
                     neovm_core::window::WindowLayoutLispBoundary::BufferBody,
                 ) && freshness_before_chrome.remains_valid_across(
                     freshness_after_leaf,
@@ -3582,7 +3582,7 @@ impl LayoutEngine {
                 )
             }
             (_, Some(freshness_after_leaf)) => {
-                freshness_after_leaf == freshness_after_fontification
+                freshness_after_leaf == &freshness_after_fontification
             }
             (_, None) => false,
         };

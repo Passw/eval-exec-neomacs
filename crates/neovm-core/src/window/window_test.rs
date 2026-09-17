@@ -2042,10 +2042,10 @@ fn layout_freshness_types_late_chrome_cache_writes_separately_from_body_mutation
         .expect("freshness after chrome cache write");
 
     assert!(
-        !before.remains_valid_across(after_chrome_cache, WindowLayoutLispBoundary::BufferBody,)
+        !before.remains_valid_across(&after_chrome_cache, WindowLayoutLispBoundary::BufferBody,)
     );
     assert!(
-        before.remains_valid_across(after_chrome_cache, WindowLayoutLispBoundary::WindowChrome,)
+        before.remains_valid_across(&after_chrome_cache, WindowLayoutLispBoundary::WindowChrome,)
     );
 
     eval.buffer_manager_mut()
@@ -2057,7 +2057,7 @@ fn layout_freshness_types_late_chrome_cache_writes_separately_from_body_mutation
         .expect("freshness after body mutation");
     assert!(
         !after_chrome_cache
-            .remains_valid_across(after_body_mutation, WindowLayoutLispBoundary::WindowChrome,)
+            .remains_valid_across(&after_body_mutation, WindowLayoutLispBoundary::WindowChrome,)
     );
 }
 

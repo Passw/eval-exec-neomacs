@@ -30,6 +30,9 @@ mod line_spacing;
 #[path = "engine_display_motion_test.rs"]
 mod display_motion;
 
+#[path = "engine_layout_validity_test.rs"]
+mod layout_validity;
+
 fn test_image_load(id: u32) -> neomacs_display_protocol::ImageLoadToken {
     neomacs_display_protocol::ImageLoadToken::new(
         neomacs_display_protocol::ImageId::new(id),

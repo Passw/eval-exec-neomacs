@@ -105,8 +105,11 @@ pub(super) fn query(
     if motion_window(eval, Some(window), buffer) != Some((frame, window)) {
         return Err(failed("Window changed during display motion"));
     }
-    if snapshot.layout_freshness.is_some_and(|freshness| {
-        Some(freshness) != eval.window_display_snapshot_freshness(frame, window, buffer)
+    if snapshot.layout_freshness.as_ref().is_some_and(|freshness| {
+        Some(freshness)
+            != eval
+                .window_display_snapshot_freshness(frame, window, buffer)
+                .as_ref()
     }) {
         return Err(failed("Display motion query returned stale rows"));
     }

@@ -605,7 +605,7 @@ pub struct WindowLayoutInputState {
 }
 
 /// Buffer inputs that can change display-row positions or geometry.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BufferLayoutInputState {
     pub(crate) id: BufferId,
     pub(crate) modified_tick: i64,
@@ -616,6 +616,47 @@ pub struct BufferLayoutInputState {
     pub(crate) accessible_bytes: EmacsByteRange,
     pub(crate) total_chars: CharLen,
     pub(crate) total_emacs_bytes: EmacsByteLen,
+    pub(crate) prefixes: LayoutPrefixInputs,
+}
+
+/// Owned prefix inputs shared by redisplay skipping, geometry freshness and
+/// row reuse. String contents can change without a buffer modification tick.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct LayoutPrefixInputs {
+    line: LayoutPrefixInput,
+    wrap: LayoutPrefixInput,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+enum LayoutPrefixInput {
+    #[default]
+    Missing,
+    String {
+        identity: usize,
+        bytes: std::sync::Arc<[u8]>,
+        multibyte: bool,
+        properties_tick: u64,
+    },
+    // Non-string display specs retain the existing identity contract. This
+    // snapshot does not claim to detect mutations inside arbitrary Lisp graphs.
+    Other(usize),
+}
+
+impl LayoutPrefixInput {
+    fn capture(value: Option<Value>) -> Self {
+        let Some(value) = value else {
+            return Self::Missing;
+        };
+        match value.as_lisp_string() {
+            Some(string) => Self::String {
+                identity: value.bits(),
+                bytes: string.as_bytes().into(),
+                multibyte: string.is_multibyte(),
+                properties_tick: string.intervals().mutation_tick(),
+            },
+            None => Self::Other(value.bits()),
+        }
+    }
 }
 
 /// Every Lisp variable whose effective value is read by window layout.
@@ -2577,7 +2618,7 @@ pub struct WindowDisplaySnapshot {
 /// Construction and comparison live on `Context`; keeping these fields opaque
 /// prevents individual snapshot consumers from inventing partial freshness
 /// checks that drift apart.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WindowDisplaySnapshotFreshness {
     pub(crate) context_instance_id: u64,
     pub(crate) window_topology_generation: u64,
@@ -2603,7 +2644,7 @@ pub struct WindowDisplaySnapshotFreshness {
 /// occurs, so that token contains monotonic mutation epochs. An in-flight
 /// attempt instead compares canonical state before and after Lisp callbacks:
 /// a scoped binding that restores its original value did not stale the rows.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WindowLayoutAttemptFreshness {
     context_instance_id: u64,
     window_topology_generation: u64,
@@ -2640,11 +2681,11 @@ impl WindowLayoutAttemptFreshness {
     /// added fields participate in the final equality automatically.  The two
     /// assignments below are the only explicitly permitted late-chrome
     /// mutations.
-    pub fn remains_valid_across(self, after: Self, boundary: WindowLayoutLispBoundary) -> bool {
+    pub fn remains_valid_across(&self, after: &Self, boundary: WindowLayoutLispBoundary) -> bool {
         match boundary {
             WindowLayoutLispBoundary::BufferBody => self == after,
             WindowLayoutLispBoundary::WindowChrome => {
-                let mut expected_after = self;
+                let mut expected_after = self.clone();
                 // GNU tab-line.el writes window-local caches such as
                 // `tab-line-buffers` while `display_mode_lines` is formatting
                 // chrome.  Face filters observe the new identity on the next
@@ -2655,7 +2696,7 @@ impl WindowLayoutAttemptFreshness {
                 // chrome already used the loaded definition, while the body
                 // precedes this phase in GNU and is not replayed.
                 expected_after.function_epoch = after.function_epoch;
-                expected_after == after
+                &expected_after == after
             }
         }
     }

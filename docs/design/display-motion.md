@@ -58,6 +58,17 @@ Errors from an installed row producer are errors, not permission to silently
 switch to a less capable text scanner. Batch/startup without that adapter
 retains the existing source-based path.
 
+Mutable string prefixes are captured by value, not just Lisp object identity.
+The shared `LayoutPrefixInputs` projection records effective buffer-local
+`line-prefix` and `wrap-prefix` string bytes, multibyteness, identity and string
+text-property revision. Redisplay skipping, retained-geometry freshness,
+in-flight validation and incremental row reuse all include that projection.
+Changing a prefix with `aset` or changing its text properties need not modify
+the buffer itself, but can still change every row's source-to-pixel mapping.
+Owned bytes are shared on clone; no mutable Lisp string is retained by this
+projection. Non-string display specs still use identity here: this does not
+claim complete invalidation for arbitrary nested mutable Lisp graphs.
+
 Source backtracking retreats past display/invisibility spans covering a
 newline before measuring forward. Producer-owned row metadata distinguishes
 buffer rows, replacement newlines, replacement wraps, and before/after overlay

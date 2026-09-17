@@ -767,6 +767,23 @@ impl crate::emacs_core::eval::Context {
             accessible_bytes: buffer.accessible_emacs_byte_region().range(),
             total_chars: buffer.total_char_len(),
             total_emacs_bytes: buffer.total_emacs_byte_len(),
+            prefixes: self.layout_prefix_inputs(buffer_id)?,
+        })
+    }
+
+    /// Capture effective buffer-local prefix values, never references to mutable
+    /// Lisp strings. Every geometry consumer uses this same projection.
+    pub fn layout_prefix_inputs(&self, buffer_id: BufferId) -> Option<super::LayoutPrefixInputs> {
+        let buffer = self.buffers.get(buffer_id)?;
+        let capture = |variable: super::WindowLayoutVariable| {
+            super::LayoutPrefixInput::capture(
+                self.obarray
+                    .value_in_buffer_id(Some(buffer), variable.sym_id()),
+            )
+        };
+        Some(super::LayoutPrefixInputs {
+            line: capture(super::WindowLayoutVariable::LinePrefix),
+            wrap: capture(super::WindowLayoutVariable::WrapPrefix),
         })
     }
 
@@ -813,8 +830,8 @@ impl crate::emacs_core::eval::Context {
     ) -> Option<&WindowDisplaySnapshot> {
         let current = self.window_display_snapshot_freshness(frame_id, window_id, buffer_id)?;
         let snapshot = self.frames.get(frame_id)?.redisplay_snapshot(window_id)?;
-        if let Some(recorded) = snapshot.layout_freshness {
-            return (recorded == current).then_some(snapshot);
+        if let Some(recorded) = &snapshot.layout_freshness {
+            return (recorded == &current).then_some(snapshot);
         }
         if let Some(recorded_modiff) = snapshot.buffer_modiff
             && recorded_modiff != current.buffer.modified_tick
