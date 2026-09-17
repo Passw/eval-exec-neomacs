@@ -16,8 +16,9 @@ Linux investigation found two head-of-line blockers in the shared VM
 frontend-event queue: pointer-hit observations that were not serviced during
 waits, and focus events incorrectly hidden from the command reader by its
 pending-input filter. Both shared paths have fixes; validation is recorded below.
-A rarer Linux/X11 stall before native resize delivery remains under
-investigation. The issue is therefore not claimed fully resolved on every path.
+A rarer Linux/X11 stall before native resize delivery is now localized to
+buffered XCB events that do not wake winit's socket wait; that third path
+does not yet have a fix. The issue is therefore not claimed fully resolved on every path.
 The macOS path has not been run locally; the shared cause is consistent
 with the reporter's trace, not yet a native macOS verification.
 
@@ -350,8 +351,113 @@ is waiting on its channel. The native thread is not stuck inside GPU rendering.
 The log has resize callbacks through `1045x745`, but none for `1100x760`,
 while the external capture is already `1100x760`. The retained debugger dump
 is `target/neomacs-gui-tests/resize-2443843/linux-x11/idle-resize-presentation.gdb.txt`.
-This remains a separate unresolved native event-delivery observation, not a
-clean full-path stability result. No callback polling workaround has been added.
+The follow-up below locates that event in XCB's queue. It is not a clean
+full-path stability result. No callback polling workaround has been added.
+
+## Third path: XCB has the resize, but the native loop is asleep
+
+Follow-up investigation separates the native transport failure from both
+fixed VM queue blockers. The real editor reproduced it in three more
+independent diagnostic loops:
+
+| Run | Result |
+| --- | --- |
+| `tmp/issue-391-native-queue-serial-70.log` | Native window is `1100x760`, mode line remains at the penultimate size; winit is in `epoll_pwait`, Xlib reports zero queued events. |
+| `tmp/issue-391-xcb-queue-serial-22.log` | Same failure; read-only debugger inspection finds `ConfigureNotify(1100x760)` and `Expose` in the underlying XCB event queue. |
+| `tmp/issue-391-native-wake-control-8.log` | Same queued events. Detaching the debugger and waiting 500 ms leaves content stale; changing only the native window title then delivers the final resize and repairs the presentation. |
+
+The last capture is
+`target/neomacs-gui-tests/resize-2680830/linux-x11/idle-resize-presentation.gdb.txt`.
+Its significant state is:
+
+```text
+Native main thread: polling::Poller::wait -> calloop -> winit
+Xlib display: fd 4, queued 0
+XCB connection: fd 4, error 0
+Xlib pending replies: none; event_waiter: 0
+XCB queued event: ConfigureNotify, window 0x200003, 1100x760
+XCB queued event: Expose
+```
+
+The inspector only reads inferior memory; it does not call `XPending`,
+consume events, or write process state. Its offsets were checked against
+the exact release executable and local libX11 1.8.13 / libxcb 1.17.0
+disassembly, and validated on a healthy process before failure capture.
+The diagnostic files are `tmp/issue-391-xlib-queue.gdb.py` and
+`tmp/issue-391-native-drag-probe.rs`. These binary-specific offsets are
+investigation tools, not a production interface or portable regression test.
+The test still fails after the diagnostic recovery; the title change is
+not part of a passing resize assertion.
+
+This establishes that the final event was neither lost by the X server nor
+already delivered to Neomacs. It was buffered below Xlib's event queue
+while the native loop waited for socket readiness. The observed failure
+therefore cannot be repaired by changing VM input filtering again.
+
+### Smaller native-library reproduction
+
+`tmp/issue-391-winit-resize-probe.rs` removes the editor, Lisp, GPU, and
+rendering. It links the same winit revision, `f24b33399b870c3632788b885a51b8c21f0f1b5d`,
+creates a window on owned Xvfb, uses `ControlFlow::Wait`, resizes externally
+with `xdotool`, and requires the matching `SurfaceResized` callback within
+one second.
+
+Its only experimental variable is a worker calling the public
+`Window::surface_size()` interface until it observes the new native size,
+then stopping queries. Stopping matters: continuous queries generate more
+socket traffic and can mask the missing wake-up.
+
+| Experiment | Result |
+| --- | --- |
+| No concurrent geometry query | 5/5 processes pass, 500 resize callbacks each. |
+| Concurrent geometry query, then idle | 5/5 processes fail at zero-based resize steps 1, 2, 3, 0, and 3. |
+
+Logs are `tmp/issue-391-winit-{control,concurrent}-{1..5}.log`. Run the
+already-built diagnostic with:
+
+```sh
+./tmp/issue-391-winit-resize-probe
+NEOMACS_DIAG_CONCURRENT_QUERY=1 ./tmp/issue-391-winit-resize-probe
+```
+
+This is a fast native-library reproduction through public window methods,
+not a claim that Neomacs itself calls that getter from a worker during the
+captured failure. The exact competing reader in the complete editor has
+not yet been traced. The smaller reproduction demonstrates the underlying
+coordination defect without requiring a GPU driver to expose the timing.
+
+### Fix direction and limits
+
+In the pinned winit source, `event_loop.rs::has_pending` asks Xlib whether
+events are available before `poll_events_with_timeout` waits on the XCB
+socket through calloop. Meanwhile, `window.rs::surface_size_physical` uses
+an XCB geometry request/reply on that same connection. Socket readiness is
+not equivalent to queued native work when another consumer can receive
+packets and buffer events. The read-only capture establishes this distinction
+for the failing editor; the minimal probe exposes the concurrent-reader case.
+
+The intended fix should keep event reading, queued-work readiness, and
+wake-up ownership together in winit's X11 transport module. Its interface
+must guarantee that buffered work becomes visible to the event-loop owner
+without an unrelated input event. It must also account for consumers of
+the exported display handle, not just add a wake to one geometry getter.
+Keep Neomacs's visual GUI regression and add a public-interface native
+transport regression when implementing that fix.
+
+No periodic redraw, finite idle-poll timeout, Lisp observer, or connection
+layout access should enter production as a substitute for that contract.
+The existing GNU source comparison remains relevant: `XTread_socket`
+drains native work, and the GTK build delegates event-loop ownership to
+its toolkit. GNU's loop is not a drop-in implementation for winit's shared
+Xlib/XCB connection model.
+
+Reference implementation details were checked against
+[Xlib's pending-event entry points](https://github.com/mirror/libX11/blob/master/src/Pending.c),
+[its XCB queue integration](https://github.com/mirror/libX11/blob/master/src/xcb_io.c),
+and the local pinned winit source. None of these references establishes an
+upstream acknowledgement or an existing fix for this specific reproduction.
+
+No production change or winit-fork change has been made for this third path.
 
 Native
 macOS resizing still requires verification on macOS. Reuse the visual
