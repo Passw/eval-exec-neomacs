@@ -4697,7 +4697,7 @@ pub(crate) fn select_window(
         .frames
         .selected_frame()
         .is_none_or(|frame| frame.selected_window != wid);
-    let (record_selection, run_buffer_list_hook, frame_changed) = {
+    let (record_selection, run_buffer_list_hook, frame_changed, reset_input_frame) = {
         let (frames, buffers) = (&mut eval.frames, &mut eval.buffers);
         let selected_fid = ensure_selected_frame_id_in_state(frames, buffers);
         // GNU `select_window' derives WINDOW_FRAME and selects that frame when
@@ -4722,6 +4722,11 @@ pub(crate) fn select_window(
             }
         }
         let frame_changed = fid != selected_fid;
+        let reset_input_frame = frame_changed
+            && frames
+                .get(fid)
+                .is_some_and(|frame| frame.effective_window_system().is_some())
+            && !frames.frame_ancestor_p(fid, selected_fid);
         if frame_changed && !frames.select_frame_with_focus_tracking(fid, focus_tracking) {
             return Err(signal(
                 LispCondition::WrongTypeArgument,
@@ -4748,7 +4753,12 @@ pub(crate) fn select_window(
         let run_buffer_list_hook = record_selection
             && selected_window_buffer_state_in_frame(frames, fid)
                 .is_some_and(|(_, buffer_id)| !buffers.buffer_hooks_inhibited(buffer_id));
-        (record_selection, run_buffer_list_hook, frame_changed)
+        (
+            record_selection,
+            run_buffer_list_hook,
+            frame_changed,
+            reset_input_frame,
+        )
     };
     if frame_changed {
         eval.sync_keyboard_terminal_owner();
@@ -4765,6 +4775,16 @@ pub(crate) fn select_window(
     }
     if record_selection && run_buffer_list_hook {
         super::builtins::run_buffer_list_update_hook(eval)?;
+    }
+    // GNU select_window crosses frames through Fselect_frame/do_switch_frame.
+    // Invalidate its cached input owner for a non-ancestor GUI switch, so a
+    // subsequent physical key can reselect its source without a new focus
+    // notification. Do not reset TTYs, where post-command selection can loop.
+    if reset_input_frame {
+        eval.command_loop
+            .keyboard
+            .kboard
+            .clear_internal_last_event_frame();
     }
     Ok(window_value(wid))
 }

@@ -5075,6 +5075,13 @@ impl crate::emacs_core::eval::Context {
             }
             InputEvent::TtyCharacter { character, target } => {
                 self.route_tty_keyboard_input(target);
+                if self.command_loop.keyboard.has_unread_selection_event() {
+                    self.command_loop
+                        .keyboard
+                        .pending_input_events
+                        .push_front(InputEvent::TtyCharacter { character, target });
+                    return Ok(None);
+                }
                 self.clear_current_message_for_keyboard_input();
                 let raw_event = Value::fixnum(i64::from(character.code()));
                 // GNU compares the quit character against the byte the
@@ -5194,10 +5201,22 @@ impl crate::emacs_core::eval::Context {
                 Ok(self.make_lispy_select_window_event(window_id))
             }
             InputEvent::KeyPress {
-                ref key,
+                key,
                 emacs_frame_id,
             } => {
                 self.route_keyboard_input_to_frame(emacs_frame_id);
+                if self.command_loop.keyboard.has_unread_selection_event() {
+                    // GNU kbd_buffer_get_event returns switch-frame first and
+                    // leaves the original key in the queue. Do not translate,
+                    // record or feed this key to an input method twice.
+                    self.command_loop.keyboard.pending_input_events.push_front(
+                        InputEvent::KeyPress {
+                            key,
+                            emacs_frame_id,
+                        },
+                    );
+                    return Ok(None);
+                }
                 tracing::debug!("read_char: received KeyPress {:?}", key);
                 self.clear_current_message_for_keyboard_input();
                 let raw_event = key.to_emacs_event_value();

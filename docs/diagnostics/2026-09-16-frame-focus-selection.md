@@ -21,6 +21,14 @@ stub in `builtins/stubs.rs`: it checked its argument, then returned nil without
 selecting anything. Existing tests asserted that placeholder return value and
 never exercised editing in a newly focused frame.
 
+A follow-up regression covered a programmatic cross-frame `select-window`
+without any native focus notification. It exposed two further ordering gaps:
+that path did not clear the cached input frame, and a frame-tagged key could
+queue a switch but still be returned before it. Selection-cache invalidation
+now belongs to the shared window-selection transaction. The keyboard reader
+leaves a key (or decoded TTY character) queued while delivering its generated
+switch first, before translation, input-method processing or macro recording.
+
 ## GNU reference
 
 Studied GNU `src/keyboard.c`, `src/frame.c`, and `lisp/frame.el` first:
@@ -80,6 +88,8 @@ Windows or Wayland test run.
 - Deleted targets, malformed events, and deletion from the leave hook.
 - `NORECORD` and consistent frame/window/buffer observations in update hooks.
 - Stateless dispatch rejection and bytecode dispatch of the real handler.
+- Cross-frame programmatic window selection followed by a physical key from
+  the still-focused frame, without a new focus notification.
 
 The five new public Lisp contract forms were also run in GNU Emacs 31.1 under
 Xvfb. Their results matched the regression expectations exactly. The GNU probe

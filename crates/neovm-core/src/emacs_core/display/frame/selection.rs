@@ -75,19 +75,6 @@ fn switch_frame(
         return Ok(Value::make_frame(id.0));
     }
     let window = frame.selected_window;
-    let reset_input_frame = frame.effective_window_system().is_some()
-        && previous.is_some_and(|old| !eval.frames.frame_ancestor_p(id, old));
-
     crate::emacs_core::window_cmds::select_window(eval, window, norecord, focus_tracking)?;
-
-    // GNU invalidates the cached input frame after a non-ancestor GUI switch,
-    // so the next physical key can select its actual source again. Do not do
-    // this for TTYs: post-command selection can otherwise loop indefinitely.
-    if reset_input_frame {
-        eval.command_loop
-            .keyboard
-            .kboard
-            .clear_internal_last_event_frame();
-    }
     Ok(Value::make_frame(id.0))
 }

@@ -1,4 +1,4 @@
-use crate::emacs_core::{Context, format_eval_result};
+use crate::emacs_core::{Context, Value, format_eval_result};
 
 fn eval_with_frames(source: &str) -> String {
     let mut eval = Context::new();
@@ -129,4 +129,45 @@ fn select_frame_honors_norecord_and_publishes_consistent_selection_to_hooks() {
         ),
         "OK (t (t t) t)"
     );
+}
+
+#[test]
+fn cross_frame_select_window_does_not_steal_the_next_physical_key() {
+    use crate::keyboard::{InputEvent, KeyEvent};
+
+    let mut eval = Context::new();
+    let buffer = eval.buffers.create_buffer("*scratch*");
+    eval.buffers.set_current(buffer);
+    let first = eval.frames.create_frame("first", 800, 600, buffer);
+    let other_buffer = eval.buffers.create_buffer("target");
+    let second = eval.frames.create_frame("second", 800, 600, other_buffer);
+    for id in [first, second] {
+        eval.frames
+            .get_mut(id)
+            .unwrap()
+            .set_window_system(Some(Value::symbol("neo")));
+    }
+    eval.obarray_mut()
+        .set_symbol_value("test-second-frame", Value::make_frame(second.0));
+    let (tx, rx) = crossbeam_channel::unbounded();
+    eval.init_input_system(rx);
+    tx.send(InputEvent::key_press_in_frame(KeyEvent::char('a'), first.0))
+        .unwrap();
+    assert_eq!(eval.read_char().unwrap(), Value::fixnum('a' as i64));
+
+    eval.eval_str("(select-window (frame-selected-window test-second-frame))")
+        .unwrap();
+    tx.send(InputEvent::key_press_in_frame(KeyEvent::char('b'), first.0))
+        .unwrap();
+    // No new native focus notification: the first window still owns the
+    // keyboard. GNU do_switch_frame explicitly documents this select-window
+    // case as the reason to clear its cached last event frame.
+    assert_eq!(
+        eval.read_char().unwrap(),
+        Value::list(vec![
+            Value::symbol("switch-frame"),
+            Value::make_frame(first.0),
+        ])
+    );
+    assert_eq!(eval.read_char().unwrap(), Value::fixnum('b' as i64));
 }

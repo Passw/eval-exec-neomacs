@@ -1693,9 +1693,21 @@ fn read_char_switches_active_kboard_to_keypress_source_frame_terminal() {
     ))
     .unwrap();
 
-    let event = ev.read_char().expect("read_char should return a keypress");
-    assert_eq!(event, Value::fixnum('z' as i64));
+    let event = ev
+        .read_char()
+        .expect("read_char should select the source frame first");
+    assert_eq!(
+        event,
+        Value::list(vec![
+            Value::symbol("switch-frame"),
+            Value::make_frame(secondary.0)
+        ])
+    );
     assert_eq!(ev.command_loop.keyboard.active_terminal_id(), 7);
+    assert_eq!(
+        ev.read_char().expect("the original key stays queued"),
+        Value::fixnum('z' as i64)
+    );
     assert_eq!(
         ev.command_loop.keyboard.input_decode_map(),
         Value::NIL,
