@@ -7,6 +7,33 @@ use neomacs_gui_tests::{DisplayHarness, GuiArtifactSet, GuiBackend};
 
 #[test]
 fn real_gui_resize_does_not_ghost_the_previous_presentation() {
+    run_resize_test(ResizeScenario::StartupText);
+}
+
+#[test]
+fn idle_gui_resize_updates_content_without_keyboard_or_mouse_input() {
+    run_resize_test(ResizeScenario::IdleEmpty);
+}
+
+#[test]
+fn idle_split_gui_resize_updates_content_without_keyboard_or_mouse_input() {
+    run_resize_test(ResizeScenario::IdleSplit);
+}
+
+#[derive(Clone, Copy)]
+enum ResizeScenario {
+    StartupText,
+    IdleEmpty,
+    IdleSplit,
+}
+
+impl ResizeScenario {
+    fn is_idle(self) -> bool {
+        matches!(self, Self::IdleEmpty | Self::IdleSplit)
+    }
+}
+
+fn run_resize_test(scenario: ResizeScenario) {
     if !x11_backend_requested() {
         return;
     }
@@ -22,11 +49,18 @@ fn real_gui_resize_does_not_ghost_the_previous_presentation() {
     );
 
     let backend = GuiBackend::LinuxX11;
-    let artifact_root = workspace_root.join("target/neomacs-gui-tests");
+    let artifact_root = workspace_root
+        .join("target/neomacs-gui-tests")
+        .join(format!("resize-{}", std::process::id()));
     let session = DisplayHarness::for_backend(backend)
         .start_session(&artifact_root)
         .expect("display session should start");
-    let artifacts = GuiArtifactSet::new(&artifact_root, backend, "resize-presentation");
+    let name = match scenario {
+        ResizeScenario::StartupText => "resize-presentation",
+        ResizeScenario::IdleEmpty => "idle-resize-presentation",
+        ResizeScenario::IdleSplit => "idle-split-resize-presentation",
+    };
+    let artifacts = GuiArtifactSet::new(&artifact_root, backend, name);
     std::fs::create_dir_all(
         artifacts
             .png
@@ -34,10 +68,8 @@ fn real_gui_resize_does_not_ghost_the_previous_presentation() {
             .expect("resize artifact should have a parent"),
     )
     .expect("resize artifact directory");
-    let before_png = artifacts
-        .png
-        .with_file_name("resize-presentation.before.png");
-    let ready_path = artifacts.png.with_file_name("resize-presentation.ready");
+    let before_png = artifacts.png.with_file_name(format!("{name}.before.png"));
+    let ready_path = artifacts.png.with_file_name(format!("{name}.ready"));
     for path in [
         &before_png,
         &artifacts.png,
@@ -64,9 +96,17 @@ fn real_gui_resize_does_not_ghost_the_previous_presentation() {
         .env("NEOMACS_LOG_FILE", &artifacts.neomacs_log)
         .env("NEOMACS_DUMP_FRAME_GLYPHS", "1")
         .env("NEOMACS_GUI_RESIZE_READY", &ready_path)
+        .env_remove("NEOMACS_GUI_RESIZE_AFTER_IDLE")
+        .env_remove("NEOMACS_GUI_RESIZE_SPLIT")
         .env("RUST_LOG", "info")
         .stdout(Stdio::from(stdout))
         .stderr(Stdio::from(stderr));
+    if scenario.is_idle() {
+        command.env("NEOMACS_GUI_RESIZE_AFTER_IDLE", "1");
+    }
+    if let ResizeScenario::IdleSplit = scenario {
+        command.env("NEOMACS_GUI_RESIZE_SPLIT", "1");
+    }
     let child = command.spawn().expect("start Neomacs resize fixture");
     let pid = child.id();
     let mut child = KillOnDrop(Some(child));
@@ -77,8 +117,34 @@ fn real_gui_resize_does_not_ghost_the_previous_presentation() {
     let (before, old_mode_rows) =
         wait_for_red_mode_line(session.env(), &window, &before_png, Duration::from_secs(12));
 
+    if scenario.is_idle() {
+        // The one-shot idle callback has reported readiness. Let it return
+        // before issuing the native resize; no periodic Lisp observer runs.
+        thread::sleep(Duration::from_millis(300));
+    }
+
     let new_width = 1100_u32;
     let new_height = 760_u32;
+    if scenario.is_idle() {
+        // Replay the reporter's burst of native size notifications, instead
+        // of testing only one isolated resize during startup.
+        for step in 1..8 {
+            let width = (before.width() * (8 - step) + new_width * step) / 8;
+            let height = (before.height() * (8 - step) + new_height * step) / 8;
+            run_x11_tool(
+                session.env(),
+                "xdotool",
+                [
+                    "windowsize",
+                    "--sync",
+                    &window,
+                    &width.to_string(),
+                    &height.to_string(),
+                ],
+            );
+            thread::sleep(Duration::from_millis(20));
+        }
+    }
     run_x11_tool(
         session.env(),
         "xdotool",
@@ -90,6 +156,22 @@ fn real_gui_resize_does_not_ghost_the_previous_presentation() {
             &new_height.to_string(),
         ],
     );
+    if scenario.is_idle() {
+        // Observe the actual presentation, not a VM log or a Lisp polling
+        // timer (which could itself wake redisplay and mask the bug).
+        // The bottom mode line must remain the same distance from the
+        // bottom of the native window, and span its new width.
+        let bottom_inset = before.height() - old_mode_rows.last().unwrap();
+        wait_for_resized_mode_line(
+            session.env(),
+            &window,
+            &artifacts.png,
+            (new_width, new_height),
+            bottom_inset,
+            Duration::from_secs(3),
+        );
+        return;
+    }
     wait_for_log(
         &artifacts.neomacs_log,
         &format!("size={new_width}x{new_height}"),
@@ -181,7 +263,7 @@ fn wait_for_x11_window(pid: u32, display_env: &[(String, String)], timeout: Dura
     let started = Instant::now();
     loop {
         let output = Command::new("xdotool")
-            .args(["search", "--pid", &pid.to_string()])
+            .args(["search", "--onlyvisible", "--pid", &pid.to_string()])
             .envs(display_env.iter().map(|(key, value)| (key, value)))
             .output()
             .expect("run xdotool search");
@@ -295,6 +377,45 @@ fn red_tinted_rows(image: &image::RgbaImage) -> Vec<u32> {
             red_pixels > image.width() as usize / 2
         })
         .collect()
+}
+
+fn wait_for_resized_mode_line(
+    display_env: &[(String, String)],
+    window: &str,
+    output_path: &Path,
+    size: (u32, u32),
+    bottom_inset: u32,
+    timeout: Duration,
+) {
+    let started = Instant::now();
+    loop {
+        capture_x11_window(display_env, window, output_path);
+        let image = image::open(output_path)
+            .expect("decode resized window capture")
+            .to_rgba8();
+        let expected_row = size.1.saturating_sub(bottom_inset);
+        let wide_red_row = image.dimensions() == size
+            && (expected_row.saturating_sub(2)..=(expected_row + 2).min(size.1 - 1)).any(|y| {
+                let red_pixels = (0..size.0)
+                    .filter(|&x| is_red_tinted(image.get_pixel(x, y).0))
+                    .count();
+                red_pixels * 10 >= size.0 as usize * 9
+            });
+        if wide_red_row {
+            return;
+        }
+        assert!(
+            started.elapsed() < timeout,
+            "content did not resize without keyboard or mouse input within {timeout:?}: \
+             expected mode line at y={expected_row} spanning width {}, \
+             actual image {:?}, red rows {:?}; capture={}",
+            size.0,
+            image.dimensions(),
+            red_tinted_rows(&image),
+            output_path.display(),
+        );
+        thread::sleep(Duration::from_millis(20));
+    }
 }
 
 fn is_red_tinted([red, green, blue, _alpha]: [u8; 4]) -> bool {
