@@ -215,9 +215,45 @@ fn display_harness_reports_missing_linux_display_inputs() {
 
 #[cfg(target_os = "linux")]
 #[test]
-fn x11_session_owns_authenticated_tcp_display_below_workspace_tmp() {
+fn wayland_session_owns_runtime_below_long_artifact_root() {
+    let root = PathBuf::from(env!("CARGO_WORKSPACE_DIR"))
+        .join("target/neomacs-gui-tests")
+        .join(format!(
+            "long-wayland-{}-{}",
+            std::process::id(),
+            "x".repeat(100)
+        ));
+    let session = DisplayHarness::for_backend(GuiBackend::LinuxWayland)
+        .start_session(&root)
+        .expect("owned Wayland session tolerates a long checkout path");
+    let get = |key: &str| {
+        session
+            .env()
+            .iter()
+            .find(|(name, _)| name == key)
+            .unwrap()
+            .1
+            .clone()
+    };
+    let runtime = PathBuf::from(get("XDG_RUNTIME_DIR"));
+    let owned_runtime = runtime.canonicalize().unwrap();
+    assert!(owned_runtime.starts_with(root.canonicalize().unwrap()));
+    assert!(runtime.join(get("WAYLAND_DISPLAY")).exists());
+    drop(session);
+    assert!(
+        !owned_runtime.exists(),
+        "session must remove its owned runtime directory"
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn x11_session_owns_authenticated_tcp_display_below_artifact_root() {
     let workspace = PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
-    let root = workspace.join("tmp/neomacs-gui-tests-xvfb-contract");
+    let root = workspace.join(format!(
+        "target/neomacs-gui-tests/xvfb-contract-{}",
+        std::process::id()
+    ));
     assert!(
         !root.exists(),
         "refusing pre-existing owned test root {root:?}"
@@ -330,14 +366,14 @@ fn test_plan_injects_display_session_environment() {
         PathBuf::from("/repo/target/neomacs-gui-tests"),
         scenario,
     )
-    .with_env("XDG_RUNTIME_DIR", "/tmp/neomacs-wayland")
+    .with_env("XDG_RUNTIME_DIR", "/fixture/neomacs-wayland")
     .with_env("WAYLAND_DISPLAY", "neomacs-gui-tests");
     let command = plan.command_spec();
 
     assert_eq!(command.env_value("WINIT_UNIX_BACKEND"), Some("wayland"));
     assert_eq!(
         command.env_value("XDG_RUNTIME_DIR"),
-        Some("/tmp/neomacs-wayland")
+        Some("/fixture/neomacs-wayland")
     );
     assert_eq!(
         command.env_value("WAYLAND_DISPLAY"),

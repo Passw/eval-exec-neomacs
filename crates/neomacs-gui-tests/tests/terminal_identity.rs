@@ -1,6 +1,7 @@
 //! Real GUI startup: an inherited Wayland socket need not have a display name.
 #![cfg(target_os = "linux")]
 
+use neomacs_gui_tests::{DisplayHarness, GuiBackend};
 use std::fs::{self, File};
 use std::os::fd::AsRawFd;
 use std::os::unix::{net::UnixStream, process::CommandExt};
@@ -9,13 +10,13 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 #[test]
-#[ignore = "requires a running Wayland compositor and a built binary/pdump"]
+// Prerequisites: Weston and a built binary/pdump; the test owns its compositor.
 fn inherited_wayland_connection_is_not_the_bootstrap_terminal() {
     assert_inherited_wayland_identity(None);
 }
 
 #[test]
-#[ignore = "requires a running Wayland compositor and a built binary/pdump"]
+// Prerequisites: Weston and a built binary/pdump; the test owns its compositor.
 fn inherited_wayland_connection_does_not_adopt_an_unused_socket_name() {
     assert_inherited_wayland_identity(Some("wayland-unused-issue-364"));
 }
@@ -25,19 +26,35 @@ fn assert_inherited_wayland_identity(unused_display: Option<&str>) {
     let binary = std::env::var_os("NEOMACS_GUI_TEST_BINARY")
         .map(PathBuf::from)
         .unwrap_or_else(|| root.join("target/release/neomacs"));
-    let display = PathBuf::from(std::env::var_os("WAYLAND_DISPLAY").expect("Wayland display"));
+    let artifacts = root.join(format!(
+        "target/neomacs-gui-tests/terminal-identity-{}-{}",
+        std::process::id(),
+        if unused_display.is_some() {
+            "unused-name"
+        } else {
+            "unnamed"
+        }
+    ));
+    fs::create_dir_all(&artifacts).unwrap();
+    let session = DisplayHarness::for_backend(GuiBackend::LinuxWayland)
+        .start_session(&artifacts)
+        .expect("start owned Wayland compositor");
+    let session_env = |key: &str| {
+        session
+            .env()
+            .iter()
+            .find(|(name, _)| name == key)
+            .map(|(_, value)| value.as_str())
+            .expect("Wayland session environment")
+    };
+    let display = PathBuf::from(session_env("WAYLAND_DISPLAY"));
     let socket_path = if display.is_absolute() {
         display
     } else {
-        PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").expect("runtime directory")).join(display)
+        PathBuf::from(session_env("XDG_RUNTIME_DIR")).join(display)
     };
     let socket = UnixStream::connect(socket_path).expect("connect to the real Wayland compositor");
     let fd = socket.as_raw_fd();
-    let artifacts = root.join(format!(
-        "target/neomacs-gui-tests/terminal-identity-{}",
-        std::process::id()
-    ));
-    fs::create_dir_all(&artifacts).unwrap();
     let result = artifacts.join("result.el");
     let stderr = artifacts.join("stderr.log");
     let mut command = Command::new(binary);
@@ -62,6 +79,7 @@ fn assert_inherited_wayland_identity(unused_display: Option<&str>) {
         ])
         .env_remove("WAYLAND_DISPLAY")
         .env_remove("DISPLAY")
+        .env("XDG_RUNTIME_DIR", session_env("XDG_RUNTIME_DIR"))
         .env("WAYLAND_SOCKET", fd.to_string())
         .env("NEOMACS_TEST_RESULT", &result)
         .env("RUST_LOG", "warn")

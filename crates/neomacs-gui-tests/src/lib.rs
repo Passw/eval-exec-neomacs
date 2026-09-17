@@ -113,6 +113,7 @@ impl DisplayHarness {
                 child: None,
                 env: Vec::new(),
                 cleanup_dir: None,
+                runtime_directory: None,
             }),
         }
     }
@@ -123,6 +124,7 @@ pub struct DisplaySession {
     child: Option<Child>,
     env: Vec<(String, String)>,
     cleanup_dir: Option<PathBuf>,
+    runtime_directory: Option<RuntimeDirectory>,
 }
 
 impl DisplaySession {
@@ -140,6 +142,56 @@ impl Drop for DisplaySession {
         if let Some(path) = self.cleanup_dir.take() {
             let _ = fs::remove_dir_all(path);
         }
+        self.runtime_directory.take();
+    }
+}
+
+/// An owned compositor runtime, independent of the user's desktop and TMPDIR.
+#[derive(Debug)]
+struct RuntimeDirectory {
+    path: PathBuf,
+    address: PathBuf,
+    _directory: fs::File,
+}
+
+impl RuntimeDirectory {
+    fn new(artifact_root: &Path) -> io::Result<Self> {
+        fs::create_dir_all(artifact_root)?;
+        let mut nonce = [0_u8; 8];
+        getrandom::fill(&mut nonce).map_err(io::Error::other)?;
+        let path = artifact_root.join(format!(
+            "wayland-runtime-{:016x}",
+            u64::from_ne_bytes(nonce)
+        ));
+        fs::create_dir(&path)?;
+        let opened = (|| {
+            set_owner_only_dir_permissions(&path)?;
+            let directory = fs::File::open(&path)?;
+            cfg_select! {
+                target_os = "linux" => {
+                    use std::os::fd::AsRawFd;
+                    // /proc follows the held directory, so long checkout paths
+                    // cannot exceed sockaddr_un's limit. No global env mutation.
+                    let address = PathBuf::from(format!("/proc/{}/fd/{}", std::process::id(), directory.as_raw_fd()));
+                }
+                _ => { let address = path.clone(); }
+            }
+            Ok(Self {
+                path: path.clone(),
+                address,
+                _directory: directory,
+            })
+        })();
+        if opened.is_err() {
+            let _ = fs::remove_dir(&path);
+        }
+        opened
+    }
+}
+
+impl Drop for RuntimeDirectory {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
     }
 }
 
@@ -538,10 +590,8 @@ pub fn start_weston_with_desktop(
         WaylandOutput::HiDpi4k => (1920, 1080, 2),
         WaylandOutput::HiDpi8k => (3840, 2160, 2),
     };
-    let runtime_dir =
-        std::env::temp_dir().join(format!("neomacs-gui-tests-{}", std::process::id()));
-    fs::create_dir_all(&runtime_dir)?;
-    set_owner_only_dir_permissions(&runtime_dir)?;
+    let runtime_directory = RuntimeDirectory::new(artifact_root)?;
+    let runtime_dir = &runtime_directory.address;
     fs::create_dir_all(artifact_root)?;
     let log_path = artifact_root.join("weston-headless.log");
 
@@ -580,7 +630,8 @@ pub fn start_weston_with_desktop(
                 ("XDG_RUNTIME_DIR".to_string(), path_to_string(&runtime_dir)),
                 ("WAYLAND_DISPLAY".to_string(), socket),
             ],
-            cleanup_dir: Some(runtime_dir),
+            cleanup_dir: None,
+            runtime_directory: Some(runtime_directory),
         })
     } else {
         let _ = child.kill();
@@ -715,6 +766,7 @@ impl PendingXvfbSession {
             child: self.child.take(),
             env,
             cleanup_dir: self.cleanup_dir.take(),
+            runtime_directory: None,
         }
     }
 }
