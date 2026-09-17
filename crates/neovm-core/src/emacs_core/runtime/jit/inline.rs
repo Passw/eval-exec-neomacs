@@ -191,17 +191,20 @@ fn callee_feedback(bc: &ByteCodeFunction) -> Vec<NumericFeedback> {
 /// Whether `callee` may be spliced at all: a lexical bytecode function of
 /// required arguments only, small enough, with no per-instance patched
 /// prefix, whose every op is inlinable.
-fn callee_is_inlinable(callee: &ByteCodeFunction, nargs: usize) -> bool {
-    match inlinable_verdict(callee, nargs) {
-        Ok(()) => {
-            super::stats::record_inline("fused");
-            true
-        }
-        Err(why) => {
-            super::stats::record_inline(format!("reject:{why}"));
-            false
-        }
+/// Whether one call site's callee may be spliced, and if so its per-pc operand
+/// depths. `pool_len` is the fused constant pool before this callee's is added.
+fn site_verdict(
+    callee: &ByteCodeFunction,
+    nargs: usize,
+    pool_len: usize,
+) -> Result<Vec<usize>, String> {
+    inlinable_verdict(callee, nargs)?;
+    if pool_len + callee.constants.len() > u16::MAX as usize + 1 {
+        return Err("constant-pool".into());
     }
+    // Unreachable ops (dead code after a `Return`) have no depth; skip the one
+    // site rather than abandon every other splice in the caller.
+    callee_depths(callee, nargs).ok_or_else(|| "depths".into())
 }
 
 /// Why a callee was (not) admitted. The `Err` strings are the census keys read
@@ -249,6 +252,16 @@ fn inlinable_verdict(callee: &ByteCodeFunction, nargs: usize) -> Result<(), Stri
         if jump_target(op).is_some_and(|t| t as usize <= pc) {
             return Err("back-edge".into());
         }
+        if jump_target(op).is_some_and(|t| t as usize >= ops.len()) {
+            return Err("jump-out".into());
+        }
+    }
+    // The `Return` expansion is the splice's only stack-rebalancing act. With
+    // every jump forward and in range, a body whose last op is a `Return`
+    // leaves through one on every path; one that falls off its end would leave
+    // the callee's frame on the caller's stack.
+    if !matches!(ops.last(), Some(Op::Return)) {
+        return Err("no-return".into());
     }
     Ok(())
 }
@@ -333,20 +346,12 @@ pub(crate) fn fuse_calls(
     arity: usize,
     caller_feedback: &[NumericFeedback],
 ) -> Option<FusedBody> {
-    // A handler push hands its TARGET to the runtime, which stores it in a
-    // `ResumeTarget` on the condition stack. After a deopt the resumed
-    // INTERPRETER frame adopts those handlers and jumps to that target in the
-    // UNFUSED ops — so a fused target there is a wrong-instruction resume, and
-    // a handler target is the one jump operand this pass must not rewrite.
-    // Leaving such a caller alone is the honest fix until the two pcs are
-    // carried separately.
-    if ops.iter().any(|op| {
-        matches!(
-            op,
-            Op::PushConditionCase(_) | Op::PushConditionCaseRaw(_) | Op::PushCatch(_)
-        )
-    }) {
-        super::stats::record_inline("reject:caller-handler");
+    // A jump table resolves through the GNU byte-offset map, which this pass
+    // rewrites. Without one, the table's fixnums ARE instruction indices, held
+    // inside a constant hash table nothing here touches — and every splice
+    // shifts the caller's tail, so an arm would dispatch into the wrong op.
+    if offset_map.is_none() && ops.iter().any(|op| matches!(op, Op::Switch)) {
+        super::stats::record_inline("reject:caller-index-switch");
         return None;
     }
     let cfg = analyze_cfg(ops, constants, offset_map, arity).ok()?;
@@ -354,7 +359,12 @@ pub(crate) fn fuse_calls(
     // The callee slot of an `Op::Call`, when it provably holds a constant.
     let mut tags: Vec<Option<u16>> = Vec::new();
     let entry = super::compile::spec_tag_entry_states(ops, constants, &cfg.leaders);
-    let mut sites: Vec<(usize, u16, usize)> = Vec::new(); // (pc, const idx, nargs)
+    // (pc, const idx, nargs, the callee's per-pc depths)
+    let mut sites: Vec<(usize, u16, usize, Vec<usize>)> = Vec::new();
+    // Every splice appends the callee's whole constant pool, and a spliced
+    // `Op::Constant` names its slot in a u16: past that the index would wrap
+    // onto an unrelated constant.
+    let mut pool_len = constants.len();
     for (i, op) in ops.iter().enumerate() {
         if cfg.leaders.binary_search(&i).is_ok() {
             tags.clear();
@@ -368,10 +378,15 @@ pub(crate) fn fuse_calls(
                 && let Some(cidx) = tags[tags.len() - 1 - nargs]
                 && let Some(callee) = constants.get(cidx as usize)
                 && let Some(bc) = callee.get_bytecode_data()
-                && callee_is_inlinable(bc, nargs)
                 && caller_depth[i] >= nargs + 1
             {
-                sites.push((i, cidx, nargs));
+                match site_verdict(bc, nargs, pool_len) {
+                    Ok(depths) => {
+                        pool_len += bc.constants.len();
+                        sites.push((i, cidx, nargs, depths));
+                    }
+                    Err(why) => super::stats::record_inline(format!("reject:{why}")),
+                }
             }
         }
         super::compile::spec_tag_transfer(op, constants, &mut tags);
@@ -379,6 +394,35 @@ pub(crate) fn fuse_calls(
     if sites.is_empty() {
         return None;
     }
+    let fused = splice_sites(
+        ops,
+        constants,
+        offset_map,
+        caller_feedback,
+        &caller_depth,
+        &sites,
+    );
+    match &fused {
+        Some(body) => {
+            for _ in &body.regions {
+                super::stats::record_inline("fused");
+            }
+        }
+        None => super::stats::record_inline("reject:splice"),
+    }
+    fused
+}
+
+/// Build the fused body for the selected `sites`. `None` abandons the whole
+/// caller, which then compiles unfused.
+fn splice_sites(
+    ops: &[Op],
+    constants: &[Value],
+    offset_map: Option<&[GnuByteOffsetMapEntry]>,
+    caller_feedback: &[NumericFeedback],
+    caller_depth: &[usize],
+    sites: &[(usize, u16, usize, Vec<usize>)],
+) -> Option<FusedBody> {
     let mut out: Vec<Op> = Vec::with_capacity(ops.len() + MAX_INLINE_BODY * sites.len());
     let mut out_feedback: Vec<NumericFeedback> = Vec::with_capacity(out.capacity());
     let mut fused_constants = constants.to_vec();
@@ -389,7 +433,7 @@ pub(crate) fn fuse_calls(
     let mut site_iter = sites.iter().peekable();
     for (i, op) in ops.iter().enumerate() {
         fused_of_caller[i] = out.len();
-        let splice = site_iter.peek().is_some_and(|(pc, _, _)| *pc == i);
+        let splice = site_iter.peek().is_some_and(|(pc, _, _, _)| *pc == i);
         if !splice {
             out.push(op.clone());
             out_feedback.push(
@@ -402,11 +446,11 @@ pub(crate) fn fuse_calls(
             caller_of_fused.push(i);
             continue;
         }
-        let (_, cidx, nargs) = *site_iter.next().expect("peeked");
+        let (_, cidx, nargs, depths) = site_iter.next().expect("peeked");
+        let (cidx, nargs) = (*cidx, *nargs);
         let callee = fused_constants[cidx as usize];
         let bc = callee.get_bytecode_data().expect("checked");
         let cops = bc.executable_ops();
-        let depths = callee_depths(bc, nargs)?;
         let feedback = callee_feedback(bc);
         let const_base = fused_constants.len();
         let region_start = out.len();
@@ -527,6 +571,11 @@ pub(crate) fn fuse_calls(
             })
             .collect()
     });
+    // Every pc the lowering can hand `deopt_site` must map back to the
+    // original body; a gap would resume the interpreter at a fused index.
+    if caller_of_fused.len() != out.len() || region_of.len() != out.len() {
+        return None;
+    }
     Some(FusedBody {
         ops: out,
         constants: fused_constants,
@@ -555,7 +604,7 @@ fn op_depths(ops: &[Op], cfg: &super::compile::Cfg) -> Option<Vec<usize>> {
             .unwrap_or(ops.len());
         for (i, op) in ops[leader..end].iter().enumerate() {
             depth[leader + i] = cur;
-            let Ok((needs, delta)) = super::compile::simple_effect(op) else {
+            let Some((needs, delta)) = caller_stack_effect(op) else {
                 break;
             };
             if cur < needs {
@@ -565,6 +614,18 @@ fn op_depths(ops: &[Op], cfg: &super::compile::Cfg) -> Option<Vec<usize>> {
         }
     }
     depth.iter().all(|&d| d != usize::MAX).then_some(depth)
+}
+
+/// The operand-stack effect of one caller op for the depth walk, mirroring
+/// `analyze_cfg`: `PopHandler` touches no operand (it only drops a handler
+/// frame), so the walk continues through it; a handler push and every other
+/// unmodelled op ends the block — its successors are leaders with their own
+/// entry depth.
+fn caller_stack_effect(op: &Op) -> Option<(usize, i64)> {
+    match op {
+        Op::PopHandler => Some((0, 0)),
+        other => super::compile::simple_effect(other).ok(),
+    }
 }
 
 thread_local! {

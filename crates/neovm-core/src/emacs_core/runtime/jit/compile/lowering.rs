@@ -3780,6 +3780,11 @@ pub(crate) fn set_active_region(region: Option<RegionDeopt>) {
     ACTIVE_REGION.with(|r| *r.borrow_mut() = region);
 }
 
+/// The call site of the region the lowering is inside, if any.
+pub(crate) fn active_region_call_site() -> Option<usize> {
+    ACTIVE_REGION.with(|r| r.borrow().as_ref().map(|region| region.call_site_pc))
+}
+
 /// Check, at a spliced region's first op, that the callee slot still holds the
 /// object whose body was spliced — and deopt to the call if it does not.
 ///
@@ -3799,14 +3804,18 @@ pub(crate) fn emit_region_entry_guard(
     stack: &[ClifValue],
     stack_raw: &[bool],
     pending: &mut Vec<PendingDeopt>,
-) {
+) -> Result<(), CompileError> {
+    // `frame_base` came from the UNFUSED caller's depths and `stack` is the
+    // FUSED lowering's; they agree only because every region is exactly
+    // stack-neutral. If they ever disagree the slot below names something other
+    // than the callee, so refuse to compile rather than guard the wrong slot —
+    // or, worse, emit no guard at all.
+    if region.frame_base == 0 || stack.len() != region.frame_base + region.nargs {
+        return Err(CompileError::UnsupportedOp("inline-region-depth"));
+    }
     // The callee object sits one slot below the first argument.
-    let Some(slot) = region.frame_base.checked_sub(1) else {
-        return;
-    };
-    let (Some(&v), Some(&raw)) = (stack.get(slot), stack_raw.get(slot)) else {
-        return;
-    };
+    let slot = region.frame_base - 1;
+    let (v, raw) = (stack[slot], stack_raw[slot]);
     let dsite = deopt_site(
         fb,
         region.call_site_pc,
@@ -3821,6 +3830,7 @@ pub(crate) fn emit_region_entry_guard(
     let expected = fb.ins().iconst(types::I64, region.callee_bits as i64);
     let same = fb.ins().icmp(IntCC::Equal, v, expected);
     emit_guard(fb, dsite, same);
+    Ok(())
 }
 
 /// Queue (and return) the precise-deopt block for the guard-emitting op at
@@ -3841,7 +3851,15 @@ pub(crate) fn deopt_site(
     // resume. Inside a region the region supplies the call's own pc instead.
     let pc = match (&region, super::super::inline::active_fused()) {
         (Some(_), _) | (None, None) => pc,
-        (None, Some(fused)) => fused.caller_pc(pc).unwrap_or(pc),
+        // Total over every lowered pc: `fuse_calls` refuses a body whose
+        // inverse map does not cover its ops.
+        (None, Some(fused)) => {
+            debug_assert!(
+                fused.caller_pc(pc).is_some(),
+                "fused pc {pc} has no caller pc"
+            );
+            fused.caller_pc(pc).unwrap_or(pc)
+        }
     };
     pending.push(PendingDeopt {
         block,

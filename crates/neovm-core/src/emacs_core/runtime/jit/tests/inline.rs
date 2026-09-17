@@ -372,14 +372,160 @@ fn an_inadmissible_shape_is_left_as_a_call() {
         ),
         "a callee with a back edge is not admissible"
     );
-    // A handler push hands its target to the runtime, which stores it for the
-    // resumed INTERPRETER frame to jump to in the unfused ops.
+    // The `Return` expansion is the only thing that rebalances the stack, so a
+    // body that could fall off its end would leave the callee frame behind.
+    // No such body reaches the fuser: sealing (the decoder in production, the
+    // test normalizer in `make_bytecode`) ends every executable body in a
+    // `Return`, which is the invariant `inlinable_verdict`'s check documents.
+    let sealed = Value::make_bytecode(lexical_fn(1, vec![Op::StackRef(0), Op::Add1], vec![]));
+    crate::emacs_core::eval::push_scratch_gc_root(sealed);
     assert!(
-        !fuse_with(
-            vec![Op::StackRef(0), Op::Add1, Op::Return],
-            vec![Op::PushConditionCase(0), Op::Pop]
+        matches!(
+            sealed
+                .get_bytecode_data()
+                .expect("bytecode")
+                .executable_ops()
+                .last(),
+            Some(Op::Return)
         ),
-        "a caller that installs a handler is left alone"
+        "sealing terminates a hand-assembled body with a Return"
     );
+    crate::emacs_core::jit::inline::force_inline_for_test(None);
+}
+
+/// A spliced `Op::Constant` names its slot in a u16, and every splice appends
+/// the callee's whole pool: a caller whose fused pool would pass 65,536 keeps
+/// its call rather than wrap an index onto an unrelated constant.
+#[test]
+fn a_splice_that_would_overflow_the_constant_pool_is_left_as_a_call() {
+    crate::test_utils::init_test_tracing();
+    let _ev = Context::new();
+    let callee = lexical_fn(
+        1,
+        vec![Op::StackRef(0), Op::Constant(2), Op::Add, Op::Return],
+        vec![Value::make_int(1), Value::make_int(2), Value::make_int(3)],
+    );
+    callee.jit_runtime().set_hot_for_test();
+    let callee_value = Value::make_bytecode(callee);
+    crate::emacs_core::eval::push_scratch_gc_root(callee_value);
+    let fuses_with_pool = |caller_pool: usize| {
+        let mut pool = vec![callee_value];
+        pool.extend((1..caller_pool).map(|i| Value::make_int(i as i64)));
+        let caller = lexical_fn(
+            1,
+            vec![Op::Constant(0), Op::StackRef(1), Op::Call(1), Op::Return],
+            pool,
+        );
+        let feedback = vec![NumericFeedback::FixnumOnly; caller.ops.len()];
+        fuse_calls(&caller.ops, &caller.constants, None, 1, &feedback)
+    };
+    let control = fuses_with_pool(100).expect("control: a small pool fuses");
+    assert!(
+        control
+            .ops
+            .iter()
+            .any(|op| matches!(op, Op::Constant(i) if *i as usize == 100 + 2)),
+        "control: the spliced constant is rebased past the caller's pool"
+    );
+    assert!(
+        fuses_with_pool(u16::MAX as usize + 1 - 3).is_some(),
+        "exactly 65,536 fused constants still fit"
+    );
+    assert!(
+        fuses_with_pool(u16::MAX as usize + 1 - 2).is_none(),
+        "65,537 fused constants would wrap a spliced index"
+    );
+}
+
+/// A handler installed by the CALLER serves two consumers that need different
+/// numbering: the compiled dispatch reaches its handler block by fused pc, but
+/// the runtime frame the push creates is later adopted by a RESUMED INTERPRETER
+/// frame, which jumps to its target in the unfused ops. Here a `car` guard
+/// after the region, inside the protected extent, deopts; the interpreter then
+/// signals, and the handler it adopted has to land on the real handler code.
+///
+///     (lambda (y z) (condition-case nil (+ (f y) (car z)) (error 'caught)))
+#[test]
+fn a_caller_handler_catches_in_the_original_body_after_a_deopt() {
+    crate::test_utils::init_test_tracing();
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    crate::emacs_core::jit::inline::force_inline_for_test(Some(true));
+    let mut ev = Context::new();
+    // (lambda (x) (1+ x))
+    let callee = lexical_fn(1, vec![Op::StackRef(0), Op::Add1, Op::Return], vec![]);
+    callee.jit_runtime().set_hot_for_test();
+    let callee_value = Value::make_bytecode(callee);
+    crate::emacs_core::eval::push_scratch_gc_root(callee_value);
+    let caller = lexical_fn(
+        2,
+        vec![
+            Op::PushConditionCase(9), // 0                  [y z]
+            Op::Constant(0),          // 1: f               [y z f]
+            Op::StackRef(2),          // 2: y               [y z f y]
+            Op::Call(1),              // 3: spliced         [y z r]
+            Op::StackRef(1),          // 4: z               [y z r z]
+            Op::Car,                  // 5: caller guard    [y z r cz]
+            Op::Add,                  // 6                  [y z s]
+            Op::PopHandler,           // 7                  [y z s]
+            Op::Return,               // 8
+            Op::Constant(1),          // 9: handler         [y z err caught]
+            Op::Return,               // 10
+        ],
+        vec![callee_value, Value::symbol("caught")],
+    );
+    caller.jit_runtime().set_hot_for_test();
+    let fused = fuse_calls(
+        &caller.ops,
+        &caller.constants,
+        None,
+        2,
+        &vec![NumericFeedback::FixnumOnly; caller.ops.len()],
+    )
+    .expect("a caller that installs a handler fuses");
+    assert!(
+        fused
+            .ops
+            .iter()
+            .any(|op| matches!(op, Op::PushConditionCase(t) if *t != 9)),
+        "the splice has to move the handler target for this test to mean anything"
+    );
+    let interp_only = caller.clone();
+    let caller_value = Value::make_bytecode(caller);
+    crate::emacs_core::eval::push_scratch_gc_root(caller_value);
+    crate::emacs_core::jit::compile::compile_bytecode_function_with(
+        Value::from_bits(caller_value.bits())
+            .get_bytecode_data()
+            .expect("bytecode"),
+        Some(&ev.obarray),
+    )
+    .expect("the fused caller compiles");
+    let pair = |n: i64| {
+        let c = Value::cons(Value::make_int(n), Value::NIL);
+        crate::emacs_core::eval::push_scratch_gc_root(c);
+        c
+    };
+    for (y, z) in [
+        (Value::make_int(3), pair(7)),              // straight through
+        (Value::make_int(3), Value::symbol("sym")), // caller guard deopts, then catches
+        (Value::make_float(1.5), pair(7)),          // region deopts, call re-runs
+        (Value::symbol("sym"), pair(7)),            // region deopts, call signals, catches
+    ] {
+        let args = vec![y, z];
+        let want = interp(&mut ev, &interp_only, args.clone());
+        let got = match ev.funcall_general_untraced(caller_value, args) {
+            Ok(v) => print_value(&v),
+            Err(crate::emacs_core::error::Flow::Signal(sig)) => {
+                format!("signal {}", sig.symbol_name())
+            }
+            Err(other) => format!("{other:?}"),
+        };
+        assert_eq!(
+            got,
+            want,
+            "y = {}, z = {}",
+            print_value(&y),
+            print_value(&z)
+        );
+    }
     crate::emacs_core::jit::inline::force_inline_for_test(None);
 }

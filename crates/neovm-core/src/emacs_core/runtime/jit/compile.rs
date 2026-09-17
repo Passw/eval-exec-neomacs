@@ -3883,10 +3883,19 @@ fn build_leaf_fn<M: Module>(
                                 &stack,
                                 &stack_raw,
                                 &mut pending_deopt,
-                            );
+                            )?;
                         }
                         None => lowering::set_active_region(None),
-                        _ => {}
+                        // A region is single-entry and the walk ascends, so
+                        // its snapshot was taken at its start and is still
+                        // the active one. Check it instead of trusting it: a
+                        // deopt under someone else's framestate replays the
+                        // wrong call.
+                        Some(region) => {
+                            if lowering::active_region_call_site() != Some(region.call_site_pc) {
+                                return Err(CompileError::UnsupportedOp("inline-region-entry"));
+                            }
+                        }
                     }
                 }
                 // Terminators consume / snapshot / spill the operand stack as tagged
@@ -4141,7 +4150,18 @@ fn build_leaf_fn<M: Module>(
                         let rt_ref = rt.as_ref().ok_or(CompileError::UnsupportedOp("handler"))?;
                         let tu = *t as usize;
                         let vmctx = fb.use_var(rt_ref.vmctx_var);
-                        let t_v = fb.ins().iconst(types::I64, tu as i64);
+                        // The target serves two consumers that need DIFFERENT
+                        // numbering. The compiled dispatch below reaches its
+                        // handler through `block_for`, keyed by the pc of the
+                        // ops being lowered — fused. But the shim stores this
+                        // operand in a `ResumeTarget`, and the only code that
+                        // reads it back is a RESUMED INTERPRETER frame, which
+                        // jumps to it in the UNFUSED ops. So the runtime gets
+                        // the original pc and `block_for` keeps the fused one.
+                        let runtime_target = inline::active_fused()
+                            .and_then(|f| f.caller_pc(tu))
+                            .unwrap_or(tu);
+                        let t_v = fb.ins().iconst(types::I64, runtime_target as i64);
                         match op {
                             Op::PushConditionCase(_) => {
                                 let d_v = fb.ins().iconst(types::I64, stack.len() as i64);
