@@ -2965,6 +2965,33 @@ impl crate::emacs_core::eval::Context {
             .take_leading_internal()
         {
             let event_effects = match event {
+                crate::frontend_events::InternalFrontendEvent::PresentedRegion {
+                    presentation,
+                    hit,
+                    x,
+                    y,
+                    target_frame_id,
+                } => {
+                    // This observation precedes its pointer action in the
+                    // same queue. It is not Lisp input, but must be consumed
+                    // during input waits so later resize events can progress.
+                    if let Some(frame_id) = self.event_frame_id(target_frame_id)
+                        && let Some(frame) = self.frames.get(frame_id)
+                        && frame.active_presentation().map(|id| id.get()) == Some(presentation)
+                    {
+                        self.command_loop
+                            .keyboard
+                            .kboard
+                            .presented_mouse_observation = Some(PresentedMouseObservation {
+                            presentation,
+                            hit,
+                            x,
+                            y,
+                            frame_id: frame_id.0,
+                        });
+                    }
+                    crate::frontend_events::InternalEventEffects::default()
+                }
                 crate::frontend_events::InternalFrontendEvent::PresentationRetired {
                     presentation,
                 } => {
@@ -5336,7 +5363,9 @@ impl crate::emacs_core::eval::Context {
                 );
                 Ok(None)
             }
-            InputEvent::LayoutInvalidated | InputEvent::ImageStateChanged { .. } => {
+            InputEvent::PresentedRegion { .. }
+            | InputEvent::LayoutInvalidated
+            | InputEvent::ImageStateChanged { .. } => {
                 unreachable!("internal frontend events are serviced before read_char")
             }
             InputEvent::MenuSelection { index, token } => {
@@ -5367,34 +5396,6 @@ impl crate::emacs_core::eval::Context {
                 ]);
                 self.command_loop.store_kbd_macro_event(event);
                 Ok(Some(event))
-            }
-            InputEvent::PresentedRegion {
-                presentation,
-                hit,
-                x,
-                y,
-                target_frame_id,
-            } => {
-                let Some(frame_id) = self.event_frame_id(target_frame_id) else {
-                    return Ok(None);
-                };
-                let Some(frame) = self.frames.get(frame_id) else {
-                    return Ok(None);
-                };
-                if frame.active_presentation().map(|id| id.get()) != Some(presentation) {
-                    return Ok(None);
-                }
-                self.command_loop
-                    .keyboard
-                    .kboard
-                    .presented_mouse_observation = Some(PresentedMouseObservation {
-                    presentation,
-                    hit,
-                    x,
-                    y,
-                    frame_id: frame_id.0,
-                });
-                Ok(None)
             }
             InputEvent::PresentedPointer {
                 presentation,

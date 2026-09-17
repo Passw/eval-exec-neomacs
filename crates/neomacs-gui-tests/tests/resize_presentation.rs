@@ -21,9 +21,8 @@ fn idle_split_gui_resize_updates_content_without_keyboard_or_mouse_input() {
 }
 
 // Real pointer motion publishes a hit observation before the movement itself.
-// Until issue 391 is fixed, this observation blocks later native resize events.
+// Issue 391: this observation must not block later native resize events.
 #[test]
-#[ignore = "issue 391: pointer observation blocks resize while waiting for input"]
 fn pointer_motion_does_not_block_idle_native_resize() {
     run_resize_test(ResizeScenario::IdleAfterPointerMotion);
 }

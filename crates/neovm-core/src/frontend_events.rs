@@ -71,34 +71,11 @@ impl FrontendEventQueue {
     }
 
     pub(crate) fn take_leading_internal(&mut self) -> Option<InternalFrontendEvent> {
-        if !self.events.front().is_some_and(is_internal) {
+        let FrontendEventSemantics::Internal(action) = semantics(self.events.front()?) else {
             return None;
-        }
-        let event = self.events.pop_front().expect("queue front was present");
-        Some(match event {
-            InputEvent::PresentationActivated {
-                presentation,
-                emacs_frame_id,
-            } => InternalFrontendEvent::PresentationActivated {
-                presentation,
-                emacs_frame_id,
-            },
-            InputEvent::PresentationDiscarded {
-                presentation,
-                emacs_frame_id,
-            } => InternalFrontendEvent::PresentationDiscarded {
-                presentation,
-                emacs_frame_id,
-            },
-            InputEvent::PresentationRetired { presentation } => {
-                InternalFrontendEvent::PresentationRetired { presentation }
-            }
-            InputEvent::LayoutInvalidated => InternalFrontendEvent::LayoutInvalidated,
-            InputEvent::ImageStateChanged { event } => {
-                InternalFrontendEvent::ImageStateChanged { event }
-            }
-            _ => unreachable!("all internal frontend events require an explicit service action"),
-        })
+        };
+        self.events.pop_front();
+        Some(action)
     }
 
     pub(crate) fn has_pending_input(
@@ -113,8 +90,15 @@ impl FrontendEventQueue {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum InternalFrontendEvent {
+    PresentedRegion {
+        presentation: u64,
+        hit: Option<neomacs_display_protocol::PresentedHit>,
+        x: f32,
+        y: f32,
+        target_frame_id: u64,
+    },
     PresentationActivated {
         presentation: u64,
         emacs_frame_id: u64,
@@ -145,49 +129,41 @@ impl InternalEventEffects {
     }
 }
 
+/// A Lisp-visible event may be filtered, but cannot unconditionally opt out
+/// of both command input and wait servicing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum FrontendEventClass {
-    Command,
-    LispSpecial,
-    Internal,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum PendingPolicy {
+enum PendingInputPolicy {
     Always,
-    Never,
-    TrackMouse,
     Focus { focused: bool },
     Filterable(&'static str),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct FrontendEventSemantics {
-    class: FrontendEventClass,
-    pending: PendingPolicy,
-    interrupts: bool,
-    wait_special: bool,
+/// Scheduling is a choice, not independent flags. In particular, an event
+/// that is never command input must carry an internal service action or be
+/// serviced during waits. Mouse motion is readable exactly when track-mouse
+/// is enabled, and serviced during waits otherwise (GNU some_mouse_moved).
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum FrontendEventSemantics {
+    Command,
+    Internal(InternalFrontendEvent),
+    MouseMotion,
+    ServiceDuringWait,
+    SpecialInput {
+        pending: PendingInputPolicy,
+        interrupts: bool,
+        service_during_wait: bool,
+    },
 }
 
-const fn command() -> FrontendEventSemantics {
-    FrontendEventSemantics {
-        class: FrontendEventClass::Command,
-        pending: PendingPolicy::Always,
-        interrupts: true,
-        wait_special: false,
-    }
-}
-
-const fn special(
-    pending: PendingPolicy,
+const fn special_input(
+    pending: PendingInputPolicy,
     interrupts: bool,
-    wait_special: bool,
+    service_during_wait: bool,
 ) -> FrontendEventSemantics {
-    FrontendEventSemantics {
-        class: FrontendEventClass::LispSpecial,
+    FrontendEventSemantics::SpecialInput {
         pending,
         interrupts,
-        wait_special,
+        service_during_wait,
     }
 }
 
@@ -196,76 +172,109 @@ const fn special(
 /// This match is deliberately exhaustive: adding a frontend event must force
 /// an explicit choice about command visibility and scheduler behavior.
 fn semantics(event: &InputEvent) -> FrontendEventSemantics {
+    use FrontendEventSemantics::{Command, Internal, MouseMotion, ServiceDuringWait};
+
     match event {
         InputEvent::RawTtyBytes { .. }
         | InputEvent::TtyByte { .. }
-        | InputEvent::TtyCharacter { .. } => command(),
-        InputEvent::KeyPress { .. } => command(),
-        InputEvent::MousePress { .. } => command(),
-        InputEvent::MouseRelease { .. } => command(),
-        InputEvent::MouseMove { .. } => special(PendingPolicy::TrackMouse, false, true),
-        InputEvent::PresentedRegion { .. } => special(PendingPolicy::Never, false, false),
-        InputEvent::MouseScroll { .. } => command(),
-        InputEvent::PixelScroll { .. } => special(PendingPolicy::Always, true, false),
-        InputEvent::LayoutInvalidated | InputEvent::ImageStateChanged { .. } => {
-            FrontendEventSemantics {
-                class: FrontendEventClass::Internal,
-                pending: PendingPolicy::Never,
-                interrupts: false,
-                wait_special: false,
-            }
+        | InputEvent::TtyCharacter { .. }
+        | InputEvent::KeyPress { .. }
+        | InputEvent::MousePress { .. }
+        | InputEvent::MouseRelease { .. }
+        | InputEvent::MouseScroll { .. }
+        | InputEvent::MenuSelection { .. }
+        | InputEvent::ToolBarClick { .. }
+        | InputEvent::PresentedPointer { .. }
+        | InputEvent::MenuBarClick { .. } => Command,
+        InputEvent::MouseMove { .. } => MouseMotion,
+        InputEvent::PixelScroll { .. } => special_input(PendingInputPolicy::Always, true, false),
+        InputEvent::PresentedRegion {
+            presentation,
+            hit,
+            x,
+            y,
+            target_frame_id,
+        } => Internal(InternalFrontendEvent::PresentedRegion {
+            presentation: *presentation,
+            hit: *hit,
+            x: *x,
+            y: *y,
+            target_frame_id: *target_frame_id,
+        }),
+        InputEvent::LayoutInvalidated => Internal(InternalFrontendEvent::LayoutInvalidated),
+        InputEvent::ImageStateChanged { event } => {
+            Internal(InternalFrontendEvent::ImageStateChanged { event: *event })
         }
-        InputEvent::MenuSelection { .. } => command(),
-        InputEvent::ToolBarClick { .. } => command(),
-        InputEvent::PresentedPointer { .. } => command(),
-        InputEvent::PresentationActivated { .. }
-        | InputEvent::PresentationDiscarded { .. }
-        | InputEvent::PresentationRetired { .. } => FrontendEventSemantics {
-            class: FrontendEventClass::Internal,
-            pending: PendingPolicy::Never,
-            interrupts: false,
-            wait_special: false,
-        },
-        InputEvent::MenuBarClick { .. } => command(),
-        InputEvent::Resize { .. } => special(PendingPolicy::Never, false, true),
-        // Same policy as Resize: not command input, serviced during waits so
-        // recovery does not sit behind a keystroke.
-        InputEvent::DisplayReset => special(PendingPolicy::Never, false, true),
-        InputEvent::WebView(..) => special(PendingPolicy::Never, false, true),
-        // A shader-surface build failure: not command input; serviced during
-        // waits so the error surfaces promptly instead of behind a keystroke.
-        InputEvent::SurfaceCreateFailed { .. } => special(PendingPolicy::Never, false, true),
-        InputEvent::FrameShaderFailed { .. } => special(PendingPolicy::Never, false, true),
-        InputEvent::TerminalCreateFailed { .. }
+        InputEvent::PresentationActivated {
+            presentation,
+            emacs_frame_id,
+        } => Internal(InternalFrontendEvent::PresentationActivated {
+            presentation: *presentation,
+            emacs_frame_id: *emacs_frame_id,
+        }),
+        InputEvent::PresentationDiscarded {
+            presentation,
+            emacs_frame_id,
+        } => Internal(InternalFrontendEvent::PresentationDiscarded {
+            presentation: *presentation,
+            emacs_frame_id: *emacs_frame_id,
+        }),
+        InputEvent::PresentationRetired { presentation } => {
+            Internal(InternalFrontendEvent::PresentationRetired {
+                presentation: *presentation,
+            })
+        }
+        // Native geometry and host notifications progress without a keystroke.
+        InputEvent::Resize { .. }
+        | InputEvent::DisplayReset
+        | InputEvent::WebView(..)
+        | InputEvent::SurfaceCreateFailed { .. }
+        | InputEvent::FrameShaderFailed { .. }
+        | InputEvent::TerminalCreateFailed { .. }
         | InputEvent::TerminalExited { .. }
-        | InputEvent::TerminalTitleChanged { .. } => special(PendingPolicy::Never, false, true),
-        InputEvent::Focus { focused, .. } => {
-            special(PendingPolicy::Focus { focused: *focused }, false, false)
-        }
-        InputEvent::MonitorsChanged { .. } => {
-            special(PendingPolicy::Filterable("monitors-changed"), false, true)
-        }
-        InputEvent::SystemFontsChanged { .. } => special(PendingPolicy::Never, false, true),
+        | InputEvent::TerminalTitleChanged { .. }
+        | InputEvent::SystemFontsChanged { .. } => ServiceDuringWait,
+        InputEvent::Focus { focused, .. } => special_input(
+            PendingInputPolicy::Focus { focused: *focused },
+            false,
+            false,
+        ),
+        InputEvent::MonitorsChanged { .. } => special_input(
+            PendingInputPolicy::Filterable("monitors-changed"),
+            false,
+            true,
+        ),
         InputEvent::SelectWindow { .. } => {
-            special(PendingPolicy::Filterable("select-window"), true, false)
+            special_input(PendingInputPolicy::Filterable("select-window"), true, false)
         }
-        InputEvent::WindowClose { .. } => special(PendingPolicy::Always, true, true),
+        InputEvent::WindowClose { .. } => special_input(PendingInputPolicy::Always, true, true),
     }
 }
 
 pub(crate) fn is_internal(event: &InputEvent) -> bool {
-    semantics(event).class == FrontendEventClass::Internal
+    matches!(semantics(event), FrontendEventSemantics::Internal(_))
 }
 
 pub(crate) fn interrupts(event: &InputEvent) -> bool {
-    semantics(event).interrupts
+    match semantics(event) {
+        FrontendEventSemantics::Command => true,
+        FrontendEventSemantics::SpecialInput { interrupts, .. } => interrupts,
+        FrontendEventSemantics::Internal(_)
+        | FrontendEventSemantics::MouseMotion
+        | FrontendEventSemantics::ServiceDuringWait => false,
+    }
 }
 
 pub(crate) fn is_wait_special(event: &InputEvent, track_mouse: bool) -> bool {
-    if matches!(event, InputEvent::MouseMove { .. }) {
-        return !track_mouse;
+    match semantics(event) {
+        FrontendEventSemantics::Command | FrontendEventSemantics::Internal(_) => false,
+        FrontendEventSemantics::MouseMotion => !track_mouse,
+        FrontendEventSemantics::ServiceDuringWait => true,
+        FrontendEventSemantics::SpecialInput {
+            service_during_wait,
+            ..
+        } => service_during_wait,
     }
-    semantics(event).wait_special
 }
 
 fn counts_as_pending(
@@ -274,21 +283,43 @@ fn counts_as_pending(
     track_mouse: bool,
     ignored_while_no_input: &impl Fn(&str) -> bool,
 ) -> bool {
-    match semantics(event).pending {
-        PendingPolicy::Always => true,
-        PendingPolicy::Never => false,
-        PendingPolicy::TrackMouse => track_mouse,
-        PendingPolicy::Focus { focused } => !filter.ignores(
-            if focused { "focus-in" } else { "focus-out" },
-            ignored_while_no_input,
-        ),
-        PendingPolicy::Filterable(symbol) => !filter.ignores(symbol, ignored_while_no_input),
+    match semantics(event) {
+        FrontendEventSemantics::Command => true,
+        FrontendEventSemantics::Internal(_) | FrontendEventSemantics::ServiceDuringWait => false,
+        FrontendEventSemantics::MouseMotion => track_mouse,
+        FrontendEventSemantics::SpecialInput { pending, .. } => match pending {
+            PendingInputPolicy::Always => true,
+            PendingInputPolicy::Focus { focused } => !filter.ignores(
+                if focused { "focus-in" } else { "focus-out" },
+                ignored_while_no_input,
+            ),
+            PendingInputPolicy::Filterable(symbol) => {
+                !filter.ignores(symbol, ignored_while_no_input)
+            }
+        },
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Behavior expectations, independent of the production scheduling enum.
+    #[derive(Debug, PartialEq, Eq)]
+    enum FrontendEventClass {
+        Command,
+        LispSpecial,
+        Internal,
+    }
+
+    #[derive(Clone, Copy)]
+    enum PendingPolicy {
+        Always,
+        Never,
+        TrackMouse,
+        Focus { focused: bool },
+        Filterable(&'static str),
+    }
 
     #[test]
     fn frame_shader_failure_is_visible_without_optional_lisp_library() {
@@ -341,20 +372,58 @@ mod tests {
         event: InputEvent,
         class: FrontendEventClass,
         pending: PendingPolicy,
-        interrupts: bool,
+        expected_interrupts: bool,
         wait_special: bool,
     ) {
-        let policy = semantics(&event);
-        assert_eq!(policy.class, class, "class for {event:?}");
-        assert_eq!(policy.pending, pending, "pending policy for {event:?}");
+        let actual_class = match semantics(&event) {
+            FrontendEventSemantics::Command => FrontendEventClass::Command,
+            FrontendEventSemantics::Internal(_) => FrontendEventClass::Internal,
+            FrontendEventSemantics::MouseMotion
+            | FrontendEventSemantics::ServiceDuringWait
+            | FrontendEventSemantics::SpecialInput { .. } => FrontendEventClass::LispSpecial,
+        };
+        assert_eq!(actual_class, class, "class for {event:?}");
         assert_eq!(
-            policy.interrupts, interrupts,
+            interrupts(&event),
+            expected_interrupts,
             "interrupt policy for {event:?}"
         );
-        assert_eq!(
-            policy.wait_special, wait_special,
-            "wait policy for {event:?}"
-        );
+        for track_mouse in [false, true] {
+            let (expected_pending, ignored_symbol) = match pending {
+                PendingPolicy::Always => (true, None),
+                PendingPolicy::Never => (false, None),
+                PendingPolicy::TrackMouse => (track_mouse, None),
+                PendingPolicy::Focus { focused } => {
+                    (true, Some(if focused { "focus-in" } else { "focus-out" }))
+                }
+                PendingPolicy::Filterable(symbol) => (true, Some(symbol)),
+            };
+            assert_eq!(
+                counts_as_pending(
+                    &event,
+                    InputPendingFilter::ConfiguredIgnoreList,
+                    track_mouse,
+                    &|_| false
+                ),
+                expected_pending,
+                "pending policy for {event:?}, track-mouse={track_mouse}"
+            );
+            assert_eq!(
+                counts_as_pending(
+                    &event,
+                    InputPendingFilter::ConfiguredIgnoreList,
+                    track_mouse,
+                    &|symbol| Some(symbol) == ignored_symbol
+                ),
+                expected_pending && ignored_symbol.is_none(),
+                "filtered pending policy for {event:?}, track-mouse={track_mouse}"
+            );
+            assert_eq!(
+                is_wait_special(&event, track_mouse),
+                wait_special && !(matches!(pending, PendingPolicy::TrackMouse) && track_mouse),
+                "wait policy for {event:?}, track-mouse={track_mouse}"
+            );
+        }
     }
 
     #[test]
@@ -512,6 +581,19 @@ mod tests {
             true,
         );
         assert_policy(
+            InputEvent::PresentedRegion {
+                presentation: 1,
+                hit: None,
+                x: 22.0,
+                y: 12.0,
+                target_frame_id: 0,
+            },
+            FrontendEventClass::Internal,
+            PendingPolicy::Never,
+            false,
+            false,
+        );
+        assert_policy(
             InputEvent::LayoutInvalidated,
             FrontendEventClass::Internal,
             PendingPolicy::Never,
@@ -540,12 +622,13 @@ mod tests {
 
     #[test]
     fn presentation_retirement_is_internal_scheduler_noise() {
-        let policy = semantics(&InputEvent::PresentationRetired { presentation: 1 });
-
-        assert_eq!(policy.class, FrontendEventClass::Internal);
-        assert_eq!(policy.pending, PendingPolicy::Never);
-        assert!(!policy.interrupts);
-        assert!(!policy.wait_special);
+        assert_policy(
+            InputEvent::PresentationRetired { presentation: 1 },
+            FrontendEventClass::Internal,
+            PendingPolicy::Never,
+            false,
+            false,
+        );
     }
 
     #[test]
@@ -598,14 +681,16 @@ mod tests {
 
     #[test]
     fn layout_invalidation_is_internal_with_an_explicit_service_action() {
-        let policy = semantics(&InputEvent::LayoutInvalidated);
         let mut queue = FrontendEventQueue::default();
         queue.push_back(InputEvent::LayoutInvalidated);
 
-        assert_eq!(policy.class, FrontendEventClass::Internal);
-        assert_eq!(policy.pending, PendingPolicy::Never);
-        assert!(!policy.interrupts);
-        assert!(!policy.wait_special);
+        assert_policy(
+            InputEvent::LayoutInvalidated,
+            FrontendEventClass::Internal,
+            PendingPolicy::Never,
+            false,
+            false,
+        );
         assert_eq!(
             queue.take_leading_internal(),
             Some(InternalFrontendEvent::LayoutInvalidated)

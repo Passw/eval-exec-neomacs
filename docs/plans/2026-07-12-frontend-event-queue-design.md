@@ -95,6 +95,47 @@ enum FrontendEvent {
 This type split is subordinate to the ordering invariant: all variants still
 occupy the same FIFO.
 
+### Scheduler policy refinement (September 17, 2026)
+
+Issue 391 exposed a second invalid combination: `PresentedRegion` was marked
+non-command input but was neither internal nor serviceable during a wait.
+Pointer motion could therefore strand all subsequent native resize events
+until an unrelated click completed the input wait.
+
+The implemented classification now uses `FrontendEventSemantics`:
+
+```rust
+enum FrontendEventSemantics {
+    Command,
+    Internal(InternalFrontendEvent),
+    MouseMotion,
+    ServiceDuringWait,
+    SpecialInput {
+        pending: PendingInputPolicy,
+        interrupts: bool,
+        service_during_wait: bool,
+    },
+}
+```
+
+`PendingInputPolicy` permits always-readable or explicitly filterable Lisp
+input, but has no `Never` variant. Unconditionally non-command events must
+instead supply an internal action or select `ServiceDuringWait`. Mouse motion
+is readable when `track-mouse` is enabled and serviced during waits otherwise.
+GNU's existing filtering behavior for focus/other visible special events is
+unchanged; this is not a claim that filtered Lisp input can never defer work.
+
+The exhaustive transport classification constructs the internal action itself.
+The queue no longer classifies an event as internal and then relies on a
+second, wildcard-based match to discover its handler. Adding an internal
+action also requires updating the exhaustive VM-owned dispatcher.
+
+`PresentedRegion` is an internal action. It records a hit only if its frame's
+active presentation matches, without calling Lisp, stopping idle time,
+interrupting `while-no-input`, or requesting redisplay. Its following mouse
+action retains its own input semantics. Observation, action, presentation
+lifecycle, and resize events retain their existing FIFO order.
+
 `PresentationRetired` is `Internal`.  Its policy is fixed:
 
 | Semantic property | Value |

@@ -341,21 +341,19 @@ fn presented_region_drives_exact_gnu_mouse_position_and_rejects_stale_observatio
     ))
     .unwrap();
 
-    assert_eq!(
-        eval.handle_read_char_input_event(
-            InputEvent::PresentedRegion {
-                presentation: 1,
-                hit,
-                x: 22.0,
-                y: 12.0,
-                target_frame_id: frame_id.0,
-            },
-            TtyInputDecoding::KeyboardCodingSystem,
-        )
-        .unwrap(),
-        None
+    feed(
+        &mut eval,
+        InputEvent::PresentedRegion {
+            presentation: 1,
+            hit,
+            x: 22.0,
+            y: 12.0,
+            target_frame_id: frame_id.0,
+        },
+        frame_id,
     );
-    eval.handle_read_char_input_event(
+    feed(
+        &mut eval,
         InputEvent::PresentedRegion {
             presentation: 0,
             hit: None,
@@ -363,9 +361,8 @@ fn presented_region_drives_exact_gnu_mouse_position_and_rejects_stale_observatio
             y: 12.0,
             target_frame_id: frame_id.0,
         },
-        TtyInputDecoding::KeyboardCodingSystem,
-    )
-    .unwrap();
+        frame_id,
+    );
     assert_eq!(
         eval.command_loop
             .keyboard
@@ -435,7 +432,8 @@ fn presented_region_drives_exact_gnu_mouse_position_and_rejects_stale_observatio
         ),
     ))
     .unwrap();
-    eval.handle_read_char_input_event(
+    feed(
+        &mut eval,
         InputEvent::PresentedRegion {
             presentation: 1,
             hit: divider_hit,
@@ -443,9 +441,8 @@ fn presented_region_drives_exact_gnu_mouse_position_and_rejects_stale_observatio
             y: 40.0,
             target_frame_id: frame_id.0,
         },
-        TtyInputDecoding::KeyboardCodingSystem,
-    )
-    .unwrap();
+        frame_id,
+    );
     let divider_event = eval
         .handle_read_char_input_event(
             InputEvent::MousePress {
@@ -649,7 +646,11 @@ fn feed(
         },
         other => other,
     };
-    eval.handle_read_char_input_event(event, TtyInputDecoding::KeyboardCodingSystem)
+    eval.command_loop
+        .keyboard
+        .pending_input_events
+        .push_back(event);
+    eval.read_char_with_timeout(Some(std::time::Duration::ZERO))
         .unwrap();
 }
 
