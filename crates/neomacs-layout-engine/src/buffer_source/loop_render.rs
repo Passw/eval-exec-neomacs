@@ -156,6 +156,7 @@ impl<'rows, 'emit, 'surface> BufferSourceLoopMutableState<'rows, 'emit, 'surface
     ) {
         self.render_pending_line_number_prefix(context);
 
+        let prefix_requested = self.row_carryover.prefix_request.is_requested();
         let wrap_prefix = self.row_carryover.prefix_request.is_wrap();
         let line_prefix_checkpoint =
             (!wrap_prefix).then(|| self.source_render.capture_glyph_checkpoint());
@@ -190,6 +191,21 @@ impl<'rows, 'emit, 'surface> BufferSourceLoopMutableState<'rows, 'emit, 'surface
                 );
             *x
         };
+        if prefix_requested {
+            // Like GNU's per-glyph max_ascent/max_descent updates, promote
+            // both the emitted row and the walk geometry before buffer text.
+            // Only do this at the prefix boundary, not on every text step.
+            self.source_render
+                .include_current_row_visible_content_metrics(
+                self.face_ids,
+                crate::display_row::metrics::DisplayRowFallbackMetrics::from_default_face_extents(
+                    params.char_width,
+                    self.row_build.row_geometry.height(),
+                    self.row_build.row_geometry.ascent(),
+                ),
+                self.row_build.row_geometry,
+            );
+        }
         if wrap_prefix {
             self.progress
                 .record_wrap_prefix_width((prefix_end_x - prefix_start_x).max(0.0));

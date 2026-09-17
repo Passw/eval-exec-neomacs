@@ -158,6 +158,19 @@ it does not exercise disk reloads, decode workers or GPU texture retirement.
 No extra invalidation counter or automatic file watcher is introduced.
 This is not a claim of complete mutable-Lisp-graph invalidation.
 
+Prefix glyph production must also update the walk's vertical geometry, not just
+the emitted glyph row. GNU `xdisp.c:produce_stretch_glyph` computes stretch
+ascent/descent and `produce_glyphs` accumulates the row maxima, including prefixes
+installed by `handle_line_prefix`. Neomacs' prefix append previously emitted the
+correct stretch dimensions without promoting the walk geometry, so even fresh
+layout could leave the following row at the old vertical position. The row
+prelude now uses the existing `include_current_row_visible_content_metrics`
+operation (also used by line numbers) to reconcile both authorities after a
+requested line/wrap prefix. The request gate avoids scanning row glyphs on
+ordinary text steps. Tests assert a minimum 60px line separation independently
+of incremental/full comparison, and cover mutable direct, image-derived and
+string-contained stretch heights through redisplay and geometry queries.
+
 `LayoutInvisibilityInput` captures the effective buffer's ordered invisibility
 membership, including each cons entry's category and ellipsis truthiness.
 In-place `setcar`/`setcdr` changes therefore participate in both the shared

@@ -268,6 +268,76 @@ fn assert_decoration_mutation_invalidates_presentation(setup: &str, mutation: &s
 }
 
 #[test]
+fn retained_geometry_tracks_explicit_prefix_stretch_height() {
+    assert_layout_mutation_with_measurement(
+        "(setq prefix-height (list 24) line-prefix (list 'space :width 1 :height prefix-height))",
+        "(setcar prefix-height 60)",
+        true,
+    );
+}
+
+#[test]
+fn tall_stretch_prefix_reserves_vertical_space_before_next_line() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert("a\nb\n");
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("tall-prefix", 160, 300, buffer);
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str("(setq line-prefix '(space :width 1 :height (60) :ascent 80))")
+        .unwrap();
+    LayoutEngine::new().layout_frame_rust(&mut eval, frame);
+    let snapshot = eval
+        .fresh_window_display_snapshot(frame, window, buffer)
+        .unwrap();
+    let first = snapshot
+        .points
+        .iter()
+        .find(|point| point.buffer_pos.as_i64() == 1)
+        .unwrap();
+    let second = snapshot
+        .points
+        .iter()
+        .find(|point| point.buffer_pos.as_i64() == 3)
+        .unwrap();
+    assert!(
+        second.y - first.y >= 60,
+        "the 60px prefix must fit before the next line"
+    );
+}
+
+#[test]
+fn retained_geometry_tracks_prefix_image_operand_height() {
+    assert_layout_mutation_with_host(
+        r##"(setq image-dimensions (list :height 24 :width 20)
+                   image-spec (cons 'image (cons :file (cons "prefix.png" image-dimensions)))
+                   line-prefix (list 'space :width 1 :height image-spec))"##,
+        "(setcar (cdr image-dimensions) 60)",
+        true,
+        Some(Box::new(ExplicitExtentImageHost)),
+    );
+}
+
+#[test]
+fn retained_geometry_tracks_wrap_prefix_string_stretch_height() {
+    assert_layout_mutation_with_measurement(
+        r##"(setq prefix-height (list 24) wrap-prefix (copy-sequence " "))
+             (put-text-property 0 1 'display
+               (list 'space :width 1 :height prefix-height) wrap-prefix)"##,
+        "(setcar prefix-height 60)",
+        true,
+    );
+}
+
+#[test]
 fn image_cache_flush_rebuilds_retained_prefix_geometry() {
     for flush in [
         "(image-flush image-spec t)",
