@@ -143,7 +143,6 @@ impl Context {
             frame_snapshot_fn: None,
             window_layout_query_adapter: WindowLayoutQueryAdapter::Unavailable,
             scroll_goal: None,
-            pending_pixel_scroll: None,
             display_host: None,
             tty_frame_host_factory: None,
             visual_config: neomacs_display_protocol::VisualConfig::default(),

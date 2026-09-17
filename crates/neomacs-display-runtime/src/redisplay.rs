@@ -28,12 +28,6 @@ pub enum FrameLayoutPurpose {
     Snapshot,
 }
 
-impl FrameLayoutPurpose {
-    const fn consumes_pending_input(self) -> bool {
-        matches!(self, Self::Redisplay)
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PreparedPresentationTicket {
     frame_id: FrameId,
@@ -169,7 +163,6 @@ impl RedisplayRuntime {
     ) -> Option<PreparedFrameDisplay> {
         let (attempt, query_seed) = {
             let mut engine = self.engine.borrow_mut();
-            self.apply_pending_input(&mut engine, evaluator, frame_id, purpose);
             let attempt = match purpose {
                 FrameLayoutPurpose::Redisplay => {
                     engine.redisplay_frame_attempt(evaluator, frame_id)
@@ -234,30 +227,5 @@ impl RedisplayRuntime {
             Ok(query) => WindowLayoutQueryOutcome::Ready(query),
             Err(failure) => WindowLayoutQueryOutcome::Failed(failure),
         }
-    }
-
-    fn apply_pending_input(
-        &self,
-        engine: &mut LayoutEngine,
-        evaluator: &mut Context,
-        frame_id: FrameId,
-        purpose: FrameLayoutPurpose,
-    ) {
-        if !purpose.consumes_pending_input() {
-            return;
-        }
-        let Some(delta) = evaluator.take_pending_pixel_scroll_for_frame(frame_id) else {
-            return;
-        };
-        let Some(window_id) = evaluator
-            .frame_manager()
-            .get(frame_id)
-            .map(|frame| frame.selected_window)
-        else {
-            return;
-        };
-        // SIGN: trackpad delta_y vs scroll direction is verified on-screen.
-        let delta_px = (-delta).round() as i32;
-        let _ = engine.pixel_scroll_window(evaluator, window_id, delta_px);
     }
 }

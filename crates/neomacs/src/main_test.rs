@@ -131,46 +131,6 @@ fn test_image_spec_identity(label: &str) -> ImageSpecIdentity {
     ImageSpecIdentity::from_lisp_spec(&spec).expect("test image spec")
 }
 
-#[test]
-fn layout_purpose_is_the_only_owner_of_pending_scroll_consumption() {
-    let mut eval = Context::new();
-    let buffer_id = eval
-        .buffer_manager()
-        .current_buffer()
-        .expect("current buffer")
-        .id();
-    eval.buffer_manager_mut()
-        .get_mut(buffer_id)
-        .expect("buffer")
-        .insert(&"scrollable line\n".repeat(40));
-    let frame_id =
-        eval.frame_manager_mut()
-            .create_frame("layout-purpose-scroll", 800, 320, buffer_id);
-    eval.accumulate_pending_pixel_scroll(frame_id, 3.5);
-
-    let snapshot = super::frame_layout::layout_frame_display_state(
-        &mut eval,
-        frame_id,
-        super::frame_layout::FrameLayoutPurpose::Snapshot,
-    )
-    .expect("snapshot layout");
-    let _ = snapshot.discard(&mut eval);
-    assert_eq!(
-        eval.pending_pixel_scroll_for_frame(frame_id),
-        Some(3.5),
-        "snapshot and logical-query layout must preserve user input for redisplay"
-    );
-
-    let redisplay = super::frame_layout::layout_frame_display_state(
-        &mut eval,
-        frame_id,
-        super::frame_layout::FrameLayoutPurpose::Redisplay,
-    )
-    .expect("redisplay layout");
-    let _ = redisplay.discard(&mut eval);
-    assert_eq!(eval.pending_pixel_scroll_for_frame(frame_id), None);
-}
-
 fn initialized_redisplay_test_frame(
     frame_name: &str,
     width: u32,

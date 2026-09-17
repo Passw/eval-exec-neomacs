@@ -201,41 +201,6 @@ impl crate::gc_trace::GcTrace for PresentedInteractions {
     }
 }
 
-/// Coalesced high-resolution scroll input waiting for redisplay.
-///
-/// Keeping the frame identity and delta in one value prevents a caller from
-/// draining a delta for the wrong frame. A different target replaces the
-/// pending gesture; repeated input for one frame preserves sub-pixel precision.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PendingPixelScroll {
-    frame: crate::window::FrameId,
-    delta_y: f32,
-}
-
-impl PendingPixelScroll {
-    fn accumulate(current: Option<Self>, frame: crate::window::FrameId, delta_y: f32) -> Self {
-        let accumulated = current.map_or(0.0, |pending| {
-            if pending.frame == frame {
-                pending.delta_y
-            } else {
-                0.0
-            }
-        });
-        Self {
-            frame,
-            delta_y: accumulated + delta_y,
-        }
-    }
-
-    pub const fn for_frame(self, frame: crate::window::FrameId) -> Option<f32> {
-        if self.frame.0 == frame.0 {
-            Some(self.delta_y)
-        } else {
-            None
-        }
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Key events
 // ---------------------------------------------------------------------------
@@ -7464,70 +7429,6 @@ fn key_sequence_translation_events(translation: Value) -> Option<Vec<Value>> {
 // ===========================================================================
 // Tests
 // ===========================================================================
-
-impl crate::emacs_core::eval::Context {
-    /// Smooth scroll (Phase 1, T4): accumulate a trackpad pixel-scroll delta for
-    /// `target_frame_id`. Deltas for the same frame sum (sub-pixel precision); a
-    /// delta for a different frame replaces the pending one. Drained + applied by
-    /// the layout pass via `Engine::pixel_scroll_window`.
-    pub fn accumulate_pending_pixel_scroll(
-        &mut self,
-        target_frame: crate::window::FrameId,
-        delta_y: f32,
-    ) {
-        self.pending_pixel_scroll = Some(PendingPixelScroll::accumulate(
-            self.pending_pixel_scroll,
-            target_frame,
-            delta_y,
-        ));
-    }
-
-    /// Observe pending scroll without taking ownership from the next redisplay.
-    pub fn pending_pixel_scroll_for_frame(&self, frame: crate::window::FrameId) -> Option<f32> {
-        self.pending_pixel_scroll
-            .and_then(|pending| pending.for_frame(frame))
-    }
-
-    /// Smooth scroll (Phase 1): take the pending trackpad pixel-scroll delta if it
-    /// targets `frame`, clearing it; returns the accumulated `delta_y`. The layout
-    /// pass converts it to pixels and applies it via `Engine::pixel_scroll_window`.
-    pub fn take_pending_pixel_scroll_for_frame(
-        &mut self,
-        frame: crate::window::FrameId,
-    ) -> Option<f32> {
-        match self.pending_pixel_scroll {
-            Some(pending) if pending.frame == frame => {
-                self.pending_pixel_scroll = None;
-                Some(pending.delta_y)
-            }
-            _ => None,
-        }
-    }
-}
-
-#[cfg(test)]
-mod pixel_scroll_accumulate_tests {
-    #[test]
-    fn accumulate_pixel_scroll_sums_same_frame_and_replaces_other() {
-        let mut eval = crate::emacs_core::eval::Context::new();
-        let frame_7 = crate::window::FrameId(7);
-        let frame_9 = crate::window::FrameId(9);
-        eval.accumulate_pending_pixel_scroll(frame_7, 3.5);
-        eval.accumulate_pending_pixel_scroll(frame_7, 2.0);
-        assert_eq!(
-            eval.pending_pixel_scroll_for_frame(frame_7),
-            Some(5.5),
-            "same-frame deltas sum (sub-pixel accumulation)"
-        );
-        eval.accumulate_pending_pixel_scroll(frame_9, -1.0);
-        assert_eq!(
-            eval.pending_pixel_scroll_for_frame(frame_9),
-            Some(-1.0),
-            "a different frame replaces the pending delta"
-        );
-        assert_eq!(eval.pending_pixel_scroll_for_frame(frame_7), None);
-    }
-}
 
 #[cfg(test)]
 #[path = "keyboard_test.rs"]

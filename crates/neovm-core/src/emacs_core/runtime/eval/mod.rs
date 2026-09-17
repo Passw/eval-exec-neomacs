@@ -3135,8 +3135,6 @@ pub struct Context {
     /// Consecutive graphical scroll commands retain a pixel goal, not a
     /// possibly clipped buffer column. Owned exclusively by this VM.
     pub(crate) scroll_goal: Option<crate::emacs_core::xdisp::motion::ScrollGoal>,
-    /// Smooth scroll accumulated for the next input-consuming redisplay.
-    pub(crate) pending_pixel_scroll: Option<crate::keyboard::PendingPixelScroll>,
     /// Host-display bridge for GUI frame realization.
     pub display_host: Option<Box<dyn DisplayHost>>,
     /// Frontend-owned opener for additional text terminals requested by
