@@ -59,6 +59,12 @@ docker run --rm --network host -v "$PWD/tmp/el9build:/build/src" \
       | sh -s -- -y --profile minimal --default-toolchain 1.96.1
     . "$HOME/.cargo/env"
     cd /build/src
+    # The clone is owned by your uid while the container runs as root, so git
+    # refuses it as dubiously owned -- silently, because package-rpm.sh discards
+    # stderr.  Without this line `git describe` and `git rev-parse` both fail,
+    # the version falls back to 0.0.0-dev, and rpmbuild rejects it at the very
+    # end with "Illegal char '-' (0x2d) in: Version".
+    git config --global --add safe.directory /build/src
     export NEOMACS_BUILD_PROFILE=release
     features=video,neomacs-layout-engine/freetype-bundled
     cargo build -p neomacs --features "$features" --profile release
@@ -84,6 +90,31 @@ Details that cost time to discover:
 - `make` is needed by `tikv-jemalloc-sys`, which runs `configure` and `make`.
 - The second `dnf install` is not optional: the packaging scripts execute the
   binary they stage, so the runtime closure has to be present.
+
+## Why there is no source RPM
+
+`rpmbuild -ba` on this spec produces a hollow `.src.rpm`, and RPM is behaving
+correctly: an SRPM carries the spec plus the files named in `SourceN:`, and this
+spec names none -- it has no `Source:`, no `%prep` and no `%build`, because it
+re-packages an already-built payload rather than compiling one.  Measured:
+
+```
+$ rpm -qpl neomacs-0.0.18-1.el9.src.rpm
+neomacs.spec                       # 6.9 KB, nothing else
+```
+
+Shipping that would be worse than shipping nothing, since it looks like source.
+Making it real means either embedding the 149 MB payload tarball as `Source0:`
+(an SRPM that contains prebuilt binaries, which Fedora and COPR reject as a
+source package), or writing a genuine source spec -- `Source0:` pointing at the
+upstream tree, `%build` running cargo, `BuildRequires`, and vendored crates
+because build hosts have no network.  The latter is the COPR/Packit path, and it
+is where an SRPM belongs anyway: COPR builds and serves it from the repo, and
+you stop hand-carrying the RPM at all.
+
+The packager identity is passed to the build as a macro rather than written into
+the spec, because Fedora's guidelines prohibit `Vendor:` and `Packager:` tags
+there -- the build system is meant to own them.
 
 ## What CI verifies
 

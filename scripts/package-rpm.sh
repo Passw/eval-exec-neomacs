@@ -202,9 +202,16 @@ gtk-update-icon-cache -q /usr/share/icons/hicolor 2>/dev/null || :
 - Release ${version}
 SPEC
 
+# The packager identity is passed as a macro, not written into the spec:
+# Fedora's packaging guidelines prohibit `Vendor:` and `Packager:` tags there
+# (the build system is meant to own them, and Fedora's own tree had to clean up
+# packages that set them).  This build has no distro build system to supply
+# them, so it is supplied here and rpm records it in the header, where
+# `rpm -qi` shows it.
 rpmbuild -bb \
   --define "_topdir $rpm_topdir" \
   --define "_dbpath $rpm_topdir/rpmdb" \
+  --define "packager NEO Emacs <noreply@github.com>" \
   --target "$rpm_arch" \
   "$rpm_topdir/SPECS/neomacs.spec"
 

@@ -116,10 +116,13 @@ cargo xtask fresh-build --release
 
 `libdrm-devel` and `gawk` are easy to miss — the first is linked by
 `gstreamer-allocators`, the second generates Lisp during the build — and
-`gcc-c++` is required because `simdutf` (via `rio-vt`) compiles C++. The inline
-browser (`--features webview`) additionally needs WPE WebKit
-(`wpewebkit-devel`, `libwpe-devel`, `wpebackend-fdo-devel`), `libsoup3-devel`
-and `clang-devel` for bindgen.
+`gcc-c++` is required because `simdutf` (via `rio-vt`) compiles C++.
+
+The inline browser (`--features webview`) is **not buildable from Fedora or RHEL
+repositories**: neither distro ships WPE WebKit — nothing provides
+`pkgconfig(wpe-webkit-2.0)` on either — so `crates/neomacs-webview/build.rs`
+fails its probe. That capability needs WPE WebKit and libsoup3 built from source
+or from a third-party repository, plus `clang-devel` for bindgen.
 
 The distributed `.rpm` is built on the target distro family rather than on the
 packaging host; see [releasing-linux.md](releasing-linux.md) for why, and for

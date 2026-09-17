@@ -253,6 +253,22 @@ test_rpm() {
   # so `%{?dist}` makes it neomacs-<version>-1.el9.<arch>.rpm rather than
   # neomacs-<version>-1.<arch>.rpm.
   artifact="$(find_one RPM-package "neomacs-*-1.*${rpm_arch}.rpm")"
+
+  # Refuse a version-stamped ncurses/tinfo requirement (issue #388).  That is
+  # what a package built on Debian-family hosts records --
+  # libtinfo.so.6(NCURSES6_TINFO_5.0.19991023)(64bit) -- and no Fedora provides
+  # that version, so the package installs nowhere in the RPM family.  A build on
+  # the target distro records the empty version instead:
+  # libtinfo.so.6()(64bit).  This check lives here rather than in the workflow
+  # so a local run exercises it too; an earlier version of it matched the
+  # library NAME and rejected the correct requirement, which only CI could have
+  # caught.
+  if rpm -qp --requires "$artifact" | grep -qE 'NCURSES'; then
+    echo "$artifact requires a versioned ncurses/tinfo symbol:" >&2
+    rpm -qp --requires "$artifact" | grep -E 'NCURSES' >&2
+    echo "no Fedora provides that symbol version; build the RPM on the target distro" >&2
+    return 1
+  fi
   root="$work_dir/rpm"
   mkdir -p "$root"
   rpm2cpio "$artifact" | (

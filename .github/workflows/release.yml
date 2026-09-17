@@ -292,27 +292,17 @@ jobs:
 
       # The point of the whole job: the package's own declared dependencies,
       # resolved by a real transaction on the distro it targets.  This is the
-      # check that issue #388 needed and nothing performed.
+      # check that issue #388 needed and nothing performed.  A package whose
+      # requirements el9 cannot satisfy -- a versioned ncurses/tinfo symbol, say
+      # -- fails right here.
       #
-      # The ncurses assertion is deliberately fatal rather than informational:
-      # the correctness argument rests on el9's ncurses having no symbol
-      # version stamps, and if a future image ever grew them this job must stop
-      # rather than ship a package only el9 can install.
+      # The explicit assertion on that symbol version lives in
+      # test-linux-release-artifacts.sh (the audit step below), not here, so a
+      # local run exercises it too; it also is what names the requirement in the
+      # failure output.
       - name: Install the package on el9 (no --nodeps)
         run: |
           dnf install -y ./dist/*.rpm
-          # Match the symbol VERSION stamp, not the library name.  What #388
-          # shipped was
-          #   libtinfo.so.6(NCURSES6_TINFO_5.0.19991023)(64bit)
-          # while what an el9 build correctly records is the empty version,
-          #   libtinfo.so.6()(64bit)
-          # and an earlier version of this check rejected that correct line.
-          if rpm -qp --requires ./dist/*.rpm | grep -qE 'NCURSES'; then
-            echo "the package carries a versioned ncurses/tinfo requirement:" >&2
-            rpm -qp --requires ./dist/*.rpm | grep -E 'NCURSES' >&2
-            echo "these are unsatisfiable on Fedora -- see issue #388" >&2
-            exit 1
-          fi
           /usr/bin/neomacs --version
           timeout 60 /usr/bin/neomacs --batch --eval "(kill-emacs 0)"
 

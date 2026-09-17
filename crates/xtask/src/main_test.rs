@@ -4216,6 +4216,11 @@ fn release_jobs_share_the_features_their_platform_declares() {
 
     for (job_name, platform) in [
         ("build Linux", "linux"),
+        // The RPM is built in its own job, inside el9, and carries its own copy
+        // of RELEASE_FEATURES.  It is listed here so that copy is pinned to the
+        // manifest too -- an unpinned duplicate is exactly how a product ships
+        // missing a capability it promises.
+        ("build RPM el9", "linux"),
         ("build macOS", "darwin"),
         ("build Windows", "windows"),
     ] {
