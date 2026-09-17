@@ -32,6 +32,8 @@ enum Token {
     String { bytes: Arc<[u8]>, multibyte: bool },
     List,
     Attributes,
+    Filtered,
+    Filter(Option<Arc<[usize]>>),
     Attribute(LFaceAttr),
     Decoration,
     DecorationProperty(DecorationProperty),
@@ -113,6 +115,24 @@ fn capture_face(value: Value) -> Arc<[Token]> {
                     tokens.push(Token::Atom(value.bits()));
                     continue;
                 };
+                if items[0]
+                    .as_symbol_name()
+                    .is_some_and(|name| matches!(name, "filtered" | ":filtered"))
+                {
+                    tokens.push(Token::Filtered);
+                    if items.len() >= 3 {
+                        // Filters inspect a flat predicate list. Window operands
+                        // are compared by identity, not by their contents.
+                        let filter = list_to_vec(&items[1])
+                            .map(|items| items.into_iter().map(|value| value.bits()).collect());
+                        tokens.push(Token::Filter(filter));
+                        pending.push(Work::End);
+                        // The resolver interprets the remaining tail as a face
+                        // list/plist, including Neomacs' flattened spec syntax.
+                        pending.push(Work::Face(value.cons_cdr().cons_cdr()));
+                    }
+                    continue;
+                }
                 if value
                     .cons_car()
                     .as_symbol_name()

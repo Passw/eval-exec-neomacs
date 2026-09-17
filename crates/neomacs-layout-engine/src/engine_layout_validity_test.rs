@@ -212,6 +212,46 @@ fn retained_presentation_rejects_mutated_decoration_color_string() {
 }
 
 #[test]
+fn retained_geometry_rejects_mutated_filtered_prefix_face_height() {
+    assert_layout_mutation_with_measurement(
+        r##"(setq prefix-face (list :height 1.0)
+                   line-prefix (copy-sequence "xx"))
+             (put-text-property 0 2 'face
+               (list :filtered (list :window-system 'neomacs) prefix-face)
+               line-prefix)"##,
+        "(setcar (cdr prefix-face) 2.0)",
+        true,
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_prefix_window_filter_operand() {
+    assert_layout_mutation_with_measurement(
+        r##"(set-window-parameter nil 'prefix-scale 'large)
+             (setq prefix-filter (list :window 'prefix-scale 'large)
+                   line-prefix (copy-sequence "xx"))
+             (put-text-property 0 2 'face
+               (list :filtered prefix-filter (list :height 2.0)) line-prefix)"##,
+        "(setcar (cdr (cdr prefix-filter)) 'small)",
+        true,
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_replacement_window_system_filter() {
+    assert_layout_mutation_with_measurement(
+        r##"(setq prefix-filter (list :window-system 'neomacs)
+                   replacement (copy-sequence "xx")
+                   line-prefix (copy-sequence " "))
+             (put-text-property 0 2 'face
+               (list :filtered prefix-filter (list :height 2.0)) replacement)
+             (put-text-property 0 1 'display replacement line-prefix)"##,
+        "(setcar (cdr prefix-filter) nil)",
+        true,
+    );
+}
+
+#[test]
 fn retained_geometry_rejects_mutated_prefix_face_height() {
     assert_layout_mutation_with_measurement(
         r##"(setq prefix-face (list :height 1.0) line-prefix (copy-sequence "xx")) (put-text-property 0 2 'face prefix-face line-prefix)"##,

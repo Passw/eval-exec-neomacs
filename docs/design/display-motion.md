@@ -95,8 +95,13 @@ plists share `DecorationProperty` with the face parser; capture includes support
 operands, mutable color bytes and box width-pair components. Presentation tests
 compare the published glyph faces against fresh layout, since decoration changes
 need not move source-position geometry. This does not change existing box-width
-realization semantics. Compound font operands, filtered-face conditions and
-image/resource expressions remain
+realization semantics. Filtered faces capture the flat predicate list by identity
+(GNU `xfaces.c:evaluate_face_filter` uses `EQ` for window operands) and traverse
+the wrapped face tail with the same cycle-safe face capture. This includes the
+current resolver's window-system extension without evaluating predicates during
+capture or changing its filter semantics. Prefix and replacement-string tests
+cover both nested face mutations and changes to the filter's operands.
+Compound font operands and image/resource expressions remain
 audit items, not a claim of complete mutable-Lisp-graph invalidation.
 
 `LayoutInvisibilityInput` captures the effective buffer's ordered invisibility
