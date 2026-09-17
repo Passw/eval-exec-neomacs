@@ -639,7 +639,20 @@ pub fn start_weston_with_desktop(
         .arg(format!("--width={width}"))
         .arg(format!("--height={height}"))
         .arg(format!("--scale={scale}"))
-        .arg("--fake-seat")
+        // Deliberately no `--fake-seat`.  It only exists in newer weston, and
+        // the ubuntu-24.04 runner ships weston 13.0.0, where it is a fatal
+        // `unhandled option: --fake-seat` that kills the compositor before it
+        // creates its socket -- so the harness's 5s wait lapsed and every
+        // Wayland scenario failed at startup rather than composing.
+        //
+        // Nothing here needs the seat either: the weston backend is used only
+        // for composition and geometry scenarios, and the tests that actually
+        // synthesise input (`native_scrolling`) run on sway instead.  Measured
+        // with weston 15: passing and omitting the flag give identical results
+        // across every weston scenario, so the option bought nothing and cost
+        // the whole Wayland half of this suite on the runner.  If a scenario
+        // ever does need a seat, probe `weston --help` for the option rather
+        // than assuming it, or it will break the runner again.
         .arg(format!("--log={}", log_path.display()))
         .env("XDG_RUNTIME_DIR", runtime_dir)
         .stdout(Stdio::null())
