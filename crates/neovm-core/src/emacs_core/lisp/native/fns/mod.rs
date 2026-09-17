@@ -79,8 +79,13 @@ unsafe fn collation_errno() -> libc::c_int {
     unsafe { *collation_errno_location() }
 }
 
+/// GNU's `emacs_strerror`, from `emacs_core::errno`.
+///
+/// This one was not merely a duplicate: it rendered the errno with Rust's
+/// `io::Error` Display, so every collation error it reported carried a
+/// " (os error N)" suffix GNU never emits. The shared helper cannot do that.
 fn collation_errno_message(errno: libc::c_int) -> String {
-    std::io::Error::from_raw_os_error(errno).to_string()
+    crate::emacs_core::errno::emacs_strerror(errno)
 }
 
 // ---------------------------------------------------------------------------

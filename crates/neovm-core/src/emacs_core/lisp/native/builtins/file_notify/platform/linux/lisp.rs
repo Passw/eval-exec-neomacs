@@ -2,20 +2,28 @@
 
 use super::super::super::*;
 use super::InotifyRequest;
+use crate::emacs_core::errno::Errno;
 use crate::emacs_core::error::expect_args;
 
+// Both helpers below feed GNU's `report_file_notify_error` (`src/inotify.c`),
+// which reads the *global* `errno` at the time it runs rather than taking one
+// as an argument.  The errnos here are named rather than their text being
+// spelled out, because these are exactly the values GNU's argument shapes are
+// observed to leave behind (see the oracle expectation for `inotify-rm-watch`).
 fn unknown_aspect_error(aspect: Value) -> Flow {
     file_notify_error(
         "Unknown aspect",
-        Some("Invalid argument".to_string()),
+        Some(ErrorDetail::Os(Errno::new(libc::EINVAL))),
         Some(aspect),
     )
 }
 
-fn invalid_descriptor_error(descriptor: Value, detail: &str) -> Flow {
+/// `src/inotify.c:502`.  A cons is rejected after GNU has already set `EINVAL`
+/// probing the descriptor's shape; a non-cons leaves `ENOENT`.
+fn invalid_descriptor_error(descriptor: Value, detail: Errno) -> Flow {
     file_notify_error(
         "Invalid descriptor ",
-        Some(detail.to_string()),
+        Some(ErrorDetail::Os(detail)),
         Some(descriptor),
     )
 }
@@ -128,9 +136,9 @@ pub(crate) fn inotify_add_watch(
 pub(crate) fn inotify_rm_watch(args: Vec<Value>) -> EvalResult {
     expect_args("inotify-rm-watch", &args, 1)?;
     let detail = if args[0].is_cons() {
-        "Invalid argument"
+        Errno::new(libc::EINVAL)
     } else {
-        "No such file or directory"
+        Errno::new(libc::ENOENT)
     };
     let Some(watch_id) = extract_watch_id(args[0]) else {
         return Err(invalid_descriptor_error(args[0], detail));

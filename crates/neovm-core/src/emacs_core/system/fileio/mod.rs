@@ -3085,26 +3085,14 @@ fn file_error_symbol(kind: ErrorKind) -> &'static str {
     }
 }
 
-/// The bare `strerror` text for an errno, matching GNU's `emacs_strerror`
-/// (e.g. ENOENT -> "No such file or directory").  Rust's
-/// `io::Error::to_string()` appends "(os error N)", which GNU never emits, so
-/// go through libc `strerror` directly.
-#[cfg(unix)]
+/// GNU's `emacs_strerror`, now defined once in `emacs_core::errno`.
+///
+/// This module used to carry its own copy -- as did `system/process`,
+/// `lisp/native/fns` and the file-notify adapters, four copies of the same
+/// eight lines. The one below is a thin alias so this file's errno-keyed
+/// branches read the way they did.
 fn errno_strerror(errno: i32) -> String {
-    // SAFETY: `strerror` returns a pointer to a static (per-thread) C string.
-    unsafe {
-        let ptr = libc::strerror(errno);
-        if ptr.is_null() {
-            String::new()
-        } else {
-            CStr::from_ptr(ptr).to_string_lossy().into_owned()
-        }
-    }
-}
-
-#[cfg(not(unix))]
-fn errno_strerror(errno: i32) -> String {
-    std::io::Error::from_raw_os_error(errno).to_string()
+    crate::emacs_core::errno::emacs_strerror(errno)
 }
 
 /// Best-effort errno for a `std::io::Error` lacking a raw OS code, used so the

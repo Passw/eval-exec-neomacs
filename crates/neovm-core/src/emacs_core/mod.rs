@@ -277,6 +277,12 @@ pub mod cus_start_platform_vars;
 pub mod dynamic_module;
 #[path = "system/environment/mod.rs"]
 pub(crate) mod environment;
+/// GNU's errno-to-text boundary ([`errno::emacs_strerror`]).  Not a mirror
+/// module -- there is no GNU `src/errno.c`; the function it ports lives in
+/// `src/emacs.c`.  See the module docs for why the text cannot be Rust's
+/// `io::Error` Display.
+#[path = "system/errno/mod.rs"]
+pub mod errno;
 #[path = "system/fileio/mod.rs"]
 pub mod fileio;
 #[path = "system/filelock/mod.rs"]

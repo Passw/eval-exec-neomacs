@@ -30,9 +30,12 @@ pub(super) fn file_name_to_lisp(ctx: &crate::emacs_core::eval::Context, path: &P
     }
 }
 
-pub(crate) fn file_notify_error(
+/// The `file-notify-error` data is `(MESSAGE DETAIL . OBJECTS)`.  DETAIL is an
+/// [`ErrorDetail`] and nothing else, so a Rust `Display` string cannot be
+/// smuggled into the slot GNU fills from `errno`.
+pub(super) fn file_notify_error(
     message: &str,
-    detail: Option<String>,
+    detail: Option<ErrorDetail>,
     object: Option<Value>,
 ) -> Flow {
     let mut tail = match object {
@@ -41,7 +44,7 @@ pub(crate) fn file_notify_error(
         _ => Value::NIL,
     };
     if let Some(detail) = detail {
-        tail = Value::cons(Value::string(&detail), tail);
+        tail = Value::cons(Value::string(&detail.to_string()), tail);
     }
     let raw_data = Value::cons(Value::string(message), tail);
     crate::emacs_core::error::signal_with_data("file-notify-error", raw_data)

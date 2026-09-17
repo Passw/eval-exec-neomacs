@@ -7,11 +7,14 @@ mod model;
 mod platform;
 mod registry;
 
-pub(super) use lisp::file_notify_error;
+// Private to the subsystem: every caller is inside `file_notify`, and keeping
+// it here means minting a `file-notify-error` stays within the module that
+// owns `ErrorDetail`.  Descendants still reach it through `use super::*`.
+use lisp::file_notify_error;
 use model::{
-    Backend as FileNotifyBackend, BackendEvent as FileNotifyEvent, DrainBatch, FileWatch,
-    RemoveWatchOutcome, TrackedWatch, WatchActivity, WatchId, WatchIdAllocator, WatchRegistration,
-    finish_watch_drain,
+    Backend as FileNotifyBackend, BackendEvent as FileNotifyEvent, DrainBatch, ErrorDetail,
+    FileWatch, RemoveWatchOutcome, TrackedWatch, WatchActivity, WatchId, WatchIdAllocator,
+    WatchRegistration, finish_watch_drain,
 };
 use registry::WatchRegistry;
 

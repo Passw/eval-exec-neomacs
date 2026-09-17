@@ -296,3 +296,67 @@ fn native_queue_overflow_cannot_continue_an_ambiguous_watch_epoch() {
             .contains("ownership epoch was lost")
     );
 }
+
+/// A failed system call must reach Lisp carrying GNU's text.
+///
+/// GNU builds every `file-notify-error` detail in `report_file_notify_error`
+/// (`src/fileio.c:307`) by rendering the failing call's `errno` with
+/// `emacs_strerror`.  Rust's `Display` for the same failure appends
+/// " (os error N)", which GNU never emits -- and that is the text this worker
+/// used to send, because the error crossed the worker/evaluator thread
+/// boundary as a stringified `io::Error`, destroying the errno on the way.
+///
+/// This is the regression the boundary type exists to prevent, so it is
+/// pinned here rather than only at the oracle level: `inotify-add-watch` on a
+/// missing path must report `"No such file or directory"`, not
+/// `"No such file or directory (os error 2)"`.
+#[test]
+fn os_failure_reaches_lisp_with_gnus_strerror_text() {
+    let error = std::io::Error::from_raw_os_error(libc::ENOENT);
+    assert!(
+        error.to_string().contains("os error"),
+        "precondition: Rust's own rendering must differ, or this test proves nothing"
+    );
+
+    let detail = ErrorDetail::os(&error);
+
+    assert_eq!(detail.to_string(), "No such file or directory");
+    assert!(
+        !detail.to_string().contains("os error"),
+        "a worker failure must not carry Rust's rendering to Lisp: {detail}"
+    );
+}
+
+/// The composed details keep the OS half GNU-shaped too, since both the
+/// inotify rollback paths and the multi-watch drain report through them.
+#[test]
+fn composed_details_keep_the_os_half_gnus() {
+    assert_eq!(
+        ErrorDetail::Context {
+            message: "could not roll back unclaimed inotify watch",
+            errno: Errno::new(libc::ENOENT),
+        }
+        .to_string(),
+        "could not roll back unclaimed inotify watch: No such file or directory"
+    );
+    assert_eq!(
+        ErrorDetail::Lines(vec![
+            ErrorDetail::Os(Errno::new(libc::ENOENT)),
+            ErrorDetail::Message("inotify worker exited"),
+        ])
+        .to_string(),
+        "No such file or directory\ninotify worker exited"
+    );
+}
+
+/// The errnos the Lisp entry points name must render the text GNU emits for
+/// the observed argument shapes (`src/inotify.c:502` reads the global `errno`,
+/// so these two values are what its callers are observed to leave behind).
+#[test]
+fn descriptor_errnos_render_gnus_observed_text() {
+    assert_eq!(Errno::new(libc::EINVAL).to_string(), "Invalid argument");
+    assert_eq!(
+        Errno::new(libc::ENOENT).to_string(),
+        "No such file or directory"
+    );
+}

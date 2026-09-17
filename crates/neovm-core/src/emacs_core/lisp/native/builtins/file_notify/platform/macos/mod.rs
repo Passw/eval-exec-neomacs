@@ -55,11 +55,12 @@ mod native {
         self, DeliveryReceiver, DeliveryRecord, DeliverySender, EVENT_CAPACITY, PublishOutcome,
     };
     use super::super::super::{
-        DrainBatch, FileNotifyBackend, FileNotifyEvent, FileWatch, RemoveWatchOutcome,
+        DrainBatch, ErrorDetail, FileNotifyBackend, FileNotifyEvent, FileWatch, RemoveWatchOutcome,
         TrackedWatch, WatchActivity, WatchId, WatchIdAllocator, WatchRegistration,
         file_notify_error, finish_watch_drain,
     };
     use super::*;
+    use crate::emacs_core::errno::Errno;
     use crate::emacs_core::error::Flow;
     use crate::emacs_core::process::WaitNotifier;
     use crate::emacs_core::value::Value;
@@ -141,7 +142,7 @@ mod native {
 
     enum WorkerControl {
         Terminal(NativeEvent),
-        Failed(String),
+        Failed(ErrorDetail),
     }
 
     struct NativeWatch {
@@ -166,11 +167,14 @@ mod native {
         Shutdown,
     }
 
+    /// Why a kqueue watch registration did not complete.  The payload is an
+    /// [`ErrorDetail`], so the OS half of each of these is still rendered as
+    /// GNU's `strerror` rather than Rust's `Display`.
     #[derive(Debug)]
     enum KqueueAddWatchError {
-        Worker(String),
-        Register(String),
-        Snapshot(String),
+        Worker(ErrorDetail),
+        Register(ErrorDetail),
+        Snapshot(ErrorDetail),
     }
 
     struct Worker {
@@ -185,7 +189,7 @@ mod native {
             let worker_kqueue = kqueue().map_err(|error| {
                 file_notify_error(
                     "File watching is not available",
-                    Some(error.to_string()),
+                    Some(ErrorDetail::rustix(error)),
                     None,
                 )
             })?;
@@ -193,7 +197,7 @@ mod native {
                 UnixDatagram::pair().map_err(|error| {
                     file_notify_error(
                         "File watching is not available",
-                        Some(error.to_string()),
+                        Some(ErrorDetail::os(&error)),
                         None,
                     )
                 })?;
@@ -202,7 +206,7 @@ mod native {
                 .map_err(|error| {
                     file_notify_error(
                         "File watching is not available",
-                        Some(error.to_string()),
+                        Some(ErrorDetail::os(&error)),
                         None,
                     )
                 })?;
@@ -220,7 +224,7 @@ mod native {
                 .map_err(|error| {
                     file_notify_error(
                         "File watching is not available",
-                        Some(error.to_string()),
+                        Some(ErrorDetail::os(&error)),
                         None,
                     )
                 })?;
@@ -232,15 +236,15 @@ mod native {
             })
         }
 
-        fn send_command(&self, command: Command) -> Result<(), String> {
+        fn send_command(&self, command: Command) -> Result<(), ErrorDetail> {
             self.commands
                 .send(command)
-                .map_err(|_| "kqueue worker exited".to_owned())?;
+                .map_err(|_| ErrorDetail::Message("kqueue worker exited"))?;
             loop {
                 match self.command_socket.send(&[1]) {
                     Ok(_) => return Ok(()),
                     Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
-                    Err(error) => return Err(error.to_string()),
+                    Err(error) => return Err(ErrorDetail::os(&error)),
                 }
             }
         }
@@ -264,11 +268,13 @@ mod native {
             })
             .map_err(KqueueAddWatchError::Worker)?;
             reply_rx.recv().map_err(|_| {
-                KqueueAddWatchError::Worker("kqueue worker exited while adding a watch".to_owned())
+                KqueueAddWatchError::Worker(ErrorDetail::Message(
+                    "kqueue worker exited while adding a watch",
+                ))
             })?
         }
 
-        fn remove(&self, descriptor: i64) -> Result<bool, String> {
+        fn remove(&self, descriptor: i64) -> Result<bool, ErrorDetail> {
             let (reply_tx, reply_rx) = mpsc::sync_channel(1);
             self.send_command(Command::Remove {
                 descriptor,
@@ -276,7 +282,7 @@ mod native {
             })?;
             reply_rx
                 .recv()
-                .map_err(|_| "kqueue worker exited while removing a watch".to_owned())
+                .map_err(|_| ErrorDetail::Message("kqueue worker exited while removing a watch"))
         }
     }
 
@@ -292,7 +298,7 @@ mod native {
     fn register_command_socket(
         kqueue_fd: &OwnedFd,
         command_socket: &UnixDatagram,
-    ) -> Result<(), String> {
+    ) -> Result<(), ErrorDetail> {
         let change = Event::new(
             EventFilter::Read(command_socket.as_raw_fd()),
             EventFlags::ADD | EventFlags::ENABLE | EventFlags::CLEAR,
@@ -303,7 +309,7 @@ mod native {
         // exits, and command application never replaces that socket.
         unsafe { kevent(kqueue_fd, &[change], events, None) }
             .map(|_| ())
-            .map_err(|error| error.to_string())
+            .map_err(ErrorDetail::rustix)
     }
 
     fn drain_command_socket(command_socket: &UnixDatagram) -> io::Result<()> {
@@ -322,7 +328,7 @@ mod native {
         kqueue_fd: &OwnedFd,
         fd: RawFd,
         actions: BitFlags<KqueueVnodeAction>,
-    ) -> Result<(), String> {
+    ) -> Result<(), ErrorDetail> {
         let flags = to_rustix_vnode_events(actions);
         let change = Event::new(
             EventFilter::Vnode { vnode: fd, flags },
@@ -334,7 +340,7 @@ mod native {
         // registration until the filter is removed by closing that fd.
         unsafe { kevent(kqueue_fd, &[change], events, None) }
             .map(|_| ())
-            .map_err(|error| error.to_string())
+            .map_err(ErrorDetail::rustix)
     }
 
     fn to_rustix_vnode_events(actions: BitFlags<KqueueVnodeAction>) -> VnodeEvents {
@@ -394,7 +400,7 @@ mod native {
                 )
             };
             if let Err(error) = wait_result {
-                events.finish_with(WorkerControl::Failed(error.to_string()), || {
+                events.finish_with(WorkerControl::Failed(ErrorDetail::rustix(error)), || {
                     for watch in watches.values() {
                         watch.activity.terminate();
                     }
@@ -444,7 +450,7 @@ mod native {
             // while vnode activity remains hot. Always poll commands after
             // resolving the complete pre-command vnode batch.
             if let Err(error) = drain_command_socket(&command_socket) {
-                events.finish_with(WorkerControl::Failed(error.to_string()), || {
+                events.finish_with(WorkerControl::Failed(ErrorDetail::os(&error)), || {
                     for watch in watches.values() {
                         watch.activity.terminate();
                     }
@@ -470,7 +476,7 @@ mod native {
                                     .map(DirectorySnapshot::read)
                                     .transpose()
                                     .map_err(|error| {
-                                        KqueueAddWatchError::Snapshot(error.to_string())
+                                        KqueueAddWatchError::Snapshot(ErrorDetail::os(&error))
                                     })
                             });
                         match result {
@@ -547,7 +553,7 @@ mod native {
                     let new_snapshot = DirectorySnapshot::read(&self.path).map_err(|error| {
                         file_notify_error(
                             "Error while reading watched directory",
-                            Some(error.to_string()),
+                            Some(ErrorDetail::os(&error)),
                             Some(Value::string(self.path.display().to_string())),
                         )
                     })?;
@@ -653,7 +659,7 @@ mod native {
             rustix::fs::open(path, flags, Mode::empty()).map_err(|error| {
                 file_notify_error(
                     "File cannot be opened",
-                    Some(error.to_string()),
+                    Some(ErrorDetail::rustix(error)),
                     Some(Value::string(path.display().to_string())),
                 )
             })
@@ -784,7 +790,7 @@ mod native {
             let mut failure = (!failures.is_empty()).then(|| {
                 file_notify_error(
                     "Error while retrieving file system events",
-                    Some(failures.join("\n")),
+                    Some(ErrorDetail::Lines(failures)),
                     None,
                 )
             });

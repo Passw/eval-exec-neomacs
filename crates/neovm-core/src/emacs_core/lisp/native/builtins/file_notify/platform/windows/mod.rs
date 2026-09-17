@@ -1,7 +1,7 @@
 #[cfg(target_os = "windows")]
 use super::super::{
-    DrainBatch, FileNotifyBackend, FileWatch, RemoveWatchOutcome, TrackedWatch, WatchActivity,
-    WatchIdAllocator, file_notify_error, finish_watch_drain,
+    DrainBatch, ErrorDetail, FileNotifyBackend, FileWatch, RemoveWatchOutcome, TrackedWatch,
+    WatchActivity, WatchIdAllocator, file_notify_error, finish_watch_drain,
 };
 use super::super::{FileNotifyEvent, WatchId, WatchRegistration};
 #[cfg(target_os = "windows")]
@@ -191,7 +191,7 @@ mod native {
             if !path.exists() {
                 return Err(file_notify_error(
                     "Cannot watch file",
-                    Some("No such file or directory".to_owned()),
+                    Some(ErrorDetail::Message("No such file or directory")),
                     Some(Value::string(path.display().to_string())),
                 ));
             }
@@ -208,7 +208,7 @@ mod native {
             .map_err(|error| {
                 file_notify_error(
                     "Cannot watch file",
-                    Some(error),
+                    Some(ErrorDetail::windows(error)),
                     Some(Value::string(path.display().to_string())),
                 )
             })?;

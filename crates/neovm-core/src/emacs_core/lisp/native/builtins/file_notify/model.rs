@@ -4,12 +4,100 @@
 //! That keeps platform-specific flag vocabularies out of the common state
 //! machine and makes cross-platform request mismatches a compile-time error.
 
+use crate::emacs_core::errno::Errno;
 use crate::emacs_core::error::Flow;
 use crate::emacs_core::process::WaitNotifier;
 use crate::emacs_core::value::Value;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+
+/// The detail slot of a `file-notify-error`, and the error vocabulary every
+/// native file-notify worker returns.
+///
+/// GNU has exactly one producer for this slot: `report_file_notify_error`
+/// (`src/fileio.c:307`) reads the global `errno` at the point of the failing
+/// system call and renders `emacs_strerror (errno)`.  Every detail GNU emits
+/// is therefore *derived from an errno*; none is authored as text.
+///
+/// This slot used to be an `Option<String>`, which accepted anything.  The
+/// inotify worker filled it with Rust's `Display` for a failed system call --
+/// `"No such file or directory (os error 2)"`, a string GNU never emits -- and
+/// since stringifying a Rust error destroys the errno, no downstream code
+/// could recover GNU's text.  There is deliberately no `String` variant and no
+/// `From<String>` here, so that mistake is a compile error rather than a
+/// parity-test failure.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum ErrorDetail {
+    /// A failed system call, carried as the errno rather than its text: the
+    /// errno is known only where the call failed, and GNU renders it with
+    /// `strerror` (see [`Errno`]).
+    Os(Errno),
+    /// A message this crate authored (worker lifecycle, descriptor shape).
+    /// `&'static str`, so no `format!` or `Display` of a foreign error can be
+    /// routed through it by accident.
+    Message(&'static str),
+    /// An authored message about a failed system call, rendered
+    /// `"<message>: <strerror>"`.
+    Context {
+        /// The authored half.
+        message: &'static str,
+        /// The OS half, known where the call failed.
+        errno: Errno,
+    },
+    /// Several failures reported as one, one per line.
+    Lines(Vec<ErrorDetail>),
+    /// A Windows adapter's error text.
+    ///
+    /// The Win32 error space is not errno's: `io::Error::raw_os_error` there
+    /// is a `GetLastError` code, which `strerror` would misrender, and GNU's
+    /// own Windows build reaches these messages by a different route.  So
+    /// this is the one place authored text is carried, and it exists only on
+    /// Windows -- no unix error path can reach it.
+    #[cfg(windows)]
+    Windows(String),
+}
+
+impl ErrorDetail {
+    /// Adopt an OS error while its errno is still live.
+    #[cfg(unix)]
+    pub(super) fn os(error: &std::io::Error) -> Self {
+        Self::Os(Errno::from_io(error))
+    }
+
+    /// Adopt a rustix failure, which reports its errno as a raw code.
+    #[cfg(unix)]
+    pub(super) fn rustix(error: rustix::io::Errno) -> Self {
+        Self::Os(Errno::new(error.raw_os_error()))
+    }
+
+    /// Adopt a Windows adapter's error text.
+    #[cfg(windows)]
+    pub(super) fn windows(message: String) -> Self {
+        Self::Windows(message)
+    }
+}
+
+impl std::fmt::Display for ErrorDetail {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Os(errno) => write!(formatter, "{errno}"),
+            Self::Message(message) => formatter.write_str(message),
+            #[cfg(windows)]
+            Self::Windows(message) => formatter.write_str(message),
+            Self::Context { message, errno } => write!(formatter, "{message}: {errno}"),
+            Self::Lines(details) => {
+                for (index, detail) in details.iter().enumerate() {
+                    if index > 0 {
+                        formatter.write_str("\n")?;
+                    }
+                    write!(formatter, "{detail}")?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
 
 /// Evaluator-owned Lisp state for one native watch.
 ///

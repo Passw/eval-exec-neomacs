@@ -7,8 +7,8 @@
 
 use super::super::delivery::DeliveryRecord;
 use super::super::{
-    DrainBatch, FileNotifyBackend, FileNotifyEvent, FileWatch, RemoveWatchOutcome, TrackedWatch,
-    WatchActivity, WatchId, WatchIdAllocator, WatchRegistration, file_notify_error,
+    DrainBatch, ErrorDetail, FileNotifyBackend, FileNotifyEvent, FileWatch, RemoveWatchOutcome,
+    TrackedWatch, WatchActivity, WatchId, WatchIdAllocator, WatchRegistration, file_notify_error,
     finish_watch_drain,
 };
 use crate::emacs_core::error::Flow;
@@ -363,7 +363,7 @@ impl FileNotifyBackend for InotifyBackend {
                             events.extend(translated);
                         }
                         WorkerControl::Failed(error) => {
-                            failures.push(error.to_string());
+                            failures.push(error);
                             terminated
                                 .extend(self.watches.iter().map(|watch| watch.common.id.clone()));
                         }
@@ -384,7 +384,7 @@ impl FileNotifyBackend for InotifyBackend {
         let failure = (!failures.is_empty()).then(|| {
             file_notify_error(
                 "Error while retrieving file system events",
-                Some(failures.join("\n")),
+                Some(ErrorDetail::Lines(failures)),
                 None,
             )
         });
