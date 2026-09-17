@@ -66,24 +66,7 @@ the test oracle, so every rewritten subsystem is verified to behave identically.
 Watch more demos and development updates on [Eval Exec's YouTube channel](https://www.youtube.com/@eval-exec).
 
 <!-- BEGIN YOUTUBE-CARDS -->
-<a href="https://www.youtube.com/watch?v=X7CGiyeA-cA">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://ytcards.demolab.com/?id=X7CGiyeA-cA&title=NEO+Emacs%3A+Animated+Buffer+Transitions&lang=en&timestamp=1787985499&background_color=%230d1117&title_color=%23ffffff&stats_color=%23dedede&max_title_lines=2&width=250&border_radius=5">
-    <img src="https://ytcards.demolab.com/?id=X7CGiyeA-cA&title=NEO+Emacs%3A+Animated+Buffer+Transitions&lang=en&timestamp=1787985499&background_color=%23ffffff&title_color=%2324292f&stats_color=%2357606a&max_title_lines=2&width=250&border_radius=5" alt="NEO Emacs: Animated Buffer Transitions" title="NEO Emacs: Animated Buffer Transitions">
-  </picture>
-</a>
-<a href="https://www.youtube.com/watch?v=ybV6ZtM00lA">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://ytcards.demolab.com/?id=ybV6ZtM00lA&title=NEO+Emacs+%28WIP%29+v0.0.14+released%2C+still+in+it%27s+early+development&lang=en&timestamp=1784906652&background_color=%230d1117&title_color=%23ffffff&stats_color=%23dedede&max_title_lines=2&width=250&border_radius=5">
-    <img src="https://ytcards.demolab.com/?id=ybV6ZtM00lA&title=NEO+Emacs+%28WIP%29+v0.0.14+released%2C+still+in+it%27s+early+development&lang=en&timestamp=1784906652&background_color=%23ffffff&title_color=%2324292f&stats_color=%2357606a&max_title_lines=2&width=250&border_radius=5" alt="NEO Emacs (WIP) v0.0.14 released, still in it's early development" title="NEO Emacs (WIP) v0.0.14 released, still in it's early development">
-  </picture>
-</a>
-<a href="https://www.youtube.com/watch?v=Q97LoqYSikg">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://ytcards.demolab.com/?id=Q97LoqYSikg&title=NEO+Emacs+%28WIP%29+is+developing+GPU+Shader&lang=en&timestamp=1784559839&background_color=%230d1117&title_color=%23ffffff&stats_color=%23dedede&max_title_lines=2&width=250&border_radius=5">
-    <img src="https://ytcards.demolab.com/?id=Q97LoqYSikg&title=NEO+Emacs+%28WIP%29+is+developing+GPU+Shader&lang=en&timestamp=1784559839&background_color=%23ffffff&title_color=%2324292f&stats_color=%2357606a&max_title_lines=2&width=250&border_radius=5" alt="NEO Emacs (WIP) is developing GPU Shader" title="NEO Emacs (WIP) is developing GPU Shader">
-  </picture>
-</a>
+
 <!-- END YOUTUBE-CARDS -->
 
 ### Feature demos
