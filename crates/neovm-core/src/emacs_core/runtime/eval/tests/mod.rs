@@ -25780,6 +25780,7 @@ fn a_speculated_call_caches_a_bit_op_inlining_callee_and_sees_its_redefinition()
 /// ones, nil for each missing optional, and the rest consed. Driven through
 /// `apply`'s native path so every argument count is reachable, including a
 /// callee wider than the marshaling's stack buffer.
+#[cfg(feature = "jit")]
 #[test]
 fn native_calls_marshal_optional_and_rest_arguments() {
     crate::test_utils::init_test_tracing();
@@ -25890,6 +25891,7 @@ fn native_calls_marshal_optional_and_rest_arguments() {
     assert!(native >= 60, "native calls checked: {native}");
 }
 
+#[cfg(feature = "jit")]
 #[test]
 fn jit_apply_enters_a_compiled_callee_natively() {
     crate::test_utils::init_test_tracing();
