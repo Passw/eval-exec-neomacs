@@ -94,6 +94,73 @@ fn assert_layout_mutation_invalidates_geometry(setup: &str, mutation: &str) {
 }
 
 #[test]
+fn retained_geometry_rejects_mutated_list_display_space() {
+    assert_prefix_spec_mutation_invalidates_geometry(
+        "wrap-prefix",
+        r##"(progn (setq prefix-space (list 'space :width 2) prefix-text (copy-sequence " ")) (put-text-property 0 1 'display (list '(raise 0) prefix-space) prefix-text) prefix-text)"##,
+        "(setcar (cdr (cdr prefix-space)) 6)",
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_disabled_display_space() {
+    assert_prefix_spec_mutation_invalidates_geometry(
+        "line-prefix",
+        r##"(progn (setq prefix-space (list 'space :width 2) prefix-text (copy-sequence " ")) (put-text-property 0 1 'display (list 'disable-eval (vector prefix-space)) prefix-text) prefix-text)"##,
+        "(setcar (cdr (cdr prefix-space)) 6)",
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_display_vector_precedence_changes() {
+    assert_prefix_spec_mutation_invalidates_geometry(
+        "line-prefix",
+        r##"(progn (setq specs (vector '(raise 0) '(space :width 6)) prefix-text (copy-sequence " ")) (put-text-property 0 1 'display specs prefix-text) prefix-text)"##,
+        r##"(aset specs 0 "x")"##,
+    );
+}
+
+#[test]
+fn cyclic_display_spec_capture_terminates_and_tracks_changes() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("cyclic-display", 160, 160, buffer);
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.eval_str(r##"(progn (setq space (list 'space :width 2) specs (list space) line-prefix (copy-sequence " ")) (setcdr specs specs) (put-text-property 0 1 'display specs line-prefix))"##).unwrap();
+    let before = eval
+        .window_layout_attempt_freshness(frame, window, buffer)
+        .unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(setcar (cdr (cdr space)) 6)").unwrap();
+    assert_ne!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(setcar (cdr (cdr space)) 2)").unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_vector_display_space() {
+    assert_prefix_spec_mutation_invalidates_geometry(
+        "line-prefix",
+        r##"(progn (setq prefix-space (list 'space :width 2) prefix-text (copy-sequence " ")) (put-text-property 0 1 'display (vector prefix-space) prefix-text) prefix-text)"##,
+        "(setcar (cdr (cdr prefix-space)) 6)",
+    );
+}
+
+#[test]
 fn retained_geometry_rejects_mutated_prefix_string_display_space() {
     assert_prefix_spec_mutation_invalidates_geometry(
         "line-prefix",

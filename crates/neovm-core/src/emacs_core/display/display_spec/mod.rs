@@ -339,11 +339,26 @@ impl DisplayPropertySpecs {
         }
         if self.is_spec_list() {
             let mut cursor = self.value;
+            let mut slow = cursor;
+            let mut advance_slow = false;
             while cursor.is_cons() {
                 if visit(cursor.cons_car()).is_break() {
                     return;
                 }
                 cursor = cursor.cons_cdr();
+                // Allocation-free cycle detection. The fast cursor is also
+                // the visitor, so every reachable list cell is visited before
+                // a cycle is detected. Dotted tails retain their old behavior.
+                advance_slow = !advance_slow;
+                if !advance_slow {
+                    if !slow.is_cons() {
+                        return;
+                    }
+                    slow = slow.cons_cdr();
+                    if cursor == slow {
+                        return;
+                    }
+                }
             }
             return;
         }

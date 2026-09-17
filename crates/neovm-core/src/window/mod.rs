@@ -648,7 +648,7 @@ enum LayoutPrefixInput {
         bytes: std::sync::Arc<[u8]>,
         multibyte: bool,
         properties_tick: u64,
-        display_spaces: string_property_input::StringDisplaySpaces,
+        display_properties: string_property_input::StringDisplayInputs,
     },
     Space(pixel_input::SpaceInput),
     // Unsupported display specs retain the existing identity contract. This
@@ -670,7 +670,7 @@ impl LayoutPrefixInput {
                 bytes: string.as_bytes().into(),
                 multibyte: string.is_multibyte(),
                 properties_tick: string.intervals().mutation_tick(),
-                display_spaces: string_property_input::StringDisplaySpaces::capture(
+                display_properties: string_property_input::StringDisplayInputs::capture(
                     string.intervals(),
                 ),
             },
