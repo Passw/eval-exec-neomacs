@@ -42,6 +42,25 @@ fn state(path: &Path, after: u64) -> Value {
     }
 }
 
+fn readback(path: &Path) -> image::DynamicImage {
+    // The running renderer rewrites its diagnostic PNG on each frame. A
+    // timer sample does not synchronize file publication: wait for a complete
+    // PNG instead of treating a concurrent write as a rendering failure.
+    let deadline = Instant::now() + Duration::from_secs(8);
+    loop {
+        match image::open(path) {
+            Ok(image) => return image,
+            Err(error) => {
+                assert!(
+                    Instant::now() < deadline,
+                    "no complete GUI readback at {path:?}: {error}"
+                );
+                thread::sleep(Duration::from_millis(20));
+            }
+        }
+    }
+}
+
 #[test]
 // Prerequisites: fresh release Neomacs/runtime and sway on PATH.
 fn precise_native_scroll_advances_without_snapback() {
@@ -175,7 +194,7 @@ focus_follows_mouse yes
     trackpad.move_to_body();
     thread::sleep(Duration::from_millis(200));
     let mut previous = state(&state_path, initial["sample"].as_u64().unwrap());
-    let initial_pixels = image::open(&pixels_path).expect("initial GUI readback");
+    let initial_pixels = readback(&pixels_path);
     initial_pixels.save(artifacts.join("before.png")).unwrap();
     // Sample text away from point at the left edge: moving the cursor alone
     // must not make a stale text presentation look like successful scrolling.
@@ -211,10 +230,10 @@ focus_follows_mouse yes
             serde_json::to_vec_pretty(&trace).unwrap(),
         )
         .unwrap();
-        if let Ok(png) = image::open(&pixels_path) {
-            png.save(artifacts.join(format!("step-{step}.png")))
-                .unwrap();
-        }
+        let pixels = readback(&pixels_path);
+        pixels
+            .save(artifacts.join(format!("step-{step}.png")))
+            .unwrap();
         eprintln!("step={step} before={previous} after={current}; artifacts={artifacts:?}");
         assert!(editor.0.try_wait().unwrap().is_none(), "editor exited");
         assert_eq!(
@@ -253,7 +272,6 @@ focus_follows_mouse yes
         }
         previous = current;
         if step == 11 {
-            let pixels = image::open(&pixels_path).expect("scrolled GUI readback");
             assert!(
                 text_pixels(&pixels) != initial_text,
                 "scrolling must update rendered text, not only Lisp state: {artifacts:?}"
