@@ -18,7 +18,7 @@ jobs:
       contents: write
     steps:
       - name: Update latest videos
-        uses: DenverCoder1/github-readme-youtube-cards@a02c9b2b841c1cae3e8651571c0146a627423dc1
+        uses: DenverCoder1/github-readme-youtube-cards@main
         with:
           playlist_id: PLdndmIrpUm_o
           max_videos: 6
