@@ -913,6 +913,13 @@ pub struct Obarray {
     /// `reattach_localized_forwarder` refuses a BLV that already has one.
     /// `clone()` resets it because clone duplicates stateful forwarders.
     debug_on_next_call_fwd: std::sync::atomic::AtomicPtr<crate::emacs_core::forward::LispBoolFwd>,
+    /// Whether `max-lisp-eval-depth` has EVER been made buffer-local in this
+    /// obarray. The eval-depth guard on every function call has to know
+    /// whether a buffer-local value could undercut the global limit; asking
+    /// the symbol slot each time is a chunk lookup and a flag read per call,
+    /// for an answer that is "no" in practice. Sticky: once set it only sends
+    /// that guard down its exact slow path.
+    pub(crate) max_lisp_eval_depth_localized: bool,
 }
 
 /// One logical read of a symbol's complete function-cell state.
@@ -1466,6 +1473,7 @@ impl Clone for Obarray {
             // descriptor belongs to the source obarray, so the clone starts
             // unresolved.
             debug_on_next_call_fwd: std::sync::atomic::AtomicPtr::new(std::ptr::null_mut()),
+            max_lisp_eval_depth_localized: self.max_lisp_eval_depth_localized,
         }
     }
 }
@@ -1734,6 +1742,7 @@ impl Obarray {
             blvs: Vec::new(),
             value_fwds: Vec::new(),
             debug_on_next_call_fwd: std::sync::atomic::AtomicPtr::new(std::ptr::null_mut()),
+            max_lisp_eval_depth_localized: false,
         };
 
         // Pre-intern fundamental symbols. Both `t` and `nil` are
@@ -2455,6 +2464,9 @@ impl Obarray {
         }
         sym.flags.set_redirect(SymbolRedirect::Localized);
         sym.val = SymbolVal { blv: raw };
+        if crate::emacs_core::intern::resolve_sym(target) == "max-lisp-eval-depth" {
+            self.max_lisp_eval_depth_localized = true;
+        }
         raw
     }
 
@@ -4457,6 +4469,9 @@ impl Obarray {
             blvs: Vec::new(),
             value_fwds: Vec::new(),
             debug_on_next_call_fwd: std::sync::atomic::AtomicPtr::new(std::ptr::null_mut()),
+            // Set by `load_obarray`'s second pass, which re-localizes every
+            // dumped Localized symbol through `make_symbol_localized`.
+            max_lisp_eval_depth_localized: false,
         };
         for (id, mut sym) in symbols {
             sym.interned_global = false;

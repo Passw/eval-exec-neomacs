@@ -2459,7 +2459,27 @@ impl Context {
         self.tagged_heap.bytes_since_gc() <= cap
     }
 
+    #[inline(always)]
     pub(super) fn gc_safe_point_exact_should_collect(&mut self) -> bool {
+        // The common answer, decided from plain fields without a call: no
+        // collection is in flight, none is pending or forced, and the
+        // allocation pacing has not tripped. Everything else takes the
+        // exact path below, unchanged.
+        if self.gc_inhibit_depth == 0
+            && !self.tagged_heap.sweep_in_progress()
+            && !self.tagged_heap.mark_in_progress()
+            && !self.gc_pending
+            && !self.gc_stress
+            && !self.tagged_heap.gc_threshold_is_overridden()
+            && !self.tagged_heap.should_collect()
+        {
+            return false;
+        }
+        self.gc_safe_point_exact_should_collect_slow()
+    }
+
+    #[inline(never)]
+    fn gc_safe_point_exact_should_collect_slow(&mut self) -> bool {
         if self.gc_inhibit_depth > 0 {
             return false;
         }

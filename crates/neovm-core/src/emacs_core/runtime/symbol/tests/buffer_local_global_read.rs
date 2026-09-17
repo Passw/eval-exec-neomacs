@@ -48,6 +48,61 @@ fn in_fresh_buffer(body: &str) -> String {
 
 /// The recursion bound the evaluator enforces is GNU's *current buffer's*
 /// `max-lisp-eval-depth`, not the default.
+/// The cached `max_depth` follows the LAST write of `max-lisp-eval-depth`,
+/// including a buffer-local one, so after a second buffer localizes it higher
+/// the cache is above the first buffer's limit. Only the guard's localized
+/// check makes the first buffer signal at its own 120 — a same-buffer test
+/// cannot see this, because there the cache happens to agree.
+#[test]
+fn a_buffer_keeps_its_own_max_lisp_eval_depth_after_another_raises_it() {
+    let mut eval = ev();
+    let form = "(save-current-buffer
+           (set-buffer (get-buffer-create \"l1-low\"))
+           (set (make-local-variable 'max-lisp-eval-depth) 120)
+           (set-buffer (get-buffer-create \"l1-high\"))
+           (set (make-local-variable 'max-lisp-eval-depth) 1000)
+           (setq l1-n 0)
+           (fset 'l1-rec (function (lambda () (setq l1-n (1+ l1-n)) (l1-rec))))
+           (set-buffer \"l1-low\")
+           (condition-case nil (l1-rec) (error nil))
+           (prog1 (if (< l1-n 300) 'stopped-at-its-own-120 'ran-past-its-limit)
+             (kill-buffer \"l1-low\")
+             (kill-buffer \"l1-high\")))";
+    assert_eq!(
+        format_eval_result(&eval.eval_str(form)),
+        "OK stopped-at-its-own-120",
+        "the low-limit buffer must signal at its own limit even though another \
+         buffer's higher local value was written last"
+    );
+}
+
+/// The eval-depth guard on every function call reads one obarray bool instead
+/// of looking `max-lisp-eval-depth` up per call. The bool is what
+/// `max_lisp_eval_depth_honours_the_buffer_local_bound_like_gnu` above relies
+/// on: it must flip exactly when the variable is first made buffer-local, and
+/// must stay clear for ordinary global reads and writes.
+#[test]
+fn making_max_lisp_eval_depth_buffer_local_sets_the_obarray_flag() {
+    let mut eval = ev();
+    assert!(
+        !eval.obarray.max_lisp_eval_depth_localized,
+        "a fresh obarray has no buffer-local max-lisp-eval-depth"
+    );
+    eval.eval_str("(setq max-lisp-eval-depth 1500)")
+        .expect("global set");
+    eval.eval_str("max-lisp-eval-depth").expect("global read");
+    assert!(
+        !eval.obarray.max_lisp_eval_depth_localized,
+        "a global set and a read must not send every call down the slow path"
+    );
+    let form = in_fresh_buffer("(set (make-local-variable 'max-lisp-eval-depth) 90)");
+    eval.eval_str(&form).expect("buffer-local set");
+    assert!(
+        eval.obarray.max_lisp_eval_depth_localized,
+        "once localized, the guard has to consult the buffer on every call"
+    );
+}
+
 #[test]
 fn max_lisp_eval_depth_honours_the_buffer_local_bound_like_gnu() {
     let mut eval = ev();

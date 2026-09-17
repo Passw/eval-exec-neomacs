@@ -5482,8 +5482,9 @@ impl Context {
     #[inline(always)]
     fn enter_interpreted_eval_depth(&mut self) -> Result<(), Flow> {
         self.depth += 1;
-        if self.depth <= self.max_depth && !self.obarray.is_localized(max_lisp_eval_depth_symbol())
-        {
+        // `max_lisp_eval_depth_localized` stands in for the per-call symbol
+        // lookup: it is set the one time the variable is made buffer-local.
+        if self.depth <= self.max_depth && !self.obarray.max_lisp_eval_depth_localized {
             return Ok(());
         }
         self.enter_interpreted_eval_depth_slow()

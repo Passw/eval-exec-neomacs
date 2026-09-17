@@ -1358,6 +1358,7 @@ impl NativeCallOutcome {
 /// these, deopt rates were unmeasurable — a mid-end slice that changes guard
 /// placement could not prove its effect. Read via
 /// [`native_run_counters`]; the pattern follows `compile::SPEC_CALL_COUNT`.
+
 pub(crate) static NATIVE_OK_COUNT: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(0);
 pub(crate) static NATIVE_DEOPT_COUNT: std::sync::atomic::AtomicU64 =
