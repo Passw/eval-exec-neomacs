@@ -5,7 +5,7 @@ use neomacs_gui_tests::{
 use std::{path::PathBuf, time::Duration};
 
 #[test]
-#[ignore = "requires a built binary/pdump and a native GUI backend"]
+// Prerequisites: requires a built binary/pdump and a native GUI backend.
 fn fitting_chromeless_child_before_redisplay_keeps_one_text_line() {
     let backend = match std::env::var("NEOMACS_GUI_TEST_BACKEND").as_deref() {
         Ok("wayland") => GuiBackend::LinuxWayland,

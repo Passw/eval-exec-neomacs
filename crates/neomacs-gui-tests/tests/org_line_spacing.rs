@@ -1,3 +1,5 @@
+#![cfg(target_os = "linux")]
+
 use neomacs_gui_tests::{
     DisplayHarness, GuiBackend, GuiRunOptions, GuiRunStatus, GuiScenario, GuiTestPlan,
     ProcessGuiCommandRunner,
@@ -5,7 +7,7 @@ use neomacs_gui_tests::{
 use std::{path::PathBuf, time::Duration};
 
 #[test]
-#[ignore = "requires a built binary/pdump, Weston, and DejaVu Sans Mono"]
+// Prerequisites: requires a built binary/pdump, Weston, and DejaVu Sans Mono.
 fn org_selection_and_empty_line_cursor_preserve_spacing_and_backgrounds() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let binary = std::env::var_os("NEOMACS_GUI_TEST_BINARY")

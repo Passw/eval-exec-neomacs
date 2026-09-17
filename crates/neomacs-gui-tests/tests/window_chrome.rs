@@ -1,4 +1,4 @@
-//! Explicitly opt-in native GUI smoke; does not substitute for AppKit visual QA.
+//! Native GUI smoke; does not substitute for AppKit visual QA.
 use neomacs_gui_tests::{
     DisplayHarness, GuiBackend, GuiRunOptions, GuiRunStatus, GuiScenario, GuiTestPlan,
     ProcessGuiCommandRunner,
@@ -6,7 +6,7 @@ use neomacs_gui_tests::{
 use std::{path::PathBuf, time::Duration};
 
 #[test]
-#[ignore = "requires a built binary/pdump and the requested native GUI backend"]
+// Prerequisites: requires a built binary/pdump and the requested native GUI backend.
 fn native_chrome_theme_change_keeps_both_frames_alive() {
     let backend = match std::env::var("NEOMACS_GUI_TEST_BACKEND").as_deref() {
         Ok("wayland") => GuiBackend::LinuxWayland,

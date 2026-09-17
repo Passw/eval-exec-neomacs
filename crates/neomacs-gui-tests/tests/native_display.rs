@@ -5,7 +5,7 @@ use neomacs_gui_tests::{
 use std::{fs, path::PathBuf, time::Duration};
 
 #[test]
-#[ignore = "requires a fresh release binary/pdump and a native graphical session"]
+// Prerequisites: requires a fresh release binary/pdump and a native graphical session.
 fn native_startup_font_and_resize_contract() {
     let result = run_native_contract("native-display", "native-display-contract.el", false);
     let state: serde_json::Value =
@@ -26,7 +26,7 @@ fn native_startup_font_and_resize_contract() {
 
 #[cfg(any(target_os = "macos", windows))]
 #[test]
-#[ignore = "requires fresh release binary/pdump and resource font installed on an ephemeral CI runner"]
+// Prerequisites: requires fresh release binary/pdump and resource font installed on an ephemeral CI runner.
 fn native_resource_font_drives_first_window() {
     assert!(
         std::env::var("NEOMACS_GUI_RESOURCE_FAMILY").is_ok(),

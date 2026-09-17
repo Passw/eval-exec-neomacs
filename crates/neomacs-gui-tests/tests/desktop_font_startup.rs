@@ -1,3 +1,5 @@
+#![cfg(target_os = "linux")]
+
 use neomacs_gui_tests::{
     GuiBackend, GuiRunOptions, GuiRunResult, GuiRunStatus, GuiScenario, GuiTestPlan,
     ProcessGuiCommandRunner, WaylandOutput, WestonDesktop, start_weston_with_desktop,
@@ -5,7 +7,7 @@ use neomacs_gui_tests::{
 use std::{fs, path::PathBuf, process::Command, time::Duration};
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, glib-compile-schemas, Ubuntu Mono and DejaVu fonts"]
+// Prerequisites: requires release binary/pdump, Weston, glib-compile-schemas, Ubuntu Mono and DejaVu fonts.
 fn command_line_font_drives_the_first_native_allocation() {
     let result = check_fixture_with_font(
         WaylandOutput::Standard,
@@ -32,19 +34,19 @@ fn command_line_font_drives_the_first_native_allocation() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, glib-compile-schemas, Ubuntu Mono, DejaVu and SVG packages"]
+// Prerequisites: requires release binary/pdump, Weston, glib-compile-schemas, Ubuntu Mono, DejaVu and SVG packages.
 fn desktop_monospace_font_drives_initial_window_and_svg_metrics() {
     check_desktop_font_startup(WaylandOutput::Standard, "desktop-font-startup");
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, glib-compile-schemas, Ubuntu Mono, DejaVu and SVG packages"]
+// Prerequisites: requires release binary/pdump, Weston, glib-compile-schemas, Ubuntu Mono, DejaVu and SVG packages.
 fn hidpi_desktop_font_preserves_initial_and_resized_column_grid() {
     check_desktop_font_startup(WaylandOutput::HiDpi4k, "desktop-font-startup-hidpi");
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, glib-compile-schemas and Ubuntu Mono"]
+// Prerequisites: requires release binary/pdump, Weston, glib-compile-schemas and Ubuntu Mono.
 fn hidpi_scale_change_never_shrinks_the_logical_frame() {
     let result = check_fixture(
         WaylandOutput::HiDpi4k,
@@ -79,7 +81,7 @@ fn check_desktop_font_startup(output: WaylandOutput, scenario: &str) {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, glib-compile-schemas and Ubuntu Mono"]
+// Prerequisites: requires release binary/pdump, Weston, glib-compile-schemas and Ubuntu Mono.
 fn hidpi_native_configure_preserves_the_requested_column_grid() {
     check_fixture(
         WaylandOutput::HiDpi4k,
@@ -89,7 +91,7 @@ fn hidpi_native_configure_preserves_the_requested_column_grid() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, glib-compile-schemas and Ubuntu Mono"]
+// Prerequisites: requires release binary/pdump, Weston, glib-compile-schemas and Ubuntu Mono.
 fn hidpi_decorated_fullscreen_restores_the_requested_column_grid() {
     check_fixture(
         WaylandOutput::HiDpi4k,
@@ -99,7 +101,7 @@ fn hidpi_decorated_fullscreen_restores_the_requested_column_grid() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston and Ubuntu Mono"]
+// Prerequisites: requires release binary/pdump, Weston and Ubuntu Mono.
 fn hidpi_8k_decorated_fullscreen_restores_the_requested_column_grid() {
     check_fixture(
         WaylandOutput::HiDpi8k,
@@ -109,7 +111,7 @@ fn hidpi_8k_decorated_fullscreen_restores_the_requested_column_grid() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston presentation feedback and Ubuntu Mono"]
+// Prerequisites: requires release binary/pdump, Weston presentation feedback and Ubuntu Mono.
 fn hidpi_8k_fullscreen_after_confirmed_presentation() {
     let result = check_fixture(
         WaylandOutput::HiDpi8k,
@@ -120,7 +122,7 @@ fn hidpi_8k_fullscreen_after_confirmed_presentation() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston presentation feedback and Ubuntu Mono"]
+// Prerequisites: requires release binary/pdump, Weston presentation feedback and Ubuntu Mono.
 fn hidpi_8k_slow_desktop_fullscreen_after_confirmed_presentation() {
     let result = check_fixture_with_desktop(
         WaylandOutput::HiDpi8k,

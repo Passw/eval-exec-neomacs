@@ -5,21 +5,21 @@ use std::{fs, path::PathBuf, time::Duration};
 
 #[cfg(target_os = "linux")]
 #[test]
-#[ignore = "requires release binary/pdump, Vulkan loader, readable procfs wait channels, and Weston"]
+// Prerequisites: requires release binary/pdump, Vulkan loader, readable procfs wait channels, and Weston.
 fn display_loss_exits_while_gpu_driver_discovery_is_pending() {
     check_pending_gpu(GpuStartupAction::LoseDisplay);
 }
 
 #[cfg(target_os = "linux")]
 #[test]
-#[ignore = "requires release binary/pdump, Vulkan loader, procfs wait channels, Xvfb and xdotool"]
+// Prerequisites: requires release binary/pdump, Vulkan loader, procfs wait channels, Xvfb and xdotool.
 fn closing_window_exits_successfully_while_gpu_discovery_is_pending() {
     check_pending_gpu(GpuStartupAction::CloseWindow);
 }
 
 #[cfg(target_os = "linux")]
 #[test]
-#[ignore = "requires release binary/pdump, Vulkan ICD, procfs wait channels, Xvfb and xdotool"]
+// Prerequisites: requires release binary/pdump, Vulkan ICD, procfs wait channels, Xvfb and xdotool.
 fn resize_during_gpu_discovery_reaches_lisp_after_completion() {
     check_pending_gpu(GpuStartupAction::ResizeAndComplete);
 }
@@ -259,7 +259,7 @@ fn check_pending_gpu(action: GpuStartupAction) {
 
 #[cfg(target_os = "linux")]
 #[test]
-#[ignore = "requires release binary/pdump, Fontconfig, and Weston"]
+// Prerequisites: requires release binary/pdump, Fontconfig, and Weston.
 fn display_loss_exits_while_initial_font_loading_is_pending() {
     let result = run_with_pending_font(PendingFontAction::LoseDisplay);
     assert!(
@@ -274,7 +274,7 @@ fn display_loss_exits_while_initial_font_loading_is_pending() {
 
 #[cfg(target_os = "linux")]
 #[test]
-#[ignore = "requires release binary/pdump, Fontconfig, and Weston"]
+// Prerequisites: requires release binary/pdump, Fontconfig, and Weston.
 fn completing_pending_font_loading_starts_the_gui() {
     let result = run_with_pending_font(PendingFontAction::Complete);
     assert!(!result.timed_out, "{result:#?}");
@@ -398,13 +398,13 @@ fn run_with_pending_font(action: PendingFontAction) -> neomacs_gui_tests::GuiRun
 }
 
 #[test]
-#[ignore = "requires a release binary and Weston"]
+// Prerequisites: requires a release binary and Weston.
 fn exit_during_lisp_startup_preserves_the_requested_status() {
     check_lisp_startup_exit_status(23);
 }
 
 #[test]
-#[ignore = "requires a release binary and Weston"]
+// Prerequisites: requires a release binary and Weston.
 fn successful_exit_during_lisp_startup_remains_successful() {
     check_lisp_startup_exit_status(0);
 }
@@ -448,7 +448,7 @@ fn check_lisp_startup_exit_status(status: i32) {
 }
 
 #[test]
-#[ignore = "requires a release binary and Weston"]
+// Prerequisites: requires a release binary and Weston.
 fn evaluator_image_failure_exits_instead_of_waiting_for_initial_window() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let artifacts = root.join("target/neomacs-gui-tests");
@@ -501,7 +501,7 @@ fn evaluator_image_failure_exits_instead_of_waiting_for_initial_window() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Fontconfig, and Weston"]
+// Prerequisites: requires release binary/pdump, Fontconfig, and Weston.
 fn empty_native_font_catalog_reports_startup_failure_without_a_window() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let artifacts = root.join("target/neomacs-gui-tests");

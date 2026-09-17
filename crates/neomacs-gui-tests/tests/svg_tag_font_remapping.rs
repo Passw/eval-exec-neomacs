@@ -1,3 +1,5 @@
+#![cfg(target_os = "linux")]
+
 use neomacs_gui_tests::{
     DisplayHarness, GuiBackend, GuiRunOptions, GuiRunStatus, GuiScenario, GuiTestPlan,
     ProcessGuiCommandRunner,
@@ -5,7 +7,7 @@ use neomacs_gui_tests::{
 use std::{path::PathBuf, time::Duration};
 
 #[test]
-#[ignore = "requires a built binary/pdump, Weston, DejaVu Sans Mono, svg-lib and svg-tag-mode"]
+// Prerequisites: requires a built binary/pdump, Weston, DejaVu Sans Mono, svg-lib and svg-tag-mode.
 fn svg_tag_box_follows_remapped_window_font_without_scaling_its_text_font() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let binary = std::env::var_os("NEOMACS_GUI_TEST_BINARY")

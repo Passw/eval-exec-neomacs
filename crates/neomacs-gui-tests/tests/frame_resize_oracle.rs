@@ -1,10 +1,12 @@
+#![cfg(target_os = "linux")]
+
 use neomacs_gui_tests::{
     DisplayHarness, GuiBackend, GuiRunOptions, GuiScenario, GuiTestPlan, ProcessGuiCommandRunner,
 };
 use std::{fs, path::PathBuf, time::Duration};
 
 #[test]
-#[ignore = "requires GNU GUI Emacs and Xvfb"]
+// Prerequisites: requires GNU GUI Emacs and Xvfb.
 fn gnu_width_only_resize_preserves_native_height() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let artifacts = root.join("target/neomacs-gui-tests/gnu-width-resize");

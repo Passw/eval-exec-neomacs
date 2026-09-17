@@ -1,22 +1,24 @@
+#![cfg(target_os = "linux")]
+
 use neomacs_gui_tests::{
     DisplayHarness, GuiBackend, GuiRunOptions, GuiScenario, GuiTestPlan, ProcessGuiCommandRunner,
 };
 use std::{fs, path::PathBuf, process::Command, time::Duration};
 
 #[test]
-#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and Ubuntu Mono/DejaVu fonts"]
+// Prerequisites: requires GNU GUI Emacs, Xvfb, GSettings and Ubuntu Mono/DejaVu fonts.
 fn gnu_opted_in_frame_follows_live_desktop_font() {
     check_live_font(GuiBackend::LinuxX11, "gnu-live-font", LiveFontCase::OptIn);
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, GSettings and Ubuntu Mono/DejaVu fonts"]
+// Prerequisites: requires release binary/pdump, Weston, GSettings and Ubuntu Mono/DejaVu fonts.
 fn opted_in_frame_follows_live_desktop_font() {
     check_live_font(GuiBackend::LinuxWayland, "live-font", LiveFontCase::OptIn);
 }
 
 #[test]
-#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and Ubuntu Mono/DejaVu fonts"]
+// Prerequisites: requires GNU GUI Emacs, Xvfb, GSettings and Ubuntu Mono/DejaVu fonts.
 fn gnu_opted_out_frame_keeps_its_font_while_queries_refresh() {
     check_live_font(
         GuiBackend::LinuxX11,
@@ -26,7 +28,7 @@ fn gnu_opted_out_frame_keeps_its_font_while_queries_refresh() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, GSettings and Ubuntu Mono/DejaVu fonts"]
+// Prerequisites: requires release binary/pdump, Weston, GSettings and Ubuntu Mono/DejaVu fonts.
 fn opted_out_frame_keeps_its_font_while_queries_refresh() {
     check_live_font(
         GuiBackend::LinuxWayland,
@@ -55,7 +57,7 @@ enum LiveFontCase {
 }
 
 #[test]
-#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and fonts"]
+// Prerequisites: requires GNU GUI Emacs, Xvfb, GSettings and fonts.
 fn gnu_overlapping_resize_and_font_change_preserve_latest_grid() {
     check_live_font(
         GuiBackend::LinuxX11,
@@ -65,7 +67,7 @@ fn gnu_overlapping_resize_and_font_change_preserve_latest_grid() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, GSettings and fonts"]
+// Prerequisites: requires release binary/pdump, Weston, GSettings and fonts.
 fn overlapping_resize_and_font_change_preserve_latest_grid() {
     check_live_font(
         GuiBackend::LinuxWayland,
@@ -75,7 +77,7 @@ fn overlapping_resize_and_font_change_preserve_latest_grid() {
 }
 
 #[test]
-#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and fonts"]
+// Prerequisites: requires GNU GUI Emacs, Xvfb, GSettings and fonts.
 fn gnu_grown_minibuffer_retains_frame_height_across_resize_and_font_change() {
     check_live_font(
         GuiBackend::LinuxX11,
@@ -85,7 +87,7 @@ fn gnu_grown_minibuffer_retains_frame_height_across_resize_and_font_change() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, GSettings and fonts"]
+// Prerequisites: requires release binary/pdump, Weston, GSettings and fonts.
 fn grown_minibuffer_retains_frame_height_across_resize_and_font_change() {
     check_live_font(
         GuiBackend::LinuxWayland,
@@ -95,7 +97,7 @@ fn grown_minibuffer_retains_frame_height_across_resize_and_font_change() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston presentation feedback, GSettings and fonts"]
+// Prerequisites: requires release binary/pdump, Weston presentation feedback, GSettings and fonts.
 fn fullscreen_font_update_keeps_pixels_and_refreshes_columns() {
     check_live_font(
         GuiBackend::LinuxWayland,
@@ -105,19 +107,19 @@ fn fullscreen_font_update_keeps_pixels_and_refreshes_columns() {
 }
 
 #[test]
-#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and Ubuntu Mono/DejaVu fonts"]
+// Prerequisites: requires GNU GUI Emacs, Xvfb, GSettings and Ubuntu Mono/DejaVu fonts.
 fn gnu_live_font_preserves_child_frame_grid() {
     check_live_font(GuiBackend::LinuxX11, "gnu-live-child", LiveFontCase::Child);
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, GSettings and fonts"]
+// Prerequisites: requires release binary/pdump, Weston, GSettings and fonts.
 fn live_font_preserves_child_frame_grid() {
     check_live_font(GuiBackend::LinuxWayland, "live-child", LiveFontCase::Child);
 }
 
 #[test]
-#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and fonts"]
+// Prerequisites: requires GNU GUI Emacs, Xvfb, GSettings and fonts.
 fn gnu_child_chrome_preserves_initial_and_live_font_text_grid() {
     check_live_font(
         GuiBackend::LinuxX11,
@@ -127,7 +129,7 @@ fn gnu_child_chrome_preserves_initial_and_live_font_text_grid() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, GSettings and fonts"]
+// Prerequisites: requires release binary/pdump, Weston, GSettings and fonts.
 fn child_chrome_preserves_initial_and_live_font_text_grid() {
     check_live_font(
         GuiBackend::LinuxWayland,
@@ -137,7 +139,7 @@ fn child_chrome_preserves_initial_and_live_font_text_grid() {
 }
 
 #[test]
-#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and fonts"]
+// Prerequisites: requires GNU GUI Emacs, Xvfb, GSettings and fonts.
 fn gnu_child_scrollbar_and_distinct_font_preserve_initial_text_grid() {
     check_live_font(
         GuiBackend::LinuxX11,
@@ -147,7 +149,7 @@ fn gnu_child_scrollbar_and_distinct_font_preserve_initial_text_grid() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, GSettings and fonts"]
+// Prerequisites: requires release binary/pdump, Weston, GSettings and fonts.
 fn child_scrollbar_and_distinct_font_preserve_initial_text_grid() {
     check_live_font(
         GuiBackend::LinuxWayland,
@@ -157,7 +159,7 @@ fn child_scrollbar_and_distinct_font_preserve_initial_text_grid() {
 }
 
 #[test]
-#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and fonts"]
+// Prerequisites: requires GNU GUI Emacs, Xvfb, GSettings and fonts.
 fn gnu_stacked_window_minimum_overrides_font_resize_inhibition() {
     check_live_font(
         GuiBackend::LinuxX11,
@@ -167,7 +169,7 @@ fn gnu_stacked_window_minimum_overrides_font_resize_inhibition() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, GSettings and fonts"]
+// Prerequisites: requires release binary/pdump, Weston, GSettings and fonts.
 fn stacked_window_minimum_overrides_font_resize_inhibition() {
     check_live_font(
         GuiBackend::LinuxWayland,
@@ -177,7 +179,7 @@ fn stacked_window_minimum_overrides_font_resize_inhibition() {
 }
 
 #[test]
-#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and fonts"]
+// Prerequisites: requires GNU GUI Emacs, Xvfb, GSettings and fonts.
 fn gnu_split_window_minimum_overrides_font_resize_inhibition() {
     check_live_font(
         GuiBackend::LinuxX11,
@@ -187,7 +189,7 @@ fn gnu_split_window_minimum_overrides_font_resize_inhibition() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, GSettings and fonts"]
+// Prerequisites: requires release binary/pdump, Weston, GSettings and fonts.
 fn split_window_minimum_overrides_font_resize_inhibition() {
     check_live_font(
         GuiBackend::LinuxWayland,
@@ -197,7 +199,7 @@ fn split_window_minimum_overrides_font_resize_inhibition() {
 }
 
 #[test]
-#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and Ubuntu Mono/DejaVu fonts"]
+// Prerequisites: requires GNU GUI Emacs, Xvfb, GSettings and Ubuntu Mono/DejaVu fonts.
 fn gnu_inhibited_font_resize_keeps_pixels_and_refreshes_columns() {
     check_live_font(
         GuiBackend::LinuxX11,
@@ -207,7 +209,7 @@ fn gnu_inhibited_font_resize_keeps_pixels_and_refreshes_columns() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston presentation feedback, GSettings and fonts"]
+// Prerequisites: requires release binary/pdump, Weston presentation feedback, GSettings and fonts.
 fn inhibited_font_resize_keeps_pixels_and_refreshes_columns() {
     check_live_font(
         GuiBackend::LinuxWayland,
@@ -217,7 +219,7 @@ fn inhibited_font_resize_keeps_pixels_and_refreshes_columns() {
 }
 
 #[test]
-#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and Ubuntu Mono/DejaVu fonts"]
+// Prerequisites: requires GNU GUI Emacs, Xvfb, GSettings and Ubuntu Mono/DejaVu fonts.
 fn gnu_duplicate_font_updates_are_noops_and_distinct_updates_repeat() {
     check_live_font(
         GuiBackend::LinuxX11,
@@ -227,7 +229,7 @@ fn gnu_duplicate_font_updates_are_noops_and_distinct_updates_repeat() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston presentation feedback, GSettings and fonts"]
+// Prerequisites: requires release binary/pdump, Weston presentation feedback, GSettings and fonts.
 fn duplicate_font_updates_are_noops_and_distinct_updates_repeat() {
     check_live_font(
         GuiBackend::LinuxWayland,
@@ -237,7 +239,7 @@ fn duplicate_font_updates_are_noops_and_distinct_updates_repeat() {
 }
 
 #[test]
-#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and Ubuntu Mono/DejaVu fonts"]
+// Prerequisites: requires GNU GUI Emacs, Xvfb, GSettings and Ubuntu Mono/DejaVu fonts.
 fn gnu_live_font_preserves_the_character_grid() {
     check_live_font(
         GuiBackend::LinuxX11,
@@ -247,7 +249,7 @@ fn gnu_live_font_preserves_the_character_grid() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston presentation feedback, GSettings and fonts"]
+// Prerequisites: requires release binary/pdump, Weston presentation feedback, GSettings and fonts.
 fn live_font_preserves_the_presented_character_grid() {
     check_live_font(
         GuiBackend::LinuxWayland,
@@ -257,7 +259,7 @@ fn live_font_preserves_the_presented_character_grid() {
 }
 
 #[test]
-#[ignore = "requires GNU GUI Emacs, Xvfb, GSettings and Ubuntu Mono/DejaVu fonts"]
+// Prerequisites: requires GNU GUI Emacs, Xvfb, GSettings and Ubuntu Mono/DejaVu fonts.
 fn gnu_live_font_overrides_current_fonts_and_sets_future_defaults() {
     check_live_font(
         GuiBackend::LinuxX11,
@@ -267,7 +269,7 @@ fn gnu_live_font_overrides_current_fonts_and_sets_future_defaults() {
 }
 
 #[test]
-#[ignore = "requires release binary/pdump, Weston, GSettings and Ubuntu Mono/DejaVu fonts"]
+// Prerequisites: requires release binary/pdump, Weston, GSettings and Ubuntu Mono/DejaVu fonts.
 fn live_font_overrides_current_fonts_and_sets_future_defaults() {
     check_live_font(
         GuiBackend::LinuxWayland,
