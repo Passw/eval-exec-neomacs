@@ -29,6 +29,7 @@ pub mod geometry;
 mod history;
 mod parameters;
 pub mod part;
+mod pixel_input;
 mod scroll_bar;
 mod sibling_layout;
 pub mod split;
@@ -639,7 +640,7 @@ enum LayoutPrefixInput {
     },
     Space {
         identity: usize,
-        operands: [Option<usize>;
+        operands: [Option<pixel_input::PixelInput>;
             <crate::emacs_core::display_spec::DisplaySpaceKey as strum::EnumCount>::COUNT],
     },
     // Unsupported display specs retain the existing identity contract. This
@@ -655,13 +656,12 @@ impl LayoutPrefixInput {
         if value.is_cons() && value.cons_car().is_symbol_named("space") {
             use crate::emacs_core::display_spec::DisplaySpaceKey;
             if let Some(items) = crate::emacs_core::value::list_to_vec(&value) {
-                let mut operands = [None; <DisplaySpaceKey as strum::EnumCount>::COUNT];
+                let mut operands = std::array::from_fn(|_| None);
                 for pair in items[1..].chunks_exact(2) {
                     if let Some(key) = DisplaySpaceKey::from_lisp_value(pair[0]) {
                         // Like geometry evaluation, use the first occurrence.
-                        // This captures direct operands, not mutable subgraphs
-                        // inside compound pixel expressions.
-                        operands[key as usize].get_or_insert(pair[1].bits());
+                        operands[key as usize]
+                            .get_or_insert_with(|| pixel_input::PixelInput::capture(pair[1]));
                     }
                 }
                 return Self::Space {

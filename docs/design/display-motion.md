@@ -70,9 +70,11 @@ projection. Stretch-space prefixes also capture the first direct operand of
 each supported geometry property, using the same `DisplaySpaceKey` enum as
 geometry evaluation. In-place plist changes therefore invalidate layout even
 when the prefix cons retains its identity. Unknown keys and shadowed duplicate
-operands do not affect this projection. Compound operands still use identity:
-mutations *inside* a nested pixel expression or a string's property value remain
-an audit item, not a claim of complete mutable-Lisp-graph invalidation.
+operands do not affect this projection. Arithmetic pixel expressions, absolute
+pixel lengths and scaled lengths are captured as an immutable token stream,
+with an iterative, cycle-aware traversal. No live Lisp references are retained.
+Image/resource expressions and mutations inside a string's property value remain
+audit items, not a claim of complete mutable-Lisp-graph invalidation.
 
 Source backtracking retreats past display/invisibility spans covering a
 newline before measuring forward. Producer-owned row metadata distinguishes
