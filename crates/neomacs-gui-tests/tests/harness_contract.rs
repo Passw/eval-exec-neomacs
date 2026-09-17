@@ -296,6 +296,26 @@ fn x11_session_owns_authenticated_tcp_display_below_workspace_tmp() {
         "X11 session reset between clients: {read_property:?}"
     );
 
+    // A second session starts with the same display-number candidate. It
+    // must not accept the first server's TCP listener as its own readiness.
+    let second_root = root.join("second-session");
+    let second = DisplayHarness::for_backend(GuiBackend::LinuxX11)
+        .start_session(&second_root)
+        .expect("start an independently authenticated second X11 session");
+    let second_display = second
+        .env()
+        .iter()
+        .find_map(|(name, value)| (name == "DISPLAY").then_some(value))
+        .unwrap();
+    assert_ne!(second_display, &display, "sessions must not share a server");
+    let second_client = Command::new("xdpyinfo")
+        .envs(second.env().iter().map(|(name, value)| (name, value)))
+        .output()
+        .expect("connect using the second session's own credentials");
+    assert!(second_client.status.success(), "{second_client:?}");
+    drop(second);
+    std::fs::remove_dir(&second_root).expect("remove empty second session root");
+
     drop(session);
     assert!(!owned_session_root.exists());
     std::fs::remove_dir(&root).expect("remove exact empty contract root");

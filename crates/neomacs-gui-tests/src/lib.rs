@@ -7,7 +7,7 @@
 use std::fs;
 use std::io;
 use std::io::Read;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::thread;
@@ -671,12 +671,13 @@ fn start_xvfb_on(artifact_root: &Path, display_number: u32) -> io::Result<Displa
         .spawn()?;
     pending.child = Some(child);
 
-    if wait_for_tcp_display(
+    if wait_for_authenticated_x11_display(
         pending
             .child
             .as_mut()
             .expect("pending Xvfb owns its spawned child"),
-        endpoint,
+        &display,
+        &authority_path,
         Duration::from_secs(5),
     )? {
         return Ok(pending.into_session(vec![
@@ -730,9 +731,10 @@ impl Drop for PendingXvfbSession {
     }
 }
 
-fn wait_for_tcp_display(
+fn wait_for_authenticated_x11_display(
     child: &mut Child,
-    endpoint: SocketAddr,
+    display: &str,
+    authority: &Path,
     timeout: Duration,
 ) -> io::Result<bool> {
     let deadline = Instant::now() + timeout;
@@ -740,7 +742,30 @@ fn wait_for_tcp_display(
         if child.try_wait()?.is_some() {
             return Ok(false);
         }
-        if TcpStream::connect_timeout(&endpoint, Duration::from_millis(100)).is_ok() {
+        // A TCP listener can belong to another session, and listening alone
+        // does not establish X11 readiness. Our fresh cookie identifies this
+        // server. xdpyinfo is also used by the real session contract test.
+        let mut probe = Command::new("xdpyinfo")
+            .env("DISPLAY", display)
+            .env("XAUTHORITY", authority)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()?;
+        let probe_deadline = deadline.min(Instant::now() + Duration::from_millis(250));
+        let ready = (|| -> io::Result<bool> {
+            while Instant::now() < probe_deadline {
+                if let Some(status) = probe.try_wait()? {
+                    return Ok(status.success());
+                }
+                thread::sleep(Duration::from_millis(10));
+            }
+            Ok(false)
+        })();
+        // Reap on success, timeout, and I/O error alike; Child has no Drop
+        // cleanup. kill is harmless after try_wait has reaped an exited probe.
+        let _ = probe.kill();
+        let _ = probe.wait();
+        if ready? {
             return Ok(child.try_wait()?.is_none());
         }
         thread::sleep(Duration::from_millis(20));
