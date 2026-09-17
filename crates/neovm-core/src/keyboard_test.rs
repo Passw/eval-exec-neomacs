@@ -22,6 +22,35 @@ fn settled_point(
 use super::*;
 
 #[test]
+fn precise_scroll_is_a_lisp_wheel_command_with_pixel_payload() {
+    let mut eval = crate::emacs_core::Context::new();
+    let buffer = eval.buffer_manager_mut().create_buffer("precise-wheel");
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("precise-wheel", 800, 600, buffer);
+    let event = eval
+        .handle_read_char_input_event(
+            InputEvent::PixelScroll {
+                delta_x: 1.5,
+                delta_y: -4.25,
+                x: 30.0,
+                y: 40.0,
+                modifiers: Modifiers::default(),
+                target_frame_id: frame.0,
+            },
+            TtyInputDecoding::KeyboardCodingSystem,
+        )
+        .unwrap()
+        .expect("precise scrolling must reach key binding dispatch");
+    let parts = crate::emacs_core::value::list_to_vec(&event).unwrap();
+    assert_eq!(parts.len(), 5, "GNU wheel event with pixel delta payload");
+    assert_eq!(parts[0].as_symbol_name(), Some("wheel-down"));
+    assert_eq!(parts[2].as_fixnum(), Some(1));
+    assert_eq!(parts[4].cons_car().as_float(), Some(1.5));
+    assert_eq!(parts[4].cons_cdr().as_float(), Some(-4.25));
+}
+
+#[test]
 fn help_prefix_echo_faces_semantic_key_bindings() {
     let mut eval = crate::emacs_core::Context::new();
     eval.assign("help-char", Value::fixnum(8));

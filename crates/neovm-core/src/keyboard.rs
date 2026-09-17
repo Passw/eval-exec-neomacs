@@ -1271,10 +1271,8 @@ pub enum InputEvent {
         modifiers: Modifiers,
         target_frame_id: u64,
     },
-    /// Trackpad pixel-precise scroll (smooth scrolling, Phase 1). Unlike
-    /// `MouseScroll` (which becomes a wheel event handled by elisp `mwheel`),
-    /// this is accumulated and applied as a sub-line `vscroll` adjustment by the
-    /// layout pass (`Engine::pixel_scroll_window`).
+    /// Precise wheel input. Like GNU's WHEEL_EVENT, this becomes a Lisp wheel
+    /// command with a pixel-delta pair for `pixel-scroll-precision`.
     PixelScroll {
         delta_x: f32,
         delta_y: f32,
@@ -5345,22 +5343,50 @@ impl crate::emacs_core::eval::Context {
                 Ok(Some(event))
             }
             InputEvent::PixelScroll {
-                delta_x: _,
+                delta_x,
                 delta_y,
-                x: _,
-                y: _,
-                modifiers: _,
+                x,
+                y,
+                modifiers,
                 target_frame_id,
             } => {
-                // Smooth scroll (Phase 1, T4): accumulate the trackpad pixel delta
-                // for this frame; the layout pass drains it and calls
-                // Engine::pixel_scroll_window before re-laying. Consume the event
-                // (no command); the command loop redisplays when input drains.
-                self.accumulate_pending_pixel_scroll(
-                    crate::window::FrameId(target_frame_id),
-                    delta_y,
-                );
-                Ok(None)
+                if !delta_x.is_finite()
+                    || !delta_y.is_finite()
+                    || (delta_x == 0.0 && delta_y == 0.0)
+                {
+                    return Ok(None);
+                }
+                let direction = if delta_x.abs() > delta_y.abs() {
+                    if delta_x > 0.0 {
+                        "wheel-left"
+                    } else {
+                        "wheel-right"
+                    }
+                } else if delta_y > 0.0 {
+                    "wheel-up"
+                } else {
+                    "wheel-down"
+                };
+                let mut symbol = String::new();
+                Self::append_modifier_prefix(&modifiers, &mut symbol);
+                symbol.push_str(direction);
+                let position = Self::make_mouse_position(x, y, target_frame_id, self);
+                // GNU keyboard.c make_lispy_event: (HEAD POS CLICK-COUNT
+                // LINE-COUNT (PIXEL-X . PIXEL-Y)). Normal command dispatch owns
+                // scrolling, point preservation, hooks and redisplay; layout
+                // must not consume a second, hidden input queue.
+                let event = Value::list(vec![
+                    Value::symbol(&symbol),
+                    position,
+                    Value::fixnum(1),
+                    Value::fixnum(1),
+                    Value::cons(
+                        Value::make_float(delta_x as f64),
+                        Value::make_float(delta_y as f64),
+                    ),
+                ]);
+                self.command_loop.store_kbd_macro_event(event);
+                Ok(Some(event))
             }
             InputEvent::PresentedRegion { .. }
             | InputEvent::LayoutInvalidated

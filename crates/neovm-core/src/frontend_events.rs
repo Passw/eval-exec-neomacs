@@ -200,12 +200,12 @@ fn semantics(event: &InputEvent) -> FrontendEventSemantics {
         | InputEvent::MousePress { .. }
         | InputEvent::MouseRelease { .. }
         | InputEvent::MouseScroll { .. }
+        | InputEvent::PixelScroll { .. }
         | InputEvent::MenuSelection { .. }
         | InputEvent::ToolBarClick { .. }
         | InputEvent::PresentedPointer { .. }
         | InputEvent::MenuBarClick { .. } => Command,
         InputEvent::MouseMove { .. } => MouseMotion,
-        InputEvent::PixelScroll { .. } => special_input(PendingInputPolicy::Always, true, false),
         InputEvent::PresentedRegion {
             presentation,
             hit,
@@ -546,7 +546,7 @@ mod tests {
                 modifiers: Modifiers::none(),
                 target_frame_id: 0,
             },
-            FrontendEventClass::LispSpecial,
+            FrontendEventClass::Command,
             PendingPolicy::Always,
             true,
             false,
