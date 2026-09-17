@@ -83,6 +83,12 @@ freshness projection and retained-row key. This follows GNU's identity-based
 membership checks; it does not deep-copy category objects or interpret non-nil
 ellipsis tails beyond their truthiness.
 
+Direct character-table writes already advance an evaluator-thread revision.
+`CharTableLayoutRevision` is shared by snapshot validation and the retained-row
+key, preventing rejected geometry from being rebuilt out of stale retained rows.
+This retains the existing conservative invalidation across tables; per-table
+dependencies and mutation inside stored glyph vectors remain separate work.
+
 Source backtracking retreats past display/invisibility spans covering a
 newline before measuring forward. Producer-owned row metadata distinguishes
 buffer rows, replacement newlines, replacement wraps, and before/after overlay

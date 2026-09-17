@@ -155,6 +155,7 @@ impl WindowDelta {
 pub struct RetainedWindowKey {
     pub prefixes: neovm_core::window::LayoutPrefixInputs,
     pub invisibility: neovm_core::window::LayoutInvisibilityInput,
+    pub char_table_revision: neovm_core::window::CharTableLayoutRevision,
     /// Generation of asynchronously decoded media (see
     /// `Context::invalidate_media`). An image that finishes decoding changes
     /// none of the buffer ticks or geometry below, so without this term the
@@ -275,6 +276,7 @@ impl RetainedWindowKey {
             .unwrap_or((0, 0, 0, false, p.buffer_size, 0));
         Self {
             media_generation: evaluator.media_generation(),
+            char_table_revision: neovm_core::window::CharTableLayoutRevision::current(),
             prefixes: evaluator
                 .layout_prefix_inputs(neovm_core::buffer::BufferId(p.buffer_id))
                 .unwrap_or_default(),
@@ -397,6 +399,7 @@ impl RetainedWindowKey {
         diff!(
             prefixes,
             invisibility,
+            char_table_revision,
             media_generation,
             buffer_id,
             window_start,
@@ -1723,6 +1726,7 @@ mod scroll_classifier_tests {
         RetainedWindowKey {
             prefixes: Default::default(),
             invisibility: Default::default(),
+            char_table_revision: Default::default(),
             media_generation: 0,
             buffer_id: 1,
             window_start,

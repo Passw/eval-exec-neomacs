@@ -584,6 +584,10 @@ pub struct FrameLayoutInputState {
     pub(crate) window_system_symbol: Option<SymId>,
 }
 
+/// Existing evaluator-thread revision for direct character-table writes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CharTableLayoutRevision(u64);
+
 /// Window inputs that can change display-row geometry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WindowLayoutInputState {
@@ -597,7 +601,7 @@ pub struct WindowLayoutInputState {
     pub(crate) preserve_vscroll_p: bool,
     pub(crate) margins: WindowMargins,
     pub(crate) display_table_identity: usize,
-    pub(crate) char_table_mutation_epoch: u64,
+    pub(crate) char_table_mutation_epoch: CharTableLayoutRevision,
     pub(crate) window_parameters_generation: u64,
     pub(crate) left_fringe_width: i32,
     pub(crate) right_fringe_width: i32,

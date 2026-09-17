@@ -94,6 +94,22 @@ fn assert_layout_mutation_invalidates_geometry(setup: &str, mutation: &str) {
 }
 
 #[test]
+fn retained_geometry_rejects_mutated_display_table_entry() {
+    assert_layout_mutation_invalidates_geometry(
+        "(setq buffer-display-table (make-char-table 'display-table nil)) (aset buffer-display-table 97 [97])",
+        "(aset buffer-display-table 97 [97 97 97 97])",
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_display_table_default() {
+    assert_layout_mutation_invalidates_geometry(
+        "(setq buffer-display-table (make-char-table 'display-table nil)) (set-char-table-range buffer-display-table nil [97])",
+        "(set-char-table-range buffer-display-table nil [97 97 97 97])",
+    );
+}
+
+#[test]
 fn retained_geometry_rejects_mutated_invisibility_membership() {
     assert_layout_mutation_invalidates_geometry(
         "(setq buffer-invisibility-spec (list 'hidden)) (put-text-property 1 11 'invisible 'hidden)",

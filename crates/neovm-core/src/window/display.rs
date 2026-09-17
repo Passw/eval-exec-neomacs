@@ -117,8 +117,12 @@ thread_local! {
     static WINDOW_PARAMETERS_LAYOUT_GENERATION: Cell<u64> = const { Cell::new(0) };
 }
 
-pub(crate) fn char_table_layout_mutation_epoch() -> u64 {
-    CHAR_TABLE_LAYOUT_MUTATION_EPOCH.with(Cell::get)
+impl super::CharTableLayoutRevision {
+    /// Existing evaluator-thread char-table invalidation shared by freshness
+    /// validation and retained-row reuse. This is not a per-table revision.
+    pub fn current() -> Self {
+        Self(CHAR_TABLE_LAYOUT_MUTATION_EPOCH.with(Cell::get))
+    }
 }
 
 pub(crate) fn note_char_table_layout_mutation() {
@@ -461,7 +465,7 @@ impl Frame {
             preserve_vscroll_p: state.preserve_vscroll_p,
             margins: *margins,
             display_table_identity: display.display_table.bits(),
-            char_table_mutation_epoch: char_table_layout_mutation_epoch(),
+            char_table_mutation_epoch: super::CharTableLayoutRevision::current(),
             window_parameters_generation: window.parameters_generation(),
             left_fringe_width,
             right_fringe_width,
