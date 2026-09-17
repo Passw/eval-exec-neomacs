@@ -115,6 +115,102 @@ fn assert_layout_mutation_with_measurement(setup: &str, mutation: &str, graphica
     );
 }
 
+fn assert_decoration_mutation_invalidates_presentation(setup: &str, mutation: &str) {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert("abc");
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("box-inputs", 160, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str(&format!(
+        r##"(progn (goto-char 1) (setq line-prefix (copy-sequence "xx")) {setup})"##
+    ))
+    .unwrap();
+    let render = |engine: &mut LayoutEngine, eval: &mut Context| {
+        let FrameLayoutAttempt::Prepared(state) = engine.redisplay_frame_attempt(eval, frame)
+        else {
+            panic!("presentation aborted")
+        };
+        let glyph = state
+            .window_matrices
+            .iter()
+            .flat_map(|window| &window.matrix.rows)
+            .flat_map(|row| &row.glyphs[GlyphArea::Text.index()])
+            .find(|glyph| matches!(glyph.glyph_type, GlyphType::Char { ch: 'x' }))
+            .expect("prefix glyph");
+        let face = &state.faces[&glyph.face_id];
+        (
+            face.box_line_width,
+            face.box_color,
+            face.underline_style,
+            face.underline_placement,
+            face.underline_color,
+        )
+    };
+    let mut engine = LayoutEngine::new();
+    let before = render(&mut engine, &mut eval);
+    assert_eq!(before, render(&mut engine, &mut eval));
+    assert!(engine.last_layout_stats().reused_rows > 0);
+    eval.eval_str(mutation).unwrap();
+    let incremental = render(&mut engine, &mut eval);
+    let reference = render(&mut LayoutEngine::new(), &mut eval);
+    assert_ne!(
+        before, reference,
+        "mutation must change the rendered decoration"
+    );
+    assert_eq!(
+        incremental, reference,
+        "retained decoration agrees with fresh layout"
+    );
+}
+
+#[test]
+fn retained_presentation_rejects_mutated_prefix_box_line_width() {
+    assert_decoration_mutation_invalidates_presentation(
+        "(setq box-spec (list :line-width 1)) (put-text-property 0 2 'face (list :box box-spec) line-prefix)",
+        "(setcar (cdr box-spec) 6)",
+    );
+}
+
+#[test]
+fn retained_presentation_rejects_mutated_box_width_pair() {
+    assert_decoration_mutation_invalidates_presentation(
+        "(setq widths (cons 1 1)) (put-text-property 0 2 'face (list :box (list :line-width widths)) line-prefix)",
+        "(setcar widths 6)",
+    );
+}
+
+#[test]
+fn retained_presentation_rejects_mutated_underline_style() {
+    assert_decoration_mutation_invalidates_presentation(
+        "(setq underline-spec (list :style 'line)) (put-text-property 0 2 'face (list :underline underline-spec) line-prefix)",
+        "(setcar (cdr underline-spec) 'wave)",
+    );
+}
+
+#[test]
+fn retained_presentation_rejects_mutated_underline_position() {
+    assert_decoration_mutation_invalidates_presentation(
+        "(setq underline-spec (list :position 0)) (put-text-property 0 2 'face (list :underline underline-spec) line-prefix)",
+        "(setcar (cdr underline-spec) 4)",
+    );
+}
+
+#[test]
+fn retained_presentation_rejects_mutated_decoration_color_string() {
+    assert_decoration_mutation_invalidates_presentation(
+        r##"(setq color (copy-sequence "#ff0000")) (put-text-property 0 2 'face (list :underline (list :color color)) line-prefix)"##,
+        "(aset color 1 48)",
+    );
+}
+
 #[test]
 fn retained_geometry_rejects_mutated_prefix_face_height() {
     assert_layout_mutation_with_measurement(

@@ -1327,6 +1327,30 @@ impl Face {
     }
 }
 
+/// Shared property vocabulary for decoration parsing and dependency capture.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, EnumString)]
+#[strum(serialize_all = "kebab-case")]
+pub(crate) enum DecorationProperty {
+    Color,
+    Style,
+    Position,
+    LineWidth,
+}
+
+impl DecorationProperty {
+    pub(crate) fn from_value(value: Value) -> Option<Self> {
+        value.as_symbol_name()?.trim_start_matches(':').parse().ok()
+    }
+
+    pub(crate) fn applies_to(self, attribute: LFaceAttr) -> bool {
+        match self {
+            Self::Color | Self::Style => matches!(attribute, LFaceAttr::Box | LFaceAttr::Underline),
+            Self::Position => attribute == LFaceAttr::Underline,
+            Self::LineWidth => attribute == LFaceAttr::Box,
+        }
+    }
+}
+
 /// Parse one `:underline` value from an anonymous attribute plist.
 ///
 /// The colour is realized through the terminal palette, exactly as this
@@ -1366,24 +1390,21 @@ fn parse_underline_value(
             let mut position = UnderlinePosition::FontMetric;
             let mut i = 0;
             while i + 1 < items.len() {
-                let key = items[i]
-                    .as_symbol_name()
-                    .unwrap_or("")
-                    .trim_start_matches(':');
+                let key = DecorationProperty::from_value(items[i]);
                 let item = &items[i + 1];
                 match key {
-                    "color" => {
+                    Some(DecorationProperty::Color) => {
                         color = face_runtime_string(item)
                             .as_deref()
                             .and_then(|spec| realize_color_spec(spec, palette));
                     }
-                    "style" => {
+                    Some(DecorationProperty::Style) => {
                         if let Some(name) = item.as_symbol_name() {
                             style =
                                 UnderlineStyle::from_symbol(name).unwrap_or(UnderlineStyle::Line);
                         }
                     }
-                    "position" => {
+                    Some(DecorationProperty::Position) => {
                         position = UnderlinePosition::from_lisp(item);
                     }
                     _ => {}
@@ -1437,13 +1458,10 @@ fn parse_box_value(value: &Value) -> FaceDecoration<BoxBorder> {
             let mut style = BoxStyle::Flat;
             let mut i = 0;
             while i + 1 < items.len() {
-                let key = items[i]
-                    .as_symbol_name()
-                    .unwrap_or("")
-                    .trim_start_matches(':');
+                let key = DecorationProperty::from_value(items[i]);
                 let item = &items[i + 1];
                 match key {
-                    "line-width" => match item.kind() {
+                    Some(DecorationProperty::LineWidth) => match item.kind() {
                         ValueKind::Fixnum(n) => width = n as i32,
                         ValueKind::Cons => {
                             let pair_car = item.cons_car();
@@ -1454,10 +1472,10 @@ fn parse_box_value(value: &Value) -> FaceDecoration<BoxBorder> {
                         }
                         _ => {}
                     },
-                    "color" => {
+                    Some(DecorationProperty::Color) => {
                         color = parse_color_value(item);
                     }
-                    "style" => {
+                    Some(DecorationProperty::Style) => {
                         if let Some(name) = item.as_symbol_name() {
                             style = BoxStyle::from_symbol(name).unwrap_or(BoxStyle::Flat);
                         }

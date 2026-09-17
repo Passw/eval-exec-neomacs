@@ -90,8 +90,13 @@ lists, known attributes (using `LFaceAttr`), scalar/string operands and `:inheri
 references. The iterative capture records shared/cyclic inheritance without
 resolving named faces or evaluating filters. Named-face definitions still use the
 existing face revision. GUI-measured regressions cover height changes; terminal
-cell geometry is not evidence for font-size invalidation. Compound decoration
-and font operands, filtered-face conditions and image/resource expressions remain
+cell geometry is not evidence for font-size invalidation. Box and underline
+plists share `DecorationProperty` with the face parser; capture includes supported
+operands, mutable color bytes and box width-pair components. Presentation tests
+compare the published glyph faces against fresh layout, since decoration changes
+need not move source-position geometry. This does not change existing box-width
+realization semantics. Compound font operands, filtered-face conditions and
+image/resource expressions remain
 audit items, not a claim of complete mutable-Lisp-graph invalidation.
 
 `LayoutInvisibilityInput` captures the effective buffer's ordered invisibility

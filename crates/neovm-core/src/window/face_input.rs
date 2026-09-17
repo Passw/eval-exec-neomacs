@@ -5,7 +5,7 @@ use crate::emacs_core::{
     plist::plist_get,
     value::{Value, list_to_vec},
 };
-use crate::face::LFaceAttr;
+use crate::face::{DecorationProperty, LFaceAttr};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
@@ -33,6 +33,9 @@ enum Token {
     List,
     Attributes,
     Attribute(LFaceAttr),
+    Decoration,
+    DecorationProperty(DecorationProperty),
+    WidthPair,
     End,
     Reference(usize),
 }
@@ -88,9 +91,11 @@ fn capture_face(value: Value) -> Arc<[Token]> {
                 tokens.push(Token::Attribute(key));
                 if key == LFaceAttr::Inherit {
                     pending.push(Work::Face(value));
+                } else if matches!(key, LFaceAttr::Box | LFaceAttr::Underline) {
+                    capture_decoration(key, value, &mut tokens);
                 } else {
-                    // Scalar/string operands are owned; compound decoration
-                    // and font payloads retain identity pending their audit.
+                    // Scalar/string operands are owned; compound font/resource
+                    // payloads retain identity pending their audit.
                     tokens.push(atom(value));
                 }
             }
@@ -131,4 +136,33 @@ fn capture_face(value: Value) -> Arc<[Token]> {
         }
     }
     tokens.into()
+}
+
+fn capture_decoration(attribute: LFaceAttr, value: Value, tokens: &mut Vec<Token>) {
+    if !value.is_cons() {
+        tokens.push(atom(value));
+        return;
+    }
+    let Some(items) = list_to_vec(&value) else {
+        // The parser rejects improper/cyclic decoration plists.
+        tokens.push(atom(value));
+        return;
+    };
+    tokens.push(Token::Decoration);
+    for pair in items.chunks_exact(2) {
+        if let Some(property) = DecorationProperty::from_value(pair[0])
+            && property.applies_to(attribute)
+        {
+            tokens.push(Token::DecorationProperty(property));
+            let value = pair[1];
+            if property == DecorationProperty::LineWidth && value.is_cons() {
+                tokens.push(Token::WidthPair);
+                tokens.push(atom(value.cons_car()));
+                tokens.push(atom(value.cons_cdr()));
+            } else {
+                tokens.push(atom(value));
+            }
+        }
+    }
+    tokens.push(Token::End);
 }
