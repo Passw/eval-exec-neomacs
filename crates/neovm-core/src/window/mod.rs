@@ -23,7 +23,9 @@ pub(crate) mod body;
 mod chrome;
 pub use chrome::WindowChromePresence;
 mod display;
+mod display_table_input;
 pub(crate) use display::WindowScrollUpdate;
+pub use display_table_input::LayoutDisplayTableInput;
 mod frame_params;
 pub mod geometry;
 mod history;
@@ -625,6 +627,7 @@ pub struct BufferLayoutInputState {
     pub(crate) total_emacs_bytes: EmacsByteLen,
     pub(crate) prefixes: LayoutPrefixInputs,
     pub(crate) invisibility: LayoutInvisibilityInput,
+    pub(crate) display_table: LayoutDisplayTableInput,
 }
 
 /// Owned prefix inputs shared by redisplay skipping, geometry freshness and

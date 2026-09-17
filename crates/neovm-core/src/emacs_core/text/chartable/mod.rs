@@ -2482,6 +2482,33 @@ fn ct_collect_raw_entries(vec: &[Value], is_uniprop: bool) -> Vec<RawEntry> {
     raws
 }
 
+/// Stored child values for display dependency capture, without Lisp allocation
+/// or expanding ranges into individual character codes. Includes defaults,
+/// parent tables and extra slots; callers distinguish tables from glyph vectors.
+pub(crate) fn display_dependency_children(table: Value) -> Option<Vec<Value>> {
+    if let Some(table) = table.as_char_table_obj() {
+        let mut values = vec![table.defalt, table.parent, table.ascii];
+        values.extend_from_slice(&table.contents);
+        values.extend_from_slice(table.extras.as_slice());
+        return Some(values);
+    }
+    if let Some(table) = table.as_sub_char_table_obj() {
+        return Some(table.contents.as_slice().to_vec());
+    }
+    if !is_char_table(&table) {
+        return None;
+    }
+    let slots = table.as_vector_data()?;
+    let mut values = vec![slots[CT_DEFAULT], slots[CT_PARENT]];
+    values.extend_from_slice(&slots[CT_EXTRA_START..ct_data_start(&slots)]);
+    values.extend(
+        ct_collect_raw_entries(&slots, false)
+            .into_iter()
+            .map(|entry| entry.value),
+    );
+    Some(values)
+}
+
 /// Ranged sub-char-table walk: descends only into slots whose
 /// character span intersects [win_start, win_end]. Mirrors GNU
 /// map_sub_char_table's from/to pruning (chartab.c) — a narrow query must not

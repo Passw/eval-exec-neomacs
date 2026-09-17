@@ -94,6 +94,78 @@ fn assert_layout_mutation_invalidates_geometry(setup: &str, mutation: &str) {
 }
 
 #[test]
+fn retained_geometry_rejects_mutated_display_table_glyph_vector() {
+    assert_layout_mutation_invalidates_geometry(
+        "(setq glyphs (vector 97) buffer-display-table (make-char-table 'display-table nil)) (aset buffer-display-table 97 glyphs)",
+        "(aset glyphs 0 30028)",
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_standard_display_table_glyph() {
+    assert_layout_mutation_invalidates_geometry(
+        "(setq glyph (cons 97 0) standard-display-table (make-char-table 'display-table nil)) (aset standard-display-table 97 (vector glyph))",
+        "(setcar glyph 30028)",
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_default_glyph_vector() {
+    assert_layout_mutation_invalidates_geometry(
+        "(setq glyphs (vector 97) buffer-display-table (make-char-table 'display-table nil)) (set-char-table-range buffer-display-table nil glyphs)",
+        "(aset glyphs 0 30028)",
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_parent_table_glyph_vector() {
+    assert_layout_mutation_invalidates_geometry(
+        "(setq glyphs (vector 97) parent-table (make-char-table 'display-table nil) buffer-display-table (make-char-table 'display-table nil)) (aset parent-table 97 glyphs) (set-char-table-parent buffer-display-table parent-table)",
+        "(aset glyphs 0 30028)",
+    );
+}
+
+#[test]
+fn retained_geometry_rejects_mutated_ellipsis_glyph_vector() {
+    assert_layout_mutation_invalidates_geometry(
+        "(put 'display-table 'char-table-extra-slots 6) (setq glyphs (vector 97) buffer-display-table (make-char-table 'display-table nil) buffer-invisibility-spec '((hidden . t))) (set-char-table-extra-slot buffer-display-table 4 glyphs) (put-text-property 1 31 'invisible 'hidden)",
+        "(aset glyphs 0 30028)",
+    );
+}
+
+#[test]
+fn display_table_freshness_ignores_unrelated_vector_mutations() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("glyph-inputs", 160, 160, buffer);
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.eval_str("(progn (setq glyphs (vector 97) unrelated (vector 97) buffer-display-table (make-char-table 'display-table nil) standard-display-table (make-char-table 'display-table nil)) (aset buffer-display-table 97 glyphs) (aset standard-display-table 97 unrelated))").unwrap();
+    let before = eval
+        .window_layout_attempt_freshness(frame, window, buffer)
+        .unwrap();
+    eval.eval_str("(aset unrelated 0 30028)").unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(aset glyphs 0 30028)").unwrap();
+    assert_ne!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+    eval.eval_str("(aset glyphs 0 97)").unwrap();
+    assert_eq!(
+        before,
+        eval.window_layout_attempt_freshness(frame, window, buffer)
+            .unwrap()
+    );
+}
+
+#[test]
 fn retained_geometry_rejects_mutated_display_table_entry() {
     assert_layout_mutation_invalidates_geometry(
         "(setq buffer-display-table (make-char-table 'display-table nil)) (aset buffer-display-table 97 [97])",

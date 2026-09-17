@@ -773,7 +773,25 @@ impl crate::emacs_core::eval::Context {
             total_emacs_bytes: buffer.total_emacs_byte_len(),
             prefixes: self.layout_prefix_inputs(buffer_id)?,
             invisibility: self.layout_invisibility_input(buffer_id)?,
+            display_table: self.layout_display_table_input(buffer_id)?,
         })
+    }
+
+    /// Capture glyph-vector inputs for the effective buffer/standard table.
+    pub fn layout_display_table_input(
+        &self,
+        buffer_id: BufferId,
+    ) -> Option<super::LayoutDisplayTableInput> {
+        let buffer = self.buffers.get(buffer_id)?;
+        let value = |variable: super::WindowLayoutVariable| {
+            self.obarray
+                .value_in_buffer_id(Some(buffer), variable.sym_id())
+        };
+        let table = value(super::WindowLayoutVariable::BufferDisplayTable)
+            .filter(|value| !value.is_nil())
+            .or_else(|| value(super::WindowLayoutVariable::StandardDisplayTable))
+            .unwrap_or(Value::NIL);
+        Some(super::LayoutDisplayTableInput::capture(table))
     }
 
     /// Capture ordered invisibility membership and ellipsis selection by value.

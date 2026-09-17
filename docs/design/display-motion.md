@@ -86,8 +86,16 @@ ellipsis tails beyond their truthiness.
 Direct character-table writes already advance an evaluator-thread revision.
 `CharTableLayoutRevision` is shared by snapshot validation and the retained-row
 key, preventing rejected geometry from being rebuilt out of stale retained rows.
-This retains the existing conservative invalidation across tables; per-table
-dependencies and mutation inside stored glyph vectors remain separate work.
+This retains the existing conservative invalidation across tables.
+`LayoutDisplayTableInput` additionally captures reachable glyph-vector contents,
+including `(character . face-id)` glyph codes, for the active buffer or standard
+display table. Defaults, extra slots and parents participate. Capture walks
+explicit table storage and deduplicates shared vectors; it never enumerates the
+character-code space or copies buffer text. Unrelated vectors do not invalidate
+layout, and restoring glyph contents restores input equality. This costs O(table
+storage + unique stored glyphs) per capture; tracking only consulted mappings is
+a future refinement, not a claimed constant-time path. Direct table writes still
+use the conservative revision above.
 
 Source backtracking retreats past display/invisibility spans covering a
 newline before measuring forward. Producer-owned row metadata distinguishes
