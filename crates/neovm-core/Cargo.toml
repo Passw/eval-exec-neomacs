@@ -173,6 +173,10 @@ path = "tests/fringe_standard_indicators.rs"
 name = "buffer_text_backends"
 harness = false
 
+[[bench]]
+name = "layout_input_capture"
+harness = false
+
 # These three were crate-wide "allow" until 2026-07: that silenced the
 # compiler's cheapest correctness signal for ALL code, including new code.
 # They are now live. Pre-existing not-yet-wired GNU-parity scaffolding was
