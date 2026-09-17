@@ -1,8 +1,8 @@
 name: Update YouTube cards
 
 on:
-  schedule:
-    - cron: "17 * * * *"
+  # Automatic updates are paused while YouTube RSS feeds return HTTP 404.
+  # Resume the hourly schedule after verifying the feed returns videos again.
   workflow_dispatch:
 
 concurrency:
