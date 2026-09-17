@@ -660,6 +660,9 @@ fn start_xvfb_on(artifact_root: &Path, display_number: u32) -> io::Result<Displa
         .arg("-listen")
         .arg("tcp")
         .arg("-nolock")
+        // DisplaySession owns the server lifetime. Short-lived probe clients
+        // must not reset it while the editor establishes its first connection.
+        .arg("-noreset")
         .arg("-auth")
         .arg(&authority_path)
         .current_dir(&session_dir)

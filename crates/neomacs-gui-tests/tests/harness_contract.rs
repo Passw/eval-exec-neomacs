@@ -267,6 +267,35 @@ fn x11_session_owns_authenticated_tcp_display_below_workspace_tmp() {
         "X11 server accepted a client without its generated cookie"
     );
 
+    // The session, not the count of connected probe clients, owns server
+    // lifetime. A reset between xdotool polls can race the editor's connection.
+    let set_property = Command::new("xprop")
+        .args([
+            "-root",
+            "-f",
+            "NEOMACS_GUI_SESSION",
+            "8s",
+            "-set",
+            "NEOMACS_GUI_SESSION",
+            "alive",
+        ])
+        .env("DISPLAY", &display)
+        .env("XAUTHORITY", &authority)
+        .output()
+        .expect("set owned X11 session marker");
+    assert!(set_property.status.success(), "{set_property:?}");
+    let read_property = Command::new("xprop")
+        .args(["-root", "NEOMACS_GUI_SESSION"])
+        .env("DISPLAY", &display)
+        .env("XAUTHORITY", &authority)
+        .output()
+        .expect("read marker after the previous client disconnected");
+    assert!(
+        read_property.status.success()
+            && String::from_utf8_lossy(&read_property.stdout).contains("alive"),
+        "X11 session reset between clients: {read_property:?}"
+    );
+
     drop(session);
     assert!(!owned_session_root.exists());
     std::fs::remove_dir(&root).expect("remove exact empty contract root");
