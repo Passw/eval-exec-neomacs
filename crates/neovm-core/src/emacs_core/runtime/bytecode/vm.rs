@@ -6946,11 +6946,11 @@ impl<'a> Vm<'a> {
         // on the native stack). See `resolve_compiled_leaf_ptr` for the full
         // invariant. (NOT "the cache never evicts" — it can; audit #1.)
         let leaf = unsafe { &*ptr };
-        // Debug-build evidence that the fast path actually fires (vs silently
+        // Test/debug-build evidence that the fast path actually fires (vs silently
         // falling back to call_for_jit on every call). Counted here rather
         // than in the shared runner below so it stays a count of SPECULATED
         // calls, not of every native-to-native call.
-        #[cfg(debug_assertions)]
+        #[cfg(any(test, debug_assertions))]
         if leaf.accepts(nargs) {
             crate::emacs_core::jit::compile::SPEC_FAST_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
         }

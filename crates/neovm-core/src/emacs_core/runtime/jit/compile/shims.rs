@@ -143,16 +143,17 @@ pub const STATUS_DEOPT_AT: i64 = 3;
 /// AOT compiles at `None`).
 pub const STATUS_NEED_GENERIC: i64 = 4;
 
-/// Debug-build counter of speculated direct-call shim entries (test evidence
-/// that `find_spec_sites` + the spec lowering actually engage).
-#[cfg(debug_assertions)]
+/// Test/debug-build counter of speculated direct-call shim entries (evidence
+/// that `find_spec_sites` + the spec lowering actually engage). Release unit
+/// tests need this too; non-test release builds carry no counter.
+#[cfg(any(test, debug_assertions))]
 pub(crate) static SPEC_CALL_COUNT: AtomicU64 = AtomicU64::new(0);
 
-/// Debug-build counter of V3 fast-path engagements: a speculated call that
+/// Test/debug-build counter of V3 fast-path engagements: a speculated call that
 /// ran the cached callee leaf DIRECTLY (skipping funcall dispatch + the cache
 /// hash lookup), as opposed to falling back to `call_for_jit`. Test evidence
 /// that the fast path actually fires instead of silently no-op'ing.
-#[cfg(debug_assertions)]
+#[cfg(any(test, debug_assertions))]
 pub(crate) static SPEC_FAST_CALL_COUNT: AtomicU64 = AtomicU64::new(0);
 
 /// Debug-build counter of speculated direct-SUBR shim entries (all three

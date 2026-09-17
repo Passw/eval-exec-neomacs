@@ -971,9 +971,9 @@ pub extern "C" fn neovm_jit_call_spec(
     out: *mut i64,
 ) -> i64 {
     jit_shim_contain!(ctx, STATUS_SIGNAL, {
-        // Debug-build evidence that speculation actually engages (tests assert on
-        // it; release builds carry no counter).
-        #[cfg(debug_assertions)]
+        // Evidence that speculation actually engages, including in release
+        // unit tests. Non-test release builds carry no counter.
+        #[cfg(any(test, debug_assertions))]
         SPEC_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
         let nargs = nargs as usize;
         // Build a rooted LispArgVec from the caller's call-args slot — used only by
