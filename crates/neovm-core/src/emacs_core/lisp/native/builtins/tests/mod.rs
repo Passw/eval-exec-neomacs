@@ -11445,17 +11445,14 @@ fn internal_labeled_narrow_to_region_clamps_within_current_restriction() {
 }
 
 #[test]
-fn dispatch_builtin_pure_handles_window_resize_and_frame_switch_placeholders() {
+fn dispatch_builtin_pure_handles_window_placeholders_but_defers_frame_selection() {
     crate::test_utils::init_test_tracing();
     let save = dispatch_builtin_pure("handle-save-session", vec![Value::symbol("event")])
         .expect("handle-save-session should resolve")
         .expect("handle-save-session should evaluate");
     assert_eq!(save, Value::NIL);
 
-    let frame = dispatch_builtin_pure("handle-switch-frame", vec![Value::make_frame(1)])
-        .expect("handle-switch-frame should resolve")
-        .expect("handle-switch-frame should evaluate");
-    assert_eq!(frame, Value::NIL);
+    assert!(dispatch_builtin_pure("handle-switch-frame", vec![Value::make_frame(1)]).is_none());
 
     let divider = dispatch_builtin_pure("window-bottom-divider-width", vec![])
         .expect("window-bottom-divider-width should resolve")

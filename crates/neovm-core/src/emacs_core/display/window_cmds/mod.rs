@@ -22,10 +22,10 @@ use crate::window::WindowChromeLine;
 use crate::window::body::{WindowBodyAxis, WindowBodyCellSize, WindowBodyUnit};
 use crate::window::{
     CombinationLimit, CursorTypeSymbol, DeleteResize, FrameDeletion, FrameDeletionSelectionPolicy,
-    FrameDivider, FrameFullscreen, FrameId, FrameManager, FrameParam, FrameParamKey,
-    FrameVisibility, Rect, SelectedFrameAfterDeletion, SplitDirection, SplitPlacement, Window,
-    WindowBufferDisplayDefaults, WindowFringeDefaults, WindowId, WindowMargins,
-    WindowScrollBarDefaults, is_valid_horizontal_scroll_bar_value,
+    FrameDivider, FrameFocusTracking, FrameFullscreen, FrameId, FrameManager, FrameParam,
+    FrameParamKey, FrameVisibility, Rect, SelectedFrameAfterDeletion, SplitDirection,
+    SplitPlacement, Window, WindowBufferDisplayDefaults, WindowFringeDefaults, WindowId,
+    WindowMargins, WindowScrollBarDefaults, is_valid_horizontal_scroll_bar_value,
     is_valid_vertical_scroll_bar_value, window_first_child_id, window_next_sibling_id,
     window_parent_id, window_prev_sibling_id,
 };
@@ -4668,13 +4668,29 @@ pub(crate) fn builtin_select_window(
             ));
         }
     };
+    select_window(
+        eval,
+        wid,
+        args.get(1).copied().unwrap_or(Value::NIL),
+        FrameFocusTracking::FollowSelection,
+    )
+}
+
+/// Commit window/frame/buffer selection together before running Lisp hooks.
+/// Frame selection and input-driven frame switches share this transaction.
+pub(crate) fn select_window(
+    eval: &mut super::eval::Context,
+    wid: WindowId,
+    norecord: Value,
+    focus_tracking: FrameFocusTracking,
+) -> EvalResult {
     // GNU `Fselect_window' does `CHECK_LIVE_WINDOW(window)': an internal
     // (non-leaf) window such as `(window-parent W)' is a valid window but not a
     // *live* one, so selecting it signals `wrong-type-argument window-live-p'.
     if !eval.frames.is_live_window_id(wid) {
         return Err(signal(
             LispCondition::WrongTypeArgument,
-            vec![Value::symbol("window-live-p"), args[0]],
+            vec![Value::symbol("window-live-p"), window_value(wid)],
         ));
     }
     let selection_changed = eval
@@ -4689,10 +4705,10 @@ pub(crate) fn builtin_select_window(
         let fid = frames.find_window_frame_id(wid).ok_or_else(|| {
             signal(
                 LispCondition::WrongTypeArgument,
-                vec![Value::symbol("window-live-p"), args[0]],
+                vec![Value::symbol("window-live-p"), window_value(wid)],
             )
         })?;
-        let record_selection = args.get(1).is_none_or(|v| v.is_nil());
+        let record_selection = norecord.is_nil();
         remember_selected_window_point_in_state(frames, buffers, selected_fid);
         {
             let frame = frames
@@ -4701,15 +4717,15 @@ pub(crate) fn builtin_select_window(
             if !frame.select_window(wid) {
                 return Err(signal(
                     LispCondition::WrongTypeArgument,
-                    vec![Value::symbol("window-live-p"), args[0]],
+                    vec![Value::symbol("window-live-p"), window_value(wid)],
                 ));
             }
         }
         let frame_changed = fid != selected_fid;
-        if frame_changed && !frames.select_frame(fid) {
+        if frame_changed && !frames.select_frame_with_focus_tracking(fid, focus_tracking) {
             return Err(signal(
                 LispCondition::WrongTypeArgument,
-                vec![Value::symbol("window-live-p"), args[0]],
+                vec![Value::symbol("window-live-p"), window_value(wid)],
             ));
         }
         if record_selection {

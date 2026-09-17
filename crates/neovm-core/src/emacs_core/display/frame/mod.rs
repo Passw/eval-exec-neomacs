@@ -6,6 +6,11 @@
 //! live in crate::window; window.c builtins stay in super::window_cmds.
 
 pub(crate) mod position;
+mod selection;
+pub(crate) use selection::{builtin_handle_switch_frame, builtin_select_frame};
+#[cfg(test)]
+#[path = "tests/selection.rs"]
+mod selection_test;
 use position::{FrameCoordinateOrigin, FramePositionSpec, apply_frame_position};
 
 use super::error::Flow;
@@ -311,53 +316,6 @@ pub(crate) fn builtin_selected_frame(
     args: Vec<Value>,
 ) -> EvalResult {
     selected_frame_impl(&mut eval.frames, &mut eval.buffers, args)
-}
-
-/// `(select-frame FRAME &optional NORECORD)` -> frame.
-pub(crate) fn builtin_select_frame(
-    eval: &mut super::eval::Context,
-    args: Vec<Value>,
-) -> EvalResult {
-    let (frames, buffers) = (&mut eval.frames, &mut eval.buffers);
-    expect_min_args("select-frame", &args, 1)?;
-    expect_max_args("select-frame", &args, 2)?;
-    let fid = match args[0].kind() {
-        // No `Fixnum` arm -- see `builtin_framep`.
-        ValueKind::Veclike(VecLikeType::Frame) => {
-            let raw_id = args[0].as_frame_id().unwrap();
-            let fid = FrameId(raw_id);
-            if frames.get(fid).is_none() {
-                return Err(signal(
-                    LispCondition::WrongTypeArgument,
-                    vec![Value::symbol("frame-live-p"), Value::make_frame(raw_id)],
-                ));
-            }
-            fid
-        }
-        _ => {
-            return Err(signal(
-                LispCondition::WrongTypeArgument,
-                vec![Value::symbol("frame-live-p"), args[0]],
-            ));
-        }
-    };
-    if let Some(old_fid) = frames.selected_frame().map(|frame| frame.id) {
-        remember_selected_window_point_in_state(frames, buffers, old_fid);
-    }
-    if !frames.select_frame(fid) {
-        return Err(signal(
-            LispCondition::WrongTypeArgument,
-            vec![Value::symbol("frame-live-p"), args[0]],
-        ));
-    }
-    if args.get(1).is_none_or(|v| v.is_nil())
-        && let Some(selected_wid) = frames.get(fid).map(|f| f.selected_window)
-    {
-        let _ = frames.note_window_selected(selected_wid);
-    }
-    sync_selected_window_buffer_in_state(frames, buffers, fid);
-    eval.sync_keyboard_terminal_owner();
-    Ok(Value::make_frame(fid.0))
 }
 
 /// `(frame-list)` -> list of frame objects.

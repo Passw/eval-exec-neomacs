@@ -67,6 +67,14 @@ pub struct WindowId(pub u64);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FrameId(pub u64);
 
+/// Whether a logical frame selection may retarget existing focus redirections.
+/// GNU `do_switch_frame` tracks explicit selections, but not input events.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum FrameFocusTracking {
+    FollowSelection,
+    Preserve,
+}
+
 /// GNU-compatible lifecycle state for a live frame.
 ///
 /// GNU stores `visible` and `iconified` as separate bits, but only these three
@@ -5978,17 +5986,30 @@ impl FrameManager {
 
     /// Select a frame.
     pub fn select_frame(&mut self, id: FrameId) -> bool {
+        self.select_frame_with_focus_tracking(id, FrameFocusTracking::FollowSelection)
+    }
+
+    pub(crate) fn select_frame_with_focus_tracking(
+        &mut self,
+        id: FrameId,
+        tracking: FrameFocusTracking,
+    ) -> bool {
         if let Some(terminal_id) = self.frames.get(&id).map(|frame| frame.terminal_id) {
             let terminal_top = self.root_frame_id(id).unwrap_or(id);
             let previous = self.selected;
             self.selected = Some(id);
             self.terminal_top_frames.insert(terminal_id, terminal_top);
-            if let Some(previous) = previous {
-                let previous_value = Value::make_frame(previous.0);
-                let redirected_value = Value::make_frame(id.0);
-                for frame in self.frames.values_mut() {
-                    if frame.focus_frame == previous_value {
-                        frame.focus_frame = redirected_value;
+            match tracking {
+                FrameFocusTracking::Preserve => {}
+                FrameFocusTracking::FollowSelection => {
+                    if let Some(previous) = previous {
+                        let previous_value = Value::make_frame(previous.0);
+                        let redirected_value = Value::make_frame(id.0);
+                        for frame in self.frames.values_mut() {
+                            if frame.focus_frame == previous_value {
+                                frame.focus_frame = redirected_value;
+                            }
+                        }
                     }
                 }
             }

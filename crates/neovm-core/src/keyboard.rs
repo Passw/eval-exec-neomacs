@@ -1791,6 +1791,10 @@ impl KBoard {
         self.internal_last_event_frame = Some(frame_id);
     }
 
+    pub(crate) fn clear_internal_last_event_frame(&mut self) {
+        self.internal_last_event_frame = None;
+    }
+
     pub fn mouse_pixel_position(&self) -> Option<MousePixelPositionState> {
         self.mouse_pixel_position
     }

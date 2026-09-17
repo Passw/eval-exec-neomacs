@@ -7649,6 +7649,9 @@ fn delete_frame_uses_mru_only_for_the_mru_symbol() {
         let form = format!(
             r##"
 (progn
+  ;; GNU do_switch_frame returns immediately for the selected frame. Leave
+  ;; recent first so the next selection genuinely records its use time.
+  (select-frame test-victim-frame)
   (select-frame test-recent-frame)
   (select-frame test-victim-frame)
   (let ((delete-frame-choose-selected {setting}))

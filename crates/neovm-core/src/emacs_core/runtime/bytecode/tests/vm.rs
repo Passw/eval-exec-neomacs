@@ -7945,7 +7945,7 @@ fn vm_base64_json_ccl_and_runtime_clusters_use_direct_dispatch() {
                  (null (fboundp 'gpm-mouse-start))
                  (null (fboundp 'gpm-mouse-stop))
                  (null (handle-save-session nil))
-                 (null (handle-switch-frame (selected-frame)))
+                 (eq (handle-switch-frame (selected-frame)) (selected-frame))
                  (null (init-image-library nil))
                  (condition-case nil (clear-image-cache nil) (error t))
                  (null (internal--track-mouse (lambda () nil)))

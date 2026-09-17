@@ -804,50 +804,6 @@ pub(crate) fn builtin_handle_save_session(args: Vec<Value>) -> EvalResult {
     Ok(Value::NIL)
 }
 
-pub(crate) fn builtin_handle_switch_frame(args: Vec<Value>) -> EvalResult {
-    expect_args("handle-switch-frame", &args, 1)?;
-    let frame = match args[0].kind() {
-        ValueKind::Veclike(VecLikeType::Frame) => args[0],
-        ValueKind::Cons => {
-            let pair_car = args[0].cons_car();
-            let pair_cdr = args[0].cons_cdr();
-            match pair_car.as_symbol_name() {
-                Some("switch-frame") => {
-                    let cdr = pair_cdr;
-                    match cdr.kind() {
-                        ValueKind::Cons => cdr.cons_car(),
-                        _ => {
-                            return Err(signal(
-                                LispCondition::WrongTypeArgument,
-                                vec![Value::symbol("framep"), args[0]],
-                            ));
-                        }
-                    }
-                }
-                _ => {
-                    return Err(signal(
-                        LispCondition::WrongTypeArgument,
-                        vec![Value::symbol("framep"), args[0]],
-                    ));
-                }
-            }
-        }
-        _ => {
-            return Err(signal(
-                LispCondition::WrongTypeArgument,
-                vec![Value::symbol("framep"), args[0]],
-            ));
-        }
-    };
-    if !frame.is_frame() {
-        return Err(signal(
-            LispCondition::WrongTypeArgument,
-            vec![Value::symbol("framep"), frame],
-        ));
-    }
-    Ok(Value::NIL)
-}
-
 pub(crate) fn builtin_init_image_library(args: Vec<Value>) -> EvalResult {
     expect_args("init-image-library", &args, 1)?;
     let available = args[0]

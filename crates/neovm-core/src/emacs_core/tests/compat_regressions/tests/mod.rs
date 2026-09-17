@@ -1002,17 +1002,16 @@ fn gnutls_symmetric_encrypt_requires_gnutls_support() {
 #[test]
 fn handle_switch_frame_accepts_switch_frame_event_and_rejects_nil() {
     crate::test_utils::init_test_tracing();
-    let frame_event = Value::list(vec![Value::symbol("switch-frame"), Value::make_frame(1)]);
-    let out = crate::emacs_core::builtins::builtin_handle_switch_frame(vec![frame_event])
+    let mut eval = crate::emacs_core::Context::new();
+    let out = eval
+        .eval_str("(handle-switch-frame (list 'switch-frame (selected-frame)))")
         .expect("switch-frame event should be accepted");
-    assert_eq!(out, Value::NIL);
+    assert!(out.is_frame());
 
-    let err =
-        crate::emacs_core::builtins::builtin_handle_switch_frame(vec![Value::NIL]).unwrap_err();
-    match err {
-        Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
-        other => panic!("expected signal, got {other:?}"),
-    }
+    let condition = eval
+        .eval_str("(condition-case err (handle-switch-frame nil) (error (car err)))")
+        .expect("catch invalid switch event");
+    assert_eq!(condition, Value::symbol("wrong-type-argument"));
 }
 
 #[test]

@@ -4430,11 +4430,12 @@ pub(crate) fn register_subrs(ctx: &mut crate::emacs_core::eval::Context) {
         .interactive(crate::emacs_core::interactive::BuiltinInteractiveSpec::String("e")),
     );
     ctx.register_subr(
-        SubrSpec::new(
+        SubrSpec::fixed1(
             "handle-switch-frame",
-            NativeFn::ContextVec(|_ctx, args| builtin_handle_switch_frame(args)),
-            SubrArity::new(1, Some(1)),
+            crate::emacs_core::frame::builtin_handle_switch_frame,
+            FixedMin1::One,
         )
+        .requires_eval_state()
         .interactive(crate::emacs_core::interactive::BuiltinInteractiveSpec::String("^e")),
     );
     ctx.register_subr(SubrSpec::new(
