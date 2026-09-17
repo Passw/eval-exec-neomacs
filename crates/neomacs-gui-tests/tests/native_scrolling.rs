@@ -45,12 +45,17 @@ fn state(path: &Path, after: u64) -> Value {
 #[test]
 // Prerequisites: fresh release Neomacs/runtime and sway on PATH.
 fn precise_native_scroll_advances_without_snapback() {
-    run_native_scroll(ScrollKind::Precise);
+    run_native_scroll(ScrollKind::Precise, ScrollTarget::Selected);
 }
 
 #[test]
 fn native_wheel_scroll_advances_without_snapback() {
-    run_native_scroll(ScrollKind::Wheel);
+    run_native_scroll(ScrollKind::Wheel, ScrollTarget::Selected);
+}
+
+#[test]
+fn precise_native_scroll_targets_the_unselected_window_under_the_pointer() {
+    run_native_scroll(ScrollKind::Precise, ScrollTarget::OtherWindow);
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -59,11 +64,20 @@ enum ScrollKind {
     Wheel,
 }
 
-fn run_native_scroll(kind: ScrollKind) {
+#[derive(Clone, Copy, Debug)]
+enum ScrollTarget {
+    Selected,
+    OtherWindow,
+}
+
+fn run_native_scroll(kind: ScrollKind, target: ScrollTarget) {
     let root = PathBuf::from(env!("CARGO_WORKSPACE_DIR"));
     let artifact_root = root.join("target/neomacs-gui-tests");
     fs::create_dir_all(&artifact_root).unwrap();
-    let artifacts = artifact_root.join(format!("native-scrolling-{kind:?}-{}", std::process::id()));
+    let artifacts = artifact_root.join(format!(
+        "native-scrolling-{kind:?}-{target:?}-{}",
+        std::process::id()
+    ));
     fs::create_dir(&artifacts).unwrap();
     fs::set_permissions(&artifacts, fs::Permissions::from_mode(0o700)).unwrap();
     // Short path to the same workspace directory, below the Unix socket limit.
@@ -129,8 +143,13 @@ focus_follows_mouse yes
     let binary = std::env::var_os("NEOMACS_GUI_TEST_BINARY")
         .map(PathBuf::from)
         .unwrap_or_else(|| root.join("target/release/neomacs"));
+    let mut command = Command::new(binary);
+    command.env_remove("NEOMACS_GUI_SCROLL_OTHER_WINDOW");
+    if matches!(target, ScrollTarget::OtherWindow) {
+        command.env("NEOMACS_GUI_SCROLL_OTHER_WINDOW", "1");
+    }
     let mut editor = OwnedChild(
-        Command::new(binary)
+        command
             .args(["-Q", "-l"])
             .arg(root.join("crates/neomacs-gui-tests/fixtures/native-scrolling.el"))
             .env("XDG_RUNTIME_DIR", &runtime)
@@ -156,14 +175,32 @@ focus_follows_mouse yes
     trackpad.move_to_body();
     thread::sleep(Duration::from_millis(200));
     let mut previous = state(&state_path, initial["sample"].as_u64().unwrap());
-    image::open(&pixels_path)
-        .expect("initial GUI readback")
-        .save(artifacts.join("before.png"))
-        .unwrap();
+    let initial_pixels = image::open(&pixels_path).expect("initial GUI readback");
+    initial_pixels.save(artifacts.join("before.png")).unwrap();
+    // Sample text away from point at the left edge: moving the cursor alone
+    // must not make a stale text presentation look like successful scrolling.
+    let text_pixels = |pixels: &image::DynamicImage| {
+        pixels
+            .crop_imm(
+                pixels.width() / 25,
+                pixels.height() / 8,
+                pixels.width() / 2,
+                pixels.height() / 2,
+            )
+            .to_rgba8()
+    };
+    let initial_text = text_pixels(&initial_pixels);
+    let position = |s: &Value| (s["start"].as_i64().unwrap(), s["vscroll"].as_i64().unwrap());
+    let initial_position = position(&previous);
     let mut trace = vec![previous.clone()];
-    for step in 0..12 {
+    let steps = match kind {
+        ScrollKind::Precise => 24,
+        ScrollKind::Wheel => 12,
+    };
+    for step in 0..steps {
+        let down = step < 12;
         match kind {
-            ScrollKind::Precise => trackpad.scroll(4.0),
+            ScrollKind::Precise => trackpad.scroll(if down { 4.0 } else { -4.0 }),
             ScrollKind::Wheel => trackpad.wheel(),
         }
         thread::sleep(Duration::from_millis(500));
@@ -180,6 +217,16 @@ focus_follows_mouse yes
         }
         eprintln!("step={step} before={previous} after={current}; artifacts={artifacts:?}");
         assert!(editor.0.try_wait().unwrap().is_none(), "editor exited");
+        assert_eq!(
+            current["selected"], initial["selected"],
+            "scrolling must preserve window selection"
+        );
+        if matches!(target, ScrollTarget::OtherWindow) {
+            assert_eq!(
+                current["selected-start"], initial["selected-start"],
+                "scrolling the other window must not move the selected viewport"
+            );
+        }
         let native_log = fs::read_to_string(artifacts.join("neomacs.log")).unwrap();
         let expected_event = match kind {
             ScrollKind::Precise => "PixelScroll {",
@@ -189,11 +236,35 @@ focus_follows_mouse yes
             native_log.contains(expected_event),
             "native input did not reach the VM bridge as {expected_event}: {artifacts:?}"
         );
-        let position = |s: &Value| (s["start"].as_i64().unwrap(), s["vscroll"].as_i64().unwrap());
         assert!(
-            position(&current) > position(&previous),
-            "{kind:?} scrolling must advance without snapping back: before={previous}, after={current}; artifacts={artifacts:?}"
+            if down {
+                position(&current) > position(&previous)
+            } else {
+                position(&current) < position(&previous)
+            },
+            "{kind:?} scrolling must follow the gesture without snapping back: down={down}, before={previous}, after={current}; artifacts={artifacts:?}"
         );
+        if step == 0 && matches!(kind, ScrollKind::Precise) {
+            assert_eq!(
+                position(&current),
+                (initial_position.0, initial_position.1 + 4),
+                "a four-pixel gesture must not fall back to whole-line wheel scrolling"
+            );
+        }
         previous = current;
+        if step == 11 {
+            let pixels = image::open(&pixels_path).expect("scrolled GUI readback");
+            assert!(
+                text_pixels(&pixels) != initial_text,
+                "scrolling must update rendered text, not only Lisp state: {artifacts:?}"
+            );
+        }
+    }
+    if matches!(kind, ScrollKind::Precise) {
+        assert_eq!(
+            position(&previous),
+            initial_position,
+            "opposite precise gestures must return to the initial viewport"
+        );
     }
 }
