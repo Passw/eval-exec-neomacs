@@ -20,16 +20,28 @@ fn idle_split_gui_resize_updates_content_without_keyboard_or_mouse_input() {
     run_resize_test(ResizeScenario::IdleSplit);
 }
 
+// Real pointer motion publishes a hit observation before the movement itself.
+// Until issue 391 is fixed, this observation blocks later native resize events.
+#[test]
+#[ignore = "issue 391: pointer observation blocks resize while waiting for input"]
+fn pointer_motion_does_not_block_idle_native_resize() {
+    run_resize_test(ResizeScenario::IdleAfterPointerMotion);
+}
+
 #[derive(Clone, Copy)]
 enum ResizeScenario {
     StartupText,
     IdleEmpty,
     IdleSplit,
+    IdleAfterPointerMotion,
 }
 
 impl ResizeScenario {
     fn is_idle(self) -> bool {
-        matches!(self, Self::IdleEmpty | Self::IdleSplit)
+        matches!(
+            self,
+            Self::IdleEmpty | Self::IdleSplit | Self::IdleAfterPointerMotion
+        )
     }
 }
 
@@ -59,6 +71,7 @@ fn run_resize_test(scenario: ResizeScenario) {
         ResizeScenario::StartupText => "resize-presentation",
         ResizeScenario::IdleEmpty => "idle-resize-presentation",
         ResizeScenario::IdleSplit => "idle-split-resize-presentation",
+        ResizeScenario::IdleAfterPointerMotion => "pointer-motion-resize-presentation",
     };
     let artifacts = GuiArtifactSet::new(&artifact_root, backend, name);
     std::fs::create_dir_all(
@@ -121,6 +134,18 @@ fn run_resize_test(scenario: ResizeScenario) {
         // The one-shot idle callback has reported readiness. Let it return
         // before issuing the native resize; no periodic Lisp observer runs.
         thread::sleep(Duration::from_millis(300));
+    }
+
+    if let ResizeScenario::IdleAfterPointerMotion = scenario {
+        // Do not click: that is precisely the unrelated command input which
+        // rescues the stalled queue in issue 391. Native pointer movement is
+        // sufficient to reproduce it on a bare X server, without a WM.
+        run_x11_tool(
+            session.env(),
+            "xdotool",
+            ["mousemove", "--sync", "--window", &window, "100", "100"],
+        );
+        thread::sleep(Duration::from_millis(100));
     }
 
     let new_width = 1100_u32;
