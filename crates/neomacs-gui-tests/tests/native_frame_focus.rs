@@ -22,8 +22,8 @@ use serde_json::Value;
 #[test]
 fn native_x11_focus_routes_typing_to_the_focused_frame() {
     match std::env::var("NEOMACS_GUI_TEST_BACKEND").ok().as_deref() {
-        Some("x11" | "linux-x11") => {}
-        None | Some("wayland" | "linux-wayland" | "macos" | "windows") => {
+        None | Some("x11" | "linux-x11") => {}
+        Some("wayland" | "linux-wayland" | "macos" | "windows") => {
             eprintln!("native focus test requires NEOMACS_GUI_TEST_BACKEND=x11");
             return;
         }

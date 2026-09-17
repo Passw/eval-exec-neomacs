@@ -259,10 +259,7 @@ fn run_resize_test(scenario: ResizeScenario) {
 
 fn x11_backend_requested() -> bool {
     match std::env::var("NEOMACS_GUI_TEST_BACKEND").ok().as_deref() {
-        None => {
-            eprintln!("skipping resize presentation test; set NEOMACS_GUI_TEST_BACKEND=x11");
-            false
-        }
+        None => cfg!(target_os = "linux"),
         Some("x11" | "linux-x11") => true,
         Some("wayland" | "linux-wayland" | "macos" | "windows") => {
             eprintln!("skipping resize presentation test; native window capture is X11-only");

@@ -361,10 +361,6 @@ fn run_font_selection_oracle(case_filter: Option<&str>) {
         "build {binary:?} before running the real GUI font selection oracle"
     );
     let gnu_emacs = gnu_emacs_binary();
-    assert!(
-        gnu_emacs.exists(),
-        "GNU Emacs binary {gnu_emacs:?} should exist for font selection oracle"
-    );
 
     let artifact_root = workspace_root.join("target/neomacs-gui-tests");
     let session = DisplayHarness::for_backend(backend)
@@ -462,10 +458,6 @@ fn real_gui_image_size_oracle_matches_gnu_emacs() {
         "build {binary:?} before running the real GUI image-size oracle"
     );
     let gnu_emacs = gnu_emacs_binary();
-    assert!(
-        gnu_emacs.exists(),
-        "GNU Emacs binary {gnu_emacs:?} should exist for image-size oracle"
-    );
 
     let artifact_root = workspace_root.join("target/neomacs-gui-tests");
     let dir = artifact_root.join(backend.slug());
@@ -580,7 +572,14 @@ fn gnu_image_oracle_command(
 }
 
 fn requested_backend() -> Option<GuiBackend> {
-    match std::env::var("NEOMACS_GUI_TEST_BACKEND").ok()?.as_str() {
+    let configured = std::env::var("NEOMACS_GUI_TEST_BACKEND").unwrap_or_else(|_| {
+        cfg_select! {
+            target_os = "macos" => { "macos".to_string() }
+            windows => { "windows".to_string() }
+            _ => { "x11".to_string() }
+        }
+    });
+    match configured.as_str() {
         "wayland" | "linux-wayland" => Some(GuiBackend::LinuxWayland),
         "x11" | "linux-x11" => Some(GuiBackend::LinuxX11),
         "macos" => Some(GuiBackend::Macos),
@@ -604,7 +603,7 @@ fn neomacs_binary(workspace_root: &std::path::Path) -> PathBuf {
 fn gnu_emacs_binary() -> PathBuf {
     std::env::var_os("NEOMACS_GUI_TEST_GNU_EMACS")
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/home/exec/.local/bin/emacs"))
+        .unwrap_or_else(|| PathBuf::from("emacs"))
 }
 
 fn gnu_font_oracle_command(
