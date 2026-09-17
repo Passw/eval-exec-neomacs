@@ -2803,14 +2803,20 @@ impl Context {
     }
 
     pub(crate) fn has_pending_frontend_input_with_configured_filter(&self) -> bool {
-        self.command_loop
-            .keyboard
-            .pending_input_events
-            .has_pending_input(
-                crate::keyboard::InputPendingFilter::ConfiguredIgnoreList,
-                self.track_mouse_enabled(),
-                |symbol| self.should_ignore_while_no_input_symbol(symbol),
-            )
+        self.has_frontend_input(crate::frontend_events::FrontendInputQuery::Pending(
+            crate::keyboard::InputPendingFilter::ConfiguredIgnoreList,
+        ))
+    }
+
+    pub(crate) fn has_frontend_input(
+        &self,
+        query: crate::frontend_events::FrontendInputQuery,
+    ) -> bool {
+        self.command_loop.keyboard.pending_input_events.has_input(
+            query,
+            self.track_mouse_enabled(),
+            |symbol| self.should_ignore_while_no_input_symbol(symbol),
+        )
     }
 
     pub(crate) fn open_channel_for_module(&self, process: Value) -> Result<std::ffi::c_int, Flow> {

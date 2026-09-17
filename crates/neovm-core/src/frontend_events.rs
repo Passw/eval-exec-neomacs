@@ -6,6 +6,24 @@
 use crate::keyboard::{InputEvent, InputPendingFilter};
 use std::collections::VecDeque;
 
+/// GNU's readable_events distinguishes a blocked reader from a filtered
+/// input-pending-p query. A focus event can be ignored by the latter but must
+/// still wake the former so read_char can handle it and advance the FIFO.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum FrontendInputQuery {
+    Readable,
+    Pending(InputPendingFilter),
+}
+
+impl FrontendInputQuery {
+    fn ignores(self, symbol: &str, ignored_while_no_input: &impl Fn(&str) -> bool) -> bool {
+        match self {
+            Self::Readable => false,
+            Self::Pending(filter) => filter.ignores(symbol, ignored_while_no_input),
+        }
+    }
+}
+
 /// Report a renderer/device-specific full-frame shader failure without
 /// putting Neomacs frontend policy in GNU's keyboard mirror.
 ///
@@ -78,15 +96,15 @@ impl FrontendEventQueue {
         Some(action)
     }
 
-    pub(crate) fn has_pending_input(
+    pub(crate) fn has_input(
         &self,
-        filter: InputPendingFilter,
+        query: FrontendInputQuery,
         track_mouse: bool,
         ignored_while_no_input: impl Fn(&str) -> bool,
     ) -> bool {
         self.events
             .iter()
-            .any(|event| counts_as_pending(event, filter, track_mouse, &ignored_while_no_input))
+            .any(|event| counts_as_input(event, query, track_mouse, &ignored_while_no_input))
     }
 }
 
@@ -277,9 +295,9 @@ pub(crate) fn is_wait_special(event: &InputEvent, track_mouse: bool) -> bool {
     }
 }
 
-fn counts_as_pending(
+fn counts_as_input(
     event: &InputEvent,
-    filter: InputPendingFilter,
+    query: FrontendInputQuery,
     track_mouse: bool,
     ignored_while_no_input: &impl Fn(&str) -> bool,
 ) -> bool {
@@ -289,12 +307,12 @@ fn counts_as_pending(
         FrontendEventSemantics::MouseMotion => track_mouse,
         FrontendEventSemantics::SpecialInput { pending, .. } => match pending {
             PendingInputPolicy::Always => true,
-            PendingInputPolicy::Focus { focused } => !filter.ignores(
+            PendingInputPolicy::Focus { focused } => !query.ignores(
                 if focused { "focus-in" } else { "focus-out" },
                 ignored_while_no_input,
             ),
             PendingInputPolicy::Filterable(symbol) => {
-                !filter.ignores(symbol, ignored_while_no_input)
+                !query.ignores(symbol, ignored_while_no_input)
             }
         },
     }
@@ -399,9 +417,9 @@ mod tests {
                 PendingPolicy::Filterable(symbol) => (true, Some(symbol)),
             };
             assert_eq!(
-                counts_as_pending(
+                counts_as_input(
                     &event,
-                    InputPendingFilter::ConfiguredIgnoreList,
+                    FrontendInputQuery::Pending(InputPendingFilter::ConfiguredIgnoreList),
                     track_mouse,
                     &|_| false
                 ),
@@ -409,14 +427,19 @@ mod tests {
                 "pending policy for {event:?}, track-mouse={track_mouse}"
             );
             assert_eq!(
-                counts_as_pending(
+                counts_as_input(
                     &event,
-                    InputPendingFilter::ConfiguredIgnoreList,
+                    FrontendInputQuery::Pending(InputPendingFilter::ConfiguredIgnoreList),
                     track_mouse,
                     &|symbol| Some(symbol) == ignored_symbol
                 ),
                 expected_pending && ignored_symbol.is_none(),
                 "filtered pending policy for {event:?}, track-mouse={track_mouse}"
+            );
+            assert_eq!(
+                counts_as_input(&event, FrontendInputQuery::Readable, track_mouse, &|_| true),
+                expected_pending,
+                "a reader must not apply input-pending-p filters for {event:?}"
             );
             assert_eq!(
                 is_wait_special(&event, track_mouse),

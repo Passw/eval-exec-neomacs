@@ -257,8 +257,18 @@ enum KeyboardWaitPolicy {
 }
 
 impl KeyboardWaitPolicy {
-    fn completes_on_command_input(self) -> bool {
-        matches!(self, Self::YieldOnCommandInput | Self::ReadCommandInput)
+    fn input_query(self) -> Option<crate::frontend_events::FrontendInputQuery> {
+        use crate::frontend_events::FrontendInputQuery;
+        match self {
+            // GNU process.c's command wait uses detect_input_pending_run_timers,
+            // without READABLE_EVENTS_FILTER_EVENTS. Ignored focus events must
+            // still reach read_char, or later presentation/resize work stalls.
+            Self::ReadCommandInput => Some(FrontendInputQuery::Readable),
+            Self::YieldOnCommandInput => Some(FrontendInputQuery::Pending(
+                crate::keyboard::InputPendingFilter::ConfiguredIgnoreList,
+            )),
+            Self::ServiceSpecialOnly | Self::WaitForSpecialInput => None,
+        }
     }
 
     fn waits_for_host_input(self) -> bool {
@@ -618,7 +628,7 @@ impl WaitRequest {
     }
 
     fn completes_on_command_input(self) -> bool {
-        self.keyboard.completes_on_command_input()
+        self.keyboard.input_query().is_some()
     }
 
     fn sets_waiting_for_user_input(self) -> bool {
@@ -1114,8 +1124,8 @@ impl super::eval::Context {
         };
         outcome.absorb_process_activity(process_outcome);
 
-        if request.completes_on_command_input()
-            && self.stage_pending_command_input_for_wait_request()?
+        if let Some(query) = request.keyboard.input_query()
+            && self.stage_pending_command_input_for_wait_request(query)?
         {
             outcome.record_command_input_pending();
             if request.needs_redisplay_after_command_input(special_input) {

@@ -27,19 +27,28 @@ fn pointer_motion_does_not_block_idle_native_resize() {
     run_resize_test(ResizeScenario::IdleAfterPointerMotion);
 }
 
+#[test]
+fn focus_change_does_not_block_idle_native_resize() {
+    run_resize_test(ResizeScenario::IdleAfterFocusChange);
+}
+
 #[derive(Clone, Copy)]
 enum ResizeScenario {
     StartupText,
     IdleEmpty,
     IdleSplit,
     IdleAfterPointerMotion,
+    IdleAfterFocusChange,
 }
 
 impl ResizeScenario {
     fn is_idle(self) -> bool {
         matches!(
             self,
-            Self::IdleEmpty | Self::IdleSplit | Self::IdleAfterPointerMotion
+            Self::IdleEmpty
+                | Self::IdleSplit
+                | Self::IdleAfterPointerMotion
+                | Self::IdleAfterFocusChange
         )
     }
 }
@@ -71,6 +80,7 @@ fn run_resize_test(scenario: ResizeScenario) {
         ResizeScenario::IdleEmpty => "idle-resize-presentation",
         ResizeScenario::IdleSplit => "idle-split-resize-presentation",
         ResizeScenario::IdleAfterPointerMotion => "pointer-motion-resize-presentation",
+        ResizeScenario::IdleAfterFocusChange => "focus-change-resize-presentation",
     };
     let artifacts = GuiArtifactSet::new(&artifact_root, backend, name);
     std::fs::create_dir_all(
@@ -133,6 +143,13 @@ fn run_resize_test(scenario: ResizeScenario) {
         // The one-shot idle callback has reported readiness. Let it return
         // before issuing the native resize; no periodic Lisp observer runs.
         thread::sleep(Duration::from_millis(300));
+    }
+
+    if let ResizeScenario::IdleAfterFocusChange = scenario {
+        // Window managers change focus during a border drag. A focus event
+        // must remain readable even when input-pending-p would filter it.
+        run_x11_tool(session.env(), "xdotool", ["windowfocus", "--sync", &window]);
+        thread::sleep(Duration::from_millis(100));
     }
 
     if let ResizeScenario::IdleAfterPointerMotion = scenario {

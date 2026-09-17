@@ -2279,8 +2279,8 @@ impl KeyboardRuntime {
         ignored_while_no_input: impl Fn(&str) -> bool,
     ) -> bool {
         self.has_pending_low_level_input_for_query(filter, &ignored_while_no_input)
-            || self.pending_input_events.has_pending_input(
-                filter,
+            || self.pending_input_events.has_input(
+                crate::frontend_events::FrontendInputQuery::Pending(filter),
                 track_mouse,
                 &ignored_while_no_input,
             )
@@ -4035,18 +4035,17 @@ impl crate::emacs_core::eval::Context {
 
     pub(crate) fn stage_pending_command_input_for_wait_request(
         &mut self,
+        query: crate::frontend_events::FrontendInputQuery,
     ) -> Result<bool, crate::emacs_core::error::Flow> {
         self.service_leading_internal_frontend_events();
-        if self.command_loop.keyboard.has_pending_kboard_input()
-            || self.has_pending_frontend_input_with_configured_filter()
-        {
+        if self.command_loop.keyboard.has_pending_kboard_input() || self.has_frontend_input(query) {
             return Ok(true);
         }
 
         while self.stage_next_host_input_event_if_available()? {
             self.service_leading_internal_frontend_events();
             if self.command_loop.keyboard.has_pending_kboard_input()
-                || self.has_pending_frontend_input_with_configured_filter()
+                || self.has_frontend_input(query)
             {
                 return Ok(true);
             }
@@ -4056,7 +4055,7 @@ impl crate::emacs_core::eval::Context {
             return Ok(true);
         }
 
-        Ok(self.has_pending_frontend_input_with_configured_filter())
+        Ok(self.has_frontend_input(query))
     }
 
     pub(crate) fn service_wait_request_special_input_events(

@@ -136,6 +136,29 @@ interrupting `while-no-input`, or requesting redisplay. Its following mouse
 action retains its own input semantics. Observation, action, presentation
 lifecycle, and resize events retain their existing FIFO order.
 
+The same investigation found that input waits reused the filtered pending
+query. During an X11 border drag, a filtered focus-out event could remain
+ahead of presentation acknowledgements and subsequent resize events. The
+first resize sometimes advanced only because the legacy resize synchronizer
+temporarily defers leading focus events; it cannot cross the acknowledgement.
+
+`FrontendInputQuery` now makes the caller's operation explicit:
+
+```rust
+enum FrontendInputQuery {
+    Readable,
+    Pending(InputPendingFilter),
+}
+```
+
+`ReadCommandInput` selects `Readable`, like GNU's
+`detect_input_pending_run_timers` without `READABLE_EVENTS_FILTER_EVENTS`.
+Filtered pending-input probes select `Pending` and retain their existing
+ignore rules. Focus remains Lisp-visible and is handled in order by the
+reader; it is not reclassified as internal or stripped of its Lisp hooks.
+The wait-policy match chooses the query exhaustively, so a new wait mode
+cannot silently inherit the wrong filtering operation.
+
 `PresentationRetired` is `Internal`.  Its policy is fixed:
 
 | Semantic property | Value |

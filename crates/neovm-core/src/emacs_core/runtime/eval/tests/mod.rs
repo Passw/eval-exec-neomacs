@@ -2827,7 +2827,9 @@ fn presentation_retirement_does_not_preempt_work_or_reset_idle_epoch() {
         .push_back(crate::keyboard::InputEvent::PresentationRetired { presentation: 99 });
 
     let command_pending = ev
-        .stage_pending_command_input_for_wait_request()
+        .stage_pending_command_input_for_wait_request(
+            crate::frontend_events::FrontendInputQuery::Readable,
+        )
         .expect("internal event service should succeed");
 
     assert!(!command_pending);
