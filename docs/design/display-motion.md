@@ -170,6 +170,13 @@ requested line/wrap prefix. The request gate avoids scanning row glyphs on
 ordinary text steps. Tests assert a minimum 60px line separation independently
 of incremental/full comparison, and cover mutable direct, image-derived and
 string-contained stretch heights through redisplay and geometry queries.
+The same reconciliation covers prefix images: changing the vertical component
+of `:margin` now moves following rows for line and wrap prefixes. A separate
+published-frame assertion checks that a 24px image with two 10px vertical
+margins reserves at least 44px without overlapping the following row. It covers
+both pending and ready catalog extents. This follows GNU's image glyph metrics
+in `xdisp.c:produce_image_glyph`, which include both margins for an unsliced
+image; sliced-image margin ownership is outside this test's scope.
 
 `LayoutInvisibilityInput` captures the effective buffer's ordered invisibility
 membership, including each cons entry's category and ellipsis truthiness.

@@ -393,6 +393,82 @@ fn retained_geometry_rejects_mutated_image_operand_in_wrap_prefix_string() {
 }
 
 #[test]
+fn retained_geometry_tracks_prefix_image_vertical_margin() {
+    for variable in ["line-prefix", "wrap-prefix"] {
+        assert_layout_mutation_with_host(
+            &format!(
+                r##"(setq image-margin (cons 0 0) {variable} (copy-sequence " "))
+                     (put-text-property 0 1 'display
+                       (list 'image :type 'png :file "prefix.png" :margin image-margin)
+                       {variable})"##
+            ),
+            "(setcdr image-margin 10)",
+            true,
+            Some(Box::new(RecordingImageDisplayHost::default())),
+        );
+    }
+}
+
+#[test]
+fn published_prefix_image_reserves_both_vertical_margins() {
+    let hosts: Vec<Box<dyn DisplayHost>> = vec![
+        Box::new(RecordingImageDisplayHost::default()),
+        Box::new(ReloadingImageHost::default()),
+    ];
+    for host in hosts {
+        let mut eval = Context::new();
+        eval.set_display_host(host);
+        let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+        eval.buffer_manager_mut()
+            .get_mut(buffer)
+            .unwrap()
+            .insert("a\nb\n");
+        let frame = eval
+            .frame_manager_mut()
+            .create_frame("image-margins", 160, 300, buffer);
+        let window = eval.frame_manager().get(frame).unwrap().selected_window;
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        eval.eval_str(
+            r##"(progn (setq line-prefix (copy-sequence " "))
+          (put-text-property 0 1 'display
+            '(image :type png :file "prefix.png" :margin (0 . 10)) line-prefix))"##,
+        )
+        .unwrap();
+        let FrameLayoutAttempt::Prepared(state) =
+            LayoutEngine::new().redisplay_frame_attempt(&mut eval, frame)
+        else {
+            panic!("image prefix must produce a presentation");
+        };
+        let matrix = &state
+            .window_matrices
+            .iter()
+            .find(|entry| entry.window_id.get() == window.0 as i64)
+            .unwrap()
+            .matrix;
+        let row_for = |ch| {
+            matrix
+                .rows
+                .iter()
+                .find(|row| {
+                    row.glyphs[GlyphArea::Text.index()].iter()
+            .any(|glyph| matches!(glyph.glyph_type, GlyphType::Char { ch: actual } if actual == ch))
+                })
+                .unwrap()
+        };
+        let first = row_for('a');
+        let second = row_for('b');
+        assert!(first.height_px >= 44.0, "24px image plus two 10px margins");
+        assert!(
+            second.pixel_y - first.pixel_y >= first.height_px,
+            "published rows must not overlap"
+        );
+    }
+}
+
+#[test]
 fn retained_geometry_rejects_mutated_prefix_image_margin() {
     assert_layout_mutation_with_host(
         r##"(setq image-margin (cons 0 0)
