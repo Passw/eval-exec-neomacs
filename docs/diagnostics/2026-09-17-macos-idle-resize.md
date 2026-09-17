@@ -1,4 +1,4 @@
-# Issue 391: pointer observations block native resize
+# Issue 391: pointer observations and filtered focus events block native resize
 
 ## Status
 
@@ -12,8 +12,12 @@ first with a real Openbox border drag and then without a window manager:
 move the pointer over the buffer, then resize. A click repairs it. No Doom
 configuration, second frame, split window, or HiDPI display is required.
 
-The Linux root cause is head-of-line blocking by a pointer-hit observation
-in the shared VM frontend-event queue. No production fix has been made.
+Linux investigation found two head-of-line blockers in the shared VM
+frontend-event queue: pointer-hit observations that were not serviced during
+waits, and focus events incorrectly hidden from the command reader by its
+pending-input filter. Both shared paths have fixes; validation is recorded below.
+A rarer Linux/X11 stall before native resize delivery remains under
+investigation. The issue is therefore not claimed fully resolved on every path.
 The macOS path has not been run locally; the shared cause is consistent
 with the reporter's trace, not yet a native macOS verification.
 
@@ -25,7 +29,7 @@ It was then reduced to a bare Xvfb test with just one empty editor window.
 
 `input_bridge.rs::convert_positioned_pointer_input` emits a
 `PresentedRegion` observation before the mouse-movement action. In
-`frontend_events.rs::semantics`, that observation is classified as
+the original `frontend_events.rs::semantics`, that observation was classified as
 `LispSpecial`, with `PendingPolicy::Never` and `wait_special = false`.
 This combination strands it during an idle input wait:
 
@@ -74,15 +78,15 @@ minimal sequence and fails on the unmodified release executable (3/3;
 twice and had one X-server startup failure before a window opened
 (`tmp/issue-391-minimal-gnu-control.log`), separate from the earlier 3/3
 passing GNU diagnostic run.
-It is explicitly ignored while the bug is unfixed, so diagnosis-only work
-does not silently turn the normal CI suite red. Run it deliberately:
+It was initially ignored during diagnosis-only work. The fix enables it in
+the normal GUI suite. Run it directly:
 
 ```sh
 NEOMACS_GUI_TEST_BACKEND=x11 \
 NEOMACS_GUI_TEST_BINARY="$PWD/target/release/neomacs" \
 cargo nextest run -p neomacs-gui-tests --test resize_presentation \
   -E 'test(pointer_motion_does_not_block_idle_native_resize)' \
-  --run-ignored all --test-threads 1
+  --test-threads 1
 ```
 
 Set the matching `NEOMACS_RUNTIME_ROOT` if using an isolated fresh build.
@@ -97,6 +101,48 @@ logging the final native `SurfaceResized` notification. Keep that separate
 from the deterministic hover reproduction, in which all resize events
 reach the bridge. Both attempts are retained; this is not a stability claim
 for the whole GUI suite.
+
+## Second blocker: focus filtering is not reader readiness
+
+The pointer-observation fix alone passed the minimal pointer regression,
+but **did not fix the original native border drag**. The retained failing
+trace showed this ordered sequence:
+
+```text
+WindowFocus(false) → Resize → PresentationActivated → PresentationRetired
+                  → Resize → Resize … → WindowFocus(true)
+```
+
+The legacy resize synchronizer could defer the leading focus event long
+enough to apply the first resize, then stopped at the presentation
+acknowledgement. The focus event remained at the queue head. The command
+wait incorrectly used the same configured filter as `input-pending-p`, so
+the default `while-no-input-ignore-events` prevented focus from waking
+`read_char`. The resulting window froze at the first intermediate size.
+
+The second minimal regression, `focus_change_does_not_block_idle_native_resize`,
+uses bare Xvfb: give the native window focus, then resize it while the editor
+is idle. It needs neither pointer motion nor a window manager.
+
+| Experiment | Result |
+| --- | --- |
+| Pointer fix only, focus then resize | 3/3 fail (`tmp/issue-391-focus-red.log`). |
+| Same executable, diagnostic `while-no-input-ignore-events = nil` | 3/3 pass (`tmp/issue-391-focus-unfiltered-control.log`). |
+| GNU Emacs 31.1, same native focus/resize sequence | 3/3 pass (`tmp/issue-391-focus-gnu-control.log`). |
+
+Clearing the ignore list is only a control, not the fix. GNU
+`process.c::wait_reading_process_output` uses
+`keyboard.c::detect_input_pending_run_timers`, which calls
+`get_input_pending(READABLE_EVENTS_DO_TIMERS_NOW)` **without**
+`READABLE_EVENTS_FILTER_EVENTS`. The comments at `readable_events` distinguish
+this ordinary reader-readiness query from a filtered `input-pending-p` query.
+
+Neomacs now encodes the distinction as `FrontendInputQuery`:
+`Readable` for command reads, `Pending(filter)` for pending-input queries.
+`KeyboardWaitPolicy` selects that operation explicitly. This preserves
+`input-pending-p` and `while-no-input` filtering instead of changing focus
+hooks, making focus an internal event, or bypassing FIFO ordering. The
+Android/Wasm branch's portable command reader uses the same `Readable` query.
 
 ## Evidence from the reporter
 
@@ -146,6 +192,8 @@ the test must observe rendered content, not only native surface size.
 - The existing startup-text resize/old-presentation ghosting case.
 - An idle empty buffer receiving a burst of native resizes without input.
 - The same idle resize with two vertically split editor windows.
+- Pointer motion followed by idle resize, without a rescuing click.
+- Native focus followed by idle resize, with the default input ignore list.
 
 The idle cases disable cursor blinking and announce readiness from a
 one-shot idle callback. After that callback returns, the external X11
@@ -194,20 +242,121 @@ Validation against the fresh-build release executable at `c17acb4d9c`:
 Final run logs are `tmp/issue-391-final-{x11,hidpi,gnu}.log`. These results
 do not establish a clean full-suite pass or a macOS reproduction.
 
-## Fix direction and remaining verification
+## Fix and remaining verification
 
-Service pointer observations in the same ordered VM-owned event queue
-during waits, without treating the observations as Lisp commands. Keep
-presentation identity validation and the observation-before-action order.
-The semantic classification should make it difficult to add another event
-that neither completes a wait nor can be serviced within it. Do not work
-around this by polling redisplay, adding a second queue, or enabling mouse
-tracking globally.
+Pointer observations now use `InternalFrontendEvent` in the same ordered
+VM-owned event queue during waits. They are not Lisp commands. The dispatcher
+retains presentation identity validation and observation-before-action order;
+the observation itself neither resets idle time nor requests redisplay.
+There is no redisplay polling, second queue, or global mouse-tracking change.
 
-This fix has not been implemented. After it is implemented, enable the
-regression by default, rerun the drag and GNU controls, and verify native
-macOS resizing. Reuse the visual contract; do not replace native resizing
-with `set-frame-size` in a Lisp polling timer, which can conceal the symptom.
+The policy is now an enum rather than independent class/pending/wait flags.
+An unconditionally non-command event must carry its internal service action
+or select wait servicing. Mouse motion explicitly alternates between readable
+input and wait servicing according to `track-mouse`. Filterable Lisp special
+events retain GNU's existing behavior. Internal classification constructs the
+action directly, eliminating the separate wildcard-based conversion; the VM
+dispatcher exhaustively handles each action on the Lisp thread.
+
+Additional GNU study covered `keyboard.c::some_mouse_moved`, `readable_events`,
+and `process_special_events`: ordinary motion is not readable input unless
+tracking is enabled, and non-user-visible work is serviced separately from
+command reads. GNU has no Neomacs presentation-observation transport; this
+is an adaptation of that separation, not a claim of identical event storage.
+
+Before production edits, the committed GUI regression failed again 3/3
+(`tmp/issue-391-fix-red.log`), with exactly the old mode-line position. The
+first internal-event fix passed all 76 focused keyboard/event tests. Existing
+pointer tests now feed observations through the ordered read interface instead
+of bypassing it with the raw Lisp-event handler.
+
+The first fix passed the full VM suite: 10,023 passed, 53 skipped
+(`tmp/issue-391-core-full.log`). Its fresh release passed all seven pointer
+regression attempts that opened a window; three further attempts failed
+before startup with `Failed to open connection to X server`
+(`tmp/issue-391-fix-green.log`). At 2x scale, two passed and one failed at
+the same startup step (`tmp/issue-391-fix-hidpi.log`). These are not clean
+stress-run passes. The original border-drag failures motivated the second
+fix above rather than treating the minimal regression as sufficient.
+
+The second fix passes 148 focused input/wait tests, including focus,
+`while-no-input`, input filtering and presentation ordering
+(`tmp/issue-391-focus-core-focused.log`). The full VM suite also passes:
+10,023 passed, 53 skipped (`tmp/issue-391-core-final.log`).
+
+The rebased Android/Wasm branch passes 164 focused core/session tests
+(`tmp/issue-391-branch-focused-runtime.log`) and
+`cargo check -p neovm-core --no-default-features --target wasm32-unknown-unknown`
+(`tmp/issue-391-branch-wasm-check.log`). The branch's first test attempt
+lacked generated runtime assets in its new worktree; the passing run sets
+`NEOMACS_RUNTIME_ROOT` to the existing complete main-worktree resources.
+Verification also exposed pre-existing references to removed stack-growth
+constants in the branch's bytecode fast path; a separate branch commit
+uses its existing shared `stack_growth::should_probe` policy. These checks
+do not constitute an Android device or browser GUI run.
+
+`cargo xtask fresh-build --release --low-memory --runtime-root
+"$PWD/tmp/issue-391-fixed-runtime"` completed successfully, including runtime
+generation and byte-compilation (`tmp/issue-391-fresh-build-final.log`).
+The original Openbox native border-drag probe then passed 6/6: three
+single-window and three split-window runs, with no rescuing click
+(`tmp/issue-391-final-native-drag{,-2,-3}.log`).
+
+Initial final-release repetitions had no resize failures: 17/18 normal GUI
+runs and 5/6 2x-scale runs passed; the other two failed before any window
+opened with `Failed to open connection to X server`
+(`tmp/issue-391-final-gui{,-hidpi}.log`).
+
+The separate harness investigation found that Xvfb reset whenever its last
+client disconnected. Short-lived `xdotool` probes during editor startup
+could therefore reset the server while the editor connected. The existing
+real X11 session contract now asserts that a root-window property survives
+between disconnected clients. It failed before the change, reporting
+`NEOMACS_GUI_SESSION: no such atom on any window`
+(`tmp/issue-391-x11-lifetime-red.log`). The owned server now uses `-noreset`:
+the Rust `DisplaySession` still terminates/reaps it and removes its exact
+owned resources on drop, while individual probe lifetimes no longer reset
+the session. That contract passes 20/20 repeats
+(`tmp/issue-391-x11-lifetime-green.log`). No editor production behavior or
+resize assertion was changed for this harness fix.
+
+With resets disabled, the normal GUI tests passed 29/30 and the new
+pointer/focus cases at 2x scale passed 10/10
+(`tmp/issue-391-final-gui{,-hidpi}-stable.log`). The remaining ordinary idle
+case reached `1100x760` but retained content at the penultimate `1045x745`
+size; its log lacks the final `SurfaceResized` callback. An earlier
+pre-fix ordinary-suite run showed the same distinct symptom. This is not
+evidence of either confirmed VM queue blocker. GNU passed that bare-Xvfb
+idle-burst scenario 10/10 with resets disabled
+(`tmp/issue-391-final-gnu-idle-stable.log`).
+
+Further diagnostic repetitions found a second harness startup defect: a
+TCP-ready port could belong to another live session. An added contract
+starts two sessions in the same process (therefore the same initial
+display-number candidate); it failed because both reported the same display
+(`tmp/issue-391-x11-owner-red.log`). Readiness now requires `xdpyinfo` to
+complete an authenticated connection with this session's new cookie, rather
+than accepting any TCP listener. Each probe is bounded and reaped, and a
+failed candidate cleans up before another display is tried. All 16 harness
+tests pass across 20 repetitions (`tmp/issue-391-x11-owner-green.log`).
+
+The final authenticated-harness GUI run passes 30/30: five repetitions of
+all five resize cases and native focus/typing routing
+(`tmp/issue-391-final-gui-auth.log`). However, a separate diagnostic idle-burst
+loop subsequently reproduced the penultimate-size stall on attempt 8
+(`tmp/issue-391-idle-native-event-auth-8.log`). Both the native event loop
+(`calloop`/`polling::Poller::wait`) and evaluator are waiting; the input bridge
+is waiting on its channel. The native thread is not stuck inside GPU rendering.
+The log has resize callbacks through `1045x745`, but none for `1100x760`,
+while the external capture is already `1100x760`. The retained debugger dump
+is `target/neomacs-gui-tests/resize-2443843/linux-x11/idle-resize-presentation.gdb.txt`.
+This remains a separate unresolved native event-delivery observation, not a
+clean full-path stability result. No callback polling workaround has been added.
+
+Native
+macOS resizing still requires verification on macOS. Reuse the visual
+contract; do not replace native resizing with `set-frame-size` in a Lisp
+polling timer, which can conceal the symptom.
 
 The existing manually dispatched native-display workflow provides a
 possible macOS runner, but its Lisp-driven resize checks do not yet drive
