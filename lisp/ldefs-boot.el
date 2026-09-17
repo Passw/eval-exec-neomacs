@@ -23057,16 +23057,31 @@ Return the opaque video-session handle.
 (fn FILE)" t)
 (autoload 'neomacs-video-mode "neomacs-video"
 "Major mode for visiting video files with native playback.
-Dired's normal file-opening commands enter this mode through
-`auto-mode-alist'.  The original file bytes remain in the buffer underneath a
-single video display property, following the lifecycle used by `image-mode'.
+`neomacs-video--select-visited-video' enters this mode for the extensions in
+`neomacs-video-file-name-regexp', from `find-file-hook'.  The original file
+bytes remain in the buffer underneath a single video display property,
+following the lifecycle used by `image-mode'.
 
 In addition to any hooks its parent mode `special-mode' might have
 run, this mode runs the hook `neomacs-video-mode-hook', as the final
 or penultimate step during initialization.
 
 \\{neomacs-video-mode-map}" t)
-(add-to-list 'auto-mode-alist '("\\.\\(?:avi\\|m4v\\|mkv\\|mov\\|mp4\\|mpeg\\|mpg\\|ogv\\|webm\\)\\'" . neomacs-video-mode))
+(autoload 'neomacs-video--select-visited-video "neomacs-video"
+"Select `neomacs-video-mode' for a video file no other rule claimed.
+
+Installed on `find-file-hook', so it runs once the mode for a visited file has
+been chosen.  It claims only a buffer that GNU's own rules left in
+`fundamental-mode', which keeps every explicit rule ahead of it: a
+`-*- mode: ... -*-' tag, a `.dir-locals.el' entry, an `auto-mode-alist' match,
+`magic-mode-alist', and `major-mode-remap-alist' all win.
+
+The hook, rather than `set-auto-mode' advice, is deliberate: `loaddefs.el' is
+read at loadup.el:175, long before `nadvice' is loaded at loadup.el:253, so an
+autoloaded `advice-add' would be `void-function' during the dump.  `add-hook'
+is available that early and never adds a duplicate, so this stays idempotent
+however many times `neomacs-video' is loaded.")
+(add-hook 'find-file-hook #'neomacs-video--select-visited-video)
 (register-definition-prefixes "neomacs-video" '("neomacs-video-"))
 
 

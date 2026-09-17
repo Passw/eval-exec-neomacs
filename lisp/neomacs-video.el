@@ -181,9 +181,10 @@ Return the opaque video-session handle.  Point is left after the video."
 ;;;###autoload
 (define-derived-mode neomacs-video-mode special-mode "Video"
   "Major mode for visiting video files with native playback.
-Dired's normal file-opening commands enter this mode through
-`auto-mode-alist'.  The original file bytes remain in the buffer underneath a
-single video display property, following the lifecycle used by `image-mode'."
+`neomacs-video--select-visited-video' enters this mode for the extensions in
+`neomacs-video-file-name-regexp', from `find-file-hook'.  The original file
+bytes remain in the buffer underneath a single video display property,
+following the lifecycle used by `image-mode'."
   (setq cursor-type nil
         truncate-lines t)
   (neomacs-video--display-visited-file)
@@ -192,10 +193,38 @@ single video display property, following the lifecycle used by `image-mode'."
   (add-hook 'change-major-mode-hook #'neomacs-video--release-buffer-session nil t)
   (add-hook 'kill-buffer-hook #'neomacs-video--release-buffer-session nil t))
 
+(defvar neomacs-video-file-name-regexp
+  "\\.\\(?:avi\\|m4v\\|mkv\\|mov\\|mp4\\|mpeg\\|mpg\\|ogv\\|webm\\)\\'"
+  "File names Neomacs opens in `neomacs-video-mode'.
+
+This is the Neomacs-only registry for those extensions, consulted by
+`neomacs-video--select-visited-video'.  They are deliberately NOT in
+`auto-mode-alist': that variable is GNU's, and its contents are observable --
+the parity suite pins its length and its `assq' results -- so an extension
+GNU does not map would report a value GNU never produces.")
+
 ;;;###autoload
-(add-to-list 'auto-mode-alist
-             '("\\.\\(?:avi\\|m4v\\|mkv\\|mov\\|mp4\\|mpeg\\|mpg\\|ogv\\|webm\\)\\'"
-               . neomacs-video-mode))
+(defun neomacs-video--select-visited-video ()
+  "Select `neomacs-video-mode' for a video file no other rule claimed.
+
+Installed on `find-file-hook', so it runs once the mode for a visited file has
+been chosen.  It claims only a buffer that GNU's own rules left in
+`fundamental-mode', which keeps every explicit rule ahead of it: a
+`-*- mode: ... -*-' tag, a `.dir-locals.el' entry, an `auto-mode-alist' match,
+`magic-mode-alist', and `major-mode-remap-alist' all win.
+
+The hook, rather than `set-auto-mode' advice, is deliberate: `loaddefs.el' is
+read at loadup.el:175, long before `nadvice' is loaded at loadup.el:253, so an
+autoloaded `advice-add' would be `void-function' during the dump.  `add-hook'
+is available that early and never adds a duplicate, so this stays idempotent
+however many times `neomacs-video' is loaded."
+  (when (and buffer-file-name
+             (eq major-mode 'fundamental-mode)
+             (string-match-p neomacs-video-file-name-regexp buffer-file-name))
+    (neomacs-video-mode)))
+
+;;;###autoload
+(add-hook 'find-file-hook #'neomacs-video--select-visited-video)
 
 (defun neomacs-video-insert-loop (file &optional width height)
   "Insert video FILE with infinite looping and autoplay.
