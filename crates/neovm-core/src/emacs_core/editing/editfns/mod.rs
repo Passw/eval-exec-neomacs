@@ -215,19 +215,33 @@ fn hook_symbol_value_truthy(
 pub(crate) fn inhibit_modification_hooks(ctx: &crate::emacs_core::eval::Context) -> bool {
     use crate::emacs_core::symbol::SymbolRedirect;
     let sym = inhibit_modification_hooks_symbol();
-    // `inhibit-modification-hooks` is a plain global (GNU `DEFVAR_BOOL`). Unless
-    // something has made it an alias, buffer-local or forwarded, its value cell
-    // IS the visible binding (`let` shadows in place), so read it directly; the
-    // alias-resolving hook reader below runs twice per text-property write.
-    if ctx
-        .obarray
-        .get_by_id(sym)
-        .is_some_and(|s| s.redirect() == SymbolRedirect::Plainval)
-    {
-        return ctx
-            .obarray
-            .symbol_value_id(sym)
-            .is_some_and(|v| !v.is_unbound() && v.is_truthy());
+    // `inhibit-modification-hooks` is GNU `DEFVAR_BOOL` (`insdel.c:2575`):
+    // the symbol forwards to a Boolean cell, `let` stores through it in place
+    // (`store_symval_forwarding`), and reading it is the one flag load of
+    // `do_symval_forwarding`'s `Lisp_Fwd_Bool` arm. Read that cell directly.
+    // The Plainval arm covers a runtime that registered it as a plain
+    // global. Anything else -- an alias, a buffer-local -- takes the
+    // alias-resolving hook reader below, which walks the symbol table
+    // several times and ran twice per text-property write when the
+    // forwarded case fell through to it.
+    if let Some(s) = ctx.obarray.get_by_id(sym) {
+        match s.redirect() {
+            SymbolRedirect::Forwarded => {
+                // SAFETY: `redirect() == Forwarded` means `val.fwd` is the live
+                // field, and every forwarder is leaked at registration.
+                let fwd: &'static crate::emacs_core::forward::LispFwd = unsafe { &*s.val.fwd };
+                if let Some(flag) = fwd.as_bool_fwd() {
+                    return flag.get();
+                }
+            }
+            SymbolRedirect::Plainval => {
+                return ctx
+                    .obarray
+                    .symbol_value_id(sym)
+                    .is_some_and(|v| !v.is_unbound() && v.is_truthy());
+            }
+            SymbolRedirect::Varalias | SymbolRedirect::Localized => {}
+        }
     }
     let sym = crate::emacs_core::hook_runtime::hook_symbol_by_id(ctx, sym);
     crate::emacs_core::hook_runtime::hook_value_by_id(ctx, sym).is_some_and(|v| v.is_truthy())
@@ -557,8 +571,13 @@ fn signal_after_change_with_kind(
     // reflect this edit before after-change hooks run.  Neomacs keeps typed
     // position caches beside the authoritative markers for layout; refresh all
     // derived caches at this common post-edit boundary, including when
-    // modification hooks are inhibited.
-    ctx.sync_window_positions(current_id);
+    // modification hooks are inhibited.  Only a character change moves a
+    // marker: a property-only change (font-lock's `put-text-property`, tens
+    // of thousands per fontification pass) leaves every position where it
+    // was, so it has no caches to refresh.
+    if kind == BufferChangeKind::Characters {
+        ctx.sync_window_positions(current_id);
+    }
 
     // GNU `adjust_overlays_for_delete_in_buffer` queries only the deletion
     // boundary after shifting the interval tree.  Do the category-resolving

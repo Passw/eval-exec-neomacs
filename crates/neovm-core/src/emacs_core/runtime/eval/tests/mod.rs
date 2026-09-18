@@ -11691,6 +11691,59 @@ fn inhibit_modification_hooks_is_bound_to_nil_by_default() {
     assert_eq!(result, "OK (t nil)");
 }
 
+/// `set-buffer-multibyte` remaps every marker in the buffer, the windows'
+/// start/point markers included, and GNU's `window-start` reads the marker.
+/// The windows' cached positions must follow at once -- not at the next
+/// character edit, and not by way of an unrelated property write's
+/// after-change refresh (which no longer runs for property-only changes).
+/// "ééééé\nrest" is 10 chars / 15 bytes; start 7 (char 6, byte 11) reads as
+/// 12 once the buffer is unibyte.
+#[test]
+fn set_buffer_multibyte_refreshes_the_window_start_from_its_marker() {
+    crate::test_utils::init_test_tracing();
+    let result = eval_one(
+        "(let ((b (get-buffer-create \" sbm\")))
+           (set-buffer b)
+           (insert \"ééééé\\nrest\")
+           (set-window-buffer nil b)
+           (set-window-start nil 7)
+           (set-buffer-multibyte nil)
+           (window-start))",
+    );
+    assert_eq!(result, "OK 12");
+}
+
+/// `inhibit-modification-hooks` is read straight off its `DEFVAR_BOOL`
+/// forwarder on every text-property write. A `let` stores through that cell
+/// (`store_symval_forwarding`), so the flag must track the binding both ways:
+/// bound to t inside `with-silent-modifications`' shape the hooks stay quiet,
+/// re-bound to nil underneath they fire again, and a plain `setq` counts too.
+#[test]
+fn text_property_writes_read_inhibit_modification_hooks_through_its_forwarder() {
+    crate::test_utils::init_test_tracing();
+    // A bare Context: no `with-temp-buffer`/`push` macros, so the buffer is
+    // selected by hand and the log is consed by hand.
+    let result = eval_one(
+        "(progn
+           (set-buffer (get-buffer-create \" imh\"))
+           (insert \"hello world\")
+           (let ((log nil))
+             (setq after-change-functions
+                   (list (lambda (b e _l) (setq log (cons (list b e) log)))))
+             (let ((inhibit-modification-hooks t))
+               (put-text-property 1 3 'face 'bold)
+               (let ((inhibit-modification-hooks nil))
+                 (put-text-property 3 5 'face 'bold))
+               (put-text-property 5 7 'face 'bold))
+             (setq inhibit-modification-hooks t)
+             (put-text-property 7 9 'face 'bold)
+             (setq inhibit-modification-hooks nil)
+             (put-text-property 9 11 'face 'bold)
+             (nreverse log)))",
+    );
+    assert_eq!(result, "OK ((3 5) (9 11))");
+}
+
 #[test]
 fn combine_after_change_calls_is_gnu_defvar_style_dynamic_variable() {
     crate::test_utils::init_test_tracing();

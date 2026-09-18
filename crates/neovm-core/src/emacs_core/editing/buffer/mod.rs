@@ -2245,6 +2245,13 @@ pub(crate) fn builtin_set_buffer_multibyte(
         eval.buffers
             .set_buffer_multibyte_flag(snapshot.id, target_multibyte)
             .ok_or_else(|| signal("error", vec![Value::string("Missing shared buffer")]))?;
+        // The remap above moved every marker in the chain, the windows'
+        // start/point markers included, without a change signal: refresh
+        // the windows' cached positions from them here, as an edit would.
+        // GNU reads `w->start` through the marker (`Fwindow_start`), so
+        // `(window-start)` right after this call already answers with the
+        // remapped position.
+        eval.sync_window_positions(snapshot.id);
     }
 
     if !old_undo_list.is_t() {
