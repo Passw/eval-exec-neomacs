@@ -71,13 +71,13 @@ let
       gst_all_1.gst-plugins-ugly
       gst_all_1.gst-libav
       gst_all_1.gst-plugins-rs
-    ]
-    ++ lib.optionals pkgs.stdenv.isLinux (
-      with pkgs;
-      [
-        gst_all_1.gst-vaapi
-      ]
-    );
+      # GStreamer 1.28 merged the VA-API elements into gst-plugins-bad, and
+      # nixpkgs removed the separate `gst_all_1.gst-vaapi` attribute rather
+      # than aliasing it ("not an in-place upgrade").  The plugin set above
+      # already carries it -- gst-plugins-bad-1.28 ships libgstva.so and
+      # libgstva-1.0.so -- so listing it separately would only break
+      # evaluation against the newer nixpkgs.
+    ];
 
   videoBuildInputs =
     videoPluginInputs
