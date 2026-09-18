@@ -6512,6 +6512,111 @@ fn contained_shim_panic_restores_boundary_state() {
     );
 }
 
+/// A panic contained inside a DIRECT callee's own call shim (a handler-free
+/// leaf, run in the caller's extent) keeps its marker for the caller leaf's
+/// healing exit on both routes through the spec shim -- the slow half that
+/// arms the site and the fast path after it. Folding it into a signal on
+/// the way back consumed the marker, and the residue of the panicked
+/// extent (the operand buffer, the roots, the depth) stayed.
+#[test]
+fn a_panic_contained_in_a_direct_callee_is_healed_by_the_caller() {
+    use crate::emacs_core::eval::Context;
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let mut ev = Context::new();
+    let ctx_ptr = &mut ev as *mut Context as *mut u8;
+    let nullary = |ops: Vec<Op>, constants: Vec<Value>| -> ByteCodeFunction {
+        let mut f = ByteCodeFunction::new(LambdaParams {
+            required: Vec::new(),
+            optional: Vec::new(),
+            rest: None,
+        });
+        f.lexical = true;
+        f.ops = ops;
+        f.constants = constants.into();
+        f.max_stack = 16;
+        f
+    };
+    // (lambda () (neovm--internal-panic "raw-boom")): no binding, no
+    // handler -- a direct-eligible leaf; the panic is contained by its own
+    // generic call shim, which returns STATUS_SIGNAL to the leaf.
+    let callee = Value::make_bytecode(nullary(
+        vec![Op::Constant(0), Op::Constant(1), Op::Call(1), Op::Return],
+        vec![
+            Value::symbol("neovm--internal-panic"),
+            Value::string("raw-boom"),
+        ],
+    ));
+    let callee_sym = Value::symbol("jit-t7-callee");
+    let crate::emacs_core::value::ValueKind::Symbol(callee_id) = callee_sym.kind() else {
+        panic!("symbol expected");
+    };
+    ev.obarray.set_symbol_function_id(callee_id, callee);
+    // (lambda () (let ((jit-t7-dynvar 5)) (jit-t7-callee))): the caller
+    // speculates the call; its binding makes its exit the specpdl sweep.
+    let caller = nullary(
+        vec![
+            Op::Constant(1),
+            Op::VarBind(0),
+            Op::Constant(2),
+            Op::Call(0),
+            Op::Unbind(1),
+            Op::Return,
+        ],
+        vec![
+            Value::symbol("jit-t7-dynvar"),
+            Value::make_int(5),
+            callee_sym,
+        ],
+    );
+    let leaf = compile_bytecode_function_with(&caller, Some(&ev.obarray)).expect("compiles");
+    let depth0 = ev.depth;
+    let frames0 = ev.bc_frames.len();
+    let buf0 = ev.bc_buf.len();
+    let cond0 = ev.condition_stack.len();
+    let spec0 = ev.specpdl.len();
+    let roots0 = crate::emacs_core::eval::save_scratch_gc_roots();
+    let shim_fast =
+        || crate::emacs_core::jit::compile::SPEC_SHIM_FAST_COUNT.load(Ordering::Relaxed);
+    for (i, label) in ["arming call (slow half)", "fast-path call"]
+        .iter()
+        .enumerate()
+    {
+        let before = shim_fast();
+        assert_eq!(leaf.call(ctx_ptr, &[]), NativeRun::Signal, "{label}");
+        if i == 1 {
+            assert!(shim_fast() > before, "the second call takes the fast path");
+        }
+        let flow = take_pending_flow().expect("the contained panic stashes a flow");
+        let Flow::Signal(sig) = flow else {
+            panic!("{label}: expected Signal, got {flow:?}");
+        };
+        assert_eq!(sig.symbol_name(), "error", "{label}");
+        let msg = sig.data[0].as_str_owned().expect("string payload");
+        assert!(
+            msg.contains("neomacs internal error") && msg.contains("raw-boom"),
+            "{label}: unexpected message: {msg}"
+        );
+        assert_eq!(ev.depth, depth0, "{label}: lisp depth restored");
+        assert_eq!(ev.bc_frames.len(), frames0, "{label}: bc_frames truncated");
+        assert_eq!(ev.bc_buf.len(), buf0, "{label}: bc_buf truncated");
+        assert_eq!(
+            ev.condition_stack.len(),
+            cond0,
+            "{label}: condition frames truncated"
+        );
+        assert_eq!(
+            ev.specpdl.len(),
+            spec0,
+            "{label}: specpdl unwound at the caller's exit"
+        );
+        assert_eq!(
+            crate::emacs_core::eval::save_scratch_gc_roots(),
+            roots0,
+            "{label}: scratch roots restored"
+        );
+    }
+}
+
 /// A panic contained on the spec shim's FAST path -- raised by Lisp the
 /// framed callee runs on its way out (an `unwind-protect` cleanup, run by
 /// the interpreter, whose live frames the panic skips) -- leaves the

@@ -1337,8 +1337,18 @@ pub(crate) fn direct_call_cold(
     leaf: &CompiledLeaf,
     status: i64,
 ) -> NativeCallOutcome {
-    use super::compile::{STATUS_DEOPT_AT, STATUS_SIGNAL};
+    use super::compile::{STATUS_DEOPT_AT, STATUS_SIGNAL, shim_panic_pending};
     if status == STATUS_SIGNAL {
+        // A panic one of the callee's shims contained: leave its marker for
+        // the caller leaf's healing exit (`cold_frame_exit` / the match
+        // shim restore the boundary only while it is set); folding it here
+        // would consume the marker with the panicked extent's residue --
+        // depth, bytecode and condition frames -- still in place. The
+        // direct callee runs in the caller's extent, so the caller is the
+        // healing owner.
+        if shim_panic_pending() {
+            return NativeCallOutcome::FlowStashed;
+        }
         // Same panic-fold boundary as the wrapped path: take_pending_flow
         // owns the panic-wins conversion; the flow goes straight back.
         let flow =

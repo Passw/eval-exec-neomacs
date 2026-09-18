@@ -1145,6 +1145,14 @@ fn call_spec_finish(
             o => o,
         };
         ctx.depth -= 1;
+        // A contained panic (its marker still set, see `direct_call_cold`):
+        // this frame's own entry goes if it is still on top, the rest of
+        // the residue and the marker are the caller's healing exit's; the
+        // general unwinder below would fold the marker first.
+        if shim_panic_pending() {
+            ctx.pop_native_backtrace_frame(bt_count);
+            return STATUS_SIGNAL;
+        }
         let outcome = if ctx.pop_native_backtrace_frame(bt_count) {
             outcome
         } else {

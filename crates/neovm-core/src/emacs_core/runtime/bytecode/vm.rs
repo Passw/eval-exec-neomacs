@@ -7194,6 +7194,15 @@ impl<'a> Vm<'a> {
             }
         };
         ctx.depth -= 1;
+        // A contained panic (its marker still set, see `direct_call_cold`):
+        // this frame's own entry goes if it is still on top; the rest of
+        // the residue and the marker are the caller leaf's healing exit's,
+        // which the general unwinder below would pre-empt by folding the
+        // marker into a signal.
+        if crate::emacs_core::jit::compile::shim_panic_pending() {
+            ctx.pop_native_backtrace_frame(bt_count);
+            return Some(outcome);
+        }
         // Pop the callee's backtrace frame (balanced single-entry pop; falls back
         // to the general unwinder if a nested imbalance occurred). The fast pop
         // never touches the outcome — the general path's by-value Result
