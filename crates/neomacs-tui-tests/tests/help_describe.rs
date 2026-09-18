@@ -210,9 +210,19 @@ fn info_directory_via_ch_i_opens_info_buffer() {
     // node is a property of the host rather than the editors.  Pin both to
     // one harness-owned directory whose single dir file both then insert
     // verbatim (Info-dir-find-node), making the node identical anywhere.
+    // The dir file must carry the explicit node header, or GNU's Info has no
+    // node named "Top" to open and signals `(user-error "No such node or
+    // anchor: Top")` -- the test then fails on the GNU side, with the error
+    // in GNU's echo area, which reads as a Neomacs failure if you only look
+    // at the assertion.  A real dir file is written as prose, then the 0x1F
+    // (^_) separator, then `File: dir,<TAB>Node: Top<TAB>...`, then the menu;
+    // verified against the oracle's own installed dir at
+    // build/share/info/dir.  The `^_' is what makes the node exist.
     let harness_dir = support::write_shared_temp_file(
         "dir",
         "This is the file info/dir, which contains the topmost node of the INFO tree.\n\n\
+         \x1f\n\
+         File: dir,\tNode: Top\tThis is the top of the INFO tree\n\n\
          \x20\n* Menu:\n\n\
          * Emacs: (emacs).\t\tThe extensible self-documenting text editor.\n\
          * Sample: (sample).\tA sample manual for the pair harness.\n",
