@@ -2594,3 +2594,294 @@ fn merge_touches_only_the_edited_neighbourhood() {
         "the fused interval carries the left plist object"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The buffer put walk (`put_property_for_object_len_raw`), GNU
+// `add_text_properties_1` shape: one descent, boundaries only where missing,
+// the written part takes the plist copy.
+// ---------------------------------------------------------------------------
+
+fn bold_runs(table: &TextPropertyTable) -> Vec<(usize, usize, Option<&'static str>)> {
+    table
+        .interval_plist_runs_for_test()
+        .into_iter()
+        .map(|(start, end, plist)| {
+            let face = plist
+                .iter()
+                .find(|(name, _)| name.is_symbol_named("face"))
+                .map(|(_, value)| {
+                    if value.is_symbol_named("bold") {
+                        "bold"
+                    } else if value.is_symbol_named("italic") {
+                        "italic"
+                    } else {
+                        "?"
+                    }
+                });
+            (start, end, face)
+        })
+        .collect()
+}
+
+#[test]
+fn put_does_not_split_an_interval_that_already_has_the_property() {
+    let face = Value::symbol("face");
+    let bold = Value::symbol("bold");
+    let mut table = TextPropertyTable::new();
+    assert!(put_chars_for_object_len(&mut table, 0, 10, 30, face, bold));
+    table.assert_tree_invariants_for_test();
+
+    // The seat interval [0, 10) already carries face=bold: GNU skips it
+    // without a split, so the only new boundary is the one at 20.
+    assert!(put_chars_for_object_len(&mut table, 5, 20, 30, face, bold));
+    table.assert_tree_invariants_for_test();
+    assert_eq!(
+        bold_runs(&table),
+        vec![
+            (0, 10, Some("bold")),
+            (10, 20, Some("bold")),
+            (20, 30, None)
+        ]
+    );
+
+    // Entirely inside intervals that already have it: nothing changes and
+    // no boundary appears (GNU returns nil from its leading skip loop).
+    assert!(!put_chars_for_object_len(&mut table, 3, 17, 30, face, bold));
+    table.assert_tree_invariants_for_test();
+    assert_eq!(
+        bold_runs(&table),
+        vec![
+            (0, 10, Some("bold")),
+            (10, 20, Some("bold")),
+            (20, 30, None)
+        ]
+    );
+
+    // The LAST interval reached already has it: written up to it, then no
+    // split at 25 (GNU's `interval_has_all_properties` test on the interval
+    // that reaches the end).
+    let mut table = TextPropertyTable::new();
+    assert!(put_chars_for_object_len(&mut table, 10, 20, 30, face, bold));
+    assert!(put_chars_for_object_len(&mut table, 5, 15, 30, face, bold));
+    table.assert_tree_invariants_for_test();
+    assert_eq!(
+        bold_runs(&table),
+        vec![
+            (0, 5, None),
+            (5, 10, Some("bold")),
+            (10, 20, Some("bold")),
+            (20, 30, None)
+        ]
+    );
+}
+
+#[test]
+fn put_splits_only_where_a_boundary_is_missing() {
+    let face = Value::symbol("face");
+    let bold = Value::symbol("bold");
+    let italic = Value::symbol("italic");
+    let mut table = TextPropertyTable::new();
+    assert!(put_chars_for_object_len(&mut table, 0, 10, 10, face, bold));
+
+    // Both ends inside one interval: two boundaries.
+    assert!(put_chars_for_object_len(&mut table, 3, 6, 10, face, italic));
+    table.assert_tree_invariants_for_test();
+    assert_eq!(
+        bold_runs(&table),
+        vec![
+            (0, 3, Some("bold")),
+            (3, 6, Some("italic")),
+            (6, 10, Some("bold"))
+        ]
+    );
+
+    // Ends on existing boundaries: no new interval.
+    assert!(put_chars_for_object_len(&mut table, 3, 10, 10, face, bold));
+    table.assert_tree_invariants_for_test();
+    assert_eq!(
+        bold_runs(&table),
+        vec![
+            (0, 3, Some("bold")),
+            (3, 6, Some("bold")),
+            (6, 10, Some("bold"))
+        ]
+    );
+
+    // A range past the last interval extends the cover and writes it.
+    assert!(put_chars_for_object_len(
+        &mut table, 6, 14, 14, face, italic
+    ));
+    table.assert_tree_invariants_for_test();
+    assert_eq!(
+        bold_runs(&table),
+        vec![
+            (0, 3, Some("bold")),
+            (3, 6, Some("bold")),
+            (6, 10, Some("italic")),
+            (10, 14, Some("italic"))
+        ]
+    );
+}
+
+#[test]
+fn put_split_leaves_the_original_plist_object_with_the_unchanged_text() {
+    // GNU `copy_properties (unchanged, i)`: the interval that is written
+    // takes a fresh copy; the untouched remainder keeps its plist object, so
+    // a cons chain Lisp holds from `text-properties-at` is never mutated by
+    // a put on neighbouring text.
+    let face = Value::symbol("face");
+    let bold = Value::symbol("bold");
+    let italic = Value::symbol("italic");
+
+    // Start split: [0, 5) is the remainder.
+    let mut table = TextPropertyTable::new();
+    put_chars_for_object_len(&mut table, 0, 10, 10, face, bold);
+    let original = table.raw_plist_at_for_test(char_pos(2)).unwrap();
+    put_chars_for_object_len(&mut table, 5, 10, 10, face, italic);
+    assert_eq!(
+        table.raw_plist_at_for_test(char_pos(2)).unwrap().bits(),
+        original.bits()
+    );
+    assert_ne!(
+        table.raw_plist_at_for_test(char_pos(7)).unwrap().bits(),
+        original.bits()
+    );
+    assert!(plist_value_get(original, face).is_some_and(|v| v.is_symbol_named("bold")));
+
+    // End split: [5, 10) is the remainder.
+    let mut table = TextPropertyTable::new();
+    put_chars_for_object_len(&mut table, 0, 10, 10, face, bold);
+    let original = table.raw_plist_at_for_test(char_pos(2)).unwrap();
+    put_chars_for_object_len(&mut table, 0, 5, 10, face, italic);
+    assert_eq!(
+        table.raw_plist_at_for_test(char_pos(7)).unwrap().bits(),
+        original.bits()
+    );
+    assert_ne!(
+        table.raw_plist_at_for_test(char_pos(2)).unwrap().bits(),
+        original.bits()
+    );
+    assert!(plist_value_get(original, face).is_some_and(|v| v.is_symbol_named("bold")));
+
+    // Both: [0, 3) keeps the object, [3, 6) and [6, 10) are two distinct copies.
+    let mut table = TextPropertyTable::new();
+    put_chars_for_object_len(&mut table, 0, 10, 10, face, bold);
+    let original = table.raw_plist_at_for_test(char_pos(2)).unwrap();
+    put_chars_for_object_len(&mut table, 3, 6, 10, face, italic);
+    let left = table.raw_plist_at_for_test(char_pos(1)).unwrap();
+    let mid = table.raw_plist_at_for_test(char_pos(4)).unwrap();
+    let right = table.raw_plist_at_for_test(char_pos(8)).unwrap();
+    assert_eq!(left.bits(), original.bits());
+    assert_ne!(mid.bits(), original.bits());
+    assert_ne!(right.bits(), original.bits());
+    assert_ne!(mid.bits(), right.bits());
+    assert!(plist_value_get(original, face).is_some_and(|v| v.is_symbol_named("bold")));
+    assert!(plist_value_get(right, face).is_some_and(|v| v.is_symbol_named("bold")));
+}
+
+#[test]
+fn put_walk_agrees_with_a_per_char_model() {
+    // Randomized differential of the buffer put walk against a per-character
+    // model: values, the `changed` answer, and the tree invariants after
+    // every put. Deterministic LCG, reproducible failures.
+    let names = [Value::symbol("face"), Value::symbol("fontified")];
+    let values = [Value::symbol("bold"), Value::symbol("italic"), Value::NIL];
+    const N: usize = 120;
+    let mut model: Vec<[Option<Value>; 2]> = vec![[None, None]; N];
+    let mut table = TextPropertyTable::new();
+
+    let mut rng: u64 = 0x9e37_79b9_7f4a_7c15;
+    let mut next = |bound: usize| -> usize {
+        rng = rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        ((rng >> 33) as usize) % bound.max(1)
+    };
+
+    for step in 0..3000 {
+        let a = next(N + 1);
+        let b = next(N + 1);
+        let (lo, up) = if a <= b { (a, b) } else { (b, a) };
+        let which = next(2);
+        let value = values[next(3)];
+        let changed = put_chars_for_object_len(&mut table, lo, up, N, names[which], value);
+        let mut model_changed = false;
+        for cell in &mut model[lo..up] {
+            let same = cell[which].is_some_and(|existing| eq_value(&existing, &value));
+            if !same {
+                cell[which] = Some(value);
+                model_changed = true;
+            }
+        }
+        assert_eq!(
+            changed, model_changed,
+            "step {step}: put [{lo}, {up}) changed?"
+        );
+        table.assert_tree_invariants_for_test();
+        for (pos, cell) in model.iter().enumerate() {
+            for (which, name) in names.iter().enumerate() {
+                let actual = get_at_char(&table, pos, *name);
+                let expected = cell[which];
+                assert!(
+                    match (actual, expected) {
+                        (None, None) => true,
+                        (Some(x), Some(y)) => eq_value(&x, &y),
+                        _ => false,
+                    },
+                    "step {step}: pos {pos} {name:?}: table {actual:?} vs model {expected:?}"
+                );
+            }
+        }
+    }
+}
+
+/// The put walk balances at the split node and climbs only while a rotation
+/// happened (`balance_after_split`), never to the root unconditionally.
+/// Font-lock's shape -- adjacent puts walking forward, each splitting the
+/// default tail -- hangs every new piece off the previous one, and the
+/// tail's weight never changes, so a policy that looks only at the root
+/// let the depth grow by one per put (2001 for 4000 intervals). The depth
+/// must stay logarithmic, and the walk must stay right.
+#[test]
+fn forward_adjacent_puts_keep_the_tree_shallow_with_local_balancing() {
+    let face = Value::symbol("face");
+    let values = [Value::symbol("bold"), Value::symbol("italic")];
+    const N: usize = 40_000;
+    const STEP: usize = 10;
+    let mut table = TextPropertyTable::new();
+    for (i, start) in (0..N).step_by(STEP).enumerate() {
+        assert!(put_chars_for_object_len(
+            &mut table,
+            start,
+            start + STEP,
+            N,
+            face,
+            values[i % 2]
+        ));
+    }
+    table.assert_tree_invariants_for_test();
+    let intervals = N / STEP;
+    let depth = table.tree_max_depth_for_test();
+    let log2 = usize::BITS - intervals.leading_zeros();
+    assert!(
+        depth <= 4 * log2 as usize,
+        "{intervals} intervals at depth {depth} (log2 {log2}): a spine grew"
+    );
+    for (i, start) in (0..N).step_by(STEP).enumerate() {
+        let got = get_at_char(&table, start + 3, face).unwrap();
+        assert!(eq_value(&got, &values[i % 2]), "interval {i}");
+    }
+    // The same walk backwards, and a second pass that re-splits every
+    // interval in the middle: neither may deepen the tree past the bound.
+    for start in (0..N).step_by(STEP).rev() {
+        put_chars_for_object_len(&mut table, start + 2, start + 7, N, face, Value::NIL);
+    }
+    table.assert_tree_invariants_for_test();
+    let depth = table.tree_max_depth_for_test();
+    let intervals = table.interval_plist_runs_for_test().len();
+    let log2 = usize::BITS - intervals.leading_zeros();
+    assert!(
+        depth <= 4 * log2 as usize,
+        "{intervals} intervals at depth {depth} (log2 {log2}) after the backward pass"
+    );
+}

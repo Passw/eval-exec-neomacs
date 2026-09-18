@@ -1115,6 +1115,41 @@ impl IntervalTree {
         }
     }
 
+    /// Balance after a raw split of `id`: at the split node, then upward only
+    /// while a rotation actually happened.
+    ///
+    /// A split leaves every ancestor's `total_length` as it was, so an
+    /// ancestor that was in balance before the split still is -- the only
+    /// node whose own condition changed is the one that was split (it lost
+    /// length and gained a child). GNU's `split_interval_right`/`left` balance
+    /// exactly that node (`balance_an_interval (new)`) and nothing above it.
+    /// A rotation there does change what its parent sees as grandchildren,
+    /// so the climb continues one level per rotation and stops at the first
+    /// level that stands pat. `balance_upwards`' unconditional climb to the
+    /// root cost more than the split itself on org's tree (seven levels of
+    /// length compares per split, a quarter of a put) and rotated nowhere
+    /// above the split node.
+    ///
+    /// Balancing only at the root before the descent (GNU's
+    /// `balance_possible_root_interval`) is not enough: font-lock's forward
+    /// walk splits the default tail once per put, and while the tail keeps
+    /// the same weight the root never rotates, so the pieces hung off it one
+    /// level deeper each time (depth 2001 for 4000 intervals in the test).
+    fn balance_after_split(&mut self, mut id: IntervalId) {
+        loop {
+            let balanced = self.balance_an_interval(id);
+            let rotated = balanced != id;
+            match self.nodes[balanced.0].parent {
+                Some(parent) if rotated => id = parent,
+                Some(_) => return,
+                None => {
+                    self.root = Some(balanced);
+                    return;
+                }
+            }
+        }
+    }
+
     fn append_default_interval(&mut self, range: CharRange) {
         if range.is_empty() {
             return;
@@ -2810,8 +2845,12 @@ impl TextPropertyTable {
         value: Value,
     ) -> bool {
         self.mutation_tick += 1;
-        if Self::name_is_syntax_relevant(name) {
+        let syntax_relevant = Self::name_is_syntax_relevant(name);
+        if syntax_relevant {
             self.syntax_prop_tick += 1;
+        }
+        let (changed, written) = self.put_property_walk(range, object_len, name, value);
+        if syntax_relevant {
             // Keep the cached bit-set ranges truthful, exactly as
             // `put_property_raw` does. Its absence here was not a
             // string-only concession: `text_props_put_property_in_emacs_byte_range`
@@ -2821,40 +2860,138 @@ impl TextPropertyTable {
             // `syntax_prop_free_run_end` query rebuilt it by walking the whole
             // interval tree. `org-editing-heavy` did that ~192 times per
             // operation.
-            self.syntax_ranges_note_put(range);
+            //
+            // The list's entries mirror interval boundaries, so it is told
+            // the span the walk actually WROTE, not the span it was asked
+            // for: an interval that already carried the property is left
+            // whole (GNU's rule, below), and noting the requested range
+            // would cut its entry at a position that is no boundary.
+            let noted = written.unwrap_or_else(|| CharRange::new(range.start(), range.start()));
+            self.syntax_ranges_note_put(noted);
         }
+        changed
+    }
+
+    /// The buffer put's tree walk. Returns whether any plist changed and the
+    /// span of intervals that received the property (`None` when every
+    /// interval in `range` already had it): its ends are interval boundaries.
+    fn put_property_walk(
+        &mut self,
+        range: CharRange,
+        object_len: CharLen,
+        name: Value,
+        value: Value,
+    ) -> (bool, Option<CharRange>) {
         if range.is_empty() {
-            return false;
+            return (false, None);
         }
         self.property_names.observe(name);
 
         self.intervals
             .ensure_cover(CharPos0::ZERO.add_len(object_len).max(range.end()));
-        self.intervals.split_at(range.start());
-        self.intervals.split_at(range.end());
 
-        // Walk the covered intervals in place: the loop body only replaces
-        // plist values (never splits or merges), so `(start, id)` cursor
-        // state stays valid and the `ids_overlapping` Vec — a per-put
-        // allocation that grows to the whole cover set — is not needed.
-        // On a 20k-interval whole-buffer put the collect + realloc traffic
-        // was ~19% of the workload.
-        let mut changed = false;
-        let mut cursor = self.intervals.first_id_overlapping(range);
-        while let Some((node_start, id)) = cursor {
-            if node_start >= range.end() {
-                break;
+        // GNU `add_text_properties_1`: ONE descent seats the walk at the
+        // interval holding START, and the walk itself decides where a
+        // boundary is missing. The old shape -- `split_at (start)`,
+        // `split_at (end)`, then `first_id_overlapping` -- descended the tree
+        // up to five times per put (each `split_at` descends once, and again
+        // after a real split to re-seat) for a result the walk already had in
+        // hand; on org font-lock, at ~10K intervals, those descents were
+        // most of a put.
+        //
+        // Two GNU rules ride along. An interval that already carries the
+        // property is never split, so a put whose ends fall inside such
+        // intervals adds no boundaries (GNU's leading "we can skip it" loop
+        // and its `interval_has_all_properties` test on the last interval).
+        // And when a split is made, the part that receives the property takes
+        // the fresh plist copy (`copy_properties`) while the untouched
+        // remainder keeps the original object -- so a plist cons Lisp already
+        // holds from `text-properties-at` stays with the text whose
+        // properties did not change. `put_property_raw` is the string path
+        // and keeps its own shape.
+        //
+        // Balancing is GNU's too: at the split node, climbing only while a
+        // rotation happened (`balance_after_split`); `split_at`'s climb to
+        // the root cost more than the split itself here.
+        let Some((seat_start, mut id)) = self.intervals.find_id(range.start()) else {
+            return (false, None);
+        };
+        let has_property = |plist: Value| {
+            plist_value_get(plist, name).is_some_and(|existing| eq_value(&existing, &value))
+        };
+        let mut node_start = seat_start;
+        let mut node_end = self.intervals.interval_end(node_start, id);
+        if has_property(self.intervals.nodes[id.0].plist) {
+            // Skip the leading intervals that already have it; the first one
+            // that does not begins on a boundary, so no split is needed.
+            loop {
+                if node_end >= range.end() {
+                    return (false, None);
+                }
+                let Some(next) = self.intervals.next_id(id) else {
+                    return (false, None);
+                };
+                id = next;
+                node_start = node_end;
+                node_end = self.intervals.interval_end(node_start, id);
+                if !has_property(self.intervals.nodes[id.0].plist) {
+                    break;
+                }
             }
-            let node_end = self.intervals.interval_end(node_start, id);
-            if node_end > range.start()
-                && plist_value_put_replace(&mut self.intervals.nodes[id.0].plist, name, value)
-            {
+        } else if seat_start < range.start() {
+            // `split_interval_right` + `copy_properties (unchanged, i)`: the
+            // remainder [start, node_end) is written below, so it takes the
+            // copy; [seat_start, start) keeps the plist object.
+            let original = self.intervals.nodes[id.0].plist;
+            let right = self
+                .intervals
+                .node_shaped_like(id, copy_plist_value(original));
+            let right_id =
+                self.intervals
+                    .split_node_right_raw(id, node_start, range.start(), right);
+            self.intervals.balance_after_split(id);
+            id = right_id;
+            node_start = range.start();
+        }
+
+        let written_start = node_start;
+        let mut changed = false;
+        loop {
+            if node_end >= range.end() {
+                if has_property(self.intervals.nodes[id.0].plist) {
+                    // Not written: the span ends at this interval's start.
+                    let written = (written_start < node_start)
+                        .then(|| CharRange::new(written_start, node_start));
+                    return (changed, written);
+                }
+                if node_end > range.end() {
+                    // `split_interval_left` + `copy_properties`: [node_start,
+                    // end) is written and takes the copy; [end, node_end)
+                    // keeps the plist object.
+                    let original = self.intervals.nodes[id.0].plist;
+                    let right = self.intervals.node_shaped_like(id, original);
+                    self.intervals
+                        .split_node_right_raw(id, node_start, range.end(), right);
+                    self.intervals.nodes[id.0].plist = copy_plist_value(original);
+                    self.intervals.balance_after_split(id);
+                }
+                if plist_value_put_replace(&mut self.intervals.nodes[id.0].plist, name, value) {
+                    self.intervals.nodes[id.0].refresh_cache();
+                    changed = true;
+                }
+                return (changed, Some(CharRange::new(written_start, range.end())));
+            }
+            if plist_value_put_replace(&mut self.intervals.nodes[id.0].plist, name, value) {
                 self.intervals.nodes[id.0].refresh_cache();
                 changed = true;
             }
-            cursor = self.intervals.next_id(id).map(|next| (node_end, next));
+            let Some(next) = self.intervals.next_id(id) else {
+                return (changed, Some(CharRange::new(written_start, node_end)));
+            };
+            id = next;
+            node_start = node_end;
+            node_end = self.intervals.interval_end(node_start, id);
         }
-        changed
     }
 
     pub(crate) fn from_plist_runs(runs: Vec<TextPropertyPlistRun>) -> Self {
