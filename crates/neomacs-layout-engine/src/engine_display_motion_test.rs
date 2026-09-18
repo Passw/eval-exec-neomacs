@@ -764,3 +764,58 @@ fn vertical_motion_preserves_a_labeled_accessible_region_during_measurement() {
         "(5 7 1 7)"
     );
 }
+
+/// A position past the right margin of a truncated line belongs to that line's
+/// row.
+///
+/// GNU never asks which row holds a position: `Fvertical_motion` reseats at the
+/// start of the origin's line, walks forward to the origin, and when that walk
+/// overshoots a line truncated on the right (`it.line_wrap == TRUNCATE &&
+/// it.current_x >= it.last_visible_x`) backtracks one line, landing back on the
+/// truncated row itself (src/indent.c:2393-2400).  Nothing implemented that for
+/// rows, so the newline ending a truncated line was in no row at all, and
+/// `C-e` -- whose `line-move-1` walks to `(line-end-position)` and then asks for
+/// a screen line -- was answered with "Display motion origin is outside measured
+/// source coverage" instead of reaching the end of its line.
+#[test]
+fn vertical_motion_reaches_the_end_of_a_truncated_line() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .expect("buffer")
+        .insert(&format!("{}\n", "x".repeat(300)));
+    // Narrow enough that the line cannot fit at any plausible character width,
+    // so redisplay truncates it -- which is the premise of this case.
+    eval.frame_manager_mut()
+        .create_frame("display-motion", 160, 240, buffer);
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let result = eval
+        .eval_str(
+            r#"(let ((noninteractive nil) (truncate-lines t))
+                 (list
+                   (progn (goto-char (point-min))
+                          (list (vertical-motion 1) (point)))
+                   (progn (goto-char 301)
+                          (list (vertical-motion 0) (point)))
+                   (progn (goto-char 301)
+                          (list (vertical-motion 1) (point)))))"#,
+        )
+        .expect("screen-line motion from inside a truncated line");
+
+    // Measured against GNU Emacs 31 on the same buffer: one screen line down from
+    // the beginning is the empty line after the newline, zero lines from the
+    // newline answers the start of its own screen line, and one line from it
+    // reaches that empty line.  Before the row lookup learned the overflow rule,
+    // the zero-line probe signalled instead of answering.
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "((1 302) (0 1) (1 302))"
+    );
+}

@@ -185,6 +185,43 @@ fn snapshot_row_index_for_pos(rows: &[&DisplayRowSnapshot], pos: LispCharPos1) -
     })
 }
 
+/// The row a display-motion origin belongs to.
+///
+/// GNU never asks which row contains a position.  `Fvertical_motion` reseats at
+/// the start of the origin's line, walks forward to the origin, and -- when that
+/// walk overshoots a line that is truncated on the right (`it.line_wrap ==
+/// TRUNCATE && it.current_x >= it.last_visible_x`) -- backtracks one line,
+/// landing back on the truncated row itself (src/indent.c:2393-2400, "We might
+/// overshoot if lines are truncated and point lies beyond the right margin").
+///
+/// A row answers the same question with its span, and a right-truncated row's
+/// span stops where the drawing stopped (`find_row_edges` gives it
+/// `it->current.pos` for `maxpos`, src/xdisp.c:25269), so a position beyond the
+/// right margin falls in the gap before the next row starts instead of in any
+/// row at all.  Rows partition the source, so such a gap is always text a row
+/// stopped drawing without ending its line, and that row owns the origin --
+/// which is exactly the row GNU's overshoot correction lands on.
+fn snapshot_row_index_for_pos_or_truncated_line(
+    rows: &[&DisplayRowSnapshot],
+    pos: LispCharPos1,
+    end_lisp: LispCharPos1,
+) -> Option<usize> {
+    if let Some(index) = snapshot_row_index_for_pos(rows, pos) {
+        return Some(index);
+    }
+    rows.iter().enumerate().rev().find_map(|(index, row)| {
+        // The origin stays on this row while it precedes the row below it:
+        // the next row starts where this row's line ends.  The last row has
+        // no row below and owns the end of the buffer itself, which is also
+        // the extent the accessible-boundary branch below assumes of it.
+        let inside_line = match rows.get(index + 1).and_then(|next| next.start_buffer_pos) {
+            Some(next_start) => pos < next_start,
+            None => pos <= end_lisp,
+        };
+        (row.start_buffer_pos.is_some_and(|start| start <= pos) && inside_line).then_some(index)
+    })
+}
+
 /// Leave pushed replacement text without discarding the physical rows crossed.
 /// GNU's move_it_by_lines advances out of a replacing string before returning
 /// a buffer point. Its vpos still counts those rows.
@@ -369,7 +406,9 @@ fn vertical_motion_on_rows(
     use crate::window::DisplayRowEndSource;
 
     let rows = snapshot_text_rows(snapshot);
-    let Some(mut current_idx) = snapshot_row_index_for_pos(&rows, request.origin) else {
+    let Some(mut current_idx) =
+        snapshot_row_index_for_pos_or_truncated_line(&rows, request.origin, accessible.end_lisp())
+    else {
         return RowMotion::NeedsMoreRows;
     };
     // A before-string inserts rows before the source cursor; positive motion
@@ -509,3 +548,7 @@ fn vertical_motion_on_rows(
         },
     })
 }
+
+#[cfg(test)]
+#[path = "tests/mod.rs"]
+mod tests;

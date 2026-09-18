@@ -58,6 +58,21 @@ Errors from an installed row producer are errors, not permission to silently
 switch to a less capable text scanner. Batch/startup without that adapter
 retains the existing source-based path.
 
+A row's span is a drawing extent, not a line extent. A line truncated on the
+right ends its row where the drawing stopped -- the row's `maxpos` is
+`it->current.pos` for that case (`find_row_edges`, src/xdisp.c:25269) -- so a
+position beyond the right margin falls *between* rows rather than inside one:
+measured in a 160-column window over 300 characters plus a newline, the rows are
+`1..159` and `302..302`. GNU answers such a position by rewinding to the start
+of the origin's line, walking forward to it, and backtracking a line when that
+walk overshoots a line truncated on the right (`it.line_wrap == TRUNCATE &&
+it.current_x >= it.last_visible_x`, src/indent.c:2393-2400). From rows, the same
+answer is the row whose line the origin is still on, bounded by the next row's
+start. Without that widening no row contains the origin, the measured rows are
+judged to exhaust their coverage at end of buffer, and the resolver refuses the
+motion -- which is what left `C-e` unable to reach the end of a truncated line,
+and `window-hscroll` unable to follow point to it.
+
 Mutable string prefixes are captured by value, not just Lisp object identity.
 The shared `LayoutPrefixInputs` projection records effective buffer-local
 `line-prefix` and `wrap-prefix` string bytes, multibyteness, identity and string
