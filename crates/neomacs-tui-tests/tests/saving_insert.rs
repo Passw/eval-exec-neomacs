@@ -1494,38 +1494,64 @@ fn mx_view_hello_file_page_scroll_repaints_cleanly() {
 }
 
 #[test]
-fn mx_view_hello_file_strict_match() {
+fn find_file_in_git_repo_shows_git_backend() {
     let (mut gnu, mut neo) = boot_pair("");
     use_backend_only_vc_mode_line(&mut gnu, &mut neo);
 
-    send_both(&mut gnu, &mut neo, "M-x");
-    read_both(&mut gnu, &mut neo, Duration::from_secs(3));
-    for s in [&mut gnu, &mut neo] {
-        s.send(b"view-hello-file");
+    // Both executables visit the same file inside one harness-owned Git
+    // repository, so the Git backend reaches the mode line on any machine.
+    // The previous view-hello-file variant leaned on each executable's own
+    // data-directory copy being Git-controlled; the installed CI oracle's
+    // copies live outside any repository, so GNU showed no backend there and
+    // the paired displays could never agree.
+    let shared = write_shared_temp_file("vc-hello.txt", "alpha\nbeta\n");
+    let repo = shared
+        .parent()
+        .expect("shared fixture lives inside its own directory");
+    let steps: [&[&str]; 3] = [
+        &["init", "--quiet", "--initial-branch=main"],
+        &["add", "vc-hello.txt"],
+        &[
+            "-c",
+            "user.name=Neomacs TUI",
+            "-c",
+            "user.email=tui@neomacs.invalid",
+            "commit",
+            "--quiet",
+            "-m",
+            "fixture",
+        ],
+    ];
+    for args in steps {
+        let status = std::process::Command::new("git")
+            .args(args)
+            .current_dir(repo)
+            .status()
+            .expect("spawn git for the VC fixture repository");
+        assert!(status.success(), "git {args:?} in the fixture repository");
     }
-    read_both(&mut gnu, &mut neo, Duration::from_secs(1));
-    send_both(&mut gnu, &mut neo, "RET");
-    // Wait for the actual HELLO mode line.  GNU may first emit an autosave
-    // warning mentioning "HELLO" while the selected window is still
-    // *scratch*, so a plain substring check can sample too early.
-    let wants_hello_vc_mode_line = |rows: &[String]| {
+    open_shared_file(&mut gnu, &mut neo, shared.path(), "C-x C-f");
+
+    // Wait for the repo file's mode line; earlier samples can still show the
+    // *scratch* buffer while the visit is in flight.
+    let wants_repo_mode_line = |rows: &[String]| {
         rows.iter()
-            .any(|r| r.contains("HELLO") && r.contains(" Git "))
+            .any(|r| r.contains("vc-hello.txt") && r.contains(" Git "))
     };
-    gnu.read_until(Duration::from_secs(8), wants_hello_vc_mode_line);
-    neo.read_until(Duration::from_secs(8), wants_hello_vc_mode_line);
+    gnu.read_until(Duration::from_secs(8), wants_repo_mode_line);
+    neo.read_until(Duration::from_secs(8), wants_repo_mode_line);
 
     let gl = gnu.text_grid();
     let nl = neo.text_grid();
     assert!(
         gl.iter().any(|row| row.contains(" Git ")),
-        "GNU HELLO mode line should show the Git backend"
+        "GNU repo-file mode line should show the Git backend"
     );
     assert!(
         nl.iter().any(|row| row.contains(" Git ")),
-        "NEO HELLO mode line should show the Git backend"
+        "NEO repo-file mode line should show the Git backend"
     );
-    assert_pair_exact_display("mx_view_hello_file_strict_match", &gnu, &neo);
+    assert_pair_exact_display("find_file_in_git_repo_shows_git_backend", &gnu, &neo);
 }
 
 #[test]
