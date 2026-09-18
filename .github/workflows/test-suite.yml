@@ -593,3 +593,36 @@ jobs:
 
       - name: Install unmodified Doom with Neomacs
         run: ./scripts/test-doom-install.sh
+
+  # A separate job rather than a second matrix arm, because the darwin side
+  # shares nothing with Linux beyond the script itself. There is no packaged
+  # darwin runtime to restore: the shared artifact is linux-x86_64 by
+  # construction and a Linux binary cannot run on darwin, so this arm compiles
+  # what it tests. A matrix would also force it to `needs:
+  # neomacs-test-runtime` -- waiting up to 150 minutes on a Linux artifact it
+  # never reads, for no ordering benefit.
+  doom-install-compatibility-macos:
+    name: doom install compatibility (macos aarch64)
+    if: ${{ github.event_name != 'schedule' }}
+    runs-on: macos-latest
+    timeout-minutes: 120
+    env:
+      TMPDIR: ${{ github.workspace }}/tmp
+      NEOMACS_BIN: ${{ github.workspace }}/target/release/neomacs
+      NEOMACS_RUNTIME_ROOT: ${{ github.workspace }}
+    steps:
+      - *checkout
+      - *prepare_workspace_tmp
+      - uses: ./.github/actions/install-build-deps
+
+      - name: Set up Rust tooling
+        uses: ./.github/actions/setup-rust
+        with:
+          cache-key: doom-install-macos
+          target: aarch64-apple-darwin
+
+      - name: Build the runtime this job installs Doom into
+        run: cargo xtask fresh-build --release
+
+      - name: Install unmodified Doom with Neomacs
+        run: ./scripts/test-doom-install.sh
