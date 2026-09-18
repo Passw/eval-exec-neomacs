@@ -24,7 +24,6 @@
 //! - [`diff_screens`] remains available for tests that intentionally inspect
 //!   raw terminal cells or exact palette values.
 
-use std::ffi::OsString;
 use std::io::Write;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -521,57 +520,6 @@ impl TuiSession {
             .args(["-nw", "-Q", "-no-comp-spawn", QUIET_NATIVE_COMP_EVAL])
             .args(extra_args.split_whitespace());
         Self::spawn_launch_with_erase_char(launch, "GNU", erase)
-    }
-
-    /// Spawn GNU Emacs in TUI mode WITHOUT `-Q`, loading the user's init
-    /// file (e.g. Doom config).  Uses the real HOME so Doom is found.
-    /// For face/theme comparison tests.
-    pub fn gnu_emacs_with_init(extra_args: &str) -> Self {
-        Self::gnu_emacs_with_init_args(extra_args.split_whitespace())
-    }
-
-    /// Structured-argument counterpart of [`Self::gnu_emacs_with_init`].
-    /// Paths and Lisp forms remain distinct OS arguments rather than passing
-    /// through whitespace tokenization.
-    pub fn gnu_emacs_with_init_args<I, S>(extra_args: I) -> Self
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<OsString>,
-    {
-        let real_home = PathBuf::from(std::env::var("HOME").expect("HOME"));
-        let launch = TuiLaunch::new("emacs")
-            .arg("-nw")
-            .args(extra_args)
-            .env("HOME", real_home.as_os_str());
-        Self::spawn_launch(launch, "GNU")
-    }
-
-    /// Spawn Neomacs in TUI mode WITHOUT `-Q` so the user's init file
-    /// (e.g. Doom Emacs config) is loaded.  Uses the real HOME.
-    /// For face/theme tests.
-    pub fn neomacs_with_init(extra_args: &str) -> Self {
-        Self::neomacs_with_init_args(extra_args.split_whitespace())
-    }
-
-    /// Structured-argument counterpart of [`Self::neomacs_with_init`].
-    pub fn neomacs_with_init_args<I, S>(extra_args: I) -> Self
-    where
-        I: IntoIterator<Item = S>,
-        S: Into<OsString>,
-    {
-        let workspace = workspace_root();
-        let bin = neomacs_binary_path(&workspace);
-        assert!(
-            bin.exists(),
-            "neomacs binary not found at {}",
-            bin.display()
-        );
-        let real_home = PathBuf::from(std::env::var("HOME").expect("HOME"));
-        let launch = TuiLaunch::new(bin.as_os_str())
-            .arg("-nw")
-            .args(extra_args)
-            .env("HOME", real_home.as_os_str());
-        Self::spawn_launch(launch, "NEO")
     }
 
     /// Spawn Neomacs in TUI mode.

@@ -3817,6 +3817,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "neomacs-infra"
+version = "0.0.18"
+
+[[package]]
 name = "neomacs-layout-engine"
 version = "0.0.18"
 dependencies = [
@@ -3965,6 +3969,7 @@ version = "0.0.18"
 dependencies = [
  "libc",
  "neomacs-display-protocol",
+ "neomacs-infra",
  "pty-process",
  "serde_json",
  "tempfile",

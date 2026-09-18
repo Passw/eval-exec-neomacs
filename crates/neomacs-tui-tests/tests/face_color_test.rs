@@ -9,7 +9,6 @@
 use crate::support;
 use neomacs_tui_tests::*;
 use std::ffi::OsString;
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use support::*;
 
@@ -74,37 +73,72 @@ fn wait_for_doom_startup(
 
 #[test]
 fn index_org_has_face_colours() {
-    let home = PathBuf::from(std::env::var_os("HOME").expect("HOME should be set"));
-    let index = [
-        home.join(".emacs.d/docs/index.org"),
-        home.join(".config/emacs/docs/index.org"),
-    ]
-    .into_iter()
-    .find(|path| path.is_file())
-    .expect("Doom docs/index.org should exist");
-    let doom_root = index
-        .parent()
-        .and_then(|docs_directory| docs_directory.parent())
-        .expect("Doom index should be below the Doom root");
-    let docs_library = doom_root.join("lisp/lib/docs.el");
+    // This comparison mounts the shared, GNU-bootstrapped, sealed Doom
+    // fixture from neomacs-infra: the tree and its bootstrap HOME are
+    // read-only, and every writable location is redirected into a
+    // per-session directory below.  Materializing is an explicit step
+    // (`cargo run -p xtask -- infra materialize doom`); where the fixture
+    // is absent — CI's shared runners, a fresh clone — the test skips
+    // rather than surprise the run with a multi-minute bootstrap.
+    let Some(doom) = neomacs_infra::DoomEnvironment::open() else {
+        eprintln!(
+            "skipping: no sealed Doom fixture; run \
+             `cargo run -p xtask -- infra materialize doom` to build one"
+        );
+        return;
+    };
+    let index = doom.tree().join("docs/index.org");
+    assert!(
+        index.is_file(),
+        "Doom fixture has no docs/index.org at {}",
+        index.display()
+    );
+    let docs_library = doom.tree().join("lisp/lib/docs.el");
     assert!(
         docs_library.is_file(),
         "Doom docs mode library should exist at {}",
         docs_library.display()
     );
-    let launch_args = [
-        OsString::from("--init-directory"),
-        doom_root.as_os_str().to_os_string(),
+    let document_args = [
         OsString::from("--load"),
         docs_library.into_os_string(),
         index.into_os_string(),
         OsString::from("--eval=(goto-char(point-min))"),
     ];
+    fn doom_launch(
+        doom: &neomacs_infra::DoomEnvironment,
+        state: &TuiTempDirectory,
+        program: &std::ffi::OsStr,
+        document_args: &[OsString],
+    ) -> TuiLaunch {
+        let mut launch = TuiLaunch::new(program)
+            .arg("-nw")
+            .args(doom.session_args())
+            .args(document_args.iter().cloned());
+        for (name, value) in doom.session_env(state) {
+            launch = launch.env(name, value);
+        }
+        launch
+    }
+    let gnu_state = TuiTempDirectory::new("doom-state-gnu-");
+    let neo_state = TuiTempDirectory::new("doom-state-neo-");
+    for state in [&gnu_state, &neo_state] {
+        doom.prepare_session_state(state)
+            .expect("seed Doom session state");
+    }
 
     // Start both editors with Doom and the same document.  Opening the file at
     // launch keeps this test focused on face rendering rather than Doom keymap
     // or completion-UI differences.
-    let mut gnu = TuiSession::gnu_emacs_with_init_args(launch_args.clone());
+    let mut gnu = TuiSession::spawn_launch(
+        doom_launch(
+            &doom,
+            &gnu_state,
+            std::ffi::OsStr::new("emacs"),
+            &document_args,
+        ),
+        "GNU",
+    );
     // GNU makes its shared TTY input/output file description nonblocking
     // (`src/keyboard.c:8256`).  Doom's initial full-screen repaint exceeds a
     // Linux PTY's output queue, so leaving GNU undrained while Neomacs starts
@@ -113,7 +147,15 @@ fn index_org_has_face_colours() {
     // startup, just as a real terminal emulator continuously drains its child.
     // The parsed screen is retained, so this changes no assertion or state.
     gnu.read(Duration::from_secs(5));
-    let mut neo = TuiSession::neomacs_with_init_args(launch_args);
+    let mut neo = TuiSession::spawn_launch(
+        doom_launch(
+            &doom,
+            &neo_state,
+            neomacs_tui_tests::neomacs_binary().as_os_str(),
+            &document_args,
+        ),
+        "NEO",
+    );
     let has_index = |grid: &[String]| {
         grid.iter().any(|row| row.contains("index.org"))
             && grid.iter().any(|row| row.contains("Doom Docs"))
