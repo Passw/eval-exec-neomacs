@@ -4029,12 +4029,31 @@ impl<'a> Vm<'a> {
                     // -- Function calls --
                     Op::Call(n) => {
                         let n = *n as usize;
-                        let args_start = stk!().len().saturating_sub(n);
-                        let stack_after_call = args_start.saturating_sub(1);
-                        let func_val = if args_start > 0 {
-                            stk!()[args_start - 1]
+                        let len = stk!().len();
+                        debug_assert!(
+                            !VERIFIED || depth!(frame_base) > n,
+                            "verified bytecode called with no function operand"
+                        );
+                        // `Op::Call(n)` requires n+1 operands (the callee plus
+                        // its arguments), which the verifier proved for this
+                        // body -- so the saturating arithmetic, the `> 0` test
+                        // and the indexer's bounds check are all dead here.
+                        // GNU does the same three steps unguarded
+                        // (`src/bytecode.c`: DISCARD then `call_fun = TOP`).
+                        let (args_start, stack_after_call, func_val) = if VERIFIED {
+                            let args_start = len - n;
+                            // SAFETY: the proof above gives args_start >= 1 and
+                            // args_start - 1 < len.
+                            let func_val = unsafe { *stk!().get_unchecked(args_start - 1) };
+                            (args_start, args_start - 1, func_val)
                         } else {
-                            Value::NIL
+                            let args_start = len.saturating_sub(n);
+                            let func_val = if args_start > 0 {
+                                stk!()[args_start - 1]
+                            } else {
+                                Value::NIL
+                            };
+                            (args_start, args_start.saturating_sub(1), func_val)
                         };
                         // JIT Phase 1: record the callee for direct-call speculation.
                         // Only NAMED (symbol) callees carry a SymId; the call-site
@@ -4088,6 +4107,64 @@ impl<'a> Vm<'a> {
                         // route below, which takes the arm properly.
                         let debug_armed = self.ctx.debug_on_next_call_is_armed();
                         let target = self.resolve_interpreter_stack_call_target(func_val, n);
+
+                        if !debug_armed
+                            && let ResolvedStackCallTarget::Interpreter { call } = target
+                        {
+                            // Iterative Bcall keeps the cursor LIVE across
+                            // the whole transition (GNU keeps `top` in a
+                            // register through setup_frame): no publish, no
+                            // reacquire, nothing here reaches a GC safe
+                            // point. The classify gate already proved the
+                            // callee sealed and stack-verified.
+                            if let Err(flow) = self.enter_bytecode_call_depth() {
+                                cursor.publish(self.ctx);
+                                resume_flow!(flow)
+                            }
+                            let prepared = call.callee();
+                            let callee_code = prepared.code();
+                            let callee_value = prepared.value();
+                            // The cache entry already holds the callee's
+                            // ops and constant pool; the frame takes them
+                            // rather than re-deriving them here.
+                            let callee_view = call.code_view();
+                            #[cfg(debug_assertions)]
+                            cursor.debug_sync_len(self.ctx);
+                            // The compact span always fits: nargs comes
+                            // from Op::Call(u16) and the operand index is
+                            // far below the span's start bound, so the
+                            // oversized fallback (which would read the
+                            // stale context stack) is unreachable here.
+                            let backtrace = self
+                                .ctx
+                                .push_backtrace_frame_from_bc_stack(func_val, args_start, n);
+                            callers
+                                .active_mut()
+                                .save_execution_state(pc_local, osr_tried);
+                            *driver_quitcounter = quitcounter;
+                            let caller_depth = InterpreterDriverDepth::from_suspended_callers(
+                                callers.suspended_len(),
+                            );
+                            aux_stack.suspend_current(caller_depth);
+                            let callee_frame = self.install_iterative_interpreter_frame(
+                                &mut cursor,
+                                PreparedInterpreterCallee::new(
+                                    callee_value,
+                                    callee_code,
+                                    callee_view,
+                                ),
+                                ConsumedCallOperandRootSlot::from_args_start(args_start),
+                                n,
+                            );
+                            callers.enter_callee(
+                                BytecodeCallContinuation {
+                                    stack_after_call,
+                                    backtrace,
+                                },
+                                callee_frame,
+                            );
+                            continue 'frame;
+                        }
                         let writeback_names = if matches!(
                             target,
                             ResolvedStackCallTarget::Interpreter { .. }
@@ -4113,61 +4190,6 @@ impl<'a> Vm<'a> {
                                 vm.call_function_debugged(func_val, args)
                             }))
                         } else if writeback_names.is_none() {
-                            if let ResolvedStackCallTarget::Interpreter { call } = target {
-                                // Iterative Bcall keeps the cursor LIVE across
-                                // the whole transition (GNU keeps `top` in a
-                                // register through setup_frame): no publish, no
-                                // reacquire, nothing here reaches a GC safe
-                                // point. The classify gate already proved the
-                                // callee sealed and stack-verified.
-                                if let Err(flow) = self.enter_bytecode_call_depth() {
-                                    cursor.publish(self.ctx);
-                                    resume_flow!(flow)
-                                }
-                                let prepared = call.callee();
-                                let callee_code = prepared.code();
-                                let callee_value = prepared.value();
-                                // The cache entry already holds the callee's
-                                // ops and constant pool; the frame takes them
-                                // rather than re-deriving them here.
-                                let callee_view = call.code_view();
-                                #[cfg(debug_assertions)]
-                                cursor.debug_sync_len(self.ctx);
-                                // The compact span always fits: nargs comes
-                                // from Op::Call(u16) and the operand index is
-                                // far below the span's start bound, so the
-                                // oversized fallback (which would read the
-                                // stale context stack) is unreachable here.
-                                let backtrace = self
-                                    .ctx
-                                    .push_backtrace_frame_from_bc_stack(func_val, args_start, n);
-                                callers
-                                    .active_mut()
-                                    .save_execution_state(pc_local, osr_tried);
-                                *driver_quitcounter = quitcounter;
-                                let caller_depth = InterpreterDriverDepth::from_suspended_callers(
-                                    callers.suspended_len(),
-                                );
-                                aux_stack.suspend_current(caller_depth);
-                                let callee_frame = self.install_iterative_interpreter_frame(
-                                    &mut cursor,
-                                    PreparedInterpreterCallee::new(
-                                        callee_value,
-                                        callee_code,
-                                        callee_view,
-                                    ),
-                                    ConsumedCallOperandRootSlot::from_args_start(args_start),
-                                    n,
-                                );
-                                callers.enter_callee(
-                                    BytecodeCallContinuation {
-                                        stack_after_call,
-                                        backtrace,
-                                    },
-                                    callee_frame,
-                                );
-                                continue 'frame;
-                            }
                             cursor.publish(self.ctx);
                             if let Err(flow) = self.enter_bytecode_call_depth() {
                                 resume_flow!(flow)
