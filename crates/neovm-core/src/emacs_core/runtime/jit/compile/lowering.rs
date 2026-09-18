@@ -5264,7 +5264,8 @@ pub(crate) fn lower_simple_op(
                             | SpecCalleeKind::PredSymbolWithPos
                             | SpecCalleeKind::PredTypeOf
                             | SpecCalleeKind::PredClTypeOf
-                            | SpecCalleeKind::PredFboundp,
+                            | SpecCalleeKind::PredFboundp
+                            | SpecCalleeKind::PredAutoloadDoLoad,
                             Some(args),
                         ) => {
                             let f = rt
@@ -5280,6 +5281,9 @@ pub(crate) fn lower_simple_op(
                                     }
                                     SpecCalleeKind::PredTypeOf => PRED_KIND_TYPE_OF,
                                     SpecCalleeKind::PredFboundp => PRED_KIND_FBOUNDP,
+                                    SpecCalleeKind::PredAutoloadDoLoad => {
+                                        PRED_KIND_AUTOLOAD_DO_LOAD
+                                    }
                                     _ => PRED_KIND_CL_TYPE_OF,
                                 },
                             );

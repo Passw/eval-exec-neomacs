@@ -8028,6 +8028,157 @@ fn fboundp_call_sites_answer_as_the_builtin_on_the_fast_path() {
     }
 }
 
+/// `(autoload-do-load FUNDEF FUNNAME MACRO-ONLY)` through `Op::Call`, at one,
+/// two and three arguments, is the GC-free predicate intrinsic
+/// (`SpecCalleeKind::PredAutoloadDoLoad`): a FUNDEF that is not an autoload
+/// object comes back as it is with no frame; an autoload object bounces to
+/// the generic call, which loads (here: fails to, exactly as the builtin);
+/// a redefinition of `autoload-do-load` reaches the generic call.
+#[test]
+fn autoload_do_load_call_sites_answer_as_the_builtin_on_the_fast_path() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::intern::{SymId, intern};
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    let binding = ev
+        .obarray
+        .symbol_function_id(intern("autoload-do-load"))
+        .expect("bound");
+    for nargs in 1..=3u8 {
+        assert_eq!(
+            super::subr_spec_kind(binding, intern("autoload-do-load"), nargs as usize),
+            Some(super::SpecCalleeKind::PredAutoloadDoLoad),
+            "{nargs} args"
+        );
+    }
+    let pool_src = "(list (symbol-function 'car) (lambda (x) x) nil t 'sym 5 \"s\" (cons 1 2)
+                          (list 'autoload \"jit-adl-missing-file\" nil nil nil)
+                          (list 'autoload \"jit-adl-missing-file\" \"doc\" t 'macro))";
+    let outcome = |r: Result<Value, crate::emacs_core::error::Flow>| -> String {
+        match r {
+            Ok(v) => crate::emacs_core::print::print_value(&v),
+            Err(crate::emacs_core::error::Flow::Signal(sig)) => format!(
+                "signal {} {:?}",
+                sig.symbol_name(),
+                sig.data
+                    .iter()
+                    .map(crate::emacs_core::print::print_value)
+                    .collect::<Vec<_>>()
+            ),
+            Err(other) => format!("{other:?}"),
+        }
+    };
+    for nargs in 1..=3u8 {
+        // (autoload-do-load x ['jit-adl-name ['macro]]): the site's callee
+        // is a constant symbol, the FUNDEF a StackRef, the rest constants.
+        let mut f = ByteCodeFunction::new(LambdaParams {
+            required: vec![SymId(1)],
+            optional: Vec::new(),
+            rest: None,
+        });
+        f.lexical = true;
+        let mut ops = vec![Op::Constant(0), Op::StackRef(1)];
+        if nargs >= 2 {
+            ops.push(Op::Constant(1));
+        }
+        if nargs >= 3 {
+            ops.push(Op::Constant(2));
+        }
+        ops.push(Op::Call(nargs as u16));
+        ops.push(Op::Return);
+        f.ops = ops;
+        f.constants = vec![
+            Value::symbol("autoload-do-load"),
+            Value::symbol("jit-adl-name"),
+            Value::symbol("macro"),
+        ]
+        .into();
+        f.max_stack = 8;
+        let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+        let pool = ev.eval_str(pool_src).expect("pool");
+        crate::emacs_core::eval::push_scratch_gc_root(pool);
+        let items = crate::emacs_core::value::list_to_vec(&pool).expect("list");
+        #[cfg(debug_assertions)]
+        let fast0 = SUBR_SPEC_FAST_COUNT.load(Ordering::Relaxed);
+        let mut plain = 0usize;
+        for item in &items {
+            let funname = if nargs >= 2 {
+                Value::symbol("jit-adl-name")
+            } else {
+                Value::NIL
+            };
+            let macro_only = if nargs >= 3 {
+                Value::symbol("macro")
+            } else {
+                Value::NIL
+            };
+            let want = outcome(crate::emacs_core::autoload::builtin_autoload_do_load_3(
+                &mut ev, *item, funname, macro_only,
+            ));
+            let got = match leaf.call(ctx, &[*item]) {
+                NativeRun::Ok(bits) => {
+                    crate::emacs_core::print::print_value(&Value::from_bits(bits))
+                }
+                NativeRun::Signal => outcome(Err(take_pending_flow().expect("stashed flow"))),
+                other => panic!(
+                    "(autoload-do-load {} ...) with {nargs} args: {other:?}",
+                    crate::emacs_core::print::print_value(item)
+                ),
+            };
+            assert_eq!(
+                got,
+                want,
+                "(autoload-do-load {} ...) with {nargs} args",
+                crate::emacs_core::print::print_value(item)
+            );
+            if !crate::emacs_core::autoload::is_autoload_value(item) {
+                plain += 1;
+            }
+        }
+        #[cfg(debug_assertions)]
+        assert!(
+            SUBR_SPEC_FAST_COUNT.load(Ordering::Relaxed) - fast0 >= plain as u64,
+            "{nargs} args: every non-autoload FUNDEF takes the intrinsic"
+        );
+        let _ = plain;
+    }
+    // A redefinition is honoured: the site re-validates and takes the
+    // generic call.
+    let mut f = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(1)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    f.lexical = true;
+    f.ops = vec![Op::Constant(0), Op::StackRef(1), Op::Call(1), Op::Return];
+    f.constants = vec![Value::symbol("autoload-do-load")].into();
+    f.max_stack = 8;
+    let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+    let original = ev
+        .obarray
+        .symbol_function_id(intern("autoload-do-load"))
+        .expect("bound");
+    ev.eval_str("(fset 'autoload-do-load (lambda (&rest _) 'redefined))")
+        .expect("fset");
+    match leaf.call(ctx, &[Value::make_int(1)]) {
+        NativeRun::Ok(bits) => assert_eq!(
+            crate::emacs_core::print::print_value(&Value::from_bits(bits)),
+            "redefined"
+        ),
+        other => panic!("redefined autoload-do-load: {other:?}"),
+    }
+    ev.obarray
+        .set_symbol_function_id(intern("autoload-do-load"), original);
+    match leaf.call(ctx, &[Value::make_int(1)]) {
+        NativeRun::Ok(bits) => assert_eq!(
+            crate::emacs_core::print::print_value(&Value::from_bits(bits)),
+            "1"
+        ),
+        other => panic!("restored autoload-do-load: {other:?}"),
+    }
+}
+
 #[test]
 fn type_of_call_sites_answer_as_the_builtin_on_the_fast_path() {
     use crate::emacs_core::eval::Context;

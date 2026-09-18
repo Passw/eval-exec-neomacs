@@ -1093,6 +1093,9 @@ pub(crate) const PRED_KIND_CL_TYPE_OF: i64 = 3;
 /// `fboundp`: whether the symbol's function cell is non-nil (see
 /// [`SpecCalleeKind::PredFboundp`]).
 pub(crate) const PRED_KIND_FBOUNDP: i64 = 4;
+/// `autoload-do-load`: FUNDEF itself unless it is an autoload object (see
+/// [`SpecCalleeKind::PredAutoloadDoLoad`]).
+pub(crate) const PRED_KIND_AUTOLOAD_DO_LOAD: i64 = 5;
 
 /// Op discriminators for [`neovm_jit_arith_spec`] (baked as an iconst by the
 /// lowering, and — offset by 5 — the [`SpecCalleeKind::to_spec_disc`] value):
@@ -1474,6 +1477,17 @@ pub extern "C" fn neovm_jit_pred_spec(
             // symbol-with-pos is a symbol here exactly when the builtin says
             // so). Anything else bounces to the generic call, which signals
             // `(wrong-type-argument symbolp V)` from a real frame.
+            // `plan_autoload_do_load_in_state`: a FUNDEF that is not an
+            // `(autoload ...)` cons is returned as it is, whatever FUNNAME and
+            // MACRO-ONLY say (they are not read on that path; the site passes
+            // only FUNDEF here). An autoload object bounces to the generic
+            // call, which does the load with its frame and roots.
+            PRED_KIND_AUTOLOAD_DO_LOAD => {
+                if crate::emacs_core::autoload::is_autoload_value(&v) {
+                    return STATUS_NEED_GENERIC;
+                }
+                v
+            }
             PRED_KIND_FBOUNDP => {
                 let Some(id) = crate::emacs_core::builtins::symbols::symbol_id_checked(
                     &v,

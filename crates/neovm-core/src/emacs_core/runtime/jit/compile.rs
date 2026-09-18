@@ -1409,6 +1409,12 @@ pub(crate) enum SpecCalleeKind {
     /// macroexpander asks this of every form head it sees, so on a source
     /// load it is the hottest builtin that has no bytecode of its own.
     PredFboundp,
+    /// `autoload-do-load` (1..3 args): `neovm_jit_pred_spec` answers FUNDEF
+    /// itself when it is not an autoload object -- the builtin's first check
+    /// (`plan_autoload_do_load_in_state`), a cons-car tag test -- and bounces
+    /// an autoload object to the generic call, which loads. The
+    /// macroexpander asks this of every form head right after `fboundp`.
+    PredAutoloadDoLoad,
     /// `equal-including-properties` (2 args): `neovm_jit_eq_incl_props_spec`,
     /// bitwise-eq hit → `t`; anything else bounces to the generic block.
     EqInclProps,
@@ -1470,6 +1476,7 @@ impl SpecCalleeKind {
                 | SpecCalleeKind::PredTypeOf
                 | SpecCalleeKind::PredClTypeOf
                 | SpecCalleeKind::PredFboundp
+                | SpecCalleeKind::PredAutoloadDoLoad
                 | SpecCalleeKind::EqInclProps
                 | SpecCalleeKind::ArithIntrinsic { .. }
         )
@@ -1489,6 +1496,7 @@ impl SpecCalleeKind {
                 | SpecCalleeKind::PredTypeOf
                 | SpecCalleeKind::PredClTypeOf
                 | SpecCalleeKind::PredFboundp
+                | SpecCalleeKind::PredAutoloadDoLoad
                 | SpecCalleeKind::EqInclProps
                 | SpecCalleeKind::ArithIntrinsic { .. }
         )
@@ -1533,6 +1541,7 @@ impl SpecCalleeKind {
             SpecCalleeKind::PredTypeOf => Some(11),
             SpecCalleeKind::PredClTypeOf => Some(12),
             SpecCalleeKind::PredFboundp => Some(13),
+            SpecCalleeKind::PredAutoloadDoLoad => Some(14),
             SpecCalleeKind::CbsymTierA { .. } | SpecCalleeKind::CbsymTierB => None,
         }
     }
@@ -1540,7 +1549,7 @@ impl SpecCalleeKind {
     /// Number of distinct `Op::Call` spec discriminants [`to_spec_disc`](Self::to_spec_disc)
     /// assigns (0..DISC_COUNT). Salted into `ABI_TAG` so a renumber/count change
     /// re-tags stale `.so`s.
-    pub(crate) const DISC_COUNT: u8 = 14;
+    pub(crate) const DISC_COUNT: u8 = 15;
 }
 
 /// A speculated direct-call site: an `Op::Call` whose callee slot provably
@@ -1678,6 +1687,7 @@ fn subr_spec_kind(binding: Value, site_sym: SymId, nargs: usize) -> Option<SpecC
             ("type-of", 1) => SpecCalleeKind::PredTypeOf,
             ("equal-including-properties", 2) => SpecCalleeKind::EqInclProps,
             ("fboundp", 1) => SpecCalleeKind::PredFboundp,
+            ("autoload-do-load", 1..=3) => SpecCalleeKind::PredAutoloadDoLoad,
             _ => SpecCalleeKind::SubrGeneral,
         })
     } else if matches!(entry.function, Some(SubrFn::Many(_)))
