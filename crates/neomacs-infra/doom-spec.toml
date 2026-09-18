@@ -1,0 +1,10 @@
+# The Doom Emacs fixture the config-environment tests mount.
+#
+# `repo` and `revision` are the pinned provenance of the tree GNU Emacs
+# bootstraps during materialization.  The initial pin records the checkout
+# this fixture was first validated against: doomemacs/core at v2.2.1.
+# Re-pin by editing this file; materialization keys its cache on the
+# revision, so a new revision rebuilds rather than reuses.
+
+repo = "https://github.com/doomemacs/core"
+revision = "8a301d98d0d6d1aa7c54a8f8df48de7b2c886b2e"

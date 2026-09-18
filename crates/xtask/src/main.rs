@@ -459,6 +459,14 @@ fn run_xtask(repo_root: PathBuf, args: impl IntoIterator<Item = OsString>) -> Re
         args.next();
         return run_workspace_cli("neomacs-parity-reference", &[], args);
     }
+    // Shared editor-config fixtures (Doom today, Spacemacs and friends
+    // later).  Materialization is an explicit step so a test run never
+    // surprises itself with a multi-minute bootstrap; tests skip where the
+    // fixture is absent.
+    if matches!(args.peek().and_then(|arg| arg.to_str()), Some("infra")) {
+        args.next();
+        return run_workspace_cli("neomacs-infra", &[], args);
+    }
     let options = FreshBuildOptions::parse(repo_root, args)?;
     run_fresh_build(&options)
 }
