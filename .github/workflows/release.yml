@@ -138,7 +138,11 @@ jobs:
       # to exercise a release-workflow change without cutting a tag.
       - name: Verify packaged artifacts and GLIBC baseline
         run: |
-          args=(--target "${{ matrix.target }}" --formats tar,appimage,deb)
+          # Quote the format list: it is ONE argument whose value happens to
+          # contain commas, and shellcheck's SC2054 ("use spaces, not commas,
+          # to separate array elements") cannot tell that from three elements.
+          # Quoting states the intent and is what silences it.
+          args=(--target "${{ matrix.target }}" --formats "tar,appimage,deb")
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             args+=(--tar-version "$VERSION")
           fi
