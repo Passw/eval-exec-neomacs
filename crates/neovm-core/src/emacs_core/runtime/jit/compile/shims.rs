@@ -1083,11 +1083,20 @@ pub extern "C" fn neovm_jit_varbind(ctx: *mut u8, sym: i64, val: i64) -> i64 {
     jit_shim_contain!(ctx, STATUS_SIGNAL, {
         use crate::emacs_core::intern::SymId;
         let value = Value::from_bits(val as usize);
-        let saved = save_scratch_gc_roots();
-        push_scratch_gc_root(value);
         // SAFETY: see neovm_jit_call's function-level contract.
         let ctx = unsafe { &mut *(ctx as *mut Context) };
         let bind_depth = ctx.specpdl.len();
+        // GNU `specbind`'s plain arm first: one swap and a specpdl push, no
+        // Lisp and no safe point, so `value` needs no scratch root (the cell
+        // holds it from the swap on). Rooting it and going through the
+        // general `try_specbind` cost more than the bind itself on a source
+        // load, where nearly every `let` is of a plain global.
+        if ctx.specbind_plain_untrapped_fast(SymId(sym as u32), value) {
+            ctx.jit_bind_stack.push(bind_depth);
+            return STATUS_OK;
+        }
+        let saved = save_scratch_gc_roots();
+        push_scratch_gc_root(value);
         let status = match ctx.try_specbind(SymId(sym as u32), value) {
             Ok(()) => {
                 ctx.jit_bind_stack.push(bind_depth);
@@ -1125,11 +1134,21 @@ pub extern "C" fn neovm_jit_unbind(ctx: *mut u8, n: i64) -> i64 {
             Some(target)
         }
     };
-    let result = match target {
-        Some(target) => ctx.unbind_to_with_result(target, Ok(Value::NIL)),
-        None => Ok(Value::NIL),
+    let Some(target) = target else {
+        return STATUS_OK;
     };
-    match result {
+    // GNU `unbind_to`'s common case, top-down: a `let` of a plain untrapped
+    // cell is one store, the lexical environment a `let` saved is one
+    // store. Pop those first; only what is left -- a watched or buffer-local
+    // `let`, an `unwind-protect`, a frame with `debug-on-exit` -- takes the
+    // general unwinder with its quit-flag bracket and debugger check. The
+    // general path did this same pop, after ~80 instructions of its own on
+    // every unbind of a source load's `let`s.
+    ctx.pop_simple_specpdl_suffix(target);
+    if ctx.specpdl.len() <= target {
+        return STATUS_OK;
+    }
+    match ctx.unbind_to_with_result(target, Ok(Value::NIL)) {
         Ok(_) => STATUS_OK,
         Err(flow) => {
             stash_pending_flow(flow);

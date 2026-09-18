@@ -1123,7 +1123,7 @@ impl Context {
     /// is a store; `drain_unwind_to` is the path that roots them.  The symbol's shape is read when the entry is popped, not
     /// when it was pushed: a watcher added or a local made inside the `let`
     /// body sends that entry to the general path, as in GNU.
-    fn pop_simple_specpdl_suffix(&mut self, count: usize) {
+    pub(crate) fn pop_simple_specpdl_suffix(&mut self, count: usize) {
         use crate::emacs_core::symbol::{SymbolRedirect, SymbolTrappedWrite};
         while self.specpdl.len() > count {
             let Some(top) = self.specpdl.last() else {

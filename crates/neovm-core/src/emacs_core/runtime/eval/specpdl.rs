@@ -38,6 +38,27 @@ impl Context {
     /// - For buffer-local variables with a local binding: SPECPDL_LET_LOCAL
     /// - For buffer-local variables without local binding: SPECPDL_LET_DEFAULT
     /// - For plain variables: SPECPDL_LET
+    /// GNU `specbind`'s PLAINVAL arm with `do_specbind`'s untrapped store, as
+    /// one obarray visit: the swap refuses a watched, constant, aliased,
+    /// buffer-local, forwarded, uninterned or host-projected symbol (`false`,
+    /// nothing stored), and binds every other one with a specpdl push and
+    /// one store. No Lisp runs and no safe point is reached, so the caller
+    /// needs no root for `value`: the cell holds it from the swap on and the
+    /// specpdl entry holds the old value. The JIT's `varbind` shim takes
+    /// this before it roots anything, which is most of a `let` on a source
+    /// load.
+    #[inline]
+    pub(crate) fn specbind_plain_untrapped_fast(&mut self, sym_id: SymId, value: Value) -> bool {
+        let Some(old) = self.obarray.swap_plain_untrapped_value_id(sym_id, value) else {
+            return false;
+        };
+        self.specpdl.push(SpecBinding::Let {
+            sym_id,
+            old_value: SavedBindingValue::from_plain(old),
+        });
+        true
+    }
+
     pub(super) fn specbind_resolved(&mut self, sym_id: SymId, value: Value) -> Result<(), Flow> {
         // GNU `specbind` switches on the redirect first: a plain value cell is
         // a specpdl push and one store (`SET_SYMBOL_VAL`).  Every other shape
@@ -48,11 +69,7 @@ impl Context {
         // as one obarray visit: the swap refuses a watched, constant,
         // aliased, buffer-local, forwarded, uninterned or host-projected
         // symbol, and each of those keeps the tiers below unchanged.
-        if let Some(old) = self.obarray.swap_plain_untrapped_value_id(sym_id, value) {
-            self.specpdl.push(SpecBinding::Let {
-                sym_id,
-                old_value: SavedBindingValue::from_plain(old),
-            });
+        if self.specbind_plain_untrapped_fast(sym_id, value) {
             return Ok(());
         }
         if sym_id != buffer_undo_list_symbol()

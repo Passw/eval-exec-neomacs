@@ -4462,6 +4462,76 @@ fn compiles_varbind_unbind_with_full_unwind_semantics() {
     );
 }
 
+/// A compiled `let` of a plain global binds on the shim's swap-and-push
+/// fast path with no root and no general dispatch. The symbol's shape is
+/// read again when the binding is POPPED, as GNU's `do_one_unbind` does: a
+/// watcher added inside the body, or a buffer-local made there, sends the
+/// unbind to the general path, so the watcher sees `unlet` with the old
+/// value and the global is restored; the fast pop never stores blind.
+#[test]
+fn a_compiled_let_reads_the_symbol_shape_again_when_it_pops() {
+    let mut ev = crate::emacs_core::eval::Context::new();
+    ev.eval_str(
+        "(progn
+           (setq jit-fastlet-var 1 jit-fastlet-log nil)
+           (fset 'jit-fastlet-watch
+                 (lambda (_symbol new-value operation _where)
+                   (setq jit-fastlet-log
+                         (cons (list operation new-value) jit-fastlet-log)))))",
+    )
+    .expect("setup");
+    let ctx = &mut ev as *mut crate::emacs_core::eval::Context as *mut u8;
+    // (let ((jit-fastlet-var 2))
+    //   (add-variable-watcher 'jit-fastlet-var 'jit-fastlet-watch)
+    //   jit-fastlet-var)
+    let leaf = lower_nullary_leaf(
+        &[
+            Op::Constant(1), // 2
+            Op::VarBind(0),
+            Op::Constant(2), // add-variable-watcher
+            Op::Constant(0), // 'jit-fastlet-var
+            Op::Constant(3), // 'jit-fastlet-watch
+            Op::Call(2),
+            Op::DiscardN(1),
+            Op::VarRef(0),
+            Op::Unbind(1),
+            Op::Return,
+        ],
+        &[
+            Value::symbol("jit-fastlet-var"),
+            Value::make_int(2),
+            Value::symbol("add-variable-watcher"),
+            Value::symbol("jit-fastlet-watch"),
+        ],
+    )
+    .expect("compiles");
+    let base = ev.specpdl.len();
+    assert_eq!(
+        leaf.call(ctx, &[]),
+        NativeRun::Ok(Value::make_int(2).bits())
+    );
+    assert_eq!(ev.specpdl.len(), base, "the binding popped");
+    assert_eq!(
+        ev.eval_str("(list jit-fastlet-var jit-fastlet-log)")
+            .map(|v| crate::emacs_core::print::print_value(&v))
+            .expect("read"),
+        "(1 ((unlet 1)))",
+        "the watcher added inside the body saw the restore, once, with the old value"
+    );
+    // The same body again: the bind is now watched too (the swap refuses,
+    // the general path binds and notifies), and the pop still notifies.
+    assert_eq!(
+        leaf.call(ctx, &[]),
+        NativeRun::Ok(Value::make_int(2).bits())
+    );
+    assert_eq!(
+        ev.eval_str("(list jit-fastlet-var jit-fastlet-log)")
+            .map(|v| crate::emacs_core::print::print_value(&v))
+            .expect("read"),
+        "(1 ((unlet 1) (let 2) (unlet 1)))"
+    );
+}
+
 #[test]
 fn compiled_unbind_and_frame_exit_propagate_restore_watcher_signals() {
     fn install_restore_watcher(variable: &str) -> crate::emacs_core::eval::Context {
