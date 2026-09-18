@@ -18100,6 +18100,117 @@ fn jit_v3_fast_path_engages_and_tracks_redefinition() {
     );
 }
 
+/// A speculated call site re-arms on an epoch miss by comparing the
+/// binding's BITS with the callee it was compiled against. Bits are not
+/// identity: a bytecode object that was unbound, collected, and whose arena
+/// slot the next definition of the same symbol landed on has the same bits
+/// and different code. The site must run the NEW definition, not the leaf it
+/// cached for the freed one.
+#[cfg(feature = "jit")]
+#[test]
+fn a_spec_slot_drops_its_leaf_when_the_callee_slot_is_recycled() {
+    crate::test_utils::init_test_tracing();
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    use crate::emacs_core::bytecode::ByteCodeFunction;
+    use crate::emacs_core::bytecode::opcode::Op;
+    use crate::emacs_core::value::LambdaParams;
+    use std::sync::atomic::Ordering;
+
+    let mut ev = Context::new();
+    // The first cycle is the bootstrap collection; the objects below must be
+    // ordinary post-bootstrap arena allocations that a sweep can free.
+    ev.gc_collect_exact();
+    let mk_times = |k: i64| -> Value {
+        let mut f = ByteCodeFunction::new(LambdaParams {
+            required: vec![crate::emacs_core::intern::SymId(1)],
+            optional: Vec::new(),
+            rest: None,
+        });
+        f.lexical = true;
+        // Two blocks (`(if x (* x k) (* x k))`) so the caller speculates the
+        // call instead of inlining the body.
+        f.ops = vec![
+            Op::StackRef(0),
+            Op::GotoIfNil(6),
+            Op::StackRef(0),
+            Op::Constant(0),
+            Op::Mul,
+            Op::Return,
+            Op::StackRef(0),
+            Op::Constant(0),
+            Op::Mul,
+            Op::Return,
+        ];
+        f.constants = vec![Value::make_int(k)].into();
+        f.max_stack = 16;
+        Value::make_bytecode(f)
+    };
+    let g_sym = Value::symbol("jit-recycled-g");
+    let ValueKind::Symbol(g_id) = g_sym.kind() else {
+        panic!("symbol expected");
+    };
+    ev.obarray.set_symbol_function_id(g_id, mk_times(2));
+    let mut caller = ByteCodeFunction::new(LambdaParams {
+        required: vec![crate::emacs_core::intern::SymId(1)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    caller.lexical = true;
+    caller.ops = vec![Op::Constant(0), Op::StackRef(1), Op::Call(1), Op::Return];
+    caller.constants = vec![g_sym].into();
+    caller.max_stack = 16;
+    caller.jit_runtime().set_hot_for_test();
+    let hot = Value::make_bytecode(caller);
+    crate::emacs_core::eval::push_scratch_gc_root(hot);
+    let five = vec![Value::make_int(5)];
+
+    let fast = || crate::emacs_core::jit::compile::SPEC_FAST_CALL_COUNT.load(Ordering::Relaxed);
+    let before = fast();
+    for _ in 0..2 {
+        assert_eq!(
+            ev.funcall_general_untraced(hot, five.clone()).unwrap(),
+            Value::make_int(10)
+        );
+    }
+    assert!(fast() >= before + 2, "the site caches the callee's leaf");
+    let first_bits = ev.obarray.symbol_function_id(g_id).expect("bound").bits();
+
+    // Unbind and collect: the first definition is garbage and its arena slot
+    // joins the free list. Then define again until a definition lands on
+    // that very slot (the free list is LIFO; every allocation is kept alive
+    // so the walk cannot revisit a slot).
+    ev.obarray.set_symbol_function_id(g_id, Value::NIL);
+    ev.gc_collect_exact();
+    let mut kept = Vec::new();
+    let mut recycled = None;
+    for _ in 0..100_000 {
+        let v = mk_times(3);
+        crate::emacs_core::eval::push_scratch_gc_root(v);
+        kept.push(v);
+        if v.bits() == first_bits {
+            recycled = Some(v);
+            break;
+        }
+    }
+    let recycled = recycled.expect("a definition reuses the freed bytecode slot");
+    ev.obarray.set_symbol_function_id(g_id, recycled);
+    assert_eq!(
+        ev.funcall_general_untraced(hot, five.clone()).unwrap(),
+        Value::make_int(15),
+        "the site must run the new definition on the recycled slot, not the leaf cached for the freed one"
+    );
+    // And the fast path is back for the new definition.
+    let before = fast();
+    assert_eq!(
+        ev.funcall_general_untraced(hot, five).unwrap(),
+        Value::make_int(15)
+    );
+    assert!(
+        fast() > before,
+        "the re-armed site caches the new callee's leaf"
+    );
+}
+
 /// Build the canonical recursive-fib benchmark shape (self-recursive through
 /// `sym_name`, guards after the recursive calls — only compilable since
 /// precise-PC deopt). `tier`: Hot forces native, Cold pins the interpreter.

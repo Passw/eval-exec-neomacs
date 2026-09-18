@@ -1013,18 +1013,21 @@ pub extern "C" fn neovm_jit_call_spec(
                     (!jit_force_slow_spec() && slot_epoch == epoch) || {
                         let cur = ctx.obarray.symbol_function_id(SymId(sym as u32));
                         if cur.is_some_and(|v| v.bits() as i64 == expected) {
-                            // An unchanged binding keeps its cached leaf unless
-                            // that leaf inlined a bit-op: the redefinition that
-                            // moved the epoch may be the bit-op's, which retired
-                            // the leaf (retired leaves stay allocated, so the
-                            // read is sound).
-                            let cached = slot.leaf.load(Ordering::Relaxed)
-                                as *const crate::emacs_core::jit::compile::CompiledLeaf;
-                            // SAFETY: a nonzero slot names a live or retired
-                            // cache leaf.
-                            if !cached.is_null() && !unsafe { (*cached).inline_deps().is_empty() } {
-                                slot.leaf.store(0, Ordering::Relaxed);
-                            }
+                            // Equal bits re-arm the site, but they do not
+                            // prove the cached leaf still belongs to the
+                            // binding: a bytecode object that was unbound,
+                            // collected and whose arena slot the next
+                            // definition of this symbol landed on has the
+                            // same bits and different code (two raw `fset`s
+                            // with a collection between; `defun` roots the
+                            // old definition through `function-history`).
+                            // And the redefinition that moved the epoch may
+                            // be a bit-op's, which retired a leaf that
+                            // inlined it. So the leaf is dropped on every
+                            // re-arm and the next call resolves it again
+                            // from the function the binding holds now --
+                            // one cache lookup per site per epoch move.
+                            slot.leaf.store(0, Ordering::Relaxed);
                             slot.epoch.store(epoch, Ordering::Relaxed);
                             true
                         } else {
