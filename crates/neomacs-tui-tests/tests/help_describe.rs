@@ -297,7 +297,7 @@ fn calendar_via_mx_opens_calendar_and_q_quits() {
 #[test]
 fn view_hello_file_pages_down_and_up_via_cv_mv() {
     let (mut gnu, mut neo) = boot_pair("");
-    use_backend_only_vc_mode_line(&mut gnu, &mut neo);
+    disable_vc_backends(&mut gnu, &mut neo);
 
     invoke_mx_command(&mut gnu, &mut neo, "view-hello-file");
     let hello_ready = |grid: &[String]| {
@@ -343,7 +343,7 @@ fn view_hello_file_pages_down_and_up_via_cv_mv() {
 #[test]
 fn view_hello_file_via_ch_h_opens_hello_buffer() {
     let (mut gnu, mut neo) = boot_pair("");
-    use_backend_only_vc_mode_line(&mut gnu, &mut neo);
+    disable_vc_backends(&mut gnu, &mut neo);
 
     send_help_sequence(&mut gnu, &mut neo, "h");
     let hello_ready = |grid: &[String]| {

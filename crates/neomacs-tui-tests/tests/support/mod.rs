@@ -236,6 +236,21 @@ pub fn eval_expression_one(session: &mut TuiSession, expression: &str) {
     session.send_key("RET");
 }
 
+/// Remove repository-specific state from paired source-tree fixtures by
+/// disabling VC entirely for the rest of the workflow.
+///
+/// The paired executables necessarily visit different copies of these
+/// fixtures: Neomacs opens its source-tree file inside the CI checkout,
+/// while the installed GNU oracle's copy lives outside any Git repository.
+/// With VC enabled GNU's mode line then carries no backend segment while
+/// Neomacs shows `Git', so the paired displays cannot agree off a machine
+/// whose GNU also runs from a Git checkout.  `vc-handled-backends nil'
+/// drops the segment on both sides; the rest of the suite keeps its
+/// explicit VC/modeline coverage.
+pub fn disable_vc_backends(gnu: &mut TuiSession, neo: &mut TuiSession) {
+    eval_expression(gnu, neo, "(setq vc-handled-backends nil)");
+}
+
 /// Keep VC enabled while removing repository-specific state from paired
 /// source-tree fixtures.
 ///
@@ -243,6 +258,9 @@ pub fn eval_expression_one(session: &mut TuiSession, expression: &str) {
 /// `vc-display-status` is nil.  This preserves coverage that the visited file
 /// is recognized as Git-controlled, while making the exact display independent
 /// of the two executables' necessarily different checkout branch/revision.
+/// Requires both sides' fixtures to live inside Git checkouts; the installed
+/// CI oracle's files do not, so `mx_view_hello_file_strict_match` cannot use
+/// this there.
 pub fn use_backend_only_vc_mode_line(gnu: &mut TuiSession, neo: &mut TuiSession) {
     eval_expression(gnu, neo, "(setq vc-display-status nil)");
 }

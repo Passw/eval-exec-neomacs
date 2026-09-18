@@ -1376,7 +1376,7 @@ fn mx_view_hello_file() {
     // "hello" demo). Content includes "Hello, world!" (English row) plus many
     // other-language greetings.
     let (mut gnu, mut neo) = boot_pair("");
-    use_backend_only_vc_mode_line(&mut gnu, &mut neo);
+    disable_vc_backends(&mut gnu, &mut neo);
 
     send_both(&mut gnu, &mut neo, "M-x");
     read_both(&mut gnu, &mut neo, Duration::from_secs(3));
@@ -1439,7 +1439,7 @@ fn mx_view_hello_file() {
 #[test]
 fn mx_view_hello_file_page_scroll_repaints_cleanly() {
     let (mut gnu, mut neo) = boot_pair("");
-    use_backend_only_vc_mode_line(&mut gnu, &mut neo);
+    disable_vc_backends(&mut gnu, &mut neo);
 
     send_both(&mut gnu, &mut neo, "M-x");
     read_both(&mut gnu, &mut neo, Duration::from_secs(3));
