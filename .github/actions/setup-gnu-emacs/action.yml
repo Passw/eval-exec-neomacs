@@ -19,7 +19,7 @@ description: >-
 
   nix-emacs-ci publishes no pretests and purcell/setup-emacs ships a minimal
   no-window-system build, so the reference is compiled here from source and
-  cached by commit; a dedicated ci.yml job warms that cache before the shards
+  cached by commit; a dedicated test-suite.yml job warms that cache before the shards
   that spawn GNU start, and a cache hit costs one restore.
 
 runs:

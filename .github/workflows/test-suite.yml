@@ -1,4 +1,4 @@
-name: ci
+name: test suite
 
 on:
   push:
@@ -8,472 +8,18 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      terminal_only:
-        description: Run only native terminal compatibility tests
-        type: boolean
-        default: false
   schedule:
     - cron: "17 5 * * 0"
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  workflow-lint:
-    name: GitHub Actions workflow lint
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - &checkout
-        name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: stable
-
-      - name: Run actionlint
-        run: |
-          # Workflows only. actionlint is a workflow linter: handed a
-          # composite action.yml it parses it AS a workflow and reports a
-          # missing "jobs" section, so the action files cannot be added to
-          # this glob. They are covered by being exercised instead -- the GNU
-          # oracle action is how CI builds its reference, so a malformed one
-          # fails the job rather than passing quietly.
-          #
-          # This lint, plus CI itself running the workflows, is what replaced
-          # 19 xtask tests that asserted on the TEXT of .github/ files. Those
-          # failed when YAML legitimately re-wrapped a line and passed when a
-          # string merely appeared in a comment; one of them demanded
-          # "--without-x", i.e. it was enforcing the exact mis-configuration
-          # it was meant to catch.
-          go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml
-
-      - name: Lint release shell contracts
-        run: |
-          # -x so sourced helpers are followed. The packaging scripts are in
-          # this list because they were not: removing a variable's assignment
-          # while a later line still read it passed `bash -n`, passed every
-          # test, and only failed when a release job ran package-release.sh.
-          # SC2154 catches exactly that.
-          shellcheck -x \
-            install.sh \
-            scripts/dispatch-release-event.sh \
-            scripts/generate-release-notes.sh \
-            scripts/prepare-docker-runtime-context.sh \
-            scripts/test-dispatch-release-event.sh \
-            scripts/test-docker-runtime-context.sh \
-            scripts/test-generate-release-notes.sh \
-            scripts/check-native-font-boundaries.sh \
-            scripts/lib/macos-macho.sh \
-            scripts/vendor-macos-runtime.sh \
-            scripts/test-macos-dependency-closure.sh \
-            scripts/package-release.sh \
-            scripts/package-appimage.sh \
-            scripts/package-deb.sh \
-            scripts/package-rpm.sh \
-            scripts/test-linux-release-artifacts.sh \
-            scripts/ci/setup-linux.sh
-          sh -n install.sh
-          bash -n \
-            scripts/dispatch-release-event.sh \
-            scripts/generate-release-notes.sh \
-            scripts/prepare-docker-runtime-context.sh \
-            scripts/test-dispatch-release-event.sh \
-            scripts/test-docker-runtime-context.sh \
-            scripts/test-generate-release-notes.sh \
-            scripts/check-native-font-boundaries.sh \
-            scripts/lib/macos-macho.sh \
-            scripts/vendor-macos-runtime.sh \
-            scripts/test-macos-dependency-closure.sh
-
-      - name: Test Docker runtime context contract
-        run: ./scripts/test-docker-runtime-context.sh
-
-      - name: Test release dispatch contract
-        run: ./scripts/test-dispatch-release-event.sh
-
-      - name: Test release-note generation contract
-        run: ./scripts/test-generate-release-notes.sh
-
-      - name: Check native font dependency boundaries
-        run: ./scripts/check-native-font-boundaries.sh
-
-      # The dependency closure is pure path logic over otool output, so it is
-      # testable with stub tools on Linux.  Running it here means a regression
-      # is caught in seconds on every push instead of by a macOS release job
-      # forty minutes in.
-      - name: Test macOS dependency closure contract
-        run: ./scripts/test-macos-dependency-closure.sh
-
-  fmt:
-    name: cargo fmt (${{ matrix.label }})
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
-    env:
-      CARGO_TERM_COLOR: always
-      RUST_BACKTRACE: 1
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-24.04
-            label: linux-x86_64
-          - runner: macos-latest
-            label: macos-aarch64
-          - runner: windows-latest
-            label: windows-msvc-x86_64
-    steps:
-      - *checkout
-
-      - name: Set up Rust tooling
-        uses: ./.github/actions/setup-rust
-        with:
-          # cargo fmt does not compile: a build cache here is ~180 MiB per
-          # platform for no reuse, against a shared 10 GiB repo limit.
-          cache: "false"
-          cache-key: ci-fmt-${{ matrix.label }}
-
-      - name: cargo fmt
-        run: |
-          cargo fmt --all --check
-          cargo fmt --manifest-path crates/neovm-core/fuzz/Cargo.toml --check
-
-  cargo-deny:
-    name: cargo deny
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - *checkout
-
-      - name: Check advisories, licenses, bans, and sources
-        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
-        with:
-          command: check
-          arguments: --all-features
-          command-arguments: --hide-inclusion-graph
-
-  check:
-    name: cargo check workspace (${{ matrix.label }})
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-24.04
-            label: linux-x86_64
-          - runner: ubuntu-24.04-arm
-            label: linux-aarch64
-          - runner: macos-latest
-            label: macos-aarch64
-          # `macos-15-intel` is GitHub's last x86_64 runner image, promised
-          # only until August 2027 (actions/runner-images#13045).  Keep the
-          # workspace compiling for x86_64-apple-darwin here so the release
-          # job never discovers a breakage at tag time.
-          - runner: macos-15-intel
-            label: macos-x86_64
-          - runner: windows-latest
-            label: windows-msvc-x86_64
-          - runner: windows-11-arm
-            label: windows-msvc-aarch64
-    env:
-      CARGO_TERM_COLOR: always
-      RUST_BACKTRACE: 1
-    steps:
-      - *checkout
-
-      - &install_linux_deps
-        name: Install Linux system dependencies
-        if: runner.os == 'Linux'
-        run: scripts/ci/setup-linux.sh build
-
-      - name: Install macOS system dependencies
-        if: runner.os == 'macOS'
-        run: brew install pkg-config
-
-      - name: Set up Rust tooling
-        uses: ./.github/actions/setup-rust
-        with:
-          cache-key: ci-check-${{ matrix.label }}
-          cache-shared-key: ${{ matrix.label }}-dev
-          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
-          install-nextest: ${{ matrix.label == 'linux-x86_64' || matrix.label == 'windows-msvc-x86_64' }}
-
-      - name: Check native dependency type coherence
-        if: matrix.label == 'linux-x86_64'
-        run: cargo run --locked -p xtask -- check-dependency-coherence
-
-      - name: cargo check workspace (Unix)
-        if: runner.os != 'Windows'
-        run: cargo check --workspace --all-targets
-
-      - name: cargo check workspace (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          cargo check --workspace --all-targets
-
-      - name: Test DirectWrite native font replay
-        if: matrix.label == 'windows-msvc-x86_64'
-        shell: bash
-        run: >-
-          cargo nextest run -p neomacs-layout-engine
-          font_backend::windows::tests
-
-      - name: cargo check minimal capability build
-        if: matrix.label == 'linux-x86_64'
-        run: cargo check -p neomacs --no-default-features
-
-      - name: Test SQLite-disabled capability surface
-        if: matrix.label == 'linux-x86_64'
-        run: >-
-          cargo nextest run -p neovm-core --no-default-features
-          -E 'test(disabled_build_exposes_only_gnu_capability_probes)'
-
-  native-terminfo:
-    name: native terminfo (${{ matrix.label }})
-    if: github.event_name != 'schedule'
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-24.04
-            label: linux
-          - runner: macos-latest
-            label: macos-system
-          - runner: macos-latest
-            label: macos-homebrew
-    steps:
-      - *checkout
-
-      - name: Install Linux terminfo tools
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libncurses-dev ncurses-bin pkg-config
-
-      - name: Select Apple ncurses
-        if: matrix.label == 'macos-system'
-        run: |
-          echo "NCURSES_NO_PKG_CONFIG=1" >> "$GITHUB_ENV"
-          echo "NCURSESW_NO_PKG_CONFIG=1" >> "$GITHUB_ENV"
-          echo "/usr/bin" >> "$GITHUB_PATH"
-
-      - name: Select Homebrew ncurses
-        if: matrix.label == 'macos-homebrew'
-        run: |
-          brew install ncurses pkg-config
-          echo "PKG_CONFIG_PATH=$(brew --prefix ncurses)/lib/pkgconfig" >> "$GITHUB_ENV"
-          echo "$(brew --prefix ncurses)/bin" >> "$GITHUB_PATH"
-
-      - name: Set up Rust tooling
-        uses: ./.github/actions/setup-rust
-        with:
-          cache-key: ci-terminfo-${{ matrix.label }}
-          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
-          install-nextest: "true"
-
-      - name: Probe Apple padding ABI independently
-        if: matrix.label == 'macos-system'
-        run: python3 crates/neomacs-terminfo/tests/padding_probe.py
-
-      - name: Compare native expansion and test snapshots
-        run: cargo nextest run -p neomacs-terminfo --locked
-
-  native-terminal-output:
-    name: native terminal output (${{ matrix.label }})
-    if: github.event_name != 'schedule'
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-latest
-            label: macos-aarch64
-          - runner: windows-latest
-            label: windows-msvc-x86_64
-    env:
-      CARGO_TERM_COLOR: always
-      RUST_BACKTRACE: 1
-    steps:
-      - *checkout
-
-      - name: Select Apple ncurses
-        if: runner.os == 'macOS'
-        run: |
-          brew install pkg-config
-          echo "NCURSES_NO_PKG_CONFIG=1" >> "$GITHUB_ENV"
-          echo "NCURSESW_NO_PKG_CONFIG=1" >> "$GITHUB_ENV"
-          echo "/usr/bin" >> "$GITHUB_PATH"
-
-      - name: Set up Rust tooling
-        uses: ./.github/actions/setup-rust
-        with:
-          cache-key: ci-terminal-output-${{ matrix.label }}
-          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
-          install-nextest: "true"
-
-      - name: Test macOS terminal output and capability policy
-        if: runner.os == 'macOS'
-        run: >-
-          cargo nextest run -p neomacs --lib --locked
-          --no-default-features --features neo-term
-          -E 'test(tty_output::) | test(tty_init::) | test(terminal_capabilities::) | test(secondary_tty::)'
-
-      - name: Test Windows terminal output in an owned console
-        if: runner.os == 'Windows'
-        shell: python
-        run: |
-          import subprocess
-          import sys
-          sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-          with subprocess.Popen(
-              ["cargo", "nextest", "run", "-p", "neomacs", "--lib", "--locked",
-               "--no-default-features", "--features", "neo-term",
-               "-E", "test(tty_output::windows::tests)", "--run-ignored", "all",
-               "--test-threads", "1"],
-              creationflags=subprocess.CREATE_NEW_CONSOLE,
-              stdout=subprocess.PIPE,
-              stderr=subprocess.STDOUT,
-              text=True,
-              encoding="utf-8",
-              errors="replace",
-          ) as process:
-              for line in process.stdout:
-                  print(line, end="", flush=True)
-              raise SystemExit(process.wait())
-
-  # Cross-compilation cannot exercise inotify, kqueue, or
-  # ReadDirectoryChangesW.  Keep this independent from the workspace check so
-  # an unrelated platform-only crate failure cannot skip the native runtime
-  # contract, and build only neovm-core's library test binary.
-  native-file-notify:
-    name: native file notifications (${{ matrix.label }})
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-24.04
-            label: linux-x86_64
-          - runner: macos-latest
-            label: macos-aarch64
-          - runner: windows-latest
-            label: windows-msvc-x86_64
-    env:
-      CARGO_TERM_COLOR: always
-      RUST_BACKTRACE: 1
-    steps:
-      - *checkout
-
-      - name: Set up Rust tooling
-        uses: ./.github/actions/setup-rust
-        with:
-          cache-key: ci-file-notify-${{ matrix.label }}
-          cache-shared-key: ${{ matrix.label }}-dev
-          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
-          install-nextest: "true"
-
-      - name: Test native runtime contracts
-        shell: bash
-        run: >-
-          cargo nextest run -p neovm-core --lib
-          -E 'test(native_runtime_test) |
-          test(windows_set_file_times_does_not_require_content_write_access) |
-          test(windows_file_writable_p_accepts_existing_directory_forms) |
-          test(windows_copy_file_without_keep_time_refreshes_timestamps) |
-          test(copy_file_keep_time_preserves_source_modification_time) |
-          test(backup_buffer_uses_rename_when_copying_is_disabled)'
-
-  # The native Rust tests above isolate backend/thread/lifecycle failures.  A
-  # release Neomacs is still required to prove the public Lisp API, special
-  # event dispatch, timers, auto-revert, and backend agree as one system.  The
-  # Linux release runtime is already built below; build only the two other
-  # native products here instead of paying for a second Linux release link.
-  file-notify-public-ert:
-    name: GNU file notification ERT (${{ matrix.label }})
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 180
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-latest
-            label: macos-aarch64
-            binary: target/release/neomacs
-          - runner: windows-latest
-            label: windows-msvc-x86_64
-            binary: target/release/neomacs.exe
-    env:
-      CARGO_TERM_COLOR: always
-      RUST_BACKTRACE: 1
-      RUST_LOG: warn
-    steps:
-      - *checkout
-
-      - name: Install macOS system dependencies
-        if: runner.os == 'macOS'
-        run: brew install pkg-config
-
-      - name: Set up Rust tooling
-        uses: ./.github/actions/setup-rust
-        with:
-          cache-key: ci-file-notify-ert-${{ matrix.label }}
-          cache-shared-key: ${{ matrix.label }}-release
-          cache-save-if: ${{ github.ref == 'refs/heads/main' }}
-
-      - name: Build fresh release runtime
-        shell: bash
-        run: cargo xtask fresh-build --release
-
-      # loaddefs-gen deliberately warns and continues when loading a source
-      # file fails, so a successful fresh-build exit status alone cannot catch
-      # a broken clean-tree bootstrap.  Simulate Darwin without the generated
-      # tramp-loaddefs seed and require Tramp's source-loading guard to work.
-      - name: Test clean-tree Tramp loaddefs bootstrap
-        shell: bash
-        run: >-
-          "${{ matrix.binary }}" --batch -Q
-          -L lisp/net
-          -l test/lisp/net/tramp-bootstrap-tests.el
-          -f ert-run-tests-batch-and-exit
-
-      - name: Run unchanged upstream GNU file-notify ERT suite
-        shell: bash
-        run: |
-          set -euxo pipefail
-          task_tmp="$PWD/target/file-notify-ert-tmp"
-          mkdir -p "$task_tmp"
-          if [ "$RUNNER_OS" = Windows ]; then
-            task_tmp="$(cygpath -w "$task_tmp")"
-            export REMOTE_TEMPORARY_FILE_DIRECTORY=NUL
-            export TEMP="$task_tmp"
-            export TMP="$task_tmp"
-          else
-            export REMOTE_TEMPORARY_FILE_DIRECTORY=/dev/null
-          fi
-          export TMPDIR="$task_tmp"
-          "${{ matrix.binary }}" --batch -Q \
-            -l test/lisp/filenotify-tests.el \
-            -f ert-run-tests-batch-and-exit
-
   neomacs-workspace-test-archive:
-    if: ${{ !inputs.terminal_only }}
     name: workspace test archive (linux x86_64)
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -496,11 +42,13 @@ jobs:
       RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
       TMPDIR: ${{ github.workspace }}/tmp
     steps:
-      - *checkout
+      - &checkout
+        name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - &prepare_workspace_tmp
         name: Prepare workspace temp directory
         run: mkdir -p "$TMPDIR/nextest"
-      - *install_linux_deps
+      - uses: ./.github/actions/install-build-deps
       - name: Set up Rust tooling
         uses: ./.github/actions/setup-rust
         with:
@@ -526,7 +74,7 @@ jobs:
 
   neomacs-melpa-direct-windows-tests:
     name: MELPA direct adapter Job Object contracts (windows x86_64)
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: windows-latest
     timeout-minutes: 30
     env:
@@ -560,7 +108,7 @@ jobs:
           --no-fail-fast
 
   neovm-core-tests:
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
+    if: ${{ github.event_name != 'schedule' }}
     needs: [neomacs-test-runtime, neomacs-workspace-test-archive]
     uses: ./.github/workflows/nextest-shards.yml
     with:
@@ -584,7 +132,6 @@ jobs:
         uses: ./.github/actions/setup-gnu-emacs
 
   neomacs-test-runtime:
-    if: ${{ !inputs.terminal_only }}
     name: Packaged Neomacs Runtime (linux x86_64)
     runs-on: ubuntu-24.04
     timeout-minutes: 150
@@ -595,7 +142,7 @@ jobs:
     steps:
       - *checkout
       - *prepare_workspace_tmp
-      - *install_linux_deps
+      - uses: ./.github/actions/install-build-deps
       - name: Set up Rust tooling
         uses: ./.github/actions/setup-rust
         with:
@@ -733,14 +280,14 @@ jobs:
           retention-days: 1
 
   neovm-oracle-tests:
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
+    if: ${{ github.event_name != 'schedule' }}
     needs: [neomacs-test-runtime, neomacs-workspace-test-archive]
     uses: ./.github/workflows/nextest-shards.yml
     with:
       suite: oracle
 
   neomacs-tui-tests:
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
+    if: ${{ github.event_name != 'schedule' }}
     needs: [neomacs-test-runtime, neomacs-workspace-test-archive, gnu-emacs-oracle]
     uses: ./.github/workflows/nextest-shards.yml
     with:
@@ -748,7 +295,7 @@ jobs:
 
   neomacs-melpa-tests:
     name: MELPA ${{ matrix.suite }} compatibility and GNU parity (linux x86_64)
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
+    if: ${{ github.event_name != 'schedule' }}
     needs: [neomacs-test-runtime, neomacs-workspace-test-archive, gnu-emacs-oracle]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -840,7 +387,7 @@ jobs:
 
   neomacs-display-tests:
     name: display stack tests (linux x86_64)
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
+    if: ${{ github.event_name != 'schedule' }}
     needs: neomacs-workspace-test-archive
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -852,7 +399,7 @@ jobs:
     steps:
       - *checkout
       - *prepare_workspace_tmp
-      - *install_linux_deps
+      - uses: ./.github/actions/install-build-deps
       - name: Set up Rust tooling
         uses: ./.github/actions/setup-rust
         with:
@@ -878,7 +425,7 @@ jobs:
 
   neomacs-prefix-face-tui-parity:
     name: GNU prefix face TUI parity (linux x86_64)
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
+    if: ${{ github.event_name != 'schedule' }}
     needs: [neomacs-test-runtime, neomacs-workspace-test-archive, gnu-emacs-oracle]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -925,7 +472,7 @@ jobs:
 
   neomacs-gui-tests:
     name: real GUI tests (linux x86_64, X11)
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
+    if: ${{ github.event_name != 'schedule' }}
     needs: [neomacs-test-runtime, neomacs-workspace-test-archive, gnu-emacs-oracle]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -982,7 +529,7 @@ jobs:
 
   neomacs-melpa-live-canary:
     name: MELPA live ecosystem canary (linux x86_64)
-    if: ${{ !inputs.terminal_only && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     needs: [neomacs-test-runtime, neomacs-workspace-test-archive, gnu-emacs-oracle]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -1029,7 +576,7 @@ jobs:
 
   doom-install-compatibility:
     name: doom install compatibility (linux x86_64)
-    if: ${{ !inputs.terminal_only && (github.event_name != 'schedule') }}
+    if: ${{ github.event_name != 'schedule' }}
     needs: neomacs-test-runtime
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -1040,61 +587,9 @@ jobs:
     steps:
       - *checkout
       - *prepare_workspace_tmp
-      - *install_linux_deps
+      - uses: ./.github/actions/install-build-deps
       - *download_test_runtime
       - *unpack_test_runtime
 
       - name: Install unmodified Doom with Neomacs
         run: ./scripts/test-doom-install.sh
-
-  regex-fuzz:
-    name: regex differential fuzzing (linux x86_64)
-    if: ${{ !inputs.terminal_only && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    env:
-      CARGO_TERM_COLOR: always
-      TMPDIR: ${{ github.workspace }}/tmp
-    steps:
-      - *checkout
-      - *prepare_workspace_tmp
-      - *install_linux_deps
-
-      - name: Install nightly Rust
-        uses: dtolnay/rust-toolchain@7c8d7d138f5c09cef361f8214cf96882cd029cdb # nightly
-        with:
-          toolchain: nightly
-
-      - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --version 0.13.2 --locked
-
-      - name: Restore evolving fuzz corpora
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: crates/neovm-core/fuzz/corpus
-          key: regex-fuzz-corpus-${{ github.run_id }}
-          restore-keys: |
-            regex-fuzz-corpus-
-
-      - name: Fuzz Pike VM against the backtracker
-        run: |
-          cargo +nightly fuzz run regex_pike_vm \
-            --fuzz-dir crates/neovm-core/fuzz -- \
-            -max_total_time=300 -max_len=512 -timeout=10
-
-      - name: Fuzz search optimizations against exhaustive scanning
-        run: |
-          cargo +nightly fuzz run regex_search_optimizations \
-            --fuzz-dir crates/neovm-core/fuzz -- \
-            -max_total_time=300 -max_len=512 -timeout=10
-
-      - name: Upload crash artifacts
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: regex-fuzz-crashes-${{ github.run_id }}
-          path: crates/neovm-core/fuzz/artifacts
-          if-no-files-found: ignore
-          retention-days: 30

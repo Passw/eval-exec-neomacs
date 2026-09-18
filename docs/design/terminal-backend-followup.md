@@ -123,7 +123,7 @@ UTF-8 explicitly so nextest's Unicode separators cannot fail under CP1252.
 Run this focused suite without launching the unrelated full CI matrix:
 
 ```sh
-gh workflow run ci.yml --ref fix/gnu-terminal-parity -f terminal_only=true
+gh workflow run native-contract.yml --ref fix/gnu-terminal-parity
 ```
 
 The native jobs also run during ordinary pull-request and main-branch CI.

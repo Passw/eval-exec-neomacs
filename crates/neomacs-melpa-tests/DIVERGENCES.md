@@ -19582,7 +19582,7 @@ one specific window" into "always" -- and requires exit 0 plus each probe's
 5. `05-thread-yield-handoff` -- `make-thread` + `thread-yield` + `condition-case`.
 
 It runs in CI, in the shared-test-runtime job immediately after
-`fresh-build --release` (`.github/workflows/ci.yml`).  That placement is not
+`fresh-build --release` (`test-suite.yml`).  That placement is not
 arbitrary: the harness gates the SHIPPED binary, so the only job where it means
 anything is the one that just built it -- the same reason
 `crates/neovm-oracle-tests/src/common.rs:161` gates `target/release/neomacs` rather
@@ -19675,7 +19675,7 @@ New pin: `post_mark_ownership_verification_runs_and_finds_nothing`.
 * **`try_resolve_sym` / `try_resolve_sym_lisp_string`** still have zero callers
   (161's residual, unchanged).
 * **The probe corpus is five forms, not a fuzzer.**  `gc-stress` runs in CI now
-  (`.github/workflows/ci.yml`, the shared-test-runtime job, immediately after
+  (`test-suite.yml`, the shared-test-runtime job, immediately after
   `fresh-build --release` -- the step is meaningless anywhere else, since the
   binary it stresses is the one that step produces), so the class has a standing
   detector.  What it does NOT have is coverage: five hand-written probes cover
@@ -48437,7 +48437,7 @@ Twelve assertions cover: absolute, `@loader_path`, `@rpath` via `LC_RPATH`, fram
 
 ### 7. Gates
 
-`bash -n` on all changed scripts. `shellcheck 0.11.0 --severity=warning` clean on all three, and **verified sensitive** with a canary script that produced 2 findings -- an empty result from a tool that did not run looks identical to a pass. `actionlint 1.7.12` on the changed workflow. The closure test is wired into `ci.yml`, where it runs on **Linux** in seconds instead of surfacing in a macOS release job forty minutes in. The Rust experiment of section 4 was reverted whole and `cargo check -p neomacs-layout-engine` returns 0.
+`bash -n` on all changed scripts. `shellcheck 0.11.0 --severity=warning` clean on all three, and **verified sensitive** with a canary script that produced 2 findings -- an empty result from a tool that did not run looks identical to a pass. `actionlint 1.7.12` on the changed workflow. The closure test is wired into `test-suite.yml`, where it runs on **Linux** in seconds instead of surfacing in a macOS release job forty minutes in. The Rust experiment of section 4 was reverted whole and `cargo check -p neomacs-layout-engine` returns 0.
 
 ### 8. Found and NOT fixed
 
