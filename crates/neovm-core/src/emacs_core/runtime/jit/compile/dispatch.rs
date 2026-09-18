@@ -1090,6 +1090,9 @@ pub(crate) const PRED_KIND_SYMBOL_WITH_POS_P: i64 = 1;
 pub(crate) const PRED_KIND_TYPE_OF: i64 = 2;
 /// `cl-type-of`.
 pub(crate) const PRED_KIND_CL_TYPE_OF: i64 = 3;
+/// `fboundp`: whether the symbol's function cell is non-nil (see
+/// [`SpecCalleeKind::PredFboundp`]).
+pub(crate) const PRED_KIND_FBOUNDP: i64 = 4;
 
 /// Op discriminators for [`neovm_jit_arith_spec`] (baked as an iconst by the
 /// lowering, and — offset by 5 — the [`SpecCalleeKind::to_spec_disc`] value):
@@ -1443,7 +1446,16 @@ pub extern "C" fn neovm_jit_pred_spec(
         // GNU `Ffuncall` runs the debugger on entry to ANY function while
         // `debug-on-next-call` is set, a subr included: that call takes the
         // generic path, as `neovm_jit_call_subr_spec`'s does.
-        if ctx.debug_on_next_call_is_armed() || !subr_spec_armed(ctx, sym, expected, slot) {
+        // GNU's `Bcall` counts a subr callee against `max-lisp-eval-depth`
+        // (`++lisp_eval_depth > max_lisp_eval_depth` before `funcall_subr`),
+        // and so does the generic path here (`call_fixed_builtin_from_native`).
+        // A call at the limit takes that path, which raises the floor and
+        // signals exactly as the interpreter would; the intrinsic never
+        // nests, so anywhere below the limit the count is unobservable.
+        if ctx.debug_on_next_call_is_armed()
+            || ctx.depth >= ctx.max_depth
+            || !subr_spec_armed(ctx, sym, expected, slot)
+        {
             #[cfg(debug_assertions)]
             SUBR_SPEC_GENERIC_COUNT.fetch_add(1, Ordering::Relaxed);
             return STATUS_NEED_GENERIC;
@@ -1457,6 +1469,26 @@ pub extern "C" fn neovm_jit_pred_spec(
             // immediates.
             PRED_KIND_RECORDP => Value::bool_val(v.is_record()),
             PRED_KIND_SYMBOL_WITH_POS_P => Value::bool_val(v.is_symbol_with_pos()),
+            // `builtin_fboundp_1`: a symbol's function cell, read off the
+            // obarray with no allocation, no Lisp and no safe point (a
+            // symbol-with-pos is a symbol here exactly when the builtin says
+            // so). Anything else bounces to the generic call, which signals
+            // `(wrong-type-argument symbolp V)` from a real frame.
+            PRED_KIND_FBOUNDP => {
+                let Some(id) = crate::emacs_core::builtins::symbols::symbol_id_checked(
+                    &v,
+                    ctx.symbols_with_pos_enabled,
+                ) else {
+                    return STATUS_NEED_GENERIC;
+                };
+                Value::bool_val(
+                    crate::emacs_core::builtins::symbols::symbol_function_cell_in_obarray(
+                        ctx.obarray(),
+                        id,
+                    )
+                    .is_some_and(|function| !function.is_nil()),
+                )
+            }
             // The registered `type-of`/`cl-type-of` bodies, which read the
             // value and return an existing symbol or a record's type slot:
             // no allocation, no Lisp, no safe point. An error (none is

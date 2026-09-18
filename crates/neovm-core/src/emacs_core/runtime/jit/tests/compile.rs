@@ -7884,6 +7884,150 @@ fn a_record_type_of_site_answers_inline() {
     }
 }
 
+/// `(fboundp SYM)` through `Op::Call` is the GC-free predicate intrinsic
+/// (`SpecCalleeKind::PredFboundp`): armed, the site answers from the symbol's
+/// function cell with no backtrace frame; a non-symbol bounces to the generic
+/// call and signals exactly as the builtin does; a redefinition of `fboundp`
+/// reaches the generic call.
+#[test]
+fn fboundp_call_sites_answer_as_the_builtin_on_the_fast_path() {
+    use crate::emacs_core::eval::Context;
+    use crate::emacs_core::intern::{SymId, intern};
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    let mut ev = Context::new();
+    let ctx = &mut ev as *mut Context as *mut u8;
+    // A bare Context: `defun`/`defmacro`/`defalias` are not loaded, so the
+    // cells are set directly.
+    ev.eval_str(
+        "(progn (fset 'jit-fboundp-nil nil) (fmakunbound 'jit-fboundp-unbound)
+                (fset 'jit-fboundp-fn (lambda () 1))
+                (fset 'jit-fboundp-mac (cons 'macro (lambda () 1)))
+                (fset 'jit-fboundp-alias 'car))",
+    )
+    .expect("setup");
+    let pool_src = "(list 'car 'jit-fboundp-fn 'jit-fboundp-mac 'jit-fboundp-alias \
+                          'jit-fboundp-nil 'jit-fboundp-unbound 'jit-fboundp-never \
+                          nil t :kw 5 \"s\" (cons 1 2) 1.5)";
+    let binding = ev
+        .obarray
+        .symbol_function_id(intern("fboundp"))
+        .expect("bound");
+    assert_eq!(
+        super::subr_spec_kind(binding, intern("fboundp"), 1),
+        Some(super::SpecCalleeKind::PredFboundp)
+    );
+    let mut f = ByteCodeFunction::new(LambdaParams {
+        required: vec![SymId(1)],
+        optional: Vec::new(),
+        rest: None,
+    });
+    f.lexical = true;
+    f.ops = vec![Op::Constant(0), Op::StackRef(1), Op::Call(1), Op::Return];
+    f.constants = vec![Value::symbol("fboundp")].into();
+    f.max_stack = 8;
+    let leaf = compile_bytecode_function_with(&f, Some(&ev.obarray)).expect("compiles");
+    let pool = ev.eval_str(pool_src).expect("pool");
+    crate::emacs_core::eval::push_scratch_gc_root(pool);
+    let items = crate::emacs_core::value::list_to_vec(&pool).expect("list");
+    let outcome = |r: Result<Value, crate::emacs_core::error::Flow>| -> String {
+        match r {
+            Ok(v) => crate::emacs_core::print::print_value(&v),
+            Err(crate::emacs_core::error::Flow::Signal(sig)) => format!(
+                "signal {} {:?}",
+                sig.symbol_name(),
+                sig.data
+                    .iter()
+                    .map(crate::emacs_core::print::print_value)
+                    .collect::<Vec<_>>()
+            ),
+            Err(other) => format!("{other:?}"),
+        }
+    };
+    #[cfg(debug_assertions)]
+    let fast0 = SUBR_SPEC_FAST_COUNT.load(Ordering::Relaxed);
+    let mut symbols = 0usize;
+    for item in &items {
+        let want = outcome(crate::emacs_core::builtins::symbols::builtin_fboundp_1(
+            &mut ev, *item,
+        ));
+        let got = match leaf.call(ctx, &[*item]) {
+            NativeRun::Ok(bits) => crate::emacs_core::print::print_value(&Value::from_bits(bits)),
+            NativeRun::Signal => outcome(Err(take_pending_flow().expect("stashed flow"))),
+            other => panic!(
+                "(fboundp {}) : {other:?}",
+                crate::emacs_core::print::print_value(item)
+            ),
+        };
+        assert_eq!(
+            got,
+            want,
+            "(fboundp {})",
+            crate::emacs_core::print::print_value(item)
+        );
+        if item.as_symbol_id().is_some() || item.is_nil() || item.is_t() {
+            symbols += 1;
+        }
+    }
+    // Every symbol answered on the intrinsic; the rest bounced.
+    #[cfg(debug_assertions)]
+    assert!(
+        SUBR_SPEC_FAST_COUNT.load(Ordering::Relaxed) - fast0 >= symbols as u64,
+        "every symbol argument takes the intrinsic"
+    );
+    let _ = symbols;
+    // At the eval-depth limit the site takes the generic call, which counts
+    // the subr against `max-lisp-eval-depth` as GNU's `Bcall` does and
+    // signals; one below the limit the intrinsic answers.
+    let (depth, max_depth) = (ev.depth, ev.max_depth);
+    ev.max_depth = 100;
+    ev.depth = 100;
+    match leaf.call(ctx, &[Value::symbol("car")]) {
+        NativeRun::Signal => {
+            let flow = take_pending_flow().expect("stashed flow");
+            assert!(
+                outcome(Err(flow)).contains("max-lisp-eval-depth"),
+                "at the limit: the nesting error"
+            );
+        }
+        other => panic!("(fboundp 'car) at the depth limit: {other:?}"),
+    }
+    ev.depth = 99;
+    match leaf.call(ctx, &[Value::symbol("car")]) {
+        NativeRun::Ok(bits) => assert_eq!(
+            crate::emacs_core::print::print_value(&Value::from_bits(bits)),
+            "t",
+            "one below the limit"
+        ),
+        other => panic!("(fboundp 'car) one below the limit: {other:?}"),
+    }
+    ev.depth = depth;
+    ev.max_depth = max_depth;
+    // A redefinition is honoured: the site re-validates and takes the
+    // generic call.
+    let original = ev
+        .obarray
+        .symbol_function_id(intern("fboundp"))
+        .expect("bound");
+    ev.eval_str("(fset 'fboundp (lambda (_) 'redefined))")
+        .expect("fset");
+    match leaf.call(ctx, &[Value::symbol("car")]) {
+        NativeRun::Ok(bits) => assert_eq!(
+            crate::emacs_core::print::print_value(&Value::from_bits(bits)),
+            "redefined"
+        ),
+        other => panic!("redefined fboundp: {other:?}"),
+    }
+    ev.obarray
+        .set_symbol_function_id(intern("fboundp"), original);
+    match leaf.call(ctx, &[Value::symbol("car")]) {
+        NativeRun::Ok(bits) => assert_eq!(
+            crate::emacs_core::print::print_value(&Value::from_bits(bits)),
+            "t"
+        ),
+        other => panic!("restored fboundp: {other:?}"),
+    }
+}
+
 #[test]
 fn type_of_call_sites_answer_as_the_builtin_on_the_fast_path() {
     use crate::emacs_core::eval::Context;
