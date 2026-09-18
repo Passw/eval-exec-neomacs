@@ -204,6 +204,27 @@ fn help_with_tutorial_via_ch_t_opens_tutorial_buffer() {
 #[test]
 fn info_directory_via_ch_i_opens_info_buffer() {
     let (mut gnu, mut neo) = boot_pair("");
+    // The two executables resolve different Info directory sets on a shared
+    // host: the installed GNU oracle reads its own share/info copy plus the
+    // system dir, while Neomacs composes its own, so the rendered Directory
+    // node is a property of the host rather than the editors.  Pin both to
+    // one harness-owned directory whose single dir file both then insert
+    // verbatim (Info-dir-find-node), making the node identical anywhere.
+    let harness_dir = support::write_shared_temp_file(
+        "dir",
+        "This is the file info/dir, which contains the topmost node of the INFO tree.\n\n\
+         \x20\n* Menu:\n\n\
+         * Emacs: (emacs).\t\tThe extensible self-documenting text editor.\n\
+         * Sample: (sample).\tA sample manual for the pair harness.\n",
+    );
+    let dir_list = format!(
+        "(setq Info-directory-list '(\"{}\"))",
+        harness_dir
+            .parent()
+            .expect("harness dir file lives in its own directory")
+            .to_string_lossy()
+    );
+    support::eval_expression(&mut gnu, &mut neo, &dir_list);
     send_help_sequence(&mut gnu, &mut neo, "i");
 
     let ready = |grid: &[String]| {
