@@ -224,6 +224,7 @@ mod memq;
 mod merge_ordered_lists_semantics;
 mod message_format_advanced;
 mod min;
+mod minor_mode_mode_line_semantics;
 mod misc_core_strict_edge_semantics;
 mod misc_fill_strict_edge_semantics;
 mod missing_subrs_batch_semantics;
