@@ -633,12 +633,39 @@ fn diff_buffer_with_file_via_mx_shows_unsaved_changes() {
     };
     let gnu_temp = visible_buffer_content_path(&gnu);
     let neo_temp = visible_buffer_content_path(&neo);
-    assert_pair_exact_display_with_path_pair(
+    // The buffer-content temporary's name is random per session, and the
+    // diff command line showing it can exceed the terminal width, wrapping
+    // mid-name.  The wrap point depends on the ambient TMPDIR length, so on
+    // short-TMPDIR hosts the random tail survives onto the next row as a
+    // bare `|XXXX' fragment past what `visible_buffer_content_path' can see.
+    // Declare that leftover tail as a pair as well; when the name fits on
+    // one row there is no tail and no extra pair.
+    let wrapped_temp_tail = |session: &neomacs_tui_tests::TuiSession| -> Option<String> {
+        let grid = session.text_grid();
+        let marker_row = grid
+            .iter()
+            .position(|row| row.contains("buffer-content-"))?;
+        grid.iter().skip(marker_row).find_map(|row| {
+            let bar = row.rfind('|')?;
+            let tail = row[bar + 1..].trim_end();
+            (!tail.is_empty() && tail.chars().all(|ch| ch.is_ascii_alphanumeric()))
+                .then(|| tail.to_owned())
+        })
+    };
+    let mut pairs = vec![(gnu_temp, neo_temp)];
+    match (wrapped_temp_tail(&gnu), wrapped_temp_tail(&neo)) {
+        (Some(gnu_tail), Some(neo_tail)) => pairs.push((gnu_tail, neo_tail)),
+        (None, None) => {}
+        mismatched => panic!(
+            "diff_buffer_with_file_via_mx_shows_unsaved_changes: asymmetric wrap of the \
+             buffer-content temporary: {mismatched:?}"
+        ),
+    }
+    assert_pair_exact_display_with_path_pairs(
         "diff_buffer_with_file_via_mx_shows_unsaved_changes",
         &gnu,
         &neo,
-        &gnu_temp,
-        &neo_temp,
+        &pairs,
     );
 }
 

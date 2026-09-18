@@ -419,6 +419,28 @@ pub fn assert_pair_exact_display(label: &str, gnu: &TuiSession, neo: &TuiSession
     assert_pair_display_report(label, gnu, neo, report);
 }
 
+/// Assert complete display parity while declaring additional pairs of
+/// concrete spellings for the same test-owned resources.
+///
+/// Each pair is one GNU spelling and its Neomacs counterpart; the
+/// comparator rewrites both to a shared placeholder before comparing, so
+/// resources the two executables necessarily name differently — session
+/// homes, generated temporaries, or fragments of them left over by
+/// terminal line wrapping — do not register as display differences.
+pub fn assert_pair_exact_display_with_path_pairs(
+    label: &str,
+    gnu: &TuiSession,
+    neo: &TuiSession,
+    pairs: &[(String, String)],
+) {
+    let mut environment = PairedDisplayEnvironment::from_sessions(gnu, neo);
+    for (gnu_spelling, neomacs_spelling) in pairs {
+        environment = environment.with_path_pair(gnu_spelling, neomacs_spelling);
+    }
+    let report = compare_displays_in_environment(gnu.screen(), neo.screen(), &environment);
+    assert_pair_display_report(label, gnu, neo, report);
+}
+
 /// Assert complete display parity while declaring one additional pair of
 /// concrete path spellings for the same test-owned resource.
 pub fn assert_pair_exact_display_with_path_pair(
