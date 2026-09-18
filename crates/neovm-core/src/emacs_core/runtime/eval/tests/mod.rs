@@ -18211,6 +18211,311 @@ fn a_spec_slot_drops_its_leaf_when_the_callee_slot_is_recycled() {
     );
 }
 
+/// The spec shim's armed fast path (a cached leaf that takes the site's
+/// arguments as the generated code laid them out) keeps the reference
+/// protocol on every exit it hands to its slow half: a callee that signals
+/// from a raw entry, a callee that runs under its own native frame (a
+/// dynamic binding) and returns or signals, a three-argument frame, and a
+/// call at the `max-lisp-eval-depth` limit. The callee's backtrace frame is
+/// gone after each, and so is its binding.
+#[cfg(feature = "jit")]
+#[test]
+fn spec_call_fast_path_keeps_the_reference_protocol_on_its_exits() {
+    crate::test_utils::init_test_tracing();
+    crate::emacs_core::jit::compile::force_profit_gate_for_test(false);
+    use crate::emacs_core::bytecode::ByteCodeFunction;
+    use crate::emacs_core::bytecode::opcode::Op;
+    use crate::emacs_core::value::LambdaParams;
+    use std::sync::atomic::Ordering;
+
+    let mut ev = Context::new();
+    let lambda = |nargs: usize, hot: bool, ops: Vec<Op>, constants: Vec<Value>| -> Value {
+        let mut f = ByteCodeFunction::new(LambdaParams {
+            required: (1..=nargs)
+                .map(|i| crate::emacs_core::intern::SymId(i as u32))
+                .collect(),
+            optional: Vec::new(),
+            rest: None,
+        });
+        f.lexical = true;
+        f.ops = ops;
+        f.constants = constants.into();
+        f.max_stack = 16;
+        if hot {
+            f.jit_runtime().set_hot_for_test();
+        }
+        let v = Value::make_bytecode(f);
+        crate::emacs_core::eval::push_scratch_gc_root(v);
+        v
+    };
+    // The shim's OWN fast-path counter: the slow half also runs cached
+    // leaves (and bumps SPEC_FAST_CALL_COUNT), so only this one proves the
+    // path under test was taken.
+    let fast = || crate::emacs_core::jit::compile::SPEC_SHIM_FAST_COUNT.load(Ordering::Relaxed);
+    let signal_name = |r: Result<Value, crate::emacs_core::error::Flow>| -> String {
+        match r {
+            Ok(v) => format!("value {}", crate::emacs_core::print::print_value(&v)),
+            Err(crate::emacs_core::error::Flow::Signal(sig)) => sig.symbol_name().to_string(),
+            Err(other) => format!("{other:?}"),
+        }
+    };
+    // Every callee is two blocks (`(if a X X)`), so the caller speculates the
+    // call instead of inlining the body. `(car 5)` leaves a leaf through a
+    // precise deopt (the inline `car` guard) and the interpreter signals;
+    // `(signal 'error nil)` leaves it through the native STATUS_SIGNAL exit.
+    // (lambda (a b c) (if a (car a) (car a))): three arguments make the
+    // callee's frame a `BacktraceNative`.
+    let car3 = lambda(
+        3,
+        false,
+        vec![
+            Op::StackRef(2),
+            Op::GotoIfNil(5),
+            Op::StackRef(2),
+            Op::Car,
+            Op::Return,
+            Op::StackRef(2),
+            Op::Car,
+            Op::Return,
+        ],
+        vec![],
+    );
+    ev.obarray
+        .set_symbol_function_id(crate::emacs_core::intern::intern("jit-fp-car3"), car3);
+    // (lambda (x) (jit-fp-car3 x 1 2))
+    let call3 = lambda(
+        1,
+        true,
+        vec![
+            Op::Constant(0),
+            Op::StackRef(1),
+            Op::Constant(1),
+            Op::Constant(2),
+            Op::Call(3),
+            Op::Return,
+        ],
+        vec![
+            Value::symbol("jit-fp-car3"),
+            Value::make_int(1),
+            Value::make_int(2),
+        ],
+    );
+    // (lambda (x) (if x (let ((jit-fp-dyn x)) (car jit-fp-dyn)) (let ...)))
+    // -- a dynamic binding makes the leaf run under its own native frame.
+    let bound = lambda(
+        1,
+        false,
+        vec![
+            Op::StackRef(0),
+            Op::GotoIfNil(8),
+            Op::StackRef(0),
+            Op::VarBind(0),
+            Op::VarRef(0),
+            Op::Car,
+            Op::Unbind(1),
+            Op::Return,
+            Op::StackRef(0),
+            Op::VarBind(0),
+            Op::VarRef(0),
+            Op::Car,
+            Op::Unbind(1),
+            Op::Return,
+        ],
+        vec![Value::symbol("jit-fp-dyn")],
+    );
+    ev.obarray
+        .set_symbol_function_id(crate::emacs_core::intern::intern("jit-fp-bound"), bound);
+    // (lambda (x) (jit-fp-bound x))
+    let call_bound = lambda(
+        1,
+        true,
+        vec![Op::Constant(0), Op::StackRef(1), Op::Call(1), Op::Return],
+        vec![Value::symbol("jit-fp-bound")],
+    );
+    // (lambda (a b c) (if a (signal 'error nil) (signal 'error nil)))
+    let raise3 = lambda(
+        3,
+        false,
+        vec![
+            Op::StackRef(2),
+            Op::GotoIfNil(7),
+            Op::Constant(0),
+            Op::Constant(1),
+            Op::Constant(2),
+            Op::Call(2),
+            Op::Return,
+            Op::Constant(0),
+            Op::Constant(1),
+            Op::Constant(2),
+            Op::Call(2),
+            Op::Return,
+        ],
+        vec![Value::symbol("signal"), Value::symbol("error"), Value::NIL],
+    );
+    ev.obarray
+        .set_symbol_function_id(crate::emacs_core::intern::intern("jit-fp-raise3"), raise3);
+    // (lambda (x) (jit-fp-raise3 x 1 2))
+    let call_raise3 = lambda(
+        1,
+        true,
+        vec![
+            Op::Constant(0),
+            Op::StackRef(1),
+            Op::Constant(1),
+            Op::Constant(2),
+            Op::Call(3),
+            Op::Return,
+        ],
+        vec![
+            Value::symbol("jit-fp-raise3"),
+            Value::make_int(1),
+            Value::make_int(2),
+        ],
+    );
+    // (lambda (x) (if x (let ((jit-fp-dyn x)) (signal 'error nil)) (let ...)))
+    let bound_raise = lambda(
+        1,
+        false,
+        vec![
+            Op::StackRef(0),
+            Op::GotoIfNil(10),
+            Op::StackRef(0),
+            Op::VarBind(3),
+            Op::Constant(0),
+            Op::Constant(1),
+            Op::Constant(2),
+            Op::Call(2),
+            Op::Unbind(1),
+            Op::Return,
+            Op::StackRef(0),
+            Op::VarBind(3),
+            Op::Constant(0),
+            Op::Constant(1),
+            Op::Constant(2),
+            Op::Call(2),
+            Op::Unbind(1),
+            Op::Return,
+        ],
+        vec![
+            Value::symbol("signal"),
+            Value::symbol("error"),
+            Value::NIL,
+            Value::symbol("jit-fp-dyn"),
+        ],
+    );
+    ev.obarray.set_symbol_function_id(
+        crate::emacs_core::intern::intern("jit-fp-bound-raise"),
+        bound_raise,
+    );
+    // (lambda (x) (jit-fp-bound-raise x))
+    let call_bound_raise = lambda(
+        1,
+        true,
+        vec![Op::Constant(0), Op::StackRef(1), Op::Call(1), Op::Return],
+        vec![Value::symbol("jit-fp-bound-raise")],
+    );
+    let seven = ev.eval_str("'(7)").expect("list");
+    crate::emacs_core::eval::push_scratch_gc_root(seven);
+    let spec_base = ev.specpdl.len();
+
+    // Raw entry: the first call arms the slot, the second takes the fast
+    // path, the third signals through it.
+    assert_eq!(
+        signal_name(ev.funcall_general_untraced(call3, vec![seven])),
+        "value 7"
+    );
+    let before = fast();
+    assert_eq!(
+        signal_name(ev.funcall_general_untraced(call3, vec![seven])),
+        "value 7"
+    );
+    assert!(fast() > before, "the armed site takes the fast path");
+    let before = fast();
+    assert_eq!(
+        signal_name(ev.funcall_general_untraced(call3, vec![Value::make_int(5)])),
+        "wrong-type-argument"
+    );
+    assert!(fast() > before, "the signalling call took the fast path");
+    assert_eq!(
+        ev.specpdl.len(),
+        spec_base,
+        "the callee's frame is popped after a signal"
+    );
+
+    // Framed entry (a dynamic binding): returns, then signals from inside
+    // the binding, which is unwound.
+    assert_eq!(
+        signal_name(ev.funcall_general_untraced(call_bound, vec![seven])),
+        "value 7"
+    );
+    let before = fast();
+    assert_eq!(
+        signal_name(ev.funcall_general_untraced(call_bound, vec![seven])),
+        "value 7"
+    );
+    assert!(fast() > before, "the framed callee takes the fast path");
+    assert_eq!(
+        signal_name(ev.funcall_general_untraced(call_bound, vec![Value::make_int(5)])),
+        "wrong-type-argument"
+    );
+    assert_eq!(
+        ev.specpdl.len(),
+        spec_base,
+        "frame and binding are popped after a signal"
+    );
+    assert_eq!(
+        format_eval_result(&ev.eval_str("(boundp 'jit-fp-dyn)")),
+        "OK nil",
+        "the dynamic binding was unwound"
+    );
+
+    // The native STATUS_SIGNAL exit, raw and framed: the first call arms,
+    // the second signals through the fast path.
+    for (caller, what) in [(call_raise3, "raw"), (call_bound_raise, "framed")] {
+        assert_eq!(
+            signal_name(ev.funcall_general_untraced(caller, vec![seven])),
+            "error",
+            "{what}: first call (arms the slot)"
+        );
+        let before = fast();
+        assert_eq!(
+            signal_name(ev.funcall_general_untraced(caller, vec![seven])),
+            "error",
+            "{what}: second call"
+        );
+        assert!(
+            fast() > before,
+            "{what}: the signalling call took the fast path"
+        );
+        assert_eq!(
+            ev.specpdl.len(),
+            spec_base,
+            "{what}: frame popped after the signal"
+        );
+    }
+    assert_eq!(
+        format_eval_result(&ev.eval_str("(boundp 'jit-fp-dyn)")),
+        "OK nil",
+        "the binding under the signal was unwound"
+    );
+
+    // At the depth limit (the callee would be one past it) the fast path
+    // declines and the slow half signals as the interpreter would.
+    let (depth, max_depth) = (ev.depth, ev.max_depth);
+    ev.depth = 101;
+    ev.max_depth = 101;
+    let at_limit = signal_name(ev.funcall_general_untraced(call3, vec![seven]));
+    ev.depth = depth;
+    ev.max_depth = max_depth;
+    assert_eq!(at_limit, "error", "a call over max-lisp-eval-depth signals");
+    assert_eq!(ev.specpdl.len(), spec_base);
+    // And the site still works afterwards.
+    assert_eq!(
+        signal_name(ev.funcall_general_untraced(call3, vec![seven])),
+        "value 7"
+    );
+}
+
 /// Build the canonical recursive-fib benchmark shape (self-recursive through
 /// `sym_name`, guards after the recursive calls — only compilable since
 /// precise-PC deopt). `tier`: Hot forces native, Cold pins the interpreter.

@@ -1830,10 +1830,52 @@ fn cbsym_spec_kind(sym: SymId, _nargs: usize) -> Option<SpecCalleeKind> {
 /// native execution (so `cache::clear()` cannot fire mid-call to free the leaf —
 /// see `resolve_compiled_leaf_ptr`; NOT "the cache never evicts", audit #1).
 /// `repr(C)` pins the field order the baked pointer arithmetic relies on.
+///
+/// `direct_consts` is the shim's own fast-path key: the cached leaf's
+/// constant base when that leaf takes this site's arguments exactly as the
+/// generated code laid them out (a pure pass-through: fixed arity equal to
+/// the site's count, no `&rest`), 0 otherwise. With it set the shim enters
+/// the leaf without re-classifying the callee, the leaf or the call; it is
+/// armed together with `leaf` and cleared with it.
 #[repr(C)]
 pub(crate) struct SpecSlot {
     epoch: AtomicU64,
     leaf: AtomicU64,
+    direct_consts: AtomicU64,
+}
+
+impl SpecSlot {
+    /// A slot armed at `epoch` with no cached leaf.
+    pub(crate) const fn at_epoch(epoch: u64) -> Self {
+        Self {
+            epoch: AtomicU64::new(epoch),
+            leaf: AtomicU64::new(0),
+            direct_consts: AtomicU64::new(0),
+        }
+    }
+
+    /// The cached callee leaf, null when none.
+    #[inline(always)]
+    pub(crate) fn leaf_ptr(&self) -> *const CompiledLeaf {
+        self.leaf.load(Ordering::Relaxed) as *const CompiledLeaf
+    }
+
+    /// Cache `leaf` for the armed callee; `direct_consts` is the callee's
+    /// constant base when the leaf is a pure pass-through for the site's
+    /// argument count (the shim's fast-path key), null otherwise.
+    #[inline(always)]
+    pub(crate) fn arm_leaf(&self, leaf: *const CompiledLeaf, direct_consts: *const Value) {
+        self.leaf.store(leaf as usize as u64, Ordering::Relaxed);
+        self.direct_consts
+            .store(direct_consts as usize as u64, Ordering::Relaxed);
+    }
+
+    /// Drop the cached leaf (and with it the fast-path key).
+    #[inline(always)]
+    pub(crate) fn clear_leaf(&self) {
+        self.direct_consts.store(0, Ordering::Relaxed);
+        self.leaf.store(0, Ordering::Relaxed);
+    }
 }
 
 /// Find direct-call speculation sites: the byte-compiler's standard call
@@ -3256,12 +3298,7 @@ pub fn lower_leaf_full_osr(
     let (spec_sites, spec_slots): (HashMap<usize, SpecSite>, Box<[SpecSlot]>) = match obarray {
         Some(ob) => {
             let sites = find_spec_sites(ops, constants, &cfg.leaders, ob, true);
-            let slots: Box<[SpecSlot]> = (0..sites.len())
-                .map(|_| SpecSlot {
-                    epoch: AtomicU64::new(0),
-                    leaf: AtomicU64::new(0),
-                })
-                .collect();
+            let slots: Box<[SpecSlot]> = (0..sites.len()).map(|_| SpecSlot::at_epoch(0)).collect();
             // Arm every slot with the epoch the bindings were observed at; any
             // bump before first execution self-heals via shim re-validation.
             let epoch = ob.function_epoch();
@@ -3466,10 +3503,7 @@ pub(crate) fn build_baseline_leaf_object<M: Module>(
     };
     let aot_spec_sites = finalize_baseline_spec_sites(&mut spec_sites, ops, reloc_index);
     let spec_slots: Box<[SpecSlot]> = (0..spec_sites.len())
-        .map(|_| SpecSlot {
-            epoch: AtomicU64::new(0),
-            leaf: AtomicU64::new(0),
-        })
+        .map(|_| SpecSlot::at_epoch(0))
         .collect();
     let has_backedge = baseline_has_backedge(ops, &cfg);
     let needs_rt = baseline_needs_rt(ops, has_backedge);

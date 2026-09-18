@@ -957,6 +957,27 @@ fn call_for_jit_from_native(
 /// resolution. On an epoch move, re-validate THIS binding: unchanged -> re-arm
 /// the slot and proceed direct; changed -> strict symbol call (fset/advice
 /// take effect immediately, GNU default-settings parity).
+///
+/// Two halves. The armed fast path runs in this frame: the site's cached
+/// leaf takes the call's arguments exactly as the generated code laid them
+/// out (`SpecSlot::direct_consts`), nothing needs the quit poll's attention,
+/// the debugger is not armed and the call fits under `max-lisp-eval-depth`.
+/// Every step of it is a load, a compare, the backtrace push (a bounded
+/// write; growing the specpdl aborts rather than unwinds), the raw native
+/// entry of a handler-free body and the balanced pop -- none can unwind in
+/// a release build, so the path runs OUTSIDE the panic-containment frame,
+/// whose register saves and landing pad were 21 of the shim's
+/// instructions. (A framed body's entry can run Lisp on its way out and
+/// keeps a containment frame of its own, [`call_spec_framed_run`].) It
+/// re-classifies
+/// nothing: the callee, the leaf and the argument shape were classified
+/// once, when the slot was armed (`Vm::call_armed_callee_native`), another
+/// 20 instructions a call. Everything else -- the first call through a
+/// site, a re-validation, a callee that needs marshaling, the debugger, the
+/// depth floor, a non-OK native exit -- takes the contained slow half,
+/// [`call_spec_slow`] / [`call_spec_finish`], which is the reference
+/// protocol unchanged.
+///
 /// SAFETY: same vmctx contract as [`neovm_jit_call`]; `slot` points into the
 /// owning CompiledLeaf's spec_slots (alive whenever its code runs).
 #[allow(clippy::not_unsafe_ptr_arg_deref)] // C-ABI shim: raw ptrs per documented SAFETY contract; only ever called from generated code.
@@ -970,12 +991,205 @@ pub extern "C" fn neovm_jit_call_spec(
     nargs: i64,
     out: *mut i64,
 ) -> i64 {
-    jit_shim_contain!(ctx, STATUS_SIGNAL, {
-        // Evidence that speculation actually engages, including in release
-        // unit tests. Non-test release builds carry no counter.
+    // Evidence that speculation actually engages, including in release
+    // unit tests. Non-test release builds carry no counter.
+    #[cfg(any(test, debug_assertions))]
+    SPEC_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+    // SAFETY: see neovm_jit_call's function-level contract; `slot` points
+    // into the executing leaf's spec_slots.
+    let ctx_ref = unsafe { &mut *(ctx as *mut Context) };
+    let slot_ref = unsafe { &*(slot as *const SpecSlot) };
+    let direct_consts = slot_ref.direct_consts.load(Ordering::Relaxed);
+    if direct_consts != 0
+        && ctx_ref.maybe_quit_hot_ok()
+        && slot_ref.epoch.load(Ordering::Relaxed) == ctx_ref.obarray.function_epoch()
+        && !jit_force_slow_spec()
+        && !ctx_ref.debug_on_next_call_is_armed()
+        && ctx_ref.depth < ctx_ref.max_depth
+    {
         #[cfg(any(test, debug_assertions))]
-        SPEC_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+        {
+            SPEC_FAST_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+            SPEC_SHIM_FAST_COUNT.fetch_add(1, Ordering::Relaxed);
+        }
+        // SAFETY: a non-null slot leaf names a live or retired cache leaf
+        // (`resolve_compiled_leaf_ptr`'s invariant), and `direct_consts` is
+        // the constant base of the object the slot was armed for, which the
+        // epoch proof keeps alive (the slot is cleared on every re-arm).
+        let leaf = unsafe { &*slot_ref.leaf_ptr() };
+        let consts = direct_consts as usize as *const Value;
+        let callee = Value::from_bits(expected as usize);
         let nargs = nargs as usize;
+        let bt_count = ctx_ref.specpdl.len();
+        // SAFETY: args_ptr addresses `nargs` valid tagged words (the caller's
+        // call-args slot). The push roots `callee` for the whole native run.
+        unsafe { ctx_ref.push_backtrace_frame_from_native_args(callee, args_ptr, nargs) };
+        ctx_ref.depth += 1;
+        let run = if leaf.direct_call_eligible() {
+            let mut bits: i64 = 0;
+            // SAFETY: a pure pass-through of a direct-eligible leaf (the
+            // slot's arming condition); `ctx` is the dormant seam Context.
+            let status = unsafe { leaf.entry_call_raw_consts(ctx, consts, args_ptr, &mut bits) };
+            if status == STATUS_OK {
+                #[cfg(any(test, debug_assertions))]
+                crate::emacs_core::jit::cache::NATIVE_OK_COUNT.fetch_add(1, Ordering::Relaxed);
+                if ctx_ref.pop_native_backtrace_frame(bt_count) {
+                    ctx_ref.depth -= 1;
+                    // SAFETY: `out` is the generated code's result stack slot.
+                    unsafe { *out = bits };
+                    return STATUS_OK;
+                }
+                FastRun::Done(Value::from_bits(bits as usize))
+            } else {
+                FastRun::Raw(status)
+            }
+        } else {
+            match call_spec_framed_run(ctx, leaf, consts, args_ptr) {
+                NativeRun::Ok(bits) => {
+                    #[cfg(any(test, debug_assertions))]
+                    crate::emacs_core::jit::cache::NATIVE_OK_COUNT.fetch_add(1, Ordering::Relaxed);
+                    if ctx_ref.pop_native_backtrace_frame(bt_count) {
+                        ctx_ref.depth -= 1;
+                        // SAFETY: as above.
+                        unsafe { *out = bits as i64 };
+                        return STATUS_OK;
+                    }
+                    FastRun::Done(Value::from_bits(bits))
+                }
+                // A panic contained in the framed entry: leave its marker
+                // and the residue -- this frame's backtrace entry, the
+                // depth count -- to the caller's healing points, exactly
+                // as the single-frame containment did. Folding it here
+                // would consume the marker before `cold_frame_exit` or the
+                // match shim could restore the caller's boundary.
+                NativeRun::Signal if shim_panic_pending() => return STATUS_SIGNAL,
+                other => FastRun::Framed(other),
+            }
+        };
+        return call_spec_finish(ctx, callee, leaf, args_ptr, nargs, out, bt_count, run);
+    }
+    call_spec_slow(ctx, sym, expected, slot_ref, args_ptr, nargs as usize, out)
+}
+
+/// The fast path's framed entry, under a containment frame of its own: a
+/// body with bindings or handler frames exits through `invoke_native`'s
+/// parity unwinds, which run Lisp -- `unwind-protect` cleanups, variable
+/// watchers, the debugger's exit hook -- and Lisp can reach a Rust panic
+/// that must become a Lisp error, not an abort at the shim's C boundary.
+/// The raw entry of a handler-free body has no such exit and stays in the
+/// shim's frame. A contained panic answers `Signal` with the pending-panic
+/// marker set; the shim returns STATUS_SIGNAL at once and leaves the
+/// healing to the caller leaf's exit (see the fast path).
+#[inline(never)]
+fn call_spec_framed_run(
+    ctx: *mut u8,
+    leaf: &CompiledLeaf,
+    consts: *const Value,
+    args_ptr: *const i64,
+) -> NativeRun {
+    jit_shim_contain!(ctx, NativeRun::Signal, {
+        leaf.call_premarshaled_consts(ctx, consts, args_ptr)
+    })
+}
+
+/// How a fast-path native run ended when it did not end in a balanced OK.
+enum FastRun {
+    /// OK, but the callee's backtrace frame is no longer the plain entry the
+    /// push made (the debugger flagged it): the general pop must run.
+    Done(Value),
+    /// A raw (direct) entry returned this non-OK status.
+    Raw(i64),
+    /// A framed run ended other than OK.
+    Framed(NativeRun),
+}
+
+/// The fast path's cold exit: everything `run_leaf_native_to_native` does
+/// after the native run for a non-OK outcome -- signal fold, precise-deopt
+/// resume, interpreter rerun, the depth and frame pops -- under the
+/// panic-containment frame those steps need. Runs with the callee's depth
+/// still counted and its frame still pushed.
+#[cold]
+#[inline(never)]
+#[allow(clippy::too_many_arguments)] // the fast path's live state, handed over whole
+fn call_spec_finish(
+    ctx: *mut u8,
+    callee: Value,
+    leaf: &CompiledLeaf,
+    args_ptr: *const i64,
+    nargs: usize,
+    out: *mut i64,
+    bt_count: usize,
+    run: FastRun,
+) -> i64 {
+    jit_shim_contain!(ctx, STATUS_SIGNAL, {
+        use crate::emacs_core::jit::cache::{self, NativeCallOutcome};
+        let ctx_ptr = ctx as *mut Context;
+        // SAFETY: the dormant seam Context (the shim contract).
+        let ctx = unsafe { &mut *ctx_ptr };
+        // SAFETY: the slot's leaf was resolved from this object's data
+        // (`call_armed_callee_native`), which materialized it.
+        let bc = unsafe { callee.bytecode_data_materialized_by_caller() };
+        let outcome = match run {
+            FastRun::Done(value) => NativeCallOutcome::Value(value),
+            FastRun::Raw(status) => {
+                #[cfg(any(test, debug_assertions))]
+                cache::count_native_status(status);
+                cache::direct_call_cold(ctx_ptr, bc, callee, leaf, status)
+            }
+            FastRun::Framed(outcome) => cache::finish_framed_run(ctx_ptr, bc, callee, outcome),
+        };
+        let outcome = match outcome {
+            NativeCallOutcome::Fallback => {
+                Vm::interp_fallback_native(ctx_ptr, bc, callee, args_ptr, nargs)
+            }
+            o => o,
+        };
+        ctx.depth -= 1;
+        let outcome = if ctx.pop_native_backtrace_frame(bt_count) {
+            outcome
+        } else {
+            // Imbalanced (rare): materialize the EvalResult the general
+            // unwinder needs, then re-compact.
+            let res = match outcome {
+                NativeCallOutcome::Value(v) => Ok(v),
+                NativeCallOutcome::FlowStashed => {
+                    Err(take_pending_flow().expect("FlowStashed implies a pending flow"))
+                }
+                NativeCallOutcome::Fallback => unreachable!("Fallback resolved before the pop"),
+            };
+            NativeCallOutcome::from_result(
+                ctx.pop_bytecode_backtrace_frame_with_result(bt_count, res),
+            )
+        };
+        match outcome {
+            NativeCallOutcome::Value(value) => {
+                // SAFETY: `out` is the generated code's result stack slot.
+                unsafe { *out = value.bits() as i64 };
+                STATUS_OK
+            }
+            NativeCallOutcome::FlowStashed => STATUS_SIGNAL,
+            NativeCallOutcome::Fallback => {
+                unreachable!("Fallback outcome at the spec-shim boundary")
+            }
+        }
+    })
+}
+
+/// The reference protocol of [`neovm_jit_call_spec`]: the quit poll, the
+/// epoch check and re-validation, and the call through
+/// `Vm::call_armed_callee_native` (which arms the slot's fast-path key) or
+/// the strict path.
+#[inline(never)]
+fn call_spec_slow(
+    ctx: *mut u8,
+    sym: i64,
+    expected: i64,
+    slot: &SpecSlot,
+    args_ptr: *const i64,
+    nargs: usize,
+    out: *mut i64,
+) -> i64 {
+    jit_shim_contain!(ctx, STATUS_SIGNAL, {
         // Build a rooted LispArgVec from the caller's call-args slot — used only by
         // the strict-call fallback paths (call_for_jit), inside their own
         // scratch-root scope. The native-to-native fast path passes `args_ptr`
@@ -995,8 +1209,6 @@ pub extern "C" fn neovm_jit_call_spec(
                 STATUS_SIGNAL
             }
             Ok(()) => {
-                // SAFETY: slot points into the executing leaf's spec_slots.
-                let slot = unsafe { &*(slot as *const SpecSlot) };
                 let slot_epoch = slot.epoch.load(Ordering::Relaxed);
                 // A loader-DISARMED site (epoch == SPEC_EPOCH_DISARMED) is
                 // permanently not-armed: its baked callee/kind disagreed with the
@@ -1027,13 +1239,13 @@ pub extern "C" fn neovm_jit_call_spec(
                             // re-arm and the next call resolves it again
                             // from the function the binding holds now --
                             // one cache lookup per site per epoch move.
-                            slot.leaf.store(0, Ordering::Relaxed);
+                            slot.clear_leaf();
                             slot.epoch.store(epoch, Ordering::Relaxed);
                             true
                         } else {
                             // The binding changed: drop any cached callee leaf so
                             // a later re-arm can't reuse a stale callee.
-                            slot.leaf.store(0, Ordering::Relaxed);
+                            slot.clear_leaf();
                             false
                         }
                     }
@@ -1054,7 +1266,7 @@ pub extern "C" fn neovm_jit_call_spec(
                     // whole native run) can reach a GC safe point, and
                     // `Vm::from_context`'s eager cache zero-fill was a
                     // measured per-call tax.
-                    match Vm::call_armed_callee_native(ctx, target, &slot.leaf, args_ptr, nargs) {
+                    match Vm::call_armed_callee_native(ctx, target, slot, args_ptr, nargs) {
                         Some(o) => o,
                         None => NativeCallOutcome::from_result(call_for_jit_from_native(
                             ctx, target, args_ptr, nargs,

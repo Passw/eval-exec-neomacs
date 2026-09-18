@@ -6811,11 +6811,10 @@ impl<'a> Vm<'a> {
     pub(crate) fn call_armed_callee_native(
         ctx: &mut crate::emacs_core::eval::Context,
         callee: Value,
-        leaf_slot: &core::sync::atomic::AtomicU64,
+        slot: &crate::emacs_core::jit::compile::SpecSlot,
         args_ptr: *const i64,
         nargs: usize,
     ) -> Option<crate::emacs_core::jit::cache::NativeCallOutcome> {
-        use core::sync::atomic::Ordering;
         // GNU `bytecode.c:798`: a `Bcall` with `debug_on_next_call` set must
         // record a frame and enter the entry debugger.  This native-to-native
         // fast path has no way to run Lisp mid-call, so it deopts exactly the
@@ -6825,13 +6824,21 @@ impl<'a> Vm<'a> {
         if ctx.debug_on_next_call_is_armed() {
             return None;
         }
-        let mut ptr = leaf_slot.load(Ordering::Relaxed)
-            as *const crate::emacs_core::jit::compile::CompiledLeaf;
+        let mut ptr = slot.leaf_ptr();
         let bc = if ptr.is_null() {
             let bc = callee.get_bytecode_data()?;
             let ctx_ptr = core::ptr::from_mut(&mut *ctx);
             ptr = crate::emacs_core::jit::cache::resolve_compiled_leaf_ptr(ctx_ptr, bc)?;
-            leaf_slot.store(ptr as usize as u64, Ordering::Relaxed);
+            // Arm the shim's fast-path key with the leaf: this site's
+            // argument count is fixed, so whether the leaf takes the call's
+            // arguments as they are is decided here, once.
+            // SAFETY: `ptr` names a cache-held leaf (see below).
+            let direct = if unsafe { (*ptr).is_pure_passthrough(nargs) } {
+                bc.constants.as_ptr()
+            } else {
+                core::ptr::null()
+            };
+            slot.arm_leaf(ptr, direct);
             bc
         } else {
             // A cached leaf is the proof that `get_bytecode_data` once ran
@@ -6863,7 +6870,8 @@ impl<'a> Vm<'a> {
         // calls, not of every native-to-native call.
         #[cfg(any(test, debug_assertions))]
         if leaf.accepts(nargs) {
-            crate::emacs_core::jit::compile::SPEC_FAST_CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+            crate::emacs_core::jit::compile::SPEC_FAST_CALL_COUNT
+                .fetch_add(1, core::sync::atomic::Ordering::Relaxed);
         }
         Self::run_leaf_native_to_native(ctx, callee, bc, leaf, args_ptr, nargs)
     }
@@ -7099,30 +7107,6 @@ impl<'a> Vm<'a> {
             }
         }
         use crate::emacs_core::jit::cache::NativeCallOutcome;
-        // Defensive interpreter rerun for the Fallback outcomes (a plain
-        // Deopt only arises with a null ctx — never here).
-        // Cold defensive path: a full Vm is fine here. A plain fn, not a
-        // closure — the closure's environment setup was a measured per-call
-        // cost on the hot path that never takes this branch.
-        #[cold]
-        #[inline(never)]
-        fn interp_fallback(
-            ctx_ptr: *mut crate::emacs_core::eval::Context,
-            bc: &ByteCodeFunction,
-            callee: Value,
-            args_ptr: *const i64,
-            nargs: usize,
-        ) -> crate::emacs_core::jit::cache::NativeCallOutcome {
-            let mut args = Vec::with_capacity(nargs);
-            for i in 0..nargs {
-                // SAFETY: args_ptr addresses `nargs` valid words.
-                args.push(Value::from_bits(unsafe { *args_ptr.add(i) } as usize));
-            }
-            let mut vm = Vm::from_context(unsafe { &mut *ctx_ptr });
-            crate::emacs_core::jit::cache::NativeCallOutcome::from_result(
-                vm.execute_with_func_value(bc, args, callee),
-            )
-        }
         /// Normalize the caller's call-args slot into the leaf's ABI and run
         /// it — the callee has `&optional` slots to nil-pad or a `&rest` tail
         /// to cons, so it is not a pure pass-through.
@@ -7185,7 +7169,7 @@ impl<'a> Vm<'a> {
                 slots.as_ptr(),
             ) {
                 NativeCallOutcome::Fallback => {
-                    interp_fallback(ctx_ptr, bc, callee, args_ptr, nargs)
+                    Vm::interp_fallback_native(ctx_ptr, bc, callee, args_ptr, nargs)
                 }
                 o => o,
             }
@@ -7201,7 +7185,7 @@ impl<'a> Vm<'a> {
                     ctx_ptr, bc, callee, leaf, args_ptr,
                 ) {
                     NativeCallOutcome::Fallback => {
-                        interp_fallback(ctx_ptr, bc, callee, args_ptr, nargs)
+                        Vm::interp_fallback_native(ctx_ptr, bc, callee, args_ptr, nargs)
                     }
                     o => o,
                 }
@@ -7232,6 +7216,33 @@ impl<'a> Vm<'a> {
         Some(NativeCallOutcome::from_result(
             ctx.pop_bytecode_backtrace_frame_with_result(bt_count, res),
         ))
+    }
+
+    /// Defensive interpreter rerun of a native callee whose run asked for
+    /// it (a rerun-from-start deopt): the caller's call-args slot becomes
+    /// the interpreter frame's arguments. Cold, and a plain fn rather than a
+    /// closure -- the closure's environment setup was a measured per-call
+    /// cost on the hot path that never takes this branch.
+    #[cfg(feature = "jit")]
+    #[cold]
+    #[inline(never)]
+    pub(crate) fn interp_fallback_native(
+        ctx_ptr: *mut crate::emacs_core::eval::Context,
+        bc: &ByteCodeFunction,
+        callee: Value,
+        args_ptr: *const i64,
+        nargs: usize,
+    ) -> crate::emacs_core::jit::cache::NativeCallOutcome {
+        let mut args = Vec::with_capacity(nargs);
+        for i in 0..nargs {
+            // SAFETY: args_ptr addresses `nargs` valid words.
+            args.push(Value::from_bits(unsafe { *args_ptr.add(i) } as usize));
+        }
+        // SAFETY: the seam-provided dormant Context.
+        let mut vm = Vm::from_context(unsafe { &mut *ctx_ptr });
+        crate::emacs_core::jit::cache::NativeCallOutcome::from_result(
+            vm.execute_with_func_value(bc, args, callee),
+        )
     }
 
     fn call_function_from_stack_args(

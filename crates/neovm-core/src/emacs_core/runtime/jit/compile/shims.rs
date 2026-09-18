@@ -156,6 +156,13 @@ pub(crate) static SPEC_CALL_COUNT: AtomicU64 = AtomicU64::new(0);
 #[cfg(any(test, debug_assertions))]
 pub(crate) static SPEC_FAST_CALL_COUNT: AtomicU64 = AtomicU64::new(0);
 
+/// Test/debug-build counter of the spec shim's OWN fast path (an armed slot
+/// whose leaf takes the call as laid out, entered from the shim's frame):
+/// distinct from [`SPEC_FAST_CALL_COUNT`], which the slow half's
+/// `call_armed_callee_native` also bumps when it runs a cached leaf.
+#[cfg(any(test, debug_assertions))]
+pub(crate) static SPEC_SHIM_FAST_COUNT: AtomicU64 = AtomicU64::new(0);
+
 /// Debug-build counter of speculated direct-SUBR shim entries (all three
 /// shims: general / predicate / equal-including-properties). Test evidence
 /// that the subr-kind sites in `find_spec_sites` + their lowering engage.

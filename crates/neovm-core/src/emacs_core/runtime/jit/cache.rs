@@ -1256,6 +1256,20 @@ fn run_resolved_leaf_native_framed(
     args_ptr: *const i64,
 ) -> NativeCallOutcome {
     let outcome = leaf.call_premarshaled_consts(ctx as *mut u8, func.constants.as_ptr(), args_ptr);
+    finish_framed_run(ctx, func, func_value, outcome)
+}
+
+/// Map a framed native run's outcome to the shim's compact outcome: the
+/// signal fold and the precise-deopt resume. Shared with the spec shim's
+/// fast path, which makes the framed call itself and hands a non-OK
+/// outcome here.
+#[inline(never)]
+pub(crate) fn finish_framed_run(
+    ctx: *mut Context,
+    func: &ByteCodeFunction,
+    func_value: Value,
+    outcome: NativeRun,
+) -> NativeCallOutcome {
     #[cfg(any(test, debug_assertions))]
     count_native_outcome(&outcome);
     match outcome {
@@ -1316,7 +1330,7 @@ fn deopt_resume_outcome(
 /// same machinery `invoke_native` would apply — out of the hot path.
 #[cold]
 #[inline(never)]
-fn direct_call_cold(
+pub(crate) fn direct_call_cold(
     ctx: *mut Context,
     func: &ByteCodeFunction,
     func_value: Value,
@@ -1413,7 +1427,7 @@ pub fn note_seam_interp_fallback() {
 /// `fetch_add` is still a locked read-modify-write on x86, ~20 cycles on
 /// every native call in a release build that reads the total nowhere.
 #[cfg(any(test, debug_assertions))]
-fn count_native_status(status: i64) {
+pub(crate) fn count_native_status(status: i64) {
     use super::compile::{STATUS_DEOPT_AT, STATUS_SIGNAL};
     let counter = if status == STATUS_SIGNAL {
         &NATIVE_SIGNAL_COUNT

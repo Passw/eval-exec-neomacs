@@ -516,10 +516,7 @@ impl CompiledLeaf {
                     (SPEC_EPOCH_DISARMED, 0)
                 }
             };
-            spec_slots_vec.push(SpecSlot {
-                epoch: AtomicU64::new(epoch),
-                leaf: AtomicU64::new(0),
-            });
+            spec_slots_vec.push(SpecSlot::at_epoch(epoch));
             spec_expected_vec.push(expected);
         }
         let spec_slots: Box<[SpecSlot]> = spec_slots_vec.into_boxed_slice();
