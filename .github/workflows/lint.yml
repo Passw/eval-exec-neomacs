@@ -49,6 +49,19 @@ jobs:
           # it was meant to catch.
           go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml
 
+      # ubuntu-24.04 no longer ships shellcheck, and the step below dies with
+      # exit 127 -- "shellcheck: command not found" -- which the run reports as
+      # a lint FAILURE rather than a missing linter.  Pinned for the same reason
+      # actionlint is: the findings, and so whether this job is red, differ
+      # between versions.
+      - name: Install shellcheck
+        run: |
+          curl -sSfL -o /tmp/shellcheck.tar.xz \
+            https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
+          sudo install -m 0755 /tmp/shellcheck-v0.11.0/shellcheck /usr/local/bin/shellcheck
+          shellcheck --version
+
       - name: Lint release shell contracts
         run: |
           # -x so sourced helpers are followed. The packaging scripts are in
