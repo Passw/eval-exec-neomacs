@@ -11713,6 +11713,42 @@ fn set_buffer_multibyte_refreshes_the_window_start_from_its_marker() {
     assert_eq!(result, "OK 12");
 }
 
+/// Once `inhibit-modification-hooks` is buffer-local somewhere -- the
+/// code-conversion work buffer makes it so, as GNU's does -- the symbol is
+/// a BLV, and the per-change read must answer with the current buffer's
+/// binding when it has one and the default otherwise: a buffer that set it
+/// locally runs no hooks, another buffer still does, and a `let` there (the
+/// default binding) still inhibits.
+#[test]
+fn text_property_writes_read_a_buffer_local_inhibit_modification_hooks() {
+    crate::test_utils::init_test_tracing();
+    let result = eval_one(
+        "(let ((log nil) (a (get-buffer-create \" imh-a\")) (b (get-buffer-create \" imh-b\")))
+           (set-default (quote after-change-functions)
+                        (list (lambda (beg end _l)
+                                (setq log (cons (list (buffer-name) beg end) log)))))
+           (set-buffer a)
+           (insert \"hello\")
+           (make-local-variable (quote inhibit-modification-hooks))
+           (setq inhibit-modification-hooks t)
+           (put-text-property 1 3 (quote face) (quote bold))
+           (set-buffer b)
+           (insert \"world\")
+           (put-text-property 1 3 (quote face) (quote bold))
+           (let ((inhibit-modification-hooks t))
+             (put-text-property 3 5 (quote face) (quote bold)))
+           (put-text-property 4 6 (quote face) (quote italic))
+           (nreverse log))",
+    );
+    // The two inserts fire (nothing inhibits them yet); the put in `imh-a`
+    // is silenced by its buffer-local `t`, the `let`-bound put in `imh-b` by
+    // the default binding; the other two puts in `imh-b` fire.
+    assert_eq!(
+        result,
+        "OK ((\" imh-a\" 1 6) (\" imh-b\" 1 6) (\" imh-b\" 1 3) (\" imh-b\" 4 6))"
+    );
+}
+
 /// `inhibit-modification-hooks` is read straight off its `DEFVAR_BOOL`
 /// forwarder on every text-property write. A `let` stores through that cell
 /// (`store_symval_forwarding`), so the flag must track the binding both ways:

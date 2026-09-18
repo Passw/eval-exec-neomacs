@@ -230,8 +230,13 @@ pub(crate) fn inhibit_modification_hooks(ctx: &crate::emacs_core::eval::Context)
                 // SAFETY: `redirect() == Forwarded` means `val.fwd` is the live
                 // field, and every forwarder is leaked at registration.
                 let fwd: &'static crate::emacs_core::forward::LispFwd = unsafe { &*s.val.fwd };
-                if let Some(flag) = fwd.as_bool_fwd() {
-                    return flag.get();
+                // Whichever forwarder this runtime installed for it -- the
+                // `DEFVAR_BOOL` flag, or an object cell when the symbol was
+                // adopted as a global object variable -- `load_ref` is the
+                // one-load read of `do_symval_forwarding`; only a buffer
+                // object forwarder (never this symbol) answers `None`.
+                if let Some(value) = fwd.load_ref() {
+                    return value.is_truthy();
                 }
             }
             SymbolRedirect::Plainval => {
@@ -240,7 +245,34 @@ pub(crate) fn inhibit_modification_hooks(ctx: &crate::emacs_core::eval::Context)
                     .symbol_value_id(sym)
                     .is_some_and(|v| !v.is_unbound() && v.is_truthy());
             }
-            SymbolRedirect::Varalias | SymbolRedirect::Localized => {}
+            // The arm a booted session takes: the code-conversion work buffer
+            // makes the variable buffer-local in itself, exactly as GNU's
+            // `make_conversion_work_buffer` does (`Fmake_local_variable`,
+            // coding.c), so after the first conversion the symbol is a BLV
+            // for good. GNU still reads it as one C load because the BLV
+            // swaps the current buffer's value into the forwarded cell on
+            // every buffer switch; here it is the current buffer's binding
+            // if it has one, else the BLV's default -- `find_symbol_value`'s
+            // order, at the cost of one gated buffer-local probe.
+            SymbolRedirect::Localized => {
+                // The BLV's where-buffer cache is GNU's swapped-in cell: on a
+                // hit this is an epoch compare and a cons cdr, where the
+                // per-buffer binding map cost ~120 instructions a read.
+                if let Some(buf) = ctx.buffers.current_buffer()
+                    && let Some(value) = ctx.obarray.read_localized_for_buffer(
+                        sym,
+                        buf.id,
+                        buf.local_var_alist_value(),
+                    )
+                {
+                    return !value.is_unbound() && value.is_truthy();
+                }
+                return ctx
+                    .obarray
+                    .symbol_value_id(sym)
+                    .is_some_and(|v| !v.is_unbound() && v.is_truthy());
+            }
+            SymbolRedirect::Varalias => {}
         }
     }
     let sym = crate::emacs_core::hook_runtime::hook_symbol_by_id(ctx, sym);

@@ -279,11 +279,17 @@ fn current_textprop_variable_value(
     // buffer-local binding, so skip the current-buffer probe (a map lookup +
     // a call) entirely — these reads run several times per char-property
     // lookup.
+    // A localized one is read through the BLV's where-buffer cache (GNU's
+    // swapped-in cell: an epoch compare and a cons cdr on a hit), which
+    // answers with the buffer's binding or the default -- the per-buffer
+    // binding map it went through before cost ~110 instructions a read,
+    // three reads per char-property lookup under font-lock.
     if obarray.is_localized(sym_id)
         && let Some(buf) = buffers.current_buffer()
-        && let Some(binding) = buf.get_buffer_local_binding_by_sym_id_gated(sym_id, true)
+        && let Some(value) =
+            obarray.read_localized_for_buffer(sym_id, buf.id, buf.local_var_alist_value())
     {
-        return binding.as_value();
+        return (!value.is_unbound()).then_some(value);
     }
     obarray.symbol_value_id_copied(sym_id)
 }
