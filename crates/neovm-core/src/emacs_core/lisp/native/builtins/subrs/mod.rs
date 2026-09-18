@@ -3853,16 +3853,23 @@ pub(crate) fn register_subrs(ctx: &mut crate::emacs_core::eval::Context) {
         NativeFn::ContextVec(|_ctx, args| crate::emacs_core::charset::builtin_charset_plist(args)),
         SubrArity::new(1, Some(1)),
     ));
+    // A coding system's memoized `:ascii-compatible-p`/`:category` are
+    // computed from its charsets (`compute_coding_ascii_compat`,
+    // `compute_coding_category`), so a charset defined, redefined or
+    // aliased after the memo filled would leave it stale: the two charset
+    // writers drop the coding-system memo too.
     ctx.register_subr(SubrSpec::new(
         "define-charset-internal",
-        NativeFn::ContextVec(|_ctx, args| {
+        NativeFn::ContextVec(|ctx, args| {
+            ctx.coding_systems.invalidate_lookup_cache();
             crate::emacs_core::charset::builtin_define_charset_internal(args)
         }),
         SubrArity::new(17, None),
     ));
     ctx.register_subr(SubrSpec::new(
         "define-charset-alias",
-        NativeFn::ContextVec(|_ctx, args| {
+        NativeFn::ContextVec(|ctx, args| {
+            ctx.coding_systems.invalidate_lookup_cache();
             crate::emacs_core::charset::builtin_define_charset_alias(args)
         }),
         SubrArity::new(2, Some(2)),

@@ -795,6 +795,29 @@ impl CodingSystemInfo {
 // CodingSystemManager
 // ---------------------------------------------------------------------------
 
+/// What the accessor builtins answer for one coding-system symbol, memoized.
+///
+/// GNU keeps a coding system's plist, base and eol-type in its spec vector
+/// (`CODING_ATTR_PLIST`, `Fcoding_system_base`, `Fcoding_system_eol_type`:
+/// one hash lookup and an `AREF`), and `coding-system-get` is Lisp over
+/// `coding-system-plist`. Here every accessor resolved names through
+/// strings -- symbol to `String`, alias walk, EOL-suffix stripping, bucket
+/// name, then `intern` for each key of a freshly consed plist -- about 6,400
+/// instructions per `coding-system-plist`, 20-40x GNU, and
+/// `sort-coding-systems` (125 systems, every `org-mode` activation) took
+/// 12 ms to GNU's 2.4 ms. The answers depend only on the registry, so they
+/// are computed once per symbol and dropped whenever the registry changes
+/// (`register`, `add_alias`, `get_mut` -- the only writers). `eol-type`
+/// memoizes fixnums only: GNU returns a fresh copy of an undecided system's
+/// vector, and so does the uncached path.
+#[derive(Default)]
+struct CodingLookupCache {
+    plist: HashMap<SymId, Value>,
+    base: HashMap<SymId, Value>,
+    eol_type: HashMap<SymId, Value>,
+    coding_type: HashMap<SymId, Value>,
+}
+
 /// Central registry for all coding systems and their aliases.
 pub struct CodingSystemManager {
     /// Registered coding systems, keyed by canonical name.
@@ -810,6 +833,9 @@ pub struct CodingSystemManager {
     keyboard_coding: SymId,
     /// Current terminal coding system.
     terminal_coding: SymId,
+    /// Memoized accessor answers (see [`CodingLookupCache`]); interior
+    /// mutability because the accessors take `&self`.
+    lookup_cache: std::cell::RefCell<CodingLookupCache>,
 }
 
 impl CodingSystemManager {
@@ -822,6 +848,7 @@ impl CodingSystemManager {
             priority: Vec::new(),
             keyboard_coding: intern("utf-8-unix"),
             terminal_coding: intern("utf-8-unix"),
+            lookup_cache: Default::default(),
         };
 
         // Register standard coding systems
@@ -1211,6 +1238,7 @@ impl CodingSystemManager {
 
     /// Register a coding system.
     fn register(&mut self, info: CodingSystemInfo) {
+        self.invalidate_lookup_cache();
         let name = info.name;
         self.systems.insert(name, info);
         self.alias_order.entry(name).or_insert_with(|| vec![name]);
@@ -1239,6 +1267,8 @@ impl CodingSystemManager {
 
     /// Look up a coding system mutably by name (resolving aliases).
     pub fn get_mut(&mut self, name: &str) -> Option<&mut CodingSystemInfo> {
+        // The caller may change anything the accessors memoize.
+        self.invalidate_lookup_cache();
         let canonical = self.resolve(name)?;
         self.systems.get_mut(&canonical)
     }
@@ -1338,6 +1368,7 @@ impl CodingSystemManager {
 
     /// Add an alias mapping.
     pub fn add_alias(&mut self, alias: &str, target: &str) {
+        self.invalidate_lookup_cache();
         let alias_id = intern(alias);
         let target_id = self.resolve(target).unwrap_or_else(|| intern(target));
         self.aliases.insert(alias_id, target_id);
@@ -1427,7 +1458,18 @@ impl CodingSystemManager {
             priority,
             keyboard_coding,
             terminal_coding,
+            lookup_cache: Default::default(),
         }
+    }
+
+    /// Drop every memoized accessor answer: the registry -- or the charset
+    /// registry two of the answers are computed from -- is about to change.
+    pub(crate) fn invalidate_lookup_cache(&self) {
+        let mut cache = self.lookup_cache.borrow_mut();
+        cache.plist.clear();
+        cache.base.clear();
+        cache.eol_type.clear();
+        cache.coding_type.clear();
     }
 
     /// Collect GC roots from coding system properties.
@@ -1439,6 +1481,18 @@ impl CodingSystemManager {
             for value in info.int_properties.values() {
                 roots.push(*value);
             }
+        }
+        // The memoized plists are consed lists; the other answers are
+        // symbols and fixnums, rooted for uniformity.
+        let cache = self.lookup_cache.borrow();
+        for value in cache
+            .plist
+            .values()
+            .chain(cache.base.values())
+            .chain(cache.eol_type.values())
+            .chain(cache.coding_type.values())
+        {
+            roots.push(*value);
         }
     }
 }
@@ -2074,6 +2128,22 @@ pub(crate) fn builtin_coding_system_plist(
     mgr: &CodingSystemManager,
     args: Vec<Value>,
 ) -> EvalResult {
+    // Memoized per coding-system symbol (see `CodingLookupCache`); an
+    // argument that is not a symbol, and any error, takes the full path.
+    let key = args.first().and_then(|value| value.as_symbol_id());
+    if let Some(key) = key
+        && let Some(value) = mgr.lookup_cache.borrow().plist.get(&key)
+    {
+        return Ok(*value);
+    }
+    let value = builtin_coding_system_plist_uncached(mgr, args)?;
+    if let Some(key) = key {
+        mgr.lookup_cache.borrow_mut().plist.insert(key, value);
+    }
+    Ok(value)
+}
+
+fn builtin_coding_system_plist_uncached(mgr: &CodingSystemManager, args: Vec<Value>) -> EvalResult {
     expect_args("coding-system-plist", &args, 1)?;
     if args[0].is_string() {
         return Err(signal(
@@ -2290,6 +2360,22 @@ pub(crate) fn builtin_coding_system_base(
     mgr: &CodingSystemManager,
     args: Vec<Value>,
 ) -> EvalResult {
+    // Memoized per coding-system symbol (see `CodingLookupCache`); an
+    // argument that is not a symbol, and any error, takes the full path.
+    let key = args.first().and_then(|value| value.as_symbol_id());
+    if let Some(key) = key
+        && let Some(value) = mgr.lookup_cache.borrow().base.get(&key)
+    {
+        return Ok(*value);
+    }
+    let value = builtin_coding_system_base_uncached(mgr, args)?;
+    if let Some(key) = key {
+        mgr.lookup_cache.borrow_mut().base.insert(key, value);
+    }
+    Ok(value)
+}
+
+fn builtin_coding_system_base_uncached(mgr: &CodingSystemManager, args: Vec<Value>) -> EvalResult {
     expect_args("coding-system-base", &args, 1)?;
     let name = coding_symbol_name(&args[0])?;
     let resolved_name = resolve_runtime_name(mgr, &name)
@@ -2303,6 +2389,27 @@ pub(crate) fn builtin_coding_system_base(
 /// Returns 0 (unix), 1 (dos), 2 (mac), or a vector of three sub-coding-systems
 /// if the EOL type is undecided.
 pub(crate) fn builtin_coding_system_eol_type(
+    mgr: &CodingSystemManager,
+    args: Vec<Value>,
+) -> EvalResult {
+    // Memoized per coding-system symbol (see `CodingLookupCache`); an
+    // argument that is not a symbol, and any error, takes the full path.
+    let key = args.first().and_then(|value| value.as_symbol_id());
+    if let Some(key) = key
+        && let Some(value) = mgr.lookup_cache.borrow().eol_type.get(&key)
+    {
+        return Ok(*value);
+    }
+    let value = builtin_coding_system_eol_type_uncached(mgr, args)?;
+    if let Some(key) = key
+        && value.is_fixnum()
+    {
+        mgr.lookup_cache.borrow_mut().eol_type.insert(key, value);
+    }
+    Ok(value)
+}
+
+fn builtin_coding_system_eol_type_uncached(
     mgr: &CodingSystemManager,
     args: Vec<Value>,
 ) -> EvalResult {
@@ -2387,6 +2494,22 @@ pub(crate) fn builtin_coding_system_type(
     mgr: &CodingSystemManager,
     args: Vec<Value>,
 ) -> EvalResult {
+    // Memoized per coding-system symbol (see `CodingLookupCache`); an
+    // argument that is not a symbol, and any error, takes the full path.
+    let key = args.first().and_then(|value| value.as_symbol_id());
+    if let Some(key) = key
+        && let Some(value) = mgr.lookup_cache.borrow().coding_type.get(&key)
+    {
+        return Ok(*value);
+    }
+    let value = builtin_coding_system_type_uncached(mgr, args)?;
+    if let Some(key) = key {
+        mgr.lookup_cache.borrow_mut().coding_type.insert(key, value);
+    }
+    Ok(value)
+}
+
+fn builtin_coding_system_type_uncached(mgr: &CodingSystemManager, args: Vec<Value>) -> EvalResult {
     expect_args("coding-system-type", &args, 1)?;
     let name = coding_symbol_name(&args[0])?;
     let resolved_name = resolve_runtime_name(mgr, &name)

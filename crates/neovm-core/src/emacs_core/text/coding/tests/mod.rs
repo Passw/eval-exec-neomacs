@@ -2801,3 +2801,109 @@ fn context_eol_conversion_reads_the_defvar_bool_dynamically() {
     let _ = eval.eval_str("(setq inhibit-eol-conversion 'anything)");
     assert_eq!(eval.eol_conversion(), EolConversion::Inhibited);
 }
+
+/// The accessors memoize per coding-system symbol, and every registry
+/// writer drops the memo: an alias re-pointed at another system answers for
+/// the new target, and a property written through `get_mut` shows up in the
+/// next plist. Memoized plists are the same object call to call, as GNU's
+/// `CODING_ATTR_PLIST` is.
+#[test]
+fn accessor_memo_follows_every_registry_change() {
+    let mut m = mgr();
+    let utf8 = Value::symbol("utf-8");
+    let first = builtin_coding_system_plist(&m, vec![utf8]).expect("plist");
+    let second = builtin_coding_system_plist(&m, vec![utf8]).expect("plist");
+    assert_eq!(first.bits(), second.bits(), "memoized: one object");
+    assert_eq!(
+        builtin_coding_system_base(&m, vec![Value::symbol("utf-8-unix")])
+            .expect("base")
+            .as_symbol_name(),
+        Some("utf-8")
+    );
+
+    m.add_alias("memo-test-alias", "utf-8");
+    let alias = Value::symbol("memo-test-alias");
+    assert_eq!(
+        builtin_coding_system_base(&m, vec![alias])
+            .expect("base")
+            .as_symbol_name(),
+        Some("utf-8")
+    );
+    m.add_alias("memo-test-alias", "iso-latin-1");
+    assert_eq!(
+        builtin_coding_system_base(&m, vec![alias])
+            .expect("base")
+            .as_symbol_name(),
+        Some("iso-latin-1"),
+        "re-pointed alias: the memo was dropped"
+    );
+
+    // `coding-system-put` is the Lisp-visible writer (it reaches the info
+    // through `get_mut`, which drops the memo).
+    let key = intern(":memo-test-prop");
+    builtin_coding_system_put(
+        &mut m,
+        vec![
+            utf8,
+            Value::from_sym_id(key),
+            Value::symbol("memo-test-value"),
+        ],
+    )
+    .expect("put");
+    let third = builtin_coding_system_plist(&m, vec![utf8]).expect("plist");
+    assert_ne!(first.bits(), third.bits(), "a new plist after the write");
+    let items = crate::emacs_core::value::list_to_vec(&third).expect("list");
+    let at = items
+        .iter()
+        .position(|v| v.as_symbol_id() == Some(key))
+        .expect("the written property is in the plist");
+    assert_eq!(items[at + 1].as_symbol_name(), Some("memo-test-value"));
+}
+
+/// `coding-system-eol-type` of an undecided system is a vector, and GNU
+/// hands back a fresh copy each time (`Fcopy_sequence`): the memo must not
+/// share one, or an `aset` on the answer would leak into the next.
+#[test]
+fn eol_type_vector_answers_are_fresh_each_call() {
+    let m = mgr();
+    let a = builtin_coding_system_eol_type(&m, vec![Value::symbol("utf-8")]).expect("eol");
+    let b = builtin_coding_system_eol_type(&m, vec![Value::symbol("utf-8")]).expect("eol");
+    assert!(a.is_vector(), "undecided: a vector, got {a:?}");
+    assert_ne!(a.bits(), b.bits(), "two calls, two vectors");
+    let fixnum =
+        builtin_coding_system_eol_type(&m, vec![Value::symbol("utf-8-unix")]).expect("eol");
+    assert_eq!(fixnum.as_fixnum(), Some(0));
+}
+
+/// `:ascii-compatible-p` of a `define-coding-system-internal` system is
+/// computed from its charsets, so defining that charset AFTER the plist was
+/// memoized must change the next answer: the charset writers drop the memo.
+#[test]
+fn defining_a_charset_drops_the_coding_system_memo() {
+    let mut ev = crate::emacs_core::eval::Context::new();
+    let read = |ev: &mut crate::emacs_core::eval::Context| {
+        ev.eval_str("(plist-get (coding-system-plist 'memo-test-cs) :ascii-compatible-p)")
+            .map(|v| crate::emacs_core::print::print_value(&v))
+            .expect("plist")
+    };
+    ev.eval_str(
+        "(define-coding-system-internal 'memo-test-cs ?x 'charset '(memo-test-charset)
+            nil nil nil nil nil nil nil '(:name memo-test-cs :docstring \"\") nil)",
+    )
+    .expect("define coding system");
+    assert_eq!(
+        read(&mut ev),
+        "nil",
+        "an unknown charset is not ASCII-compatible"
+    );
+    ev.eval_str(
+        "(define-charset-internal 'memo-test-charset 1 [33 126 0 0 0 0 0 0]
+            nil nil nil nil nil t nil nil 0 nil nil nil nil nil)",
+    )
+    .expect("define charset");
+    assert_eq!(
+        read(&mut ev),
+        "t",
+        "the memo was dropped by the charset definition"
+    );
+}
