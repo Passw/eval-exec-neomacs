@@ -1203,6 +1203,7 @@ pub(crate) fn run_resolved_leaf(
 /// SAFETY: see [`CompiledLeaf::call_premarshaled`] — `args_ptr` must address
 /// `leaf.arity` live words with no GC safepoint before the native entry reads
 /// them (the spec fast path's `maybe_quit`-returned-Ok window).
+#[inline(always)]
 pub(crate) fn run_resolved_leaf_native(
     ctx: *mut Context,
     func: &ByteCodeFunction,
@@ -1217,6 +1218,11 @@ pub(crate) fn run_resolved_leaf_native(
     // shim the caller invokes (see CompiledLeaf::direct_call_eligible for the
     // containment/soundness argument). Non-OK statuses are routed through
     // the same machinery invoke_native would use, out of line.
+    //
+    // `#[inline(always)]`: this is the eligibility test, the raw entry call
+    // and a status compare; as a separate function it cost the call shims a
+    // frame of its own (prologue, epilogue and the call) on every native
+    // call. The framed half and every cold exit stay out of line.
     if leaf.direct_call_eligible() {
         let mut out: i64 = 0;
         // SAFETY: args_ptr addresses leaf.arity live words (the caller's
@@ -1226,13 +1232,31 @@ pub(crate) fn run_resolved_leaf_native(
             leaf.entry_call_raw_consts(ctx as *mut u8, func.constants.as_ptr(), args_ptr, &mut out)
         };
         if status == super::compile::STATUS_OK {
+            #[cfg(any(test, debug_assertions))]
             NATIVE_OK_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return NativeCallOutcome::Value(Value::from_bits(out as usize));
         }
+        #[cfg(any(test, debug_assertions))]
         count_native_status(status);
         return direct_call_cold(ctx, func, func_value, leaf, status);
     }
+    run_resolved_leaf_native_framed(ctx, func, func_value, leaf, args_ptr)
+}
+
+/// The framed half of [`run_resolved_leaf_native`]: a body with bindings,
+/// handler frames or a sidecar runs under its own `invoke_native` frame.
+/// Out of line so the direct path above, inlined into the call shims, stays
+/// a raw entry call and a status compare.
+#[inline(never)]
+fn run_resolved_leaf_native_framed(
+    ctx: *mut Context,
+    func: &ByteCodeFunction,
+    func_value: Value,
+    leaf: &CompiledLeaf,
+    args_ptr: *const i64,
+) -> NativeCallOutcome {
     let outcome = leaf.call_premarshaled_consts(ctx as *mut u8, func.constants.as_ptr(), args_ptr);
+    #[cfg(any(test, debug_assertions))]
     count_native_outcome(&outcome);
     match outcome {
         NativeRun::Ok(bits) => NativeCallOutcome::Value(Value::from_bits(bits)),
@@ -1384,6 +1408,11 @@ pub fn note_seam_interp_fallback() {
 
 /// Direct-path variant of [`count_native_outcome`]: the handler-free fast
 /// path never materializes a `NativeRun`, only a raw status word.
+///
+/// Test/debug builds only, like the spec-site counters: a relaxed
+/// `fetch_add` is still a locked read-modify-write on x86, ~20 cycles on
+/// every native call in a release build that reads the total nowhere.
+#[cfg(any(test, debug_assertions))]
 fn count_native_status(status: i64) {
     use super::compile::{STATUS_DEOPT_AT, STATUS_SIGNAL};
     let counter = if status == STATUS_SIGNAL {
@@ -1396,6 +1425,7 @@ fn count_native_status(status: i64) {
     counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 }
 
+#[cfg(any(test, debug_assertions))]
 fn count_native_outcome(outcome: &NativeRun) {
     let counter = match outcome {
         NativeRun::Ok(_) => &NATIVE_OK_COUNT,
@@ -1424,6 +1454,7 @@ fn finish_native_run(
     func_value: Value,
     outcome: NativeRun,
 ) -> Result<Option<usize>, Flow> {
+    #[cfg(any(test, debug_assertions))]
     count_native_outcome(&outcome);
     match outcome {
         NativeRun::Ok(bits) => Ok(Some(bits)),

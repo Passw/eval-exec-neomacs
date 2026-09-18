@@ -1512,23 +1512,35 @@ pub extern "C" fn neovm_jit_pred_spec(
             _ if let Some(type_symbol) = crate::emacs_core::builtins::types::record_type_of(v) => {
                 type_symbol
             }
-            _ => {
-                let answer = if kind == PRED_KIND_TYPE_OF {
-                    crate::emacs_core::builtins::types::builtin_type_of(&[v])
-                } else {
-                    debug_assert_eq!(kind, PRED_KIND_CL_TYPE_OF);
-                    crate::emacs_core::builtins::types::builtin_cl_type_of(&[v])
-                };
-                match answer {
-                    Ok(value) => value,
-                    Err(_) => return STATUS_NEED_GENERIC,
-                }
-            }
+            _ => match pred_spec_type_of_non_record(kind, v) {
+                Some(value) => value,
+                None => return STATUS_NEED_GENERIC,
+            },
         };
         // SAFETY: `out` is the generated code's result stack slot.
         unsafe { *out = result.bits() as i64 };
         STATUS_OK
     })
+}
+
+/// The `type-of`/`cl-type-of` arm of [`neovm_jit_pred_spec`] for a value that
+/// is not a record: the registered builtin bodies, which classify by tag and
+/// header and return an existing symbol (no allocation, no Lisp, no safe
+/// point). `None` = the builtin signalled (unreachable at arity 1; the site
+/// bounces to the generic call, which raises it from a real frame). Out of
+/// line: the two classifiers are large, and the shim's other arms are a few
+/// loads each -- keeping them in the shim body cost every predicate call
+/// their register spills.
+#[cold]
+#[inline(never)]
+fn pred_spec_type_of_non_record(kind: i64, v: Value) -> Option<Value> {
+    let answer = if kind == PRED_KIND_TYPE_OF {
+        crate::emacs_core::builtins::types::builtin_type_of(&[v])
+    } else {
+        debug_assert_eq!(kind, PRED_KIND_CL_TYPE_OF);
+        crate::emacs_core::builtins::types::builtin_cl_type_of(&[v])
+    };
+    answer.ok()
 }
 
 /// Speculated `equal-including-properties` call (2 args): when armed and the

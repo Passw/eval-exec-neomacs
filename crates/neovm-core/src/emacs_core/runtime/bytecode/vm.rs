@@ -6825,14 +6825,30 @@ impl<'a> Vm<'a> {
         if ctx.debug_on_next_call_is_armed() {
             return None;
         }
-        let bc = callee.get_bytecode_data()?;
         let mut ptr = leaf_slot.load(Ordering::Relaxed)
             as *const crate::emacs_core::jit::compile::CompiledLeaf;
-        if ptr.is_null() {
+        let bc = if ptr.is_null() {
+            let bc = callee.get_bytecode_data()?;
             let ctx_ptr = core::ptr::from_mut(&mut *ctx);
             ptr = crate::emacs_core::jit::cache::resolve_compiled_leaf_ptr(ctx_ptr, bc)?;
             leaf_slot.store(ptr as usize as u64, Ordering::Relaxed);
-        }
+            bc
+        } else {
+            // A cached leaf is the proof that `get_bytecode_data` once ran
+            // on these bits (it is resolved from the instruction stream that
+            // call returned, materializing a mapped stub in place, once, for
+            // good), and the epoch proof above says `callee` -- the site's
+            // baked `expected` bits -- is what the binding holds now, so the
+            // object is alive. That it is bytecode and filled rests on the
+            // heap, not on identity: bytecode lives in a typed arena whose
+            // recycled slots only ever hold a whole `ByteCodeFunction`, and
+            // mapped stubs are never freed. (Identity is NOT proved -- see
+            // the re-validate arm's bits compare in `neovm_jit_call_spec`;
+            // this read is the same the old type-checked one made.) The
+            // type check and stub probe were six instructions per armed call.
+            // SAFETY: as argued.
+            unsafe { callee.bytecode_data_materialized_by_caller() }
+        };
         // SAFETY: `ptr` names a cache-held leaf, valid here because the tagged-heap
         // identity is STABLE during native execution (the only thing that drops
         // cache leaves is `cache::clear()` on a heap-identity change, and the heap
@@ -7038,12 +7054,15 @@ impl<'a> Vm<'a> {
         args_ptr: *const i64,
         nargs: usize,
     ) -> Option<crate::emacs_core::jit::cache::NativeCallOutcome> {
-        if !leaf.accepts(nargs) {
-            // Wrong arg count: defer to the strict path, which signals
-            // wrong-number-of-arguments exactly as the interpreter would.
+        // An exact fixed-arity match is accepted by construction (required
+        // <= arity == nargs), so the common case answers with one compare;
+        // only a short or long call pays the full lambda-list check. Wrong
+        // arg count: defer to the strict path, which signals
+        // wrong-number-of-arguments exactly as the interpreter would.
+        let pure = leaf.is_pure_passthrough(nargs);
+        if !pure && !leaf.accepts(nargs) {
             return None;
         }
-        let pure = leaf.is_pure_passthrough(nargs);
         // BACKTRACE PARITY (cc-mode clean-build fix): the interpreter call path
         // pushes a backtrace frame for the callee (call_function_from_stack_args);
         // this native-to-native fast path must too, or `backtrace-frame` walks a

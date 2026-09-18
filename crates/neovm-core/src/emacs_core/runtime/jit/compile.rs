@@ -302,10 +302,27 @@ pub(crate) fn force_deopt_for_test(on: bool) {
 /// `NEOVM_JIT_THRESHOLD=1`) stress-tests the slow/re-arm paths everywhere the
 /// armed fast path would normally short-circuit — the spec-machinery analogue
 /// of [`jit_force_deopt`].
+///
+/// One relaxed byte load on the armed fast path: a `OnceLock` answered the
+/// same question with its state load, a compare and the value load on every
+/// speculated call (`neovm_jit_call_spec` and `neovm_jit_pred_spec` both ask).
+#[inline(always)]
 fn jit_force_slow_spec() -> bool {
-    use std::sync::OnceLock;
-    static FORCE: OnceLock<bool> = OnceLock::new();
-    *FORCE.get_or_init(|| std::env::var("NEOVM_JIT_FORCE_SLOW_SPEC").as_deref() == Ok("1"))
+    use std::sync::atomic::{AtomicU8, Ordering};
+    /// 0 = not read yet, 1 = off, 2 = on.
+    static FORCE: AtomicU8 = AtomicU8::new(0);
+    #[cold]
+    #[inline(never)]
+    fn read_knob() -> bool {
+        let on = std::env::var("NEOVM_JIT_FORCE_SLOW_SPEC").as_deref() == Ok("1");
+        FORCE.store(if on { 2 } else { 1 }, Ordering::Relaxed);
+        on
+    }
+    match FORCE.load(Ordering::Relaxed) {
+        1 => false,
+        2 => true,
+        _ => read_knob(),
+    }
 }
 
 /// Verification harness (R2): when `NEOVM_JIT_FORCE_CBSYM_GENERIC=1`, EVERY

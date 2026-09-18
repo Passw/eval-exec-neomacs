@@ -872,7 +872,21 @@ impl CompiledLeaf {
                 ctx.specpdl.len() == spec_base && ctx.jit_bind_stack.len() == stack_base
             },
         };
-        if status == STATUS_SIGNAL || cond_base.is_some() || !bind_frame_clean {
+        if status == STATUS_OK && bind_frame_clean {
+            // The balanced OK exit of a handler-bearing body is the whole of
+            // `cold_frame_exit`'s work for that exit: no panic is parked (a
+            // contained panic leaves via STATUS_SIGNAL), no binding stands,
+            // and the condition-frame truncation is the parity step --
+            // `cleanup_bytecode_frame` truncates to the entry depth whether
+            // the body popped its frames or a caught signal jumped over
+            // them. Inline: the outlined exit cost every `condition-case`
+            // body ~40 instructions of frame setup to do this one truncate.
+            if let Some(base) = cond_base {
+                // SAFETY: the native call has returned; the seam's &mut
+                // Context is still dormant (we are inside its extent).
+                unsafe { (*(vmctx as *mut Context)).truncate_condition_stack(base) };
+            }
+        } else if status == STATUS_SIGNAL || cond_base.is_some() || !bind_frame_clean {
             // Everything below the fast path is a no-op unless a signal is
             // pending or this leaf registered frames — outlined so the hot
             // OK-exit stops paying their register spills.

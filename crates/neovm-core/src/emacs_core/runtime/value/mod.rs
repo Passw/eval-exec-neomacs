@@ -2772,6 +2772,37 @@ impl TaggedValue {
         data
     }
 
+    /// [`Self::bytecode_data_typechecked_by_caller`] for a caller that has
+    /// ALSO proved the object materialized: the JIT's armed spec site, whose
+    /// slot caches a leaf compiled from this very object's instruction
+    /// stream (`get_bytecode_data` materialized it before the leaf could be
+    /// resolved, and a stub is materialized in place, once, for good). Skips
+    /// the type check and the stub probe both — six instructions on a call
+    /// path that runs five million times in a package load.
+    ///
+    /// # Safety
+    /// `self` must be a ByteCode value whose data was materialized by an
+    /// earlier `get_bytecode_data` on the same object (debug-asserted).
+    #[cfg(feature = "jit")]
+    #[inline(always)]
+    pub(crate) unsafe fn bytecode_data_materialized_by_caller(
+        self,
+    ) -> &'static super::bytecode::ByteCodeFunction {
+        debug_assert_eq!(self.veclike_type(), Some(VecLikeType::ByteCode));
+        #[cfg(test)]
+        BYTECODE_DATA_ACCESS_COUNT.with(|count| count.set(count.get() + 1));
+        let ptr = (self.bits() & !TAG_MASK) as *const ByteCodeObj;
+        // SAFETY: the caller's type and materialization proofs (debug-asserted)
+        // establish a live, filled ByteCodeObj; bytecode arena/mapped objects
+        // are immovable.
+        let data = unsafe { &(*ptr).data };
+        debug_assert!(
+            !data.is_pdump_stub(),
+            "caller promised a materialized function"
+        );
+        data
+    }
+
     /// [`Self::get_bytecode_data`] that promises NOT to materialize a lazy
     /// pdump stub (once stubs exist): the peek for scanners that only care
     /// about already-live functions — AOT post-insert marking, PGO drains.
