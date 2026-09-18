@@ -46,6 +46,8 @@ mod issue_254;
 mod mark_region_fill;
 #[path = "menu_bar.rs"]
 mod menu_bar;
+#[path = "minor_mode_order_repro.rs"]
+mod minor_mode_order_repro;
 #[path = "modes.rs"]
 mod modes;
 #[path = "org.rs"]
