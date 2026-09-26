@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use expect_test::expect;
-use neomacs_tui_tests::{RawTerminalSnapshot, TuiSession};
+use expect_test::{expect, expect_file};
+use neomacs_tui_tests::{RawTerminalSnapshot, Snapshot, TuiSession};
 
 use super::{CachedMelpaOracle, LEUVEN_THEME_MELPA_PIN};
 
@@ -489,12 +489,12 @@ fn assert_rendered_rows(
     pair: &PackageTuiPair,
     label: &str,
     needles: &[&str],
-    expected: expect_test::Expect,
+    expected: impl Snapshot,
     neo_mismatches: &mut Vec<String>,
 ) -> String {
     let gnu = ansi_rows(&pair.gnu, needles);
     let neo = ansi_rows(&pair.neo, needles);
-    expected.assert_eq(&gnu);
+    expected.assert_snapshot(&gnu);
     record_neo_mismatch(neo_mismatches, label, &neo, &gnu);
     gnu
 }
@@ -545,7 +545,7 @@ fn leuven_theme_real_color_lifecycle_matches_gnu() {
         BASELINE-RESTORED (:enabled nil :mode dark :direct ("unspecified-fg" "unspecified-bg") :resolved ("unspecified-fg" "unspecified-bg"))
         RESTORATION (:light t :baseline t :second-disable t)
         LEUVEN-TUI-READY"##]];
-    expected.assert_eq(&gnu_report);
+    expected.assert_snapshot(&gnu_report);
     record_neo_mismatch(
         &mut neo_mismatches,
         "public theme lifecycle",
@@ -624,47 +624,7 @@ fn leuven_theme_real_color_lifecycle_matches_gnu() {
     invoke_both(&mut pair, "neomacs-leuven-tui-show-report", "PHASE light");
     let gnu_light_report = lifecycle_report(&pair, true);
     let neo_light_report = lifecycle_report(&pair, false);
-    let light_report = expect![[r##"
-        PHASE light (leuven)
-        SCALE-DIRECT light numeric (1.45 1.25 1.0 1.75 1.75 1.2)
-        SCALE-DIRECT light nil-before-reload (1.45 1.25 1.0 1.75 1.75 1.2)
-        SCALE-DIRECT light nil-after-reload (unspecified unspecified 1.0 unspecified unspecified unspecified)
-        SCALE-DIRECT light default (1.8 1.3 1.0 1.6 1.6 1.1)
-        SCALE-DIRECT light final-numeric (1.45 1.25 1.0 1.75 1.75 1.2)
-        FACE-D default ((:foreground . "#333333") (:background . "#FFFFFF"))
-        FACE-R default ((:foreground . "#333333") (:background . "#FFFFFF"))
-        FACE-D font-lock-comment-face ((:foreground . "#A0A1A7") (:slant . italic))
-        FACE-R font-lock-comment-face ((:foreground . "#A0A1A7") (:slant . italic))
-        FACE-D font-lock-keyword-face ((:foreground . "#0000FF"))
-        FACE-R font-lock-keyword-face ((:foreground . "#0000FF"))
-        FACE-D font-lock-function-name-face ((:foreground . "#006699"))
-        FACE-R font-lock-function-name-face ((:foreground . "#006699"))
-        FACE-D diff-context ((:foreground . "#A0A1A7") (:background . unspecified))
-        FACE-R diff-context ((:foreground . "#A0A1A7") (:background . "#FFFFFF"))
-        FACE-D diff-header ((:foreground . "#800000") (:background . "#FFFFAF") (:weight . bold))
-        FACE-R diff-header ((:foreground . "#800000") (:background . "#FFFFAF") (:weight . bold))
-        FACE-D org-document-title ((:foreground . "black") (:weight . bold) (:height . 1.45))
-        FACE-R org-document-title ((:foreground . "black") (:weight . bold) (:height . 1))
-        FACE-D org-level-1 ((:foreground . "#3C3C3C") (:background . "#F0F0F0") (:height . 1.25))
-        FACE-R org-level-1 ((:foreground . "#3C3C3C") (:background . "#F0F0F0") (:height . 1))
-        FACE-D org-link ((:foreground . "#006DAF") (:underline . t))
-        FACE-R org-link ((:foreground . "#006DAF") (:underline . t))
-        FACE-D org-block ((:foreground . "#000088") (:background . "#FFFFE0"))
-        FACE-R org-block ((:foreground . "#000088") (:background . "#FFFFE0"))
-        RUN Elisp font-lock-comment-delimiter-face ";; "
-        RUN Elisp font-lock-keyword-face "defun"
-        RUN Elisp font-lock-function-name-face "deploy-release"
-        RUN Elisp font-lock-doc-face "\"Ship ARTIFACT safely.\""
-        RUN Org org-document-title "Release Control Ω\n"
-        RUN Org (org-todo org-level-1) "TODO"
-        RUN Org (org-done org-level-2) "DONE"
-        RUN Org org-link "[[https://example.test/runbook][runbook]]"
-        RUN Org org-block-begin-line "#+begin_src emacs-lisp\n"
-        RUN Diff diff-header "diff --git a/release.el b/release.el\n--- "
-        RUN Diff diff-hunk-header "@@ -1,2 +1,2 @@"
-        RUN Diff diff-context " context line\n"
-        RUN Diff diff-indicator-removed "-"
-        RUN Diff diff-indicator-added "+""##]];
+    let light_report = expect_file!["snapshots/light_report.txt"];
     light_report.assert_eq(&gnu_light_report);
     record_neo_mismatch(
         &mut neo_mismatches,
@@ -744,47 +704,7 @@ fn leuven_theme_real_color_lifecycle_matches_gnu() {
     invoke_both(&mut pair, "neomacs-leuven-tui-show-report", "PHASE dark");
     let gnu_dark_report = lifecycle_report(&pair, true);
     let neo_dark_report = lifecycle_report(&pair, false);
-    let dark_report = expect![[r##"
-        PHASE dark (leuven-dark leuven)
-        SCALE-DIRECT dark numeric (1.55 1.35 1.0 1.65 1.65 1.15)
-        SCALE-DIRECT dark nil-before-reload (1.55 1.35 1.0 1.65 1.65 1.15)
-        SCALE-DIRECT dark nil-after-reload (unspecified unspecified 1.0 unspecified unspecified unspecified)
-        SCALE-DIRECT dark default (1.8 1.3 1.0 1.6 1.6 1.1)
-        SCALE-DIRECT dark final-numeric (1.55 1.35 1.0 1.65 1.65 1.15)
-        FACE-D default ((:foreground . "#cfccd2") (:background . "#25202a"))
-        FACE-R default ((:foreground . "#cfccd2") (:background . "#25202a"))
-        FACE-D font-lock-comment-face ((:foreground . "#767283") (:slant . italic))
-        FACE-R font-lock-comment-face ((:foreground . "#767283") (:slant . italic))
-        FACE-D font-lock-keyword-face ((:foreground . "#ffff0b"))
-        FACE-R font-lock-keyword-face ((:foreground . "#ffff0b"))
-        FACE-D font-lock-function-name-face ((:foreground . "#ff996f"))
-        FACE-R font-lock-function-name-face ((:foreground . "#ff996f"))
-        FACE-D diff-context ((:foreground . "#7b777f") (:background . unspecified))
-        FACE-R diff-context ((:foreground . "#7b777f") (:background . "#25202a"))
-        FACE-D diff-header ((:foreground . "#83ffff") (:background . "#252073") (:weight . bold))
-        FACE-R diff-header ((:foreground . "#83ffff") (:background . "#252073") (:weight . bold))
-        FACE-D org-document-title ((:foreground . "#ffffff") (:weight . bold) (:height . 1.55))
-        FACE-R org-document-title ((:foreground . "#ffffff") (:weight . bold) (:height . 1))
-        FACE-D org-level-1 ((:foreground . "#c7c3cb") (:background . "#322d37") (:height . 1.35))
-        FACE-R org-level-1 ((:foreground . "#c7c3cb") (:background . "#322d37") (:height . 1))
-        FACE-D org-link ((:foreground . "#ff925a") (:underline . t))
-        FACE-R org-link ((:foreground . "#ff925a") (:underline . t))
-        FACE-D org-block ((:foreground . "#ffff7f") (:background . "#252046"))
-        FACE-R org-block ((:foreground . "#ffff7f") (:background . "#252046"))
-        RUN Elisp font-lock-comment-delimiter-face ";; "
-        RUN Elisp font-lock-keyword-face "defun"
-        RUN Elisp font-lock-function-name-face "deploy-release"
-        RUN Elisp font-lock-doc-face "\"Ship ARTIFACT safely.\""
-        RUN Org org-document-title "Release Control Ω\n"
-        RUN Org (org-todo org-level-1) "TODO"
-        RUN Org (org-done org-level-2) "DONE"
-        RUN Org org-link "[[https://example.test/runbook][runbook]]"
-        RUN Org org-block-begin-line "#+begin_src emacs-lisp\n"
-        RUN Diff diff-header "diff --git a/release.el b/release.el\n--- "
-        RUN Diff diff-hunk-header "@@ -1,2 +1,2 @@"
-        RUN Diff diff-context " context line\n"
-        RUN Diff diff-indicator-removed "-"
-        RUN Diff diff-indicator-added "+""##]];
+    let dark_report = expect_file!["snapshots/dark_report.txt"];
     dark_report.assert_eq(&gnu_dark_report);
     record_neo_mismatch(
         &mut neo_mismatches,
