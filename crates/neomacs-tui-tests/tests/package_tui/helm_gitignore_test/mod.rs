@@ -2,8 +2,8 @@ use std::fs;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use expect_test::expect;
-use neomacs_tui_tests::TuiSession;
+use expect_test::{expect, expect_file};
+use neomacs_tui_tests::{Snapshot, TuiSession};
 
 use super::{CachedMelpaOracle, HELM_GITIGNORE_MELPA_PIN};
 
@@ -637,11 +637,11 @@ fn assert_helm_semantic_snapshot(
     stage: &str,
     pattern: &str,
     candidates: &[&str],
-    expected: expect_test::Expect,
+    expected: impl Snapshot,
     divergences: &mut Vec<String>,
 ) {
     let gnu = helm_semantic_snapshot(&pair.gnu, pattern, candidates);
-    expected.assert_eq(&gnu);
+    expected.assert_snapshot(&gnu);
     let neo = helm_semantic_snapshot(&pair.neo, pattern, candidates);
     if neo != gnu {
         divergences.push(format!(
@@ -668,11 +668,11 @@ fn terminal_failure_snapshot(session: &TuiSession) -> String {
 fn assert_terminal_failure_parity(
     pair: &PackageTuiPair,
     stage: &str,
-    expected: expect_test::Expect,
+    expected: impl Snapshot,
     divergences: &mut Vec<String>,
 ) {
     let gnu = terminal_failure_snapshot(&pair.gnu);
-    expected.assert_eq(&gnu);
+    expected.assert_snapshot(&gnu);
     let neo = terminal_failure_snapshot(&pair.neo);
     if neo != gnu {
         divergences.push(format!(
@@ -827,10 +827,10 @@ fn assert_gnu_literal_and_parity(
     stage: &str,
     gnu: &str,
     neo: Option<&str>,
-    expected: expect_test::Expect,
+    expected: impl Snapshot,
     divergences: &mut Vec<String>,
 ) {
-    expected.assert_eq(gnu);
+    expected.assert_snapshot(gnu);
     if let Some(neo) = neo.filter(|neo| *neo != gnu) {
         divergences.push(format!("{stage} differs:\nGNU:\n{gnu}\nNeomacs:\n{neo}"));
     }
@@ -907,31 +907,7 @@ fn helm_gitignore_public_workflows_match_gnu() {
         "single selection",
         &gnu,
         neo.as_deref(),
-        expect![[r##"
-            (:buffer (:text "# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode
-            # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode
-
-            ### VisualStudioCode ###
-            .vscode/*
-            !.vscode/settings.json
-            !.vscode/tasks.json
-            !.vscode/launch.json
-            !.vscode/extensions.json
-            !.vscode/*.code-snippets
-
-            # Local History for Visual Studio Code
-            .history/
-
-            # Built Visual Studio Code Extensions
-            *.vsix
-
-            ### VisualStudioCode Patch ###
-            # Ignore all local history of files
-            .history
-            .ionide
-
-            # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode
-            " :point 1 :mode gitignore-mode :modified t :file nil :selected t) :requests ((:request-line "GET /dropdown/templates.json?term=visual HTTP/1.1" :headers ("Accept-encoding: gzip" "Accept: */*" "Connection: close" "Host: 127.0.0.1:<port>" "MIME-Version: 1.0" "User-Agent: <editor>") :body-bytes 0) (:request-line "GET /developers/gitignore/dropdown/templates.json?term=visual HTTP/1.1" :headers ("Accept-encoding: gzip" "Accept: */*" "Connection: close" "Host: 127.0.0.1:<port>" "MIME-Version: 1.0" "User-Agent: <editor>") :body-bytes 0) (:request-line "GET /api/visualstudiocode HTTP/1.1" :headers ("Accept-encoding: gzip" "Accept: */*" "Connection: close" "Host: 127.0.0.1:<port>" "MIME-Version: 1.0" "User-Agent: <editor>") :body-bytes 0) (:request-line "GET /developers/gitignore/api/visualstudiocode HTTP/1.1" :headers ("Accept-encoding: gzip" "Accept: */*" "Connection: close" "Host: 127.0.0.1:<port>" "MIME-Version: 1.0" "User-Agent: <editor>") :body-bytes 0)) :request-urls ("<origin>/dropdown/templates.json?term=visual" "<origin>/api/visualstudiocode") :remaining-plan nil :misses nil :live-clients nil :response-buffers nil)"##]],
+        expect_file!["snapshots/single_selection.txt"],
         &mut divergences,
     );
     eval_both(&mut pair, "(neomacs-helm-gitignore-tui-reset)");
@@ -996,42 +972,7 @@ fn helm_gitignore_public_workflows_match_gnu() {
         "ordered multi-selection",
         &gnu,
         neo.as_deref(),
-        expect![[r##"
-            (:buffer (:text "# Created by https://www.toptal.com/developers/gitignore/api/linux,archlinuxpackages
-            # Edit at https://www.toptal.com/developers/gitignore?templates=linux,archlinuxpackages
-
-            ### ArchLinuxPackages ###
-            *.tar
-            *.tar.*
-            *.jar
-            *.exe
-            *.msi
-            *.zip
-            *.tgz
-            *.log
-            *.log.*
-            *.sig
-
-            pkg/
-            src/
-
-            ### Linux ###
-            *~
-
-            # temporary files which can be created if a process still has a handle open of a deleted file
-            .fuse_hidden*
-
-            # KDE directory preferences
-            .directory
-
-            # Linux trash folder which might appear on any partition or disk
-            .Trash-*
-
-            # .nfs files are created when an open file is removed but is still being accessed
-            .nfs*
-
-            # End of https://www.toptal.com/developers/gitignore/api/linux,archlinuxpackages
-            " :point 1 :mode gitignore-mode :modified t :file nil :selected t) :requests ((:request-line "GET /dropdown/templates.json?term=linux HTTP/1.1" :headers ("Accept-encoding: gzip" "Accept: */*" "Connection: close" "Host: 127.0.0.1:<port>" "MIME-Version: 1.0" "User-Agent: <editor>") :body-bytes 0) (:request-line "GET /developers/gitignore/dropdown/templates.json?term=linux HTTP/1.1" :headers ("Accept-encoding: gzip" "Accept: */*" "Connection: close" "Host: 127.0.0.1:<port>" "MIME-Version: 1.0" "User-Agent: <editor>") :body-bytes 0) (:request-line "GET /api/linux,archlinuxpackages HTTP/1.1" :headers ("Accept-encoding: gzip" "Accept: */*" "Connection: close" "Host: 127.0.0.1:<port>" "MIME-Version: 1.0" "User-Agent: <editor>") :body-bytes 0) (:request-line "GET /developers/gitignore/api/linux,archlinuxpackages HTTP/1.1" :headers ("Accept-encoding: gzip" "Accept: */*" "Connection: close" "Host: 127.0.0.1:<port>" "MIME-Version: 1.0" "User-Agent: <editor>") :body-bytes 0)) :request-urls ("<origin>/dropdown/templates.json?term=linux" "<origin>/api/linux,archlinuxpackages") :remaining-plan nil :misses nil :live-clients nil :response-buffers nil)"##]],
+        expect_file!["snapshots/ordered_multi_selection.txt"],
         &mut divergences,
     );
     eval_both(&mut pair, "(neomacs-helm-gitignore-tui-reset)");
@@ -1323,35 +1264,7 @@ fn helm_gitignore_public_workflows_match_gnu() {
         "edited and saved file",
         &gnu_file,
         neo_file.as_deref(),
-        expect![[
-            r####"# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode
-# Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode
-
-### VisualStudioCode ###
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-!.vscode/*.code-snippets
-
-# Local History for Visual Studio Code
-.history/
-
-# Built Visual Studio Code Extensions
-*.vsix
-
-### VisualStudioCode Patch ###
-# Ignore all local history of files
-.history
-.ionide
-
-# End of https://www.toptal.com/developers/gitignore/api/visualstudiocode
-
-# Project-local release artifacts
-release-output/
-"####
-        ]],
+        expect_file!["snapshots/edited_and_saved_file.txt"],
         &mut divergences,
     );
     let gnu = capture_editor(&mut pair.gnu, "edited-and-saved", "GNU");
@@ -1360,34 +1273,7 @@ release-output/
         "edited and saved buffer",
         &gnu,
         neo.as_deref(),
-        expect![[r##"
-            (:buffer (:text "# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode
-            # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode
-
-            ### VisualStudioCode ###
-            .vscode/*
-            !.vscode/settings.json
-            !.vscode/tasks.json
-            !.vscode/launch.json
-            !.vscode/extensions.json
-            !.vscode/*.code-snippets
-
-            # Local History for Visual Studio Code
-            .history/
-
-            # Built Visual Studio Code Extensions
-            *.vsix
-
-            ### VisualStudioCode Patch ###
-            # Ignore all local history of files
-            .history
-            .ionide
-
-            # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode
-
-            # Project-local release artifacts
-            release-output/
-            " :point 617 :mode gitignore-mode :modified nil :file ".gitignore" :selected t) :requests ((:request-line "GET /dropdown/templates.json?term=visual HTTP/1.1" :headers ("Accept-encoding: gzip" "Accept: */*" "Connection: close" "Host: 127.0.0.1:<port>" "MIME-Version: 1.0" "User-Agent: <editor>") :body-bytes 0) (:request-line "GET /developers/gitignore/dropdown/templates.json?term=visual HTTP/1.1" :headers ("Accept-encoding: gzip" "Accept: */*" "Connection: close" "Host: 127.0.0.1:<port>" "MIME-Version: 1.0" "User-Agent: <editor>") :body-bytes 0) (:request-line "GET /api/visualstudiocode HTTP/1.1" :headers ("Accept-encoding: gzip" "Accept: */*" "Connection: close" "Host: 127.0.0.1:<port>" "MIME-Version: 1.0" "User-Agent: <editor>") :body-bytes 0) (:request-line "GET /developers/gitignore/api/visualstudiocode HTTP/1.1" :headers ("Accept-encoding: gzip" "Accept: */*" "Connection: close" "Host: 127.0.0.1:<port>" "MIME-Version: 1.0" "User-Agent: <editor>") :body-bytes 0)) :request-urls ("<origin>/dropdown/templates.json?term=visual" "<origin>/api/visualstudiocode") :remaining-plan nil :misses nil :live-clients nil :response-buffers nil)"##]],
+        expect_file!["snapshots/edited_and_saved_buffer.txt"],
         &mut divergences,
     );
     drop(pair);
