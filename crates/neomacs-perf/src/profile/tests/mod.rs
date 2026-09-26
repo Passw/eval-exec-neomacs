@@ -491,7 +491,7 @@ fn batch_capture_distinguishes_edit_loop_from_whole_process_scope() {
 }
 
 #[test]
-fn gui_capture_profiles_only_the_app_via_the_frontend_hook() {
+fn gui_capture_profiles_only_the_app_in_the_harness_owned_session() {
     let scratch = tempfile::Builder::new()
         .prefix("neomacs-perf-gui-profile-command-")
         .tempdir_in(crate::workspace_root().join("tmp"))
@@ -502,34 +502,39 @@ fn gui_capture_profiles_only_the_app_via_the_frontend_hook() {
         ProfileScope::EditLoop,
         Duration::from_secs(2),
     );
+    // The GUI frontend launches the editor directly (the display session is
+    // harness-owned infrastructure), so the capture is a Direct wrap: perf
+    // record profiles the editor process, never the compositor.
+    let mut editor = Command::new("target/release/neomacs");
+    editor.arg("-Q");
     let command = capture
-        .wrap(
-            Command::new("tools/bench/gui-run.sh"),
-            CaptureRoute::Adapter("GUI"),
-        )
+        .wrap(editor, CaptureRoute::Direct)
         .expect("wrap GUI command");
 
-    assert_eq!(command.get_program(), "tools/bench/gui-run.sh");
+    assert_eq!(command.get_program(), "perf");
+    let arguments = command
+        .get_args()
+        .map(|argument| argument.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    assert!(arguments.iter().any(|argument| argument == "record"));
+    assert!(arguments.iter().any(|argument| argument == "--"));
+    assert!(arguments
+        .iter()
+        .any(|argument| argument.starts_with("--control=fifo:")));
     let environment = command
         .get_envs()
         .filter_map(|(name, value)| Some((name.to_str()?, value?.to_str()?)))
         .collect::<std::collections::BTreeMap<_, _>>();
-    assert_eq!(environment.get("GUI_PERF_EVENT"), Some(&"cpu-clock:u"));
-    assert_eq!(environment.get("GUI_PERF_FREQUENCY"), Some(&"999"));
-    assert_eq!(environment.get("GUI_PERF_CALL_GRAPH"), Some(&"dwarf,16384"));
-    assert!(
-        environment
-            .get("GUI_PERF_CONTROL")
-            .is_some_and(|control| control.starts_with("fifo:"))
-    );
     assert!(environment.contains_key("NEOMACS_PERF_GATE_PORT"));
     assert!(
-        PathBuf::from(
-            environment
-                .get("GUI_PERF_RECORD")
-                .expect("GUI capture path")
-        )
-        .ends_with("perf.data")
+        !environment
+            .keys()
+            .any(|name| name.starts_with("GUI_PERF_")),
+        "the GUI adapter perf contract retired with tools/bench/gui-run.sh"
+    );
+    assert!(
+        arguments.iter().any(|argument| argument.ends_with("perf.data")),
+        "perf record writes its data below the run directory"
     );
 }
 

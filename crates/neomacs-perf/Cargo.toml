@@ -17,6 +17,7 @@ default = ["native-video"]
 native-video = ["dep:gstreamer", "dep:gstreamer-pbutils"]
 
 [dependencies]
+neomacs-infra = { path = "../neomacs-infra" }
 neomacs-melpa-test-support.workspace = true
 clap.workspace = true
 linux-perf-data.workspace = true
