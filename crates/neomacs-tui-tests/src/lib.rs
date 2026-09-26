@@ -2152,7 +2152,14 @@ mod exact_display_tests;
 #[path = "tests/git_fixture_test.rs"]
 mod git_fixture_tests;
 
+#[cfg(test)]
+#[path = "tests/snapshot_test.rs"]
+mod snapshot_tests;
+
 pub mod git_fixture;
 pub mod package_scenario;
 #[allow(dead_code)]
 pub mod pair;
+
+pub use snapshot::Snapshot;
+pub mod snapshot;

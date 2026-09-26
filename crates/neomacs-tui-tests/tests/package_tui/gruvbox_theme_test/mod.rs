@@ -5,7 +5,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::time::Duration;
 
 use expect_test::{Expect, expect};
-use neomacs_tui_tests::{RawTerminalSnapshot, TuiSession};
+use neomacs_tui_tests::{RawTerminalSnapshot, Snapshot, TuiSession};
 
 use super::{
     COMPAT_GNU_ELPA_PIN, CachedMelpaOracle, GRUVBOX_THEME_MELPA_PIN, ORDERLESS_MELPA_PIN,
@@ -945,7 +945,7 @@ fn report(session: &TuiSession) -> String {
 fn record_pair(
     pair: &PackageTuiPair,
     label: &str,
-    expected: Expect,
+    expected: impl Snapshot,
     mismatches: &mut Vec<String>,
 ) -> String {
     let gnu = report(&pair.gnu);
@@ -953,7 +953,7 @@ fn record_pair(
     if neo != gnu {
         mismatches.push(format!("{label} differs\nGNU:\n{gnu}\nNeo:\n{neo}"));
     }
-    expected.assert_eq(&gnu);
+    expected.assert_snapshot(&gnu);
     gnu
 }
 
@@ -994,7 +994,7 @@ fn record_grid(
     pair: &PackageTuiPair,
     label: &str,
     needles: &[&str],
-    expected: Expect,
+    expected: impl Snapshot,
     mismatches: &mut Vec<String>,
 ) -> String {
     let gnu = catch_phase(&format!("GNU {label} grid"), || {
@@ -1018,14 +1018,14 @@ fn record_grid(
     if neo != gnu {
         mismatches.push(format!("{label} differs\nGNU: {gnu:?}\nNeo: {neo:?}"));
     }
-    expected.assert_eq(&gnu);
+    expected.assert_snapshot(&gnu);
     gnu
 }
 
 fn record_properties(
     pair: &mut PackageTuiPair,
     label: &str,
-    expected: Expect,
+    expected: impl Snapshot,
     mismatches: &mut Vec<String>,
 ) -> String {
     let mut gnu = Vec::new();
@@ -1113,7 +1113,7 @@ fn record_properties(
     if neo != gnu {
         mismatches.push(format!("{label} differs\nGNU:\n{gnu}\nNeo:\n{neo}"));
     }
-    expected.assert_eq(&gnu);
+    expected.assert_snapshot(&gnu);
     gnu
 }
 
@@ -1147,8 +1147,8 @@ fn drive_orderless_completion(session: &mut TuiSession) -> (String, String) {
 
 fn record_orderless_completion(
     pair: &mut PackageTuiPair,
-    grid_expected: Expect,
-    report_expected: Expect,
+    grid_expected: impl Snapshot,
+    report_expected: impl Snapshot,
     mismatches: &mut Vec<String>,
 ) {
     let gnu = catch_phase("GNU real Orderless completion", || {
@@ -1179,14 +1179,14 @@ fn record_orderless_completion(
             "Orderless completion report differs\nGNU:\n{gnu_report}\nNeo:\n{neo_report}"
         ));
     }
-    grid_expected.assert_eq(&gnu_grid);
-    report_expected.assert_eq(&gnu_report);
+    grid_expected.assert_snapshot(&gnu_grid);
+    report_expected.assert_snapshot(&gnu_report);
 }
 
 fn initialize_consumer(
     pair: &mut PackageTuiPair,
     profile: &str,
-    expected: Expect,
+    expected: impl Snapshot,
     mismatches: &mut Vec<String>,
 ) {
     invoke_both(pair, "gt357-use-dark-medium", "; comment Ω");
@@ -1249,14 +1249,14 @@ fn capture_matrix_pair(pair: &mut PackageTuiPair) -> (String, String) {
 fn assert_matrix(
     pair: &mut PackageTuiPair,
     label: &str,
-    expected: Expect,
+    expected: impl Snapshot,
     mismatches: &mut Vec<String>,
 ) {
     let (gnu, neo) = capture_matrix_pair(pair);
     if neo != gnu {
         mismatches.push(format!("{label} differs\nGNU:\n{gnu}\nNeo:\n{neo}"));
     }
-    expected.assert_eq(&gnu);
+    expected.assert_snapshot(&gnu);
 }
 
 fn finish(pair: &mut PackageTuiPair, mismatches: &mut Vec<String>) {
@@ -1461,7 +1461,7 @@ struct StackRenderingExpectations {
 fn record_current_state(
     pair: &mut PackageTuiPair,
     label: &str,
-    expected: Expect,
+    expected: impl Snapshot,
     mismatches: &mut Vec<String>,
 ) -> String {
     let mut gnu = Vec::new();
@@ -1504,7 +1504,7 @@ fn record_current_state(
     if neo != gnu {
         mismatches.push(format!("{label} differs\nGNU:\n{gnu}\nNeo:\n{neo}"));
     }
-    expected.assert_eq(&gnu);
+    expected.assert_snapshot(&gnu);
     gnu
 }
 
