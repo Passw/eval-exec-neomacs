@@ -10,7 +10,7 @@ mod support;
 
 #[path = "overlay_face_render.rs"]
 mod overlay_face_render;
-#[path = "package_tui.rs"]
+#[path = "package_tui/mod.rs"]
 mod package_tui;
 
 #[path = "basic.rs"]

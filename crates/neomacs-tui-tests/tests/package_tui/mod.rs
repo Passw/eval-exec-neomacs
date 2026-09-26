@@ -1,8 +1,14 @@
 //! Interactive package-TUI parity: real MELPA packages rendered in real
 //! PTY pairs.
 //!
-//! This is a distinct Cargo test target so package-screen compatibility can
-//! be selected without compiling test-name conventions into CI shell code.
+//! This is a module of the crate's one `tui` test binary (`Cargo.toml` sets
+//! `autotests = false`), rooted here so the package screens stay selectable as
+//! a group by name: `.config/nextest.toml` keys its group on
+//! `test(~package_tui::)`.
+//!
+//! Each package below lives in `package_tui/<pkg>_test/`, and its module name
+//! is part of that test path — renaming a directory renames the tests the
+//! filter above selects.
 //!
 //! The suite moved here from `neomacs-melpa-tests`: package acquisition is
 //! shared (`neomacs-melpa-test-support`, `neomacs-infra::packages`), so
@@ -134,36 +140,20 @@ impl PackageOracle {
 }
 
 // ── The moved package-screen suites ────────────────────────────────────
+//
+// One directory per package below `package_tui/`, so a package can grow its
+// own fixtures and expected grids without turning into one long file. Module
+// names stay as they were: test names remain `package_tui::<pkg>_test::…`,
+// which is what the nextest group filter selects on.
 
-#[path = "package_tui/ace_window_test.rs"]
 mod ace_window_test;
-
-#[path = "package_tui/beacon_test.rs"]
 mod beacon_test;
-
-#[path = "package_tui/corfu_test.rs"]
 mod corfu_test;
-
-#[path = "package_tui/gruvbox_theme_test.rs"]
 mod gruvbox_theme_test;
-
-#[path = "package_tui/helm_css_scss_test.rs"]
 mod helm_css_scss_test;
-
-#[path = "package_tui/helm_gitignore_test.rs"]
 mod helm_gitignore_test;
-
-#[path = "package_tui/helm_pydoc_test.rs"]
 mod helm_pydoc_test;
-
-#[path = "package_tui/leuven_theme_test.rs"]
 mod leuven_theme_test;
-
-#[path = "package_tui/magit_test.rs"]
 mod magit_test;
-
-#[path = "package_tui/mwim_test.rs"]
 mod mwim_test;
-
-#[path = "package_tui/vertico_test.rs"]
 mod vertico_test;
