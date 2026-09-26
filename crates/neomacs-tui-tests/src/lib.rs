@@ -2148,6 +2148,7 @@ fn visible_row_text(screen: &vt100::Screen, row: u16, columns: u16) -> String {
 #[path = "tests/exact_display_test.rs"]
 mod exact_display_tests;
 
+pub mod git_fixture;
 pub mod package_scenario;
 #[allow(dead_code)]
 pub mod pair;

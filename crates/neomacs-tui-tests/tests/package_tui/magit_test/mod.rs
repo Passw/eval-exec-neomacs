@@ -2,10 +2,40 @@ use std::time::Duration;
 
 use expect_test::expect;
 use neomacs_tui_tests::RawTerminalSnapshot;
+use neomacs_tui_tests::git_fixture::{GitCommitSpec, GitFixtureSpec};
 
 use super::{CachedMelpaOracle, MAGIT_MELPA_PIN};
 
 use super::scenario::{DisplayCheckpoint, PackageTuiScenario, PairTimeout, ReadinessCheckpoint};
+
+/// The repository the log screen is rendered from.
+///
+/// The harness creates it inside each peer's sandbox before that peer boots,
+/// and the sandbox's drop removes it.  Branch, contents, identity and dates are
+/// all pinned here: the expected grid pins the resulting commit hashes, so
+/// nothing may come from the host's git configuration, clock, or timezone.
+const MAGIT_LOG_FIXTURE: GitFixtureSpec = GitFixtureSpec {
+    directory: "repo",
+    branch: "main",
+    file: "tracked.txt",
+    commits: &[
+        GitCommitSpec {
+            subject: "short",
+            timestamp: "2001-02-03T04:05:06+0000",
+            contents: "one\n",
+        },
+        GitCommitSpec {
+            subject: "a deliberately much longer subject",
+            timestamp: "2002-03-04T05:06:07+0000",
+            contents: "one\ntwo\n",
+        },
+        GitCommitSpec {
+            subject: "medium subject",
+            timestamp: "2003-04-05T06:07:08+0000",
+            contents: "one\ntwo\nthree\n",
+        },
+    ],
+};
 
 const MAGIT_LOG_TUI_PRELUDE: &str = r#"
 (require 'magit)
@@ -20,31 +50,11 @@ const MAGIT_LOG_TUI_PRELUDE: &str = r#"
       magit-display-buffer-function #'neomacs-magit-tui-display-same-window
       magit-log-margin
       '(t "%Y-%m-%d %a %H:%M" magit-log-margin-width t 18))
-(let* ((default-directory (file-name-as-directory default-directory))
-       (file (expand-file-name "tracked.txt" default-directory)))
-  (unless (zerop (call-process "git" nil nil nil "init" "-q" "."))
-    (error "git init failed"))
-  (dolist (setting '(("user.name" "A U Thor")
-                     ("user.email" "a.u.thor@example.com")))
-    (unless (zerop (apply #'call-process "git" nil nil nil "config" setting))
-      (error "git config failed: %S" setting)))
-  (cl-labels
-      ((commit (subject timestamp contents)
-         (with-temp-file file
-           (insert contents))
-         (unless (zerop (call-process "git" nil nil nil "add" "tracked.txt"))
-           (error "git add failed"))
-         (let ((process-environment
-                (append (list (concat "GIT_AUTHOR_DATE=" timestamp)
-                              (concat "GIT_COMMITTER_DATE=" timestamp))
-                        process-environment)))
-           (unless (zerop (call-process "git" nil nil nil "commit" "-q" "-m" subject))
-             (error "git commit failed: %s" subject)))))
-    (commit "short" "2001-02-03T04:05:06+0000" "one\n")
-    (commit "a deliberately much longer subject" "2002-03-04T05:06:07+0000"
-            "one\ntwo\n")
-    (commit "medium subject" "2003-04-05T06:07:08+0000" "one\ntwo\nthree\n"))
-  (find-file file)
+(let ((repo (getenv "NEOMACS_TUI_GIT_FIXTURE")))
+  (unless (and repo (file-directory-p repo))
+    (error "NEOMACS_TUI_GIT_FIXTURE is not a directory: %S" repo))
+  (setq default-directory (file-name-as-directory repo))
+  (find-file (expand-file-name "tracked.txt" default-directory))
   (magit-log-buffer-file)
   (when-let* ((warnings (get-buffer "*Warnings*")))
     (kill-buffer warnings))
@@ -62,6 +72,7 @@ fn magit_log_buffer_file_margin_columns_match_gnu_full_screen() {
         })
     };
     let mut pair = PackageTuiScenario::new("magit-log-margin", oracle.prepared_packages())
+        .git_fixture(MAGIT_LOG_FIXTURE)
         .spawn_when_ready(
             ReadinessCheckpoint::new(
                 "Magit log rows",
@@ -75,8 +86,8 @@ fn magit_log_buffer_file_margin_columns_match_gnu_full_screen() {
 
     let expected_ansi_grid = expect![[r#"
         [0;3mFile Edit Options Buffers Tools Magit Help                                                                                                                      [0m
-        [0;1;4;38;2;238;220;130;48;2;51;51;51mCommits in master touching tracked.txt                                                                                                                          [0m
-        [0;38;2;102;102;102;48;2;51;51;51med5bbb1[0;48;2;51;51;51m * [0;38;2;51;51;51;48;2;176;226;255mmaster[0;48;2;51;51;51m medium subject                                                                                          [0;38;2;255;99;71mA U Thor          [0m [0;38;2;204;204;204m2003-04-05 Sat 06:07[0m
+        [0;1;4;38;2;238;220;130;48;2;51;51;51mCommits in main touching tracked.txt                                                                                                                            [0m
+        [0;38;2;102;102;102;48;2;51;51;51med5bbb1[0;48;2;51;51;51m * [0;38;2;51;51;51;48;2;176;226;255mmain[0;48;2;51;51;51m medium subject                                                                                            [0;38;2;255;99;71mA U Thor          [0m [0;38;2;204;204;204m2003-04-05 Sat 06:07[0m
         [0;38;2;102;102;102md7e6cb1[0m * a deliberately much longer subject                                                                             [0;38;2;255;99;71mA U Thor          [0m [0;38;2;204;204;204m2002-03-04 Mon 05:06[0m
         [0;38;2;102;102;102m807ccad[0m * short                                                                                                          [0;38;2;255;99;71mA U Thor          [0m [0;38;2;204;204;204m2001-02-03 Sat 04:05[0m
                                                                                                                                                                         [0m
@@ -128,8 +139,8 @@ fn magit_log_buffer_file_margin_columns_match_gnu_full_screen() {
     expected_ansi_grid.assert_eq(&gnu_snapshot.ansi_grid());
     let expected_plain_grid = expect![[r#"
          0 |File␠Edit␠Options␠Buffers␠Tools␠Magit␠Help␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠|
-         1 |Commits␠in␠master␠touching␠tracked.txt␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠|
-         2 |ed5bbb1␠*␠master␠medium␠subject␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠A␠U␠Thor␠␠␠␠␠␠␠␠␠␠␠2003-04-05␠Sat␠06:07|
+         1 |Commits␠in␠main␠touching␠tracked.txt␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠|
+         2 |ed5bbb1␠*␠main␠medium␠subject␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠A␠U␠Thor␠␠␠␠␠␠␠␠␠␠␠2003-04-05␠Sat␠06:07|
          3 |d7e6cb1␠*␠a␠deliberately␠much␠longer␠subject␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠A␠U␠Thor␠␠␠␠␠␠␠␠␠␠␠2002-03-04␠Mon␠05:06|
          4 |807ccad␠*␠short␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠␠A␠U␠Thor␠␠␠␠␠␠␠␠␠␠␠2001-02-03␠Sat␠04:05|
          5 |∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅∅|
