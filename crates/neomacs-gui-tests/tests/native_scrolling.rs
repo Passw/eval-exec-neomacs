@@ -22,7 +22,11 @@ impl Drop for OwnedChild {
 }
 
 fn state(path: &Path, after: u64) -> Value {
-    let deadline = Instant::now() + Duration::from_secs(8);
+    state_with_timeout(path, after, Duration::from_secs(8))
+}
+
+fn state_with_timeout(path: &Path, after: u64, timeout: Duration) -> Value {
+    let deadline = Instant::now() + timeout;
     loop {
         if let Ok(bytes) = fs::read(path)
             && let Ok(value) = serde_json::from_slice::<Value>(&bytes)
@@ -108,6 +112,26 @@ fn native_page_keys_in_a_large_buffer_have_confirmed_input_latency() {
     run_native_scroll_in_buffer(ScrollKind::Page, ScrollTarget::Selected, 100_000);
 }
 
+#[test]
+fn rich_large_buffer_native_page_keys_have_confirmed_input_latency() {
+    run_native_scroll_profile(ScrollKind::Page, ScrollTarget::Selected, 100_000, true);
+}
+
+#[test]
+fn rich_large_buffer_native_precise_bursts_return_to_the_initial_viewport() {
+    run_native_scroll_profile(
+        ScrollKind::PreciseBurst,
+        ScrollTarget::Selected,
+        100_000,
+        true,
+    );
+}
+
+#[test]
+fn rich_large_buffer_native_wheel_scroll_advances() {
+    run_native_scroll_profile(ScrollKind::Wheel, ScrollTarget::Selected, 100_000, true);
+}
+
 #[derive(Clone, Copy, Debug)]
 enum ScrollKind {
     Precise,
@@ -127,11 +151,16 @@ fn run_native_scroll(kind: ScrollKind, target: ScrollTarget) {
 }
 
 fn run_native_scroll_in_buffer(kind: ScrollKind, target: ScrollTarget, lines: usize) {
+    run_native_scroll_profile(kind, target, lines, false);
+}
+
+fn run_native_scroll_profile(kind: ScrollKind, target: ScrollTarget, lines: usize, rich: bool) {
+    let profile = if rich { "rich-v1" } else { "plain" };
     let root = neomacs_infra::workspace_root();
     let artifact_root = root.join("target/neomacs-gui-tests");
     fs::create_dir_all(&artifact_root).unwrap();
     let artifacts = artifact_root.join(format!(
-        "native-scrolling-{kind:?}-{target:?}-{lines}-{}",
+        "native-scrolling-{kind:?}-{target:?}-{lines}-{profile}-{}",
         std::process::id()
     ));
     fs::create_dir(&artifacts).unwrap();
@@ -179,6 +208,10 @@ focus_follows_mouse yes
             .env("NEOMACS_DEBUG_SURFACE_READBACK_PNG", &pixels_path)
             .env("WAYLAND_DEBUG", "1");
     }
+    command.env_remove("NEOMACS_GUI_SCROLL_RICH");
+    if rich {
+        command.env("NEOMACS_GUI_SCROLL_RICH", "1");
+    }
     command.env_remove("NEOMACS_GUI_SCROLL_OTHER_WINDOW");
     if matches!(target, ScrollTarget::OtherWindow) {
         command.env("NEOMACS_GUI_SCROLL_OTHER_WINDOW", "1");
@@ -209,8 +242,27 @@ focus_follows_mouse yes
             .unwrap(),
     );
     let mut trackpad = wayland::Trackpad::connect(&PathBuf::from(&runtime).join(&socket));
-    let initial = state(&state_path, 2);
-    assert_eq!(initial["buffer-size"].as_u64(), Some((lines * 40) as u64));
+    let initial = state_with_timeout(&state_path, 2, Duration::from_secs(90));
+    if rich {
+        assert_eq!(initial["content"]["profile"], "rich-v1");
+        assert_eq!(initial["content"]["lines"].as_u64(), Some(lines as u64));
+        assert_eq!(initial["content"]["face-variants"], 6);
+        assert_eq!(initial["content"]["font-selection"], "installed");
+        assert!(
+            initial["content"]["font-families"]
+                .as_array()
+                .unwrap()
+                .len()
+                >= 3
+        );
+        assert_eq!(
+            initial["content"]["overlays"].as_u64(),
+            Some((lines.div_ceil(32) * 4) as u64)
+        );
+        assert!(initial["buffer-size"].as_u64().unwrap() > (lines * 40) as u64);
+    } else {
+        assert_eq!(initial["buffer-size"].as_u64(), Some((lines * 40) as u64));
+    }
     if lines > 400 {
         assert!(
             initial["start"].as_u64().unwrap() > 1_000_000,

@@ -1,5 +1,9 @@
 ;;; native-scrolling.el --- Observe native scroll gestures -*- lexical-binding: t; -*-
 (require 'json)
+(load (expand-file-name "../../neomacs-perf/fixtures/scrolling-content.el"
+                        (file-name-directory load-file-name)) nil nil t)
+(defvar neomacs-scroll-rich (getenv "NEOMACS_GUI_SCROLL_RICH"))
+(defvar neomacs-scroll-content-metadata nil)
 (setq inhibit-startup-screen t)
 (menu-bar-mode -1)
 (tool-bar-mode -1)
@@ -27,6 +31,7 @@
 (defun neomacs-scroll-observe ()
   (setq neomacs-scroll-sample (1+ neomacs-scroll-sample))
   (let ((state `((sample . ,neomacs-scroll-sample)
+                 (content . ,neomacs-scroll-content-metadata)
                  (buffer-size . ,(with-current-buffer (window-buffer neomacs-scroll-window)
                                    (buffer-size)))
                  (processed-pixels . ,neomacs-scroll-pixels)
@@ -46,14 +51,18 @@
    (switch-to-buffer (get-buffer-create "*native-scrolling*"))
    (delete-other-windows)
    (erase-buffer)
-   ;; Repeat fixed-width lines so buffer size changes without changing row geometry.
-   (let ((block (mapconcat
-                 (lambda (i) (format "Line %03d -- native scrolling diagnostic\n" i))
-                 (number-sequence 0 999) "")))
-     (dotimes (_ (/ neomacs-scroll-lines 1000))
-       (insert block))
-     (dotimes (i (% neomacs-scroll-lines 1000))
-       (insert (format "Line %03d -- native scrolling diagnostic\n" i))))
+   (if neomacs-scroll-rich
+       (progn
+         (neomacs-scroll-content-insert neomacs-scroll-lines)
+         (setq neomacs-scroll-content-metadata neomacs-scroll-content-summary))
+     ;; Repeat fixed-width lines so buffer size changes without changing row geometry.
+     (let ((block (mapconcat
+                   (lambda (i) (format "Line %03d -- native scrolling diagnostic\n" i))
+                   (number-sequence 0 999) "")))
+       (dotimes (_ (/ neomacs-scroll-lines 1000))
+         (insert block))
+       (dotimes (i (% neomacs-scroll-lines 1000))
+         (insert (format "Line %03d -- native scrolling diagnostic\n" i)))))
    (goto-char (point-min))
    (when (> neomacs-scroll-lines 400)
      (forward-line (/ neomacs-scroll-lines 2))
@@ -62,4 +71,4 @@
    (when (getenv "NEOMACS_GUI_SCROLL_OTHER_WINDOW")
      (select-window (split-window-right)))
    (neomacs-scroll-observe)))
-(run-at-time 40 nil (lambda () (kill-emacs 2)))
+(run-at-time 180 nil (lambda () (kill-emacs 2)))
