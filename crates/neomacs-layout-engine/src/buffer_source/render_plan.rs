@@ -1454,14 +1454,15 @@ impl BufferSourceOutputSetup {
         let mut render_services =
             ChromeRowRenderServices::new(font_metrics, face_resolver, &mut face_ids);
         let mut output_emitter = output_emitter;
-        let redisplay_positions = walk_setup.install_body_and_publish_redisplay(
+        let redisplay_positions = walk_setup.install_body(
             output.reborrow(),
             &mut output_emitter,
-            evaluator,
             render_services.reborrow(),
             &tail_context,
-            publish_request,
         );
+        // Live window publication belongs to this evaluator-side orchestrator,
+        // after body installation and before chrome reads window-end (%p, etc.).
+        publish_request.publish_window_end(evaluator, redisplay_positions);
         // GNU's redisplay tail keeps producing rows below the last buffer line.
         // Compose the decorations for those rows here: a line-number-faced
         // TEXT_AREA prefix when line numbers are active, and an `empty-line`

@@ -6,9 +6,7 @@ use crate::buffer_source::loop_state::{
     BufferSourceLoopMutableState, BufferSourceRowBuildState, BufferSourceRowCarryoverState,
     BufferSourceSurfaceContext,
 };
-use crate::buffer_source::render_attempt::{
-    BufferSourceOutputState, BufferSourceRedisplayPublishRequest,
-};
+use crate::buffer_source::render_attempt::BufferSourceOutputState;
 use crate::buffer_source::render_plan::BufferSourceDefaultFacePlan;
 use crate::buffer_source::row_prelude::BufferSourceRowPreludeRequestContext;
 use crate::buffer_source::tail_render::{
@@ -48,7 +46,6 @@ use crate::types::{LineWrapMode, WindowParams};
 use crate::window_output::{
     TextWindowOutputTarget, TextWindowRedisplayPositions, WindowOutputEmitter,
 };
-use neovm_core::emacs_core::Context;
 use neovm_core::emacs_core::image_catalog::ImageScaleEnvironment;
 
 pub(crate) struct BufferSourceWalkSetupRequest<'a> {
@@ -438,23 +435,6 @@ impl BufferSourceWalkSetup {
                 output_emitter,
                 render_services,
             ))
-    }
-
-    pub(crate) fn install_body_and_publish_redisplay(
-        &mut self,
-        output: TextWindowOutputTarget<'_>,
-        output_emitter: &mut WindowOutputEmitter,
-        evaluator: &mut Context,
-        render_services: ChromeRowRenderServices<'_, '_>,
-        tail_context: &BufferSourceTailRequestContext<'_>,
-        publish_request: BufferSourceRedisplayPublishRequest,
-    ) -> TextWindowRedisplayPositions {
-        let redisplay_positions =
-            self.install_body(output, output_emitter, render_services, tail_context);
-        // GNU status-line percent specs read the live window state from the
-        // just-produced redisplay. Publish before chrome rows are evaluated.
-        publish_request.publish_window_end(evaluator, redisplay_positions);
-        redisplay_positions
     }
 
     #[allow(clippy::too_many_arguments)]
