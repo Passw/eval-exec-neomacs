@@ -2093,3 +2093,38 @@ fn replacement_string_session_stamps_gnu_string_indices() {
     assert_eq!(source.string(), expected_string);
     assert_eq!(source.covered_buffer_range(), Some(covered_range));
 }
+
+#[test]
+fn resolved_text_produces_clipped_glyphs_on_a_thread_without_an_evaluator() {
+    let input =
+        crate::row_layout::ResolvedTextInput::capture(independent_text_item("abλ"), FaceId::new(1))
+            .expect("resolved text");
+    let (row, status, end, slots) = std::thread::spawn(move || {
+        let row_layout = layout();
+        let mut row = new_display_row(&row_layout);
+        let progress = DisplayRowProgressWriter::new(
+            &row_layout,
+            &mut row,
+            DisplayRowPosition::new(0.0, 0),
+            16.0,
+        )
+        .push_resolved_text(input);
+        (
+            row,
+            progress.status(),
+            progress.end(),
+            progress.slots().len(),
+        )
+    })
+    .join()
+    .expect("owned text production must not require evaluator TLS");
+    assert_eq!(row_text(&row), "ab");
+    assert_eq!(status, DisplayRowAppendStatus::Clipped);
+    assert_eq!(end, DisplayRowPosition::new(16.0, 2));
+    assert_eq!(slots, 2);
+    assert!(
+        row.glyphs[GlyphArea::Text.index()]
+            .iter()
+            .all(|glyph| glyph.face_id == FaceId::new(2))
+    );
+}
