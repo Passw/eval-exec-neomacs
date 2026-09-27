@@ -2128,3 +2128,52 @@ fn resolved_text_produces_clipped_glyphs_on_a_thread_without_an_evaluator() {
             .all(|glyph| glyph.face_id == FaceId::new(2))
     );
 }
+
+#[test]
+fn resolved_text_concrete_font_output_matches_on_an_evaluator_free_worker() {
+    use crate::display_row::face_state::{
+        DisplayRowFace, DisplayRowGlyphMeasurer, DisplayRowMeasurementMode,
+    };
+    use crate::font::metrics::FontMetricsService;
+    use crate::glyph_advance::GlyphAdvanceQuantization;
+    use crate::neovm_bridge::ResolvedFace;
+
+    fn produce(input: crate::row_layout::ResolvedTextInput) -> (GlyphRow, DisplayRowPosition) {
+        // Each thread owns its font service. No live evaluator/font cache is
+        // transferred, and the row writer sees only the captured text input.
+        let mut fonts = FontMetricsService::new();
+        let faces = [DisplayRowFace::from_resolved(
+            FaceId::new(2),
+            &ResolvedFace::default(),
+        )];
+        let mut measurer = DisplayRowGlyphMeasurer::with_mode(
+            &faces,
+            Some(&mut fonts),
+            8.0,
+            GlyphAdvanceQuantization::PreserveLogicalPixels,
+            DisplayRowMeasurementMode::ConcreteFont,
+        );
+        let row_layout = layout();
+        let mut row = new_display_row(&row_layout);
+        let progress = DisplayRowProgressWriter::with_glyph_measurer(
+            &row_layout,
+            &mut row,
+            &mut measurer,
+            DisplayRowPosition::new(0.0, 0),
+            400.0,
+        )
+        .push_resolved_text(input);
+        assert_eq!(progress.status(), DisplayRowAppendStatus::Complete);
+        (row, progress.end())
+    }
+
+    let input =
+        crate::row_layout::ResolvedTextInput::capture(text_item("office λ سلام"), FaceId::new(1))
+            .expect("resolved text");
+    let expected = produce(input.clone());
+    let actual = std::thread::spawn(move || produce(input))
+        .join()
+        .expect("concrete font production must not require evaluator TLS");
+    assert!(expected.1.x_px() > 0.0);
+    assert_eq!(actual, expected);
+}
