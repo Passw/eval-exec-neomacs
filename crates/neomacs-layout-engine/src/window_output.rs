@@ -5,6 +5,9 @@
 //! while simultaneously recording immutable row snapshots for renderer
 //! handoff.
 
+mod snapshot_rows;
+use snapshot_rows::PreparedWindowRows;
+
 use super::display_status_line::{
     ChromeRowRenderServices, DisplayRowOutputProgress, WindowChromeRowsRenderOutcome,
     WindowChromeRowsRenderRequest, WindowChromeRowsRenderState,
@@ -2019,21 +2022,12 @@ impl WindowOutputEmitter {
         let window_id = self.window_id;
         let logical_cursor = self.logical_cursor.take();
         let phys_cursor = self.phys_cursor.take();
-        self.points
-            .sort_by_key(|point| (point.buffer_pos, point.row, point.col, point.x));
-        self.rows.sort_by_key(|row| row.row);
-        let body_origin_y = (regions.text_body.y - regions.outer.y).round() as i64;
-        let mut body_rows: Vec<_> = self
-            .points
-            .iter()
-            .map(|point| neovm_core::window::PresentedBodyRowSnapshot {
-                output_row: point.row,
-                body_row: point.row.saturating_sub(self.text_row_base),
-                body_y: point.y.saturating_sub(body_origin_y),
-            })
-            .collect();
-        body_rows.sort_by_key(|row| row.output_row);
-        body_rows.dedup_by_key(|row| row.output_row);
+        let prepared_rows = PreparedWindowRows::new(
+            self.points,
+            self.rows,
+            self.text_row_base,
+            (regions.text_body.y - regions.outer.y).round() as i64,
+        );
         // Record the displayed buffer's modification tick so display primitives
         // that consult this snapshot (notably `vertical-motion` with a column
         // target) can reject it once the buffer is mutated without a fresh
@@ -2056,7 +2050,7 @@ impl WindowOutputEmitter {
             cell_origin,
             regions,
             regions_materialized: true,
-            body_rows,
+            body_rows: prepared_rows.body_rows,
             text_area_left_offset: (regions.text_body.x - regions.outer.x).round() as i64,
             mode_line_height,
             header_line_height,
@@ -2064,8 +2058,8 @@ impl WindowOutputEmitter {
             chrome_strings: self.chrome_strings,
             logical_cursor,
             phys_cursor: phys_cursor.clone(),
-            points: self.points,
-            rows: self.rows,
+            points: prepared_rows.points,
+            rows: prepared_rows.rows,
             buffer_modiff,
             layout_freshness,
             window_end_record: None,
