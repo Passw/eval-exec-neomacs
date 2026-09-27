@@ -39,12 +39,16 @@ pub(crate) fn prepare(
             fixture.display()
         )
     })?;
+    let content_source = workspace_root.join("crates/neomacs-perf/fixtures/scrolling-content.el");
+    fs::copy(&content_source, run_directory.join("scrolling-content.el"))
+        .map_err(|error| format!("failed to copy scrolling content fixture: {error}"))?;
     let provenance = run_directory.join("input-provenance.json");
     let provenance_manifest = ScrollingInputProvenanceManifest {
         editor,
         host: collect_host_provenance(request.machine_policy()),
         workload_source: "crates/neomacs-perf/fixtures/scrolling.el",
         workload_source_sha256: sha256_file(&fixture_source)?,
+        content_source_sha256: sha256_file(&content_source)?,
         environment_policy: "closed-v1",
         passthrough_environment: request
             .benchmark_environment()
@@ -154,6 +158,7 @@ struct ScrollingInputProvenanceManifest<'a> {
     host: HostProvenance,
     workload_source: &'a str,
     workload_source_sha256: String,
+    content_source_sha256: String,
     environment_policy: &'a str,
     passthrough_environment: BTreeMap<String, String>,
 }

@@ -64,57 +64,13 @@
 fraction of the buffer, so scrolling keeps meeting rows the layout
 engine has not seen recently instead of re-reading the same dozen.")
 
-;; Faces a real session carries on screen: font-lock weights and slants,
-;; diff backgrounds, links, spell-check waves, boxes. The renderer cannot
-;; fast-path past them, which is the point.
-(defconst neomacs-perf-scroll--faces
-  [(:weight bold)
-   (:slant italic)
-   (:weight bold :slant italic)
-   (:underline t)
-   (:foreground "red")
-   (:foreground "#00cc00")
-   (:background "#333333" :foreground "white")
-   (:strike-through t)
-   (:box (:line-width 1 :color "orange"))
-   (:underline (:color "red" :style wave))
-   (:foreground "dodger blue" :underline t)
-   (:weight bold :height 1.2 :foreground "gold")
-   (:background "light blue" :extend t)
-   (:inverse-video t)]
-  "Face specs cycled across buffer lines.")
-
-(defconst neomacs-perf-scroll--sample-words
-  ["buffer" "window" "point" "redisplay" "glyph" "layout" "scroll"
-   "cache" "damage" "face" "overlay" "font"]
-  "Words composed into every line, cycled by index.")
+(load (expand-file-name "scrolling-content.el" (file-name-directory load-file-name)) nil nil t)
 
 (defun neomacs-perf-scroll--insert-buffer ()
-  (let ((lines neomacs-perf-scroll--line-count)
-        (faces neomacs-perf-scroll--faces))
-    (dotimes (index lines)
-      (let ((start (point)))
-        (insert (neomacs-perf-scroll--line-text index))
-        (put-text-property
-         start (point) 'face (aref faces (% index (length faces)))))
-      (insert "\n"))))
-
-(defun neomacs-perf-scroll--line-text (index)
-  "Deterministic line content for INDEX: no randomness anywhere."
-  (let* ((words neomacs-perf-scroll--sample-words)
-         (first (aref words (% index (length words))))
-         (second (aref words (% (* index 7) (length words)))))
-    (cond
-     ((zerop (% index 8))
-      ;; A CJK line every 8th row: multibyte width handling is on the
-      ;; scroll path or it is not tested.
-      (format "line %05d: a好好b %s %s 0123456789" index first second))
-     ((zerop (% index 16))
-      ;; A very long line every 16th row: horizontal truncation work.
-      (format "line %05d: %s %s %s %s %s %s %s %s"
-              index first second first second first second first))
-     (t
-      (format "line %05d: %s %s the quick brown fox" index first second)))))
+  (neomacs-scroll-content-insert neomacs-perf-scroll--line-count)
+  (let ((summary neomacs-scroll-content-summary))
+    (with-temp-file (concat (getenv "NEOMACS_PERF_RESULT") ".content.json")
+      (insert (json-serialize summary)))))
 
 ;;; Timed work.
 
