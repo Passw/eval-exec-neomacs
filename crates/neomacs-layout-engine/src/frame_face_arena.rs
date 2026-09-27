@@ -365,6 +365,17 @@ impl FrameFaceArena {
         })
     }
 
+    /// Resume private row acquisition after an unrelated presentation was
+    /// sealed. Every previously reserved ID must still name the same face.
+    pub(crate) fn resume_prepared(
+        &self,
+        prepared: &PreparedFaceSnapshot,
+    ) -> Result<FrameFaceAttempt, FrameFaceReuseError> {
+        let mut attempt = self.begin_attempt();
+        attempt.admit_prepared(prepared.faces.keys().copied(), prepared, self)?;
+        Ok(attempt)
+    }
+
     pub(crate) fn prepared_snapshot(&self) -> PreparedFaceSnapshot {
         PreparedFaceSnapshot {
             owner: Arc::clone(&self.owner),

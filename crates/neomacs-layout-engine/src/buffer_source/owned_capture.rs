@@ -129,6 +129,16 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
             end_byte.unwrap_or(step.source_position.byte_idx()),
             end_char.unwrap_or(step.source_position.charpos()),
         );
+        if let DisplayItemKind::TextRun(run) = &item.kind
+            && run.text.chars().any(|ch| {
+                crate::display_source::nonascii_space_p(ch)
+                    || crate::display_source::nonascii_hyphen_p(ch)
+            })
+        {
+            // These require the buffer loop's nobreak face/substitution
+            // policy, even though their source vocabulary is ordinary text.
+            return Err(RowProgramError::Unsupported);
+        }
         let complete = matches!(item.kind, DisplayItemKind::RowBreak(_));
         items.push(item);
         if complete {
@@ -211,5 +221,15 @@ mod tests {
                 neovm_core::buffer::EmacsBytePos::ZERO
             )
         );
+    }
+    #[test]
+    fn nobreak_text_requires_buffer_special_character_policy() {
+        for ch in ['\u{00a0}', '\u{00ad}', '\u{2011}'] {
+            let text = format!("before{ch}after\n");
+            assert!(
+                matches!(capture(&text, 32), Err(RowProgramError::Unsupported)),
+                "{ch:?}"
+            );
+        }
     }
 }

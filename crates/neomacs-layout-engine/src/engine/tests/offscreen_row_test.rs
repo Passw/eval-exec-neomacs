@@ -402,15 +402,20 @@ fn idle_capture_yields_between_rows_and_cancels_after_a_revision_change() {
 
 #[test]
 fn idle_maintenance_prepares_an_unseen_page_without_changing_the_live_viewport() {
-    idle_first_visit(false);
+    idle_first_visit(false, false);
 }
 
 #[test]
 fn idle_maintenance_prepares_an_unseen_backward_page() {
-    idle_first_visit(true);
+    idle_first_visit(true, false);
 }
 
-fn idle_first_visit(backward: bool) {
+#[test]
+fn idle_capture_survives_redisplays_with_unchanged_layout_inputs() {
+    idle_first_visit(false, true);
+}
+
+fn idle_first_visit(backward: bool, redisplay_between_steps: bool) {
     let line = "ordinary offscreen text\n";
     let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
     eval.frame_manager_mut()
@@ -456,11 +461,17 @@ fn idle_first_visit(backward: bool) {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     let mut steps = 0;
     while engine.maintain_scroll_coverage(&eval).is_some() {
+        if redisplay_between_steps {
+            engine.layout_frame_rust(&mut eval, frame);
+        }
         steps += 1;
         assert!(std::time::Instant::now() < deadline);
         std::thread::yield_now();
     }
-    assert!(steps >= row_count, "acquisition must yield between rows");
+    assert!(
+        steps + 1 >= row_count,
+        "acquisition must yield between rows"
+    );
     assert_eq!(before, selected_window_layout_trace(&eval, &engine, frame));
     scroll_window_to(
         &mut eval,

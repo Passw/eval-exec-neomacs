@@ -34,6 +34,7 @@ struct Capture {
     window: WindowId,
     retained: RetainedWindowMatrix,
     attempt: FrameFaceAttempt,
+    faces: Option<PreparedFaceSnapshot>,
     row_base: usize,
     row_count: usize,
     position: CharPos0,
@@ -216,21 +217,29 @@ impl LayoutEngine {
                 }
             }
         }
-        let _ = self.scroll_coverage.drain(&mut self.prepared_viewports);
+        match self.scroll_coverage.drain(&mut self.prepared_viewports) {
+            Ok(true) => {
+                tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", "worker page ready")
+            }
+            Err(error) => {
+                tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", ?error, "worker page rejected")
+            }
+            Ok(false) => {}
+        }
         if self.scroll_coverage.admission.is_some() {
             return Some(Duration::from_millis(4));
         }
         if self.scroll_coverage.capture.is_none() {
             let start = self.scroll_coverage.targets.pop()?;
-            if self
-                .begin_scroll_coverage(evaluator, frame.id, window, start)
-                .is_err()
-            {
+            if let Err(error) = self.begin_scroll_coverage(evaluator, frame.id, window, start) {
+                tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", ?error, start = start.get(), "capture not eligible");
                 return (!self.scroll_coverage.targets.is_empty())
                     .then_some(Duration::from_millis(1));
             }
         }
-        let _ = self.capture_scroll_step(evaluator);
+        if let Err(error) = self.capture_scroll_step(evaluator) {
+            tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", ?error, "row capture rejected");
+        }
         (self.scroll_coverage.capture.is_some()
             || self.scroll_coverage.admission.is_some()
             || !self.scroll_coverage.targets.is_empty())
@@ -296,6 +305,7 @@ impl LayoutEngine {
             window,
             retained,
             attempt,
+            faces: None,
             row_base,
             row_count: row_indices.len(),
             position: start,
@@ -326,17 +336,31 @@ impl LayoutEngine {
         let Some(mut capture) = self.scroll_coverage.capture.take() else {
             return Ok(false);
         };
+        let arena = self
+            .frame_face_arenas
+            .get(&capture.frame)
+            .ok_or(RowProgramError::Unsupported)?;
+        capture.attempt = match &capture.faces {
+            Some(faces) => arena
+                .resume_prepared(faces)
+                .map_err(|_| RowProgramError::Unsupported)?,
+            None => arena.begin_attempt(),
+        };
         self.capture_scroll_row(evaluator, &mut capture)?;
-        if capture.programs.len() < capture.row_count {
-            self.scroll_coverage.capture = Some(capture);
-            return Ok(true);
-        }
+        // Reserve after every bounded step: an intervening timer redisplay
+        // may seal another arena generation before the next idle wake.
         let faces = self
             .frame_face_arenas
             .get_mut(&capture.frame)
             .ok_or(RowProgramError::Unsupported)?
             .reserve_prepared(&capture.attempt)
             .map_err(|_| RowProgramError::Unsupported)?;
+        if capture.programs.len() < capture.row_count {
+            capture.faces = Some(faces);
+            self.scroll_coverage.capture = Some(capture);
+            return Ok(true);
+        }
+        tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", start = capture.retained.key.window_start, rows = capture.programs.len(), "submitting unseen page");
         let ticket = self.scroll_coverage.worker.submit(capture.programs)?;
         self.scroll_coverage.admission = Some(Admission {
             frame: capture.frame,

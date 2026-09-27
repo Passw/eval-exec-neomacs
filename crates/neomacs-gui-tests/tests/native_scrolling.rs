@@ -234,7 +234,7 @@ focus_follows_mouse yes
                 if timing_only {
                     "warn"
                 } else {
-                    "warn,neomacs=debug,neomacs_display_runtime=debug"
+                    "warn,neomacs=debug,neomacs_display_runtime=debug,neomacs_layout_engine::scroll_coverage=debug"
                 },
             )
             .env("NEOMACS_LOG_FILE", artifacts.join("neomacs.log"))
