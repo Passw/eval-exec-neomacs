@@ -4794,13 +4794,18 @@ fn window_line_height_impl(
     {
         let line_spec = args.first().copied().unwrap_or(Value::NIL);
         let metrics = if line_spec.is_nil() {
-            resolve_exact_visible_metrics(frames, buffers, args.get(1), None)?.and_then(
-                |(_, metrics)| {
-                    snapshot
-                        .row_metrics(metrics.row)
-                        .map(|row| snapshot_text_row_line_metrics(snapshot, row))
-                },
-            )
+            resolve_exact_visible_metrics(
+                frames,
+                buffers,
+                args.get(1),
+                None,
+                PositionGeometrySource::Presented,
+            )?
+            .and_then(|(_, metrics)| {
+                snapshot
+                    .row_metrics(metrics.row)
+                    .map(|row| snapshot_text_row_line_metrics(snapshot, row))
+            })
         } else if let Some(selector) = WindowLineSelector::from_lisp_value(line_spec) {
             snapshot_chrome_line_metrics(snapshot, selector)
         } else {
@@ -6450,6 +6455,14 @@ fn approximate_point_at_coords(
     }))
 }
 
+/// Lisp motion queries use current redisplay rows, recomputed when stale.
+/// Native pointer events retain their captured presentation coordinates.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PositionGeometrySource {
+    Redisplay,
+    Presented,
+}
+
 /// Result of asking an immutable GUI presentation for one buffer position.
 ///
 /// A live Emacs window and the renderer's active presentation are updated on
@@ -6520,21 +6533,26 @@ fn resolve_exact_visible_metrics_with_layout(
     window: Option<&Value>,
     pos: Option<&Value>,
 ) -> Result<Option<(WindowId, ExactVisibleMetrics)>, Flow> {
-    // Prefer retained rows only while they are still VALID for the live
-    // window.  Their columns are window-relative and therefore meaningless
-    // without the horizontal origin they were produced at; see the freshness
-    // note in `compute_terminal_window_geometry`.
-    let retained_rows_valid = retained_rows_answer_for_live_window(eval, window)?;
-    if retained_rows_valid
-        && let Some(found) =
-            resolve_exact_visible_metrics(&eval.frames, &eval.buffers, window, pos)?
-    {
-        return Ok(Some(found));
-    }
     let Some((fid, wid)) = resolve_live_window_identity(&eval.frames, window)? else {
         return Ok(None);
     };
-    if let Some(geometry) = compute_terminal_window_geometry(eval, fid, wid)? {
+    // Prefer retained rows only while they are still VALID for the live
+    // window.  Their columns are window-relative and therefore meaningless
+    // without the horizontal origin they were produced at; see the freshness
+    // note in `compute_live_window_geometry`.
+    let retained_rows_valid = retained_rows_answer_for_live_window(eval, window)?;
+    if retained_rows_valid
+        && let Some(found) = resolve_exact_visible_metrics(
+            &eval.frames,
+            &eval.buffers,
+            window,
+            pos,
+            PositionGeometrySource::Redisplay,
+        )?
+    {
+        return Ok(Some(found));
+    }
+    if let Some(geometry) = compute_live_window_geometry(eval, fid, wid)? {
         let Some(ctx) = resolve_live_window_display_context(&eval.frames, &eval.buffers, window)?
         else {
             return Ok(None);
@@ -6554,7 +6572,13 @@ fn resolve_exact_visible_metrics_with_layout(
     // answer rather than nothing -- which is exactly what they did before the
     // preference above, so the freshness gate can only replace a stale answer
     // with a recomputed one and never with silence.
-    resolve_exact_visible_metrics(&eval.frames, &eval.buffers, window, pos)
+    resolve_exact_visible_metrics(
+        &eval.frames,
+        &eval.buffers,
+        window,
+        pos,
+        PositionGeometrySource::Presented,
+    )
 }
 
 /// Whether the retained row map for WINDOW still describes the live window.
@@ -6563,9 +6587,9 @@ fn resolve_exact_visible_metrics_with_layout(
 /// `Context::fresh_window_display_snapshot` compares the whole
 /// [`crate::window::WindowDisplaySnapshotFreshness`] token, whose fields are
 /// deliberately opaque so that "individual snapshot consumers [cannot] invent
-/// partial freshness checks that drift apart".  A window-system frame answers
-/// posn queries from its presented geometry, which carries its own staleness
-/// states (see [`PresentedBufferPosition`]), so it is not this question.
+/// partial freshness checks that drift apart". This includes graphical
+/// windows: a renderer acknowledgement does not make old scroll coordinates
+/// suitable for a new Lisp motion query.
 fn retained_rows_answer_for_live_window(
     eval: &super::eval::Context,
     window: Option<&Value>,
@@ -6576,9 +6600,6 @@ fn retained_rows_answer_for_live_window(
     let Some(frame) = eval.frames.get(fid) else {
         return Ok(true);
     };
-    if frame.effective_window_system().is_some() {
-        return Ok(true);
-    }
     let Some(buffer_id) = frame.find_window(wid).and_then(|window| window.buffer_id()) else {
         return Ok(true);
     };
@@ -6592,6 +6613,7 @@ fn resolve_exact_visible_metrics(
     buffers: &crate::buffer::BufferManager,
     window: Option<&Value>,
     pos: Option<&Value>,
+    source: PositionGeometrySource,
 ) -> Result<Option<(WindowId, ExactVisibleMetrics)>, Flow> {
     let Some((fid, wid)) = resolve_live_window_identity(frames, window)? else {
         return Ok(None);
@@ -6613,7 +6635,11 @@ fn resolve_exact_visible_metrics(
             .point_for_buffer_pos(pos_lisp)
             .map(|point| (wid, exact_metrics_from_redisplay_point(snapshot, point))));
     }
-    let Some(publication) = frame.active_presentation_geometry() else {
+    let publication = match source {
+        PositionGeometrySource::Redisplay => frame.completed_presentation_geometry(),
+        PositionGeometrySource::Presented => frame.active_presentation_geometry(),
+    };
+    let Some(publication) = publication else {
         return Ok(None);
     };
     let point = match resolve_presented_buffer_position(publication, wid, pos_lisp)
@@ -6991,17 +7017,34 @@ pub(crate) fn builtin_posn_at_x_y(eval: &mut super::eval::Context, args: Vec<Val
     // a window redisplay has not drawn yet.
     // `posn-at-x-y` takes a FRAME-OR-WINDOW, so it resolves the target through
     // its own designator rule rather than the window-only one.
-    let computed = match resolve_posn_at_xy_window(&eval.frames, args.get(2))? {
-        Some((fid, wid, _)) => compute_terminal_window_geometry(eval, fid, wid)?,
-        None => None,
+    let (computed, source) = match resolve_posn_at_xy_window(&eval.frames, args.get(2))? {
+        Some((fid, wid, _)) => {
+            let computed = compute_live_window_geometry(eval, fid, wid)?;
+            let fresh =
+                retained_rows_answer_for_live_window(eval, Some(&Value::make_window(wid.0)))?;
+            let source = if computed.is_some() || fresh {
+                PositionGeometrySource::Redisplay
+            } else {
+                PositionGeometrySource::Presented
+            };
+            (computed, source)
+        }
+        None => (None, PositionGeometrySource::Presented),
     };
-    posn_at_x_y_impl(&mut eval.frames, &mut eval.buffers, computed.as_ref(), args)
+    posn_at_x_y_impl(
+        &mut eval.frames,
+        &mut eval.buffers,
+        computed.as_ref(),
+        source,
+        args,
+    )
 }
 
-/// Run the canonical row producer for one terminal window that redisplay has
-/// left no rows for; `None` whenever the retained snapshot can answer, the
-/// frame is not a live terminal frame, or no frontend adapter is installed.
-fn compute_terminal_window_geometry(
+/// Run the canonical row producer when the live window has no current rows.
+/// This does not publish or activate a presentation. `None` means a fresh
+/// redisplay snapshot can answer, the frame is not interactive, or no frontend
+/// adapter is installed.
+fn compute_live_window_geometry(
     eval: &mut super::eval::Context,
     fid: FrameId,
     wid: WindowId,
@@ -7009,10 +7052,10 @@ fn compute_terminal_window_geometry(
     let Some(frame) = eval.frames.get(fid) else {
         return Ok(None);
     };
-    // GNU's own gate: `pos_visible_p` returns false immediately for
-    // `FRAME_INITIAL_P`, and a window-system frame answers from its presented
-    // geometry rather than from a terminal row walk.
-    if frame.initial || frame.effective_window_system().is_some() || eval.noninteractive() {
+    // GNU's coordinate queries walk from the live window start even on a
+    // graphical frame. Using the renderer's older presentation during queued
+    // pixel-scroll commands makes point correction undo part of the gesture.
+    if frame.initial || eval.noninteractive() {
         return Ok(None);
     }
     // A populated snapshot that is still FRESH already answered (or correctly
@@ -7303,6 +7346,7 @@ fn posn_at_x_y_impl(
     frames: &mut crate::window::FrameManager,
     buffers: &mut crate::buffer::BufferManager,
     computed: Option<&WindowDisplaySnapshot>,
+    source: PositionGeometrySource,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args_range("posn-at-x-y", &args, 2, 4)?;
@@ -7320,8 +7364,12 @@ fn posn_at_x_y_impl(
         return Ok(Value::NIL);
     };
 
-    if frame.effective_window_system().is_some() {
-        let publication = frame.active_presentation_geometry().ok_or_else(|| {
+    if computed.is_none() && frame.effective_window_system().is_some() {
+        let publication = match source {
+            PositionGeometrySource::Redisplay => frame.completed_presentation_geometry(),
+            PositionGeometrySource::Presented => frame.active_presentation_geometry(),
+        };
+        let publication = publication.ok_or_else(|| {
             signal(
                 LispCondition::Error,
                 vec![Value::string("GUI frame has no presented geometry")],

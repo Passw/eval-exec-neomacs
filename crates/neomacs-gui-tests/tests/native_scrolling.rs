@@ -37,6 +37,22 @@ fn state(path: &Path, after: u64) -> Value {
     }
 }
 
+fn state_after_input(path: &Path, after: u64, counter: &str, expected: f64) -> Value {
+    let deadline = Instant::now() + Duration::from_secs(8);
+    let mut sample = after;
+    loop {
+        let value = state(path, sample);
+        if value[counter].as_f64().unwrap() >= expected {
+            return value;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "scroll input not completed: {value}"
+        );
+        sample = value["sample"].as_u64().unwrap();
+    }
+}
+
 fn readback(path: &Path) -> image::DynamicImage {
     // The running renderer rewrites its diagnostic PNG on each frame. A
     // timer sample does not synchronize file publication: wait for a complete
@@ -72,9 +88,15 @@ fn precise_native_scroll_targets_the_unselected_window_under_the_pointer() {
     run_native_scroll(ScrollKind::Precise, ScrollTarget::OtherWindow);
 }
 
+#[test]
+fn precise_native_scroll_bursts_advance_without_snapback() {
+    run_native_scroll(ScrollKind::PreciseBurst, ScrollTarget::Selected);
+}
+
 #[derive(Clone, Copy, Debug)]
 enum ScrollKind {
     Precise,
+    PreciseBurst,
     Wheel,
 }
 
@@ -162,19 +184,43 @@ focus_follows_mouse yes
     let initial_text = text_pixels(&initial_pixels);
     let position = |s: &Value| (s["start"].as_i64().unwrap(), s["vscroll"].as_i64().unwrap());
     let initial_position = position(&previous);
+    let mut processed_pixels = previous["processed-pixels"].as_f64().unwrap();
+    let mut processed_wheels = previous["processed-wheels"].as_f64().unwrap();
     let mut trace = vec![previous.clone()];
     let steps = match kind {
-        ScrollKind::Precise => 24,
+        ScrollKind::Precise | ScrollKind::PreciseBurst => 24,
         ScrollKind::Wheel => 12,
     };
     for step in 0..steps {
         let down = step < 12;
         match kind {
             ScrollKind::Precise => trackpad.scroll(if down { 4.0 } else { -4.0 }),
+            ScrollKind::PreciseBurst => {
+                // Deliver a burst without waiting for a redisplay between
+                // events. Observe direction and rendered text after each
+                // batch, then reverse while preserving the same device.
+                for _ in 0..8 {
+                    trackpad.scroll(if down { 4.0 } else { -4.0 });
+                }
+            }
             ScrollKind::Wheel => trackpad.wheel(),
         }
         thread::sleep(Duration::from_millis(500));
-        let current = state(&state_path, previous["sample"].as_u64().unwrap());
+        let after = previous["sample"].as_u64().unwrap();
+        // A timer sample can precede this batch even after the sleep. Wait
+        // for command completion, so delayed input is not mistaken for
+        // snapback. This is a correctness test, not a latency measurement.
+        let current = if matches!(kind, ScrollKind::Precise | ScrollKind::PreciseBurst) {
+            processed_pixels += if matches!(kind, ScrollKind::PreciseBurst) {
+                32.0
+            } else {
+                4.0
+            };
+            state_after_input(&state_path, after, "processed-pixels", processed_pixels)
+        } else {
+            processed_wheels += 1.0;
+            state_after_input(&state_path, after, "processed-wheels", processed_wheels)
+        };
         trace.push(current.clone());
         fs::write(
             artifacts.join("trace.json"),
@@ -199,7 +245,7 @@ focus_follows_mouse yes
         }
         let native_log = fs::read_to_string(artifacts.join("neomacs.log")).unwrap();
         let expected_event = match kind {
-            ScrollKind::Precise => "PixelScroll {",
+            ScrollKind::Precise | ScrollKind::PreciseBurst => "PixelScroll {",
             ScrollKind::Wheel => "MouseScroll {",
         };
         assert!(
@@ -229,7 +275,7 @@ focus_follows_mouse yes
             );
         }
     }
-    if matches!(kind, ScrollKind::Precise) {
+    if matches!(kind, ScrollKind::Precise | ScrollKind::PreciseBurst) {
         assert_eq!(
             position(&previous),
             initial_position,

@@ -876,3 +876,67 @@ fn vertical_motion_reaches_the_end_of_a_truncated_line() {
         "((1 302) (0 1) (1 302))"
     );
 }
+
+#[test]
+fn graphical_posn_queries_follow_live_scroll_before_presentation() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    let text: String = (0..400)
+        .map(|i| format!("Line {i:03} -- native scrolling diagnostic\n"))
+        .collect();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert(&text);
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("live-posn", 1000, 700, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str(
+        "(progn (goto-char 881) (set-window-start nil 801 t) (set-window-vscroll nil 12 t))",
+    )
+    .unwrap();
+    let mut display = LayoutEngine::new_without_font_metrics();
+    display.layout_frame_rust(&mut eval, frame);
+    activate_last_engine_presentation(&mut eval, &display, frame);
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let observe = |eval: &mut Context| {
+        let value = eval.eval_str(
+            "(let ((noninteractive nil)) (list (nth 1 (posn-at-x-y 0 100 (selected-window))) (nth 2 (posn-at-point 881))))",
+        ).unwrap();
+        neovm_core::emacs_core::print::print_value(&value)
+    };
+    let old = observe(&mut eval);
+    eval.eval_str("(progn (set-window-start nil 721 t) (set-window-vscroll nil 14 t))")
+        .unwrap();
+    let before_presentation = observe(&mut eval);
+    let positions = eval
+        .eval_str("(list (window-start) (window-vscroll nil t) (point))")
+        .unwrap();
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&positions),
+        "(721 14 881)"
+    );
+    display.layout_frame_rust(&mut eval, frame);
+    let after_layout = observe(&mut eval);
+    activate_last_engine_presentation(&mut eval, &display, frame);
+    let after_presentation = observe(&mut eval);
+    assert_ne!(old, after_presentation, "the viewport really moved");
+    assert_eq!(
+        after_layout, after_presentation,
+        "completed redisplay rows must answer before renderer activation"
+    );
+    assert_eq!(
+        before_presentation, after_presentation,
+        "Lisp coordinate queries must follow live scrolling before renderer acknowledgement"
+    );
+}

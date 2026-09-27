@@ -5060,6 +5060,24 @@ impl Frame {
         }
     }
 
+    /// Geometry from the latest completed redisplay, even before renderer
+    /// acknowledgement. Lisp motion queries may use this only after checking
+    /// the live window's snapshot freshness. Native hit testing uses active
+    /// or event-captured presentation geometry instead.
+    pub(crate) fn completed_presentation_geometry(
+        &self,
+    ) -> Option<&geometry::PresentationGeometry> {
+        let latest = self.presentation_state.last_identity?;
+        self.presentation_state
+            .prepared
+            .get(&latest)
+            .map(|prepared| &prepared.geometry)
+            .or_else(|| {
+                self.active_presentation_geometry()
+                    .filter(|active| active.presentation() == latest)
+            })
+    }
+
     /// Typed publication for WINDOW in the renderer-active presentation.
     ///
     /// Rectangles are available through either variant, but callers that want

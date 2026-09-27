@@ -6,9 +6,21 @@
 (blink-cursor-mode -1)
 (defvar neomacs-scroll-sample 0)
 (defvar neomacs-scroll-window nil)
+(defvar neomacs-scroll-pixels 0)
+(defvar neomacs-scroll-wheels 0)
+(advice-add 'mwheel-scroll :after
+            (lambda (&rest _args)
+              (setq neomacs-scroll-wheels (1+ neomacs-scroll-wheels))))
+(advice-add 'pixel-scroll-precision :after
+            (lambda (event)
+              (when (consp (nth 4 event))
+                (setq neomacs-scroll-pixels
+                      (+ neomacs-scroll-pixels (abs (cdr (nth 4 event))))))))
 (defun neomacs-scroll-observe ()
   (setq neomacs-scroll-sample (1+ neomacs-scroll-sample))
   (let ((state `((sample . ,neomacs-scroll-sample)
+                 (processed-pixels . ,neomacs-scroll-pixels)
+                 (processed-wheels . ,neomacs-scroll-wheels)
                  (start . ,(window-start neomacs-scroll-window))
                  (vscroll . ,(window-vscroll neomacs-scroll-window t))
                  (point . ,(window-point neomacs-scroll-window))
