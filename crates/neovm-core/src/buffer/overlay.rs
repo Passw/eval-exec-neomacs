@@ -6,8 +6,10 @@
 //! split by keeping overlay objects on the GC heap and storing only live object
 //! ids in each buffer's overlay index.
 
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BinaryHeap};
+use std::rc::Rc;
 
 use crate::buffer::BufferId;
 use crate::emacs_core::error::Flow;
@@ -255,6 +257,20 @@ pub(super) fn record_overlay_full_enumeration_visit() {
 
 pub struct OverlayList {
     index: OverlayIndex,
+    snapshot: RefCell<Option<OverlaySnapshot>>,
+}
+
+/// An evaluator-owned immutable overlay index. Like overlay plist values,
+/// this contains Lisp objects and must not cross to a layout worker.
+#[derive(Clone)]
+pub struct OverlaySnapshot(Rc<OverlayList>);
+
+impl std::ops::Deref for OverlaySnapshot {
+    type Target = OverlayList;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -276,6 +292,28 @@ impl Clone for OverlayList {
 }
 
 impl OverlayList {
+    /// Reuse the immutable index until a membership, position or plist write.
+    /// The live buffer roots the cached Lisp objects; callers never receive a
+    /// mutable handle to the cached index. Mutation drops the cache without
+    /// changing an observer already using the previous snapshot.
+    pub fn snapshot(&self) -> OverlaySnapshot {
+        if let Some(snapshot) = self.snapshot.borrow().as_ref() {
+            return snapshot.clone();
+        }
+        let snapshot = OverlaySnapshot(Rc::new(self.snapshot_clone()));
+        *self.snapshot.borrow_mut() = Some(snapshot.clone());
+        snapshot
+    }
+
+    fn invalidate_snapshot(&mut self) {
+        self.snapshot.get_mut().take();
+    }
+
+    fn index_mut(&mut self) -> &mut OverlayIndex {
+        self.invalidate_snapshot();
+        &mut self.index
+    }
+
     /// Copy the list for an immutable observer such as redisplay.
     ///
     /// Snapshot overlays require independent position handles, so they cannot
@@ -841,6 +879,7 @@ impl OverlayList {
     pub fn new() -> Self {
         Self {
             index: OverlayIndex::new(),
+            snapshot: RefCell::new(None),
         }
     }
 
@@ -855,11 +894,11 @@ impl OverlayList {
         // overlay already owned by this index is rejected, while cross-buffer
         // moves materialize and rewrite the coordinates before reattaching.
         let range = EmacsByteRange::from_usize(data.start, data.end);
-        self.index.attach(overlay, range);
+        self.index_mut().attach(overlay, range);
     }
 
     pub fn detach_overlay(&mut self, overlay: Value) -> bool {
-        self.index.detach(overlay).is_some()
+        self.index_mut().detach(overlay).is_some()
     }
 
     pub fn delete_overlay(&mut self, overlay: Value) -> bool {
@@ -873,6 +912,7 @@ impl OverlayList {
     }
 
     pub fn delete_all_overlays(&mut self) {
+        self.invalidate_snapshot();
         let live: Vec<Value> = self.index.values().collect();
         for overlay in live {
             let _ = overlay.with_overlay_data_mut(|data| {
@@ -883,6 +923,7 @@ impl OverlayList {
     }
 
     pub(crate) fn retarget_buffer(&mut self, from: BufferId, to: BufferId) {
+        self.invalidate_snapshot();
         for overlay in self.index.values() {
             let _ = overlay.with_overlay_data_mut(|data| {
                 if data.buffer == Some(from) {
@@ -893,15 +934,20 @@ impl OverlayList {
     }
 
     pub fn overlay_put(&mut self, overlay: Value, prop: Value, value: Value) -> Result<bool, Flow> {
-        let changed = overlay
+        let (changed, plist_replaced) = overlay
             .with_overlay_data_mut(|data| {
                 let (plist, changed) = overlay_plist_put(data.plist, prop, value);
+                let plist_replaced = plist.bits() != data.plist.bits();
                 data.plist = plist;
-                Ok::<bool, Flow>(changed)
+                Ok::<_, Flow>((changed, plist_replaced))
             })
             .unwrap()?;
         if changed {
-            self.index.overlay_properties_changed(overlay);
+            self.index_mut().overlay_properties_changed(overlay);
+        } else if plist_replaced {
+            // Adding a previously absent nil property changes the plist even
+            // though GNU's display-change flag remains false.
+            self.invalidate_snapshot();
         }
         Ok(changed)
     }
@@ -945,7 +991,7 @@ impl OverlayList {
     }
 
     pub fn move_overlay_to_emacs_byte_range(&mut self, overlay: Value, range: EmacsByteRange) {
-        if self.index.move_to(overlay, range).is_none() {
+        if self.index_mut().move_to(overlay, range).is_none() {
             return;
         }
         let _ = overlay.with_overlay_data_mut(|data| {
@@ -1448,11 +1494,13 @@ impl OverlayList {
         if len.is_empty() {
             return;
         }
-        let effects = self.index.adjust_for_text_edit(OverlayTextEdit::Insert {
-            position: pos,
-            length: len,
-            before_markers,
-        });
+        let effects = self
+            .index_mut()
+            .adjust_for_text_edit(OverlayTextEdit::Insert {
+                position: pos,
+                length: len,
+                before_markers,
+            });
         self.apply_edit_effects(effects);
     }
 
@@ -1469,7 +1517,7 @@ impl OverlayList {
             return;
         }
         let effects = self
-            .index
+            .index_mut()
             .adjust_for_text_edit(OverlayTextEdit::Delete { range });
         self.apply_edit_effects(effects);
     }
@@ -1525,12 +1573,14 @@ impl OverlayList {
     }
 
     pub fn set_front_advance(&mut self, overlay: Value, advance: bool) {
+        self.invalidate_snapshot();
         let _ = overlay.with_overlay_data_mut(|data| {
             data.front_advance = advance;
         });
     }
 
     pub fn set_rear_advance(&mut self, overlay: Value, advance: bool) {
+        self.invalidate_snapshot();
         let _ = overlay.with_overlay_data_mut(|data| {
             data.rear_advance = advance;
         });
@@ -1940,6 +1990,9 @@ impl GcTrace for OverlayList {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
         for overlay in self.index.values() {
             roots.push(overlay);
+        }
+        if let Some(snapshot) = self.snapshot.borrow().as_ref() {
+            snapshot.trace_roots(roots);
         }
     }
 }

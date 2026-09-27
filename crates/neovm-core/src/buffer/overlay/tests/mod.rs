@@ -618,6 +618,145 @@ fn snapshot_clone_preserves_raw_same_start_query_order() {
 }
 
 #[test]
+fn immutable_overlay_snapshots_reuse_the_index_and_preserve_previous_observations() {
+    crate::test_utils::init_test_tracing();
+    let mut list = OverlayList::new();
+    let overlay = alloc_overlay(10, 20);
+    let face = Value::symbol("face");
+    list.insert_overlay(overlay);
+    list.overlay_put(overlay, face, Value::symbol("old-face"))
+        .unwrap();
+    let before = list.snapshot();
+    assert!(
+        std::ptr::eq(&*before, &*list.snapshot()),
+        "unchanged capture must not rebuild the index"
+    );
+    let frozen_overlay = overlays_at(&before, 12)[0];
+    list.overlay_put(overlay, face, Value::symbol("new-face"))
+        .unwrap();
+    let after = list.snapshot();
+    assert!(!std::ptr::eq(&*before, &*after));
+    assert_eq!(
+        before.overlay_get_named(frozen_overlay, face),
+        Some(Value::symbol("old-face"))
+    );
+    assert_eq!(
+        after.overlay_get_named(overlays_at(&after, 12)[0], face),
+        Some(Value::symbol("new-face"))
+    );
+    list.move_overlay_to_emacs_byte_range(overlay, emacs_byte_range(30, 40));
+    assert!(overlays_at(&list.snapshot(), 12).is_empty());
+    assert_eq!(overlay_start(&before, frozen_overlay), Some(10));
+    assert_eq!(overlays_at(&list.snapshot(), 32).len(), 1);
+    let inserted = alloc_overlay(31, 35);
+    list.insert_overlay(inserted);
+    assert_eq!(overlays_at(&list.snapshot(), 32).len(), 2);
+    list.delete_overlay(inserted);
+    assert_eq!(overlays_at(&list.snapshot(), 32).len(), 1);
+    list.delete_all_overlays();
+    assert!(list.snapshot().is_empty());
+    assert_eq!(before.len(), 1);
+}
+
+#[test]
+fn immutable_overlay_snapshots_invalidate_on_text_edits_and_gravity_changes() {
+    crate::test_utils::init_test_tracing();
+    let mut list = OverlayList::new();
+    let overlay = alloc_overlay(10, 20);
+    list.insert_overlay(overlay);
+    let before = list.snapshot();
+    list.set_front_advance(overlay, true);
+    let front = list.snapshot();
+    assert!(!std::ptr::eq(&*before, &*front));
+    assert!(
+        overlays_at(&front, 12)[0]
+            .as_overlay_data()
+            .unwrap()
+            .front_advance
+    );
+    list.set_rear_advance(overlay, true);
+    assert!(
+        overlays_at(&list.snapshot(), 12)[0]
+            .as_overlay_data()
+            .unwrap()
+            .rear_advance
+    );
+    list.adjust_for_insert_at_emacs_byte_pos(emacs_byte_pos(0), emacs_byte_len(5), false);
+    assert!(overlays_at(&list.snapshot(), 12).is_empty());
+    assert_eq!(overlays_at(&before, 12).len(), 1);
+    list.adjust_for_delete_emacs_byte_range(emacs_byte_range(0, 5));
+    assert_eq!(overlays_at(&list.snapshot(), 12).len(), 1);
+    list.retarget_buffer(BufferId(1), BufferId(2));
+    assert_eq!(
+        overlays_at(&list.snapshot(), 12)[0]
+            .as_overlay_data()
+            .unwrap()
+            .buffer,
+        Some(BufferId(2))
+    );
+}
+
+#[test]
+fn buffer_overlay_roots_include_cached_snapshot_objects_and_release_invalidated_copies() {
+    crate::test_utils::init_test_tracing();
+    let mut list = OverlayList::new();
+    let live = alloc_overlay(0, 2);
+    list.insert_overlay(live);
+    let snapshot = list.snapshot();
+    let frozen = overlays_at(&snapshot, 0)[0];
+    assert!(!eq_value(&live, &frozen));
+    let mut roots = Vec::new();
+    list.trace_roots(&mut roots);
+    assert!(roots.iter().any(|value| eq_value(value, &frozen)));
+    list.overlay_put(live, Value::symbol("face"), Value::symbol("changed"))
+        .unwrap();
+    roots.clear();
+    list.trace_roots(&mut roots);
+    assert!(roots.iter().any(|value| eq_value(value, &live)));
+    assert!(!roots.iter().any(|value| eq_value(value, &frozen)));
+}
+
+#[test]
+fn immutable_overlay_snapshot_observes_a_new_explicit_nil_property() {
+    crate::test_utils::init_test_tracing();
+    let mut list = OverlayList::new();
+    let live = alloc_overlay(0, 2);
+    list.insert_overlay(live);
+    let before = list.snapshot();
+    let name = Value::symbol("explicit-nil");
+    // The display value did not change, but the observable plist did.
+    assert!(!list.overlay_put(live, name, Value::NIL).unwrap());
+    let after = list.snapshot();
+    let frozen = overlays_at(&after, 0)[0];
+    assert_eq!(after.overlay_get_named(frozen, name), Some(Value::NIL));
+    assert_eq!(
+        before.overlay_get_named(overlays_at(&before, 0)[0], name),
+        None
+    );
+}
+
+#[test]
+fn cached_overlay_snapshot_survives_exact_evaluator_gc() {
+    crate::test_utils::init_test_tracing();
+    let mut eval = crate::emacs_core::Context::new();
+    eval.eval_str("(progn (insert \"abcd\") (overlay-put (make-overlay 1 4) 'before-string (copy-sequence \"frozen\")))").unwrap();
+    let buffer = eval.buffers.current_buffer().unwrap().id;
+    // No Rust-held Value roots the copied overlay. The cache belongs to the
+    // live buffer and must keep its independent overlay/plist objects alive.
+    drop(eval.buffers.get(buffer).unwrap().overlays().snapshot());
+    for _ in 0..3 {
+        eval.gc_collect_exact();
+        let snapshot = eval.buffers.get(buffer).unwrap().overlays().snapshot();
+        let overlay = overlays_at(&snapshot, 0)[0];
+        assert_eq!(
+            snapshot.overlay_get_named(overlay, Value::symbol("before-string")),
+            Some(Value::string("frozen"))
+        );
+        assert_eq!(overlay_end(&snapshot, overlay), Some(3));
+    }
+}
+
+#[test]
 fn delete_overlay_removes_non_root_interval_entry() {
     crate::test_utils::init_test_tracing();
     let mut list = OverlayList::new();

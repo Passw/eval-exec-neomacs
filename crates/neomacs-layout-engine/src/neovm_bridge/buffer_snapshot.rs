@@ -8,7 +8,8 @@ use super::{
 };
 use neovm_core::buffer::{
     Buffer, BufferTextSnapshot, CharPos0, CharRange, EmacsByteLen, EmacsBytePos, EmacsByteRange,
-    buffer::BUFFER_SLOT_COUNT, overlay::OverlayList,
+    buffer::BUFFER_SLOT_COUNT,
+    overlay::{OverlayList, OverlaySnapshot},
 };
 use neovm_core::emacs_core::plist::plist_get;
 use neovm_core::emacs_core::symbol::Obarray;
@@ -30,7 +31,7 @@ pub(crate) struct LayoutBufferSnapshot {
     accessible_start_emacs_byte: EmacsBytePos,
     accessible_end_emacs_byte: EmacsBytePos,
     accessible_end_char: CharPos0,
-    overlays: OverlayList,
+    overlays: OverlaySnapshot,
     /// Symbol plists for the category symbols actually referenced by this
     /// buffer's text and overlays. Capturing this sparse set keeps layout
     /// immutable without cloning the evaluator's complete obarray.
@@ -68,7 +69,7 @@ impl LayoutBufferSnapshot {
             accessible_end_emacs_byte: buffer.point_max_emacs_byte_pos(),
             accessible_end_char: buffer.point_max_char_pos(),
             vars: resolve_layout_vars(local_var_alist, &slots, obarray),
-            overlays: buffer.overlays().snapshot_clone(),
+            overlays: buffer.overlays().snapshot(),
             category_symbol_plists: FxHashMap::default(),
             automatic_composition_spans: Vec::new(),
             string_composition_rules: None,
