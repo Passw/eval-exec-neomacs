@@ -14,3 +14,7 @@ pub(crate) use mapped_input::ResolvedMappedTextInput;
 
 mod spacing_input;
 pub(crate) use spacing_input::ResolvedSpacingInput;
+
+pub(crate) mod program;
+
+pub(crate) mod worker;

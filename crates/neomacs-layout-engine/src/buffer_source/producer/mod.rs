@@ -85,13 +85,33 @@ impl<'request, B: LayoutBufferView> BufferElementProducer<'request, B> {
         start_charpos: i64,
         text_start_byte: usize,
     ) -> Self {
+        Self::new_for_window_range(
+            buffer_id,
+            buffer,
+            window_id,
+            start_charpos,
+            CharPos0::new(usize::MAX),
+            text_start_byte,
+        )
+    }
+
+    /// Bound acquisition before a text run can allocate its source payload.
+    /// Reaching this boundary is exhaustion, not an artificial row break.
+    pub(crate) fn new_for_window_range(
+        buffer_id: BufferId,
+        buffer: &'request B,
+        window_id: Option<u64>,
+        start_charpos: i64,
+        end: CharPos0,
+        text_start_byte: usize,
+    ) -> Self {
         Self {
             source_cursor: BufferTextSourceCursor::new_for_window(
                 buffer_id,
                 buffer,
                 window_id,
                 CharPos0::new(start_charpos.max(0) as usize),
-                CharPos0::new(usize::MAX),
+                end,
                 RenderFaceRef::Inherit,
             ),
             source_resolve_state: DisplaySourceResolveState::default(),
