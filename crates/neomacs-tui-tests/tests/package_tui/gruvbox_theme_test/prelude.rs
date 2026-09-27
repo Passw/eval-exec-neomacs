@@ -1,4 +1,3 @@
-
 pub(super) const GRUVBOX_TUI_PRELUDE: &str = r####"
 (require 'ansi-color)
 (require 'cl-lib)
