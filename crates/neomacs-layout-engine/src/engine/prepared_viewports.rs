@@ -28,6 +28,50 @@ pub(super) struct PreparedViewports {
 }
 
 impl PreparedViewports {
+    #[cfg(test)]
+    pub(super) fn insert_computed(
+        &mut self,
+        frame: neovm_core::window::FrameId,
+        window: DisplayWindowId,
+        retained: RetainedWindowMatrix,
+        faces: PreparedFaceSnapshot,
+    ) {
+        let rows = retained.matrix.rows.len();
+        let glyphs = retained
+            .matrix
+            .rows
+            .iter()
+            .flat_map(|row| &row.glyphs)
+            .map(Vec::len)
+            .sum();
+        if rows > MAX_ROWS || glyphs > MAX_GLYPHS {
+            return;
+        }
+        self.entries.retain(|entry| {
+            entry.frame != frame
+                || entry.window != window
+                || entry.retained.key.window_start != retained.key.window_start
+        });
+        self.entries.push_back(PreparedViewport {
+            frame,
+            window,
+            retained,
+            faces,
+            rows,
+            glyphs,
+        });
+        self.trim();
+    }
+
+    fn trim(&mut self) {
+        while self.entries.len() > MAX_VIEWPORTS
+            || self.entries.iter().map(|entry| entry.rows).sum::<usize>() > MAX_ROWS
+            || self.entries.iter().map(|entry| entry.glyphs).sum::<usize>() > MAX_GLYPHS
+        {
+            self.entries.pop_front();
+        }
+    }
+
     pub(super) fn replay(
         &self,
         frame: neovm_core::window::FrameId,
@@ -143,11 +187,6 @@ impl PreparedViewports {
                 glyphs,
             });
         }
-        while self.entries.len() > MAX_VIEWPORTS
-            || self.entries.iter().map(|entry| entry.rows).sum::<usize>() > MAX_ROWS
-            || self.entries.iter().map(|entry| entry.glyphs).sum::<usize>() > MAX_GLYPHS
-        {
-            self.entries.pop_front();
-        }
+        self.trim();
     }
 }

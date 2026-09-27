@@ -10,7 +10,7 @@ use crate::display_source_resolver::PendingDisplaySourceFace;
 use crate::frame_face_arena::FrameFaceAttempt;
 use crate::neovm_bridge::{LayoutBufferView, LayoutCharPropertyLookup};
 use crate::row_layout::program::RowProgramError;
-use neovm_core::buffer::{BufferId, CharPos0, EmacsByteRange};
+use neovm_core::buffer::{BufferId, CharPos0, EmacsBytePos, EmacsByteRange};
 use neovm_core::emacs_core::Value;
 
 pub(crate) struct CapturedPhysicalLine {
@@ -36,6 +36,11 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
     let buffer = context.buffer();
     let start_byte = buffer.layout_char_pos_to_emacs_byte_pos(start);
     if start_byte < buffer.layout_point_min_emacs_byte_pos() {
+        return Err(RowProgramError::Unsupported);
+    }
+    if start_byte > buffer.layout_point_min_emacs_byte_pos()
+        && buffer.layout_emacs_byte_at_pos(EmacsBytePos::new(start_byte.get() - 1)) != Some(b'\n')
+    {
         return Err(RowProgramError::Unsupported);
     }
     let end = CharPos0::new(start.get().saturating_add(max_chars))

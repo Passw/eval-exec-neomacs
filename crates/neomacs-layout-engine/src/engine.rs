@@ -5,6 +5,8 @@
 //! grid, and publishes `FrameDisplayState` snapshots for render backends.
 
 mod prepared_viewports;
+#[cfg(test)]
+mod scroll_coverage;
 use prepared_viewports::PreparedViewports;
 
 #[cfg(test)]
@@ -766,6 +768,8 @@ pub struct LayoutEngine {
     /// replay. Speculative attempts never replace this state.
     retained_window_matrices: rustc_hash::FxHashMap<DisplayWindowId, RetainedWindowMatrix>,
     prepared_viewports: PreparedViewports,
+    #[cfg(test)]
+    scroll_coverage: scroll_coverage::ScrollCoverage,
     /// Every OTHER frame's retained state, parked while this one is laid out.
     ///
     /// One `LayoutEngine` serves every visible frame -- `RedisplayRuntime` owns
@@ -1386,6 +1390,8 @@ impl LayoutEngine {
             frame_face_arenas: rustc_hash::FxHashMap::default(),
             retained_window_matrices: rustc_hash::FxHashMap::default(),
             prepared_viewports: PreparedViewports::default(),
+            #[cfg(test)]
+            scroll_coverage: scroll_coverage::ScrollCoverage::default(),
             retained_by_frame: rustc_hash::FxHashMap::default(),
             retained_frame: None,
             retained_window_chrome_metrics: rustc_hash::FxHashMap::default(),
@@ -1420,6 +1426,8 @@ impl LayoutEngine {
             frame_face_arenas: rustc_hash::FxHashMap::default(),
             retained_window_matrices: rustc_hash::FxHashMap::default(),
             prepared_viewports: PreparedViewports::default(),
+            #[cfg(test)]
+            scroll_coverage: scroll_coverage::ScrollCoverage::default(),
             retained_by_frame: rustc_hash::FxHashMap::default(),
             retained_frame: None,
             retained_window_chrome_metrics: rustc_hash::FxHashMap::default(),

@@ -5,10 +5,10 @@
 
 use neovm_core::window::{DisplayPointSnapshot, DisplayRowSnapshot, PresentedBodyRowSnapshot};
 
-pub(super) struct PreparedWindowRows {
-    pub(super) points: Vec<DisplayPointSnapshot>,
-    pub(super) rows: Vec<DisplayRowSnapshot>,
-    pub(super) body_rows: Vec<PresentedBodyRowSnapshot>,
+pub(crate) struct PreparedWindowRows {
+    pub(crate) points: Vec<DisplayPointSnapshot>,
+    pub(crate) rows: Vec<DisplayRowSnapshot>,
+    pub(crate) body_rows: Vec<PresentedBodyRowSnapshot>,
 }
 
 impl PreparedWindowRows {

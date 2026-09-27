@@ -6,6 +6,8 @@
 //! tests can also mirror output-cursor moves into a live window.
 
 mod row_geometry;
+#[cfg(test)]
+pub(crate) mod prepared_body;
 mod snapshot_rows;
 use row_geometry::WindowRowGeometry;
 

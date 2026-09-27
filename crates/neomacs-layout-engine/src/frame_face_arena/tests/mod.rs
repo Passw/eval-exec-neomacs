@@ -497,3 +497,45 @@ fn prepared_dynamic_face_survives_a_page_that_does_not_use_it() {
     third.admit_prepared([face.id], &prepared, &second).unwrap();
     assert_eq!(third.face(face.id), Some(face));
 }
+
+#[test]
+fn worker_face_reservation_preserves_publication_and_serializes_identity_allocation() {
+    let mut arena = FrameFaceArena::default();
+    let generation = arena.generation();
+    let mut attempt = arena.begin_attempt();
+    let sibling = arena.begin_attempt();
+    let resolved = crate::neovm_bridge::ResolvedFace::default();
+    let id = crate::display_row::face_state::stable_face_id_for_resolved(&mut attempt, &resolved);
+    let rendered = crate::display_row::face_state::resolved_display_row_face(id, &resolved, None)
+        .render_face();
+    attempt.import_face(rendered.clone()).unwrap();
+    let prepared = arena.reserve_prepared(&attempt).unwrap();
+    assert_eq!(arena.generation(), generation);
+    assert!(
+        arena.faces.is_empty(),
+        "reservation must not publish speculative faces"
+    );
+    assert!(matches!(
+        arena.reserve_prepared(&sibling),
+        Err(FrameFaceReuseError::ForeignSnapshot)
+    ));
+    let mut fresh = arena.begin_attempt();
+    fresh.admit_prepared([id], &prepared, &arena).unwrap();
+    assert_eq!(fresh.face(id), Some(rendered));
+    let mut other = resolved.clone();
+    other.font_size *= 2.0;
+    let other_id = crate::display_row::face_state::stable_face_id_for_resolved(&mut fresh, &other);
+    assert_ne!(id, other_id);
+    let foreign = FrameFaceArena::default().begin_attempt();
+    assert!(matches!(
+        arena.reserve_prepared(&foreign),
+        Err(FrameFaceReuseError::ForeignArena)
+    ));
+    let invalidated = arena.invalidate();
+    assert!(
+        invalidated
+            .begin_attempt()
+            .admit_prepared([id], &prepared, &invalidated)
+            .is_err()
+    );
+}

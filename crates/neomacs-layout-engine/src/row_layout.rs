@@ -2,9 +2,9 @@
 //!
 //! Kept out of production until an off-screen consumer is integrated.
 //! Resolved natural text, source-mapped text and literal spacing are admitted.
-//! This module does not yet define a complete row job: geometry, realized
-//! fonts, validity and work budgets must
-//! accompany these inputs before an off-screen worker can execute them.
+//! Complete physical-line programs carry geometry, captured font measurements
+//! and work budgets. A bounded worker executes them without evaluator state.
+//! Window identity, admission and publication remain the engine's responsibility.
 
 mod input;
 pub(crate) use input::ResolvedTextInput;

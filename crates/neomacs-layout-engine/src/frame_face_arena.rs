@@ -340,6 +340,32 @@ impl Default for FrameFaceArena {
 }
 
 impl FrameFaceArena {
+    /// Reserve identities for evaluator-resolved off-screen work without
+    /// publishing its speculative metrics into the current presentation.
+    #[cfg(test)]
+    pub(crate) fn reserve_prepared(
+        &mut self,
+        attempt: &FrameFaceAttempt,
+    ) -> Result<PreparedFaceSnapshot, FrameFaceReuseError> {
+        let state = attempt.state.borrow();
+        if !Arc::ptr_eq(&self.owner, &state.owner) {
+            return Err(FrameFaceReuseError::ForeignArena);
+        }
+        if !Arc::ptr_eq(&self.snapshot, &state.base_snapshot) {
+            return Err(FrameFaceReuseError::ForeignSnapshot);
+        }
+        self.realized = FrameFaceAttempt::fold_realized(&state);
+        self.next_face_id = self.next_face_id.max(state.next_face_id);
+        // A second attempt based on the old allocator may have minted the
+        // same IDs for different faces. Reservations serialize that lineage
+        // without changing the displayed face table or its generation.
+        self.snapshot = Arc::new(FrameFaceSnapshot);
+        Ok(PreparedFaceSnapshot {
+            owner: Arc::clone(&self.owner),
+            faces: Arc::new(state.faces.clone()),
+        })
+    }
+
     pub(crate) fn prepared_snapshot(&self) -> PreparedFaceSnapshot {
         PreparedFaceSnapshot {
             owner: Arc::clone(&self.owner),

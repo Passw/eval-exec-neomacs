@@ -287,6 +287,10 @@ pub(crate) struct RowProgram {
 pub(crate) struct ComputedRow {
     pub row: GlyphRow,
     pub slots: Vec<DisplayRowGlyphSlot>,
+    pub source: SourceSpan,
+    pub end: DisplayRowPosition,
+    pub terminator_width: f32,
+    pub terminator_height: f32,
 }
 
 impl RowProgram {
@@ -302,6 +306,23 @@ impl RowProgram {
         if faces.len() > limits.items || !geometry.width.is_finite() || geometry.width <= 0.0 {
             return Err(RowProgramError::Budget);
         }
+        let mut metadata_bytes = geometry
+            .tabs
+            .stop_cols
+            .len()
+            .saturating_mul(std::mem::size_of::<usize>());
+        for face in &faces {
+            if face.stipple.is_some() {
+                return Err(RowProgramError::Unsupported);
+            }
+            metadata_bytes = metadata_bytes
+                .saturating_add(face.font_family.len())
+                .saturating_add(face.font_file_path.as_ref().map_or(0, String::len))
+                .saturating_add(face.lisp_name.as_ref().map_or(0, String::len));
+        }
+        if metadata_bytes > limits.text_bytes {
+            return Err(RowProgramError::Budget);
+        }
         let mut measurements = Measurements {
             backend: measurer.display_geometry_backend(),
             char_width: geometry.metrics.char_width(),
@@ -311,7 +332,7 @@ impl RowProgram {
             missing: false,
         };
         let mut operations = Vec::new();
-        let mut bytes = 0usize;
+        let mut bytes = metadata_bytes;
         let mut glyphs = 0usize;
         let mut complete = false;
         for item in items {
@@ -375,11 +396,17 @@ impl RowProgram {
         let mut row = new_display_row(&layout);
         let mut position = DisplayRowPosition::new(0.0, 0);
         let mut slots = Vec::new();
+        let mut source_start = None;
+        let mut source_end = None;
+        let mut terminator_width = self.geometry.metrics.char_width();
+        let mut terminator_height = self.geometry.metrics.row_height();
         for (operation, plan) in self.operations {
             if cancelled() {
                 return Err(RowProgramError::Cancelled);
             }
             let item = operation.into_item();
+            source_start.get_or_insert_with(|| item.span.start.clone());
+            source_end = Some(item.span.end.clone());
             let newline = if let DisplayItemKind::RowBreak(value) = item.kind {
                 Some((
                     value,
@@ -403,6 +430,16 @@ impl RowProgram {
             position = progress.end();
             slots.extend(progress.slots().iter().cloned());
             if let Some((value, face, edges, membership)) = newline {
+                if let Some(realized) = self
+                    .faces
+                    .iter()
+                    .find(|candidate| candidate.face_id == face)
+                {
+                    terminator_width = realized
+                        .metrics
+                        .char_width_px(self.geometry.metrics.char_width());
+                    terminator_height = realized.metrics.line_height_px();
+                }
                 let mode = match self.measurements.backend {
                     DisplayGeometryBackend::WindowSystemPixels => {
                         DisplayRowMeasurementMode::ConcreteFont
@@ -428,7 +465,17 @@ impl RowProgram {
             }
         }
         crate::glyph_row_writer::normalize_external_row(&mut row);
-        Ok(ComputedRow { row, slots })
+        Ok(ComputedRow {
+            row,
+            slots,
+            source: SourceSpan::new(
+                source_start.ok_or(RowProgramError::Incomplete)?,
+                source_end.ok_or(RowProgramError::Incomplete)?,
+            ),
+            end: position,
+            terminator_width,
+            terminator_height,
+        })
     }
 }
 

@@ -35899,3 +35899,5 @@ fn hscroll_cursor_publication_preserves_clipping_visible_text_and_eol() {
 }
 
 mod prepared_viewport_test;
+
+mod offscreen_row_test;

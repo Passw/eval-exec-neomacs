@@ -122,7 +122,7 @@ impl LayoutBufferSnapshot {
     }
 }
 
-fn capture_automatic_composition_spans(
+pub(super) fn capture_automatic_composition_spans(
     buffer: &Buffer,
     obarray: &Obarray,
     vars: &[Option<Value>; <LayoutVar as strum::EnumCount>::COUNT],
@@ -233,7 +233,7 @@ fn capture_layout_category_symbol_plists(
 /// available) the variable's default value. An alist entry that exists but
 /// is unbound shadows nothing — it falls through to the default, exactly
 /// like the old `assq`-then-default sequence.
-fn resolve_layout_vars(
+pub(super) fn resolve_layout_vars(
     local_var_alist: Value,
     slots: &[Value; BUFFER_SLOT_COUNT],
     obarray: Option<&Obarray>,

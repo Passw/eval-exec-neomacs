@@ -3187,19 +3187,8 @@ pub fn realize_frame_fonts(
         let Some(face) = state.faces.get_mut(&face_id) else {
             continue;
         };
-        let family = if face.font_family.is_empty() {
-            "monospace"
-        } else {
-            face.font_family.as_str()
-        };
-        let italic = face.is_italic();
-        match svc.resolved_font_for_face(family, face.font_weight, italic, face.font_size.max(1.0))
-        {
+        match realize_face_font(face, svc) {
             Some(font) => {
-                face.default_resolved_font_id = Some(font.id);
-                if face.font_file_path.is_none() {
-                    face.font_file_path = font.identity.file_path.clone();
-                }
                 state.fonts.entry(font.id).or_insert(font);
             }
             None => {
@@ -3218,6 +3207,30 @@ pub fn realize_frame_fonts(
     }
 
     realize_frame_char_fonts(state, svc);
+}
+
+/// Pin the same primary font identity for prepared rows and presented rows.
+/// The caller retains the returned resource when publishing a frame.
+pub(crate) fn realize_face_font(
+    face: &mut neomacs_display_protocol::face::Face,
+    service: &mut FontMetricsService,
+) -> Option<ResolvedFont> {
+    let family = if face.font_family.is_empty() {
+        "monospace"
+    } else {
+        face.font_family.as_str()
+    };
+    let font = service.resolved_font_for_face(
+        family,
+        face.font_weight,
+        face.is_italic(),
+        face.font_size.max(1.0),
+    )?;
+    face.default_resolved_font_id = Some(font.id);
+    if face.font_file_path.is_none() {
+        face.font_file_path = font.identity.file_path.clone();
+    }
+    Some(font)
 }
 
 fn protocol_face_font_selection(
