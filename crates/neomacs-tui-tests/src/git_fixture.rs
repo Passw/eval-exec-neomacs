@@ -98,9 +98,8 @@ impl GitFixture {
             &[],
         )?;
         for commit in spec.commits {
-            std::fs::write(fixture.path.join(spec.file), commit.contents).map_err(|error| {
-                format!("write git fixture file {}: {error}", spec.file)
-            })?;
+            std::fs::write(fixture.path.join(spec.file), commit.contents)
+                .map_err(|error| format!("write git fixture file {}: {error}", spec.file))?;
             fixture.git(&["add", "--", spec.file], &[])?;
             fixture.git(
                 &[

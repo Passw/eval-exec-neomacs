@@ -5,11 +5,7 @@ use neomacs_tui_tests::Snapshot;
 
 use super::{CachedMelpaOracle, LEUVEN_THEME_MELPA_PIN};
 
-use super::scenario::{
-                         PackageTuiScenario,
-                         PairTimeout,
-                         ReadinessCheckpoint,
-                     };
+use super::scenario::{PackageTuiScenario, PairTimeout, ReadinessCheckpoint};
 
 mod harness;
 mod prelude;

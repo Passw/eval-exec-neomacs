@@ -88,8 +88,8 @@ fn hostile_host_environment_cannot_change_the_fixture() {
         std::env::set_var("GIT_AUTHOR_DATE", "1999-01-01T00:00:00+0000");
         std::env::set_var("GIT_COMMITTER_DATE", "1999-01-01T00:00:00+0000");
     }
-    let hostile =
-        GitFixture::create(hostile_sandbox.path(), &SPEC).expect("create fixture while host is hostile");
+    let hostile = GitFixture::create(hostile_sandbox.path(), &SPEC)
+        .expect("create fixture while host is hostile");
     for leak in GIT_ENV_LEAKS {
         // SAFETY: as above.
         unsafe { std::env::remove_var(leak) };

@@ -9,8 +9,9 @@ use crate::Snapshot;
 #[test]
 fn file_backed_snapshot_compares_the_file_bytes() {
     expect_file!["snapshots/example.txt"].assert_snapshot("hello\n");
-    let mismatch =
-        std::panic::catch_unwind(|| expect_file!["snapshots/example.txt"].assert_snapshot("other\n"));
+    let mismatch = std::panic::catch_unwind(|| {
+        expect_file!["snapshots/example.txt"].assert_snapshot("other\n")
+    });
     assert!(
         mismatch.is_err(),
         "a differing screen must fail the assertion"
