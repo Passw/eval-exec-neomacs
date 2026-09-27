@@ -239,6 +239,13 @@ pub(crate) struct LayoutBufferSnapshot {
 
 impl LayoutBufferSnapshot {
     pub fn from_buffer(buffer: &Buffer) -> Self {
+        Self::capture_buffer(buffer, None)
+    }
+
+    // Resolve layout variables once, with the caller's global defaults already
+    // available. Window snapshots must not build and then replace a complete
+    // buffer-local-only variable table on every layout attempt.
+    fn capture_buffer(buffer: &Buffer, obarray: Option<&Obarray>) -> Self {
         let local_var_alist = buffer.local_var_alist_value();
         let slots = buffer.slot_values_snapshot();
         Self {
@@ -249,7 +256,7 @@ impl LayoutBufferSnapshot {
             accessible_start_emacs_byte: buffer.point_min_emacs_byte_pos(),
             accessible_end_emacs_byte: buffer.point_max_emacs_byte_pos(),
             accessible_end_char: buffer.point_max_char_pos(),
-            vars: resolve_layout_vars(local_var_alist, &slots, None),
+            vars: resolve_layout_vars(local_var_alist, &slots, obarray),
             local_var_alist,
             slots,
             overlays: buffer.overlays().snapshot_clone(),
@@ -281,10 +288,8 @@ impl LayoutBufferSnapshot {
         visible: Option<(usize, usize)>,
         target: crate::display_property::DisplayPropertyTarget,
     ) -> Self {
-        let mut snapshot = Self::from_buffer(buffer);
+        let mut snapshot = Self::capture_buffer(buffer, Some(obarray));
         snapshot.display_target = target;
-        snapshot.vars =
-            resolve_layout_vars(snapshot.local_var_alist, &snapshot.slots, Some(obarray));
         snapshot.category_symbol_plists = capture_layout_category_symbol_plists(buffer, obarray);
         snapshot.automatic_composition_spans =
             capture_automatic_composition_spans(buffer, obarray, &snapshot.vars, visible);
