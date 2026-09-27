@@ -147,16 +147,21 @@ fn resolve_nix(name: &str, version: &str, attribute: &str) -> Result<ResolvedToo
             bin_dir.display()
         )));
     }
+    // A nix row's *pin* is the flake's locked nixpkgs revision, so the column
+    // is a prefix sanity check rather than an exact match: the revision
+    // decides the patch level, and recording it here would mean editing the
+    // lock whenever the flake updates.  `system` rows keep the exact match,
+    // because nothing pins a host binary but this column.
     let actual = version_of(&bin, name)?;
-    if actual != version {
+    if !actual.starts_with(version) {
         return Err(ToolsError::VersionMismatch {
-            expected: version.to_string(),
+            expected: format!("{version} (as a prefix)"),
             actual,
         });
     }
     Ok(ResolvedTool {
         name: name.to_string(),
-        version: version.to_string(),
+        version: actual.clone(),
         strategy: ToolSource::Nix {
             attribute: attribute.to_string(),
         },

@@ -33,7 +33,8 @@ use std::sync::OnceLock;
 /// Keep this in step with the suites' actual tool requirements; a test that
 /// grows a new external dependency adds its row here rather than reaching
 /// for whatever the host happens to have.
-pub const REQUIRED_TOOLS: &[(&str, &str)] = &[("git", "2.51.2"), ("node", "v22.22.2")];
+pub const REQUIRED_TOOLS: &[(&str, &str)] =
+    &[("git", "2.51.2"), ("java", "21"), ("node", "v22.22.2")];
 
 /// Directories to prepend to `PATH` for editor sessions, best effort.
 ///
