@@ -512,16 +512,24 @@ impl RenderApp {
         self.frame_windows.tick_top_level_child_frames();
         let mut queued = std::collections::VecDeque::new();
         queued.extend(std::mem::take(&mut self.pending_child_frames).into_values());
-        queued.extend(self.comms.frame_rx.try_iter());
+        if let Some(worker) = &self.frame_preparation {
+            queued.extend(worker.ready());
+        } else {
+            queued.extend(
+                self.comms
+                    .frame_rx
+                    .try_iter()
+                    .map(super::frame_preparation::PreparedFrame::new),
+            );
+        }
         loop {
             let mut deferred = std::collections::HashMap::new();
             let mut made_progress = false;
             while let Some(display_state) = queued.pop_front() {
-                super::frame_stats::note_scene_commit(
-                    neomacs_display_protocol::frame_time::observe_platform_now(),
-                );
-                let frame_id = display_state.frame_placement.frame();
+                super::frame_stats::note_scene_commit(display_state.received);
+                let frame_id = display_state.state.frame_placement.frame();
                 let parent_id = display_state
+                    .state
                     .frame_placement
                     .parent()
                     .unwrap_or(neomacs_display_protocol::DisplayFrameId::new(0));
@@ -529,7 +537,7 @@ impl RenderApp {
                     && !self.frame_windows.has_presented_frame(parent_id.get())
                 {
                     if let Some(superseded) = deferred.insert(frame_id.get(), display_state) {
-                        let placement = superseded.frame_placement;
+                        let placement = superseded.state.frame_placement;
                         self.comms.send_input(
                             crate::thread_comm::InputEvent::PresentationDiscarded {
                                 presentation: placement.presentation().get(),
@@ -541,27 +549,13 @@ impl RenderApp {
                 }
                 made_progress = true;
 
-                // Materialize FrameDisplayState → FrameGlyphBuffer for the
-                // existing rendering code.  The layout engine populates
-                // the grid and non-grid items; materialize() converts the
-                // grid into pixel-positioned glyphs and appends non-grid items.
-                // Reduce rows to scroll anchors before materializing them away:
-                // a FrameGlyphBuffer carries no rows, so this is the last point
-                // at which a later scroll can be measured.
-                let scroll_anchors =
-                    crate::render_thread::frame_compositor::continuity::scroll::anchors_by_window(
-                        &display_state,
-                    );
-                let reflow_imprints =
-                    crate::render_thread::frame_compositor::continuity::reflow::imprints_by_window(
-                        &display_state,
-                    );
-                let frame = display_state.materialize();
-                // Row-damage summary for the renderer's vertex reuse. Built from
-                // exactly this display_state (the one `frame` was materialized
-                // from) so damage and glyphs can never describe different frames.
-                let row_damage =
-                    neomacs_renderer_wgpu::FrameRowDamage::from_display_state(&display_state);
+                let super::frame_preparation::PreparedFrame {
+                    frame,
+                    damage: row_damage,
+                    scroll: scroll_anchors,
+                    reflow: reflow_imprints,
+                    ..
+                } = display_state;
 
                 // ── Observation point: inspect what will be rendered ──
                 // `NEOMACS_DUMP_FRAME_GLYPHS=1`   → counts + role/text + raw glyph Debug.

@@ -12,6 +12,7 @@ mod cursor_runtime;
 mod device_loss;
 mod frame_compositor;
 mod frame_ingest;
+mod frame_preparation;
 mod frame_sched;
 mod frame_state;
 pub(crate) mod frame_stats;

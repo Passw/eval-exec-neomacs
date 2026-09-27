@@ -13,6 +13,7 @@ impl RenderApp {
             let before = subtree.len();
             for (&id, state) in &self.pending_child_frames {
                 if state
+                    .state
                     .frame_placement
                     .parent()
                     .is_some_and(|parent| subtree.contains(&parent.get()))

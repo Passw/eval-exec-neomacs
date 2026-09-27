@@ -591,7 +591,7 @@ impl RenderApp {
     pub(super) fn synchronize_image_residency(&mut self) {
         let mut retained = self.frame_windows.retained_images();
         for pending in self.pending_child_frames.values() {
-            retained.extend(pending.referenced_images().iter());
+            retained.extend(pending.state.referenced_images().iter());
         }
         retained.extend(self.toolbar.textures().values().copied());
         if let Some(renderer) = self.renderer.as_mut() {

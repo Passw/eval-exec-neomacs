@@ -883,8 +883,8 @@ pub(super) struct RenderApp {
     pub(super) frame_windows: GuiFrameWindowManager,
     /// Latest child snapshots whose immediate ancestry has not been presented
     /// yet. They are retried transactionally when an ancestor arrives.
-    pub(super) pending_child_frames:
-        HashMap<u64, neomacs_display_protocol::SealedFramePresentation>,
+    pub(super) pending_child_frames: HashMap<u64, super::frame_preparation::PreparedFrame>,
+    pub(super) frame_preparation: Option<super::frame_preparation::FramePreparation>,
 
     pub(super) child_frame_style: ChildFrameStyle,
     pub(super) toolbar: ToolbarResources,
@@ -1087,6 +1087,7 @@ impl RenderApp {
             shared_terminals,
             frame_windows,
             pending_child_frames: HashMap::new(),
+            frame_preparation: None,
             child_frame_style: ChildFrameStyle::default(),
             toolbar: ToolbarResources::default(),
             scroll_indicators_enabled: false,

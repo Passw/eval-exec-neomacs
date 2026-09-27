@@ -539,6 +539,7 @@ fn run_render_loop_with_startup(
     };
 
     tracing::info!("Render thread entering winit event loop");
+    let preparation_proxy = event_loop.create_proxy();
     let exit_input = comms.input_tx.clone();
     let result = startup::run(event_loop, initial, move |size| {
         let app = RenderApp::new(
@@ -552,8 +553,15 @@ fn run_render_loop_with_startup(
             #[cfg(feature = "neo-term")]
             shared_terminals,
         );
-        #[cfg(any(feature = "video", feature = "webview"))]
         let mut app = app;
+        match super::frame_preparation::FramePreparation::spawn(
+            app.comms.frame_rx.clone(),
+            app.comms.input_tx.clone(),
+            move || preparation_proxy.wake_up(),
+        ) {
+            Ok(worker) => app.frame_preparation = Some(worker),
+            Err(error) => tracing::warn!(%error, "frame preparation worker unavailable"),
+        }
         #[cfg(feature = "video")]
         {
             app.video_wake = video_wake;
