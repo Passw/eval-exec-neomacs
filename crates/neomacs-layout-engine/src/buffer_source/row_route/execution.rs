@@ -247,6 +247,9 @@ impl<'rows, 'emit, 'surface>
             end: CharPos0,
             kind: RoutedRowPartKind<'plan>,
             active: crate::display_row::face_state::DisplayRowActiveFaceState,
+            // Measurement and commit consume the same captured text. Source
+            // resolution does not run Lisp between these phases.
+            text_source: Option<BufferPlainItemSource>,
         }
         let mut probed: Vec<ProbedSegment> = Vec::with_capacity(ranges.len());
         let mut carried_active: Option<crate::display_row::face_state::DisplayRowActiveFaceState> =
@@ -303,12 +306,13 @@ impl<'rows, 'emit, 'surface>
                 end: *seg_end,
                 kind: part.kind,
                 active,
+                text_source: None,
             });
         }
 
         let geometry = *self.row_build.row_geometry;
         let mut probe_position = position;
-        for segment in &probed {
+        for segment in &mut probed {
             // Advance-based measurement: tab expansion depends on the pen x
             // and 2-col chars advance two cells, so the measured END position
             // (x AND col) seeds the next segment's probe exactly as the
@@ -412,14 +416,14 @@ impl<'rows, 'emit, 'surface>
                     position
                 }
                 RoutedRowPartKind::Text => {
-                    let source = BufferPlainItemSource::text_only(
+                    let source = segment.text_source.insert(BufferPlainItemSource::text_only(
                         loop_context.buffer_id(),
                         buffer,
                         segment.start,
                         segment.end,
                         RenderFaceRef::FaceId(segment.active.face_id()),
-                    );
-                    let Some(text_item) = source.text_item().cloned() else {
+                    ));
+                    let Some(text_item) = source.text_item() else {
                         note_route_refusal(RouteRefusal::ProbeMeasure);
                         return PlainRowRouteOutcome::NotRouted;
                     };
@@ -436,7 +440,7 @@ impl<'rows, 'emit, 'surface>
                     append_context.measure_source_display_item_advance_naturally(
                         &geometry,
                         &mut measure,
-                        &text_item,
+                        text_item,
                         probe_position,
                         DisplayRowAppendKind::SourceText,
                     )
@@ -606,7 +610,7 @@ impl<'rows, 'emit, 'surface>
         // exactly as the pipeline's next iteration would (installing the
         // measured face, including row extents, scoping row-extend/box).
         let mut render_position = position;
-        for (index, segment) in probed.iter().enumerate() {
+        for (index, segment) in probed.into_iter().enumerate() {
             // P4.6: DELEGATE the anchor's strings to the pipeline's own
             // session — the identical call `render.rs`'s loop-level element
             // arm makes, with the loop state this commit already owns. The
@@ -845,13 +849,9 @@ impl<'rows, 'emit, 'surface>
                 self.row_build.row_extend.clear();
             }
 
-            let mut source = BufferPlainItemSource::text_only(
-                loop_context.buffer_id(),
-                buffer,
-                segment.start,
-                segment.end,
-                RenderFaceRef::FaceId(active_face_state.face_id()),
-            );
+            let mut source = segment
+                .text_source
+                .expect("a committed text segment passed source measurement");
             let append_context = BufferSourceRowAppendContext::from_active_face_row(
                 buffer,
                 loop_context.buffer_id(),
