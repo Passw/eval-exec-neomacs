@@ -555,12 +555,47 @@ fn idle_capture_survives_redisplays_with_unchanged_layout_inputs() {
 }
 
 fn idle_first_visit(backward: bool, redisplay_between_steps: bool) {
+    idle_first_visit_step(backward, redisplay_between_steps, None);
+}
+
+#[test]
+fn idle_worker_rows_complete_small_forward_scrolls() {
+    for rows in [1, 3] {
+        idle_first_visit_step(false, false, Some(rows));
+    }
+}
+
+fn idle_first_visit_step(backward: bool, redisplay_between_steps: bool, step: Option<usize>) {
+    idle_first_visit_styled(backward, redisplay_between_steps, step, false);
+}
+
+#[test]
+fn idle_worker_rows_complete_small_scrolls_with_distinct_prefix_faces() {
+    idle_first_visit_styled(false, false, Some(1), true);
+    idle_first_visit_styled(false, false, Some(3), true);
+}
+
+fn idle_first_visit_styled(
+    backward: bool,
+    redisplay_between_steps: bool,
+    step: Option<usize>,
+    styled: bool,
+) {
     let line = "ordinary offscreen text\n";
     let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
     eval.frame_manager_mut()
         .get_mut(frame)
         .unwrap()
         .window_system = Some(Value::symbol("neomacs"));
+    if styled {
+        eval.eval_str(
+            "(progn
+            (put-text-property 1 70 'face '(:height 150 :family \"DejaVu Serif\"))
+            (put-text-property 277 690 'face '(:height 125 :weight bold))
+            (overlay-put (make-overlay 277 690) 'mouse-face 'highlight))",
+        )
+        .unwrap();
+    }
     if backward {
         scroll_window_to(
             &mut eval,
@@ -590,7 +625,9 @@ fn idle_first_visit(backward: bool, redisplay_between_steps: bool) {
         .iter()
         .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
         .collect();
-    let start = if backward {
+    let start = if let Some(step) = step {
+        step * line.len()
+    } else if backward {
         (120 - rows.len().saturating_sub(2).max(1)) * line.len()
     } else {
         rows[rows.len() - 2].start_charpos

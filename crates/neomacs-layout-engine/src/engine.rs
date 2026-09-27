@@ -2101,6 +2101,17 @@ impl LayoutEngine {
                             is_edit = false;
                         }
                     }
+                    if cursor_only.is_none() && !is_edit
+                        && let Some(prefix) = &scroll
+                        && let Some((replay, faces)) = self.prepared_viewports.complete_forward_scroll(
+                            frame_id, DisplayWindowId::new(params.window_id), key,
+                            prefix, &committed_face_arena, params.force_start,
+                        )
+                    {
+                        cursor_only = Some(replay);
+                        prepared_faces = Some(faces);
+                        scroll = None;
+                    }
                     IncrementalWindowPlan {
                         prepared_faces,
                         cursor_only,

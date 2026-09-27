@@ -383,6 +383,29 @@ impl FrameFaceArena {
         }
     }
 
+    /// Join current retained rows and private computed rows without changing
+    /// either namespace. The normal attempt admission still validates every
+    /// referenced identity before this combined snapshot can be replayed.
+    pub(crate) fn prepared_with_retained(
+        &self,
+        prepared: &PreparedFaceSnapshot,
+    ) -> Result<PreparedFaceSnapshot, FrameFaceReuseError> {
+        if !Arc::ptr_eq(&self.owner, &prepared.owner) {
+            return Err(FrameFaceReuseError::ForeignArena);
+        }
+        let mut faces = self.faces.as_ref().clone();
+        for (id, face) in prepared.faces.iter() {
+            if faces.get(id).is_some_and(|current| current != face) {
+                return Err(FrameFaceReuseError::ConflictingFace(*id));
+            }
+            faces.insert(*id, face.clone());
+        }
+        Ok(PreparedFaceSnapshot {
+            owner: Arc::clone(&self.owner),
+            faces: Arc::new(faces),
+        })
+    }
+
     pub(crate) fn generation(&self) -> FrameFaceGeneration {
         self.generation
     }

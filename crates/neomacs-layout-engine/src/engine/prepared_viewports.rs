@@ -20,6 +20,7 @@ struct PreparedViewport {
     faces: PreparedFaceSnapshot,
     rows: usize,
     glyphs: usize,
+    computed: bool,
 }
 
 #[derive(Default)]
@@ -58,6 +59,7 @@ impl PreparedViewports {
             faces,
             rows,
             glyphs,
+            computed: true,
         });
         self.trim();
     }
@@ -92,6 +94,149 @@ impl PreparedViewports {
             // The cursor builder deliberately leaves chrome empty. Even when
             // revisiting a page, mode-line Lisp must run against today's state.
             Some((replay, entry.faces.clone()))
+        })
+    }
+
+    /// Complete a small forward scroll from retained prefix rows and a worker
+    /// page beginning inside that prefix. The overlap proves the source seam;
+    /// placement uses measured heights, never a default-font row estimate.
+    pub(super) fn complete_forward_scroll(
+        &self,
+        frame: neovm_core::window::FrameId,
+        window: DisplayWindowId,
+        key: &RetainedWindowKey,
+        prefix: &ScrollReplay,
+        arena: &FrameFaceArena,
+        force_start: bool,
+    ) -> Option<(CursorOnlyReplay, PreparedFaceSnapshot)> {
+        if prefix.sync.is_some() || prefix.edit || prefix.face_generation != arena.generation() {
+            return None;
+        }
+        self.entries.iter().rev().find_map(|entry| {
+            if !entry.computed
+                || entry.frame != frame
+                || entry.window != window
+                || entry.retained.key.window_start <= key.window_start
+                || !RetainedWindowKey::scroll_eligible(&entry.retained.key, key)
+            {
+                return None;
+            }
+            let seam = entry.retained.key.window_start as usize;
+            let above: Vec<_> = prefix
+                .reused_rows
+                .iter()
+                .take_while(|(_, row)| row.start_charpos < seam)
+                .collect();
+            let (last_index, last_row) = *above.last()?;
+            if last_row.end_charpos.checked_add(1)? != seam {
+                return None;
+            }
+            let mut candidate = entry.retained.clone();
+            candidate.key.window_start = key.window_start;
+            candidate.presented_cursor = None;
+            let snapshot = &mut candidate.display_snapshot;
+            snapshot.logical_cursor = None;
+            snapshot.phys_cursor = None;
+            snapshot.layout_freshness = None;
+            snapshot.window_end_record = None;
+            snapshot.rows = prefix
+                .reused_row_snapshots
+                .iter()
+                .filter(|row| row.row <= *last_index as i64)
+                .cloned()
+                .collect();
+            snapshot.points = prefix
+                .reused_points
+                .iter()
+                .filter(|point| point.row <= *last_index as i64)
+                .cloned()
+                .collect();
+            for row in &mut candidate.matrix.rows {
+                if !RetainedWindowMatrix::is_chrome_role(row.role) {
+                    let mut disabled = neomacs_display_protocol::glyph_matrix::GlyphRow::new(
+                        neomacs_display_protocol::frame_glyphs::GlyphRowRole::Text,
+                    );
+                    disabled.enabled = false;
+                    *row = neomacs_display_protocol::glyph_matrix::MatrixRow::new(disabled);
+                }
+            }
+            for (index, row) in above {
+                candidate.matrix.rows[*index] = row.clone();
+            }
+            let mut index = last_index + 1;
+            let mut y = last_row.pixel_y + last_row.height_px;
+            let bottom = snapshot.regions.text_body.y + snapshot.regions.text_body.height
+                - snapshot.regions.outer.y;
+            let mut next = seam;
+            let mut remap = rustc_hash::FxHashMap::default();
+            for (source_index, row) in entry
+                .retained
+                .matrix
+                .rows
+                .iter()
+                .enumerate()
+                .filter(|(_, row)| row.enabled && !RetainedWindowMatrix::is_chrome_role(row.role))
+            {
+                if row.start_charpos != next {
+                    return None;
+                }
+                if y + row.height_px > bottom {
+                    break;
+                }
+                let destination = candidate.matrix.rows.get_mut(index)?;
+                if RetainedWindowMatrix::is_chrome_role(destination.role) {
+                    return None;
+                }
+                let dy = y - row.pixel_y;
+                let mut shifted = row.as_ref().clone();
+                shifted.pixel_y = y;
+                shifted.cursor_col = None;
+                shifted.cursor_type = None;
+                *destination = neomacs_display_protocol::glyph_matrix::MatrixRow::new(shifted);
+                remap.insert(source_index as i64, (index as i64, dy.round() as i64));
+                next = row.end_charpos.checked_add(1)?;
+                y += row.height_px;
+                index += 1;
+            }
+            // A canonical walk could start another (possibly partial tall)
+            // row. Complete-row coverage cannot certify that frontier yet.
+            if bottom - y >= key.char_height || index == last_index + 1 {
+                return None;
+            }
+            snapshot.rows.extend(
+                entry
+                    .retained
+                    .display_snapshot
+                    .rows
+                    .iter()
+                    .filter_map(|row| {
+                        let &(index, dy) = remap.get(&row.row)?;
+                        let mut row = row.clone();
+                        row.row = index;
+                        row.y += dy;
+                        Some(row)
+                    }),
+            );
+            snapshot
+                .points
+                .extend(
+                    entry
+                        .retained
+                        .display_snapshot
+                        .points
+                        .iter()
+                        .filter_map(|point| {
+                            let &(index, dy) = remap.get(&point.row)?;
+                            let mut point = point.clone();
+                            point.row = index;
+                            point.y += dy;
+                            Some(point)
+                        }),
+                );
+            let replay = candidate
+                .cursor_only_replay_with_forced_start(key, force_start)
+                .ok()?;
+            Some((replay, arena.prepared_with_retained(&entry.faces).ok()?))
         })
     }
 
@@ -188,6 +333,7 @@ impl PreparedViewports {
                 faces: faces.prepared_snapshot(),
                 rows,
                 glyphs,
+                computed: false,
             });
         }
         self.trim();

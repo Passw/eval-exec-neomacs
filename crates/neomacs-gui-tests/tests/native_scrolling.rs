@@ -369,8 +369,8 @@ focus_follows_mouse yes
                 .unwrap();
         }
         eprintln!("step={step} before={previous} after={current}; artifacts={artifacts:?}");
-        if !timing_only && !rich && matches!(kind, ScrollKind::Page) && step == 3 {
-            // These four pages have never been displayed. Historical page
+        if !timing_only && !rich && matches!(kind, ScrollKind::Page | ScrollKind::Wheel) && step == 3 {
+            // These four forward viewports have never been displayed. Historical page
             // replay cannot satisfy this check: idle worker coverage must
             // actually reach the native command's accepted presentation.
             let stats = fs::read_to_string(artifacts.join("layout-stats.log")).unwrap();
@@ -379,7 +379,7 @@ focus_follows_mouse yes
                     .strip_prefix("prepared=")
                     .and_then(|value| value.parse::<usize>().ok())
                     .is_some_and(|count| count > 0)),
-                "native PageDown never used its precomputed unseen pages; artifacts={artifacts:?}"
+                "native forward scrolling never used its precomputed rows; artifacts={artifacts:?}"
             );
         }
         assert!(editor.0.try_wait().unwrap().is_none(), "editor exited");
