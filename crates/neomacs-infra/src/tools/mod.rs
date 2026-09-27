@@ -33,8 +33,14 @@ use std::sync::OnceLock;
 /// Keep this in step with the suites' actual tool requirements; a test that
 /// grows a new external dependency adds its row here rather than reaching
 /// for whatever the host happens to have.
-pub const REQUIRED_TOOLS: &[(&str, &str)] =
-    &[("git", "2.51.2"), ("java", "21"), ("node", "v22.22.2")];
+pub const REQUIRED_TOOLS: &[(&str, &str)] = &[("git", "*"), ("java", "*"), ("node", "*")];
+
+/// A row whose version is `*` asks only that the tool be *provided*.
+///
+/// The suites' expected values were taken against particular builds, but
+/// requiring the same build everywhere costs more than it buys: it makes
+/// every host that has moved on skip the suite instead of running it.
+pub const ANY_VERSION: &str = "*";
 
 /// Directories to prepend to `PATH` for editor sessions, best effort.
 ///

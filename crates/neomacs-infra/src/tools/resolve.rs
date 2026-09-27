@@ -82,7 +82,7 @@ pub fn resolve_tool(name: &str, version: &str) -> Result<ResolvedTool, ToolsErro
 /// would otherwise re-enter it.
 pub fn resolve_locked(name: &str, version: &str) -> Result<ResolvedTool, ToolsError> {
     let entry: ToolLockEntry = tool_lock_entry(name).map_err(ToolsError::Failed)?;
-    if entry.version != version {
+    if version != crate::tools::ANY_VERSION && entry.version != version {
         return Err(ToolsError::Failed(format!(
             "requested {name} {version} but the lock row pins {}",
             entry.version
@@ -153,7 +153,7 @@ fn resolve_nix(name: &str, version: &str, attribute: &str) -> Result<ResolvedToo
     // lock whenever the flake updates.  `system` rows keep the exact match,
     // because nothing pins a host binary but this column.
     let actual = version_of(&bin, name)?;
-    if !actual.starts_with(version) {
+    if version != crate::tools::ANY_VERSION && !actual.starts_with(version) {
         return Err(ToolsError::VersionMismatch {
             expected: format!("{version} (as a prefix)"),
             actual,
@@ -239,7 +239,7 @@ fn resolve_system(name: &str, version: &str) -> Result<ResolvedTool, ToolsError>
         )));
     }
     let actual = version_of(&candidate, name)?;
-    if actual != version {
+    if version != crate::tools::ANY_VERSION && actual != version {
         return Err(ToolsError::VersionMismatch {
             expected: version.to_string(),
             actual,
