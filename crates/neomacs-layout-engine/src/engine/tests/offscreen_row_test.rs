@@ -306,6 +306,10 @@ fn worker_capture_rejects_overlay_replacements_and_excessive_overlap() {
     use crate::row_layout::program::RowProgramError;
     for (setup, expected) in [
         (
+            "(setq overlay-arrow-variable-list '(worker-custom-arrow))",
+            RowProgramError::Unsupported,
+        ),
+        (
             "(overlay-put (make-overlay 2761 3100) 'before-string \"prefix\")",
             RowProgramError::Unsupported,
         ),
@@ -542,6 +546,68 @@ fn idle_capture_yields_between_rows_and_cancels_after_a_revision_change() {
 #[test]
 fn idle_maintenance_prepares_an_unseen_page_without_changing_the_live_viewport() {
     idle_first_visit(false, false);
+}
+
+#[test]
+fn offscreen_capture_budget_ignores_unused_retained_matrix_capacity() {
+    let (mut eval, frame, _, window) =
+        incr_editing_frame(&"ordinary offscreen text\n".repeat(300), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let window_id = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
+    let retained = engine.retained_window_matrices.get_mut(&window_id).unwrap();
+    retained.matrix.resize(1000, retained.matrix.ncols);
+    engine
+        .request_scroll_coverage(&eval, frame, window, CharPos0::new(120 * 23))
+        .expect("unused matrix slots are not source rows to precompute");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !engine
+        .scroll_coverage
+        .drain(&mut engine.prepared_viewports)
+        .unwrap()
+    {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    let mut key = engine.retained_window_matrices[&window_id].key.clone();
+    key.window_start = 120 * 23;
+    key.point = 125 * 23;
+    let (replay, _) = engine
+        .prepared_viewports
+        .replay(frame, window_id, &key, false)
+        .expect("unused slots must not exceed the prepared-cache capacity either");
+    assert!(replay.body_rows.len() > 10);
+}
+
+#[test]
+fn unchanged_redisplays_keep_retained_matrix_capacity_bounded() {
+    let (mut eval, frame, _, window) =
+        incr_editing_frame(&"ordinary offscreen text\n".repeat(300), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let window_id = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
+    let rows = engine.retained_window_matrices[&window_id]
+        .matrix
+        .rows
+        .len();
+    for _ in 0..100 {
+        engine.layout_frame_rust(&mut eval, frame);
+    }
+    assert_eq!(
+        engine.retained_window_matrices[&window_id]
+            .matrix
+            .rows
+            .len(),
+        rows
+    );
 }
 
 #[test]

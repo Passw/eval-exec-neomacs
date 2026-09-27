@@ -262,7 +262,6 @@ impl LayoutEngine {
         let retained = self
             .retained_window_matrices
             .get(&window_id)
-            .cloned()
             .ok_or(RowProgramError::Unsupported)?;
         let key = &retained.key;
         if key.hscroll != 0
@@ -279,24 +278,58 @@ impl LayoutEngine {
         {
             return Err(RowProgramError::Unsupported);
         }
-        let row_indices: Vec<_> = retained
+        let row_base = retained
             .matrix
             .rows
             .iter()
-            .enumerate()
-            .filter(|(_, row)| !RetainedWindowMatrix::is_chrome_role(row.role))
-            .map(|(index, _)| index)
-            .collect();
-        if row_indices.is_empty() || row_indices.len() > 64 {
+            .position(|row| row.enabled && !RetainedWindowMatrix::is_chrome_role(row.role))
+            .ok_or(RowProgramError::Unsupported)?;
+        // Retained matrices can keep spare rows after geometry changes and
+        // incremental walks. Their allocation is not the visible row count.
+        // Programs start at the default row height and can only grow, so this
+        // ceiling includes every complete row and the next frontier row.
+        let needed = (retained.display_snapshot.regions.text_body.height / key.char_height).ceil();
+        if !needed.is_finite() || needed < 1.0 || needed > 64.0 || row_base > 64 {
             return Err(RowProgramError::Budget);
         }
-        let row_base = row_indices[0];
+        let row_count = needed as usize;
         let attempt = self
             .frame_face_arenas
             .get(&frame)
             .ok_or(RowProgramError::Unsupported)?
             .begin_attempt();
-        let mut retained = retained;
+        // Copy only fixed window inputs, not spare matrix capacity, old glyphs,
+        // points or Lisp chrome strings. This private template is never a
+        // synchronous query certificate or a published window presentation.
+        let snapshot = &retained.display_snapshot;
+        let mut matrix = neomacs_display_protocol::glyph_matrix::GlyphMatrix::new(
+            row_base + row_count,
+            retained.matrix.ncols,
+        );
+        matrix.matrix_x = retained.matrix.matrix_x;
+        matrix.matrix_y = retained.matrix.matrix_y;
+        matrix.header_line = retained.matrix.header_line;
+        matrix.tab_line = retained.matrix.tab_line;
+        let mut retained = RetainedWindowMatrix {
+            matrix,
+            key: key.clone(),
+            validity: retained.validity,
+            display_snapshot: neovm_core::window::WindowDisplaySnapshot {
+                window_id: window,
+                cell_origin: snapshot.cell_origin,
+                regions: snapshot.regions,
+                text_area_left_offset: snapshot.text_area_left_offset,
+                mode_line_height: snapshot.mode_line_height,
+                header_line_height: snapshot.header_line_height,
+                tab_line_height: snapshot.tab_line_height,
+                ..Default::default()
+            },
+            presented_cursor: None,
+            face_generation: retained.face_generation,
+            chrome_uses_column: false,
+            chrome_modified_flag: retained.chrome_modified_flag,
+            chrome_fingerprints: None,
+        };
         retained.key.window_start = start.get() as i64;
         self.scroll_coverage.worker.cancel();
         self.scroll_coverage.admission = None;
@@ -307,9 +340,9 @@ impl LayoutEngine {
             attempt,
             faces: None,
             row_base,
-            row_count: row_indices.len(),
+            row_count,
             position: start,
-            programs: Vec::with_capacity(row_indices.len()),
+            programs: Vec::with_capacity(row_count),
         });
         Ok(())
     }
@@ -456,6 +489,18 @@ impl LayoutEngine {
             128,
             crate::display_property::DisplayPropertyTarget::Graphical,
         );
+        if let Some(arrows) = evaluator
+            .obarray()
+            .symbol_value("overlay-arrow-variable-list")
+            && !arrows.is_nil()
+            && !(arrows.is_cons()
+                && arrows.cons_car() == Value::symbol("overlay-arrow-position")
+                && arrows.cons_cdr().is_nil())
+        {
+            // Custom marker variables need the canonical buffer-loop arrow
+            // pass. Do not traverse an unbounded user list speculatively.
+            return Err(RowProgramError::Unsupported);
+        }
         // The complete body kernel will widen this domain; these policies
         // still belong to the buffer loop, not the item writer.
         for variable in [
