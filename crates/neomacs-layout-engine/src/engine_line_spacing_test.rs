@@ -97,3 +97,49 @@ fn relative_default_line_spacing_uses_whole_pixels_without_moving_the_baseline()
     assert_eq!(rows[2].pixel_y - rows[1].pixel_y, baseline.height_px + 2.0);
     assert_eq!(rows[0].ascent_px, baseline.ascent_px);
 }
+
+#[test]
+fn routed_row_keeps_tall_glyph_metrics_when_newline_returns_to_default_face() {
+    let line = "tall text\n";
+    let (mut eval, frame, buffer, _) = incr_editing_frame(&line.repeat(50), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str(&format!(
+        "(put-text-property 1 {} 'face '(:height 150))",
+        3 * line.len()
+    ))
+    .unwrap();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .goto_emacs_byte_pos(neovm_core::buffer::EmacsBytePos::new(5 * line.len()));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    let retained = &engine.retained_window_matrices
+        [&neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64)];
+    let row = retained
+        .matrix
+        .rows
+        .iter()
+        .find(|row| row.enabled && row.start_charpos == 2 * line.len())
+        .unwrap();
+    let glyph_height = row
+        .glyphs
+        .iter()
+        .flatten()
+        .map(|glyph| glyph.pixel_height)
+        .fold(0.0f32, f32::max);
+    assert!(
+        glyph_height > retained.key.char_height,
+        "fixture must use a taller face"
+    );
+    assert!(
+        row.height_px >= glyph_height,
+        "row height {} discarded a {}px glyph",
+        row.height_px,
+        glyph_height
+    );
+}

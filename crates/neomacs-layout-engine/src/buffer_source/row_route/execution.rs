@@ -807,13 +807,12 @@ impl<'rows, 'emit, 'surface>
                             loop_context.char_height(),
                             self.face_ids.clone(),
                         );
-                        let geometry = *self.row_build.row_geometry;
                         let mut render_policy = DisplaySourceAppendRenderPolicy::natural();
                         let mut source_state =
                             crate::display_row::source_state::DisplayRowSourceState::frame_local();
                         let Some(append_progress) = append_context
                             .render_display_item_source_to_text_row(
-                                &geometry,
+                                self.row_build.row_geometry,
                                 &mut self.source_render.reborrow(),
                                 &mut source,
                                 &mut source_state,
@@ -861,12 +860,11 @@ impl<'rows, 'emit, 'surface>
                 loop_context.char_height(),
                 self.face_ids.clone(),
             );
-            let geometry = *self.row_build.row_geometry;
             let mut render_policy = DisplaySourceAppendRenderPolicy::natural();
             let mut source_state =
                 crate::display_row::source_state::DisplayRowSourceState::frame_local();
             let Some(append_progress) = append_context.render_display_item_source_to_text_row(
-                &geometry,
+                self.row_build.row_geometry,
                 &mut self.source_render.reborrow(),
                 &mut source,
                 &mut source_state,
