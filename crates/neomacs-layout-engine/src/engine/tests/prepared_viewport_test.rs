@@ -18,6 +18,19 @@ fn returning_to_a_prepared_page_reuses_body_and_matches_fresh_layout() {
         engine.layout_frame_rust(&mut eval, frame);
         if step >= 2 {
             assert_eq!(engine.last_layout_stats().prepared_windows, 1);
+            let matrix = &engine
+                .last_frame_display_state
+                .as_ref()
+                .unwrap()
+                .window_matrices
+                .iter()
+                .find(|entry| entry.window_id.get() == window.0 as i64)
+                .unwrap()
+                .matrix;
+            assert!(
+                (0..matrix.rows.len()).all(|row| matrix.row_damage(row) == RowDamage::New),
+                "historical layout reuse must not skip repainting the current scene"
+            );
             assert_eq!(
                 crate::display_status_line::mode_line_eval_count(),
                 1,

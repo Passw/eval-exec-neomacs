@@ -2990,7 +2990,14 @@ impl LayoutEngine {
                         } else {
                             row.mode_line
                         };
-                        if !row.enabled || is_chrome {
+                        // Prepared coverage may come from an older viewport,
+                        // not the consumer's immediately preceding matrix.
+                        // Its rows save layout work, but their old provenance
+                        // cannot authorize skipping paint in the current scene.
+                        if !row.enabled
+                            || is_chrome
+                            || self.prepared_window_ids.contains(&window_id)
+                        {
                             entry.matrix.set_row_damage(idx, RowDamage::New);
                             continue;
                         }
