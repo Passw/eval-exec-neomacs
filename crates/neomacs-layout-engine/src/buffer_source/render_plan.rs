@@ -1289,6 +1289,40 @@ impl BufferSourceOutputSetup {
                 );
             }
 
+            // A replay may not be SEALED without the frame's physical cursor.
+            //
+            // GNU's reuse gives the optimization up rather than proceed without
+            // the cursor: `try_window_reusing_current_matrix` searches the
+            // current matrix with `row_containing_pos` and otherwise
+            //     /* Give up if point isn't in a row displayed or reused.  This
+            //        also handles the case where w->cursor.vpos < nrows_scrolled
+            //        after the calls to display_line, which can happen with
+            //        scroll margins.  (See bug#1295.)  */
+            //     clear_glyph_matrix (w->desired_matrix); return false;
+            // (src/xdisp.c:21916-21926, :22098-22105), and `try_window_id` gives
+            // up the same way (src/xdisp.c:23077-23085: "Give up if cursor was
+            // not found.").  The reason is that the cursor is not optional: a
+            // frame has exactly ONE physical cursor slot, `tty_set_cursor`
+            // places the terminal cursor from the selected window's `w->cursor`
+            // (src/dispnew.c:5673) and `tty_update_end` shows it after every
+            // update (src/term.c:253).  A replay that found no row for point --
+            // or whose cursor ended outside the window's text area, GNU's
+            // scroll-margin case -- leaves that slot empty, and the tty then
+            // hides the cursor on the echo-area row instead of showing it on
+            // point's (the `C-l` after an isearch case).  Reject the replay
+            // instead: the retried layout carries no fast-path plan, so it
+            // cannot mispredict, and a full walk always places the cursor.
+            if params.cursor_role.is_active()
+                && cursor_style_for_window(params).is_some()
+                && output.builder().phys_cursor().is_none()
+            {
+                crate::window_output::restore_text_window_retry_checkpoint(
+                    output.reborrow(),
+                    retry_checkpoint,
+                );
+                return BufferSourceRenderAttemptOutcome::ReplayMispredicted;
+            }
+
             // As on the cursor-only path: an EDIT replay confined to the cursor's
             // own row may re-install the retained chrome, while a genuine scroll
             // never may (its `%p` moved). The discriminator is in

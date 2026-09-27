@@ -681,7 +681,10 @@ impl DisplayOutputBuilder {
         self.frame_state.cursors()
     }
 
-    #[cfg(test)]
+    /// The frame's single physical cursor slot, as published so far.
+    ///
+    /// Read by redisplay's fast paths to verify they did not seal a frame
+    /// without a cursor (see `render_attempt`'s replay invariant).
     pub(crate) fn phys_cursor(&self) -> Option<&PhysCursor> {
         self.frame_state.phys_cursor()
     }

@@ -4553,6 +4553,101 @@ fn phase2_scroll_matches_full_rebuild_golden() {
     );
 }
 
+/// The frame's single physical cursor slot, as the renderers read it.
+fn frame_phys_cursor(
+    engine: &LayoutEngine,
+) -> Option<neomacs_display_protocol::frame_glyphs::PhysCursor> {
+    engine
+        .last_frame_display_state
+        .as_ref()
+        .expect("an accepted frame")
+        .state()
+        .phys_cursor
+        .clone()
+}
+
+/// REGRESSION (`C-l` recenter hides the physical cursor): a pure-scroll replay
+/// whose point lies in a REUSED row must still publish the selected window's
+/// physical cursor, exactly as a full rebuild of the same state does.
+///
+/// GNU's reuse gives the optimization up rather than proceed without the
+/// cursor: `try_window_reusing_current_matrix` searches the current matrix with
+/// `row_containing_pos` and otherwise
+///     /* Give up if point isn't in a row displayed or reused.  */
+///     clear_glyph_matrix (w->desired_matrix); return false;
+/// (src/xdisp.c:21916-21926, :22098-22105), and `try_window_id` gives up the
+/// same way (src/xdisp.c:23077-23085).  The cursor is not optional: a frame has
+/// exactly ONE physical cursor slot, `tty_set_cursor` places the terminal
+/// cursor from the selected window's `w->cursor` (src/dispnew.c:5673) and
+/// `tty_update_end` shows it after every update (src/term.c:253).  Neomacs'
+/// scroll replay used to skip the cursor silently when its row lookup found
+/// nothing, so the sealed frame carried no `phys_cursor` at all and the tty
+/// left the cursor hidden on the echo-area row (the failing `C-l`-after-isearch
+/// parity case).
+#[test]
+fn phase2_scroll_replay_keeps_the_selected_windows_phys_cursor() {
+    // 80 numbered lines, with the window warmed near the top of the buffer and
+    // point at the END of a line (where isearch's RET leaves it).  The scroll
+    // then moves window-start forward a few rows with point unchanged, so
+    // point's row is one of the REUSED rows while the newly-exposed rows are
+    // the bottom ones the partial walk lays out.
+    let text: String = (1..=80)
+        .map(|line| format!("recenter line {line:02}\n"))
+        .collect();
+    let line_len = 17;
+    let point_line = 12; // 1-based, comfortably inside a tall window
+    let point_byte = (point_line - 1) * line_len + 16; // its trailing newline
+    let scroll_lines = 4i64;
+    let scrolled_start = scroll_lines * line_len as i64 + 1;
+
+    let (mut eval, frame_id, buf_id, win) = incr_editing_frame(&text, 800, 600);
+    let mut engine = LayoutEngine::new();
+    scroll_window_to(&mut eval, frame_id, win, buf_id, 1, point_byte);
+    engine.layout_frame_rust(&mut eval, frame_id);
+    assert!(
+        frame_phys_cursor(&engine).is_some(),
+        "the warm full-layout frame carries the selected window's cursor"
+    );
+
+    scroll_window_to(&mut eval, frame_id, win, buf_id, scrolled_start, point_byte);
+    engine.layout_frame_rust(&mut eval, frame_id);
+    assert_eq!(
+        engine.last_layout_stats().scroll_windows,
+        1,
+        "the scrolled pass must take the pure-scroll fast path: {:?}",
+        engine.last_layout_stats()
+    );
+
+    let cursor = frame_phys_cursor(&engine).expect(
+        "a frame accepted by the pure-scroll replay must still carry the selected window's \
+         physical cursor",
+    );
+    assert_eq!(
+        cursor.window_id.get(),
+        win.0 as i64,
+        "the frame's physical cursor must belong to the selected window"
+    );
+
+    // And it must land where a full rebuild of the same state puts it.
+    let (mut eval_ref, frame_ref, buf_ref, win_ref) = incr_editing_frame(&text, 800, 600);
+    scroll_window_to(
+        &mut eval_ref,
+        frame_ref,
+        win_ref,
+        buf_ref,
+        scrolled_start,
+        point_byte,
+    );
+    let mut ref_engine = LayoutEngine::new();
+    ref_engine.layout_frame_rust(&mut eval_ref, frame_ref);
+    let reference = frame_phys_cursor(&ref_engine).expect("full rebuild publishes the cursor");
+    assert_eq!(
+        (cursor.row, cursor.col, cursor.x, cursor.y),
+        (reference.row, reference.col, reference.x, reference.y),
+        "the scroll replay's cursor must match a full rebuild's"
+    );
+}
+
 /// Phase 2 — a PARTIAL-ROW scroll (window_start not on a retained row boundary)
 /// must bail to a full rebuild: the uniform row shift only applies to whole-row
 /// scrolls.
