@@ -3309,10 +3309,10 @@ pub struct Context {
     // frontend callback seam avoids a core/layout dependency cycle
     pub redisplay_fn: Option<Box<dyn FnMut(&mut Self)>>,
     /// One bounded, read-only display maintenance step before an unbounded
-    /// command-input wait. Returning a delay requests another idle wakeup;
-    /// it does not request redisplay or block waiting for a worker.
+    /// command-input wait. The delay requests another idle wakeup; the boolean
+    /// requests publication after the engine borrow has been released.
     #[allow(clippy::type_complexity)]
-    pub display_idle_maintenance_fn: Option<Box<dyn FnMut(&Self) -> Option<std::time::Duration>>>,
+    pub display_idle_maintenance_fn: Option<Box<dyn FnMut(&Self) -> (Option<std::time::Duration>, bool)>>,
     /// Frontend-installed frame snapshot hook (`neomacs--frame-snapshot`).
     /// Same seam pattern as `redisplay_fn`: neovm-core cannot reach the
     /// layout engine, so the frontend lays out the requested frames on

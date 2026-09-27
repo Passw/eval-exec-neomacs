@@ -122,11 +122,10 @@ pub struct RedisplayRuntime {
 }
 
 impl RedisplayRuntime {
-    pub fn maintain_scroll_coverage(&self, evaluator: &Context) -> Option<std::time::Duration> {
-        self.engine
-            .try_borrow_mut()
-            .ok()?
-            .maintain_scroll_coverage(evaluator)
+    pub fn maintain_scroll_coverage(&self, evaluator: &Context) -> (Option<std::time::Duration>, bool) {
+        let Ok(mut engine) = self.engine.try_borrow_mut() else { return (None, false); };
+        let wake = engine.maintain_scroll_coverage(evaluator);
+        (wake, engine.take_scroll_coverage_publication())
     }
 
     /// Construct a runtime without the expensive scalable-font database.

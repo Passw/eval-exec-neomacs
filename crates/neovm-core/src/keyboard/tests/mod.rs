@@ -2212,7 +2212,7 @@ fn display_idle_maintenance_yields_to_input_and_avoids_nested_or_timed_reads() {
     let observed = calls.clone();
     eval.display_idle_maintenance_fn = Some(Box::new(move |_| {
         observed.set(observed.get() + 1);
-        Some(std::time::Duration::from_millis(1))
+        (Some(std::time::Duration::from_millis(1)), false)
     }));
     assert!(
         eval.display_idle_maintenance_deadline(false, false)

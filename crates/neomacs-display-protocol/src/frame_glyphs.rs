@@ -1151,6 +1151,8 @@ pub enum ContentTransitionHint {
 /// each frame by the C-side matrix walker. No incremental state management needed.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct FrameGlyphBuffer {
+    /// Shared immutable off-screen text for compositor scrolling.
+    pub scroll_surfaces: Vec<std::sync::Arc<crate::scroll_coverage::ScrollSurface>>,
     pub input_checkpoint: Vec<crate::input_progress::InputCheckpoint>,
     /// Evaluator interaction snapshot paired with these exact pixels.
     pub presentation_id: crate::frame_chrome::PresentationId,
@@ -1527,6 +1529,7 @@ impl FrameGlyphBuffer {
 
     pub fn new() -> Self {
         Self {
+            scroll_surfaces: Vec::new(),
             input_checkpoint: Vec::new(),
             presentation_id: crate::frame_chrome::PresentationId::default(),
             frame_placement: crate::presented_frame::PresentedFramePlacement::default(),

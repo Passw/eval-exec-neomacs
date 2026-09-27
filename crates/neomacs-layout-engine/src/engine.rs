@@ -3168,6 +3168,8 @@ impl LayoutEngine {
         // compositor may animate toward it.
         frame_display_state.origin = evaluator.presentation_origin();
         frame_display_state.input_checkpoint = input_checkpoint;
+        self.prepared_viewports.export(frame_id, &next_retained_window_matrices,
+            &mut frame_display_state, &sealed_face_arena, &mut self.font_metrics);
         let resolved = match crate::frame_presentation::ResolvedFrame::new(frame_display_state) {
             Ok(resolved) => resolved,
             Err(error) => {

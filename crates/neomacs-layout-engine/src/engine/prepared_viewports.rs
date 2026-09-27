@@ -4,6 +4,8 @@
 //! full layout key matches. This is content reuse, not a replay of old input or
 //! old chrome. No live evaluator state is retained here.
 
+mod export;
+
 use super::*;
 use crate::frame_face_arena::PreparedFaceSnapshot;
 use crate::incremental_layout::WindowDelta;
@@ -26,6 +28,7 @@ struct PreparedViewport {
 #[derive(Default)]
 pub(super) struct PreparedViewports {
     entries: VecDeque<PreparedViewport>,
+    export_epochs: Vec<(neovm_core::window::FrameId, DisplayWindowId, RetainedWindowKey, u64)>,
 }
 
 impl PreparedViewports {

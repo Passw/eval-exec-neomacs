@@ -1,0 +1,271 @@
+//! Bounded text outside an authoritative viewport. Coverage has its own body
+//! hit index; it never extends window-end or the frame's query geometry.
+
+use std::sync::Arc;
+
+use crate::{
+    FrameDisplayState, FrameGlyph, FrameGlyphBuffer, FrameRect, GlyphRowRole,
+    PresentationFramePoint, PresentedHit, PresentedHitError, PresentedHitIndex, PresentedHitQuery,
+    PresentedRegionKind, Rect, WindowMatrixEntry,
+};
+
+/// Exact row/font transport, owned separately from authoritative window rows.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ScrollCoverage {
+    pub epoch: u64,
+    #[serde(default)]
+    pub predict_pixels: bool,
+    /// Row index whose source body-row number is zero.
+    pub anchor_row: usize,
+    pub viewport: Rect,
+    /// Translate frame Y into nonnegative coverage coordinates.
+    pub origin: f32,
+    pub content: WindowMatrixEntry,
+    pub faces: crate::FrameFaceMap,
+    pub fonts: crate::font::ResolvedFontTable,
+    pub char_fonts: crate::font::CharFontTable,
+    pub shaped_clusters: crate::font::ShapedClusterTable,
+    pub hit_index: PresentedHitIndex,
+}
+
+/// Materialized once on frame ingestion, shared by render clones.
+#[derive(Clone, Debug)]
+pub struct ScrollSurface {
+    coverage: Arc<ScrollCoverage>,
+    glyphs: Vec<FrameGlyph>,
+}
+
+impl ScrollCoverage {
+    /// Refuse malformed, disjoint, foreign-window or unbounded transport.
+    /// Only ordinary text and whitespace are admitted by this first source
+    /// domain; media and Lisp strings need their own interaction ownership.
+    pub fn materialize(self: &Arc<Self>, frame: &FrameDisplayState) -> Option<Arc<ScrollSurface>> {
+        let window = self.content.window_id;
+        let bounds = self.content.text_clip_bounds?;
+        let valid_rect = |rect: Rect| {
+            FrameRect::new(rect.x, rect.y, rect.width, rect.height).is_ok()
+                && rect.width > 0.0
+                && rect.height > 0.0
+        };
+        if self.epoch == 0
+            || self.anchor_row >= self.content.matrix.rows.len()
+            || !valid_rect(bounds)
+            || !valid_rect(self.viewport)
+            || bounds.x != self.viewport.x
+            || bounds.width != self.viewport.width
+            || !self.origin.is_finite()
+            || bounds.y > self.viewport.y + self.origin
+            || bounds.bottom() < self.viewport.bottom() + self.origin
+            || self.content.matrix.rows.len() > 192
+            || self.hit_index.presentation() != frame.presentation_id
+            || self.hit_index.regions().len() != 1
+            || !self.hit_index.string_positions().is_empty()
+            || !self.hit_index.resize_handles().is_empty()
+        {
+            return None;
+        }
+        let region = self.hit_index.regions()[0];
+        if region.window() != Some(window)
+            || region.kind() != PresentedRegionKind::TextBody
+            || region.bounds().raw() != bounds
+            || self.hit_index.text_positions().len() > 65_536
+            || self.hit_index.text_positions().iter().any(|position| {
+                let rect = position.bounds().raw();
+                position.window() != window
+                    || rect.x < bounds.x
+                    || rect.right() > bounds.right()
+                    || rect.y < bounds.y
+                    || rect.bottom() > bounds.bottom()
+            })
+        {
+            return None;
+        }
+        let mut glyph_count = 0usize;
+        let mut bottom = bounds.y;
+        let mut next_source = None;
+        for row in &self.content.matrix.rows {
+            if !row.enabled {
+                continue;
+            }
+            if row.role != GlyphRowRole::Text
+                || row.height_px <= 0.0
+                || !row.height_px.is_finite()
+                || (self.content.text_pixel_bounds.y + row.pixel_y - bottom).abs() > 0.01
+                || next_source.is_some_and(|next| row.start_charpos != next)
+            {
+                return None;
+            }
+            glyph_count =
+                glyph_count.checked_add(row.glyphs.iter().map(Vec::len).sum::<usize>())?;
+            if glyph_count > 65_536 {
+                return None;
+            }
+            bottom += row.height_px;
+            next_source = row.end_charpos.checked_add(1);
+        }
+        if (bottom - bounds.bottom()).abs() > 0.01 {
+            return None;
+        }
+        let mut source = FrameDisplayState::new(0, 0, frame.char_width, frame.char_height);
+        source.faces = self.faces.clone();
+        source.fonts = self.fonts.clone();
+        source.char_fonts = self.char_fonts.clone();
+        source.shaped_clusters = self.shaped_clusters.clone();
+        source.window_matrices.push(self.content.clone());
+        let mut glyphs = Vec::with_capacity(glyph_count);
+        source.for_each_glyph(|glyph| glyphs.push(glyph));
+        if glyphs.iter().any(|glyph| {
+            !matches!(
+                glyph,
+                FrameGlyph::Char {
+                    row_role: GlyphRowRole::Text,
+                    ..
+                } | FrameGlyph::Stretch {
+                    row_role: GlyphRowRole::Text,
+                    ..
+                }
+            )
+        }) {
+            return None;
+        }
+        Some(Arc::new(ScrollSurface {
+            coverage: Arc::clone(self),
+            glyphs,
+        }))
+    }
+}
+
+impl ScrollSurface {
+    pub fn coverage(&self) -> &ScrollCoverage {
+        &self.coverage
+    }
+
+    /// Positive offsets expose later buffer text. Coverage is a hard limit,
+    /// including for a reversed gesture; no blank frontier may be exposed.
+    pub fn clamp_offset(&self, offset: f32) -> f32 {
+        if !offset.is_finite() {
+            return 0.0;
+        }
+        let viewport = self.coverage.viewport;
+        let bounds = self
+            .coverage
+            .content
+            .text_clip_bounds
+            .expect("validated coverage");
+        offset.clamp(
+            bounds.y - viewport.y - self.coverage.origin,
+            bounds.bottom() - viewport.bottom() - self.coverage.origin,
+        )
+    }
+
+    /// Paint and pointer lookup use this exact same offset and viewport.
+    pub fn paint(&self, frame: &mut FrameGlyphBuffer, offset: f32) {
+        let offset = self.clamp_offset(offset) + self.coverage.origin;
+        let window = self.coverage.content.window_id;
+        let clip = self.coverage.viewport;
+        frame.glyphs.retain(|glyph| {
+            glyph.window_id() != Some(window) || glyph.row_role() != Some(GlyphRowRole::Text)
+        });
+        for glyph in &self.glyphs {
+            let mut glyph = glyph.clone();
+            match &mut glyph {
+                FrameGlyph::Char {
+                    y,
+                    baseline,
+                    height,
+                    clip_rect,
+                    ..
+                } => {
+                    *y -= offset;
+                    *baseline -= offset;
+                    *clip_rect = Some(clip);
+                    if *y >= clip.bottom() || *y + *height <= clip.y {
+                        continue;
+                    }
+                }
+                FrameGlyph::Stretch {
+                    y,
+                    height,
+                    clip_rect,
+                    ..
+                } => {
+                    *y -= offset;
+                    *clip_rect = Some(clip);
+                    if *y >= clip.bottom() || *y + *height <= clip.y {
+                        continue;
+                    }
+                }
+                _ => unreachable!("validated text coverage"),
+            }
+            frame.glyphs.push(glyph);
+        }
+        frame.faces.extend(self.coverage.faces.clone());
+        frame.fonts.extend(self.coverage.fonts.clone());
+        frame.char_fonts.extend(self.coverage.char_fonts.clone());
+        frame
+            .shaped_clusters
+            .extend(self.coverage.shaped_clusters.clone());
+    }
+
+    /// A point must first belong to this window's visible body. Inverting a
+    /// scroll can never fall through to another pane or its mode line.
+    pub fn hit(
+        &self,
+        point: PresentationFramePoint,
+        offset: f32,
+    ) -> Result<Option<PresentedHit>, PresentedHitError> {
+        let viewport = self.coverage.viewport;
+        if point.x() < viewport.x
+            || point.x() >= viewport.right()
+            || point.y() < viewport.y
+            || point.y() >= viewport.bottom()
+        {
+            return Ok(None);
+        }
+        let mapped = crate::GeometryPoint::<
+            crate::interaction_projection::PresentationFrameSpace,
+            crate::LogicalPixels,
+        >::from_px(
+            point.x(),
+            point.y() + self.clamp_offset(offset) + self.coverage.origin,
+        )
+        .expect("validated coverage offset");
+        let hit = self.coverage.hit_index.resolve(PresentedHitQuery::new(
+            PresentationFramePoint::from_witnessed(point.presentation(), mapped),
+        ))?;
+        let offset = self.clamp_offset(offset) + self.coverage.origin;
+        let first = self
+            .coverage
+            .content
+            .matrix
+            .rows
+            .iter()
+            .position(|row| {
+                row.enabled
+                    && self.coverage.content.text_pixel_bounds.y + row.pixel_y + row.height_px
+                        > viewport.y + offset
+            })
+            .unwrap_or(0);
+        let row_delta = self.coverage.anchor_row as i64 - first as i64;
+        Ok(hit.map(|hit| hit.project_scrolled_body(viewport, offset, row_delta)))
+    }
+}
+
+impl PartialEq for ScrollSurface {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.coverage, &other.coverage)
+            || (self.coverage.epoch == other.coverage.epoch
+                && self.coverage.predict_pixels == other.coverage.predict_pixels
+                && self.coverage.origin == other.coverage.origin
+                && self.coverage.anchor_row == other.coverage.anchor_row
+                && self.coverage.viewport == other.coverage.viewport
+                && self.coverage.content.text_clip_bounds
+                    == other.coverage.content.text_clip_bounds
+                && self.coverage.hit_index == other.coverage.hit_index
+                && self.coverage.faces == other.coverage.faces
+                && self.coverage.fonts == other.coverage.fonts
+                && self.coverage.char_fonts == other.coverage.char_fonts
+                && self.coverage.shaped_clusters == other.coverage.shaped_clusters
+                && self.glyphs == other.glyphs)
+    }
+}

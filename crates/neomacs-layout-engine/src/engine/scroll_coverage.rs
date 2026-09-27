@@ -73,6 +73,7 @@ pub(super) struct ScrollCoverage {
     capture: Option<Capture>,
     observed: Option<(FrameId, DisplayWindowId, RetainedWindowKey)>,
     targets: Vec<CharPos0>,
+    publication_pending: bool,
 }
 
 impl ScrollCoverage {
@@ -144,6 +145,7 @@ impl ScrollCoverage {
         snapshot.layout_freshness = None;
         snapshot.window_end_record = None;
         admission.retained.presented_cursor = None;
+        self.publication_pending = true;
         destination.insert_computed(
             admission.frame,
             admission.window,
@@ -155,6 +157,11 @@ impl ScrollCoverage {
 }
 
 impl LayoutEngine {
+    /// A completed idle page needs one fresh immutable transport publication.
+    pub fn take_scroll_coverage_publication(&mut self) -> bool {
+        std::mem::take(&mut self.scroll_coverage.publication_pending)
+    }
+
     /// Perform one bounded off-screen acquisition step during a command-loop
     /// idle wait. Never evaluate Lisp, publish a viewport, or wait for a worker.
     pub fn maintain_scroll_coverage(

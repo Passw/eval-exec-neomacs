@@ -5830,8 +5830,14 @@ impl crate::emacs_core::eval::Context {
             return None;
         }
         let mut maintenance = self.display_idle_maintenance_fn.take()?;
-        let next = maintenance(self);
+        let (next, publish) = maintenance(self);
         self.display_idle_maintenance_fn = Some(maintenance);
+        if publish {
+            // Drop the engine borrow before redisplay re-enters layout. This
+            // publishes newly available coverage without changing the buffer.
+            self.invalidate_redisplay();
+            self.redisplay();
+        }
         next.and_then(|delay| std::time::Instant::now().checked_add(delay))
     }
 
