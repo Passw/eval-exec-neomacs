@@ -21,6 +21,7 @@ use crate::display_source_overflow::{DisplayXwidgetOverflowAction, WindowLocalRo
 use crate::glyph_row_writer;
 #[cfg(test)]
 use crate::output::builder::DisplayOutputBuilder;
+#[cfg(test)]
 use crate::row_layout::ResolvedTextInput;
 use neomacs_display_protocol::frame_glyphs::GlyphRowRole;
 use neomacs_display_protocol::glyph_matrix::{
@@ -1687,11 +1688,6 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
     }
 
     pub(crate) fn push_item(&mut self, item: DisplayItem) -> DisplayRowAppendProgress {
-        let item =
-            match ResolvedTextInput::capture(item, self.writer.face_id(RenderFaceRef::Inherit)) {
-                Ok(input) => return self.push_resolved_text(input),
-                Err(item) => item,
-            };
         let start = self.position;
         let mut metrics = DisplayRowWriteMetrics::default();
         let mut slots = Vec::new();
@@ -1707,6 +1703,40 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
         let item_glyph_start = self.area_len();
         let status = match kind {
             DisplayItemKind::RowBreak(_) => DisplayRowAppendStatus::RowBreak,
+            DisplayItemKind::TextRun(run) => match run.composition {
+                DisplayTextComposition::UnicodeFallback => self.push_text_item(
+                    &span,
+                    face,
+                    item_layout,
+                    run.text.as_ref(),
+                    DisplayTextClustering::UnicodeFallback,
+                    DisplayTextSourceMapping::NaturalText,
+                    pointer_appearance.as_ref(),
+                    &mut metrics,
+                    &mut slots,
+                ),
+                DisplayTextComposition::Independent => self.push_text_item(
+                    &span,
+                    face,
+                    item_layout,
+                    run.text.as_ref(),
+                    DisplayTextClustering::Independent,
+                    DisplayTextSourceMapping::NaturalText,
+                    pointer_appearance.as_ref(),
+                    &mut metrics,
+                    &mut slots,
+                ),
+                DisplayTextComposition::Automatic(terminal) => self.push_automatic_text_item(
+                    &span,
+                    face,
+                    item_layout,
+                    run.text.as_ref(),
+                    terminal,
+                    pointer_appearance.as_ref(),
+                    &mut metrics,
+                    &mut slots,
+                ),
+            },
             DisplayItemKind::SourceMappedText(text) => self.push_text_item(
                 &span,
                 face,
@@ -1849,67 +1879,22 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
         DisplayRowAppendProgress::new(start, self.position, metrics, status, slots)
     }
 
-    /// Append captured text through the same canonical measurement, clipping,
-    /// source mapping and box-edge code used by synchronous display items.
+    /// Feed owned input back through the canonical append implementation.
+    /// Capture stays outside the synchronous append hot path.
+    #[cfg(test)]
     pub(crate) fn push_resolved_text(
         &mut self,
         input: ResolvedTextInput,
     ) -> DisplayRowAppendProgress {
-        let ResolvedTextInput {
-            span,
-            face,
-            run,
-            layout: item_layout,
-            pointer_appearance,
-            box_vertical_edges,
-            box_run_membership,
-        } = input;
-        let face = RenderFaceRef::FaceId(face);
-        let start = self.position;
-        let mut metrics = DisplayRowWriteMetrics::default();
-        let mut slots = Vec::new();
-        let item_glyph_start = self.area_len();
-        let status = match run.composition {
-            DisplayTextComposition::UnicodeFallback => self.push_text_item(
-                &span,
-                face,
-                item_layout,
-                run.text.as_ref(),
-                DisplayTextClustering::UnicodeFallback,
-                DisplayTextSourceMapping::NaturalText,
-                pointer_appearance.as_ref(),
-                &mut metrics,
-                &mut slots,
-            ),
-            DisplayTextComposition::Independent => self.push_text_item(
-                &span,
-                face,
-                item_layout,
-                run.text.as_ref(),
-                DisplayTextClustering::Independent,
-                DisplayTextSourceMapping::NaturalText,
-                pointer_appearance.as_ref(),
-                &mut metrics,
-                &mut slots,
-            ),
-            DisplayTextComposition::Automatic(terminal) => self.push_automatic_text_item(
-                &span,
-                face,
-                item_layout,
-                run.text.as_ref(),
-                terminal,
-                pointer_appearance.as_ref(),
-                &mut metrics,
-                &mut slots,
-            ),
-        };
-        self.apply_item_box_run_topology(
-            item_glyph_start,
-            box_run_membership,
-            box_vertical_edges,
-            status == DisplayRowAppendStatus::Complete,
-        );
-        DisplayRowAppendProgress::new(start, self.position, metrics, status, slots)
+        self.push_item(DisplayItem {
+            span: input.span,
+            face: RenderFaceRef::FaceId(input.face),
+            kind: DisplayItemKind::TextRun(input.run),
+            layout: input.layout,
+            pointer_appearance: input.pointer_appearance,
+            box_vertical_edges: input.box_vertical_edges,
+            box_run_membership: input.box_run_membership,
+        })
     }
 
     fn apply_item_box_run_topology(
