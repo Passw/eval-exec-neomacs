@@ -3234,6 +3234,7 @@ impl LayoutEngine {
                 buffer.reset_unchanged_region();
             }
         }
+        neomacs_display_protocol::input_latency::sealed(frame_id.0, sealed.presentation(), || evaluator.input_latency_viewport(frame_id.0));
         self.last_frame_display_state = Some(sealed);
         // Acknowledge the chrome dirty flag for exactly the windows whose
         // chrome this layout GENERATED — GNU's `mark_window_display_accurate_1`.

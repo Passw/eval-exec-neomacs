@@ -518,6 +518,13 @@ impl RenderApp {
             super::frame_sched::LoopWake::At(at) => Some(at.instant()),
             super::frame_sched::LoopWake::Idle => None,
         };
+        // Foreign Wayland feedback can be queued without another winit
+        // application event. Drain it on a bounded diagnostics-only wake;
+        // do not manufacture a redraw to obtain a presentation receipt.
+        if let Some(receipt_poll) = self.presentation_observer.dispatch_deadline(now) {
+            let receipt_poll = receipt_poll.into_instant();
+            deadline = Some(deadline.map_or(receipt_poll, |d| d.min(receipt_poll)));
+        }
         if self.has_pending_images() {
             const IMAGE_DECODE_POLL_INTERVAL: std::time::Duration =
                 std::time::Duration::from_millis(16);

@@ -170,6 +170,7 @@ impl RenderApp {
             self.presentation_observer.before_present(
                 window.as_ref(),
                 emacs_frame_id,
+                frame.presentation_id,
                 logical_size,
                 window_state.scale_factor(),
             );

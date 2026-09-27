@@ -110,6 +110,11 @@ pub struct PositionedPointerInput {
 /// Input event from render thread to Emacs
 #[derive(Debug, Clone)]
 pub enum InputEvent {
+    /// Diagnostic token paired with one actual command event.
+    Observed {
+        token: neomacs_display_protocol::input_latency::InputToken,
+        event: Box<InputEvent>,
+    },
     /// Bytes read directly from a Unix TTY.
     ///
     /// This transport fact deliberately carries no terminal-sequence or
@@ -1022,6 +1027,55 @@ pub struct RenderComms {
 }
 
 impl RenderComms {
+    fn observe_scroll_input(event: InputEvent) -> InputEvent {
+        #[cfg(target_os = "linux")]
+        if neomacs_display_protocol::input_latency::enabled() {
+            let target = match &event {
+                InputEvent::Key {
+                    keysym: 0xff55 | 0xff56,
+                    pressed: true,
+                    emacs_frame_id,
+                    ..
+                } => Some((*emacs_frame_id, "page")),
+                InputEvent::PositionedPointer(PositionedPointerInput {
+                    position,
+                    action: PointerAction::Scroll { delta, .. },
+                    ..
+                }) => Some((
+                    position.target_frame_id,
+                    match delta {
+                        ScrollDelta::Lines { .. } => "wheel",
+                        ScrollDelta::Pixels { .. } => "precise",
+                    },
+                )),
+                _ => None,
+            };
+            if let Some((frame, kind)) = target {
+                let mut time = libc::timespec {
+                    tv_sec: 0,
+                    tv_nsec: 0,
+                };
+                // SAFETY: valid out-pointer, POSIX monotonic clock. The
+                // compositor's clock ID must match before subtraction.
+                if unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut time) } == 0 {
+                    let time = neomacs_display_protocol::input_latency::PlatformTimestamp {
+                        clock_id: libc::CLOCK_MONOTONIC as u32,
+                        nanoseconds: time.tv_sec as u64 * 1_000_000_000 + time.tv_nsec as u64,
+                    };
+                    if let Some(token) =
+                        neomacs_display_protocol::input_latency::received(frame, kind, time)
+                    {
+                        return InputEvent::Observed {
+                            token,
+                            event: Box::new(event),
+                        };
+                    }
+                }
+            }
+        }
+        event
+    }
+
     fn is_lossy_input_event(event: &InputEvent) -> bool {
         matches!(
             event,
@@ -1048,6 +1102,7 @@ impl RenderComms {
 
     fn event_name(event: &InputEvent) -> &'static str {
         match event {
+            InputEvent::Observed { event, .. } => Self::event_name(event),
             InputEvent::RawTtyBytes { .. } => "raw-tty-bytes",
             InputEvent::Key { .. } => "key",
             InputEvent::PositionedPointer(PositionedPointerInput { action, .. }) => match action {
@@ -1100,6 +1155,7 @@ impl RenderComms {
     /// After converting the display event, the bridge owns notifying the
     /// evaluator's wait backend.
     pub fn send_input(&self, event: InputEvent) {
+        let event = Self::observe_scroll_input(event);
         let log_delivery = Self::should_log_delivery(&event);
         let event_name = Self::event_name(&event);
         if Self::is_lossy_input_event(&event) {

@@ -701,6 +701,8 @@ impl Context {
                 )
             });
 
+            let input_measurement = neomacs_display_protocol::input_latency::CommandInputs::begin();
+
             // Finding 2: this-original-command stays at the original
             // (pre-remap) command for the duration of the iteration
             // unless a pre-command-hook explicitly cleared it.
@@ -771,6 +773,7 @@ impl Context {
             let command_execution_start = command_observation
                 .as_ref()
                 .map(UserCommandObservation::begin_execution);
+            input_measurement.start(|frame| self.input_latency_viewport(frame));
             let exec_result = self.dispatch_command_in_loop(remapped);
             if let (Some(observation), Some(start)) =
                 (command_observation.as_mut(), command_execution_start)
@@ -797,6 +800,7 @@ impl Context {
             // GNU `command_loop_1` calls `safe_run_hooks (Qpost_command_hook)`
             // at keyboard.c:1563.
             self.safe_run_hook_if_bound("post-command-hook")?;
+            input_measurement.complete(|frame| self.input_latency_viewport(frame));
 
             // GNU `command_loop_1` (src/keyboard.c:1342-1345): "If displaying a
             // message, resize the echo area window to fit that message's size
@@ -1676,6 +1680,31 @@ impl Context {
         for frame in frames {
             let _ = self.safe_funcall(Value::symbol("window--resize-mini-frame"), vec![frame]);
         }
+    }
+
+    /// Plain viewport facts used to attribute a diagnostic scroll response.
+    /// Point/chrome changes alone do not count as scrolling.
+    pub fn input_latency_viewport(
+        &self,
+        frame_id: u64,
+    ) -> Vec<neomacs_display_protocol::input_latency::ScrollViewport> {
+        let Some(frame) = self.frames.get(crate::window::FrameId(frame_id)) else {
+            return Vec::new();
+        };
+        frame
+            .window_list()
+            .into_iter()
+            .filter_map(|window| {
+                let layout = frame.window_layout_inputs(window)?;
+                Some(neomacs_display_protocol::input_latency::ScrollViewport {
+                    window: window.0,
+                    buffer: layout.buffer_id.0,
+                    start: layout.window_start.to_one_based_usize(),
+                    hscroll: layout.hscroll,
+                    vscroll: layout.vscroll,
+                })
+            })
+            .collect()
     }
 
     pub(super) fn redisplay_signature(&self) -> RedisplaySignature {

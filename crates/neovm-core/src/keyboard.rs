@@ -1248,6 +1248,11 @@ impl TtyInputTarget {
 /// Input events from the display layer.
 #[derive(Clone, Debug)]
 pub enum InputEvent {
+    /// Native diagnostic observation; unwrapped by the ordered command reader.
+    Observed {
+        token: neomacs_display_protocol::input_latency::InputToken,
+        event: Box<InputEvent>,
+    },
     /// Uninterpreted bytes from a Unix TTY.
     ///
     /// The evaluator expands this transport batch into ordered
@@ -5094,6 +5099,10 @@ impl crate::emacs_core::eval::Context {
         }
 
         match event {
+            InputEvent::Observed { token, event } => {
+                neomacs_display_protocol::input_latency::consumed(token);
+                self.handle_read_char_input_event(*event, tty_input_decoding)
+            }
             InputEvent::RawTtyBytes { bytes, target } => {
                 self.route_tty_keyboard_input(target);
                 for byte in bytes.into_iter().rev() {

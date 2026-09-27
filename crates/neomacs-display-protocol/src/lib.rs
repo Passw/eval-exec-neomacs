@@ -85,3 +85,5 @@ pub use xwidget_extent::*;
 
 #[cfg(test)]
 mod tests;
+
+pub mod input_latency;

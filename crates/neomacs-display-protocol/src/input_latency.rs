@@ -1,0 +1,424 @@
+//! Opt-in causal input-to-presentation measurements.
+//!
+//! A received input is not an acknowledgement. Its command must have started,
+//! and a sealed layout must show a changed viewport, before native confirmation.
+//! Storage is bounded, and a coalesced/discarded layout may be superseded by a
+//! later one without losing the input's original receive time.
+
+use crate::PresentationId;
+use std::{
+    cell::RefCell,
+    collections::VecDeque,
+    io::Write,
+    path::PathBuf,
+    sync::{Mutex, OnceLock},
+};
+
+const MAX_PENDING: usize = 256;
+const MAX_PRESENTATIONS: usize = 16;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InputToken(u64);
+
+/// Timestamp in a platform clock domain, never a scheduler prediction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PlatformTimestamp {
+    pub clock_id: u32,
+    pub nanoseconds: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ScrollViewport {
+    pub window: u64,
+    pub buffer: u64,
+    pub start: usize,
+    pub hscroll: usize,
+    pub vscroll: i32,
+}
+
+#[derive(Debug)]
+struct Pending {
+    token: InputToken,
+    frame: u64,
+    kind: &'static str,
+    received: PlatformTimestamp,
+    baseline: Option<Vec<ScrollViewport>>,
+    completed: bool,
+    layouts: VecDeque<PresentationId>,
+}
+
+#[derive(Default)]
+struct Measurements {
+    next: u64,
+    pending: VecDeque<Pending>,
+    dropped: u64,
+}
+
+impl Measurements {
+    fn receive(
+        &mut self,
+        frame: u64,
+        kind: &'static str,
+        received: PlatformTimestamp,
+    ) -> InputToken {
+        self.next += 1;
+        let token = InputToken(self.next);
+        if self.pending.len() == MAX_PENDING {
+            self.pending.pop_front();
+            self.dropped += 1;
+        }
+        self.pending.push_back(Pending {
+            token,
+            frame,
+            kind,
+            received,
+            baseline: None,
+            completed: false,
+            layouts: VecDeque::new(),
+        });
+        token
+    }
+
+    fn start(
+        &mut self,
+        tokens: &[InputToken],
+        mut viewport: impl FnMut(u64) -> Vec<ScrollViewport>,
+    ) {
+        for item in &mut self.pending {
+            if tokens.contains(&item.token) {
+                item.baseline = Some(viewport(item.frame));
+            }
+        }
+    }
+
+    fn finish(
+        &mut self,
+        tokens: &[InputToken],
+        mut viewport: impl FnMut(u64) -> Vec<ScrollViewport>,
+    ) {
+        self.pending.retain_mut(|item| {
+            if !tokens.contains(&item.token) {
+                return true;
+            }
+            item.completed = true;
+            // A no-op must not be attributed to some unrelated future scroll.
+            !item.layouts.is_empty()
+                || item.baseline.as_ref().is_some_and(|baseline| {
+                    !baseline.is_empty() && *baseline != viewport(item.frame)
+                })
+        });
+    }
+
+    fn cancel(&mut self, tokens: &[InputToken]) {
+        self.pending.retain(|item| !tokens.contains(&item.token));
+    }
+
+    fn seal(&mut self, frame: u64, layout: PresentationId, viewport: &[ScrollViewport]) {
+        for item in &mut self.pending {
+            if item.frame == frame
+                && item.baseline.as_ref().is_some_and(|baseline| {
+                    !baseline.is_empty() && (item.completed || baseline != viewport)
+                })
+            {
+                if item.layouts.len() == MAX_PRESENTATIONS {
+                    item.layouts.pop_front();
+                }
+                item.layouts.push_back(layout);
+            }
+        }
+    }
+
+    fn confirmed(
+        &mut self,
+        layout: PresentationId,
+        time: PlatformTimestamp,
+    ) -> Vec<serde_json::Value> {
+        let mut samples = Vec::new();
+        self.pending.retain(|item| {
+            if !item.layouts.contains(&layout) {
+                return true;
+            }
+            // Clock disagreement is unavailable evidence, never zero latency.
+            let latency = (time.clock_id == item.received.clock_id)
+                .then(|| time.nanoseconds.checked_sub(item.received.nanoseconds))
+                .flatten();
+            samples.push(serde_json::json!({
+                "input": item.token.0, "frame": item.frame, "kind": item.kind,
+                "presentation": layout.get(), "clock_id": time.clock_id,
+                "received_ns": item.received.nanoseconds, "presented_ns": time.nanoseconds,
+                "input_to_present_ns": latency, "evicted_inputs": self.dropped,
+            }));
+            false
+        });
+        samples
+    }
+}
+
+struct Recorder {
+    path: PathBuf,
+    measurements: Mutex<Measurements>,
+}
+static RECORDER: OnceLock<Option<Recorder>> = OnceLock::new();
+fn recorder() -> Option<&'static Recorder> {
+    RECORDER
+        .get_or_init(|| {
+            std::env::var_os("NEOMACS_INPUT_LATENCY_FILE")
+                .filter(|p| !p.is_empty())
+                .map(|path| Recorder {
+                    path: path.into(),
+                    measurements: Mutex::new(Measurements::default()),
+                })
+        })
+        .as_ref()
+}
+
+pub fn enabled() -> bool {
+    recorder().is_some()
+}
+
+pub fn received(frame: u64, kind: &'static str, time: PlatformTimestamp) -> Option<InputToken> {
+    Some(
+        recorder()?
+            .measurements
+            .lock()
+            .unwrap()
+            .receive(frame, kind, time),
+    )
+}
+
+thread_local! { static CONSUMED: RefCell<Vec<InputToken>> = const { RefCell::new(Vec::new()) }; }
+
+/// Called only when the ordered input reader removes the actual command event.
+pub fn consumed(token: InputToken) {
+    CONSUMED.with_borrow_mut(|tokens| {
+        if tokens.len() == MAX_PENDING {
+            tokens.remove(0);
+        }
+        tokens.push(token);
+    });
+}
+
+/// Captures inputs for one executing command. In-command redisplay can be the
+/// first response; it qualifies only after the viewport actually changes.
+/// Dropping an unfinished command cancels inputs that have not been presented.
+pub struct CommandInputs {
+    tokens: Vec<InputToken>,
+    completed: bool,
+}
+impl CommandInputs {
+    pub fn begin() -> Self {
+        Self {
+            tokens: CONSUMED.with_borrow_mut(std::mem::take),
+            completed: false,
+        }
+    }
+    pub fn start(&self, viewport: impl FnMut(u64) -> Vec<ScrollViewport>) {
+        if let Some(recorder) = recorder() {
+            recorder
+                .measurements
+                .lock()
+                .unwrap()
+                .start(&self.tokens, viewport);
+        }
+    }
+    pub fn complete(mut self, viewport: impl FnMut(u64) -> Vec<ScrollViewport>) {
+        if let Some(recorder) = recorder() {
+            recorder
+                .measurements
+                .lock()
+                .unwrap()
+                .finish(&self.tokens, viewport);
+        }
+        self.completed = true;
+    }
+}
+
+impl Drop for CommandInputs {
+    fn drop(&mut self) {
+        if !self.completed {
+            if let Some(recorder) = recorder() {
+                recorder.measurements.lock().unwrap().cancel(&self.tokens);
+            }
+        }
+        CONSUMED.with_borrow_mut(Vec::clear);
+    }
+}
+
+pub fn sealed(frame: u64, layout: PresentationId, viewport: impl FnOnce() -> Vec<ScrollViewport>) {
+    if let Some(recorder) = recorder() {
+        recorder
+            .measurements
+            .lock()
+            .unwrap()
+            .seal(frame, layout, &viewport());
+    }
+}
+
+pub fn confirmed(layout: PresentationId, time: PlatformTimestamp) {
+    let Some(recorder) = recorder() else { return };
+    let samples = recorder
+        .measurements
+        .lock()
+        .unwrap()
+        .confirmed(layout, time);
+    if samples.is_empty() {
+        return;
+    }
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&recorder.path)
+    {
+        Ok(mut file) => {
+            for sample in samples {
+                let _ = writeln!(file, "{sample}");
+            }
+        }
+        Err(error) => tracing::warn!(%error, "cannot write input latency samples"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn viewport(start: usize) -> Vec<ScrollViewport> {
+        vec![ScrollViewport {
+            window: 1,
+            buffer: 1,
+            start,
+            hscroll: 0,
+            vscroll: 0,
+        }]
+    }
+    fn time(nanoseconds: u64) -> PlatformTimestamp {
+        PlatformTimestamp {
+            clock_id: 1,
+            nanoseconds,
+        }
+    }
+    #[test]
+    fn queued_input_and_other_frames_cannot_complete_a_latency_sample() {
+        let mut measurements = Measurements::default();
+        let token = measurements.receive(7, "wheel", time(100));
+        measurements.seal(7, PresentationId::new(1), &viewport(2));
+        assert!(
+            measurements
+                .confirmed(PresentationId::new(1), time(200))
+                .is_empty()
+        );
+        measurements.start(&[token], |_| viewport(1));
+        measurements.seal(8, PresentationId::new(2), &viewport(2));
+        assert!(
+            measurements
+                .confirmed(PresentationId::new(2), time(300))
+                .is_empty()
+        );
+        measurements.seal(7, PresentationId::new(3), &viewport(2));
+        let samples = measurements.confirmed(PresentationId::new(3), time(400));
+        assert_eq!(samples[0]["input_to_present_ns"], 300);
+        assert!(
+            measurements
+                .confirmed(PresentationId::new(3), time(500))
+                .is_empty()
+        );
+    }
+    #[test]
+    fn superseded_layout_keeps_original_input_time_and_bounds_memory() {
+        let mut measurements = Measurements::default();
+        for _ in 0..MAX_PENDING + 1 {
+            measurements.receive(7, "precise", time(100));
+        }
+        assert_eq!(measurements.pending.len(), MAX_PENDING);
+        assert_eq!(measurements.dropped, 1);
+        let token = measurements.pending.back().unwrap().token;
+        measurements.start(&[token], |_| viewport(1));
+        for id in 1..=20 {
+            measurements.seal(7, PresentationId::new(id), &viewport(2));
+        }
+        assert_eq!(
+            measurements.pending.back().unwrap().layouts.len(),
+            MAX_PRESENTATIONS
+        );
+        assert!(
+            measurements
+                .confirmed(PresentationId::new(1), time(200))
+                .is_empty()
+        );
+        let samples = measurements.confirmed(PresentationId::new(20), time(500));
+        assert_eq!(samples[0]["input_to_present_ns"], 400);
+        assert_eq!(samples[0]["evicted_inputs"], 1);
+    }
+    #[test]
+    fn command_preflight_cannot_ack_before_the_viewport_changes() {
+        let mut measurements = Measurements::default();
+        let token = measurements.receive(7, "precise", time(100));
+        measurements.start(&[token], |_| viewport(1));
+        measurements.seal(7, PresentationId::new(1), &viewport(1));
+        assert!(
+            measurements
+                .confirmed(PresentationId::new(1), time(200))
+                .is_empty()
+        );
+        measurements.seal(7, PresentationId::new(2), &viewport(2));
+        assert_eq!(
+            measurements
+                .confirmed(PresentationId::new(2), time(300))
+                .len(),
+            1
+        );
+        let token = measurements.receive(7, "page", time(400));
+        measurements.start(&[token], |_| viewport(2));
+        measurements.cancel(&[token]);
+        measurements.seal(7, PresentationId::new(3), &viewport(3));
+        assert!(
+            measurements
+                .confirmed(PresentationId::new(3), time(500))
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn completed_no_op_cannot_be_credited_to_a_later_command() {
+        let mut measurements = Measurements::default();
+        let token = measurements.receive(7, "page", time(100));
+        measurements.start(&[token], |_| viewport(1));
+        measurements.finish(&[token], |_| viewport(1));
+        measurements.seal(7, PresentationId::new(2), &viewport(2));
+        assert!(
+            measurements
+                .confirmed(PresentationId::new(2), time(300))
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn completed_scrolls_can_be_coalesced_back_to_the_original_viewport() {
+        let mut measurements = Measurements::default();
+        let token = measurements.receive(7, "precise", time(100));
+        measurements.start(&[token], |_| viewport(1));
+        measurements.finish(&[token], |_| viewport(2));
+        measurements.seal(7, PresentationId::new(2), &viewport(1));
+        assert_eq!(
+            measurements
+                .confirmed(PresentationId::new(2), time(300))
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn unrelated_clock_cannot_fabricate_latency() {
+        let mut measurements = Measurements::default();
+        let token = measurements.receive(7, "page", time(100));
+        measurements.start(&[token], |_| viewport(1));
+        measurements.seal(7, PresentationId::new(1), &viewport(2));
+        let samples = measurements.confirmed(
+            PresentationId::new(1),
+            PlatformTimestamp {
+                clock_id: 2,
+                nanoseconds: 200,
+            },
+        );
+        assert!(samples[0]["input_to_present_ns"].is_null());
+    }
+}
