@@ -264,6 +264,90 @@ fn first_visit_at(
     shift: usize,
     point_row: usize,
 ) {
+    first_visit_with_setup(face, line, change, shift, point_row, None);
+}
+
+#[test]
+fn first_visit_worker_page_preserves_overlapping_face_and_pointer_overlays() {
+    first_visit_with_setup(
+        None,
+        "ordinary offscreen text\n",
+        None,
+        0,
+        5,
+        Some(
+            "(let ((a (make-overlay 2761 3100)) (b (make-overlay 2780 3060)))
+                 (overlay-put a 'face '(:family \"DejaVu Serif\" :height 150 :foreground \"red\"))
+                 (overlay-put a 'mouse-face 'highlight)
+                 (overlay-put a 'help-echo \"offscreen help\")
+                 (overlay-put b 'priority 12)
+                 (overlay-put b 'face '(:weight bold :underline t)))",
+        ),
+    );
+}
+
+#[test]
+fn first_visit_worker_page_resolves_overlay_category_faces() {
+    first_visit_with_setup(
+        None,
+        "ordinary offscreen text\n",
+        None,
+        0,
+        5,
+        Some(
+            "(progn (put 'worker-overlay-category 'face '(:height 125 :slant italic))
+                 (overlay-put (make-overlay 2761 3100) 'category 'worker-overlay-category))",
+        ),
+    );
+}
+
+#[test]
+fn worker_capture_rejects_overlay_replacements_and_excessive_overlap() {
+    use crate::row_layout::program::RowProgramError;
+    for (setup, expected) in [
+        (
+            "(overlay-put (make-overlay 2761 3100) 'before-string \"prefix\")",
+            RowProgramError::Unsupported,
+        ),
+        (
+            "(overlay-put (make-overlay 2761 3100) 'display \"replacement\")",
+            RowProgramError::Unsupported,
+        ),
+        (
+            "(progn (put 'worker-overlay-category 'after-string \"suffix\")
+                 (overlay-put (make-overlay 2761 3100) 'category 'worker-overlay-category))",
+            RowProgramError::Unsupported,
+        ),
+        (
+            "(let ((i 0)) (while (< i 33) (make-overlay 2761 3100) (setq i (1+ i))))",
+            RowProgramError::Budget,
+        ),
+    ] {
+        let (mut eval, frame, _, window) =
+            incr_editing_frame(&"ordinary offscreen text\n".repeat(300), 800, 600);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        eval.eval_str(setup).unwrap();
+        let mut engine = LayoutEngine::new();
+        engine.layout_frame_rust(&mut eval, frame);
+        assert_eq!(
+            engine.request_scroll_coverage(&eval, frame, window, CharPos0::new(2760)),
+            Err(expected),
+            "{setup}"
+        );
+    }
+}
+
+fn first_visit_with_setup(
+    face: Option<&str>,
+    line: &str,
+    change: Option<&str>,
+    shift: usize,
+    point_row: usize,
+    setup: Option<&str>,
+) {
     let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
     eval.frame_manager_mut()
         .get_mut(frame)
@@ -279,6 +363,9 @@ fn first_visit_at(
             start + 12 * line_chars
         ))
         .unwrap();
+    }
+    if let Some(setup) = setup {
+        eval.eval_str(setup).unwrap();
     }
     let mut engine = LayoutEngine::new();
     engine.layout_frame_rust(&mut eval, frame);

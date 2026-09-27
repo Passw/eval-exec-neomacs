@@ -77,6 +77,8 @@ enum Operation {
         span: SourceSpan,
         face: FaceId,
         line_height: DisplayLineHeightPolicy,
+        layout: DisplayItemLayout,
+        pointer_appearance: Option<DisplayPointerAppearance>,
         edges: neomacs_display_protocol::face::BoxVerticalEdges,
         membership: neomacs_display_protocol::face::BoxRunMembership,
     },
@@ -105,6 +107,8 @@ impl Operation {
                     span: item.span,
                     face: render_face_ref_id(item.face, base),
                     line_height: value.line_height,
+                    layout: item.layout,
+                    pointer_appearance: item.pointer_appearance,
                     edges: item.box_vertical_edges,
                     membership: item.box_run_membership,
                 })
@@ -141,6 +145,8 @@ impl Operation {
                 span,
                 face,
                 line_height,
+                layout,
+                pointer_appearance,
                 edges,
                 membership,
             } => {
@@ -154,6 +160,8 @@ impl Operation {
                 );
                 item.box_vertical_edges = edges;
                 item.box_run_membership = membership;
+                item.layout = layout;
+                item.pointer_appearance = pointer_appearance;
                 item
             }
         }

@@ -49,20 +49,6 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
     if start >= end || max_items == 0 {
         return Err(RowProgramError::Budget);
     }
-    // Do not traverse/allocate arbitrary overlay strings during speculative
-    // capture. The interval iterator stops on its first match, independently
-    // of how many overlays exist elsewhere in a large buffer.
-    if buffer
-        .layout_overlays()
-        .iter_overlays_in_accessible_emacs_byte_range(
-            EmacsByteRange::new(start_byte, end_byte),
-            buffer.layout_point_max_emacs_byte_pos(),
-        )
-        .next()
-        .is_some()
-    {
-        return Err(RowProgramError::Unsupported);
-    }
     let lookups = [
         "display",
         "invisible",
@@ -73,6 +59,35 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
         "line-spacing",
     ]
     .map(|name| LayoutCharPropertyLookup::new(buffer, Value::symbol(name)));
+    let string_lookups = ["before-string", "after-string"]
+        .map(|name| LayoutCharPropertyLookup::new(buffer, Value::symbol(name)));
+    // Ordinary overlay faces and pointer metadata use the canonical producer.
+    // Bound intersecting overlays before it can collect them or inspect any
+    // replacement strings. Category/alias properties use the same effective
+    // lookup as visible layout, so indirect replacements cannot bypass this.
+    let overlays = buffer.layout_overlays();
+    for (index, overlay) in overlays
+        .iter_overlays_in_accessible_emacs_byte_range(
+            EmacsByteRange::new(start_byte, end_byte),
+            buffer.layout_point_max_emacs_byte_pos(),
+        )
+        .enumerate()
+    {
+        if cancelled() {
+            return Err(RowProgramError::Cancelled);
+        }
+        if index >= max_items {
+            return Err(RowProgramError::Budget);
+        }
+        if overlays.overlay_applies_to_window(overlay, Some(window))
+            && lookups
+                .iter()
+                .chain(&string_lookups)
+                .any(|lookup| lookup.effective_overlay_value(buffer, overlay).is_some())
+        {
+            return Err(RowProgramError::Unsupported);
+        }
+    }
     // Property boundaries are bounded too: a hostile line with a different
     // property on every character cannot hide unbounded capture work.
     let mut pos = start_byte;
