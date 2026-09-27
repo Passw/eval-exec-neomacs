@@ -240,6 +240,15 @@ fn first_visit_to_worker_prepared_unicode_page_matches_fresh_layout() {
 }
 
 fn first_visit(face: Option<&str>, line: &str, change: Option<&str>) {
+    first_visit_shifted(face, line, change, 0);
+}
+
+#[test]
+fn first_visit_shifted_within_worker_page_matches_fresh_layout() {
+    first_visit_shifted(None, "ordinary offscreen text\n", None, 1);
+}
+
+fn first_visit_shifted(face: Option<&str>, line: &str, change: Option<&str>, shift: usize) {
     let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
     eval.frame_manager_mut()
         .get_mut(frame)
@@ -273,26 +282,30 @@ fn first_visit(face: Option<&str>, line: &str, change: Option<&str>) {
         );
         std::thread::yield_now();
     }
+    let start = start + shift * line_chars;
+    let start_byte = start_byte + shift * line.len();
     let display_window = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
     let mut requested_key = engine.retained_window_matrices[&display_window].key.clone();
     requested_key.window_start = start as i64;
     requested_key.point = (start + 5 * line_chars) as i64;
-    let (replay, faces) = engine
-        .prepared_viewports
-        .replay(frame, display_window, &requested_key)
-        .expect("ready coverage must satisfy the requested key");
-    let arena = &engine.frame_face_arenas[&frame];
-    arena
-        .begin_attempt()
-        .admit_prepared(
-            replay
-                .body_rows
-                .iter()
-                .flat_map(|(_, row)| row.glyphs.iter().flatten().map(|glyph| glyph.face_id)),
-            &faces,
-            arena,
-        )
-        .expect("prepared face namespace");
+    if shift == 0 {
+        let (replay, faces) = engine
+            .prepared_viewports
+            .replay(frame, display_window, &requested_key)
+            .expect("ready coverage must satisfy the requested key");
+        let arena = &engine.frame_face_arenas[&frame];
+        arena
+            .begin_attempt()
+            .admit_prepared(
+                replay
+                    .body_rows
+                    .iter()
+                    .flat_map(|(_, row)| row.glyphs.iter().flatten().map(|glyph| glyph.face_id)),
+                &faces,
+                arena,
+            )
+            .expect("prepared face namespace");
+    }
     if let Some(change) = change {
         eval.eval_str(change).unwrap();
     }
@@ -321,7 +334,10 @@ fn first_visit(face: Option<&str>, line: &str, change: Option<&str>) {
         engine.retained_window_matrices[&display_window].key
     );
     if change.is_none() {
-        assert!(engine.last_layout_stats().reused_rows > 10);
+        assert!(
+            engine.last_layout_stats().reused_rows + engine.last_layout_stats().reused_shifted_rows
+                > 10
+        );
     }
     let actual = selected_window_layout_trace(&eval, &engine, frame);
     let mut fresh = LayoutEngine::new();
@@ -513,5 +529,43 @@ fn worker_page_is_rejected_after_horizontal_scroll() {
         None,
         "ordinary offscreen text\n",
         Some("(set-window-hscroll nil 2)"),
+    );
+}
+
+#[test]
+fn worker_page_with_font_family_weight_and_slant_matches_fresh_layout() {
+    first_visit(
+        Some("(:family \"DejaVu Serif\" :weight bold :slant italic :height 125)"),
+        "ordinary offscreen text\n",
+        None,
+    );
+}
+
+#[test]
+fn worker_page_with_box_and_extended_background_matches_fresh_layout() {
+    first_visit(
+        Some("(:box (:line-width 2 :color \"blue\") :background \"red\" :extend t)"),
+        "ordinary offscreen text\n",
+        None,
+    );
+}
+
+#[test]
+fn worker_page_with_combined_decorations_matches_fresh_layout() {
+    first_visit(
+        Some(
+            "(:underline (:style wave :color \"blue\") :overline t :strike-through t :inverse-video t)",
+        ),
+        "ordinary offscreen text\n",
+        None,
+    );
+}
+
+#[test]
+fn worker_page_with_smaller_font_and_tabs_matches_fresh_layout() {
+    first_visit(
+        Some("(:family \"DejaVu Serif\" :height 125)"),
+        "font\ttext\n",
+        None,
     );
 }

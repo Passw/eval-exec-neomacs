@@ -287,6 +287,7 @@ pub(crate) struct RowProgram {
 pub(crate) struct ComputedRow {
     pub row: GlyphRow,
     pub slots: Vec<DisplayRowGlyphSlot>,
+    pub slot_heights: Vec<f32>,
     pub source: SourceSpan,
     pub end: DisplayRowPosition,
     pub terminator_width: f32,
@@ -396,6 +397,7 @@ impl RowProgram {
         let mut row = new_display_row(&layout);
         let mut position = DisplayRowPosition::new(0.0, 0);
         let mut slots = Vec::new();
+        let mut slot_heights = Vec::new();
         let mut source_start = None;
         let mut source_end = None;
         let mut terminator_width = self.geometry.metrics.char_width();
@@ -417,6 +419,15 @@ impl RowProgram {
             } else {
                 None
             };
+            // Source-slot height describes the active face at this item,
+            // not the eventual maximum height of the complete row.
+            let face = render_face_ref_id(item.face, self.geometry.base_face);
+            let face_height = self
+                .faces
+                .iter()
+                .find(|candidate| candidate.face_id == face)
+                .map(|face| face.metrics.line_height_px())
+                .ok_or(RowProgramError::Unsupported)?;
             let progress = DisplayRowProgressWriter::with_text_run_measurement_and_glyph_measurer_for_area_and_start_policy(
                 &layout, &mut row, plan, &mut self.measurements, position, self.geometry.width,
                 DisplayRowTextAreaOrigin::row_local(), GlyphArea::Text, DisplayRowAppendStartPolicy::ReconcileWithRowTail,
@@ -428,6 +439,7 @@ impl RowProgram {
                 return Err(RowProgramError::Overflow);
             }
             position = progress.end();
+            slot_heights.extend(std::iter::repeat_n(face_height, progress.slots().len()));
             slots.extend(progress.slots().iter().cloned());
             if let Some((value, face, edges, membership)) = newline {
                 if let Some(realized) = self
@@ -468,6 +480,7 @@ impl RowProgram {
         Ok(ComputedRow {
             row,
             slots,
+            slot_heights,
             source: SourceSpan::new(
                 source_start.ok_or(RowProgramError::Incomplete)?,
                 source_end.ok_or(RowProgramError::Incomplete)?,

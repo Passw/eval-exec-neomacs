@@ -54,7 +54,10 @@ pub(crate) fn position_buffer_rows(
         let relative_y = (y - window_top).round() as i64;
         geometry.begin_current_row_progress(Some(index), row_index, 0, relative_y, 0);
         geometry.note_row_walk_start(LispCharPos1::from_one_based_usize(start.get() + 1));
-        for slot in computed.slots {
+        if computed.slots.len() != computed.slot_heights.len() {
+            return Err(RowProgramError::Unsupported);
+        }
+        for (slot, slot_height) in computed.slots.into_iter().zip(computed.slot_heights) {
             let DisplaySourcePosition::Buffer {
                 buffer_id: slot_buffer,
                 char_pos,
@@ -71,7 +74,7 @@ pub(crate) fn position_buffer_rows(
                 text_x + slot.x_px(),
                 y,
                 slot.width_px(),
-                computed.row.height_px,
+                slot_height,
                 index,
                 slot.col(),
             );
