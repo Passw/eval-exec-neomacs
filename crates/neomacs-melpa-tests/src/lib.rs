@@ -6502,7 +6502,7 @@ fn run_phase_with_validation(
     form: &str,
     check_editor_error_output: bool,
 ) -> Result<PhaseReport, String> {
-    let form_directory = workspace_root().join("tmp/melpa/editor-forms");
+    let form_directory = neomacs_melpa_test_support::melpa_cache_root().join("editor-forms");
     fs::create_dir_all(&form_directory).map_err(|error| {
         format!(
             "failed to create editor-form directory {}: {error}",

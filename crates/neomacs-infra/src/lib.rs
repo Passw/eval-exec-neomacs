@@ -55,6 +55,22 @@ pub fn workspace_root() -> PathBuf {
     nextest_workspace_root().unwrap_or_else(cargo_workspace_root)
 }
 
+/// Root of the prepared-artifact caches the package suites build up.
+///
+/// Package sources, prepared install trees, tool runtimes: every byte under
+/// here is derived from a pin and can be rebuilt, so it lives with the rest of
+/// the build output instead of in the source tree.  `cargo clean` removes it,
+/// which is the reset gesture for a suite that has gone strange.
+///
+/// `CARGO_TARGET_DIR` is honored first, so a workspace that relocates its
+/// target directory keeps its caches with it.
+pub fn melpa_cache_root() -> PathBuf {
+    std::env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| workspace_root().join("target"))
+        .join("melpa")
+}
+
 /// The invoking crate's root directory, resolved on the machine *running*
 /// the code.
 ///

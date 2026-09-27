@@ -229,7 +229,7 @@ fn astute_generated_autoload_registers_mode_without_eagerly_loading_package() ->
          (boundp 'astute-transform-list)
          (assoc 'astute-mode minor-mode-alist))"##,
         expect![[
-            r#"OK (nil t t "[ORACLE-WORKSPACE]/tmp/melpa/source-install-cache/astute/20241015.444/69d413c952771c0d06cda161fb25fe495fb895b0/517749e477c16c0437cae029be71e672061a6c19/d31dec67631f14ef8be3ad6438e172a07298082b/home/.emacs.d/elpa/astute-20241015.444/astute.el" nil nil nil nil)"#
+            r#"OK (nil t t "[ORACLE-WORKSPACE]/target/melpa/source-install-cache/astute/20241015.444/69d413c952771c0d06cda161fb25fe495fb895b0/517749e477c16c0437cae029be71e672061a6c19/d31dec67631f14ef8be3ad6438e172a07298082b/home/.emacs.d/elpa/astute-20241015.444/astute.el" nil nil nil nil)"#
         ]],
     )
 }
