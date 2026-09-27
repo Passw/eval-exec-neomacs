@@ -5,6 +5,7 @@
 //! GNU's intentionally different batch engine stays in `editing/indent`.
 
 mod measurement;
+pub(crate) mod pixels;
 pub(crate) mod paging;
 mod policy;
 pub(crate) use policy::ScrollGoal;

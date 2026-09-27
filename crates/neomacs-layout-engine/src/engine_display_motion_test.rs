@@ -4,6 +4,124 @@ use super::*;
 use neovm_core::window::WindowLayoutQueryOutcome;
 
 #[test]
+fn backward_pixel_measurement_uses_the_offscreen_rows_actual_height() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert("row\nnext\n");
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("pixel-height", 400, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str("(progn (put-text-property 1 2 'display '(space :height 4)) (goto-char 5) (set-window-start nil 5 t))").unwrap();
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let result = eval.eval_str("(list (mapcar (lambda (offset) (cdr (window-text-pixel-size nil (cons 5 offset) 5 nil nil nil t))) '(-1 -63 -64 -65)) (window-start) (point))").unwrap();
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "(((64 1) (64 1) (64 1) (64 1)) 5 5)"
+    );
+    let result = eval.eval_str("(progn (put-text-property 1 2 'display '(space :height 2)) (cdr (window-text-pixel-size nil '(5 . -1) 5 nil nil nil t)))").unwrap();
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "(32 1)"
+    );
+}
+
+#[test]
+fn backward_pixel_measurement_expands_past_wrapped_source_lines() {
+    use neovm_core::window::WindowLayoutQueryScope;
+    use std::num::NonZeroUsize;
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert(&format!("{}\nnext\n", "x".repeat(2000)));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("pixel-wrap", 160, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    let snapshot = query
+        .query_window_layout(
+            &mut eval,
+            frame,
+            window,
+            WindowLayoutQueryScope::Rows {
+                start: LispCharPos1::ONE,
+                count: NonZeroUsize::new(256).unwrap(),
+            },
+        )
+        .unwrap()
+        .into_geometry()
+        .unwrap();
+    let rows: Vec<_> = snapshot
+        .rows
+        .iter()
+        .filter(|row| row.start_buffer_pos.is_some())
+        .collect();
+    let anchor = rows
+        .iter()
+        .position(|row| row.start_buffer_pos == Some(LispCharPos1::new(2002)))
+        .unwrap();
+    assert!(
+        anchor > 16,
+        "exercise expansion beyond the initial query budget"
+    );
+    let preceding = rows[anchor - 1];
+    let expected = format!(
+        "({} {})",
+        rows[anchor].y - preceding.y,
+        preceding.start_buffer_pos.unwrap().as_i64()
+    );
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let result = eval
+        .eval_str("(cdr (window-text-pixel-size nil '(2002 . -1) 2002 nil nil nil t))")
+        .unwrap();
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        expected
+    );
+    // The same ambiguity occurs at a continuation boundary shared with the
+    // preceding row's end, not only after the source newline.
+    let origin = preceding.start_buffer_pos.unwrap().as_i64();
+    let earlier = rows[anchor - 2];
+    let result = eval
+        .eval_str(&format!(
+            "(cdr (window-text-pixel-size nil '({origin} . -1) {origin} nil nil nil t))"
+        ))
+        .unwrap();
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        format!(
+            "({} {})",
+            preceding.y - earlier.y,
+            earlier.start_buffer_pos.unwrap().as_i64()
+        )
+    );
+}
+
+#[test]
 fn consecutive_scroll_commands_preserve_the_original_goal_past_short_rows() {
     let mut eval = Context::new();
     let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();

@@ -4408,6 +4408,33 @@ pub(crate) fn builtin_window_text_pixel_size_ctx(
         )
     };
 
+    // Precision scrolling measures backwards from the current row boundary,
+    // excluding that row. Use the same offscreen producer as display motion;
+    // multiplying source lines by the default font height loses pixels on
+    // every crossing of a mixed-font, raised, wrapped, or overlay row.
+    if let Some(offset) = y_offset.filter(|offset| *offset < 0)
+        && initial_from_pos == to_pos
+        && args.get(3).is_none_or(|v| v.is_nil())
+        && args.get(4).is_none_or(|v| v.is_nil())
+        && args.get(5).is_none_or(|v| v.is_nil())
+        && args.get(6).is_some_and(|v| v.is_truthy())
+    {
+        let origin = eval
+            .buffers
+            .get(buf_id)
+            .expect("resolved buffer")
+            .emacs_byte_pos_to_lisp_char_pos(initial_from_pos);
+        if let Some(extent) =
+            motion::pixels::backward_extent(eval, fid, wid, buf_id, origin, offset)?
+        {
+            return Ok(Value::list(vec![
+                Value::fixnum(extent.width),
+                Value::fixnum(extent.height),
+                Value::fixnum(extent.start.as_i64()),
+            ]));
+        }
+    }
+
     // Determine FROM/TO range.
     let (from_pos, offset_landed_on_occupied_row) = if let Some(y_offset) = y_offset {
         window_text_pixel_offset_target(
