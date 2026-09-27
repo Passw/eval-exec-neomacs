@@ -2240,3 +2240,62 @@ fn owned_mapped_text_preserves_string_coordinates_and_clipping_on_a_worker() {
         );
     }
 }
+
+#[test]
+fn owned_spacing_matches_canonical_metrics_and_clipping_on_a_worker() {
+    use crate::row_layout::ResolvedSpacingInput;
+    fn require_send_sync<T: Send + Sync + 'static>() {}
+    require_send_sync::<ResolvedSpacingInput>();
+    for width in [16.0, 80.0] {
+        for spacing in [
+            DisplayStretchWidth::Length(DisplayLength::Pixels(24.0)),
+            DisplayStretchWidth::Length(DisplayLength::Em(3.0)),
+            DisplayStretchWidth::RelativeToSource {
+                factor: 3.0,
+                source: EmacsChar::from_char('W'),
+            },
+        ] {
+            let item = DisplayItem::new(
+                SourceSpan::synthetic(1, 0, 1),
+                RenderFaceRef::FaceId(FaceId::new(4)),
+                DisplayItemKind::Stretch(DisplayStretch {
+                    width: spacing,
+                    height: Some(DisplayLength::Pixels(24.0)),
+                    ascent: Some(DisplayLength::Pixels(18.0)),
+                }),
+            );
+            let row_layout = layout();
+            let mut expected_row = new_display_row(&row_layout);
+            let expected_progress = DisplayRowProgressWriter::new(
+                &row_layout,
+                &mut expected_row,
+                DisplayRowPosition::new(0.0, 0),
+                width,
+            )
+            .push_item(item.clone());
+            let input = ResolvedSpacingInput::capture(item, FaceId::new(1)).unwrap();
+            let actual = std::thread::spawn(move || {
+                let row_layout = layout();
+                let mut row = new_display_row(&row_layout);
+                let progress = DisplayRowProgressWriter::new(
+                    &row_layout,
+                    &mut row,
+                    DisplayRowPosition::new(0.0, 0),
+                    width,
+                )
+                .push_item(input.into_display_item());
+                (row, progress)
+            })
+            .join()
+            .unwrap();
+            assert_eq!(actual, (expected_row, expected_progress));
+            if width > 24.0 {
+                let glyph = &actual.0.glyphs[GlyphArea::Text.index()][0];
+                assert_eq!(
+                    (glyph.pixel_width, glyph.pixel_height, glyph.pixel_ascent),
+                    (24.0, 24.0, 18.0)
+                );
+            }
+        }
+    }
+}
