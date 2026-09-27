@@ -1478,6 +1478,12 @@ const BENCHMARK_PASSTHROUGH_ENVIRONMENT: &[&str] = &[
     "LD_LIBRARY_PATH",
     "DYLD_LIBRARY_PATH",
     "DYLD_FALLBACK_LIBRARY_PATH",
+    // Preserve Vulkan loader discovery on hosts whose drivers live outside
+    // the default search paths (e.g. NixOS). Dropping these can silently
+    // benchmark software rendering instead of the session's GPU driver.
+    "VK_DRIVER_FILES",
+    "VK_ICD_FILENAMES",
+    "VK_ADD_DRIVER_FILES",
     "GST_PLUGIN_SYSTEM_PATH_1_0",
     "GST_PLUGIN_SCANNER_1_0",
     "SYSTEMROOT",

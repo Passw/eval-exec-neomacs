@@ -148,6 +148,10 @@ headless Weston session to X11-only GNU Emacs builds through Xwayland. The
 session is `neomacs-infra`'s `WestonBenchSession`: a harness-owned
 compositor with a private `XDG_RUNTIME_DIR`, a pinned locale, and a
 deterministic teardown, retried on a fresh compositor when a launch flakes.
+The editor preserves `VK_DRIVER_FILES`, `VK_ICD_FILENAMES`, and
+`VK_ADD_DRIVER_FILES` in its otherwise restricted environment and records them
+in input provenance. These loader settings matter on hosts such as NixOS:
+dropping them can silently select software rendering and inflate GUI timings.
 The `mx-tab-completion` fixture installs 1,024 identically named no-op commands
 before measurement, then performs a real `M-x`, TAB, completion-window,
 selection, and minibuffer-exit lifecycle over that controlled namespace.

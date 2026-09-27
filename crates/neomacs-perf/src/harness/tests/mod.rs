@@ -1035,6 +1035,23 @@ fn harness_built_from_dirty_tracked_sources_cannot_be_acceptance_evidence() {
     assert!(error.contains("rebuild"));
 }
 
+#[test]
+fn benchmark_environment_preserves_vulkan_driver_discovery() {
+    use std::ffi::OsString;
+    let variables = [
+        ("VK_DRIVER_FILES", "/drivers/radeon.json"),
+        ("VK_ICD_FILENAMES", "/legacy/radeon.json"),
+        ("VK_ADD_DRIVER_FILES", "/extra/radeon.json"),
+    ];
+    let forwarded = crate::harness::passthrough_from(
+        variables.map(|(name, value)| (OsString::from(name), OsString::from(value))),
+    );
+    assert_eq!(
+        forwarded,
+        variables.map(|(name, value)| (name.to_owned(), OsString::from(value)))
+    );
+}
+
 /// The editor child gets the allowlisted host variables plus any operator-set
 /// JIT master switch, `NEOVM_JIT_*` diagnostic knob, explicit OSR trace or
 /// allowlisted collector knob (not the GC trace, not the logging filter).
