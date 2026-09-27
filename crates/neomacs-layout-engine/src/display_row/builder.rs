@@ -22,7 +22,7 @@ use crate::glyph_row_writer;
 #[cfg(test)]
 use crate::output::builder::DisplayOutputBuilder;
 #[cfg(test)]
-use crate::row_layout::ResolvedTextInput;
+use crate::row_layout::{ResolvedMappedTextInput, ResolvedTextInput};
 use neomacs_display_protocol::frame_glyphs::GlyphRowRole;
 use neomacs_display_protocol::glyph_matrix::{
     Glyph, GlyphArea, GlyphProvenance, GlyphRow, GlyphStringSource, GlyphType,
@@ -1890,6 +1890,27 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
             span: input.span,
             face: RenderFaceRef::FaceId(input.face),
             kind: DisplayItemKind::TextRun(input.run),
+            layout: input.layout,
+            pointer_appearance: input.pointer_appearance,
+            box_vertical_edges: input.box_vertical_edges,
+            box_run_membership: input.box_run_membership,
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn push_resolved_mapped_text(
+        &mut self,
+        input: ResolvedMappedTextInput,
+    ) -> DisplayRowAppendProgress {
+        self.push_item(DisplayItem {
+            span: input.span,
+            face: RenderFaceRef::FaceId(input.face),
+            kind: DisplayItemKind::SourceMappedText(
+                crate::display_item::DisplaySourceMappedText::face_segment(
+                    input.text,
+                    input.glyph_string_start,
+                ),
+            ),
             layout: input.layout,
             pointer_appearance: input.pointer_appearance,
             box_vertical_edges: input.box_vertical_edges,

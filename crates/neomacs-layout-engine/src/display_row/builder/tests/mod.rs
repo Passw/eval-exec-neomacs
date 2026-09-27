@@ -2177,3 +2177,66 @@ fn resolved_text_concrete_font_output_matches_on_an_evaluator_free_worker() {
     assert!(expected.1.x_px() > 0.0);
     assert_eq!(actual, expected);
 }
+
+#[test]
+fn owned_mapped_text_preserves_string_coordinates_and_clipping_on_a_worker() {
+    use crate::row_layout::ResolvedMappedTextInput;
+    fn require_send_sync<T: Send + Sync + 'static>() {}
+    require_send_sync::<ResolvedMappedTextInput>();
+    let _eval = Context::new();
+    let covered = crate::display_item::BufferDisplayReplacementSource::spanning(
+        neovm_core::buffer::BufferId(1),
+        neovm_core::buffer::CharPos0::new(2),
+        neovm_core::buffer::EmacsBytePos::new(3),
+        neovm_core::buffer::CharPos0::new(4),
+        neovm_core::buffer::EmacsBytePos::new(5),
+    );
+    let mut source = crate::display_source::BufferDisplayReplacementStringRequest::new(
+        7,
+        Value::string("STR"),
+        covered,
+    )
+    .into_source(FaceId::new(2))
+    .unwrap();
+    let item = source
+        .next_item(&mut DisplaySourceContext::empty())
+        .unwrap();
+    for width in [16.0, 80.0] {
+        let row_layout = layout();
+        let mut expected_row = new_display_row(&row_layout);
+        let expected_progress = DisplayRowProgressWriter::new(
+            &row_layout,
+            &mut expected_row,
+            DisplayRowPosition::new(0.0, 0),
+            width,
+        )
+        .push_item(item.clone());
+        let input = ResolvedMappedTextInput::capture(item.clone(), FaceId::new(1)).unwrap();
+        let actual = std::thread::spawn(move || {
+            let row_layout = layout();
+            let mut row = new_display_row(&row_layout);
+            let progress = DisplayRowProgressWriter::new(
+                &row_layout,
+                &mut row,
+                DisplayRowPosition::new(0.0, 0),
+                width,
+            )
+            .push_resolved_mapped_text(input);
+            (row, progress)
+        })
+        .join()
+        .unwrap();
+        assert_eq!(actual, (expected_row, expected_progress));
+        let glyphs = &actual.0.glyphs[GlyphArea::Text.index()];
+        assert_eq!(glyphs[0].legacy_charpos(), 0);
+        assert_eq!(glyphs[1].legacy_charpos(), 1);
+        assert_eq!(
+            actual.1.slots()[0].source(),
+            DisplaySourcePosition::buffer(
+                neovm_core::buffer::BufferId(1),
+                neovm_core::buffer::CharPos0::new(2),
+                neovm_core::buffer::EmacsBytePos::new(3),
+            )
+        );
+    }
+}
