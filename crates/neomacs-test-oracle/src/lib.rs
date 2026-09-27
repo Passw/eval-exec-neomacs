@@ -276,6 +276,18 @@ pub fn oracle_normalizer_elisp() -> &'static str {
                          (directory-file-name (car root)))
                         (cdr root)
                         value t t))))
+             ;; A temporary file's name is random by construction, so a value
+             ;; that prints one can never match on a second run -- not against
+             ;; a record, and not between the two editors, which do not share
+             ;; the directory.  Collapse the random suffix wherever it appears
+             ;; under a `tmp' directory, which is where the harness points
+             ;; TMPDIR.
+             ;; No LITERAL argument: the replacement's \1 has to expand.
+             (setq value
+                   (replace-regexp-in-string
+                    "\\(/tmp/[^/[:space:]]*\\)-[[:alnum:]]\\{6\\}\\>"
+                    "\\1-XXXXXX"
+                    value t))
              value)
            (defun neomacs--test-oracle-built-artifact (value)
              ;; A payload inventory entry of the shape (NAME SIZE CONTENT),
