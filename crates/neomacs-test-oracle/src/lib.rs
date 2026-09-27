@@ -277,10 +277,32 @@ pub fn oracle_normalizer_elisp() -> &'static str {
                         (cdr root)
                         value t t))))
              value)
+           (defun neomacs--test-oracle-built-artifact (value)
+             ;; A payload inventory entry of the shape (NAME SIZE CONTENT),
+             ;; for an artifact a build step produced rather than the package
+             ;; shipped: its bytes belong to the compiler or the documentation
+             ;; builder, not to the package.  Record that it was built and is
+             ;; not empty; the size and digest move with whichever Emacs or
+             ;; texinfo built it, so pinning them pins the recording host.
+             (and (consp value)
+                  (stringp (car value))
+                  (let ((name (car value)))
+                    (or (string-suffix-p ".elc" name)
+                        (string-suffix-p ".info" name)))
+                  (numberp (cadr value))
+                  (let ((content (car (cddr value))))
+                    (or (stringp content) (null content) (eq content t)))))
            (defun neomacs--test-oracle-normalize (value seen)
              (cond
               ((stringp value)
                (neomacs--test-oracle-normalize-string value))
+              ((neomacs--test-oracle-built-artifact value)
+               (list (car value)
+                     (if (string-suffix-p ".elc" (car value))
+                         :compiled
+                       :built)
+                     (not (null (cadr value)))
+                     (not (null (car (cddr value))))))
               ;; Some Neomacs runtime handles currently use integer IDs, so
               ;; predicates such as `windowp' can also accept ordinary small
               ;; integers. Preserve numeric values before probing opaque
