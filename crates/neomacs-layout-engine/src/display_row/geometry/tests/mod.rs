@@ -407,14 +407,17 @@ fn display_row_geometry_state_reports_current_row_visibility_by_limit() {
     };
 
     assert!(geometry.current_row_is_visible(DisplayRowVisibilityLimit {
+        allow_partial: false,
         max_rows: 5,
         bottom_y: 104.0,
     }));
     assert!(!geometry.current_row_is_visible(DisplayRowVisibilityLimit {
+        allow_partial: false,
         max_rows: 4,
         bottom_y: 104.0,
     }));
     assert!(!geometry.current_row_is_visible(DisplayRowVisibilityLimit {
+        allow_partial: false,
         max_rows: 5,
         bottom_y: 103.9,
     }));

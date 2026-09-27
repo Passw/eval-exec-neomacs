@@ -100,24 +100,11 @@ impl ScrollCoverage {
         let mut rows = result.rows?;
         let regions = &admission.retained.display_snapshot.regions;
         let mut height = 0.0;
-        let visible = rows
-            .iter()
-            .take_while(|row| {
-                let take = height + row.row.height_px <= regions.text_body.height;
-                if take {
-                    height += row.row.height_px;
-                }
-                take
-            })
-            .count();
-        if visible < rows.len()
-            && height + admission.retained.key.char_height <= regions.text_body.height
-        {
-            // The canonical walk can start this tall row but stop before its
-            // newline. Complete physical-line programs cannot certify that
-            // partial-row frontier yet.
-            return Err(RowProgramError::Unsupported);
-        }
+        let visible = rows.iter().take_while(|row| {
+            let take = height < regions.text_body.height;
+            if take { height += row.row.height_px; }
+            take
+        }).count();
         rows.truncate(visible);
         let body = position_buffer_rows(
             rows,

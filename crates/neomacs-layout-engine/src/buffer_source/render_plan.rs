@@ -472,7 +472,7 @@ impl BufferSourceOutputSetup {
         max_rows: usize,
         walk_setup: &BufferSourceWalkSetup,
     ) -> Self {
-        Self::new(
+        let mut setup = Self::new(
             frame_id,
             window_id,
             params.window_id as u64,
@@ -489,7 +489,14 @@ impl BufferSourceOutputSetup {
             geometry.visibility_bottom_y,
             max_rows,
             walk_setup,
-        )
+        );
+        setup.row_visibility_limit.allow_partial = params.window_system
+            && !params.kind.is_minibuffer()
+            && params.measurement_rows.is_none();
+        if setup.row_visibility_limit.allow_partial {
+            setup.row_visibility_limit.bottom_y = layout_box.body().bottom();
+        }
+        setup
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -534,6 +541,7 @@ impl BufferSourceOutputSetup {
                 ),
             ),
             row_visibility_limit: DisplayRowVisibilityLimit {
+                allow_partial: false,
                 max_rows,
                 // Lifted to span `max_rows` for a minibuffer so the unclamped
                 // GNU `resize_mini_window` measurement can emit content rows

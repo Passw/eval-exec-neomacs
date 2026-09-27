@@ -3458,6 +3458,7 @@ fn buffer_text_word_wrap_source_action_applies_transition_state() {
         &mut face_scan,
         &geometry,
         DisplayRowVisibilityLimit {
+            allow_partial: false,
             max_rows: 2,
             bottom_y: 64.0,
         },
@@ -3604,6 +3605,7 @@ fn buffer_text_special_wrap_source_action_applies_transition_state() {
             DisplayTextRowTransition::BeganNextRow,
             &geometry,
             DisplayRowVisibilityLimit {
+                allow_partial: false,
                 max_rows: 2,
                 bottom_y: 64.0,
             },
@@ -3695,6 +3697,7 @@ fn buffer_text_special_overflow_render_request_wraps_then_keeps_prepared_append(
             80.0,
             LineWrapMode::Wrap,
             DisplayRowVisibilityLimit {
+                allow_partial: false,
                 max_rows: 4,
                 bottom_y: 64.0,
             },
@@ -3811,6 +3814,7 @@ fn buffer_text_character_wrap_source_action_applies_transition_state() {
         &mut face_scan,
         &geometry,
         DisplayRowVisibilityLimit {
+            allow_partial: false,
             max_rows: 2,
             bottom_y: 64.0,
         },
@@ -3838,6 +3842,7 @@ fn buffer_text_character_wrap_source_action_skips_state_when_transition_exhauste
         &mut face_scan,
         &geometry,
         DisplayRowVisibilityLimit {
+            allow_partial: false,
             max_rows: 2,
             bottom_y: 64.0,
         },
@@ -3865,6 +3870,7 @@ fn buffer_text_character_wrap_source_action_reports_hidden_after_state_sync() {
         &mut face_scan,
         &geometry,
         DisplayRowVisibilityLimit {
+            allow_partial: false,
             max_rows: 2,
             bottom_y: 64.0,
         },
@@ -3950,6 +3956,7 @@ fn buffer_text_overflow_render_request_handles_character_wrap_transition() {
             LineWrapMode::Wrap,
             word_wrap,
             DisplayRowVisibilityLimit {
+                allow_partial: false,
                 max_rows: 4,
                 bottom_y: 64.0,
             },
@@ -6985,6 +6992,7 @@ fn buffer_text_source_render_request_appends_plain_text_run_with_cursor_inside()
         false,
         DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
         DisplayRowVisibilityLimit {
+            allow_partial: false,
             max_rows: 4,
             bottom_y: 64.0,
         },
@@ -7136,6 +7144,7 @@ fn buffer_text_source_render_request_keeps_space_run_whole_when_trailing_enabled
         false,
         DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
         DisplayRowVisibilityLimit {
+            allow_partial: false,
             max_rows: 4,
             bottom_y: 64.0,
         },
@@ -7294,6 +7303,7 @@ fn buffer_text_source_render_request_keeps_space_run_whole_when_word_wrap_enable
         false,
         DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
         DisplayRowVisibilityLimit {
+            allow_partial: false,
             max_rows: 4,
             bottom_y: 64.0,
         },
@@ -7454,6 +7464,7 @@ fn buffer_text_source_render_request_renders_fit_prefix_before_overflow() {
         false,
         DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
         DisplayRowVisibilityLimit {
+            allow_partial: false,
             max_rows: 4,
             bottom_y: 64.0,
         },
@@ -12585,6 +12596,7 @@ fn display_property_live_render_outcome(
             false,
             DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
             DisplayRowVisibilityLimit {
+                allow_partial: false,
                 max_rows: 4,
                 bottom_y: 64.0,
             },

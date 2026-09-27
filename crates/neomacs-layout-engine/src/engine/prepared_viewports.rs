@@ -181,7 +181,7 @@ impl PreparedViewports {
             }
             let mut index = last_index + 1;
             let mut y = last_row.pixel_y + last_row.height_px;
-            let bottom = geometry.visibility_bottom_y - snapshot.regions.outer.y;
+            let bottom = snapshot.regions.text_body.bottom() - snapshot.regions.outer.y;
             let mut next = seam;
             let mut remap = rustc_hash::FxHashMap::default();
             for (source_index, row) in entry
@@ -195,7 +195,7 @@ impl PreparedViewports {
                 if row.start_charpos != next {
                     return None;
                 }
-                if y + row.height_px > bottom
+                if y >= bottom
                     || index >= geometry.display_text_row_base + geometry.max_rows
                 {
                     break;
@@ -215,9 +215,9 @@ impl PreparedViewports {
                 y += row.height_px;
                 index += 1;
             }
-            // A canonical walk could start another (possibly partial tall)
-            // row. Complete-row coverage cannot certify that frontier yet.
-            if bottom - y >= key.char_height || index == last_index + 1 {
+            // Any row intersecting the body is laid out in full, then clipped.
+            if (y < bottom && index < geometry.display_text_row_base + geometry.max_rows)
+                || index == last_index + 1 {
                 return None;
             }
             snapshot.rows.extend(

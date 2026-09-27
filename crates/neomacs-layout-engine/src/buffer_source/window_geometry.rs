@@ -282,12 +282,10 @@ impl BufferWindowGeometryRequest {
             return ceiling.max(1);
         }
 
-        // Ordinary GUI window with an active vscroll: GNU shifts the content UP by
-        // `vscroll` pixels, top-clipping the first row and exposing one more
-        // partially-visible row at the bottom.  Walk enough rows to cover the
-        // shifted span `[vscroll, vscroll + text_height]` — `base_max_rows + 1`
-        // for a sub-line vscroll, more when vscroll exceeds a row.
-        if self.uses_vscroll_shift() && self.text_height > 0.0 {
+        // Ordinary GUI windows include the partially visible bottom row,
+        // even at zero vscroll. Rounding down there leaves a blank strip that
+        // flashes as a pixel gesture crosses a whole-row boundary.
+        if self.window_system && !self.kind.is_minibuffer() && self.text_height > 0.0 {
             return ((self.vscroll + self.text_height) / self.char_height).ceil() as usize;
         }
 

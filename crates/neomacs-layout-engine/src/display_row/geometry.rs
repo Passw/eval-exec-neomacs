@@ -255,6 +255,8 @@ pub(crate) struct DisplayRowGeometryCursor {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct DisplayRowVisibilityLimit {
+    /// GUI bodies lay out the complete row intersecting the bottom clip.
+    pub(crate) allow_partial: bool,
     pub(crate) max_rows: usize,
     pub(crate) bottom_y: f32,
 }
@@ -658,7 +660,12 @@ impl DisplayRowGeometryState {
     }
 
     pub(crate) fn current_row_is_visible(&self, limit: DisplayRowVisibilityLimit) -> bool {
-        self.row < limit.max_rows && self.y + self.height <= limit.bottom_y
+        self.row < limit.max_rows
+            && if limit.allow_partial {
+                self.y < limit.bottom_y
+            } else {
+                self.y + self.height <= limit.bottom_y
+            }
     }
 
     pub(crate) fn is_within_row_limit(&self, limit: DisplayRowLimit) -> bool {
