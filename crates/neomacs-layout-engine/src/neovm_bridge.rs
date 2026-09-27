@@ -26,7 +26,7 @@ use neovm_core::emacs_core::plist::plist_get;
 use neovm_core::emacs_core::symbol::Obarray;
 use neovm_core::emacs_core::textprop::{DirectCharProperties, resolve_effective_char_property};
 use neovm_core::emacs_core::value::{ValueKind, eq_value, list_to_vec};
-use neovm_core::emacs_core::{Context, SymId, Value};
+use neovm_core::emacs_core::{Context, Value};
 use neovm_core::face::{
     BoxStyle as NeoBoxStyle, Color as NeoColor, Face as NeoFace, FaceDecoration, FaceHeight,
     FaceTable, FontWeight, UnderlinePosition as NeoUnderlinePosition,
@@ -56,7 +56,6 @@ use neomacs_display_protocol::cursor::{CursorBarWidth, CursorKind, CursorSpec};
 use neomacs_display_protocol::face::{BasicFaceId, BoxLineWidth};
 use neomacs_display_protocol::types::{FaceId, Rect};
 use neomacs_display_protocol::{EffectsConfig, PresentedResizeEdge};
-use rustc_hash::FxHashMap;
 use strum::{EnumString, IntoStaticStr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, EnumString, IntoStaticStr)]

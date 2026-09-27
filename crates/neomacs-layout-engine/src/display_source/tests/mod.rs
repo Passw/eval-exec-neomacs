@@ -2666,6 +2666,32 @@ fn overlay_string_mouse_faces_are_scoped_to_the_overlay_occurrence() {
     assert_eq!(before, before_fragment);
     assert_ne!(before, after);
     assert_ne!(before, other_overlay);
+
+    // Row production may copy captured pointer metadata on a worker. Verify
+    // the production string-source capture preserves each occurrence in the
+    // published glyph identity, without needing an evaluator on that thread.
+    let metadata = std::thread::spawn(move || {
+        [before, after, other_overlay]
+            .map(|appearance| appearance.glyph_metadata().expect("resolved mouse face"))
+    })
+    .join()
+    .expect("captured metadata can be consumed without an evaluator");
+    for (actual, overlay, after) in [
+        (metadata[0], 10, false),
+        (metadata[1], 10, true),
+        (metadata[2], 11, false),
+    ] {
+        assert_eq!(actual.face_id, FaceId::new(11));
+        assert_eq!(actual.source.range_start, 0);
+        assert_eq!(actual.source.range_end, 2);
+        assert_eq!(
+            actual.source.occurrence,
+            neomacs_display_protocol::glyph_matrix::GlyphPointerOccurrenceIdentity::OverlayString {
+                overlay_id: Value::fixnum(overlay).bits() as u64,
+                after,
+            },
+        );
+    }
 }
 
 #[test]
