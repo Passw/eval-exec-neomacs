@@ -98,6 +98,16 @@ fn native_page_keys_advance_and_have_confirmed_input_latency() {
     run_native_scroll(ScrollKind::Page, ScrollTarget::Selected);
 }
 
+#[test]
+fn precise_native_bursts_in_a_large_buffer_return_to_the_initial_viewport() {
+    run_native_scroll_in_buffer(ScrollKind::PreciseBurst, ScrollTarget::Selected, 100_000);
+}
+
+#[test]
+fn native_page_keys_in_a_large_buffer_have_confirmed_input_latency() {
+    run_native_scroll_in_buffer(ScrollKind::Page, ScrollTarget::Selected, 100_000);
+}
+
 #[derive(Clone, Copy, Debug)]
 enum ScrollKind {
     Precise,
@@ -113,11 +123,15 @@ enum ScrollTarget {
 }
 
 fn run_native_scroll(kind: ScrollKind, target: ScrollTarget) {
+    run_native_scroll_in_buffer(kind, target, 400);
+}
+
+fn run_native_scroll_in_buffer(kind: ScrollKind, target: ScrollTarget, lines: usize) {
     let root = neomacs_infra::workspace_root();
     let artifact_root = root.join("target/neomacs-gui-tests");
     fs::create_dir_all(&artifact_root).unwrap();
     let artifacts = artifact_root.join(format!(
-        "native-scrolling-{kind:?}-{target:?}-{}",
+        "native-scrolling-{kind:?}-{target:?}-{lines}-{}",
         std::process::id()
     ));
     fs::create_dir(&artifacts).unwrap();
@@ -177,6 +191,7 @@ focus_follows_mouse yes
             .env("WAYLAND_DISPLAY", &socket)
             .env("WINIT_UNIX_BACKEND", "wayland")
             .env_remove("DISPLAY")
+            .env("NEOMACS_GUI_SCROLL_LINES", lines.to_string())
             .env("NEOMACS_GUI_STATE_JSON", &state_path)
             .env("NEOMACS_INPUT_LATENCY_FILE", &latency_path)
             .env(
@@ -195,6 +210,13 @@ focus_follows_mouse yes
     );
     let mut trackpad = wayland::Trackpad::connect(&PathBuf::from(&runtime).join(&socket));
     let initial = state(&state_path, 2);
+    assert_eq!(initial["buffer-size"].as_u64(), Some((lines * 40) as u64));
+    if lines > 400 {
+        assert!(
+            initial["start"].as_u64().unwrap() > 1_000_000,
+            "large-buffer scrolling must exercise a viewport far from buffer start"
+        );
+    }
     trackpad.move_to_body();
     thread::sleep(Duration::from_millis(200));
     let mut previous = state(&state_path, initial["sample"].as_u64().unwrap());

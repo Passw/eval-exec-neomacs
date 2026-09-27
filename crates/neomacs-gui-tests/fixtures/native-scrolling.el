@@ -9,6 +9,8 @@
 (defvar neomacs-scroll-pixels 0)
 (defvar neomacs-scroll-wheels 0)
 (defvar neomacs-scroll-pages 0)
+(defvar neomacs-scroll-lines
+  (string-to-number (or (getenv "NEOMACS_GUI_SCROLL_LINES") "400")))
 (dolist (command '(scroll-up-command scroll-down-command
                    pixel-scroll-interpolate-down pixel-scroll-interpolate-up))
   (advice-add command :after
@@ -25,6 +27,8 @@
 (defun neomacs-scroll-observe ()
   (setq neomacs-scroll-sample (1+ neomacs-scroll-sample))
   (let ((state `((sample . ,neomacs-scroll-sample)
+                 (buffer-size . ,(with-current-buffer (window-buffer neomacs-scroll-window)
+                                   (buffer-size)))
                  (processed-pixels . ,neomacs-scroll-pixels)
                  (processed-wheels . ,neomacs-scroll-wheels)
                  (processed-pages . ,neomacs-scroll-pages)
@@ -42,9 +46,18 @@
    (switch-to-buffer (get-buffer-create "*native-scrolling*"))
    (delete-other-windows)
    (erase-buffer)
-   (dotimes (i 400)
-     (insert (format "Line %03d -- native scrolling diagnostic\n" i)))
+   ;; Repeat fixed-width lines so buffer size changes without changing row geometry.
+   (let ((block (mapconcat
+                 (lambda (i) (format "Line %03d -- native scrolling diagnostic\n" i))
+                 (number-sequence 0 999) "")))
+     (dotimes (_ (/ neomacs-scroll-lines 1000))
+       (insert block))
+     (dotimes (i (% neomacs-scroll-lines 1000))
+       (insert (format "Line %03d -- native scrolling diagnostic\n" i))))
    (goto-char (point-min))
+   (when (> neomacs-scroll-lines 400)
+     (forward-line (/ neomacs-scroll-lines 2))
+     (set-window-start (selected-window) (point) t))
    (setq neomacs-scroll-window (selected-window))
    (when (getenv "NEOMACS_GUI_SCROLL_OTHER_WINDOW")
      (select-window (split-window-right)))
