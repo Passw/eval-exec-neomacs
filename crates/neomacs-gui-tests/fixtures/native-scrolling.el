@@ -8,6 +8,12 @@
 (defvar neomacs-scroll-window nil)
 (defvar neomacs-scroll-pixels 0)
 (defvar neomacs-scroll-wheels 0)
+(defvar neomacs-scroll-pages 0)
+(dolist (command '(scroll-up-command scroll-down-command
+                   pixel-scroll-interpolate-down pixel-scroll-interpolate-up))
+  (advice-add command :after
+              (lambda (&rest _args)
+                (setq neomacs-scroll-pages (1+ neomacs-scroll-pages)))))
 (advice-add 'mwheel-scroll :after
             (lambda (&rest _args)
               (setq neomacs-scroll-wheels (1+ neomacs-scroll-wheels))))
@@ -21,6 +27,7 @@
   (let ((state `((sample . ,neomacs-scroll-sample)
                  (processed-pixels . ,neomacs-scroll-pixels)
                  (processed-wheels . ,neomacs-scroll-wheels)
+                 (processed-pages . ,neomacs-scroll-pages)
                  (start . ,(window-start neomacs-scroll-window))
                  (vscroll . ,(window-vscroll neomacs-scroll-window t))
                  (point . ,(window-point neomacs-scroll-window))

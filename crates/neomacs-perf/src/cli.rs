@@ -20,6 +20,10 @@ const DEFAULT_TIMEOUT_SECS: NonZeroU64 = NonZeroU64::new(300).expect("300 is non
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PerfCommand {
     List,
+    InputLatency {
+        path: PathBuf,
+        budget_us: NonZeroU64,
+    },
     Run {
         scenario: ScenarioId,
         editor: Option<PathBuf>,
@@ -89,6 +93,13 @@ struct PerfCli {
 
 #[derive(Debug, Subcommand)]
 enum PerfSubcommand {
+    /// Summarize one NEOMACS_INPUT_LATENCY_FILE native GUI session.
+    InputLatency {
+        path: PathBuf,
+        /// Input-to-confirmed-presentation budget, in microseconds.
+        #[arg(long, default_value = "16667")]
+        budget_us: NonZeroU64,
+    },
     /// List the registered performance scenarios.
     List,
     /// Execute one correctness-gated workload run.
@@ -393,6 +404,9 @@ impl TryFrom<PerfSubcommand> for PerfCommand {
     fn try_from(command: PerfSubcommand) -> Result<Self, Self::Error> {
         Ok(match command {
             PerfSubcommand::List => Self::List,
+            PerfSubcommand::InputLatency { path, budget_us } => {
+                Self::InputLatency { path, budget_us }
+            }
             PerfSubcommand::Run(arguments) => {
                 let execution_overrides = arguments
                     .execution_overrides
@@ -487,6 +501,18 @@ pub fn run_cli(
 ) -> Result<(), PerfCliError> {
     let workspace_root = workspace_root.as_ref();
     match parse_perf_command(args)? {
+        PerfCommand::InputLatency { path, budget_us } => {
+            let text = std::fs::read_to_string(&path).map_err(|error| PerfCliError::Usage {
+                message: format!("{}: {error}", path.display()),
+            })?;
+            let report = crate::input_latency::report(&text, budget_us.get())
+                .map_err(|message| PerfCliError::Usage { message })?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report).expect("valid report")
+            );
+            Ok(())
+        }
         PerfCommand::List => {
             for scenario in scenarios() {
                 println!("{}\t{}", scenario.id, scenario.description);

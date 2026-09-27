@@ -8,6 +8,7 @@ mod counters;
 mod execution_policy;
 mod harness;
 mod host;
+mod input_latency;
 mod native_video;
 mod portable_dump;
 mod profile;

@@ -93,11 +93,17 @@ fn precise_native_scroll_bursts_advance_without_snapback() {
     run_native_scroll(ScrollKind::PreciseBurst, ScrollTarget::Selected);
 }
 
+#[test]
+fn native_page_keys_advance_and_have_confirmed_input_latency() {
+    run_native_scroll(ScrollKind::Page, ScrollTarget::Selected);
+}
+
 #[derive(Clone, Copy, Debug)]
 enum ScrollKind {
     Precise,
     PreciseBurst,
     Wheel,
+    Page,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -132,10 +138,33 @@ focus_follows_mouse yes
     let socket = session_env["WAYLAND_DISPLAY"].clone();
     let state_path = artifacts.join("state.json");
     let pixels_path = artifacts.join("surface.png");
+    let latency_path = artifacts.join("input-latency.jsonl");
     let binary = std::env::var_os("NEOMACS_GUI_TEST_BINARY")
         .map(PathBuf::from)
         .unwrap_or_else(|| root.join("target/release/neomacs"));
+    // Run the default pixel correctness pass before a timing-only pass.
+    // Continuous GPU readback/PNG encoding would dominate input latency.
+    let timing_only = std::env::var_os("NEOMACS_GUI_SCROLL_TIMING_ONLY").is_some();
+    fs::write(
+        artifacts.join("measurement-mode"),
+        if timing_only {
+            "timing-only\n"
+        } else {
+            "pixel-correctness\n"
+        },
+    )
+    .unwrap();
     let mut command = Command::new(binary);
+    command
+        .env_remove("NEOMACS_DEBUG_SURFACE_READBACK")
+        .env_remove("NEOMACS_DEBUG_SURFACE_READBACK_PNG")
+        .env_remove("WAYLAND_DEBUG");
+    if !timing_only {
+        command
+            .env("NEOMACS_DEBUG_SURFACE_READBACK", "10000")
+            .env("NEOMACS_DEBUG_SURFACE_READBACK_PNG", &pixels_path)
+            .env("WAYLAND_DEBUG", "1");
+    }
     command.env_remove("NEOMACS_GUI_SCROLL_OTHER_WINDOW");
     if matches!(target, ScrollTarget::OtherWindow) {
         command.env("NEOMACS_GUI_SCROLL_OTHER_WINDOW", "1");
@@ -149,12 +178,14 @@ focus_follows_mouse yes
             .env("WINIT_UNIX_BACKEND", "wayland")
             .env_remove("DISPLAY")
             .env("NEOMACS_GUI_STATE_JSON", &state_path)
-            .env("NEOMACS_DEBUG_SURFACE_READBACK", "10000")
-            .env("NEOMACS_DEBUG_SURFACE_READBACK_PNG", &pixels_path)
-            .env("WAYLAND_DEBUG", "1")
+            .env("NEOMACS_INPUT_LATENCY_FILE", &latency_path)
             .env(
                 "RUST_LOG",
-                "warn,neomacs=debug,neomacs_display_runtime=debug",
+                if timing_only {
+                    "warn"
+                } else {
+                    "warn,neomacs=debug,neomacs_display_runtime=debug"
+                },
             )
             .env("NEOMACS_LOG_FILE", artifacts.join("neomacs.log"))
             .stdout(fs::File::create(artifacts.join("stdout")).unwrap())
@@ -167,8 +198,10 @@ focus_follows_mouse yes
     trackpad.move_to_body();
     thread::sleep(Duration::from_millis(200));
     let mut previous = state(&state_path, initial["sample"].as_u64().unwrap());
-    let initial_pixels = readback(&pixels_path);
-    initial_pixels.save(artifacts.join("before.png")).unwrap();
+    let initial_pixels = (!timing_only).then(|| readback(&pixels_path));
+    if let Some(pixels) = &initial_pixels {
+        pixels.save(artifacts.join("before.png")).unwrap();
+    }
     // Sample text away from point at the left edge: moving the cursor alone
     // must not make a stale text presentation look like successful scrolling.
     let text_pixels = |pixels: &image::DynamicImage| {
@@ -181,18 +214,25 @@ focus_follows_mouse yes
             )
             .to_rgba8()
     };
-    let initial_text = text_pixels(&initial_pixels);
+    let initial_text = initial_pixels.as_ref().map(text_pixels);
     let position = |s: &Value| (s["start"].as_i64().unwrap(), s["vscroll"].as_i64().unwrap());
     let initial_position = position(&previous);
     let mut processed_pixels = previous["processed-pixels"].as_f64().unwrap();
     let mut processed_wheels = previous["processed-wheels"].as_f64().unwrap();
+    let mut processed_pages = previous["processed-pages"].as_f64().unwrap();
     let mut trace = vec![previous.clone()];
     let steps = match kind {
         ScrollKind::Precise | ScrollKind::PreciseBurst => 24,
         ScrollKind::Wheel => 12,
+        ScrollKind::Page => 8,
     };
     for step in 0..steps {
-        let down = step < 12;
+        let down = step
+            < if matches!(kind, ScrollKind::Page) {
+                4
+            } else {
+                12
+            };
         match kind {
             ScrollKind::Precise => trackpad.scroll(if down { 4.0 } else { -4.0 }),
             ScrollKind::PreciseBurst => {
@@ -204,6 +244,22 @@ focus_follows_mouse yes
                 }
             }
             ScrollKind::Wheel => trackpad.wheel(),
+            ScrollKind::Page => {
+                let status = Command::new("wtype")
+                    .env("XDG_RUNTIME_DIR", &runtime)
+                    .env("WAYLAND_DISPLAY", &socket)
+                    .args([
+                        "-s",
+                        "200",
+                        "-k",
+                        if down { "Next" } else { "Prior" },
+                        "-s",
+                        "100",
+                    ])
+                    .status()
+                    .expect("wtype is required for native page-key testing");
+                assert!(status.success());
+            }
         }
         thread::sleep(Duration::from_millis(500));
         let after = previous["sample"].as_u64().unwrap();
@@ -217,6 +273,9 @@ focus_follows_mouse yes
                 4.0
             };
             state_after_input(&state_path, after, "processed-pixels", processed_pixels)
+        } else if matches!(kind, ScrollKind::Page) {
+            processed_pages += 1.0;
+            state_after_input(&state_path, after, "processed-pages", processed_pages)
         } else {
             processed_wheels += 1.0;
             state_after_input(&state_path, after, "processed-wheels", processed_wheels)
@@ -227,10 +286,12 @@ focus_follows_mouse yes
             serde_json::to_vec_pretty(&trace).unwrap(),
         )
         .unwrap();
-        let pixels = readback(&pixels_path);
-        pixels
-            .save(artifacts.join(format!("step-{step}.png")))
-            .unwrap();
+        let pixels = (!timing_only).then(|| readback(&pixels_path));
+        if let Some(pixels) = &pixels {
+            pixels
+                .save(artifacts.join(format!("step-{step}.png")))
+                .unwrap();
+        }
         eprintln!("step={step} before={previous} after={current}; artifacts={artifacts:?}");
         assert!(editor.0.try_wait().unwrap().is_none(), "editor exited");
         assert_eq!(
@@ -243,15 +304,18 @@ focus_follows_mouse yes
                 "scrolling the other window must not move the selected viewport"
             );
         }
-        let native_log = fs::read_to_string(artifacts.join("neomacs.log")).unwrap();
-        let expected_event = match kind {
-            ScrollKind::Precise | ScrollKind::PreciseBurst => "PixelScroll {",
-            ScrollKind::Wheel => "MouseScroll {",
-        };
-        assert!(
-            native_log.contains(expected_event),
-            "native input did not reach the VM bridge as {expected_event}: {artifacts:?}"
-        );
+        if !timing_only {
+            let native_log = fs::read_to_string(artifacts.join("neomacs.log")).unwrap();
+            let expected_event = match kind {
+                ScrollKind::Precise | ScrollKind::PreciseBurst => "PixelScroll {",
+                ScrollKind::Wheel => "MouseScroll {",
+                ScrollKind::Page => "KeyPress {",
+            };
+            assert!(
+                native_log.contains(expected_event),
+                "native input did not reach the VM bridge as {expected_event}: {artifacts:?}"
+            );
+        }
         assert!(
             if down {
                 position(&current) > position(&previous)
@@ -268,12 +332,49 @@ focus_follows_mouse yes
             );
         }
         previous = current;
-        if step == 11 {
+        if (step == 11 || (step == 3 && matches!(kind, ScrollKind::Page))) && !timing_only {
             assert!(
-                text_pixels(&pixels) != initial_text,
+                Some(text_pixels(pixels.as_ref().unwrap())) != initial_text,
                 "scrolling must update rendered text, not only Lisp state: {artifacts:?}"
             );
         }
+    }
+    let deadline = Instant::now() + Duration::from_secs(8);
+    let samples = loop {
+        let samples: Vec<Value> = fs::read_to_string(&latency_path)
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| serde_json::from_str(line).ok())
+            .collect();
+        let expected = steps
+            * if matches!(kind, ScrollKind::PreciseBurst) {
+                8
+            } else {
+                1
+            };
+        if samples.len() >= expected {
+            assert_eq!(samples.len(), expected);
+            break samples;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "missing causal presentation receipts: {samples:?}; {artifacts:?}"
+        );
+        thread::sleep(Duration::from_millis(20));
+    };
+    let expected_kind = match kind {
+        ScrollKind::Wheel => "wheel",
+        ScrollKind::Page => "page",
+        _ => "precise",
+    };
+    for sample in &samples {
+        assert_eq!(sample["kind"], expected_kind);
+        assert!(
+            sample["input_to_present_ns"].as_u64().is_some(),
+            "clock mismatch: {sample}"
+        );
+        assert!(sample["presentation"].as_u64().unwrap() > 0);
+        assert_eq!(sample["evicted_inputs"], 0);
     }
     if matches!(kind, ScrollKind::Precise | ScrollKind::PreciseBurst) {
         assert_eq!(
