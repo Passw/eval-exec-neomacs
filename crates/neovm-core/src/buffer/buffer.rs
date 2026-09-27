@@ -1982,8 +1982,9 @@ impl Eq for BufferStateMarkers {}
 ///
 /// A snapshot is intentionally separate from [`BufferText`]: callers can read
 /// text and text properties, but cannot observe or mutate the concrete text
-/// backend. `BufferText::Clone` is a deep snapshot, so this is safe to move
-/// across the display boundary.
+/// backend. `BufferText::Clone` isolates mutations, sharing immutable text
+/// and properties copy-on-write. Lisp property values remain evaluator-owned;
+/// this is not an input type for a background row worker.
 #[derive(Clone)]
 pub struct BufferTextSnapshot {
     text: BufferText,
