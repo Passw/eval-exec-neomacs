@@ -1094,6 +1094,17 @@ impl RetainedWindowMatrix {
         &self,
         curr: &RetainedWindowKey,
     ) -> Result<CursorOnlyReplay, CursorOnlyDecline> {
+        self.cursor_only_replay_with_forced_start(curr, false)
+    }
+
+    /// An explicit scroll fixes the viewport start even when point lands on
+    /// its boundary. Keep all content/cursor validation; only the ordinary
+    /// point-motion recenter guard is unnecessary in that case.
+    pub(crate) fn cursor_only_replay_with_forced_start(
+        &self,
+        curr: &RetainedWindowKey,
+        force_start: bool,
+    ) -> Result<CursorOnlyReplay, CursorOnlyDecline> {
         if self.validity != MatrixValidity::Valid {
             return Err(CursorOnlyDecline::MatrixNotValid);
         }
@@ -1167,7 +1178,7 @@ impl RetainedWindowMatrix {
         // Ungated, this rejected every frame of a window nothing had touched --
         // 200 consecutive frames of the rust-lsp-typing fixture rebuilt a
         // 7-row window in full with `differing=[]`.
-        if point_moved {
+        if point_moved && !force_start {
             if Some(new_cursor_row_index) == last_body_index && !cursor_row.ends_at_zv {
                 return Err(CursorOnlyDecline::PointMoveMayScrollDown);
             }

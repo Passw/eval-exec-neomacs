@@ -249,6 +249,21 @@ fn first_visit_shifted_within_worker_page_matches_fresh_layout() {
 }
 
 fn first_visit_shifted(face: Option<&str>, line: &str, change: Option<&str>, shift: usize) {
+    first_visit_at(face, line, change, shift, 5);
+}
+
+#[test]
+fn first_visit_page_command_reuses_worker_rows_with_point_at_page_start() {
+    first_visit_at(None, "ordinary offscreen text\n", None, 0, 0);
+}
+
+fn first_visit_at(
+    face: Option<&str>,
+    line: &str,
+    change: Option<&str>,
+    shift: usize,
+    point_row: usize,
+) {
     let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
     eval.frame_manager_mut()
         .get_mut(frame)
@@ -287,11 +302,20 @@ fn first_visit_shifted(face: Option<&str>, line: &str, change: Option<&str>, shi
     let display_window = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
     let mut requested_key = engine.retained_window_matrices[&display_window].key.clone();
     requested_key.window_start = start as i64;
-    requested_key.point = (start + 5 * line_chars) as i64;
+    requested_key.point = (start + point_row * line_chars) as i64;
     if shift == 0 {
+        if point_row == 0 {
+            assert!(
+                engine
+                    .prepared_viewports
+                    .replay(frame, display_window, &requested_key, false)
+                    .is_none(),
+                "ordinary point motion must still run viewport resolution"
+            );
+        }
         let (replay, faces) = engine
             .prepared_viewports
-            .replay(frame, display_window, &requested_key)
+            .replay(frame, display_window, &requested_key, true)
             .expect("ready coverage must satisfy the requested key");
         let arena = &engine.frame_face_arenas[&frame];
         arena
@@ -309,13 +333,25 @@ fn first_visit_shifted(face: Option<&str>, line: &str, change: Option<&str>, shi
     if let Some(change) = change {
         eval.eval_str(change).unwrap();
     }
+    // Native scroll commands synchronously ask for window geometry before
+    // publishing their new start. These queries must preserve idle coverage.
+    for _ in 0..3 {
+        engine
+            .query_window_layout(
+                &mut eval,
+                frame,
+                window,
+                neovm_core::window::WindowLayoutQueryScope::Viewport,
+            )
+            .unwrap();
+    }
     scroll_window_to(
         &mut eval,
         frame,
         window,
         buffer,
         start as i64 + 1,
-        start_byte + 5 * line.len(),
+        start_byte + point_row * line.len(),
     );
     if let neovm_core::window::Window::Leaf { force_start, .. } = eval
         .frame_manager_mut()

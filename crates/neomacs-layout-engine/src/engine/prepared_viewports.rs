@@ -76,6 +76,7 @@ impl PreparedViewports {
         frame: neovm_core::window::FrameId,
         window: DisplayWindowId,
         key: &RetainedWindowKey,
+        force_start: bool,
     ) -> Option<(CursorOnlyReplay, PreparedFaceSnapshot)> {
         self.entries.iter().rev().find_map(|entry| {
             if entry.frame != frame
@@ -84,7 +85,10 @@ impl PreparedViewports {
             {
                 return None;
             }
-            let replay = entry.retained.cursor_only_replay(key).ok()?;
+            let replay = entry
+                .retained
+                .cursor_only_replay_with_forced_start(key, force_start)
+                .ok()?;
             // The cursor builder deliberately leaves chrome empty. Even when
             // revisiting a page, mode-line Lisp must run against today's state.
             Some((replay, entry.faces.clone()))

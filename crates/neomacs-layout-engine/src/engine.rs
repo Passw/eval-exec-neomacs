@@ -2051,6 +2051,7 @@ impl LayoutEngine {
                             frame_id,
                             DisplayWindowId::new(params.window_id),
                             key,
+                            params.force_start,
                         ) {
                             cursor_only = Some(replay);
                             prepared_faces = Some(faces);
