@@ -54,7 +54,9 @@ fn ascii_table_installed_payload_inventory_sizes_and_content_digests_match() -> 
                (expand-file-name file directory)))
             (directory-files directory nil "\\`[^.]"))
            #'string<)))"##,
-        expect![[r#"OK (("ascii-table-autoloads.el" 796 "aeb50ebef24754a49da0510c41a5e94c3a8aa3012c4496a9174b510aed0081d5") ("ascii-table-pkg.el" 416 "3d55cf0d7d4b3fea3212f024153b31c1c05cacc94ecdad4c5e1f7ae06c000aff") ("ascii-table.el" 10566 "8e20cb770d349783841fbcc2148c966c150d3ef028effa1c72848e17ac344b45") ("ascii-table.elc" :compiled t t))"#]],
+        expect![[
+            r#"OK (("ascii-table-autoloads.el" 796 "aeb50ebef24754a49da0510c41a5e94c3a8aa3012c4496a9174b510aed0081d5") ("ascii-table-pkg.el" 416 "3d55cf0d7d4b3fea3212f024153b31c1c05cacc94ecdad4c5e1f7ae06c000aff") ("ascii-table.el" 10566 "8e20cb770d349783841fbcc2148c966c150d3ef028effa1c72848e17ac344b45") ("ascii-table.elc" :compiled t t))"#
+        ]],
     )
 }
 
