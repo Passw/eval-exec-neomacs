@@ -187,10 +187,15 @@ fn scroll_replay_bails_on_partial_row_scroll() {
 }
 
 #[test]
-fn scroll_replay_bails_on_scroll_up() {
+fn scroll_replay_prepares_backward_synchronization() {
     let m = synthetic_matrix(20, 5); // rows start at 20,30,40,50,60
     let curr = synthetic_key(0, 5); // above the retained top
-    assert!(m.scroll_replay(&curr).is_none());
+    let replay = m.scroll_replay(&curr).expect("backward plan");
+    assert!(replay.sync.is_some());
+    assert!(
+        replay.reused_rows.is_empty(),
+        "the walk must prove synchronization first"
+    );
 }
 
 #[test]

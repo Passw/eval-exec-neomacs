@@ -47,6 +47,45 @@ impl PreparedViewports {
         })
     }
 
+    /// Reuse coverage from an older viewport when it supplies more rows than
+    /// the immediately preceding presentation. In particular, a backward
+    /// scroll can be a forward replay within an older prepared page.
+    pub(super) fn scroll_replay(
+        &self,
+        frame: neovm_core::window::FrameId,
+        window: DisplayWindowId,
+        key: &RetainedWindowKey,
+        minimum_reused: usize,
+    ) -> Option<(ScrollReplay, FrameFaceArena)> {
+        self.entries.iter().rev().find_map(|entry| {
+            if entry.frame != frame
+                || entry.window != window
+                || entry.retained.key.window_start >= key.window_start
+            {
+                return None;
+            }
+            // Avoid allocating shifted glyph rows unless this entry can beat
+            // the current plan. The canonical replay builder still decides
+            // eligibility, including row boundaries, fringes and wrapping.
+            let potential = entry
+                .retained
+                .matrix
+                .rows
+                .iter()
+                .filter(|row| {
+                    row.enabled
+                        && !RetainedWindowMatrix::is_chrome_role(row.role)
+                        && row.start_charpos as i64 >= key.window_start
+                })
+                .count();
+            if potential <= minimum_reused {
+                return None;
+            }
+            let replay = entry.retained.scroll_replay(key)?;
+            (replay.reused_rows.len() > minimum_reused).then(|| (replay, entry.faces.clone()))
+        })
+    }
+
     pub(super) fn accept(
         &mut self,
         frame: neovm_core::window::FrameId,

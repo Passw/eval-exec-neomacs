@@ -1216,9 +1216,10 @@ impl RetainedWindowMatrix {
     /// text/appearance change, else `None` (→ full rebuild). Handles forward
     /// (downward) scroll — the new `window_start` lands on a retained row
     /// boundary `s` rows down; rows `[s..]` are reused (shifted up by `dvpos`)
-    /// and `s` newly-exposed rows remain to be laid at the bottom. Scroll-up
-    /// (new start above the retained top), partial-row scroll, vscroll, line
-    /// numbers, and continuation/truncation rows all bail (conservative).
+    /// and `s` newly-exposed rows remain to be laid at the bottom. A backward
+    /// scroll walks exposed rows until it proves synchronization with the old
+    /// top. The engine limits that optimization to small moves. Vscroll, line
+    /// numbers, and unsafe continuation/truncation rows bail conservatively.
     pub fn scroll_replay(&self, curr: &RetainedWindowKey) -> Option<ScrollReplay> {
         if self.validity != MatrixValidity::Valid {
             return None;

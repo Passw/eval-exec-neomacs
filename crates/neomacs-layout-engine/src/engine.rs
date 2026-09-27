@@ -2050,7 +2050,7 @@ impl LayoutEngine {
                     }
 
                     let mut is_edit = false;
-                    let scroll = if cursor_only.is_none() {
+                    let mut scroll = if cursor_only.is_none() {
                         if let Some(scroll) =
                             self.build_scroll_replay(params, *layout_box, evaluator)
                         {
@@ -2066,6 +2066,32 @@ impl LayoutEngine {
                     } else {
                         None
                     };
+                    // A cached page supplies content, not a new viewport
+                    // decision. Point motion alone must still run recentering.
+                    // Prefer an existing backward synchronization plan over
+                    // shifting an older page with less predictable overlap.
+                    if cursor_only.is_none()
+                        && scroll.as_ref().is_none_or(|replay| replay.sync.is_none())
+                        && params.selected
+                        && self
+                            .retained_window_matrices
+                            .get(&DisplayWindowId::new(params.window_id))
+                            .is_some_and(|previous| {
+                                RetainedWindowKey::scroll_eligible(&previous.key, key)
+                            })
+                    {
+                        let reused = scroll.as_ref().map_or(0, |replay| replay.reused_rows.len());
+                        if let Some((replay, faces)) = self.prepared_viewports.scroll_replay(
+                            frame_id,
+                            DisplayWindowId::new(params.window_id),
+                            key,
+                            reused,
+                        ) {
+                            scroll = Some(replay);
+                            prepared_faces = Some(faces);
+                            is_edit = false;
+                        }
+                    }
                     IncrementalWindowPlan {
                         prepared_faces,
                         cursor_only,
@@ -2934,6 +2960,9 @@ impl LayoutEngine {
                     let reused = reused.len().min(enabled_body);
                     next_layout_stats.reused_shifted_rows += reused;
                     next_layout_stats.relaid_body_rows += enabled_body - reused;
+                    if self.prepared_window_ids.contains(&window_id) {
+                        next_layout_stats.prepared_windows += 1;
+                    }
                     next_layout_stats.record_window_class(LayoutClass::Scroll);
                 } else if let Some(ref reused) = edit_reused {
                     // Rows outside the regenerated edit span reused verbatim;
@@ -3376,6 +3405,13 @@ impl LayoutEngine {
         let window_id = DisplayWindowId::new(params.window_id);
         let prev = self.retained_window_matrices.get(&window_id)?;
         let curr_key = RetainedWindowKey::from_params(params, layout_box, evaluator);
+        if curr_key.window_start < prev.key.window_start
+            && (!crate::incremental_layout::edit_sync::scroll_back_enabled()
+                || !Self::small_backward_scroll(prev, &curr_key, evaluator))
+        {
+            return None;
+        }
+
         // A genuine scroll keeps walking chrome, and structurally rather than by
         // trusting a trigger: `%p` is computed from window-start/window-end, so
         // chrome whose visible region moved is stale by definition. Leaving
@@ -3389,6 +3425,48 @@ impl LayoutEngine {
             replay.chrome_memo = prev.chrome_memo();
         }
         Some(replay)
+    }
+
+    /// Choose reuse only when most rows can survive. Count logical lines
+    /// through the text index, with a bounded scan fallback; this estimate
+    /// controls optimization only. The canonical walk still measures every
+    /// exposed row and proves the synchronization point before installing it.
+    fn small_backward_scroll(
+        previous: &RetainedWindowMatrix,
+        current: &RetainedWindowKey,
+        evaluator: &neovm_core::emacs_core::Context,
+    ) -> bool {
+        use neovm_core::buffer::{BufferId, CharPos0, EmacsByteRange};
+        let Some(buffer) = evaluator.buffer_manager().get(BufferId(current.buffer_id)) else {
+            return false;
+        };
+        let from = buffer.char_pos_to_emacs_byte_pos_clamped(CharPos0::new(
+            current.window_start.max(0) as usize,
+        ));
+        let to = buffer.char_pos_to_emacs_byte_pos_clamped(CharPos0::new(
+            previous.key.window_start.max(0) as usize,
+        ));
+        if to.get().saturating_sub(from.get()) > 65_536 {
+            return false;
+        }
+        let range = EmacsByteRange::new(from, to);
+        let limit = previous
+            .matrix
+            .rows
+            .iter()
+            .filter(|row| row.enabled && !RetainedWindowMatrix::is_chrome_role(row.role))
+            .count()
+            / 2;
+        if let Some(lines) = buffer.indexed_newline_count(range) {
+            return lines <= limit;
+        }
+        let mut lines = 0;
+        buffer
+            .try_for_each_emacs_byte_range_chunk(range, |chunk| {
+                lines += chunk.iter().filter(|byte| **byte == b'\n').count();
+                if lines > limit { Err(()) } else { Ok(()) }
+            })
+            .is_ok()
     }
 
     /// Phase 3: if this window's previous-frame matrix can be reused after a
