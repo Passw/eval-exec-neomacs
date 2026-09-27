@@ -3738,3 +3738,31 @@ fn pin_file_as_family_opens_deterministic_woff_selected_by_fontconfig() {
         "the exact-font path must use the same container decoder as ordinary font loading"
     );
 }
+
+#[test]
+fn glyph_vertical_metrics_match_canonical_font_selection_across_cache_changes() {
+    let mut service = make_svc();
+    for scale in [1.0, 2.0] {
+        service
+            .set_device_scale(neomacs_display_protocol::geometry::DeviceScale::new(scale).unwrap());
+        for size in [12.0, 18.0] {
+            service.clear_caches();
+            let selection = RealizedFaceFontSelection::new("monospace", 400, false, size);
+            // First ASCII query exercises a cold cache; the rest reuse it.
+            // Non-ASCII characters still use canonical fontset selection.
+            for ch in ['A', ' ', 'z', 'λ', '中', '\u{1f600}'] {
+                let observed = service.vertical_metrics_for_realized_face_char(ch, selection);
+                let canonical = service.resolved_font_for_realized_face_char(ch, selection);
+                assert_eq!(observed.is_some(), canonical.is_some());
+                if let (Some(observed), Some(canonical)) = (observed, canonical) {
+                    assert_eq!(observed.ascent, canonical.ascent_px);
+                    assert_eq!(observed.descent, canonical.descent_px);
+                    assert_eq!(
+                        observed.line_height,
+                        canonical.ascent_px + canonical.descent_px
+                    );
+                }
+            }
+        }
+    }
+}

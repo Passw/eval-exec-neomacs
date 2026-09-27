@@ -69,10 +69,20 @@ pub struct FontMetrics {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct FontVerticalMetrics {
-    ascent: f32,
-    descent: f32,
-    line_height: f32,
+pub(crate) struct FontVerticalMetrics {
+    pub(crate) ascent: f32,
+    pub(crate) descent: f32,
+    pub(crate) line_height: f32,
+}
+
+impl FontVerticalMetrics {
+    fn from_resolved_font(font: &ResolvedFont) -> Self {
+        Self {
+            ascent: font.ascent_px,
+            descent: font.descent_px,
+            line_height: font.ascent_px + font.descent_px,
+        }
+    }
 }
 
 /// Provenance of one metric observation.
@@ -2030,6 +2040,32 @@ impl FontMetricsService {
     ) -> Option<ResolvedFont> {
         self.materialized_font_for_realized_face_char(ch, selection)
             .map(|materialized| materialized.font)
+    }
+
+    /// Read glyph heights without copying the cached font's owned names,
+    /// identity and replay assets on every ASCII glyph. Cache misses and
+    /// non-ASCII selection keep the canonical primary/fontset policy below.
+    pub(crate) fn vertical_metrics_for_realized_face_char(
+        &mut self,
+        ch: char,
+        selection: RealizedFaceFontSelection<'_>,
+    ) -> Option<FontVerticalMetrics> {
+        if ch.is_ascii() {
+            let key = self.cache_key(
+                selection.family,
+                selection.weight,
+                selection.italic,
+                selection.font_size,
+            );
+            if let Some(cached) = self.resolved_face_font_cache.get(&key) {
+                return cached
+                    .as_ref()
+                    .map(|handle| FontVerticalMetrics::from_resolved_font(&handle.font));
+            }
+        }
+        self.materialized_font_for_realized_face_char(ch, selection)
+            .as_ref()
+            .map(|handle| FontVerticalMetrics::from_resolved_font(&handle.font))
     }
 
     fn materialized_font_for_realized_face_char(

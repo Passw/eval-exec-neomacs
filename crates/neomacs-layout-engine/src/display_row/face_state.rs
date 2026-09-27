@@ -695,13 +695,13 @@ impl DisplayGlyphMeasurer for DisplayRowGlyphMeasurer<'_> {
             return None;
         }
         let face = self.face(face_id)?;
-        let font = self
+        let metrics = self
             .font_metrics
             .as_mut()?
-            .resolved_font_for_realized_face_char(ch, face.font_selection())?;
-        let height = font.ascent_px + font.descent_px;
+            .vertical_metrics_for_realized_face_char(ch, face.font_selection())?;
+        let height = metrics.line_height;
         (height > 0.0).then(|| {
-            crate::display_row::builder::DisplayRowVerticalMetrics::new(height, font.ascent_px)
+            crate::display_row::builder::DisplayRowVerticalMetrics::new(height, metrics.ascent)
         })
     }
 
