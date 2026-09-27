@@ -1848,6 +1848,8 @@ pub struct LayoutStats {
     pub full_windows: usize,
     /// Windows that took the cursor-only fast path (Phase 1).
     pub cursor_only_windows: usize,
+    /// Subset of body replays restored from an older prepared viewport.
+    pub prepared_windows: usize,
     /// Windows that took the pure-scroll fast path (Phase 2).
     pub scroll_windows: usize,
     /// Windows that took the localized-edit fast path (Phase 3).

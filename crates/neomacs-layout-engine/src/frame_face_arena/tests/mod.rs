@@ -445,3 +445,41 @@ fn sealing_advances_the_generation() {
         "each accepted presentation needs a distinct retained-face generation"
     );
 }
+
+#[test]
+fn prepared_faces_reject_foreign_or_conflicting_namespaces() {
+    let arena = FrameFaceArena::default();
+    let mut first = arena.begin_attempt();
+    let mut sibling = arena.begin_attempt();
+    let id = FaceId::new(1);
+    let mut face = Face::new(id);
+    first.import_face(face.clone()).unwrap();
+    face.font_size += 4.0;
+    sibling.import_face(face).unwrap();
+    let first = first.commit();
+    let sibling = sibling.commit();
+    let mut next = first.begin_attempt();
+    assert!(next.admit_prepared([id], &sibling, &first).is_err());
+    assert!(next.faces().is_empty());
+    let foreign = FrameFaceArena::default();
+    assert!(next.admit_prepared([id], &foreign, &first).is_err());
+    assert!(next.faces().is_empty());
+    next.admit_prepared([id], &first, &first).unwrap();
+    assert_eq!(next.face(id), first.faces.get(&id).cloned());
+}
+
+#[test]
+fn prepared_dynamic_face_survives_a_page_that_does_not_use_it() {
+    let arena = FrameFaceArena::default();
+    let mut first = arena.begin_attempt();
+    let mut face = Face::new(FaceId::new(0));
+    face.foreground = Color::from_pixel(0x00112233);
+    face.id = first.stable_face_id(face_realization_identity(&face));
+    first.import_face(face.clone()).unwrap();
+    let first = first.commit();
+    let second = first.begin_attempt().commit();
+    assert!(second.faces.is_empty());
+    let mut third = second.begin_attempt();
+    third.admit_prepared([face.id], &first, &second).unwrap();
+    assert_eq!(third.face(face.id), Some(face));
+}

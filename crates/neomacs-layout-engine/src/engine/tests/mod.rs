@@ -35897,3 +35897,5 @@ fn hscroll_cursor_publication_preserves_clipping_visible_text_and_eol() {
         assert_eq!(replay, full, "point={point}");
     }
 }
+
+mod prepared_viewport_test;

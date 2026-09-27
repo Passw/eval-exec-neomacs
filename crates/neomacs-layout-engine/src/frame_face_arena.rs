@@ -563,6 +563,54 @@ impl FrameFaceAttempt {
         Ok(())
     }
 
+    /// Import older prepared content only when its IDs still name the same
+    /// realizations in the current committed namespace. The caller separately
+    /// checks the full layout key (including font-selection invalidation).
+    pub(crate) fn admit_prepared(
+        &mut self,
+        face_ids: impl IntoIterator<Item = FaceId>,
+        source: &FrameFaceArena,
+        current: &FrameFaceArena,
+    ) -> Result<(), FrameFaceReuseError> {
+        let mut state = self.state.borrow_mut();
+        if !Arc::ptr_eq(&state.owner, &source.owner) || !Arc::ptr_eq(&state.owner, &current.owner) {
+            return Err(FrameFaceReuseError::ForeignArena);
+        }
+        if !Arc::ptr_eq(&state.base_snapshot, &current.snapshot) {
+            return Err(FrameFaceReuseError::ForeignSnapshot);
+        }
+        let ids: Vec<_> = face_ids.into_iter().collect();
+        for id in &ids {
+            let face = source
+                .faces
+                .get(id)
+                .ok_or(FrameFaceReuseError::MissingFace(*id))?;
+            if let Some(now) = current.faces.get(id) {
+                if now != face {
+                    return Err(FrameFaceReuseError::ConflictingFace(*id));
+                }
+            } else {
+                let identity = face_realization_identity(face);
+                if id.get() < BasicFaceId::SENTINEL
+                    || realized_identity_lookup(
+                        &current.realized,
+                        face_identity_hash(&identity),
+                        &identity,
+                    ) != Some(*id)
+                {
+                    return Err(FrameFaceReuseError::MissingFace(*id));
+                }
+            }
+            if state.faces.get(id).is_some_and(|now| now != face) {
+                return Err(FrameFaceReuseError::ConflictingFace(*id));
+            }
+        }
+        for id in ids {
+            state.faces.insert(id, source.faces[&id].clone());
+        }
+        Ok(())
+    }
+
     fn publish(&mut self, face: Face) -> Result<FaceId, FrameFaceConflict> {
         let mut state = self.state.borrow_mut();
         let face_id = face.id;

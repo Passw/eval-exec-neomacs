@@ -4,6 +4,9 @@
 //! character position, computes line breaks, positions glyphs on a fixed-width
 //! grid, and publishes `FrameDisplayState` snapshots for render backends.
 
+mod prepared_viewports;
+use prepared_viewports::PreparedViewports;
+
 #[cfg(test)]
 use super::display_status_line::eval_status_line_format;
 use super::display_status_line::{
@@ -759,11 +762,10 @@ pub struct LayoutEngine {
     /// retries discard that attempt, and only a sealed presentation replaces
     /// the committed arena.
     frame_face_arenas: rustc_hash::FxHashMap<neovm_core::window::FrameId, FrameFaceArena>,
-    /// Per-window retained layout, owned across cycles (incremental-layout
-    /// Phase 0a). Committed at the accepted `break` only; NOT read yet — the
-    /// engine still rebuilds every window every cycle. The container a later
-    /// phase reuses rows out of.
+    /// Last accepted layout per window, used by cursor, scroll, and edit
+    /// replay. Speculative attempts never replace this state.
     retained_window_matrices: rustc_hash::FxHashMap<DisplayWindowId, RetainedWindowMatrix>,
+    prepared_viewports: PreparedViewports,
     /// Every OTHER frame's retained state, parked while this one is laid out.
     ///
     /// One `LayoutEngine` serves every visible frame -- `RedisplayRuntime` owns
@@ -792,6 +794,7 @@ pub struct LayoutEngine {
     /// by the commit path to attribute rows to `reused_rows` and classify the
     /// window `CursorOnly`. Reset per frame.
     cursor_only_window_ids: rustc_hash::FxHashSet<DisplayWindowId>,
+    prepared_window_ids: rustc_hash::FxHashSet<DisplayWindowId>,
     /// Windows that took the Phase 2 pure-scroll fast path this frame, mapped to
     /// `(exact_reused_rows, dvpos)`. Read by the commit path to attribute
     /// rows + classify `Scroll` + emit `RowDamage::ReusedShifted`.
@@ -834,6 +837,7 @@ pub struct LayoutEngine {
 /// the frame plan, rather than an ordering side effect of whichever window
 /// happens to render first.
 struct IncrementalWindowPlan {
+    prepared_faces: Option<FrameFaceArena>,
     cursor_only: Option<CursorOnlyReplay>,
     scroll: Option<ScrollReplay>,
     is_edit: bool,
@@ -1107,6 +1111,7 @@ impl IncrementalWindowPlan {
     }
 
     fn disable_reuse(&mut self) {
+        self.prepared_faces = None;
         self.cursor_only = None;
         self.scroll = None;
         self.is_edit = false;
@@ -1171,6 +1176,16 @@ fn admit_retained_frame_faces(
     let current_generation = committed_arena.generation();
     let mut face_ids = std::collections::BTreeSet::new();
     for plan in plans {
+        if let Some(source) = &plan.prepared_faces {
+            face_attempt.admit_prepared(
+                plan.retained_face_ids()
+                    .into_iter()
+                    .filter(|id| *id != FaceId::new(0)),
+                source,
+                committed_arena,
+            )?;
+            continue;
+        }
         let Some(retained_generation) = plan.retained_face_generation() else {
             continue;
         };
@@ -1203,6 +1218,7 @@ impl LayoutEngine {
         self.frame_visual_histories = FrameVisualHistories::default();
         self.frame_face_arenas.clear();
         self.retained_window_matrices.clear();
+        self.prepared_viewports = PreparedViewports::default();
         self.retained_window_chrome_metrics.clear();
         self.last_frame_display_state = None;
         self.reset_frame_attempt_state();
@@ -1218,6 +1234,7 @@ impl LayoutEngine {
         self.pending_tab_bar_pointer = None;
         self.window_snapshots.clear();
         self.cursor_only_window_ids.clear();
+        self.prepared_window_ids.clear();
         self.scroll_window_ids.clear();
         self.edit_window_ids.clear();
     }
@@ -1368,10 +1385,12 @@ impl LayoutEngine {
             last_frame_display_state: None,
             frame_face_arenas: rustc_hash::FxHashMap::default(),
             retained_window_matrices: rustc_hash::FxHashMap::default(),
+            prepared_viewports: PreparedViewports::default(),
             retained_by_frame: rustc_hash::FxHashMap::default(),
             retained_frame: None,
             retained_window_chrome_metrics: rustc_hash::FxHashMap::default(),
             cursor_only_window_ids: rustc_hash::FxHashSet::default(),
+            prepared_window_ids: rustc_hash::FxHashSet::default(),
             scroll_window_ids: rustc_hash::FxHashMap::default(),
             edit_window_ids: rustc_hash::FxHashMap::default(),
             pre_fontify_dirty_spans: rustc_hash::FxHashMap::default(),
@@ -1400,10 +1419,12 @@ impl LayoutEngine {
             last_frame_display_state: None,
             frame_face_arenas: rustc_hash::FxHashMap::default(),
             retained_window_matrices: rustc_hash::FxHashMap::default(),
+            prepared_viewports: PreparedViewports::default(),
             retained_by_frame: rustc_hash::FxHashMap::default(),
             retained_frame: None,
             retained_window_chrome_metrics: rustc_hash::FxHashMap::default(),
             cursor_only_window_ids: rustc_hash::FxHashSet::default(),
+            prepared_window_ids: rustc_hash::FxHashSet::default(),
             scroll_window_ids: rustc_hash::FxHashMap::default(),
             edit_window_ids: rustc_hash::FxHashMap::default(),
             pre_fontify_dirty_spans: rustc_hash::FxHashMap::default(),
@@ -1977,9 +1998,11 @@ impl LayoutEngine {
             let mut window_plans: Vec<IncrementalWindowPlan> = window_params_list
                 .iter()
                 .zip(&window_layout_inputs)
-                .map(|(params, (_, layout_box))| {
+                .zip(&retained_keys)
+                .map(|((params, (_, layout_box)), (_, key))| {
                     if query_window.is_some() {
                         return IncrementalWindowPlan {
+                            prepared_faces: None,
                             cursor_only: None,
                             scroll: None,
                             is_edit: false,
@@ -2006,12 +2029,26 @@ impl LayoutEngine {
                             None
                         };
                         return IncrementalWindowPlan {
+                            prepared_faces: None,
                             cursor_only,
                             scroll: None,
                             is_edit: false,
                         };
                     }
-                    let cursor_only = self.build_cursor_only_replay(params, *layout_box, evaluator);
+                    let mut cursor_only =
+                        self.build_cursor_only_replay(params, *layout_box, evaluator);
+                    let mut prepared_faces = None;
+                    if cursor_only.is_none() {
+                        if let Some((replay, faces)) = self.prepared_viewports.replay(
+                            frame_id,
+                            DisplayWindowId::new(params.window_id),
+                            key,
+                        ) {
+                            cursor_only = Some(replay);
+                            prepared_faces = Some(faces);
+                        }
+                    }
+
                     let mut is_edit = false;
                     let scroll = if cursor_only.is_none() {
                         if let Some(scroll) =
@@ -2030,6 +2067,7 @@ impl LayoutEngine {
                         None
                     };
                     IncrementalWindowPlan {
+                        prepared_faces,
                         cursor_only,
                         scroll,
                         is_edit,
@@ -2213,6 +2251,10 @@ impl LayoutEngine {
                     params.mode_line_height,
                 );
 
+                if plan.prepared_faces.is_some() {
+                    self.prepared_window_ids
+                        .insert(DisplayWindowId::new(params.window_id));
+                }
                 let mut cursor_only_replay = plan.cursor_only.take();
                 let mut scroll_replay = plan.scroll.take();
                 let mut is_edit = plan.is_edit;
@@ -2882,6 +2924,9 @@ impl LayoutEngine {
                 } else if cursor_only {
                     // Body rows were reused verbatim (0 relaid); chrome re-walked.
                     next_layout_stats.reused_rows += enabled_body;
+                    if self.prepared_window_ids.contains(&window_id) {
+                        next_layout_stats.prepared_windows += 1;
+                    }
                     next_layout_stats.record_window_class(LayoutClass::CursorOnly);
                 } else if let Some((ref reused, _dvpos)) = scroll_reused {
                     // Overlapping rows reused shifted; the rest were newly exposed
@@ -3111,7 +3156,7 @@ impl LayoutEngine {
             {
                 let _ = writeln!(
                     f,
-                    "full={} cursor_only={} scroll={} edit={} relaid_body={} relaid_chrome={} reused={} reused_shifted={} reused_chrome={} snapshots={} compose_bytes={} text_cow_copies={} mini_still={} chrome_memo={}",
+                    "full={} cursor_only={} scroll={} edit={} relaid_body={} relaid_chrome={} reused={} reused_shifted={} reused_chrome={} snapshots={} compose_bytes={} text_cow_copies={} mini_still={} chrome_memo={} prepared={}",
                     s.full_windows,
                     s.cursor_only_windows,
                     s.scroll_windows,
@@ -3126,6 +3171,7 @@ impl LayoutEngine {
                     s.buffer_text_cow_copies,
                     s.mini_window_still,
                     s.chrome_memo_hits,
+                    s.prepared_windows,
                 );
             }
         }
@@ -3136,6 +3182,12 @@ impl LayoutEngine {
         // Wholesale, and correct because these maps hold exactly this frame's
         // windows -- `load_retained_frame` saw to that. Windows this frame
         // deleted are pruned by the replacement, which is what it is for.
+        self.prepared_viewports.accept(
+            frame_id,
+            std::mem::take(&mut self.retained_window_matrices),
+            &next_retained_window_matrices,
+            self.frame_face_arenas.get(&frame_id),
+        );
         self.retained_window_matrices = next_retained_window_matrices;
         self.frame_face_arenas.insert(frame_id, sealed_face_arena);
         for buffer_id in acked_buffer_ids {
