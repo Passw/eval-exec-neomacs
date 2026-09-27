@@ -20,6 +20,31 @@ use crate::window_output::prepared_body::position_buffer_rows;
 use neovm_core::buffer::CharPos0;
 use neovm_core::window::{FrameId, WindowId};
 
+/// Keep speculative work bounded, including cyclic user lists. Recheck at
+/// admission because custom marker variables need not bump display ticks.
+pub(super) fn inactive_overlay_arrows(evaluator: &neovm_core::emacs_core::Context) -> bool {
+    let mut tail = evaluator
+        .obarray()
+        .symbol_value("overlay-arrow-variable-list")
+        .copied()
+        .unwrap_or(Value::NIL);
+    for _ in 0..32 {
+        if !tail.is_cons() {
+            return true;
+        }
+        if let Some(sym) = tail.cons_car().as_symbol_id()
+            && evaluator
+                .obarray()
+                .symbol_value_id(sym)
+                .is_some_and(|value| !value.is_nil())
+        {
+            return false;
+        }
+        tail = tail.cons_cdr();
+    }
+    !tail.is_cons()
+}
+
 struct Admission {
     frame: FrameId,
     window: DisplayWindowId,
@@ -489,16 +514,7 @@ impl LayoutEngine {
             128,
             crate::display_property::DisplayPropertyTarget::Graphical,
         );
-        if let Some(arrows) = evaluator
-            .obarray()
-            .symbol_value("overlay-arrow-variable-list")
-            && !arrows.is_nil()
-            && !(arrows.is_cons()
-                && arrows.cons_car() == Value::symbol("overlay-arrow-position")
-                && arrows.cons_cdr().is_nil())
-        {
-            // Custom marker variables need the canonical buffer-loop arrow
-            // pass. Do not traverse an unbounded user list speculatively.
+        if !inactive_overlay_arrows(evaluator) {
             return Err(RowProgramError::Unsupported);
         }
         // The complete body kernel will widen this domain; these policies

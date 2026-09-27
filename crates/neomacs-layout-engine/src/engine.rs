@@ -1542,7 +1542,10 @@ impl LayoutEngine {
     ) -> Option<neovm_core::window::WindowLayoutQuery> {
         let query_window = purpose.query_window();
         self.load_retained_frame(frame_id);
-        if query_window.is_none() {
+        if !scroll_coverage::inactive_overlay_arrows(evaluator) {
+            self.scroll_coverage.cancel();
+            self.prepared_viewports = PreparedViewports::default();
+        } else if query_window.is_none() {
             let _ = self.scroll_coverage.drain(&mut self.prepared_viewports);
         }
         // Incremental-layout instrumentation (Phase 0a): start each frame from

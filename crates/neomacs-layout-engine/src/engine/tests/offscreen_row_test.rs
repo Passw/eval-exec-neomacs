@@ -268,6 +268,32 @@ fn first_visit_at(
 }
 
 #[test]
+fn first_visit_worker_page_accepts_inactive_startup_overlay_arrows() {
+    first_visit_with_setup(
+        None,
+        "ordinary offscreen text\n",
+        None,
+        0,
+        5,
+        Some(
+            "(setq overlay-arrow-variable-list '(next-error-overlay-arrow-position overlay-arrow-position) next-error-overlay-arrow-position nil)",
+        ),
+    );
+}
+
+#[test]
+fn worker_page_is_rejected_when_custom_overlay_arrow_becomes_active() {
+    first_visit_with_setup(
+        None,
+        "ordinary offscreen text\n",
+        Some("(setq worker-custom-arrow (copy-marker 2761))"),
+        0,
+        5,
+        Some("(setq overlay-arrow-variable-list '(worker-custom-arrow) worker-custom-arrow nil)"),
+    );
+}
+
+#[test]
 fn first_visit_worker_page_preserves_overlapping_face_and_pointer_overlays() {
     first_visit_with_setup(
         None,
@@ -306,7 +332,11 @@ fn worker_capture_rejects_overlay_replacements_and_excessive_overlap() {
     use crate::row_layout::program::RowProgramError;
     for (setup, expected) in [
         (
-            "(setq overlay-arrow-variable-list '(worker-custom-arrow))",
+            "(setq overlay-arrow-variable-list (make-list 33 'worker-custom-arrow))",
+            RowProgramError::Unsupported,
+        ),
+        (
+            "(setq overlay-arrow-variable-list '(worker-custom-arrow) worker-custom-arrow (copy-marker 2761))",
             RowProgramError::Unsupported,
         ),
         (
