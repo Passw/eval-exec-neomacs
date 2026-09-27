@@ -1856,6 +1856,9 @@ pub struct ScrollBarItem {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct FrameDisplayState {
+    /// Completed native commands reflected in this immutable frame.
+    #[serde(default)]
+    pub input_checkpoint: Vec<crate::input_progress::InputCheckpoint>,
     /// Evaluator interaction snapshot paired with these exact pixels.
     pub presentation_id: PresentationId,
     /// Why this presentation was produced.
@@ -2392,6 +2395,7 @@ impl FrameDisplayState {
 
     pub fn new(frame_cols: usize, frame_rows: usize, char_width: f32, char_height: f32) -> Self {
         Self {
+            input_checkpoint: Vec::new(),
             presentation_id: PresentationId::default(),
             origin: crate::presentation_origin::PresentationOrigin::Ordinary,
             frame_placement: crate::presented_frame::PresentedFramePlacement::default(),
@@ -2639,6 +2643,7 @@ impl FrameDisplayState {
         MATERIALIZE_CALL_COUNT.with(|count| count.set(count.get() + 1));
         let mut buf = FrameGlyphBuffer::with_size(self.frame_pixel_width, self.frame_pixel_height);
         buf.presentation_id = self.presentation_id;
+        buf.input_checkpoint = self.input_checkpoint.clone();
         buf.frame_placement = self.frame_placement;
         buf.origin = self.origin;
         buf.char_width = self.char_width;

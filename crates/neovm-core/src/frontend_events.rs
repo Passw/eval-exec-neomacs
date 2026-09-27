@@ -193,7 +193,7 @@ fn semantics(event: &InputEvent) -> FrontendEventSemantics {
     use FrontendEventSemantics::{Command, Internal, MouseMotion, ServiceDuringWait};
 
     match event {
-        InputEvent::Observed { event, .. } => semantics(event),
+        InputEvent::Observed { event, .. } | InputEvent::Tracked { event, .. } => semantics(event),
         InputEvent::RawTtyBytes { .. }
         | InputEvent::TtyByte { .. }
         | InputEvent::TtyCharacter { .. }

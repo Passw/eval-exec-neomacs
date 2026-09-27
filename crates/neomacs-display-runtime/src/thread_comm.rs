@@ -110,6 +110,10 @@ pub struct PositionedPointerInput {
 /// Input event from render thread to Emacs
 #[derive(Debug, Clone)]
 pub enum InputEvent {
+    Tracked {
+        receipt: neomacs_display_protocol::input_progress::InputDelivery,
+        event: Box<InputEvent>,
+    },
     /// Diagnostic token paired with one actual command event.
     Observed {
         token: neomacs_display_protocol::input_latency::InputToken,
@@ -991,6 +995,7 @@ impl ThreadComms {
         };
 
         let render = RenderComms {
+            input_stream: Default::default(),
             tooltip_context: self.tooltip_context,
             frame_rx: self.frame_rx,
             cmd_rx: self.cmd_rx,
@@ -1019,6 +1024,7 @@ pub struct EmacsComms {
 
 /// Render thread communication handle
 pub struct RenderComms {
+    input_stream: neomacs_display_protocol::input_progress::InputStream,
     pub frame_rx: FrameReceiver,
     pub cmd_rx: Receiver<RenderCommand>,
     pub input_tx: Sender<InputEvent>,
@@ -1102,7 +1108,9 @@ impl RenderComms {
 
     fn event_name(event: &InputEvent) -> &'static str {
         match event {
-            InputEvent::Observed { event, .. } => Self::event_name(event),
+            InputEvent::Observed { event, .. } | InputEvent::Tracked { event, .. } => {
+                Self::event_name(event)
+            }
             InputEvent::RawTtyBytes { .. } => "raw-tty-bytes",
             InputEvent::Key { .. } => "key",
             InputEvent::PositionedPointer(PositionedPointerInput { action, .. }) => match action {
@@ -1155,7 +1163,30 @@ impl RenderComms {
     /// After converting the display event, the bridge owns notifying the
     /// evaluator's wait backend.
     pub fn send_input(&self, event: InputEvent) {
+        let receipt = if matches!(
+            &event,
+            InputEvent::Key {
+                keysym: 0xff55 | 0xff56,
+                pressed: true,
+                ..
+            } | InputEvent::PositionedPointer(PositionedPointerInput {
+                action: PointerAction::Scroll { .. },
+                ..
+            })
+        ) {
+            self.input_stream.issue()
+        } else {
+            None
+        };
         let event = Self::observe_scroll_input(event);
+        let event = if let Some(receipt) = receipt {
+            InputEvent::Tracked {
+                receipt,
+                event: Box::new(event),
+            }
+        } else {
+            event
+        };
         let log_delivery = Self::should_log_delivery(&event);
         let event_name = Self::event_name(&event);
         if Self::is_lossy_input_event(&event) {

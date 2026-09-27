@@ -376,6 +376,7 @@ impl EchoAreaMessageText {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct RedisplaySignature {
+    input_checkpoint: Vec<neomacs_display_protocol::input_progress::InputCheckpoint>,
     selected_frame: Option<u64>,
     selected_window: Option<u64>,
     current_buffer: Option<u64>,
@@ -434,6 +435,7 @@ impl RedisplaySignature {
                 }
             };
         }
+        field!(input_checkpoint);
         field!(selected_frame);
         field!(selected_window);
         field!(current_buffer);
@@ -3371,6 +3373,7 @@ pub struct Context {
     /// a full rebuild (adversarial-review fix). Rare event → a global counter
     /// (over-invalidating all windows) is acceptable and simpler than per-var keys.
     pub display_var_change_count: u64,
+    pub input_progress: neomacs_display_protocol::input_progress::InputProgress,
     /// Explicit redisplay invalidation generation, used for state that GNU
     /// marks with update_mode_lines/window redisplay flags.
     redisplay_generation: u64,

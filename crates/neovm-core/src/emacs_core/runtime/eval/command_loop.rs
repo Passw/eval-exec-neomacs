@@ -496,6 +496,10 @@ impl Context {
                 return Ok(Value::NIL);
             }
 
+            // Retained through hooks, point adjustment and finalization. A
+            // mid-command redisplay must not acknowledge unfinished input.
+            let _completed_inputs = self.input_progress.begin_command();
+
             self.flush_pending_safe_funcalls();
             self.sync_current_buffer_to_selected_window();
 
@@ -1744,6 +1748,7 @@ impl Context {
             }
         });
         RedisplaySignature {
+            input_checkpoint: self.input_progress.checkpoint(),
             selected_frame,
             selected_window,
             current_buffer: self.buffers.current_buffer_id().map(|id| id.0),

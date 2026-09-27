@@ -1151,6 +1151,7 @@ pub enum ContentTransitionHint {
 /// each frame by the C-side matrix walker. No incremental state management needed.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct FrameGlyphBuffer {
+    pub input_checkpoint: Vec<crate::input_progress::InputCheckpoint>,
     /// Evaluator interaction snapshot paired with these exact pixels.
     pub presentation_id: crate::frame_chrome::PresentationId,
     /// Canonical frame ancestry/placement for this presentation.
@@ -1526,6 +1527,7 @@ impl FrameGlyphBuffer {
 
     pub fn new() -> Self {
         Self {
+            input_checkpoint: Vec::new(),
             presentation_id: crate::frame_chrome::PresentationId::default(),
             frame_placement: crate::presented_frame::PresentedFramePlacement::default(),
             origin: crate::presentation_origin::PresentationOrigin::Ordinary,

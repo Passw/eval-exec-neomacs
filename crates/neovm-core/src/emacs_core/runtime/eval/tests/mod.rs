@@ -27894,3 +27894,59 @@ fn inlined_bobp_and_eobp_track_the_accessible_bounds_like_gnu() {
         "OK (((t nil) (nil nil) (nil t) (t nil) (nil t)) 40000)"
     );
 }
+
+#[test]
+fn native_input_progress_waits_through_command_hooks_and_finalization() {
+    fn probe(ctx: &mut Context, _: Vec<Value>) -> EvalResult {
+        let checkpoints = ctx.input_progress.checkpoint();
+        // The startup post-command hook runs before reading any input.
+        assert!(checkpoints.iter().all(|checkpoint| checkpoint.through == 0));
+        Ok(Value::NIL)
+    }
+    let (mut ev, global_map) = command_loop_error_test_context();
+    ev.noninteractive = false;
+    ev.register_subr(SubrSpec::new(
+        "neo-input-progress-probe",
+        NativeFn::ContextVec(probe),
+        SubrArity::new(0, Some(0)),
+    ));
+    ev.eval_str("(setq pre-command-hook '(neo-input-progress-probe) post-command-hook '(neo-input-progress-probe))").unwrap();
+    crate::emacs_core::keymap::list_keymap_define_seq(
+        global_map,
+        &[Value::fixnum('q' as i64)],
+        Value::symbol("neo-stop-command-loop-error-test-command"),
+    )
+    .unwrap();
+    let stream = neomacs_display_protocol::input_progress::InputStream::default();
+    let receipt = stream.issue().unwrap();
+    let frame = ev.frames.selected_frame().unwrap().id.0;
+    let (tx, rx) = crossbeam_channel::unbounded();
+    ev.input_rx = Some(rx);
+    tx.send(crate::keyboard::InputEvent::Tracked {
+        receipt: receipt.clone(),
+        event: Box::new(crate::keyboard::InputEvent::KeyPress {
+            key: crate::keyboard::KeyEvent::char('q'),
+            emacs_frame_id: frame,
+        }),
+    })
+    .unwrap();
+    ev.command_loop.running = true;
+    ev.recursive_edit_inner().unwrap();
+    assert!(receipt.acknowledged_by(&ev.input_progress.checkpoint()));
+}
+
+#[test]
+fn native_input_progress_completion_requires_a_fresh_presentation() {
+    let mut ev = Context::new();
+    let stream = neomacs_display_protocol::input_progress::InputStream::default();
+    let command = ev.input_progress.begin_command();
+    ev.input_progress.consumed(stream.issue().unwrap());
+    let during_command = ev.redisplay_signature();
+    drop(command);
+    let completed = ev.redisplay_signature();
+    assert_ne!(
+        during_command, completed,
+        "mid-command redisplay must not suppress the completion frame"
+    );
+    assert_eq!(completed, ev.redisplay_signature());
+}

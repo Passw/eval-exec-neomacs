@@ -1248,6 +1248,10 @@ impl TtyInputTarget {
 /// Input events from the display layer.
 #[derive(Clone, Debug)]
 pub enum InputEvent {
+    Tracked {
+        receipt: neomacs_display_protocol::input_progress::InputDelivery,
+        event: Box<InputEvent>,
+    },
     /// Native diagnostic observation; unwrapped by the ordered command reader.
     Observed {
         token: neomacs_display_protocol::input_latency::InputToken,
@@ -5099,6 +5103,10 @@ impl crate::emacs_core::eval::Context {
         }
 
         match event {
+            InputEvent::Tracked { receipt, event } => {
+                self.input_progress.consumed(receipt);
+                self.handle_read_char_input_event(*event, tty_input_decoding)
+            }
             InputEvent::Observed { token, event } => {
                 neomacs_display_protocol::input_latency::consumed(token);
                 self.handle_read_char_input_event(*event, tty_input_decoding)

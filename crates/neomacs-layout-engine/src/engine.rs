@@ -1541,6 +1541,9 @@ impl LayoutEngine {
         purpose: LayoutPurpose,
     ) -> Option<neovm_core::window::WindowLayoutQuery> {
         let query_window = purpose.query_window();
+        // Layout Lisp can enter a nested command reader. Capture completion
+        // before gathering pixels, never from commands that finish mid-layout.
+        let input_checkpoint = evaluator.input_progress.checkpoint();
         self.load_retained_frame(frame_id);
         if !scroll_coverage::inactive_overlay_arrows(evaluator) {
             self.scroll_coverage.cancel();
@@ -3164,6 +3167,7 @@ impl LayoutEngine {
         // currently placing this geometry is what decides whether the
         // compositor may animate toward it.
         frame_display_state.origin = evaluator.presentation_origin();
+        frame_display_state.input_checkpoint = input_checkpoint;
         let resolved = match crate::frame_presentation::ResolvedFrame::new(frame_display_state) {
             Ok(resolved) => resolved,
             Err(error) => {
