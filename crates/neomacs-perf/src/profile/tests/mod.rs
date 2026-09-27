@@ -518,22 +518,24 @@ fn gui_capture_profiles_only_the_app_in_the_harness_owned_session() {
         .collect::<Vec<_>>();
     assert!(arguments.iter().any(|argument| argument == "record"));
     assert!(arguments.iter().any(|argument| argument == "--"));
-    assert!(arguments
-        .iter()
-        .any(|argument| argument.starts_with("--control=fifo:")));
+    assert!(
+        arguments
+            .iter()
+            .any(|argument| argument.starts_with("--control=fifo:"))
+    );
     let environment = command
         .get_envs()
         .filter_map(|(name, value)| Some((name.to_str()?, value?.to_str()?)))
         .collect::<std::collections::BTreeMap<_, _>>();
     assert!(environment.contains_key("NEOMACS_PERF_GATE_PORT"));
     assert!(
-        !environment
-            .keys()
-            .any(|name| name.starts_with("GUI_PERF_")),
+        !environment.keys().any(|name| name.starts_with("GUI_PERF_")),
         "the GUI adapter perf contract retired with tools/bench/gui-run.sh"
     );
     assert!(
-        arguments.iter().any(|argument| argument.ends_with("perf.data")),
+        arguments
+            .iter()
+            .any(|argument| argument.ends_with("perf.data")),
         "perf record writes its data below the run directory"
     );
 }

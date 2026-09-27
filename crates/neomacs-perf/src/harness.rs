@@ -459,9 +459,8 @@ impl PerfHarness {
                 }
             };
             let process_wall_us = process_started.elapsed().as_micros();
-            let launch_flake = !output.status.success()
-                && !prepared.sentinel.is_file()
-                && retried_launches;
+            let launch_flake =
+                !output.status.success() && !prepared.sentinel.is_file() && retried_launches;
             if launch_flake && attempt < GUI_LAUNCH_ATTEMPTS {
                 if let Some(profile) = profile.as_deref_mut() {
                     profile.cancel_gate();
@@ -1435,28 +1434,36 @@ fn frontend_command(
         // The bench display session's environment (private XDG_RUNTIME_DIR,
         // Wayland socket, Xwayland display, locale pin) is owned by
         // neomacs-infra and injected per attempt by the run loop.
-        Frontend::Gui { width: _, height: _ } => {
+        Frontend::Gui {
+            width: _,
+            height: _,
+        } => {
             if let Some(session) = display_environment {
-                command.envs(session.env().iter().map(|(name, value)| (name.as_str(), value.as_str())));
+                command.envs(
+                    session
+                        .env()
+                        .iter()
+                        .map(|(name, value)| (name.as_str(), value.as_str())),
+                );
             }
         }
     }
     crate::portable_dump::configure_capture(&mut command, &prepared.provenance);
     prepared.add_workload_arguments(&mut command);
     command.current_dir(workspace_root);
-        command
-            .env_remove("EMACSLOADPATH")
-            .env("SENTINEL", &prepared.sentinel)
-            .env("NEOMACS_PERF_RESULT", &prepared.result)
-            .env("NEOMACS_PERF_WORKLOAD", request.scenario.workload_str())
-            // The fixture reports this name in its result JSON, so a
-            // fixture shared by two rows (mx-tab) writes the identity the
-            // validator demands rather than a hardcoded one.
-            .env("NEOMACS_PERF_SCENARIO_ID", request.scenario.workload_str())
-            .env(
-                "NEOMACS_PERF_ITERATIONS",
-                request.iterations().get().to_string(),
-            );
+    command
+        .env_remove("EMACSLOADPATH")
+        .env("SENTINEL", &prepared.sentinel)
+        .env("NEOMACS_PERF_RESULT", &prepared.result)
+        .env("NEOMACS_PERF_WORKLOAD", request.scenario.workload_str())
+        // The fixture reports this name in its result JSON, so a
+        // fixture shared by two rows (mx-tab) writes the identity the
+        // validator demands rather than a hardcoded one.
+        .env("NEOMACS_PERF_SCENARIO_ID", request.scenario.workload_str())
+        .env(
+            "NEOMACS_PERF_ITERATIONS",
+            request.iterations().get().to_string(),
+        );
     prepared.add_workload_environment(&mut command);
     command
 }
@@ -2230,10 +2237,7 @@ fn valid_measurements(result: &ScenarioResult, wall_elapsed_us: u128) -> Vec<Mea
             scenarios::mx_tab::valid_mx_tab_completion_measurements(result, wall_elapsed_us)
         }
         ScenarioResult::MxTabCompletionSteady(result) => {
-            scenarios::mx_tab::valid_mx_tab_completion_steady_measurements(
-                result,
-                wall_elapsed_us,
-            )
+            scenarios::mx_tab::valid_mx_tab_completion_steady_measurements(result, wall_elapsed_us)
         }
         ScenarioResult::Scrolling(result) => {
             scenarios::scrolling::valid_scrolling_measurements(result, wall_elapsed_us)

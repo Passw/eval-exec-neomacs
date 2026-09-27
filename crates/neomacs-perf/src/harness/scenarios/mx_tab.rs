@@ -295,7 +295,8 @@ fn validate_shared_mx_tab_invariants(
 pub(crate) fn valid_mx_tab_completion_measurements(
     result: &MxTabCompletionResult,
     wall_elapsed_us: u128,
-) -> Vec<Measurement> {    vec![
+) -> Vec<Measurement> {
+    vec![
         Measurement {
             name: MetricName::ProcessWallTime,
             value: wall_elapsed_us as f64,

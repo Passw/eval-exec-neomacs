@@ -257,7 +257,9 @@ impl WestonBenchSession {
     /// set, weston has reported its X server on a display.
     pub fn start(artifact_root: &Path, config: WestonBenchConfig) -> io::Result<Self> {
         if config.width == 0 || config.height == 0 {
-            return Err(io::Error::other("bench display dimensions must be positive"));
+            return Err(io::Error::other(
+                "bench display dimensions must be positive",
+            ));
         }
         fs::create_dir_all(artifact_root)?;
         let runtime_directory = RuntimeDirectory::new(artifact_root)?;
@@ -429,9 +431,7 @@ fn wait_for_xwayland_display(log_path: &Path, timeout: Duration) -> Option<Strin
 fn xwayland_display_from_log(log_path: &Path) -> Option<String> {
     let contents = fs::read_to_string(log_path).ok()?;
     const MARKER: &str = "xserver listening on display ";
-    let line = contents
-        .lines()
-        .rfind(|line| line.contains(MARKER))?;
+    let line = contents.lines().rfind(|line| line.contains(MARKER))?;
     let start = line.find(MARKER)? + MARKER.len();
     let display: String = line[start..]
         .chars()
@@ -834,7 +834,11 @@ mod bench_tests {
             },
         )
         .expect("bench session starts");
-        assert!(session.wayland_display().starts_with("neomacs-infra-bench-"));
+        assert!(
+            session
+                .wayland_display()
+                .starts_with("neomacs-infra-bench-")
+        );
         let display = session.x_display().expect("xwayland display reported");
         assert!(display.starts_with(':'));
         let env: BTreeMap<&str, &str> = session

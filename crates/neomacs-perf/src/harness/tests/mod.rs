@@ -1370,7 +1370,10 @@ fn steady_mx_tab_row_requires_its_warmup_and_reports_it() {
     assert_eq!(per_completion.value, 5000.0);
 
     // A steady row whose warm-up never ran is just a slow cold row: reject.
-    let no_warmup = result_json.replace("\"warmup_completion_help_calls\": 5", "\"warmup_completion_help_calls\": 0");
+    let no_warmup = result_json.replace(
+        "\"warmup_completion_help_calls\": 5",
+        "\"warmup_completion_help_calls\": 0",
+    );
     let workspace2 = tempfile::Builder::new()
         .prefix("neomacs-perf-mx-steady-nowarm-")
         .tempdir_in(&workspace_tmp)
@@ -1449,7 +1452,10 @@ fn scrolling_row_validates_phases_checksums_and_restoration() {
 
     // A changed buffer during scrolling is a correctness failure, not a
     // fast sample: scrolling must never mutate what it displays.
-    let mutated = result_json.replace("\"final_checksum\": \"abc123\"", "\"final_checksum\": \"different\"");
+    let mutated = result_json.replace(
+        "\"final_checksum\": \"abc123\"",
+        "\"final_checksum\": \"different\"",
+    );
     let workspace2 = tempfile::Builder::new()
         .prefix("neomacs-perf-scrolling-bad-")
         .tempdir_in(&workspace_tmp)
