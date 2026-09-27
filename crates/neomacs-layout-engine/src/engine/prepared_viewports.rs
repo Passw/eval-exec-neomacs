@@ -5,6 +5,7 @@
 //! old chrome. No live evaluator state is retained here.
 
 use super::*;
+use crate::frame_face_arena::PreparedFaceSnapshot;
 use crate::incremental_layout::WindowDelta;
 use std::collections::VecDeque;
 
@@ -16,7 +17,7 @@ struct PreparedViewport {
     frame: neovm_core::window::FrameId,
     window: DisplayWindowId,
     retained: RetainedWindowMatrix,
-    faces: FrameFaceArena,
+    faces: PreparedFaceSnapshot,
     rows: usize,
     glyphs: usize,
 }
@@ -32,7 +33,7 @@ impl PreparedViewports {
         frame: neovm_core::window::FrameId,
         window: DisplayWindowId,
         key: &RetainedWindowKey,
-    ) -> Option<(CursorOnlyReplay, FrameFaceArena)> {
+    ) -> Option<(CursorOnlyReplay, PreparedFaceSnapshot)> {
         self.entries.iter().rev().find_map(|entry| {
             if entry.frame != frame
                 || entry.window != window
@@ -56,7 +57,7 @@ impl PreparedViewports {
         window: DisplayWindowId,
         key: &RetainedWindowKey,
         minimum_reused: usize,
-    ) -> Option<(ScrollReplay, FrameFaceArena)> {
+    ) -> Option<(ScrollReplay, PreparedFaceSnapshot)> {
         self.entries.iter().rev().find_map(|entry| {
             if entry.frame != frame
                 || entry.window != window
@@ -137,7 +138,7 @@ impl PreparedViewports {
                 frame,
                 window,
                 retained,
-                faces: faces.clone(),
+                faces: faces.prepared_snapshot(),
                 rows,
                 glyphs,
             });

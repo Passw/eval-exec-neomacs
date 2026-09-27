@@ -837,7 +837,7 @@ pub struct LayoutEngine {
 /// the frame plan, rather than an ordering side effect of whichever window
 /// happens to render first.
 struct IncrementalWindowPlan {
-    prepared_faces: Option<FrameFaceArena>,
+    prepared_faces: Option<crate::frame_face_arena::PreparedFaceSnapshot>,
     cursor_only: Option<CursorOnlyReplay>,
     scroll: Option<ScrollReplay>,
     is_edit: bool,

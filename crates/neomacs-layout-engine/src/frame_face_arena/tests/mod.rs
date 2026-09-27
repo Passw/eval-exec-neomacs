@@ -459,12 +459,19 @@ fn prepared_faces_reject_foreign_or_conflicting_namespaces() {
     let first = first.commit();
     let sibling = sibling.commit();
     let mut next = first.begin_attempt();
-    assert!(next.admit_prepared([id], &sibling, &first).is_err());
+    assert!(
+        next.admit_prepared([id], &sibling.prepared_snapshot(), &first)
+            .is_err()
+    );
     assert!(next.faces().is_empty());
     let foreign = FrameFaceArena::default();
-    assert!(next.admit_prepared([id], &foreign, &first).is_err());
+    assert!(
+        next.admit_prepared([id], &foreign.prepared_snapshot(), &first)
+            .is_err()
+    );
     assert!(next.faces().is_empty());
-    next.admit_prepared([id], &first, &first).unwrap();
+    next.admit_prepared([id], &first.prepared_snapshot(), &first)
+        .unwrap();
     assert_eq!(next.face(id), first.faces.get(&id).cloned());
 }
 
@@ -477,9 +484,16 @@ fn prepared_dynamic_face_survives_a_page_that_does_not_use_it() {
     face.id = first.stable_face_id(face_realization_identity(&face));
     first.import_face(face.clone()).unwrap();
     let first = first.commit();
+    fn require_send_sync<T: Send + Sync + 'static>() {}
+    require_send_sync::<PreparedFaceSnapshot>();
+    let prepared = first.prepared_snapshot();
     let second = first.begin_attempt().commit();
+    drop(first);
+    let prepared = std::thread::spawn(move || prepared)
+        .join()
+        .expect("prepared identities need no thread-local arena");
     assert!(second.faces.is_empty());
     let mut third = second.begin_attempt();
-    third.admit_prepared([face.id], &first, &second).unwrap();
+    third.admit_prepared([face.id], &prepared, &second).unwrap();
     assert_eq!(third.face(face.id), Some(face));
 }

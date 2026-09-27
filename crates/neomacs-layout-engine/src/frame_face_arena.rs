@@ -134,6 +134,18 @@ pub(crate) struct FrameFaceAttempt {
     state: Rc<RefCell<FrameFaceAttemptState>>,
 }
 
+/// Immutable face identities accompanying prepared rows.
+///
+/// Unlike an arena or attempt this grants no identity-allocation or publication
+/// capability. It can cross a worker boundary; admission still validates its
+/// namespace and every referenced identity against the current arena. The
+/// caller must separately validate the rows' complete layout-input key.
+#[derive(Clone, Debug)]
+pub(crate) struct PreparedFaceSnapshot {
+    owner: Arc<FrameFaceOwner>,
+    faces: Arc<FrameFaceMap>,
+}
+
 /// An immutable realization owned by exactly one speculative attempt.
 /// Only the arena can construct this value. Raw IDs are extracted after
 /// checking the destination attempt, never paired with replacement styling.
@@ -328,6 +340,13 @@ impl Default for FrameFaceArena {
 }
 
 impl FrameFaceArena {
+    pub(crate) fn prepared_snapshot(&self) -> PreparedFaceSnapshot {
+        PreparedFaceSnapshot {
+            owner: Arc::clone(&self.owner),
+            faces: Arc::clone(&self.faces),
+        }
+    }
+
     pub(crate) fn generation(&self) -> FrameFaceGeneration {
         self.generation
     }
@@ -569,7 +588,7 @@ impl FrameFaceAttempt {
     pub(crate) fn admit_prepared(
         &mut self,
         face_ids: impl IntoIterator<Item = FaceId>,
-        source: &FrameFaceArena,
+        source: &PreparedFaceSnapshot,
         current: &FrameFaceArena,
     ) -> Result<(), FrameFaceReuseError> {
         let mut state = self.state.borrow_mut();
