@@ -556,7 +556,6 @@ fn run_render_loop_with_startup(
         let mut app = app;
         match super::frame_preparation::FramePreparation::spawn(
             app.comms.frame_rx.clone(),
-            app.comms.input_tx.clone(),
             move || preparation_proxy.wake_up(),
         ) {
             Ok(worker) => app.frame_preparation = Some(worker),

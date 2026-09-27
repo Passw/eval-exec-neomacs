@@ -4,12 +4,13 @@
 //! are owned by the evaluator's cross-platform wait notifier after the input
 //! bridge queues a converted event.
 
-use crossbeam_channel::{Receiver, Sender, TrySendError, bounded, unbounded};
+use crossbeam_channel::{Receiver, Sender, TrySendError, bounded};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use neomacs_display_protocol::SealedFramePresentation;
+mod frame_mailbox;
+pub use frame_mailbox::{FrameReceiver, FrameSender, QueuedPresentation, SupersededPresentation};
 use neomacs_display_protocol::{
     ImageColorContext, ImageId, ImageLoadToken, ImageMaskPolicy, ImageRealization, ImageRotation,
     ImageSizeSpec, SelectionOwner, VideoId,
@@ -940,8 +941,8 @@ impl SharedRenderCapabilities {
 /// Communication channels between threads
 pub struct ThreadComms {
     /// Frame display state: Emacs → Render
-    pub frame_tx: Sender<SealedFramePresentation>,
-    pub frame_rx: Receiver<SealedFramePresentation>,
+    pub frame_tx: FrameSender,
+    pub frame_rx: FrameReceiver,
 
     /// Commands: Emacs → Render
     pub cmd_tx: Sender<RenderCommand>,
@@ -958,7 +959,7 @@ pub struct ThreadComms {
 impl ThreadComms {
     /// Create new thread communication channels
     pub fn new() -> Self {
-        let (frame_tx, frame_rx) = unbounded();
+        let (frame_tx, frame_rx) = frame_mailbox::channel();
         let (cmd_tx, cmd_rx) = bounded(COMMAND_CHANNEL_CAPACITY);
         let (input_tx, input_rx) = bounded(INPUT_CHANNEL_CAPACITY);
         let capabilities = Arc::new(SharedRenderCapabilities::default());
@@ -1004,7 +1005,7 @@ impl Default for ThreadComms {
 
 /// Emacs thread communication handle
 pub struct EmacsComms {
-    pub frame_tx: Sender<SealedFramePresentation>,
+    pub frame_tx: FrameSender,
     pub cmd_tx: Sender<RenderCommand>,
     pub input_rx: Receiver<InputEvent>,
     pub capabilities: Arc<SharedRenderCapabilities>,
@@ -1013,7 +1014,7 @@ pub struct EmacsComms {
 
 /// Render thread communication handle
 pub struct RenderComms {
-    pub frame_rx: Receiver<SealedFramePresentation>,
+    pub frame_rx: FrameReceiver,
     pub cmd_rx: Receiver<RenderCommand>,
     pub input_tx: Sender<InputEvent>,
     pub capabilities: Arc<SharedRenderCapabilities>,

@@ -3791,7 +3791,8 @@ fn publish_gui_frame_sends_opening_frame_before_startup_lisp() {
     configure_gnu_startup_state(&mut eval, frame_id, &gui_startup());
 
     REDISPLAY_RUNTIME.with(|runtime| runtime.enable_cosmic_metrics());
-    let (frame_tx, frame_rx) = crossbeam_channel::unbounded();
+    let comms = neomacs_display_runtime::thread_comm::ThreadComms::new();
+    let (frame_tx, frame_rx) = (comms.frame_tx, comms.frame_rx);
     let active_before = eval
         .frame_manager()
         .get(frame_id)
@@ -3844,7 +3845,8 @@ fn publish_gui_frame_sends_every_visible_top_level_frame_tree() {
     );
 
     REDISPLAY_RUNTIME.with(|runtime| runtime.enable_cosmic_metrics());
-    let (frame_tx, frame_rx) = crossbeam_channel::unbounded();
+    let comms = neomacs_display_runtime::thread_comm::ThreadComms::new();
+    let (frame_tx, frame_rx) = (comms.frame_tx, comms.frame_rx);
 
     publish_gui_frame(&mut eval, &frame_tx, None);
 
@@ -3869,7 +3871,8 @@ fn rejected_gui_frame_is_discarded_instead_of_becoming_active() {
     configure_gnu_startup_state(&mut eval, frame_id, &gui_startup());
 
     REDISPLAY_RUNTIME.with(|runtime| runtime.enable_cosmic_metrics());
-    let (frame_tx, frame_rx) = crossbeam_channel::unbounded();
+    let comms = neomacs_display_runtime::thread_comm::ThreadComms::new();
+    let (frame_tx, frame_rx) = (comms.frame_tx, comms.frame_rx);
     drop(frame_rx);
 
     publish_gui_frame(&mut eval, &frame_tx, None);
@@ -6877,4 +6880,38 @@ fn the_stale_bytecode_refusal_covers_this_crates_tests() {
          source; `main' announcing itself a shipped editor is a different \
          process from this one"
     );
+}
+
+#[test]
+fn superseded_gui_publications_retire_evaluator_records_without_input_roundtrip() {
+    let mut eval = create_bootstrap_evaluator_cached_with_features(&["neomacs"])
+        .expect("cached bootstrap evaluator");
+    let _bootstrap = bootstrap_buffers(&mut eval, 960, 640, gui_display());
+    let frame_id = eval.frame_manager().selected_frame().unwrap().id;
+    configure_gnu_startup_state(&mut eval, frame_id, &gui_startup());
+    REDISPLAY_RUNTIME.with(|runtime| runtime.enable_cosmic_metrics());
+    let comms = neomacs_display_runtime::thread_comm::ThreadComms::new();
+    assert!(
+        !eval
+            .frame_manager()
+            .get(frame_id)
+            .unwrap()
+            .has_prepared_display_presentations()
+    );
+    for _ in 0..16 {
+        publish_gui_frame(&mut eval, &comms.frame_tx, None);
+    }
+    let latest = comms.frame_rx.try_recv().unwrap();
+    assert!(comms.frame_rx.try_recv().is_err());
+    assert!(comms.input_rx.try_recv().is_err());
+    let presentation =
+        neovm_core::window::geometry::PresentationId::new(latest.presentation().get());
+    let frame = eval.frame_manager_mut().get_mut(frame_id).unwrap();
+    assert_eq!(frame.active_presentation(), None);
+    frame.activate_display_presentation(presentation).unwrap();
+    assert!(
+        !frame.has_prepared_display_presentations(),
+        "superseded publications leaked"
+    );
+    assert_eq!(frame.active_presentation(), Some(presentation));
 }

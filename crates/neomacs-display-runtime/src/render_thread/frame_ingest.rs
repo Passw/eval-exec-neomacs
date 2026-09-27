@@ -518,8 +518,9 @@ impl RenderApp {
             queued.extend(
                 self.comms
                     .frame_rx
-                    .try_iter()
-                    .map(super::frame_preparation::PreparedFrame::new),
+                    .drain_pending()
+                    .into_iter()
+                    .map(super::frame_preparation::PreparedFrame::from_queued),
             );
         }
         loop {

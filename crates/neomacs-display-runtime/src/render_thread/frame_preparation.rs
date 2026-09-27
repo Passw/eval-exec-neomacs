@@ -28,6 +28,14 @@ impl PreparedFrame {
         }
     }
 
+    pub(super) fn from_queued(queued: crate::thread_comm::QueuedPresentation) -> Self {
+        let mut prepared = Self::new(queued.state);
+        if queued.skipped_predecessor {
+            prepared.invalidate_row_reuse();
+        }
+        prepared
+    }
+
     pub(super) fn new(state: SealedFramePresentation) -> Self {
         let received = neomacs_display_protocol::frame_time::observe_platform_now();
         let scroll = super::frame_compositor::continuity::scroll::anchors_by_window(&state);
@@ -51,61 +59,47 @@ pub(super) struct FramePreparation {
 }
 
 impl FramePreparation {
-    /// Backpressure bounds materialized results to two queued frames and one
-    /// in flight. The evaluator's existing presentation channel remains the
-    /// input owner; this worker is its only receiver in asynchronous mode.
+    /// Two materialized results may wait for the native loop. Upstream, the
+    /// mailbox retains only the latest pending revision of each logical frame.
     pub(super) fn spawn(
-        incoming: Receiver<SealedFramePresentation>,
-        discarded: Sender<crate::thread_comm::InputEvent>,
+        incoming: crate::thread_comm::FrameReceiver,
         wake: impl Fn() + Send + 'static,
     ) -> std::io::Result<Self> {
         let (completed, ready) = bounded(2);
         let (stop, stopped) = bounded(1);
-        std::thread::Builder::new().name("neomacs-frame-prepare".into()).spawn(move || {
-            loop {
-                let state = select! {
-                    recv(stopped) -> _ => break,
-                    recv(incoming) -> state => match state { Ok(state) => state, Err(_) => break },
-                };
-                // Collapse an already queued burst per logical frame before
-                // doing expensive materialization. Bound each drain so a busy
-                // producer cannot starve preparation indefinitely.
-                let mut batch = vec![state];
-                let mut coalesced = std::collections::HashSet::new();
-                for state in incoming.try_iter().take(31) {
-                    let id = state.frame_placement.frame();
-                    if let Some(index) = batch.iter().position(|old| old.frame_placement.frame() == id) {
-                        let old = batch.remove(index);
-                        coalesced.insert(id);
-                        let event = crate::thread_comm::InputEvent::PresentationDiscarded {
-                            presentation: old.presentation().get(), emacs_frame_id: id.get(),
-                        };
-                        select! {
-                            recv(stopped) -> _ => return,
-                            send(discarded, event) -> sent => if sent.is_err() { return; },
+        std::thread::Builder::new()
+            .name("neomacs-frame-prepare".into())
+            .spawn(move || {
+                loop {
+                    if stopped.try_recv().is_ok() {
+                        break;
+                    }
+                    let state = match incoming.try_recv() {
+                        Ok(state) => state,
+                        Err(crossbeam_channel::TryRecvError::Disconnected) => break,
+                        Err(crossbeam_channel::TryRecvError::Empty) => {
+                            select! {
+                                recv(stopped) -> _ => break,
+                                recv(incoming.available()) -> _ => {},
+                            }
+                            continue;
                         }
-                    }
-                    batch.push(state);
-                }
-                for state in batch {
-                    let skipped_predecessor = coalesced.contains(&state.frame_placement.frame());
-                    let mut prepared = PreparedFrame::new(state);
-                    if skipped_predecessor {
-                        prepared.invalidate_row_reuse();
-                    }
+                    };
+                    let prepared = PreparedFrame::from_queued(state);
                     select! {
-                        recv(stopped) -> _ => return,
-                        send(completed, prepared) -> sent => if sent.is_err() { return; },
+                        recv(stopped) -> _ => break,
+                        send(completed, prepared) -> sent => if sent.is_err() { break; },
                     }
                     wake();
                 }
-            }
-        })?;
+            })?;
         Ok(Self { ready, stop })
     }
 
     pub(super) fn ready(&self) -> impl Iterator<Item = PreparedFrame> + '_ {
-        self.ready.try_iter()
+        // A producer replenishing the queue must not keep one native-loop
+        // poll running indefinitely. Each subsequent send wakes the loop.
+        self.ready.try_iter().take(2)
     }
 }
 

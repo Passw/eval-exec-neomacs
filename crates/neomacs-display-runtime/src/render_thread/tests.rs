@@ -1296,7 +1296,7 @@ fn unknown_secondary_frame_snapshot_does_not_fall_back_to_primary() {
     );
     emacs
         .frame_tx
-        .send(seal_state(FrameDisplayState::from_frame_glyph_buffer(
+        .submit(seal_state(FrameDisplayState::from_frame_glyph_buffer(
             &secondary,
         )))
         .expect("queue secondary snapshot");
@@ -1334,7 +1334,6 @@ fn installing_frame_emits_activation_before_replaced_presentation_retirement() {
             app.frame_preparation = Some(
                 super::frame_preparation::FramePreparation::spawn(
                     app.comms.frame_rx.clone(),
-                    app.comms.input_tx.clone(),
                     move || {
                         let _ = wake.send(());
                     },
@@ -1345,7 +1344,7 @@ fn installing_frame_emits_activation_before_replaced_presentation_retirement() {
 
         emacs
             .frame_tx
-            .send(presentation_state(0x42, 0, 41))
+            .submit(presentation_state(0x42, 0, 41))
             .expect("queue initial presentation");
         if asynchronous {
             wakes
@@ -1364,7 +1363,7 @@ fn installing_frame_emits_activation_before_replaced_presentation_retirement() {
 
         emacs
             .frame_tx
-            .send(presentation_state(0x42, 0, 42))
+            .submit(presentation_state(0x42, 0, 42))
             .expect("queue replacement presentation");
         if asynchronous {
             wakes
@@ -1404,11 +1403,12 @@ fn superseded_pending_frame_is_discarded_before_activation() {
 
     emacs
         .frame_tx
-        .send(presentation_state(0x51, 0x50, 51))
+        .submit(presentation_state(0x51, 0x50, 51))
         .expect("queue first deferred child");
+    app.poll_frame();
     emacs
         .frame_tx
-        .send(presentation_state(0x51, 0x50, 52))
+        .submit(presentation_state(0x51, 0x50, 52))
         .expect("queue replacement deferred child");
     app.poll_frame();
 
@@ -1484,7 +1484,7 @@ fn poll_frame_routes_nested_child_through_its_presented_ancestor_to_the_root_win
     );
     emacs
         .frame_tx
-        .send(seal_state(FrameDisplayState::from_frame_glyph_buffer(
+        .submit(seal_state(FrameDisplayState::from_frame_glyph_buffer(
             &nested,
         )))
         .unwrap();
@@ -1504,7 +1504,7 @@ fn poll_frame_routes_nested_child_through_its_presented_ancestor_to_the_root_win
 
     emacs
         .frame_tx
-        .send(seal_state(FrameDisplayState::from_frame_glyph_buffer(
+        .submit(seal_state(FrameDisplayState::from_frame_glyph_buffer(
             &parent,
         )))
         .unwrap();
@@ -1514,7 +1514,7 @@ fn poll_frame_routes_nested_child_through_its_presented_ancestor_to_the_root_win
 
     emacs
         .frame_tx
-        .send(seal_state(FrameDisplayState::from_frame_glyph_buffer(
+        .submit(seal_state(FrameDisplayState::from_frame_glyph_buffer(
             &root,
         )))
         .unwrap();
@@ -1568,7 +1568,7 @@ fn poll_frame_routes_nested_child_through_its_presented_ancestor_to_the_root_win
     );
     emacs
         .frame_tx
-        .send(seal_state(FrameDisplayState::from_frame_glyph_buffer(
+        .submit(seal_state(FrameDisplayState::from_frame_glyph_buffer(
             &cyclic_parent,
         )))
         .unwrap();
@@ -1624,11 +1624,11 @@ fn poll_frame_routes_nested_child_through_its_presented_ancestor_to_the_root_win
 #[test]
 fn asynchronous_preparation_coalesces_bursts_and_preserves_frame_identity() {
     use super::frame_preparation::FramePreparation;
-    let (incoming, receive) = crossbeam_channel::unbounded();
-    let (discarded, events) = crossbeam_channel::unbounded();
+    let (emacs, render) = ThreadComms::new().split();
+    let (incoming, receive) = (emacs.frame_tx, render.frame_rx);
     let (wake, wakes) = crossbeam_channel::unbounded();
-    incoming.send(presentation_state(1, 0, 10)).unwrap();
-    incoming.send(presentation_state(2, 1, 11)).unwrap();
+    incoming.submit(presentation_state(1, 0, 10)).unwrap();
+    incoming.submit(presentation_state(2, 1, 11)).unwrap();
     let mut latest = presentation_state(1, 0, 12).into_state();
     let mut matrix = neomacs_display_protocol::GlyphMatrix::new(1, 1);
     matrix.set_row_damage(0, neomacs_display_protocol::glyph_matrix::RowDamage::Reused);
@@ -1643,8 +1643,9 @@ fn asynchronous_preparation_coalesces_bursts_and_preserves_frame_identity() {
             text_clip_bounds: None,
             selected: true,
         });
-    incoming.send(seal_state(latest)).unwrap();
-    let worker = FramePreparation::spawn(receive, discarded, move || {
+    let superseded = incoming.submit(seal_state(latest)).unwrap().unwrap();
+    assert_eq!(superseded.presentation().get(), 10);
+    let worker = FramePreparation::spawn(receive, move || {
         let _ = wake.send(());
     })
     .unwrap();
@@ -1671,26 +1672,18 @@ fn asynchronous_preparation_coalesces_bursts_and_preserves_frame_identity() {
             item.state.materialize().glyphs.len()
         );
     }
-    assert!(matches!(
-        events.recv_timeout(timeout).unwrap(),
-        crate::thread_comm::InputEvent::PresentationDiscarded {
-            presentation: 10,
-            emacs_frame_id: 1
-        }
-    ));
-    assert!(events.try_recv().is_err());
 }
 
 #[test]
 fn asynchronous_preparation_stops_with_a_full_result_queue() {
     use super::frame_preparation::FramePreparation;
-    let (incoming, receive) = crossbeam_channel::unbounded();
-    let (discarded, _events) = crossbeam_channel::unbounded();
+    let (emacs, render) = ThreadComms::new().split();
+    let (incoming, receive) = (emacs.frame_tx, render.frame_rx);
     let (wake, wakes) = crossbeam_channel::unbounded();
     for id in 1..=4 {
-        incoming.send(presentation_state(id, 0, id)).unwrap();
+        incoming.submit(presentation_state(id, 0, id)).unwrap();
     }
-    let worker = FramePreparation::spawn(receive, discarded, move || {
+    let worker = FramePreparation::spawn(receive, move || {
         let _ = wake.send(());
     })
     .unwrap();

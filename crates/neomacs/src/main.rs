@@ -5578,7 +5578,7 @@ fn ensure_dir_string(path: &Path) -> String {
 
 fn publish_gui_frame(
     evaluator: &mut Context,
-    frame_tx: &crossbeam_channel::Sender<neomacs_display_protocol::SealedFramePresentation>,
+    frame_tx: &neomacs_display_runtime::thread_comm::FrameSender,
     render_waker: Option<&GuiEventLoopWaker>,
 ) {
     evaluator.setup_thread_locals();
@@ -5607,8 +5607,13 @@ fn publish_gui_frame(
             continue;
         };
         let (ticket, display_state) = prepared.into_submission();
-        match frame_tx.try_send(display_state) {
-            Ok(()) => sent_any = true,
+        match frame_tx.submit(display_state) {
+            Ok(superseded) => {
+                if let Some(old) = superseded {
+                    old.discard(evaluator);
+                }
+                sent_any = true;
+            }
             Err(error) => {
                 ticket.discard(evaluator);
                 tracing::debug!(
