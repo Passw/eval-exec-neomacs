@@ -29,6 +29,16 @@ pub(super) struct PreparedViewports {
 }
 
 impl PreparedViewports {
+    pub(super) fn has_computed(
+        &self,
+        frame: neovm_core::window::FrameId,
+        window: DisplayWindowId,
+    ) -> bool {
+        self.entries
+            .iter()
+            .any(|entry| entry.computed && entry.frame == frame && entry.window == window)
+    }
+
     pub(super) fn insert_computed(
         &mut self,
         frame: neovm_core::window::FrameId,
@@ -106,6 +116,7 @@ impl PreparedViewports {
         window: DisplayWindowId,
         key: &RetainedWindowKey,
         prefix: &ScrollReplay,
+        geometry: crate::buffer_source::window_geometry::BufferWindowGeometry,
         arena: &FrameFaceArena,
         force_start: bool,
     ) -> Option<(CursorOnlyReplay, PreparedFaceSnapshot)> {
@@ -117,7 +128,7 @@ impl PreparedViewports {
                 || entry.frame != frame
                 || entry.window != window
                 || entry.retained.key.window_start <= key.window_start
-                || !RetainedWindowKey::scroll_eligible(&entry.retained.key, key)
+                || !RetainedWindowKey::row_content_eligible(&entry.retained.key, key)
             {
                 return None;
             }
@@ -133,6 +144,11 @@ impl PreparedViewports {
             }
             let mut candidate = entry.retained.clone();
             candidate.key.window_start = key.window_start;
+            candidate.key.vscroll = key.vscroll;
+            candidate.matrix.resize(
+                geometry.display_text_row_base + geometry.max_rows,
+                candidate.matrix.ncols,
+            );
             candidate.presented_cursor = None;
             let snapshot = &mut candidate.display_snapshot;
             snapshot.logical_cursor = None;
@@ -165,8 +181,7 @@ impl PreparedViewports {
             }
             let mut index = last_index + 1;
             let mut y = last_row.pixel_y + last_row.height_px;
-            let bottom = snapshot.regions.text_body.y + snapshot.regions.text_body.height
-                - snapshot.regions.outer.y;
+            let bottom = geometry.visibility_bottom_y - snapshot.regions.outer.y;
             let mut next = seam;
             let mut remap = rustc_hash::FxHashMap::default();
             for (source_index, row) in entry
@@ -180,7 +195,9 @@ impl PreparedViewports {
                 if row.start_charpos != next {
                     return None;
                 }
-                if y + row.height_px > bottom {
+                if y + row.height_px > bottom
+                    || index >= geometry.display_text_row_base + geometry.max_rows
+                {
                     break;
                 }
                 let destination = candidate.matrix.rows.get_mut(index)?;
@@ -291,11 +308,16 @@ impl PreparedViewports {
                 return true;
             }
             next.get(&entry.window).is_some_and(|current| {
-                let delta = WindowDelta::between(&entry.retained.key, &current.key);
-                !delta.text_changed && !delta.properties_changed && !delta.overlays_changed
-                    && !delta.other_changed
-                    // The current viewport is already retained by the engine.
-                    && delta.window_start_moved
+                if entry.computed {
+                    RetainedWindowKey::row_content_eligible(&entry.retained.key, &current.key)
+                } else {
+                    let delta = WindowDelta::between(&entry.retained.key, &current.key);
+                    !delta.text_changed
+                        && !delta.properties_changed
+                        && !delta.overlays_changed
+                        && !delta.other_changed
+                        && delta.window_start_moved
+                }
             })
         });
         let Some(faces) = faces else {

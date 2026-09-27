@@ -244,6 +244,15 @@ pub struct RetainedWindowKey {
 }
 
 impl RetainedWindowKey {
+    /// Row contents are independent of their viewport start and pixel offset.
+    /// Keep every source, font, window-policy and geometry invalidator intact.
+    pub(crate) fn row_content_eligible(previous: &Self, current: &Self) -> bool {
+        let mut placed = current.clone();
+        placed.window_start = previous.window_start;
+        placed.vscroll = previous.vscroll;
+        Self::cursor_only_eligible(previous, &placed)
+    }
+
     /// Snapshot the layout inputs from the resolved window params for this pass,
     /// reading the per-buffer invalidation ticks + global face counter from the
     /// evaluator. A missing buffer falls back to zero ticks (it will not match a
@@ -1239,10 +1248,33 @@ impl RetainedWindowMatrix {
     /// top. The engine limits that optimization to small moves. Vscroll, line
     /// numbers, and unsafe continuation/truncation rows bail conservatively.
     pub fn scroll_replay(&self, curr: &RetainedWindowKey) -> Option<ScrollReplay> {
+        self.scroll_replay_for_placement(curr, None)
+    }
+
+    /// A shifted prefix for joining with prepared coverage. It is not a
+    /// partial-walk plan: the join must certify the complete target viewport.
+    pub(crate) fn prepared_projection_prefix(
+        &self,
+        curr: &RetainedWindowKey,
+        text_y: f32,
+    ) -> Option<ScrollReplay> {
+        self.scroll_replay_for_placement(curr, Some(text_y))
+    }
+
+    fn scroll_replay_for_placement(
+        &self,
+        curr: &RetainedWindowKey,
+        projected_y: Option<f32>,
+    ) -> Option<ScrollReplay> {
         if self.validity != MatrixValidity::Valid {
             return None;
         }
-        if !RetainedWindowKey::scroll_eligible(&self.key, curr) || curr.vscroll != 0 {
+        let eligible = if projected_y.is_some() {
+            RetainedWindowKey::row_content_eligible(&self.key, curr)
+        } else {
+            RetainedWindowKey::scroll_eligible(&self.key, curr) && curr.vscroll == 0
+        };
+        if !eligible {
             return None;
         }
         // Collect body rows in matrix order; bail on anything that the uniform
@@ -1271,6 +1303,9 @@ impl RetainedWindowMatrix {
             body.push((idx, row));
         }
         if body.len() < 2 {
+            return None;
+        }
+        if projected_y.is_some() && curr.window_start < body[0].1.start_charpos as i64 {
             return None;
         }
         // Whole-row scroll distance: the body row whose start matches the new
@@ -1311,11 +1346,11 @@ impl RetainedWindowMatrix {
         let s = body.iter().position(|(_, row)| {
             row.displays_text && row.start_charpos as i64 == curr.window_start
         })?;
-        if s == 0 {
+        if s == 0 && projected_y.is_none() {
             return None;
         }
         let last = body.len() - 1;
-        let dvpos = body[0].1.pixel_y - body[s].1.pixel_y;
+        let dvpos = projected_y.unwrap_or(body[0].1.pixel_y) - body[s].1.pixel_y;
         let dvpos_i64 = dvpos.round() as i64;
         // old matrix row index → new matrix row index for each reused row.
         let mut remap: rustc_hash::FxHashMap<i64, i64> = rustc_hash::FxHashMap::default();
@@ -1363,7 +1398,7 @@ impl RetainedWindowMatrix {
             reused_row_snapshots,
             reused_points,
             walk_start: PartialBodyWalkStart::new(last_row.end_charpos as i64 + 1),
-            exposed_row_base: body[last - s + 1].0,
+            exposed_row_base: body.get(last - s + 1).map_or(body[last].0 + 1, |row| row.0),
             exposed_row_count: s,
             exposed_text_y: last_row.pixel_y + dvpos + last_row.height_px,
             new_window_start: curr.window_start,

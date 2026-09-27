@@ -208,7 +208,10 @@ focus_follows_mouse yes
             .env("NEOMACS_DEBUG_SURFACE_READBACK", "10000")
             .env("NEOMACS_DEBUG_SURFACE_READBACK_PNG", &pixels_path)
             .env("WAYLAND_DEBUG", "1")
-            .env("NEOMACS_LAYOUT_STATS_FILE", artifacts.join("layout-stats.log"));
+            .env(
+                "NEOMACS_LAYOUT_STATS_FILE",
+                artifacts.join("layout-stats.log"),
+            );
     }
     command.env_remove("NEOMACS_GUI_SCROLL_RICH");
     if rich {
@@ -369,7 +372,15 @@ focus_follows_mouse yes
                 .unwrap();
         }
         eprintln!("step={step} before={previous} after={current}; artifacts={artifacts:?}");
-        if !timing_only && !rich && matches!(kind, ScrollKind::Page | ScrollKind::Wheel) && step == 3 {
+        if !timing_only
+            && !rich
+            && matches!(target, ScrollTarget::Selected)
+            && matches!(
+                kind,
+                ScrollKind::Page | ScrollKind::Wheel | ScrollKind::Precise
+            )
+            && step == 3
+        {
             // These four forward viewports have never been displayed. Historical page
             // replay cannot satisfy this check: idle worker coverage must
             // actually reach the native command's accepted presentation.

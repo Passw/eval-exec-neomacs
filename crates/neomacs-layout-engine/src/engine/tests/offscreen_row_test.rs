@@ -677,6 +677,32 @@ fn idle_first_visit_styled(
     step: Option<usize>,
     styled: bool,
 ) {
+    idle_first_visit_projected(backward, redisplay_between_steps, step, styled, 0);
+}
+
+#[test]
+fn idle_worker_rows_cover_fractional_scroll_placement() {
+    for hidden in [1, 4, 12] {
+        for step in [0, 1, 3] {
+            idle_first_visit_projected(false, false, Some(step), false, hidden);
+        }
+    }
+}
+
+#[test]
+fn idle_worker_fractional_scroll_preserves_mixed_face_geometry() {
+    for step in [0, 1, 3] {
+        idle_first_visit_projected(false, false, Some(step), true, 4);
+    }
+}
+
+fn idle_first_visit_projected(
+    backward: bool,
+    redisplay_between_steps: bool,
+    step: Option<usize>,
+    styled: bool,
+    hidden: i32,
+) {
     let line = "ordinary offscreen text\n";
     let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
     eval.frame_manager_mut()
@@ -753,21 +779,33 @@ fn idle_first_visit_styled(
         start as i64 + 1,
         start + 5 * line.len(),
     );
-    if let neovm_core::window::Window::Leaf { force_start, .. } = eval
-        .frame_manager_mut()
-        .get_mut(frame)
-        .unwrap()
-        .find_window_mut(window)
-        .unwrap()
-    {
-        *force_start = true;
+    let offsets = if hidden == 0 {
+        vec![0]
+    } else {
+        vec![hidden, 2, 14, 1, 0, 6]
+    };
+    for hidden in offsets {
+        if let neovm_core::window::Window::Leaf {
+            force_start,
+            vscroll,
+            ..
+        } = eval
+            .frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .find_window_mut(window)
+            .unwrap()
+        {
+            *force_start = true;
+            *vscroll = -hidden;
+        }
+        engine.layout_frame_rust(&mut eval, frame);
+        assert_eq!(engine.last_layout_stats().prepared_windows, 1);
+        let actual = selected_window_layout_trace(&eval, &engine, frame);
+        let mut fresh = LayoutEngine::new();
+        fresh.layout_frame_rust(&mut eval, frame);
+        assert_eq!(actual, selected_window_layout_trace(&eval, &fresh, frame));
     }
-    engine.layout_frame_rust(&mut eval, frame);
-    assert_eq!(engine.last_layout_stats().prepared_windows, 1);
-    let actual = selected_window_layout_trace(&eval, &engine, frame);
-    let mut fresh = LayoutEngine::new();
-    fresh.layout_frame_rust(&mut eval, frame);
-    assert_eq!(actual, selected_window_layout_trace(&eval, &fresh, frame));
 }
 
 #[test]

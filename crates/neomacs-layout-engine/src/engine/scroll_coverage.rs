@@ -190,7 +190,8 @@ impl LayoutEngine {
                 .is_some_and(|(old_frame, old_window, key)| {
                     *old_frame == frame.id
                         && *old_window == window_id
-                        && RetainedWindowKey::cursor_only_eligible(key, &retained.key)
+                        && key.window_start == retained.key.window_start
+                        && RetainedWindowKey::row_content_eligible(key, &retained.key)
                 });
         if !unchanged {
             self.scroll_coverage.cancel();
@@ -290,7 +291,6 @@ impl LayoutEngine {
             .ok_or(RowProgramError::Unsupported)?;
         let key = &retained.key;
         if key.hscroll != 0
-            || key.vscroll != 0
             || key.selective_display != 0
             || key.show_trailing_whitespace
             || key.display_line_numbers != crate::types::DisplayLineNumbersMode::Off
@@ -356,6 +356,7 @@ impl LayoutEngine {
             chrome_fingerprints: None,
         };
         retained.key.window_start = start.get() as i64;
+        retained.key.vscroll = 0;
         self.scroll_coverage.worker.cancel();
         self.scroll_coverage.admission = None;
         self.scroll_coverage.capture = Some(Capture {

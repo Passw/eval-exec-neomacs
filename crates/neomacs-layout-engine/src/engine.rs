@@ -2104,16 +2104,30 @@ impl LayoutEngine {
                             is_edit = false;
                         }
                     }
-                    if cursor_only.is_none() && !is_edit
-                        && let Some(prefix) = &scroll
-                        && let Some((replay, faces)) = self.prepared_viewports.complete_forward_scroll(
-                            frame_id, DisplayWindowId::new(params.window_id), key,
-                            prefix, &committed_face_arena, params.force_start,
-                        )
+                    if cursor_only.is_none() && !is_edit && !params.is_minibuffer()
+                        && self.prepared_viewports.has_computed(frame_id, DisplayWindowId::new(params.window_id))
+                        && params.display_line_numbers == crate::types::DisplayLineNumbersMode::Off
                     {
-                        cursor_only = Some(replay);
-                        prepared_faces = Some(faces);
-                        scroll = None;
+                        let geometry = BufferWindowGeometryRequest::new(
+                            params, layout_box, params.char_width, params.char_height,
+                        ).into_geometry(crate::display_row::walk_state::LineNumberFieldLayout::new(
+                            0, params.char_width,
+                        ));
+                        let projected = scroll.is_none().then(|| self.retained_window_matrices
+                            .get(&DisplayWindowId::new(params.window_id))
+                            .and_then(|previous| previous.prepared_projection_prefix(
+                                key, geometry.text_y - geometry.vscroll - params.bounds.y,
+                            ))).flatten();
+                        if let Some(prefix) = scroll.as_ref().or(projected.as_ref())
+                            && let Some((replay, faces)) = self.prepared_viewports.complete_forward_scroll(
+                                frame_id, DisplayWindowId::new(params.window_id), key,
+                                prefix, geometry, &committed_face_arena, params.force_start,
+                            )
+                        {
+                            cursor_only = Some(replay);
+                            prepared_faces = Some(faces);
+                            scroll = None;
+                        }
                     }
                     IncrementalWindowPlan {
                         prepared_faces,
