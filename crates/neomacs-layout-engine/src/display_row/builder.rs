@@ -2579,15 +2579,18 @@ impl<'layout, 'row, 'measurer> DisplayRowWriter<'layout, 'row, 'measurer> {
             };
             glyph.vertical_offset_px = item_layout.vertical_offset_px(reference_height);
         }
-        let vertical_metrics = self.row.glyphs[area_index][before_len..]
-            .iter()
-            .filter_map(|glyph| {
+        // Read one glyph's metrics before mutating the row extent. Keeping
+        // those borrows separate avoids allocating a temporary vector for
+        // every emitted character, while preserving the accumulation order.
+        for index in before_len..self.row.glyphs[area_index].len() {
+            let metrics = {
+                let glyph = &self.row.glyphs[area_index][index];
                 DisplayRowVerticalMetrics::from_glyph(glyph)
                     .map(|metrics| metrics.with_vertical_offset(glyph.vertical_offset_px))
-            })
-            .collect::<Vec<_>>();
-        for metrics in vertical_metrics {
-            metrics.include_in_row(self.row);
+            };
+            if let Some(metrics) = metrics {
+                metrics.include_in_row(self.row);
+            }
         }
     }
 
