@@ -8,10 +8,10 @@
 //! family rather than one package.
 //!
 //! A suite's `harness.rs` keeps what is genuinely its own: readiness markers,
-//! package-specific capture, and the tolerances that differ. Gruvbox, for
-//! instance, keeps its own `invoke` because it allows its M-x prompt the same
-//! twenty seconds as its readiness marker, rather than the eight the other
-//! suites use.
+//! package-specific capture, and the values it waits on. A wait's tolerance
+//! stays at its call site -- `invoke_with_prompt_timeout` for a prompt that
+//! follows a heavy screen -- so a suite can be patient where it has reason to
+//! be without forking the helper.
 
 use crate::TuiSession;
 use crate::package_scenario::PackageTuiPair;
@@ -41,8 +41,24 @@ pub fn wait_for(
 
 /// Type `M-x <command> RET` into `session` and wait for the `ready` marker.
 pub fn invoke(session: &mut TuiSession, command: &str, ready: &str) {
+    invoke_with_prompt_timeout(session, command, ready, Duration::from_secs(8))
+}
+
+/// As [`invoke`], but with an explicit budget for the `M-x` prompt.
+///
+/// The prompt opens when the editor next reads keys, and an editor still
+/// working through a large asynchronous screen -- Magit inserting a status
+/// buffer runs several git processes and fontifies the result -- can take
+/// longer than the default to get there, however quickly the screen itself
+/// settles.
+pub fn invoke_with_prompt_timeout(
+    session: &mut TuiSession,
+    command: &str,
+    ready: &str,
+    prompt_timeout: Duration,
+) {
     session.send_keys("M-x");
-    wait_for(session, Duration::from_secs(8), "M-x prompt", |grid| {
+    wait_for(session, prompt_timeout, "M-x prompt", |grid| {
         grid.iter().any(|row| row.contains("M-x"))
     });
     session.send(command.as_bytes());

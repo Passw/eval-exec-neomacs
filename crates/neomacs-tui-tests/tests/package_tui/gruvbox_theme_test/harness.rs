@@ -9,7 +9,9 @@ use super::prelude::GRUVBOX_TUI_PRELUDE;
 use expect_test::{Expect, ExpectFile, expect};
 // Re-exported so the sibling modules reach the shared vocabulary the same way
 // they reach this module's own helpers.
-pub(super) use neomacs_tui_tests::package_harness::{catch_phase, wait_for};
+pub(super) use neomacs_tui_tests::package_harness::{
+    catch_phase, invoke_with_prompt_timeout, wait_for,
+};
 use neomacs_tui_tests::{RawTerminalSnapshot, Snapshot, TuiSession};
 use std::time::Duration;
 
@@ -55,24 +57,12 @@ pub(super) fn oracle() -> CachedMelpaOracle {
 /// Gruvbox allows every wait the same twenty seconds, the M-x prompt included.
 pub(super) const WAIT_TIMEOUT: Duration = Duration::from_secs(20);
 
-pub(super) fn invoke(session: &mut TuiSession, command: &str, ready: &str) {
-    session.send_keys("M-x");
-    wait_for(session, WAIT_TIMEOUT, "M-x prompt", |grid| {
-        grid.iter().any(|row| row.contains("M-x"))
-    });
-    session.send(command.as_bytes());
-    session.send_keys("RET");
-    wait_for(session, WAIT_TIMEOUT, ready, |grid| {
-        grid.iter().any(|row| row.contains(ready))
-    });
-}
-
 pub(super) fn invoke_both(pair: &mut PackageTuiPair, command: &str, ready: &str) {
     let gnu = catch_phase(&format!("GNU {command}"), || {
-        invoke(&mut pair.gnu, command, ready)
+        invoke_with_prompt_timeout(&mut pair.gnu, command, ready, WAIT_TIMEOUT)
     });
     let neo = catch_phase(&format!("Neo {command}"), || {
-        invoke(&mut pair.neo, command, ready)
+        invoke_with_prompt_timeout(&mut pair.neo, command, ready, WAIT_TIMEOUT)
     });
     let errors = [gnu.err(), neo.err()]
         .into_iter()
