@@ -39,7 +39,7 @@ pub mod scenario {
 
 pub const ACE_WINDOW_MELPA_PIN: (&str, &str) = ("ace-window", "20220911.358");
 pub const BEACON_MELPA_PIN: (&str, &str) = ("beacon", "20220730.100");
-pub const COMPAT_GNU_ELPA_PIN: (&str, &str) = ("compat", "31.0.0.2");
+pub const COMPAT_GNU_ELPA_PIN: (&str, &str) = ("compat", "31.1.0.0");
 pub const CORFU_MELPA_PIN: (&str, &str) = ("corfu", "20260802.2028");
 pub const GRUVBOX_THEME_MELPA_PIN: (&str, &str) = ("gruvbox-theme", "20250117.222");
 pub const HELM_CORE_MELPA_PIN: (&str, &str) = ("helm-core", "20260720.1307");
