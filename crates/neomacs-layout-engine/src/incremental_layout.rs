@@ -1178,7 +1178,14 @@ impl RetainedWindowMatrix {
         // Ungated, this rejected every frame of a window nothing had touched --
         // 200 consecutive frames of the rust-lsp-typing fixture rebuilt a
         // 7-row window in full with `differing=[]`.
-        if point_moved && !force_start {
+        // A forced start may still move point out of a clipped boundary row.
+        // Only a completely visible cursor row can bypass the recenter guard.
+        let body = curr.partition.text_body();
+        let cursor_top = cursor_row.pixel_y + self.display_snapshot.regions.outer.y;
+        let forced_visible = force_start
+            && cursor_top >= body.y
+            && cursor_top + cursor_row.height_px <= body.y + body.height;
+        if point_moved && !forced_visible {
             if Some(new_cursor_row_index) == last_body_index && !cursor_row.ends_at_zv {
                 return Err(CursorOnlyDecline::PointMoveMayScrollDown);
             }

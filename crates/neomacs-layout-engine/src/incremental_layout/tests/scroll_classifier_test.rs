@@ -136,6 +136,25 @@ fn cursor_only_reuses_an_untouched_window_whose_point_sits_on_the_last_row() {
 }
 
 #[test]
+fn forced_start_reuse_still_rejects_a_point_move_into_a_clipped_bottom_row() {
+    let mut retained = synthetic_matrix(0, 5);
+    let mut current = retained.key.clone();
+    current.point = 46;
+    assert!(
+        retained
+            .cursor_only_replay_with_forced_start(&current, true)
+            .is_ok()
+    );
+    MatrixRow::make_mut(&mut retained.matrix.rows[4]).pixel_y = 590.0;
+    assert_eq!(
+        retained
+            .cursor_only_replay_with_forced_start(&current, true)
+            .err(),
+        Some(CursorOnlyDecline::PointMoveMayScrollDown)
+    );
+}
+
+#[test]
 fn scroll_replay_detects_whole_row_scroll_down() {
     let m = synthetic_matrix(0, 5); // rows start at 0,10,20,30,40
     let curr = synthetic_key(20, 25); // scrolled to row 2, point followed
