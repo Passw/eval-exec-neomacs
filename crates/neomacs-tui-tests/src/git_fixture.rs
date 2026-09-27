@@ -60,6 +60,13 @@ pub struct GitFixtureSpec {
     pub file: &'static str,
     /// Commits, oldest first.
     pub commits: &'static [GitCommitSpec],
+    /// Contents left in the working tree AFTER the last commit, with the index
+    /// untouched, so the repository starts with one unstaged modification.
+    ///
+    /// `None` leaves the working tree clean. This is the state a status or diff
+    /// screen reads, and it is written here rather than by the editors so both
+    /// peers see the same one.
+    pub worktree: Option<&'static str>,
 }
 
 /// One commit in a fixture repository.
@@ -117,6 +124,11 @@ impl GitFixture {
                     ("GIT_COMMITTER_DATE", commit.timestamp),
                 ],
             )?;
+        }
+        if let Some(contents) = spec.worktree {
+            std::fs::write(fixture.path.join(spec.file), contents).map_err(|error| {
+                format!("write git fixture working tree {}: {error}", spec.file)
+            })?;
         }
         Ok(fixture)
     }

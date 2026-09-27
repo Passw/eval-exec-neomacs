@@ -24,6 +24,7 @@ const SPEC: GitFixtureSpec = GitFixtureSpec {
             contents: "one\ntwo\n",
         },
     ],
+    worktree: None,
 };
 
 /// Run git in `repo`, clearing the host's redirects as the fixture does -- an
@@ -113,6 +114,52 @@ fn hostile_host_environment_cannot_change_the_fixture() {
         git(&canary, &["rev-list", "--all", "--count"]),
         "0",
         "the fixture wrote into the repository the host pointed at"
+    );
+}
+
+/// A spec that leaves a working-tree change starts dirty, and stays dirty in
+/// exactly one place: the working tree.  What a status or diff screen reads is
+/// this difference, so it has to be the fixture's own file contents and not the
+/// index, the commit, or anything another commit would carry.
+#[test]
+fn worktree_contents_start_unstaged() {
+    const DIRTY: GitFixtureSpec = GitFixtureSpec {
+        worktree: Some("one\nchanged\n"),
+        ..SPEC
+    };
+    let sandbox = TuiTempDirectory::new("tui-git-dirty-");
+    let fixture = GitFixture::create(sandbox.path(), &DIRTY).expect("create dirty fixture");
+
+    assert_eq!(
+        std::fs::read_to_string(fixture.path().join("tracked.txt"))
+            .expect("read working tree file"),
+        "one\nchanged\n",
+        "the working tree holds the spec's contents"
+    );
+    assert_eq!(
+        git(fixture.path(), &["show", "HEAD:tracked.txt"]),
+        "one\ntwo",
+        "the commits are unaffected by the working-tree change"
+    );
+    assert_eq!(
+        git(fixture.path(), &["diff", "--name-only"]),
+        "tracked.txt",
+        "the change is unstaged, so it is what a status screen lists"
+    );
+    assert_eq!(
+        git(fixture.path(), &["diff", "--cached", "--name-only"]),
+        "",
+        "nothing is staged"
+    );
+    // `git` trims its output, so the index column's blank is gone: "M" here is
+    // the *worktree* column, which is what makes the change unstaged.
+    assert_eq!(
+        git(
+            fixture.path(),
+            &["status", "--porcelain", "--untracked-files=no"]
+        ),
+        "M tracked.txt",
+        "one unstaged modification and nothing else"
     );
 }
 
