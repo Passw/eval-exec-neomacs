@@ -1,11 +1,15 @@
 use std::time::Duration;
 
 use expect_test::{expect, expect_file};
-use neomacs_tui_tests::{RawTerminalSnapshot, Snapshot, TuiSession};
+use neomacs_tui_tests::Snapshot;
 
 use super::{CachedMelpaOracle, LEUVEN_THEME_MELPA_PIN};
 
-use super::scenario::{PackageTuiPair, PackageTuiScenario, PairTimeout, ReadinessCheckpoint};
+use super::scenario::{
+                         PackageTuiScenario,
+                         PairTimeout,
+                         ReadinessCheckpoint,
+                     };
 
 mod harness;
 mod prelude;

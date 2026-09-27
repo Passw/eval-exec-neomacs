@@ -1,6 +1,4 @@
-use super::super::scenario::{
-    PackageTuiPair, PackageTuiScenario, PairTimeout, ReadinessCheckpoint,
-};
+use super::super::scenario::PackageTuiPair;
 use super::prelude::*;
 use neomacs_tui_tests::{RawTerminalSnapshot, Snapshot, TuiSession};
 use std::time::Duration;
