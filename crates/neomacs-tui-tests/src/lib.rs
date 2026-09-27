@@ -2157,6 +2157,7 @@ mod git_fixture_tests;
 mod snapshot_tests;
 
 pub mod git_fixture;
+pub mod package_harness;
 pub mod package_scenario;
 #[allow(dead_code)]
 pub mod pair;

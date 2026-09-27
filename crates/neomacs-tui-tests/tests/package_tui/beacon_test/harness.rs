@@ -1,82 +1,12 @@
 use super::super::scenario::PackageTuiPair;
 use expect_test::Expect;
+// Re-exported so the sibling modules reach the shared vocabulary the same way
+// they reach this module's own helpers.
+pub(super) use neomacs_tui_tests::package_harness::{
+    both, catch_phase, exact_row, invoke, wait_for,
+};
 use neomacs_tui_tests::{RawTerminalSnapshot, TuiSession};
-use std::any::Any;
-use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::time::{Duration, Instant};
-
-pub(super) fn wait_for(
-    session: &mut TuiSession,
-    timeout: Duration,
-    description: &str,
-    predicate: impl Fn(&[String]) -> bool,
-) {
-    session.read_until(timeout, |grid| predicate(grid));
-    let grid = session.text_grid();
-    assert!(
-        predicate(&grid),
-        "{} timed out waiting for {description}:\n{}",
-        session.name,
-        grid.join("\n")
-    );
-}
-
-pub(super) fn invoke(session: &mut TuiSession, command: &str, ready: &str) {
-    session.send_keys("M-x");
-    wait_for(session, Duration::from_secs(8), "M-x prompt", |grid| {
-        grid.iter().any(|row| row.contains("M-x"))
-    });
-    session.send(command.as_bytes());
-    session.send_keys("RET");
-    wait_for(session, Duration::from_secs(20), ready, |grid| {
-        grid.iter().any(|row| row.contains(ready))
-    });
-}
-
-pub(super) fn panic_text(payload: Box<dyn Any + Send>) -> String {
-    payload
-        .downcast_ref::<String>()
-        .cloned()
-        .or_else(|| {
-            payload
-                .downcast_ref::<&str>()
-                .map(|value| (*value).to_owned())
-        })
-        .unwrap_or_else(|| "non-string panic payload".to_owned())
-}
-
-pub(super) fn catch_phase<T>(label: &str, phase: impl FnOnce() -> T) -> Result<T, String> {
-    catch_unwind(AssertUnwindSafe(phase))
-        .map_err(|payload| format!("{label}: {}", panic_text(payload)))
-}
-
-pub(super) fn both(
-    pair: &mut PackageTuiPair,
-    label: &str,
-    operation: impl Fn(&mut TuiSession) + Copy,
-) -> Result<(), String> {
-    let gnu = catch_phase(&format!("GNU {label}"), || operation(&mut pair.gnu));
-    let neo = catch_phase(&format!("Neo {label}"), || operation(&mut pair.neo));
-    let errors = [gnu.err(), neo.err()]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>();
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors.join("\n"))
-    }
-}
-
-pub(super) fn exact_row(session: &TuiSession, marker: &str) -> String {
-    session
-        .text_grid()
-        .into_iter()
-        .find(|row| row.contains(marker))
-        .unwrap_or_else(|| panic!("{} did not render {marker:?}", session.name))
-        .trim()
-        .to_owned()
-}
 
 pub(super) fn push_rows(
     pair: &PackageTuiPair,

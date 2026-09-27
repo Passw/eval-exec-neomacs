@@ -7,9 +7,10 @@ use super::super::{
 };
 use super::prelude::GRUVBOX_TUI_PRELUDE;
 use expect_test::{Expect, ExpectFile, expect};
+// Re-exported so the sibling modules reach the shared vocabulary the same way
+// they reach this module's own helpers.
+pub(super) use neomacs_tui_tests::package_harness::{catch_phase, wait_for};
 use neomacs_tui_tests::{RawTerminalSnapshot, Snapshot, TuiSession};
-use std::any::Any;
-use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::time::Duration;
 
 pub(super) const REPORT_PREFIXES: &[&str] = &[
@@ -51,47 +52,19 @@ pub(super) fn oracle() -> CachedMelpaOracle {
         .with_prelude(GRUVBOX_TUI_PRELUDE)
 }
 
-pub(super) fn wait_for<F>(session: &mut TuiSession, description: &str, predicate: F)
-where
-    F: Fn(&[String]) -> bool,
-{
-    session.read_until(Duration::from_secs(20), |grid| predicate(grid));
-    let grid = session.text_grid();
-    assert!(
-        predicate(&grid),
-        "{} timed out waiting for {description}:\n{}",
-        session.name,
-        grid.join("\n")
-    );
-}
+/// Gruvbox allows every wait the same twenty seconds, the M-x prompt included.
+pub(super) const WAIT_TIMEOUT: Duration = Duration::from_secs(20);
 
 pub(super) fn invoke(session: &mut TuiSession, command: &str, ready: &str) {
     session.send_keys("M-x");
-    wait_for(session, "M-x prompt", |grid| {
+    wait_for(session, WAIT_TIMEOUT, "M-x prompt", |grid| {
         grid.iter().any(|row| row.contains("M-x"))
     });
     session.send(command.as_bytes());
     session.send_keys("RET");
-    wait_for(session, ready, |grid| {
+    wait_for(session, WAIT_TIMEOUT, ready, |grid| {
         grid.iter().any(|row| row.contains(ready))
     });
-}
-
-pub(super) fn panic_text(payload: Box<dyn Any + Send>) -> String {
-    payload
-        .downcast_ref::<String>()
-        .cloned()
-        .or_else(|| {
-            payload
-                .downcast_ref::<&str>()
-                .map(|value| (*value).to_owned())
-        })
-        .unwrap_or_else(|| "non-string panic payload".to_owned())
-}
-
-pub(super) fn catch_phase<T>(label: &str, phase: impl FnOnce() -> T) -> Result<T, String> {
-    catch_unwind(AssertUnwindSafe(phase))
-        .map_err(|payload| format!("{label}: {}", panic_text(payload)))
 }
 
 pub(super) fn invoke_both(pair: &mut PackageTuiPair, command: &str, ready: &str) {
@@ -306,29 +279,45 @@ pub(super) fn record_properties(
 
 pub(super) fn drive_orderless_completion(session: &mut TuiSession) -> (String, String) {
     session.send_keys("M-x");
-    wait_for(session, "M-x before Orderless completion", |grid| {
-        grid.iter().any(|row| row.contains("M-x"))
-    });
+    wait_for(
+        session,
+        WAIT_TIMEOUT,
+        "M-x before Orderless completion",
+        |grid| grid.iter().any(|row| row.contains("M-x")),
+    );
     session.send(b"gt357-orderless-select");
     session.send_keys("RET");
-    wait_for(session, "real Orderless minibuffer prompt", |grid| {
-        grid.iter().any(|row| row.contains("Gruvbox Orderless:"))
-    });
+    wait_for(
+        session,
+        WAIT_TIMEOUT,
+        "real Orderless minibuffer prompt",
+        |grid| grid.iter().any(|row| row.contains("Gruvbox Orderless:")),
+    );
     session.send(b"alp b gam del");
     session.send_keys("TAB");
-    wait_for(session, "Orderless four-component completion row", |grid| {
-        grid.iter()
-            .any(|row| row.contains("alpha beta gamma delta"))
-    });
+    wait_for(
+        session,
+        WAIT_TIMEOUT,
+        "Orderless four-component completion row",
+        |grid| {
+            grid.iter()
+                .any(|row| row.contains("alpha beta gamma delta"))
+        },
+    );
     let grid = ansi_rows(session, &["alpha beta gamma delta"]);
     session.send_keys("C-a");
     session.send_keys("C-k");
     session.send(b"alpha beta gamma delta");
     session.send_keys("RET");
-    wait_for(session, "completed Orderless selection", |grid| {
-        grid.iter()
-            .any(|row| row.contains("GRUVBOX-ORDERLESS-READY"))
-    });
+    wait_for(
+        session,
+        WAIT_TIMEOUT,
+        "completed Orderless selection",
+        |grid| {
+            grid.iter()
+                .any(|row| row.contains("GRUVBOX-ORDERLESS-READY"))
+        },
+    );
     (grid, report(session))
 }
 
