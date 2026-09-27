@@ -201,12 +201,14 @@ focus_follows_mouse yes
     command
         .env_remove("NEOMACS_DEBUG_SURFACE_READBACK")
         .env_remove("NEOMACS_DEBUG_SURFACE_READBACK_PNG")
-        .env_remove("WAYLAND_DEBUG");
+        .env_remove("WAYLAND_DEBUG")
+        .env_remove("NEOMACS_LAYOUT_STATS_FILE");
     if !timing_only {
         command
             .env("NEOMACS_DEBUG_SURFACE_READBACK", "10000")
             .env("NEOMACS_DEBUG_SURFACE_READBACK_PNG", &pixels_path)
-            .env("WAYLAND_DEBUG", "1");
+            .env("WAYLAND_DEBUG", "1")
+            .env("NEOMACS_LAYOUT_STATS_FILE", artifacts.join("layout-stats.log"));
     }
     command.env_remove("NEOMACS_GUI_SCROLL_RICH");
     if rich {

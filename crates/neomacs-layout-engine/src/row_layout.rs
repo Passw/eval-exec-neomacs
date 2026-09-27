@@ -1,6 +1,5 @@
-//! Experimental owned row inputs, exercised against the canonical writer in tests.
+//! Owned row inputs for bounded off-screen workers.
 //!
-//! Kept out of production until an off-screen consumer is integrated.
 //! Resolved natural text, source-mapped text and literal spacing are admitted.
 //! Complete physical-line programs carry geometry, captured font measurements
 //! and work budgets. A bounded worker executes them without evaluator state.

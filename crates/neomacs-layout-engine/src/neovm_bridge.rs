@@ -6,9 +6,7 @@
 use std::cmp::Ordering;
 
 mod buffer_snapshot;
-#[cfg(test)]
 mod borrowed_buffer;
-#[cfg(test)]
 pub(crate) use borrowed_buffer::BorrowedLayoutBuffer;
 pub(crate) use buffer_snapshot::LayoutBufferSnapshot;
 use buffer_snapshot::capture_string_composition_rules;

@@ -56,7 +56,6 @@ pub mod neovm_bridge;
 pub(crate) mod output;
 pub(crate) mod presentation;
 pub(crate) mod redisplay_fontification;
-#[cfg(test)]
 pub(crate) mod row_layout;
 pub(crate) mod scroll_policy;
 pub mod text_shaper;

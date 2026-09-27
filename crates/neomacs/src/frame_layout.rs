@@ -144,6 +144,9 @@ pub fn install_frame_snapshot_fn(evaluator: &mut Context) {
 /// the renderer presentation lifecycle. Both GUI and TTY install this adapter;
 /// batch mode intentionally does not.
 pub fn install_window_layout_query_fn(evaluator: &mut Context) {
+    evaluator.display_idle_maintenance_fn = Some(Box::new(|eval| {
+        REDISPLAY_RUNTIME.with(|runtime| runtime.maintain_scroll_coverage(eval))
+    }));
     evaluator.install_window_layout_query(|eval, frame_id, window_id, scope| {
         REDISPLAY_RUNTIME.with(|runtime| runtime.query_window(eval, frame_id, window_id, scope))
     });

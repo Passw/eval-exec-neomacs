@@ -28,7 +28,6 @@ pub(super) struct PreparedViewports {
 }
 
 impl PreparedViewports {
-    #[cfg(test)]
     pub(super) fn insert_computed(
         &mut self,
         frame: neovm_core::window::FrameId,

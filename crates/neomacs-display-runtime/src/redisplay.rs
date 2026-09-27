@@ -122,6 +122,13 @@ pub struct RedisplayRuntime {
 }
 
 impl RedisplayRuntime {
+    pub fn maintain_scroll_coverage(&self, evaluator: &Context) -> Option<std::time::Duration> {
+        self.engine
+            .try_borrow_mut()
+            .ok()?
+            .maintain_scroll_coverage(evaluator)
+    }
+
     /// Construct a runtime without the expensive scalable-font database.
     /// GUI startup enables it explicitly; TTY keeps cell metrics.
     pub fn new_without_font_metrics() -> Self {

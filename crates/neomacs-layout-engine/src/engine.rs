@@ -5,7 +5,6 @@
 //! grid, and publishes `FrameDisplayState` snapshots for render backends.
 
 mod prepared_viewports;
-#[cfg(test)]
 mod scroll_coverage;
 use prepared_viewports::PreparedViewports;
 
@@ -768,7 +767,6 @@ pub struct LayoutEngine {
     /// replay. Speculative attempts never replace this state.
     retained_window_matrices: rustc_hash::FxHashMap<DisplayWindowId, RetainedWindowMatrix>,
     prepared_viewports: PreparedViewports,
-    #[cfg(test)]
     scroll_coverage: scroll_coverage::ScrollCoverage,
     /// Every OTHER frame's retained state, parked while this one is laid out.
     ///
@@ -1223,6 +1221,7 @@ impl LayoutEngine {
         self.frame_face_arenas.clear();
         self.retained_window_matrices.clear();
         self.prepared_viewports = PreparedViewports::default();
+        self.scroll_coverage.cancel();
         self.retained_window_chrome_metrics.clear();
         self.last_frame_display_state = None;
         self.reset_frame_attempt_state();
@@ -1390,7 +1389,6 @@ impl LayoutEngine {
             frame_face_arenas: rustc_hash::FxHashMap::default(),
             retained_window_matrices: rustc_hash::FxHashMap::default(),
             prepared_viewports: PreparedViewports::default(),
-            #[cfg(test)]
             scroll_coverage: scroll_coverage::ScrollCoverage::default(),
             retained_by_frame: rustc_hash::FxHashMap::default(),
             retained_frame: None,
@@ -1426,7 +1424,6 @@ impl LayoutEngine {
             frame_face_arenas: rustc_hash::FxHashMap::default(),
             retained_window_matrices: rustc_hash::FxHashMap::default(),
             prepared_viewports: PreparedViewports::default(),
-            #[cfg(test)]
             scroll_coverage: scroll_coverage::ScrollCoverage::default(),
             retained_by_frame: rustc_hash::FxHashMap::default(),
             retained_frame: None,
@@ -1545,6 +1542,9 @@ impl LayoutEngine {
     ) -> Option<neovm_core::window::WindowLayoutQuery> {
         let query_window = purpose.query_window();
         self.load_retained_frame(frame_id);
+        if query_window.is_none() {
+            let _ = self.scroll_coverage.drain(&mut self.prepared_viewports);
+        }
         // Incremental-layout instrumentation (Phase 0a): start each frame from
         // a clean slate; populated as the accepted frame is committed below.
         if query_window.is_none() {

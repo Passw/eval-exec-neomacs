@@ -5750,10 +5750,17 @@ impl crate::emacs_core::eval::Context {
                     .command_idle_auto_save_delay()
                     .and_then(|delay| std::time::Instant::now().checked_add(delay));
             }
-            let wait_deadline = [deadline, idle_auto_save_deadline, key_echo_deadline]
-                .into_iter()
-                .flatten()
-                .min();
+            let display_idle_deadline =
+                self.display_idle_maintenance_deadline(command_input, timeout.is_some());
+            let wait_deadline = [
+                deadline,
+                idle_auto_save_deadline,
+                key_echo_deadline,
+                display_idle_deadline,
+            ]
+            .into_iter()
+            .flatten()
+            .min();
             let wait_result = self.wait_for_command_input(wait_deadline);
 
             match wait_result? {
@@ -5799,6 +5806,25 @@ impl crate::emacs_core::eval::Context {
                 }
             }
         }
+    }
+
+    fn display_idle_maintenance_deadline(
+        &mut self,
+        command_input: bool,
+        timed_read: bool,
+    ) -> Option<std::time::Instant> {
+        if !command_input
+            || timed_read
+            || self.command_loop.keyboard.has_pending_low_level_input()
+            || self.has_pending_command_input_for_query()
+            || self.input_rx.as_ref().is_some_and(|rx| !rx.is_empty())
+        {
+            return None;
+        }
+        let mut maintenance = self.display_idle_maintenance_fn.take()?;
+        let next = maintenance(self);
+        self.display_idle_maintenance_fn = Some(maintenance);
+        next.and_then(|delay| std::time::Instant::now().checked_add(delay))
     }
 
     /// GNU's buffer-size-scaled delay for `auto-save-timeout`.

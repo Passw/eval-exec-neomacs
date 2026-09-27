@@ -2204,3 +2204,39 @@ fn alt_transport_cooks_the_alt_bit_like_gnu() {
         "A-x"
     );
 }
+
+#[test]
+fn display_idle_maintenance_yields_to_input_and_avoids_nested_or_timed_reads() {
+    let mut eval = crate::emacs_core::Context::new();
+    let calls = std::rc::Rc::new(std::cell::Cell::new(0));
+    let observed = calls.clone();
+    eval.display_idle_maintenance_fn = Some(Box::new(move |_| {
+        observed.set(observed.get() + 1);
+        Some(std::time::Duration::from_millis(1))
+    }));
+    assert!(
+        eval.display_idle_maintenance_deadline(false, false)
+            .is_none()
+    );
+    assert!(eval.display_idle_maintenance_deadline(true, true).is_none());
+    assert_eq!(calls.get(), 0);
+    assert!(
+        eval.display_idle_maintenance_deadline(true, false)
+            .is_some()
+    );
+    assert_eq!(calls.get(), 1);
+    let (sender, receiver) = crossbeam_channel::unbounded();
+    eval.input_rx = Some(receiver);
+    sender
+        .send(InputEvent::Focus {
+            focused: true,
+            emacs_frame_id: 0,
+        })
+        .unwrap();
+    assert!(
+        eval.display_idle_maintenance_deadline(true, false)
+            .is_none()
+    );
+    assert_eq!(calls.get(), 1);
+    assert!(eval.display_idle_maintenance_fn.is_some());
+}

@@ -399,3 +399,108 @@ fn idle_capture_yields_between_rows_and_cancels_after_a_revision_change() {
             .unwrap()
     );
 }
+
+#[test]
+fn idle_maintenance_prepares_an_unseen_page_without_changing_the_live_viewport() {
+    idle_first_visit(false);
+}
+
+#[test]
+fn idle_maintenance_prepares_an_unseen_backward_page() {
+    idle_first_visit(true);
+}
+
+fn idle_first_visit(backward: bool) {
+    let line = "ordinary offscreen text\n";
+    let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    if backward {
+        scroll_window_to(
+            &mut eval,
+            frame,
+            window,
+            buffer,
+            (120 * line.len() + 1) as i64,
+            125 * line.len(),
+        );
+        if let neovm_core::window::Window::Leaf { force_start, .. } = eval
+            .frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .find_window_mut(window)
+            .unwrap()
+        {
+            *force_start = true;
+        }
+    }
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let before = selected_window_layout_trace(&eval, &engine, frame);
+    let display_window = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
+    let rows: Vec<_> = engine.retained_window_matrices[&display_window]
+        .matrix
+        .rows
+        .iter()
+        .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        .collect();
+    let start = if backward {
+        (120 - rows.len().saturating_sub(2).max(1)) * line.len()
+    } else {
+        rows[rows.len() - 2].start_charpos
+    };
+    let row_count = rows.len();
+    drop(rows);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let mut steps = 0;
+    while engine.maintain_scroll_coverage(&eval).is_some() {
+        steps += 1;
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    assert!(steps >= row_count, "acquisition must yield between rows");
+    assert_eq!(before, selected_window_layout_trace(&eval, &engine, frame));
+    scroll_window_to(
+        &mut eval,
+        frame,
+        window,
+        buffer,
+        start as i64 + 1,
+        start + 5 * line.len(),
+    );
+    if let neovm_core::window::Window::Leaf { force_start, .. } = eval
+        .frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .find_window_mut(window)
+        .unwrap()
+    {
+        *force_start = true;
+    }
+    engine.layout_frame_rust(&mut eval, frame);
+    assert_eq!(engine.last_layout_stats().prepared_windows, 1);
+    let actual = selected_window_layout_trace(&eval, &engine, frame);
+    let mut fresh = LayoutEngine::new();
+    fresh.layout_frame_rust(&mut eval, frame);
+    assert_eq!(actual, selected_window_layout_trace(&eval, &fresh, frame));
+}
+
+#[test]
+fn worker_page_is_rejected_after_font_change() {
+    first_visit(
+        None,
+        "ordinary offscreen text\n",
+        Some("(internal-set-lisp-face-attribute 'default :height 180 (selected-frame))"),
+    );
+}
+
+#[test]
+fn worker_page_is_rejected_after_horizontal_scroll() {
+    first_visit(
+        None,
+        "ordinary offscreen text\n",
+        Some("(set-window-hscroll nil 2)"),
+    );
+}

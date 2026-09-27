@@ -45,6 +45,8 @@ pub(super) struct ScrollCoverage {
     worker: RowWorker,
     admission: Option<Admission>,
     capture: Option<Capture>,
+    observed: Option<(FrameId, DisplayWindowId, RetainedWindowKey)>,
+    targets: Vec<CharPos0>,
 }
 
 impl ScrollCoverage {
@@ -52,6 +54,8 @@ impl ScrollCoverage {
         self.worker.cancel();
         self.admission = None;
         self.capture = None;
+        self.observed = None;
+        self.targets.clear();
     }
 
     pub(super) fn drain(
@@ -138,6 +142,101 @@ impl ScrollCoverage {
 }
 
 impl LayoutEngine {
+    /// Perform one bounded off-screen acquisition step during a command-loop
+    /// idle wait. Never evaluate Lisp, publish a viewport, or wait for a worker.
+    pub fn maintain_scroll_coverage(
+        &mut self,
+        evaluator: &neovm_core::emacs_core::Context,
+    ) -> Option<std::time::Duration> {
+        use std::time::Duration;
+        let frame = evaluator.frame_manager().selected_frame()?;
+        let window = frame.selected_window;
+        let window_id = DisplayWindowId::new(window.0 as i64);
+        if self.retained_frame != Some(frame.id) || self.font_metrics.is_none() {
+            self.scroll_coverage.cancel();
+            return None;
+        }
+        let retained = self.retained_window_matrices.get(&window_id)?;
+        let unchanged =
+            self.scroll_coverage
+                .observed
+                .as_ref()
+                .is_some_and(|(old_frame, old_window, key)| {
+                    *old_frame == frame.id
+                        && *old_window == window_id
+                        && RetainedWindowKey::cursor_only_eligible(key, &retained.key)
+                });
+        if !unchanged {
+            self.scroll_coverage.cancel();
+            self.scroll_coverage.observed = Some((frame.id, window_id, retained.key.clone()));
+            let buffer = evaluator
+                .buffer_manager()
+                .get(neovm_core::buffer::BufferId(retained.key.buffer_id))?;
+            let rows: Vec<_> = retained
+                .matrix
+                .rows
+                .iter()
+                .filter(|row| row.enabled && !RetainedWindowMatrix::is_chrome_role(row.role))
+                .collect();
+            // Backward acquisition scans at most 8 KiB, regardless of buffer
+            // length. It stops only on a complete physical-line boundary.
+            let start = CharPos0::new(retained.key.window_start.max(0) as usize);
+            let start_byte = buffer.char_pos_to_emacs_byte_pos_clamped(start).get();
+            let begin = buffer.point_min_emacs_byte_pos().get();
+            let lower = start_byte.saturating_sub(8192).max(begin);
+            let mut position = start_byte;
+            let mut lines = 0;
+            while position > lower {
+                position -= 1;
+                if buffer.emacs_byte_at_pos(neovm_core::buffer::EmacsBytePos::new(position))
+                    == Some(b'\n')
+                {
+                    lines += 1;
+                    if lines > rows.len().saturating_sub(2).max(1) {
+                        position += 1;
+                        break;
+                    }
+                }
+            }
+            if position < start_byte
+                && (position == begin || lines > rows.len().saturating_sub(2).max(1))
+            {
+                self.scroll_coverage
+                    .targets
+                    .push(buffer.emacs_byte_pos_to_char_pos_clamped(
+                        neovm_core::buffer::EmacsBytePos::new(position),
+                    ));
+            }
+            // Two-row overlap matches the usual page movement and also leaves
+            // reusable rows for smaller wheel motions into the next page.
+            if let Some(row) = rows.get(rows.len().saturating_sub(2)) {
+                let forward = CharPos0::new(row.start_charpos);
+                if forward > start {
+                    self.scroll_coverage.targets.push(forward);
+                }
+            }
+        }
+        let _ = self.scroll_coverage.drain(&mut self.prepared_viewports);
+        if self.scroll_coverage.admission.is_some() {
+            return Some(Duration::from_millis(4));
+        }
+        if self.scroll_coverage.capture.is_none() {
+            let start = self.scroll_coverage.targets.pop()?;
+            if self
+                .begin_scroll_coverage(evaluator, frame.id, window, start)
+                .is_err()
+            {
+                return (!self.scroll_coverage.targets.is_empty())
+                    .then_some(Duration::from_millis(1));
+            }
+        }
+        let _ = self.capture_scroll_step(evaluator);
+        (self.scroll_coverage.capture.is_some()
+            || self.scroll_coverage.admission.is_some()
+            || !self.scroll_coverage.targets.is_empty())
+        .then_some(Duration::from_millis(1))
+    }
+
     /// Capture a bounded unseen page. No live start, point or presentation is
     /// changed. A failure leaves the normal synchronous path authoritative.
     pub(super) fn begin_scroll_coverage(
@@ -190,7 +289,8 @@ impl LayoutEngine {
             .begin_attempt();
         let mut retained = retained;
         retained.key.window_start = start.get() as i64;
-        self.scroll_coverage.cancel();
+        self.scroll_coverage.worker.cancel();
+        self.scroll_coverage.admission = None;
         self.scroll_coverage.capture = Some(Capture {
             frame,
             window,
@@ -204,6 +304,7 @@ impl LayoutEngine {
         Ok(())
     }
 
+    #[cfg(test)]
     pub(super) fn request_scroll_coverage(
         &mut self,
         evaluator: &neovm_core::emacs_core::Context,

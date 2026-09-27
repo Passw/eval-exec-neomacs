@@ -342,7 +342,6 @@ impl Default for FrameFaceArena {
 impl FrameFaceArena {
     /// Reserve identities for evaluator-resolved off-screen work without
     /// publishing its speculative metrics into the current presentation.
-    #[cfg(test)]
     pub(crate) fn reserve_prepared(
         &mut self,
         attempt: &FrameFaceAttempt,

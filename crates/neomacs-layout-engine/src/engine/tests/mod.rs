@@ -2950,6 +2950,11 @@ impl GlyphTrace {
                     // Compare CONTENT — normalize the allocation-dependent Face.id.
                     let mut f = f.clone();
                     f.id = FaceId::new(0);
+                    // Resource IDs are local to each font service, too. Keep
+                    // binding presence and the exact font path/attributes;
+                    // allocation order is not a rendering difference.
+                    f.default_resolved_font_id = f.default_resolved_font_id
+                        .map(|_| neomacs_display_protocol::font::ResolvedFontId(0));
                     format!("{f:?}")
                 })
                 .unwrap_or_else(|| format!("UNREGISTERED#{}", glyph.face_id)),
