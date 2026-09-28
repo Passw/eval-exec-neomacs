@@ -331,6 +331,8 @@ pub(crate) struct ComputedRow {
     pub end_kind: ComputedRowEnd,
     pub terminator_width: f32,
     pub terminator_height: f32,
+    pub fringe: Option<crate::buffer_source::fringe_arrows::TruncationContinuationFringeRequest>,
+    pub continuation: bool,
 }
 
 pub(crate) enum RowMeasurements<'a> {
@@ -565,9 +567,8 @@ impl RowProgram {
         self.limits
     }
 
-    /// Cancellation is checked between bounded operations. Overflow rejects
-    /// the complete row: wrapping must preserve producer rewind semantics and
-    /// is intentionally not invented by this physical-line kernel.
+    /// Single-row test adapter. A continuation requires the visual-row API;
+    /// callers of this adapter only accept a complete physical line.
     #[cfg(test)]
     pub(crate) fn compute(
         self,
@@ -592,15 +593,14 @@ impl RowProgram {
         if row_limit == 0 {
             return Err(RowProgramError::Budget);
         }
-        // Contextual shaping and non-text source transitions still require
-        // the canonical buffer walk. A later unsupported item must not
-        // silently inherit a reset origin.
+        // Non-text source transitions still require the canonical buffer
+        // walk. A later unsupported item must not inherit a reset origin.
         let can_wrap = self.geometry.character_wrap
             && self
                 .operations
                 .iter()
                 .all(|(operation, _)| match operation {
-                    Operation::Text(text) => text.run.text.is_ascii(),
+                    Operation::Text(_) => true,
                     Operation::Break { .. } => true,
                     _ => false,
                 });
@@ -626,6 +626,7 @@ impl RowProgram {
             .collect();
         let mut operation_index = 0;
         let mut operation_offset = 0;
+        let mut scalar_operations = rustc_hash::FxHashSet::default();
         let mut word_wrap = crate::display_row::walk_state::WordWrapRenderState::new(
             can_wrap && self.geometry.word_wrap,
         );
@@ -639,7 +640,21 @@ impl RowProgram {
                 )
                 .ok_or(RowProgramError::Unsupported)?
             };
-            let plan = ascii_measurement_suffix(original_plan, operation_offset);
+            let scalar_plan;
+            let original_plan = if scalar_operations.contains(&operation_index) {
+                let DisplayItemKind::TextRun(run) = &original.kind else {
+                    unreachable!()
+                };
+                scalar_plan = original_plan.scalar_fallback(&run.text);
+                &scalar_plan
+            } else {
+                original_plan
+            };
+            let plan = measurement_suffix(
+                original_plan,
+                operation_offset,
+                text_byte_offset(original, operation_offset)?,
+            );
             if cancelled() {
                 return Err(RowProgramError::Cancelled);
             }
@@ -692,9 +707,8 @@ impl RowProgram {
             item_layout.ascent_px = row.ascent_px.max(minimum.ascent_px());
             let render_item =
                 crate::display_row::render_item::DisplayRowRenderItem::from_source_item(item);
-            let can_split = can_wrap
-                && matches!(render_item.source_item().kind, DisplayItemKind::TextRun(ref run)
-                    if run.text.is_ascii());
+            let can_split =
+                can_wrap && matches!(render_item.source_item().kind, DisplayItemKind::TextRun(_));
             let checkpoint = DisplayRowGlyphCheckpoint::capture(&row);
             let previous_slots = slots.len();
             let progress = DisplayRowProgressWriter::with_text_run_measurement_and_glyph_measurer_for_area_and_start_policy(
@@ -703,6 +717,17 @@ impl RowProgram {
             ).with_buffer_tab_admission().push_item(render_item.row_item_for_write());
             if self.measurements.missing {
                 return Err(RowProgramError::MissingMeasurement);
+            }
+            if progress.status() == DisplayRowAppendStatus::Clipped
+                && !scalar_operations.contains(&operation_index)
+                && matches!(&render_item.source_item().kind, DisplayItemKind::TextRun(run)
+                    if !run.text.is_ascii() && run.composition == DisplayTextComposition::Independent)
+            {
+                // Canonical buffer production falls back to scalar items for
+                // the rest of an overflowing run on this visual row.
+                checkpoint.restore(&mut row);
+                scalar_operations.insert(operation_index);
+                continue;
             }
             if word_wrap.is_enabled()
                 && let DisplayItemKind::TextRun(run) = &render_item.source_item().kind
@@ -725,11 +750,10 @@ impl RowProgram {
                     && let Some(ch) = run.text.chars().nth(progress.slots().len())
                     && let DisplaySourcePosition::Buffer {
                         char_pos, byte_pos, ..
-                    } = render_item
-                        .source_item()
-                        .span
-                        .start
-                        .advanced_by(progress.slots().len(), progress.slots().len())
+                    } = render_item.source_item().span.start.advanced_by(
+                        progress.slots().len(),
+                        text_byte_offset(render_item.source_item(), progress.slots().len())?,
+                    )
                 {
                     word_wrap.record_candidate_at(
                         ch,
@@ -799,11 +823,10 @@ impl RowProgram {
                 } else {
                     (operation_index, operation_offset + progress.slots().len())
                 };
-                let next_source = operations[next_index]
-                    .0
-                    .span
-                    .start
-                    .advanced_by(next_offset, next_offset);
+                let next_source = operations[next_index].0.span.start.advanced_by(
+                    next_offset,
+                    text_byte_offset(&operations[next_index].0, next_offset)?,
+                );
                 row.continued = true;
                 continuation::extend_background(
                     &mut row,
@@ -819,9 +842,6 @@ impl RowProgram {
                     return Err(RowProgramError::Budget);
                 }
                 crate::glyph_row_writer::normalize_external_row(&mut row);
-                if let Some(fringe) = &self.geometry.fringe {
-                    fringe.decorate_row(&mut row, true, !rows.is_empty());
-                }
                 completed_glyphs += row.glyphs.iter().map(Vec::len).sum::<usize>();
                 rows.push(ComputedRow {
                     row,
@@ -833,6 +853,8 @@ impl RowProgram {
                     ),
                     end: position,
                     end_kind: ComputedRowEnd::Continuation,
+                    fringe: self.geometry.fringe.clone(),
+                    continuation: !rows.is_empty(),
                     terminator_width,
                     terminator_height,
                 });
@@ -843,6 +865,7 @@ impl RowProgram {
                 row = new_display_row(&layout);
                 position = DisplayRowPosition::new(0.0, 0)
                     .with_tab_coordinates(physical_line_tabs.coordinates());
+                scalar_operations.clear();
                 operation_index = next_index;
                 operation_offset = next_offset;
                 word_wrap.reset_after_row_transition();
@@ -923,9 +946,6 @@ impl RowProgram {
             };
         }
         crate::glyph_row_writer::normalize_external_row(&mut row);
-        if let Some(fringe) = &self.geometry.fringe {
-            fringe.decorate_row(&mut row, false, !rows.is_empty());
-        }
         rows.push(ComputedRow {
             row,
             slots,
@@ -936,6 +956,8 @@ impl RowProgram {
             ),
             end: position,
             end_kind: ComputedRowEnd::Newline,
+            fringe: self.geometry.fringe.clone(),
+            continuation: !rows.is_empty(),
             terminator_width,
             terminator_height,
         });
@@ -943,9 +965,25 @@ impl RowProgram {
     }
 }
 
-fn ascii_measurement_suffix(
+fn text_byte_offset(item: &DisplayItem, chars: usize) -> Result<usize, RowProgramError> {
+    if chars == 0 {
+        return Ok(0);
+    }
+    let DisplayItemKind::TextRun(run) = &item.kind else {
+        return Err(RowProgramError::Unsupported);
+    };
+    run.text
+        .char_indices()
+        .map(|(byte, _)| byte)
+        .chain(std::iter::once(run.text.len()))
+        .nth(chars)
+        .ok_or(RowProgramError::Unsupported)
+}
+
+fn measurement_suffix(
     plan: &DisplayTextRunMeasurement,
     consumed: usize,
+    consumed_bytes: usize,
 ) -> DisplayTextRunMeasurement {
     match plan {
         DisplayTextRunMeasurement::PerChar => DisplayTextRunMeasurement::PerChar,
@@ -955,7 +993,7 @@ fn ascii_measurement_suffix(
                 .filter_map(|advance| {
                     let mut advance = advance.clone();
                     advance.char_offset = advance.char_offset.checked_sub(consumed)?;
-                    advance.byte_offset = advance.byte_offset.checked_sub(consumed)?;
+                    advance.byte_offset = advance.byte_offset.checked_sub(consumed_bytes)?;
                     Some(advance)
                 })
                 .collect(),

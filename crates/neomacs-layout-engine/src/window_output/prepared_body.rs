@@ -107,6 +107,15 @@ pub(crate) fn position_buffer_rows(
             window_bounds,
         )
         .finalize_row(&mut computed.row, matrix_ncols, None);
+        // Decoration depends on the finalized paragraph direction. Resolve
+        // it after bidi, just as the visible window's fringe pass does.
+        if let Some(fringe) = &computed.fringe {
+            fringe.decorate_row(
+                &mut computed.row,
+                computed.end_kind == ComputedRowEnd::Continuation,
+                computed.continuation,
+            );
+        }
         computed.row.hash = computed.row.compute_hash();
         y += computed.row.height_px;
         glyph_rows.push(computed.row);

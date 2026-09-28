@@ -176,8 +176,8 @@ impl BufferSourceTextRunRenderRequest {
             .current_row_display_positions();
         // Snapshot the row's drawn-glyph counts BEFORE this run is appended. The
         // whole-run word-wrap path records candidates after the append, so each
-        // candidate's glyph boundary is this base plus its `char_offset` text
-        // glyphs (natural runs map one source char to one text glyph).
+        // candidate's boundary adds the writer's primitive offset, which
+        // includes wide-character padding and accounts for composition.
         let row_glyph_checkpoint_start = source_render.capture_glyph_checkpoint();
         let source_end_charpos = source_item.source_end_charpos();
         let source_end_byte_idx = source_item.source_end_byte_idx();

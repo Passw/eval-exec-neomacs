@@ -285,6 +285,39 @@ fn measurement_spans(text: &str) -> Vec<DisplayTextRunMeasurementSpan> {
 }
 
 impl DisplayTextRunMeasurement {
+    /// The buffer's scalar fallback retains contextual-script advances, but
+    /// independent non-script characters take their opened-font glyph metrics.
+    /// A rejected whole run must not keep a grapheme shaping measurement that
+    /// the scalar producer does not use.
+    pub(crate) fn scalar_fallback(&self, text: &str) -> Self {
+        let Self::Measured(advances) = self else {
+            return Self::PerChar;
+        };
+        let contextual: Vec<_> = measurement_spans(text)
+            .into_iter()
+            .filter_map(|span| {
+                let DisplayTextRunMeasurementSpan::ShapedSpan { byte_range, .. } = span else {
+                    return None;
+                };
+                text[byte_range.clone()]
+                    .chars()
+                    .next()
+                    .and_then(crate::composition::complex_script)
+                    .map(|_| byte_range)
+            })
+            .collect();
+        Self::Measured(
+            advances
+                .iter()
+                .filter(|advance| {
+                    let index = contextual.partition_point(|range| range.end <= advance.byte_offset);
+                    contextual.get(index).is_some_and(|range| range.contains(&advance.byte_offset))
+                })
+                .cloned()
+                .collect(),
+        )
+    }
+
     pub(crate) fn measured_advances(&self) -> Option<&[DisplayTextRunAdvance]> {
         match self {
             Self::PerChar => None,

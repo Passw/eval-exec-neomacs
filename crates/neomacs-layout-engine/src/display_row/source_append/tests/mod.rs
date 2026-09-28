@@ -5478,7 +5478,7 @@ fn render_natural_display_item_source_into_current_text_row_stamps_slots_at_curr
             2,
             8.0,
             1
-        )]
+        ).with_text_glyph_offset(0)]
     );
     assert_eq!(outcome.end_position(), DisplayRowPosition::new(24.0, 3));
 }

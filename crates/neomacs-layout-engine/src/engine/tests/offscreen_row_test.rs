@@ -1415,12 +1415,12 @@ fn scaled_line_height_overflow_keeps_finite_geometry() {
 fn worker_keeps_complete_prefix_before_unsupported_rows() {
     let line = "ordinary offscreen text\n";
     let start = 120 * line.len();
-    for boundary in ["replacement", "wrapped-contextual"] {
+    for boundary in ["replacement", "contextual-fragment"] {
         let mut text = line.repeat(300);
-        if boundary == "wrapped-contextual" {
+        if boundary == "contextual-fragment" {
             text.replace_range(
                 start + 3 * line.len()..start + 4 * line.len(),
-                &("W".repeat(119) + "好\n"),
+                &("好".repeat(129) + "\n"),
             );
         }
         let (mut eval, frame, buffer, window) = incr_editing_frame(&text, 800, 600);
@@ -1987,5 +1987,57 @@ fn worker_word_wrapping_rewinds_extended_face_boundaries() {
                 line.len()
             )),
         );
+    }
+}
+
+#[test]
+fn worker_prepares_wrapped_unicode_source_offsets() {
+    for text in [
+        "café café ",
+        "好好 words ",
+        "á words ",
+        "שלום words ",
+        "سلام words ",
+        "👩‍💻 words ",
+    ] {
+        for word_wrap in ["nil", "t"] {
+            let line = format!("{}\n", text.repeat(10));
+            first_visit_with_setup(
+                None,
+                &line,
+                None,
+                0,
+                3,
+                Some(&format!("(setq word-wrap {word_wrap})")),
+            );
+        }
+    }
+}
+
+#[test]
+fn worker_unicode_wrap_boundaries_and_mixed_fonts_match_fresh_layout() {
+    for prefix in 62..=76 {
+        let line = format!("{} á 好 سلام 👩‍💻 tail tail\n", "W".repeat(prefix));
+        let chars = line.chars().count();
+        let start = 120 * chars + 1;
+        for wrap in ["nil", "t"] {
+            first_visit_with_setup(
+                None,
+                &line,
+                None,
+                0,
+                3,
+                Some(&format!(
+                    "(progn (setq word-wrap {wrap}) (let ((p {start}))
+                  (while (< p {})
+                    (put-text-property (+ p {}) (+ p {}) 'face
+                      '(:family \"serif\" :height 130 :weight bold :slant italic))
+                    (setq p (+ p {chars})))))",
+                    start + 12 * chars,
+                    prefix + 1,
+                    prefix + 9
+                )),
+            );
+        }
     }
 }

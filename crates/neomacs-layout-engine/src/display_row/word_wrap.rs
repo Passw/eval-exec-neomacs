@@ -51,11 +51,13 @@ pub(crate) fn record_text_progress(
                     source_position,
                     output_display_point_start + char_offset,
                     (row_first, previous_charpos),
-                    // The candidate (word start) sits at `char_offset` text
-                    // glyphs into this run, so the boundary's glyph checkpoint is
-                    // the pre-run snapshot advanced by `char_offset`.
-                    row_glyph_checkpoint_start
-                        .with_added_text_glyphs(char_offset, row_glyph_checkpoint_after_append),
+                    // Wide-character padding and composition make source and
+                    // glyph offsets differ. Use the boundary recorded by the
+                    // canonical writer before it appended this source slot.
+                    row_glyph_checkpoint_start.with_added_text_glyphs(
+                        slot.text_glyph_offset().unwrap_or(char_offset),
+                        row_glyph_checkpoint_after_append,
+                    ),
                     slot.start_position(),
                     if char_offset == 0 {
                         predecessor_row_extend

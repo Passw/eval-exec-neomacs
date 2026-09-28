@@ -837,8 +837,8 @@ impl DisplayRowGlyphCheckpoint {
     /// Derive a checkpoint `added` text glyphs further along than `self`. Used by
     /// the whole-text-run word-wrap path, which records candidates *after* the
     /// run is appended: the base checkpoint snapshots the row before the run, and
-    /// each candidate's boundary is `base + char_offset` text glyphs (natural
-    /// text runs map one source char to one text glyph). Any added text glyph
+    /// each candidate supplies the writer's actual primitive offset, including
+    /// padding and composition. Any added text glyph
     /// means the row now displays text.
     pub(crate) fn with_added_text_glyphs(
         self,
@@ -1108,6 +1108,9 @@ pub(crate) struct DisplayRowGlyphSlot {
     width_cols: usize,
     coverage: DisplayRowGlyphCoverage,
     default_cell_height: bool,
+    // Primitive boundary relative to the start of this text append. Source
+    // characters and stored glyphs differ for padding and composition.
+    text_glyph_offset: Option<usize>,
 }
 
 /// Source positions and paint primitives are not one-to-one. Composition
@@ -1150,6 +1153,7 @@ impl DisplayRowGlyphSlot {
                 source_chars: std::num::NonZeroUsize::MIN,
             },
             default_cell_height: false,
+            text_glyph_offset: None,
         }
     }
 
@@ -1162,6 +1166,15 @@ impl DisplayRowGlyphSlot {
 
     pub(crate) fn cell_height(&self, face_height: f32, default_height: f32) -> f32 {
         if self.default_cell_height { default_height } else { face_height }
+    }
+
+    pub(crate) fn with_text_glyph_offset(mut self, offset: usize) -> Self {
+        self.text_glyph_offset = Some(offset);
+        self
+    }
+
+    pub(crate) fn text_glyph_offset(&self) -> Option<usize> {
+        self.text_glyph_offset
     }
 
     pub(crate) fn source(&self) -> DisplaySourcePosition {
@@ -1969,6 +1982,7 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
         metrics: &mut DisplayRowWriteMetrics,
         slots: &mut Vec<DisplayRowGlyphSlot>,
     ) -> DisplayRowAppendStatus {
+        let glyph_start = self.area_len();
         let face_id = self.writer.face_id(face);
         let measurement = self.text_run_measurement(text, face_id);
         let glyph_pointer_appearance =
@@ -2049,7 +2063,8 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
                 written.width_px(),
                 written.width_cols(),
                 pointer_appearance.cloned(),
-            ).with_default_cell_height(ch == '\t' && matches!(source_mapping, DisplayTextSourceMapping::NaturalText)));
+            ).with_default_cell_height(ch == '\t' && matches!(source_mapping, DisplayTextSourceMapping::NaturalText))
+                .with_text_glyph_offset(before_len - glyph_start));
             self.advance(written);
             metrics.add(written);
             byte_offset += ch.len_utf8();
