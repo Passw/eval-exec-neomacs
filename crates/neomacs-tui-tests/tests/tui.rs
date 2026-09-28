@@ -39,6 +39,8 @@ mod files_dired;
 mod frame_visibility;
 #[path = "help_describe.rs"]
 mod help_describe;
+#[path = "ibuffer.rs"]
+mod ibuffer;
 #[path = "input_methods.rs"]
 mod input_methods;
 #[path = "issue_140_hscroll.rs"]
