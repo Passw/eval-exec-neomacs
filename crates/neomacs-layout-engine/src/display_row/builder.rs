@@ -1083,10 +1083,10 @@ impl DisplayRowAppendStartPolicy {
     fn resolve(
         self,
         requested: DisplayRowPosition,
-        current_tail: DisplayRowPosition,
+        current_tail: impl FnOnce() -> DisplayRowPosition,
     ) -> DisplayRowPosition {
         match self {
-            Self::ReconcileWithRowTail => append_start_position(requested, current_tail),
+            Self::ReconcileWithRowTail => append_start_position(requested, current_tail()),
             Self::SourcePosition => requested,
         }
     }
@@ -1608,7 +1608,7 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
         let mut writer =
             DisplayRowWriter::with_glyph_measurer_for_area(layout, row, glyph_measurer, area);
         writer.set_empty_row_start(position);
-        let position = start_policy.resolve(position, writer.current_text_position());
+        let position = start_policy.resolve(position, || writer.current_text_position());
         Self {
             writer,
             position,
@@ -1672,7 +1672,7 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
         let mut writer =
             DisplayRowWriter::with_glyph_measurer_for_area(layout, row, glyph_measurer, area);
         writer.set_empty_row_start(position);
-        let position = start_policy.resolve(position, writer.current_text_position());
+        let position = start_policy.resolve(position, || writer.current_text_position());
         Self {
             writer,
             position,
