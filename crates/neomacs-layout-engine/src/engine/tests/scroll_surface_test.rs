@@ -177,13 +177,11 @@ fn exported_scroll_surface_rejects_non_contiguous_or_foreign_hit_geometry() {
     assert!(std::sync::Arc::new(broken).materialize(state).is_none());
     eval.eval_str("(goto-char 1) (insert \"changed\")").unwrap();
     engine.layout_frame_rust(&mut eval, frame_id);
+    let changed = engine.last_frame_display_state.as_ref().unwrap();
+    assert!(original.clone().materialize(changed).is_none());
     assert!(
-        engine
-            .last_frame_display_state
-            .as_ref()
-            .unwrap()
-            .scroll_coverage
-            .is_empty()
+        changed.scroll_coverage.iter().all(|coverage| coverage.epoch != original.epoch),
+        "the edit must retire the old worker coverage; fresh visible-row coverage has a new epoch"
     );
 }
 
@@ -564,4 +562,35 @@ fn assert_scroll_surface_hover_projection(insertions: bool) {
         Err(neomacs_display_protocol::PresentedPointerMapError::MissingSourceMap)
     );
     assert_eq!(frame, unchanged);
+}
+
+#[test]
+fn initial_visible_rows_offer_bounded_compositor_scroll_before_worker_results() {
+    let (mut eval, frame, _, window) =
+        incr_editing_frame(&"ordinary scrolling text\n".repeat(300), 800, 603);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let state = engine.last_frame_display_state.as_ref().unwrap();
+    let owner = DisplayWindowId::new(window.0 as i64);
+    let coverage = state
+        .scroll_coverage
+        .iter()
+        .find(|coverage| coverage.content.window_id == owner)
+        .expect("the already laid out partial bottom row must be available before background work");
+    let surface = coverage
+        .clone()
+        .materialize(state)
+        .expect("current scene is certified");
+    let available = surface.clamp_offset(1000.0);
+    assert!(
+        available > 0.0 && available < 30.0,
+        "only the retained row remainder is available: {available}"
+    );
+    assert_eq!(surface.clamp_offset(-1000.0), 0.0);
+    let mut projected = state.materialize();
+    surface.paint(&mut projected, available).unwrap();
 }

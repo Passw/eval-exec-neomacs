@@ -75,9 +75,9 @@ impl PreparedViewports {
                     && RetainedWindowKey::row_content_eligible(&entry.retained.key, &current.key)
             })
             .collect();
-        if entries.is_empty() {
-            return None;
-        }
+        // The canonical visible walk may already own a partial row beyond
+        // the viewport. Export that certified remainder immediately; the
+        // bounds check below rejects scenes with no scrollable remainder.
         let original = state
             .window_matrices
             .iter()
