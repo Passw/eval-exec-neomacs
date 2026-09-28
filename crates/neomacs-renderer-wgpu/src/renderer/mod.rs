@@ -29,7 +29,7 @@ mod dynamic_buffer;
 pub use draw::DrawContext;
 mod paint;
 mod target;
-pub use target::{NativeContentPlacement, NativePlacementError, RenderTarget};
+pub use target::{NativeContentPlacement, NativePlacementError, RenderTarget, SnapshotRegion};
 mod effect_common;
 mod effects_state;
 mod frame_pass;
