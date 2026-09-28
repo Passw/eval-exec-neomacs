@@ -26,7 +26,9 @@ pub(crate) fn backward_extent(
         return Ok(None);
     };
     let mut start = measurement::backtrack(source, origin, 1);
-    let mut count = 16usize;
+    // Start near the requested anchor. Wrapped lines and larger pixel
+    // displacements expand through the same canonical row query below.
+    let mut count = 4usize;
     loop {
         let Some(snapshot) = measurement::query(
             eval,
