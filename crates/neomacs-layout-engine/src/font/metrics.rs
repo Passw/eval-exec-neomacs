@@ -547,7 +547,7 @@ struct SymbolFontPolicyKey {
     char_script_table_generation: u64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct SymbolFontPolicy {
     key: SymbolFontPolicyKey,
     symbol_ranges: Vec<(u32, u32)>,
@@ -563,6 +563,24 @@ impl Default for SymbolFontPolicy {
             },
             symbol_ranges: Vec::new(),
         }
+    }
+}
+
+/// Evaluator policy copied into a bounded measurement job; native handles stay
+/// on the worker and no Lisp values or symbol IDs enter this snapshot.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct DetachedFontPolicy {
+    characters: std::sync::Arc<crate::font::resolver::FrozenCharacterPolicies>,
+    symbols: SymbolFontPolicy,
+    bytes: usize,
+}
+
+impl DetachedFontPolicy {
+    pub(crate) fn bytes(&self) -> usize {
+        self.bytes
+    }
+    pub(crate) fn query_count(&self) -> usize {
+        self.characters.query_count()
     }
 }
 
@@ -748,6 +766,52 @@ impl FontMetricsService {
             primary_match_cache: HashMap::default(),
             symbol_font_policy: SymbolFontPolicy::default(),
         }
+    }
+
+    pub(crate) fn capture_worker_font_policy(
+        &self,
+        requests: &[(&str, char, u16, bool, f32)],
+        max_bytes: usize,
+    ) -> Option<DetachedFontPolicy> {
+        if requests.len() > 128 {
+            return None;
+        }
+        let ascii_symbols = SymbolFontPolicy::default();
+        let symbols = if requests.is_empty() {
+            &ascii_symbols
+        } else {
+            &self.symbol_font_policy
+        };
+        let symbol_bytes = std::mem::size_of::<DetachedFontPolicy>()
+            .checked_add(symbols.symbol_ranges.len().checked_mul(8)?)?;
+        let remaining = max_bytes.checked_sub(symbol_bytes)?;
+        let requests: Vec<_> = requests
+            .iter()
+            .map(|&(family, ch, weight, italic, size)| {
+                (family, ch, weight, italic, self.selection_size(size))
+            })
+            .collect();
+        let characters =
+            crate::font::resolver::FrozenCharacterPolicies::capture(&requests, remaining)?;
+        let bytes = symbol_bytes.checked_add(characters.bytes())?;
+        Some(DetachedFontPolicy {
+            characters: std::sync::Arc::new(characters),
+            symbols: symbols.clone(),
+            bytes,
+        })
+    }
+
+    pub(crate) fn install_worker_font_policy(&mut self, policy: &DetachedFontPolicy) {
+        if self.symbol_font_policy != policy.symbols {
+            self.clear_caches();
+            self.symbol_font_policy = policy.symbols.clone();
+        }
+        self.font_resolver
+            .install_worker_policy(policy.characters.clone());
+    }
+
+    pub(crate) fn worker_font_policy_missing(&self) -> bool {
+        self.font_resolver.worker_policy_missing()
     }
 
     pub fn set_device_scale(

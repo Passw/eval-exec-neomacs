@@ -2031,3 +2031,31 @@ fn font_put_wrong_arity() {
     crate::test_utils::init_test_tracing();
     assert!(font_put(vec![Value::NIL, Value::NIL]).is_err());
 }
+
+#[test]
+fn bounded_family_alternatives_preserve_order_and_refuse_excess_payload() {
+    crate::emacs_core::xfaces::builtin_internal_set_alternative_font_family_alist(vec![
+        Value::list(vec![Value::list(vec![
+            Value::string("Fixture"),
+            Value::string("Second"),
+            Value::string("Third"),
+        ])]),
+    ])
+    .unwrap();
+    assert_eq!(
+        super::bounded_alternative_font_families("fixture", 8, 256),
+        Some(super::alternative_font_families("fixture"))
+    );
+    assert_eq!(
+        super::bounded_alternative_font_families("fixture", 2, 256),
+        None
+    );
+    assert_eq!(
+        super::bounded_alternative_font_families("fixture", 8, 8),
+        None
+    );
+    assert_eq!(
+        super::bounded_alternative_font_families("Absent", 0, 256),
+        None
+    );
+}

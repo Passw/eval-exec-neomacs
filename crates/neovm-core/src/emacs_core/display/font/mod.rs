@@ -221,6 +221,47 @@ pub fn alternative_font_families(family: &str) -> Vec<String> {
         .unwrap_or_else(|| vec![lookup.to_string()])
 }
 
+/// Capture a bounded family search order without cloning an unbounded alist.
+/// The byte budget conservatively allows UTF-8 expansion of Emacs bytes.
+pub fn bounded_alternative_font_families(
+    family: &str,
+    max_entries: usize,
+    max_bytes: usize,
+) -> Option<Vec<String>> {
+    if family.len() > max_bytes {
+        return None;
+    }
+    let lookup = family.trim();
+    if lookup.is_empty() {
+        return Some(Vec::new());
+    }
+    let alist = alternative_font_family_alist().read().ok()?;
+    let mut remaining = max_bytes;
+    for (index, (name, families)) in alist.iter().enumerate() {
+        if index >= max_entries {
+            return None;
+        }
+        let name = crate::emacs_core::intern::resolve_sym_lisp_string(*name);
+        remaining = remaining.checked_sub(name.as_bytes().len())?;
+        if !name.as_bytes().eq_ignore_ascii_case(lookup.as_bytes()) {
+            continue;
+        }
+        if families.len() > max_entries {
+            return None;
+        }
+        let mut result = Vec::new();
+        for family in families {
+            let name = crate::emacs_core::intern::resolve_sym_lisp_string(*family);
+            remaining = remaining.checked_sub(name.as_bytes().len().checked_mul(4)?)?;
+            result.push(crate::emacs_core::emacs_char::to_utf8_lossy(
+                name.as_bytes(),
+            ));
+        }
+        return Some(result);
+    }
+    Some(vec![lookup.to_owned()])
+}
+
 pub fn alternative_font_registries(registry: &str) -> Vec<String> {
     let lookup = registry.trim();
     if lookup.is_empty() {

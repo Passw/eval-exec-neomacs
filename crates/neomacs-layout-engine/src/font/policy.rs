@@ -41,7 +41,7 @@ impl<'a> FontFamilySource<'a> {
 }
 
 /// Owned family policy. Native alias resolution is intentionally deferred.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum CapturedFontFamilyPolicy {
     Explicit(String),
     Inherited(Vec<String>),

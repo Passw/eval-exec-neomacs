@@ -231,6 +231,42 @@ impl FontsetData {
         entries
     }
 
+    fn bounded_entries_for_char(
+        &self,
+        code: u32,
+        max_entries: usize,
+        max_ranges: usize,
+    ) -> Option<Vec<FontSpecEntry>> {
+        let specific = self
+            .find_range(code)
+            .map_or(&[][..], |range| range.entries.as_slice());
+        let fallback = self.fallback.as_deref().unwrap_or_default();
+        let mut result = Vec::new();
+        let mut ranges_left = max_ranges;
+        for (index, entry) in specific.iter().chain(fallback).enumerate() {
+            if index >= max_entries {
+                return None;
+            }
+            if let FontSpecEntry::Font(spec) = entry {
+                match &spec.repertory {
+                    Some(FontRepertory::Charset(_)) => return None,
+                    Some(FontRepertory::CharTableRanges(ranges)) => {
+                        ranges_left = ranges_left.checked_sub(ranges.len())?;
+                    }
+                    None => {}
+                }
+                if !spec.matches_char(code) {
+                    continue;
+                }
+            }
+            result.push(entry.clone());
+            if matches!(entry, FontSpecEntry::ExplicitNone) {
+                break;
+            }
+        }
+        Some(result)
+    }
+
     fn update_target(&mut self, target: FontsetTarget, entry: FontSpecEntry, add: FontsetAddMode) {
         match target {
             FontsetTarget::Fallback => self.update_fallback(entry, add),
@@ -715,6 +751,23 @@ pub(crate) fn resolve_fontset_name_arg(value: &Value) -> Result<String, Flow> {
             vec![Value::symbol("stringp"), *value],
         )),
     }
+}
+
+/// Bounded snapshot acquisition for detached font-selection jobs. Range
+/// repertories are owned; charset-backed rules require the evaluator's charset
+/// engine and are refused before it can load or expand a map. The synchronous
+/// resolver continues to handle those rules through the ordinary reader.
+pub fn bounded_entries_for_char(
+    ch: char,
+    max_entries: usize,
+    max_ranges: usize,
+) -> Option<(u64, Vec<FontSpecEntry>)> {
+    let slot = registry().read().ok()?;
+    let data = slot
+        .fontsets
+        .get(&fontset_name_lisp_string(DEFAULT_FONTSET_NAME))?;
+    let entries = data.bounded_entries_for_char(ch as u32, max_entries, max_ranges)?;
+    Some((slot.generation, entries))
 }
 
 pub fn matching_entries_for_char(ch: char) -> Vec<FontSpecEntry> {

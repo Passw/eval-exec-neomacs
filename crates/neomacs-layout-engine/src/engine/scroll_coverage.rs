@@ -67,6 +67,9 @@ struct Capture {
     row_count: usize,
     position: CharPos0,
     programs: Vec<RowProgram>,
+    font_snapshots:
+        Vec<std::sync::Arc<crate::row_layout::font_measurement::FontMeasurementSnapshot>>,
+    font_bytes: usize,
 }
 
 struct WindowCoverage {
@@ -494,6 +497,8 @@ impl LayoutEngine {
             row_count,
             position: start,
             programs: Vec::with_capacity(row_count),
+            font_snapshots: Vec::new(),
+            font_bytes: 0,
         });
         Ok(())
     }
@@ -757,13 +762,35 @@ impl LayoutEngine {
             text_bytes: 512,
             glyphs: 256,
         };
-        let program = if RowProgram::supports_deferred_ascii(&captured.items) {
-            let fonts = crate::row_layout::font_measurement::PrimaryFontSnapshot::capture(
+        let deferred = if RowProgram::supports_deferred_text(&captured.items) {
+            crate::row_layout::font_measurement::FontMeasurementSnapshot::capture(
                 &faces,
                 realizer
                     .font_metrics_service_mut()
                     .ok_or(RowProgramError::Unsupported)?,
-            )?;
+                &captured.items,
+            )
+            .ok()
+        } else {
+            None
+        };
+        let program = if let Some(fonts) = deferred {
+            let fonts = if let Some(shared) = capture
+                .font_snapshots
+                .iter()
+                .find(|old| old.as_ref() == &fonts)
+            {
+                shared.clone()
+            } else {
+                let bytes = capture.font_bytes.saturating_add(fonts.bytes());
+                if bytes > crate::row_layout::worker::MAX_FONT_BYTES {
+                    return Err(RowProgramError::Budget);
+                }
+                let shared = std::sync::Arc::new(fonts);
+                capture.font_bytes = bytes;
+                capture.font_snapshots.push(shared.clone());
+                shared
+            };
             RowProgram::capture_deferred(geometry, captured.items, faces, fonts, limits)?
         } else {
             let mut measurer = DisplayRowGlyphMeasurer::with_mode(

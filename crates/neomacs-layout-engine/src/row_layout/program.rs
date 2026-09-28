@@ -1,6 +1,6 @@
-//! Complete, bounded row programs. Capture resolves source semantics. ASCII
-//! rows defer measurement to a worker-local font service; other admitted rows
-//! retain exact measurements from capture. Execution uses the canonical writer
+//! Complete, bounded row programs. Capture resolves source semantics. Rows
+//! with bounded font policy defer measurement to a worker-local font service;
+//! other admitted rows retain captured measurements. Execution uses the canonical writer
 //! and never consults evaluator TLS.
 
 use super::{ResolvedMappedTextInput, ResolvedSpacingInput, ResolvedTextInput};
@@ -304,7 +304,7 @@ impl DisplayGlyphMeasurer for Measurements {
 #[derive(Clone, Debug)]
 pub(crate) struct RowProgram {
     geometry: RowProgramGeometry,
-    deferred_fonts: Option<super::font_measurement::PrimaryFontSnapshot>,
+    deferred_fonts: Option<std::sync::Arc<super::font_measurement::FontMeasurementSnapshot>>,
     operations: Vec<(Operation, DisplayTextRunMeasurement)>,
     measurements: Measurements,
     faces: Vec<DisplayRowFace>,
@@ -334,14 +334,14 @@ impl RowProgram {
         Self::capture_inner(geometry, items, faces, Some(measurer), None, limits)
     }
 
-    pub(crate) fn supports_deferred_ascii(items: &[DisplayItem]) -> bool {
+    pub(crate) fn supports_deferred_text(items: &[DisplayItem]) -> bool {
         items.iter().all(|item| match &item.kind {
-            DisplayItemKind::TextRun(run) => run.text.is_ascii(),
-            DisplayItemKind::SourceMappedText(run) => run.text.is_ascii(),
+            DisplayItemKind::TextRun(_) => true,
+            DisplayItemKind::SourceMappedText(_) => true,
             DisplayItemKind::Stretch(DisplayStretch {
                 width: DisplayStretchWidth::RelativeToSource { source, .. },
                 ..
-            }) => source.as_rust_char().is_some_and(|ch| ch.is_ascii()),
+            }) => source.as_rust_char().is_some(),
             DisplayItemKind::Stretch(_) | DisplayItemKind::RowBreak(_) => true,
             _ => false,
         })
@@ -351,10 +351,10 @@ impl RowProgram {
         geometry: RowProgramGeometry,
         items: Vec<DisplayItem>,
         faces: Vec<DisplayRowFace>,
-        fonts: super::font_measurement::PrimaryFontSnapshot,
+        fonts: std::sync::Arc<super::font_measurement::FontMeasurementSnapshot>,
         limits: RowProgramLimits,
     ) -> Result<Self, RowProgramError> {
-        if !Self::supports_deferred_ascii(&items) {
+        if !Self::supports_deferred_text(&items) {
             return Err(RowProgramError::Unsupported);
         }
         Self::capture_inner(geometry, items, faces, None, Some(fonts), limits)
@@ -365,7 +365,7 @@ impl RowProgram {
         items: impl IntoIterator<Item = DisplayItem>,
         faces: Vec<DisplayRowFace>,
         mut measurer: Option<&mut dyn DisplayGlyphMeasurer>,
-        deferred_fonts: Option<super::font_measurement::PrimaryFontSnapshot>,
+        deferred_fonts: Option<std::sync::Arc<super::font_measurement::FontMeasurementSnapshot>>,
         limits: RowProgramLimits,
     ) -> Result<Self, RowProgramError> {
         if faces.len() > limits.items || !geometry.width.is_finite() || geometry.width <= 0.0 {
@@ -465,6 +465,12 @@ impl RowProgram {
         })
     }
 
+    pub(crate) fn font_snapshot_identity(&self) -> Option<usize> {
+        self.deferred_fonts
+            .as_ref()
+            .map(|snapshot| std::sync::Arc::as_ptr(snapshot) as usize)
+    }
+
     pub(crate) fn font_bytes(&self) -> usize {
         self.deferred_fonts
             .as_ref()
@@ -482,7 +488,7 @@ impl RowProgram {
         let fonts = worker.prepare(&snapshot, &self.faces, cancelled)?;
         let mut measurer = crate::display_row::face_state::DisplayRowGlyphMeasurer::with_mode(
             &self.faces,
-            Some(fonts),
+            Some(&mut *fonts),
             self.geometry.metrics.char_width(),
             crate::glyph_advance::GlyphAdvanceQuantization::PreserveLogicalPixels,
             DisplayRowMeasurementMode::ConcreteFont,
@@ -507,6 +513,9 @@ impl RowProgram {
             }
             self.measurements
                 .capture_item(&item, &mut measurer, self.geometry.base_face);
+        }
+        if fonts.worker_font_policy_missing() {
+            return Err(RowProgramError::MissingMeasurement);
         }
         Ok(())
     }

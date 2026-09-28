@@ -10,7 +10,7 @@ const MAX_ROWS: usize = 64;
 const MAX_BYTES: usize = 64 * 1024;
 const MAX_GLYPHS: usize = 16 * 1024;
 const MAX_ITEMS: usize = 4096;
-const MAX_FONT_BYTES: usize = 64 * 1024;
+pub(crate) const MAX_FONT_BYTES: usize = 64 * 1024;
 
 /// An opaque receipt. A caller must still validate its full layout key before
 /// admitting the corresponding result; this number says nothing about reuse.
@@ -69,12 +69,18 @@ impl RowWorker {
         let mut glyphs = 0usize;
         let mut items = 0usize;
         let mut font_bytes = 0usize;
+        let mut snapshots = rustc_hash::FxHashSet::default();
         for row in &rows {
             let limits = row.limits();
             bytes = bytes.saturating_add(limits.text_bytes);
             glyphs = glyphs.saturating_add(limits.glyphs);
             items = items.saturating_add(limits.items);
-            font_bytes = font_bytes.saturating_add(row.font_bytes());
+            if row
+                .font_snapshot_identity()
+                .is_some_and(|identity| snapshots.insert(identity))
+            {
+                font_bytes = font_bytes.saturating_add(row.font_bytes());
+            }
         }
         if bytes > MAX_BYTES
             || glyphs > MAX_GLYPHS

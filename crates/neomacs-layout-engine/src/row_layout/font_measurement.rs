@@ -12,6 +12,7 @@ use neomacs_display_protocol::font::{
 
 const MAX_ROW_FONT_BYTES: usize = 4096;
 const MAX_CACHED_FACES: usize = 64;
+const MAX_CACHED_CHARACTER_QUERIES: usize = 512;
 
 #[derive(Clone, Debug, PartialEq)]
 struct PrimaryFontReceipt {
@@ -56,18 +57,23 @@ struct MeasurementRevision {
     scale_bits: u32,
 }
 
-#[derive(Clone, Debug)]
-pub(crate) struct PrimaryFontSnapshot {
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct FontMeasurementSnapshot {
     revision: MeasurementRevision,
     receipts: Vec<PrimaryFontReceipt>,
+    policy: crate::font::metrics::DetachedFontPolicy,
     bytes: usize,
 }
 
-impl PrimaryFontSnapshot {
+impl FontMeasurementSnapshot {
     pub(crate) fn capture(
         faces: &[DisplayRowFace],
         fonts: &mut FontMetricsService,
+        items: &[crate::display_item::DisplayItem],
     ) -> Result<Self, RowProgramError> {
+        if faces.len() > MAX_CACHED_FACES {
+            return Err(RowProgramError::Budget);
+        }
         let mut receipts = Vec::with_capacity(faces.len());
         let mut bytes = std::mem::size_of::<Self>();
         for face in faces {
@@ -86,6 +92,58 @@ impl PrimaryFontSnapshot {
             }
             receipts.push(receipt);
         }
+        let mut requests = Vec::new();
+        for item in items {
+            let base = faces.first().ok_or(RowProgramError::Unsupported)?.face_id;
+            let id = crate::display_face_ref::render_face_ref_id(item.face, base);
+            let face = faces
+                .iter()
+                .find(|face| face.face_id == id)
+                .ok_or(RowProgramError::Unsupported)?;
+            let text = match &item.kind {
+                crate::display_item::DisplayItemKind::TextRun(run) => Some(run.text.as_ref()),
+                crate::display_item::DisplayItemKind::SourceMappedText(run) => {
+                    Some(run.text.as_ref())
+                }
+                _ => None,
+            };
+            let source = match &item.kind {
+                crate::display_item::DisplayItemKind::Stretch(
+                    crate::display_item::DisplayStretch {
+                        width:
+                            crate::display_item::DisplayStretchWidth::RelativeToSource {
+                                source, ..
+                            },
+                        ..
+                    },
+                ) => source.as_rust_char(),
+                _ => None,
+            };
+            for ch in text
+                .unwrap_or("")
+                .chars()
+                .chain(source)
+                .filter(|ch| !ch.is_ascii())
+            {
+                let request = (
+                    face.font_family.as_str(),
+                    ch,
+                    face.font_weight,
+                    face.italic,
+                    face.font_size.max(1.0),
+                );
+                if !requests.contains(&request) {
+                    if requests.len() == 128 {
+                        return Err(RowProgramError::Budget);
+                    }
+                    requests.push(request);
+                }
+            }
+        }
+        let policy = fonts
+            .capture_worker_font_policy(&requests, MAX_ROW_FONT_BYTES.saturating_sub(bytes))
+            .ok_or(RowProgramError::Unsupported)?;
+        bytes += policy.bytes();
         Ok(Self {
             revision: MeasurementRevision {
                 catalog: fonts.font_catalog_generation(),
@@ -93,6 +151,7 @@ impl PrimaryFontSnapshot {
                 scale_bits: fonts.device_scale().get().to_bits(),
             },
             receipts,
+            policy,
             bytes,
         })
     }
@@ -109,12 +168,13 @@ pub(crate) struct WorkerFontMeasurements {
     service: Option<FontMetricsService>,
     revision: Option<MeasurementRevision>,
     faces: Vec<(String, u16, bool, u32)>,
+    character_queries: usize,
 }
 
 impl WorkerFontMeasurements {
     pub(crate) fn prepare(
         &mut self,
-        snapshot: &PrimaryFontSnapshot,
+        snapshot: &FontMeasurementSnapshot,
         faces: &[DisplayRowFace],
         cancelled: &impl Fn() -> bool,
     ) -> Result<&mut FontMetricsService, RowProgramError> {
@@ -123,10 +183,12 @@ impl WorkerFontMeasurements {
         }
         if self.revision != Some(snapshot.revision)
             || self.faces.len() + faces.len() > MAX_CACHED_FACES
+            || self.character_queries + snapshot.policy.query_count() > MAX_CACHED_CHARACTER_QUERIES
         {
             self.service = Some(FontMetricsService::new());
             self.revision = Some(snapshot.revision);
             self.faces.clear();
+            self.character_queries = 0;
         }
         let service = self
             .service
@@ -164,6 +226,8 @@ impl WorkerFontMeasurements {
                 self.faces.push(key);
             }
         }
+        self.character_queries += snapshot.policy.query_count();
+        service.install_worker_font_policy(&snapshot.policy);
         Ok(service)
     }
 }
@@ -182,7 +246,7 @@ mod tests {
     fn cancellation_does_not_initialize_native_fonts() {
         let mut source = FontMetricsService::new();
         let faces = [face()];
-        let snapshot = PrimaryFontSnapshot::capture(&faces, &mut source).unwrap();
+        let snapshot = FontMeasurementSnapshot::capture(&faces, &mut source, &[]).unwrap();
         let mut worker = WorkerFontMeasurements::default();
         assert!(matches!(
             worker.prepare(&snapshot, &faces, &|| true),
@@ -195,7 +259,7 @@ mod tests {
     fn changed_font_metrics_reject_worker_measurement() {
         let mut source = FontMetricsService::new();
         let faces = [face()];
-        let mut snapshot = PrimaryFontSnapshot::capture(&faces, &mut source).unwrap();
+        let mut snapshot = FontMeasurementSnapshot::capture(&faces, &mut source, &[]).unwrap();
         snapshot.receipts[0].ascent += 1.0;
         let mut worker = WorkerFontMeasurements::default();
         assert!(matches!(
@@ -209,7 +273,7 @@ mod tests {
         let mut source = FontMetricsService::new();
         let faces = vec![face(); MAX_CACHED_FACES];
         assert!(matches!(
-            PrimaryFontSnapshot::capture(&faces, &mut source),
+            FontMeasurementSnapshot::capture(&faces, &mut source, &[]),
             Err(RowProgramError::Budget)
         ));
     }
@@ -221,9 +285,27 @@ mod tests {
         let mut worker = WorkerFontMeasurements::default();
         for scale in [1.0, 1.5, 2.0, 1.0] {
             source.set_device_scale(DeviceScale::new(scale).unwrap());
-            let snapshot = PrimaryFontSnapshot::capture(&faces, &mut source).unwrap();
+            let snapshot = FontMeasurementSnapshot::capture(&faces, &mut source, &[]).unwrap();
             let service = worker.prepare(&snapshot, &faces, &|| false).unwrap();
             assert_eq!(service.device_scale().get(), scale);
         }
+    }
+    #[test]
+    fn worker_character_query_budget_rebuilds_the_native_cache() {
+        use crate::display_item::*;
+        let mut source = FontMetricsService::new();
+        let faces = [face()];
+        let items = [DisplayItem::new(
+            SourceSpan::synthetic(1, 0, 1),
+            RenderFaceRef::FaceId(faces[0].face_id),
+            DisplayItemKind::TextRun(DisplayTextRun::independent("中")),
+        )];
+        let snapshot = FontMeasurementSnapshot::capture(&faces, &mut source, &items).unwrap();
+        assert_eq!(snapshot.policy.query_count(), 1);
+        let mut worker = WorkerFontMeasurements::default();
+        worker.prepare(&snapshot, &faces, &|| false).unwrap();
+        worker.character_queries = MAX_CACHED_CHARACTER_QUERIES;
+        worker.prepare(&snapshot, &faces, &|| false).unwrap();
+        assert_eq!(worker.character_queries, 1);
     }
 }

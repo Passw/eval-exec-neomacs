@@ -7,6 +7,9 @@
 //! operation is explicit: its native winner bypasses enumeration's style
 //! filters without changing shared fontset selection.
 
+mod worker_policy;
+pub(crate) use worker_policy::FrozenCharacterPolicies;
+
 use crate::font::policy::{CapturedFontFamilyPolicy, FontFamilySource, GnuFontPolicy};
 use crate::font::selection::{CandidateSelectionScore, candidate_selection_score};
 use crate::font_backend::{
@@ -141,6 +144,7 @@ impl FontEntityMatchPolicy {
 
 /// Platform-neutral owner of fontset policy and candidate scoring.
 pub struct FontResolver {
+    worker_policy: Option<worker_policy::WorkerPolicy>,
     backend: Box<dyn FontBackend>,
     materializer: Option<neomacs_font_materializer::FontMaterializer>,
     capability_cache: Mutex<
@@ -161,6 +165,7 @@ impl FontResolver {
     pub fn new(backend: Box<dyn FontBackend>) -> Self {
         Self {
             backend,
+            worker_policy: None,
             materializer: neomacs_font_materializer::FontMaterializer::new().ok(),
             capability_cache: Mutex::new(HashMap::default()),
             primary_cache: Mutex::new(HashMap::default()),
@@ -442,9 +447,15 @@ impl FontResolver {
             weight: requested_weight,
             slant: requested_slant.gnu_numeric(),
             width: requested_width.gnu_numeric(),
-            fontset_generation: fontset_generation(),
+            fontset_generation: self
+                .worker_policy
+                .as_ref()
+                .map_or_else(fontset_generation, |policy| policy.policies.generation),
             size,
         };
+        if self.worker_policy.is_some() {
+            return self.resolve_worker_character(key);
+        }
         if let Ok(cache) = self.char_cache.lock()
             && let Some(cached) = cache.get(&key)
         {
@@ -704,7 +715,7 @@ impl FontResolver {
 
 /// One fontset alternative, detached from the evaluator. Keep capture per
 /// alternative so the live resolver does not inspect rules after its winner.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct CapturedCharacterPolicy {
     requested_family: String,
     ch: char,

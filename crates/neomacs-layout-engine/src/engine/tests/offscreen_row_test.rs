@@ -1743,3 +1743,43 @@ fn worker_admission_rejects_font_registry_alternatives_after_capture() {
         }
     }
 }
+
+#[test]
+fn unicode_worker_capture_does_not_measure_glyphs_on_evaluator() {
+    let (mut eval, frame, _, window) =
+        incr_editing_frame(&"中文 offscreen text\n".repeat(300), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    use crate::display_row::face_state::GLYPH_MEASURE_CALLS;
+    GLYPH_MEASURE_CALLS.with(|calls| calls.set(0));
+    engine
+        .request_scroll_coverage(&eval, frame, window, CharPos0::new(2880))
+        .unwrap();
+    assert_eq!(
+        GLYPH_MEASURE_CALLS.with(|calls| calls.get()),
+        0,
+        "offscreen glyph measurement belongs on the row worker"
+    );
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !engine
+        .scroll_coverage
+        .drain(&mut engine.prepared_viewports)
+        .unwrap()
+    {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+}
+
+#[test]
+fn worker_unicode_page_with_mixed_font_attributes_matches_fresh_layout() {
+    first_visit(
+        Some("(:family \"serif\" :height 150 :weight bold :slant italic)"),
+        "中文 café text\n",
+        None,
+    );
+}

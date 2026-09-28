@@ -808,3 +808,89 @@ fn captured_family_policy_keeps_alias_order_and_fallback_boundary() {
         vec![None]
     );
 }
+
+#[test]
+fn frozen_character_requests_survive_live_policy_mutation_and_reject_unknown_queries() {
+    let mut eval = neovm_core::emacs_core::Context::new();
+    eval.eval_str("(let ((font-encoding-alist '((\".*\" unicode)))) (set-fontset-font t #x3042 '(\"Fixture Sans\" . \"iso10646-1\")))").unwrap();
+    let policies = FrozenCharacterPolicies::capture(
+        &[("Base Mono", 'あ', 400, false, selection_size())],
+        4096,
+    )
+    .unwrap();
+    let candidates = vec![candidate("Fixture Sans", 400, FontSlant::Normal, 0)];
+    let resolver = FontResolver::new(Box::new(CandidateBackend {
+        candidates: candidates.clone(),
+    }));
+    let expected = resolver
+        .resolve_for_char(
+            "Base Mono",
+            'あ',
+            400,
+            FontSlant::Normal,
+            FontWidth::Normal,
+            selection_size(),
+        )
+        .unwrap();
+    eval.eval_str("(set-fontset-font t #x3042 nil)").unwrap();
+    drop(eval);
+    std::thread::spawn(move || {
+        let mut resolver = FontResolver::new(Box::new(CandidateBackend { candidates }));
+        resolver.install_worker_policy(Arc::new(policies));
+        assert_eq!(
+            resolver.resolve_for_char(
+                "Base Mono",
+                'あ',
+                400,
+                FontSlant::Normal,
+                FontWidth::Normal,
+                selection_size()
+            ),
+            Some(expected)
+        );
+        assert!(!resolver.worker_policy_missing());
+        assert!(
+            resolver
+                .resolve_for_char(
+                    "Base Mono",
+                    'い',
+                    400,
+                    FontSlant::Normal,
+                    FontWidth::Normal,
+                    selection_size()
+                )
+                .is_none()
+        );
+        assert!(resolver.worker_policy_missing());
+    })
+    .join()
+    .unwrap();
+}
+
+#[test]
+fn frozen_explicit_none_does_not_enable_native_fallback() {
+    let mut eval = neovm_core::emacs_core::Context::new();
+    eval.eval_str("(set-fontset-font t #x3042 nil)").unwrap();
+    let policies = FrozenCharacterPolicies::capture(
+        &[("Base Mono", 'あ', 400, false, selection_size())],
+        4096,
+    )
+    .unwrap();
+    let mut resolver = FontResolver::new(Box::new(CandidateBackend {
+        candidates: vec![candidate("Fixture Sans", 400, FontSlant::Normal, 0)],
+    }));
+    resolver.install_worker_policy(Arc::new(policies));
+    assert!(
+        resolver
+            .resolve_for_char(
+                "Base Mono",
+                'あ',
+                400,
+                FontSlant::Normal,
+                FontWidth::Normal,
+                selection_size()
+            )
+            .is_none()
+    );
+    assert!(!resolver.worker_policy_missing());
+}
