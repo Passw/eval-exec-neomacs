@@ -948,7 +948,7 @@ impl OverlayList {
         } else if plist_replaced {
             // Adding a previously absent nil property changes the plist even
             // though GNU's display-change flag remains false.
-            self.invalidate_snapshot();
+            self.index_mut().overlay_properties_changed(overlay);
         }
         Ok(changed)
     }
@@ -1037,6 +1037,14 @@ impl OverlayList {
     /// list is always empty.
     pub fn overlays_in_gnu_lists_order(&self) -> Vec<Value> {
         self.index.all_ascending()
+    }
+
+    /// Conservative test of direct plist keys across all live overlays.
+    /// False proves absence; true may be a Bloom-signature collision. After
+    /// lazy index construction this reads one aggregate, without walking the
+    /// overlays. Category inheritance is intentionally not followed here.
+    pub fn may_contain_property(&self, property: Value) -> bool {
+        self.index.may_contain_property(property)
     }
 
     /// A content digest of every live overlay: its span and its whole

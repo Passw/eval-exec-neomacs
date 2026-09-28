@@ -216,6 +216,9 @@ fn capture_layout_category_symbol_plists(
         pos = next.min(end);
     }
 
+    if !buffer.overlays().may_contain_property(category_property) {
+        return plists;
+    }
     for overlay in buffer.overlays().overlays_in_gnu_lists_order() {
         if let Some(category) = buffer
             .overlays()

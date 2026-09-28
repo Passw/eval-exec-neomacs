@@ -736,6 +736,33 @@ fn immutable_overlay_snapshot_observes_a_new_explicit_nil_property() {
 }
 
 #[test]
+fn whole_overlay_property_summary_tracks_live_membership_and_nil_keys() {
+    crate::test_utils::init_test_tracing();
+    let mut list = OverlayList::new();
+    let category = Value::symbol("category");
+    assert!(!list.may_contain_property(category));
+    let overlay = alloc_overlay(0, 0);
+    list.insert_overlay(overlay);
+    assert!(!list.may_contain_property(category));
+    let before = list.snapshot();
+    // An absent -> explicit nil write does not change GNU's display tick,
+    // but must update the key summary, including zero-width endpoint pairs.
+    assert!(!list.overlay_put(overlay, category, Value::NIL).unwrap());
+    assert!(list.may_contain_property(category));
+    assert!(!before.may_contain_property(category));
+    let with_nil = list.snapshot();
+    assert!(with_nil.may_contain_property(category));
+    list.overlay_put(overlay, category, Value::symbol("test-category"))
+        .unwrap();
+    assert!(list.may_contain_property(category));
+    list.adjust_for_insert_at_emacs_byte_pos(emacs_byte_pos(0), emacs_byte_len(5), false);
+    assert!(list.may_contain_property(category));
+    list.delete_overlay(overlay);
+    assert!(!list.may_contain_property(category));
+    assert!(with_nil.may_contain_property(category));
+}
+
+#[test]
 fn cached_overlay_snapshot_survives_exact_evaluator_gc() {
     crate::test_utils::init_test_tracing();
     let mut eval = crate::emacs_core::Context::new();

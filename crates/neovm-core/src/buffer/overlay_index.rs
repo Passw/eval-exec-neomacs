@@ -1193,6 +1193,11 @@ impl OverlayIndex {
         overlays
     }
 
+    pub(super) fn may_contain_property(&self, property: Value) -> bool {
+        OverlayPropertyFilter::for_properties([property])
+            .subtree_may_match(self.endpoint_index().records.filter_mask())
+    }
+
     pub(super) fn endpoint_records_strictly_within(
         &self,
         bounds: EmacsByteRange,
