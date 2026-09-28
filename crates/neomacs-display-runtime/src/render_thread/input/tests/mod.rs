@@ -249,8 +249,18 @@ fn wheel_input_atomically_carries_its_presented_region() {
         winit::event::MouseScrollDelta::LineDelta(0.0, -1.0),
     );
 
+    let crate::thread_comm::InputEvent::Tracked { receipt, event } =
+        emacs.input_rx.try_recv().unwrap()
+    else {
+        panic!("wheel delivery must carry its completion receipt");
+    };
+    assert!(!receipt.receipt().cancelled());
+    let event = match *event {
+        crate::thread_comm::InputEvent::Observed { event, .. } => *event,
+        event => event,
+    };
     assert!(matches!(
-        emacs.input_rx.try_recv().unwrap(),
+        event,
         crate::thread_comm::InputEvent::PositionedPointer(
             crate::thread_comm::PositionedPointerInput {
                 position: crate::thread_comm::PointerPosition {
