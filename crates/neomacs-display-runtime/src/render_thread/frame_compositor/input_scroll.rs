@@ -253,6 +253,11 @@ impl InputScroll {
         self.staged = Some(Some((active.surface.clone(), active.offset)));
     }
 
+    /// Only the projection staged after surface acquisition may be rasterized.
+    pub(in crate::render_thread) fn staged_projection(&self) -> Option<(Arc<ScrollSurface>, f32)> {
+        self.staged.as_ref()?.clone()
+    }
+
     pub(in crate::render_thread) fn active(&self) -> bool {
         self.active.is_some()
     }

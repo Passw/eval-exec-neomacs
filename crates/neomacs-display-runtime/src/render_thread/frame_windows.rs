@@ -2538,6 +2538,7 @@ impl GuiFrameWindowManager {
             render.compositor.glyph_atlas = None;
             // Retained cursorless scene: texture + view + bind group.
             render.compositor.retained_static = None;
+            render.compositor.retained_scroll = None;
             // Composition ring plus every running transition's leased
             // source picture.
             clear_frame_transition_textures(&mut render.compositor.transitions);

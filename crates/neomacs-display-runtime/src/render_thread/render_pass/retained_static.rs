@@ -51,6 +51,7 @@ pub(super) fn is_eligible(
     render: &GuiFrameRenderState,
 ) -> bool {
     compositor_only_hint
+        && !render.compositor.input_scroll.active()
         && pane_placements.is_empty()
         && !render.compositor.transitions.has_active()
         && !window_has_active_overlays(render)

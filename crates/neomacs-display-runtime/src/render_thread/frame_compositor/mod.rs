@@ -72,6 +72,7 @@ pub(crate) struct FrameCompositor {
     /// (frame scheduling plan, Stage 4). Built lazily from the current frame
     /// and reused across cursor-only frames; invalidated on any full render.
     pub(super) retained_static: Option<RetainedStatic>,
+    pub(super) retained_scroll: Option<super::render_pass::RetainedScroll>,
     /// Anchors and imprints of the presentation most recently *installed*,
     /// waiting to become the baseline if and when it is composed. Separate from
     /// the baseline pair below for the same reason `baseline` is separate from
@@ -205,6 +206,7 @@ impl FrameCompositor {
             renderer_effects: RendererFrameEffects::default(),
             transitions: TransitionState::default(),
             retained_static: None,
+            retained_scroll: None,
             incoming_scroll_anchors: ScrollAnchorsByWindow::default(),
             incoming_reflow_imprints: ReflowImprintsByWindow::default(),
             scroll_anchors: ScrollAnchorsByWindow::default(),

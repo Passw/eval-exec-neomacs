@@ -154,6 +154,13 @@ impl ScrollSurface {
         &self.coverage
     }
 
+    /// Complete certified body glyphs in coverage coordinates. A retained
+    /// rasterizer must use the coverage clip, then crop to the viewport with
+    /// the same origin/offset as `paint` and `hit`.
+    pub fn coverage_glyphs(&self) -> &[FrameGlyph] {
+        &self.glyphs
+    }
+
     /// Positive offsets expose later buffer text. Coverage is a hard limit,
     /// including for a reversed gesture; no blank frontier may be exposed.
     pub fn clamp_offset(&self, offset: f32) -> f32 {

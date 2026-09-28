@@ -46,6 +46,8 @@ mod composition_targets;
 mod full_render;
 mod present;
 mod retained_static;
+mod retained_scroll;
+pub(super) use retained_scroll::RetainedScroll;
 mod scene;
 pub(in crate::render_thread) mod surface;
 
@@ -90,6 +92,7 @@ struct FrameDrawInputs<'a> {
     bg_gradient: Option<((f32, f32, f32), (f32, f32, f32))>,
     child_frame_style: &'a ChildFrameStyle,
     scroll_indicators_enabled: bool,
+    retain_scroll_body: bool,
     toolbar: &'a ToolbarResources,
 }
 
@@ -113,6 +116,7 @@ fn render_frame_window_contents(
         cursor_visible,
         inputs.root_animated_cursor,
         inputs.bg_gradient,
+        inputs.retain_scroll_body,
     );
     let renderer_effects_still_active = render.compositor.renderer_effects.needs_redraw();
 
@@ -332,6 +336,7 @@ fn render_frame_window_contents_to_surface(
         bg_gradient,
         child_frame_style,
         scroll_indicators_enabled,
+        retain_scroll_body: extra_line_spacing == 0.0 && extra_letter_spacing == 0.0,
         toolbar,
     };
 

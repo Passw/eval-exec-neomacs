@@ -31,8 +31,17 @@ pub(super) fn render_frame_root_glyphs(
     cursor_visible: bool,
     root_animated_cursor: Option<crate::core::types::AnimatedCursor>,
     bg_gradient: Option<((f32, f32, f32), (f32, f32, f32))>,
+    retain_scroll_body: bool,
 ) {
     frame_stats::count(&frame_stats::ROOT_GLYPH_PASSES);
+    let raster = super::retained_scroll::prepare(
+        renderer,
+        render,
+        frame,
+        present_mapping,
+        bg_gradient.is_some() || !retain_scroll_body,
+    );
+    let frame = raster.as_ref().map_or(frame, |raster| &raster.frame);
     let pointer_selection = render.pointer_selection_for(frame);
     let hovered_scroll_bar = render.hovered_scroll_bar(frame);
     if let Some(atlas) = render.compositor.glyph_atlas.as_mut() {
@@ -50,9 +59,28 @@ pub(super) fn render_frame_root_glyphs(
             hovered_scroll_bar,
             bg_gradient,
             pointer_selection,
-            render.compositor.current_row_damage.as_ref(),
+            if raster.is_some() {
+                None
+            } else {
+                render.compositor.current_row_damage.as_ref()
+            },
         );
     });
+    if let Some(raster) = raster {
+        let region = neomacs_renderer_wgpu::renderer::SnapshotRegion::new(
+            &raster.texture,
+            raster.source_pixels,
+            raster.destination,
+        )
+        .expect("crop was validated before drawing the base");
+        renderer
+            .begin_draw(neomacs_renderer_wgpu::renderer::RenderTarget::new(
+                surface_view,
+                present_mapping.surface(),
+            ))
+            .blit_snapshot_region(region);
+        frame_stats::count(&frame_stats::SCROLL_RASTER_BLITS);
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -1,0 +1,305 @@
+//! A pooled raster of certified body coverage. Root composition still draws
+//! chrome/cursors normally and child frames remain above this layer. This owns
+//! no editor state and never publishes a projection or retires an input.
+use crate::render_thread::frame_windows::GuiFrameRenderState;
+use neomacs_display_protocol::{
+    Color, DeviceScale, FrameGlyph, FrameGlyphBuffer, FrameRect, GeometrySize, GlyphRowRole,
+    LogicalPixels, PresentMapping, PresentationExtent, Rect, SurfaceState,
+    scroll_coverage::ScrollSurface,
+};
+use neomacs_renderer_wgpu::{SnapshotLease, SnapshotSize, WgpuRenderer};
+use std::sync::{Arc, LazyLock};
+
+// These profiles differ only in cursor animation and scroll-bar width; both
+// are drawn by the ordinary base pass. Other custom effects remain a fallback.
+static STATIC_BODY_PROFILES: LazyLock<[neomacs_display_protocol::EffectsConfig; 3]> =
+    LazyLock::new(|| {
+        let normal = neomacs_display_protocol::EffectsConfig::default();
+        let mut quiet = normal.clone();
+        quiet.cursor_color_cycle.enabled = false;
+        let mut software = quiet.clone();
+        software.scroll_bar.width = 0;
+        [normal, quiet, software]
+    });
+
+pub(in crate::render_thread) struct RetainedScroll {
+    surface: Arc<ScrollSurface>,
+    generation: u64,
+    scale: DeviceScale,
+    texture: SnapshotLease,
+    origin: (f32, f32),
+}
+
+pub(super) struct PreparedScrollRaster {
+    pub frame: FrameGlyphBuffer,
+    pub texture: SnapshotLease,
+    pub source_pixels: Rect,
+    pub destination: FrameRect,
+}
+
+/// Rasterize at the original device-pixel phase, even if the text area's
+/// logical origin is fractional. The texture includes the rounding padding.
+fn raster_geometry(
+    bounds: Rect,
+    scale: DeviceScale,
+    limit: u32,
+) -> Option<(SnapshotSize, (f32, f32))> {
+    let scale = scale.get();
+    let x = (bounds.x * scale).floor();
+    let y = (bounds.y * scale).floor();
+    let width = (bounds.right() * scale).ceil() - x;
+    let height = (bounds.bottom() * scale).ceil() - y;
+    if !width.is_finite()
+        || !height.is_finite()
+        || width < 1.0
+        || height < 1.0
+        || width > limit as f32
+        || height > limit as f32
+    {
+        return None;
+    }
+    Some((
+        SnapshotSize::new(width as u32, height as u32)?,
+        (x / scale, y / scale),
+    ))
+}
+
+fn body_background(frame: &FrameGlyphBuffer, viewport: Rect) -> Option<Color> {
+    let mut background = frame.background;
+    if frame.background_alpha != 1.0 {
+        return None;
+    }
+    for glyph in &frame.glyphs {
+        if let FrameGlyph::Background { bounds, color } = glyph {
+            let intersects = bounds.x < viewport.right()
+                && bounds.right() > viewport.x
+                && bounds.y < viewport.bottom()
+                && bounds.bottom() > viewport.y;
+            if intersects {
+                // A partial or translucent background needs the full layer
+                // compositor; don't turn it into an opaque scrolling layer.
+                if bounds.x > viewport.x
+                    || bounds.y > viewport.y
+                    || bounds.right() < viewport.right()
+                    || bounds.bottom() < viewport.bottom()
+                {
+                    return None;
+                }
+                background = *color;
+            }
+        }
+    }
+    (background.a == 1.0).then_some(background)
+}
+
+fn raster_frame(
+    surface: &ScrollSurface,
+    frame: &FrameGlyphBuffer,
+    size: SnapshotSize,
+    origin: (f32, f32),
+    scale: DeviceScale,
+    background: Color,
+) -> FrameGlyphBuffer {
+    let coverage = surface.coverage();
+    let mut raster = FrameGlyphBuffer::with_size(
+        size.width() as f32 / scale.get(),
+        size.height() as f32 / scale.get(),
+    );
+    raster.presentation_id = frame.presentation_id;
+    raster.clone_font_bindings_from(frame);
+    raster.faces.extend(coverage.faces.clone());
+    raster.fonts.extend(coverage.fonts.clone());
+    raster.char_fonts.extend(coverage.char_fonts.clone());
+    raster
+        .shaped_clusters
+        .extend(coverage.shaped_clusters.clone());
+    raster.background = background;
+    raster.char_width = frame.char_width;
+    raster.char_height = frame.char_height;
+    raster.font_pixel_size = frame.font_pixel_size;
+    let bounds = coverage
+        .content
+        .text_clip_bounds
+        .expect("certified coverage");
+    let clip = Rect::new(
+        bounds.x - origin.0,
+        bounds.y - origin.1,
+        bounds.width,
+        bounds.height,
+    );
+    raster.glyphs = surface.coverage_glyphs().to_vec();
+    for glyph in &mut raster.glyphs {
+        match glyph {
+            FrameGlyph::Char {
+                x,
+                y,
+                baseline,
+                clip_rect,
+                ..
+            } => {
+                *x -= origin.0;
+                *y -= origin.1;
+                *baseline -= origin.1;
+                *clip_rect = Some(clip);
+            }
+            FrameGlyph::Stretch {
+                x, y, clip_rect, ..
+            } => {
+                *x -= origin.0;
+                *y -= origin.1;
+                *clip_rect = Some(clip);
+            }
+            _ => unreachable!("certified text coverage"),
+        }
+    }
+    raster
+}
+
+/// Prepare before the root draw, so every rejection takes the unchanged full
+/// glyph path. The pool applies its global memory ceiling; an oversized page
+/// or refused lease is an ordinary fallback, never an untracked allocation.
+pub(super) fn prepare(
+    renderer: &mut WgpuRenderer,
+    render: &mut GuiFrameRenderState,
+    frame: &FrameGlyphBuffer,
+    mapping: PresentMapping,
+    has_gradient: bool,
+) -> Option<PreparedScrollRaster> {
+    let Some((surface, offset)) = render.compositor.input_scroll.staged_projection() else {
+        render.compositor.retained_scroll = None;
+        return None;
+    };
+    // Effects which alter body pixels need their own raster dependencies.
+    // Default effects are static body paint; live effects and custom profiles
+    // conservatively retain the established full-render path.
+    if has_gradient
+        || !STATIC_BODY_PROFILES.contains(&renderer.effects)
+        || render.compositor.renderer_effects.needs_redraw()
+        || super::retained_static::window_has_active_overlays(render)
+        || std::env::var_os("NEOMACS_DISABLE_RETAINED_SCROLL").is_some()
+    {
+        render.compositor.retained_scroll = None;
+        return None;
+    }
+    let coverage = surface.coverage();
+    let background = body_background(frame, coverage.viewport)?;
+    let scale = mapping.surface().device_scale();
+    let generation = render.compositor.current_scene_generation;
+    let bounds = coverage.content.text_clip_bounds?;
+    let (size, origin) = raster_geometry(
+        bounds,
+        scale,
+        renderer.device().limits().max_texture_dimension_2d,
+    )?;
+    let valid = render
+        .compositor
+        .retained_scroll
+        .as_ref()
+        .is_some_and(|cache| {
+            Arc::ptr_eq(&cache.surface, &surface)
+                && cache.generation == generation
+                && cache.scale == scale
+                && cache.texture.size() == size
+        });
+    if !valid {
+        // Release old coverage before admission, allowing its pool slot to be
+        // reclaimed rather than charging both generations against the budget.
+        render.compositor.retained_scroll = None;
+        let texture = match renderer.acquire_snapshot(size) {
+            Ok(texture) => texture,
+            Err(_) => {
+                crate::render_thread::frame_stats::count(
+                    &crate::render_thread::frame_stats::FULL_FRAME_TEXTURE_REFUSALS,
+                );
+                return None;
+            }
+        };
+        let raster = raster_frame(&surface, frame, size, origin, scale, background);
+        let SurfaceState::Drawable(target) =
+            SurfaceState::from_device_size(size.width(), size.height(), scale).ok()?
+        else {
+            return None;
+        };
+        let raster_mapping = PresentMapping::top_left_clip(
+            target,
+            PresentationExtent::new(
+                raster.presentation_id,
+                GeometrySize::<LogicalPixels>::from_px(raster.width, raster.height).ok()?,
+            ),
+        );
+        let atlas = render.compositor.glyph_atlas.as_mut()?;
+        atlas.set_current_frame_fonts(raster.font_bindings());
+        // Rendering an auxiliary picture must not advance or replace the live
+        // frame's effect queues. Its fonts and immutable default metrics are
+        // nevertheless the same bindings used by the ordinary root draw.
+        renderer.with_frame_effects(&mut Default::default(), |renderer| {
+            renderer.render_frame_glyphs(
+                texture.view(),
+                &raster,
+                atlas,
+                raster_mapping,
+                false,
+                None,
+                None,
+                None,
+                None,
+                None,
+            );
+        });
+        crate::render_thread::frame_stats::count(
+            &crate::render_thread::frame_stats::SCROLL_RASTER_BUILDS,
+        );
+        tracing::debug!(target: "neomacs_display_runtime::retained_scroll", window = coverage.content.window_id.get(), "rasterized scroll coverage");
+        render.compositor.retained_scroll = Some(RetainedScroll {
+            surface: surface.clone(),
+            generation,
+            scale,
+            texture,
+            origin,
+        });
+    }
+    let cache = render.compositor.retained_scroll.as_ref()?;
+    let viewport = coverage.viewport;
+    let source_pixels = Rect::new(
+        (viewport.x - cache.origin.0) * scale.get(),
+        (viewport.y + coverage.origin + surface.clamp_offset(offset) - cache.origin.1)
+            * scale.get(),
+        viewport.width * scale.get(),
+        viewport.height * scale.get(),
+    );
+    let destination =
+        FrameRect::new(viewport.x, viewport.y, viewport.width, viewport.height).ok()?;
+    neomacs_renderer_wgpu::renderer::SnapshotRegion::new(
+        &cache.texture,
+        source_pixels,
+        destination,
+    )?;
+    let mut base = frame.clone();
+    let window = coverage.content.window_id;
+    base.glyphs.retain(|glyph| {
+        glyph.window_id() != Some(window) || glyph.row_role() != Some(GlyphRowRole::Text)
+    });
+    Some(PreparedScrollRaster {
+        frame: base,
+        texture: cache.texture.clone(),
+        source_pixels,
+        destination,
+    })
+}
+
+#[cfg(test)]
+mod tests;
+
+#[cfg(test)]
+mod geometry_tests {
+    use super::*;
+    #[test]
+    fn raster_extent_preserves_device_phase_and_rejects_oversized_coverage() {
+        let scale = DeviceScale::new(1.5).unwrap();
+        let (size, origin) =
+            raster_geometry(Rect::new(2.25, 3.75, 20.0, 40.0), scale, 1024).unwrap();
+        assert_eq!(origin, (2.0, 10.0 / 3.0));
+        assert_eq!((size.width(), size.height()), (31, 61));
+        assert!(raster_geometry(Rect::new(0.0, 0.0, 10.0, 10000.0), scale, 1024).is_none());
+    }
+}
