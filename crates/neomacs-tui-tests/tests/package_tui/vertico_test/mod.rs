@@ -8,11 +8,17 @@ use super::{COMPAT_GNU_ELPA_PIN, CachedMelpaOracle, VERTICO_MELPA_PIN};
 use super::scenario::{DisplayCheckpoint, PackageTuiScenario, PairTimeout, ReadinessCheckpoint};
 
 mod harness;
+mod overflow;
 mod prelude;
 mod selection;
 
 use harness::candidate_rows;
 use prelude::VERTICO_TUI_PRELUDE;
+
+#[test]
+fn vertico_overflow_scrolls_the_candidate_window_and_counts_candidates() {
+    overflow::run();
+}
 
 #[test]
 fn vertico_selection_moves_the_highlight_and_accepts_by_key() {

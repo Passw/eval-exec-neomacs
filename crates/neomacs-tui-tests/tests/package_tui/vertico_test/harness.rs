@@ -80,6 +80,30 @@ pub(super) fn idle_mode_line_row(rows: u16) -> u16 {
     rows - 2
 }
 
+/// The row the main window's mode line is on.
+pub(super) fn mode_line_row_of(session: &TuiSession) -> u16 {
+    mode_line_row_in(&session.text_grid())
+        .unwrap_or_else(|| panic!("{} did not render a mode line", session.name))
+}
+
+/// [`mode_line_row_of`] against an already-read grid, for use in a wait.
+pub(super) fn mode_line_row_in(grid: &[String]) -> Option<u16> {
+    grid.iter()
+        .position(|row| row.contains(MODE_LINE_MARKER))
+        .map(|row| row as u16)
+}
+
+/// The row the minibuffer window's prompt is on, directly under the mode line.
+///
+/// Vertico grows the minibuffer window and draws the candidates into it, so the
+/// window's own first row -- the prompt -- is the row after the main window's
+/// mode line, and the candidate rows follow it without a gap. How tall the
+/// window grows is the package's decision and is pinned by the frozen screens;
+/// that the window starts here is what this returns.
+pub(super) fn prompt_row_in(grid: &[String]) -> Option<u16> {
+    mode_line_row_in(grid).map(|row| row + 1)
+}
+
 /// The rows holding a candidate whose text starts with `prefix`, in screen
 /// order.
 ///
