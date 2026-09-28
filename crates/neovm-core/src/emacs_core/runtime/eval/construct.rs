@@ -2158,6 +2158,7 @@ impl Context {
             obarray.symbol_value_id_or_nil(core_eval_symbols.throw_on_input_symbol);
 
         let mut ev = Self {
+            owned_roots: Default::default(),
             tagged_heap,
             pdump_image: None,
             after_pdump_load_hook_pending: false,
