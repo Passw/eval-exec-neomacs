@@ -25,6 +25,7 @@ struct Summary {
 pub(crate) fn report(text: &str, budget_us: u64) -> Result<serde_json::Value, String> {
     let mut groups: BTreeMap<String, Vec<u64>> = BTreeMap::new();
     let mut projected_groups: BTreeMap<String, Vec<u64>> = BTreeMap::new();
+    let mut first_response_groups: BTreeMap<String, Vec<u64>> = BTreeMap::new();
     let mut identities = BTreeSet::new();
     for (index, line) in text.lines().enumerate() {
         let sample: Sample =
@@ -47,6 +48,14 @@ pub(crate) fn report(text: &str, budget_us: u64) -> Result<serde_json::Value, St
                 .or_default()
                 .push(projected);
         }
+        first_response_groups
+            .entry(sample.kind.clone())
+            .or_default()
+            .push(
+                sample
+                    .input_to_projected_present_ns
+                    .map_or(latency, |projected| projected.min(latency)),
+            );
         groups.entry(sample.kind).or_default().push(latency);
     }
     if groups.is_empty() {
@@ -78,8 +87,9 @@ pub(crate) fn report(text: &str, budget_us: u64) -> Result<serde_json::Value, St
     };
     let summaries = summarize(groups);
     let projected = summarize(projected_groups);
+    let first_response = summarize(first_response_groups);
     Ok(
-        serde_json::json!({ "measurement": "native-enqueue-to-compositor-presentation", "scope": "inputs with a confirmed viewport change", "budget_us": budget_us, "by_input_kind": summaries, "projected_by_input_kind": projected, "projected_scope": "subset with exact native submission confirmation; authoritative samples include fallbacks" }),
+        serde_json::json!({ "measurement": "native-enqueue-to-compositor-presentation", "scope": "inputs with a confirmed viewport change", "budget_us": budget_us, "by_input_kind": summaries, "first_response_by_input_kind": first_response, "first_response_scope": "earliest confirmed projected or authoritative presentation for every input, including fallbacks", "projected_by_input_kind": projected, "projected_scope": "subset with exact native submission confirmation; authoritative samples include fallbacks" }),
     )
 }
 
@@ -100,6 +110,21 @@ mod tests {
             report["projected_by_input_kind"]["precise"]["over_budget"],
             0
         );
+    }
+
+    #[test]
+    fn first_response_includes_fallbacks_and_uses_the_earliest_confirmation() {
+        let text = [
+            r#"{"input":1,"kind":"precise","input_to_present_ns":100000000,"input_to_projected_present_ns":5000000,"evicted_inputs":0}"#,
+            r#"{"input":2,"kind":"precise","input_to_present_ns":200000000,"evicted_inputs":0}"#,
+            r#"{"input":3,"kind":"precise","input_to_present_ns":4000000,"input_to_projected_present_ns":6000000,"evicted_inputs":0}"#,
+        ].join("\n");
+        let report = report(&text, 16667).unwrap();
+        let first = &report["first_response_by_input_kind"]["precise"];
+        assert_eq!(first["samples"], 3);
+        assert_eq!(first["p50_ms"], 5.0);
+        assert_eq!(first["p95_ms"], 200.0);
+        assert_eq!(first["over_budget"], 1);
     }
 
     #[test]
