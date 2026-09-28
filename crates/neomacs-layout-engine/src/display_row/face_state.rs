@@ -17,6 +17,11 @@ use neomacs_display_protocol::face::{
 use neomacs_display_protocol::types::Color;
 use neomacs_display_protocol::types::FaceId;
 
+#[cfg(test)]
+thread_local! {
+    pub(crate) static GLYPH_MEASURE_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 fn underline_style_from_code(code: u8) -> UnderlineStyle {
     UnderlineStyle::from_gnu_code(code).unwrap_or_default()
 }
@@ -658,6 +663,8 @@ impl<'a> DisplayRowGlyphMeasurer<'a> {
         columns: u8,
         fallback_advance_px: f32,
     ) -> f32 {
+        #[cfg(test)]
+        GLYPH_MEASURE_CALLS.with(|calls| calls.set(calls.get() + 1));
         let face_char_width = face.char_width_px(self.fallback_char_width);
         let column_advance = f32::from(columns) * face_char_width;
         let measured = self

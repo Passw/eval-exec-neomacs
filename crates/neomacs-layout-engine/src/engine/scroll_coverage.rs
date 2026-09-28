@@ -740,35 +740,48 @@ impl LayoutEngine {
                 .import_face(rendered)
                 .map_err(|_| RowProgramError::Unsupported)?;
         }
-        let mut measurer = DisplayRowGlyphMeasurer::with_mode(
-            &faces,
-            realizer.font_metrics_service_mut(),
-            metrics.char_width(),
-            GlyphAdvanceQuantization::PreserveLogicalPixels,
-            DisplayRowMeasurementMode::ConcreteFont,
-        );
-        capture.programs.push(RowProgram::capture(
-            RowProgramGeometry {
-                inherited_line_spacing: key.extra_line_spacing,
-                width: key.partition.text_body().width,
-                metrics,
-                tabs: crate::display_row::builder::DisplayTabPolicy::from_tab_width_and_stops(
-                    0.0,
-                    key.tab_width,
-                    &key.tab_stop_list,
-                ),
-                base_face: base_id,
-                background: Color::from_pixel(bootstrap.background),
-            },
-            captured.items,
-            faces.clone(),
-            &mut measurer,
-            RowProgramLimits {
-                items: 32,
-                text_bytes: 512,
-                glyphs: 256,
-            },
-        )?);
+        let geometry = RowProgramGeometry {
+            inherited_line_spacing: key.extra_line_spacing,
+            width: key.partition.text_body().width,
+            metrics,
+            tabs: crate::display_row::builder::DisplayTabPolicy::from_tab_width_and_stops(
+                0.0,
+                key.tab_width,
+                &key.tab_stop_list,
+            ),
+            base_face: base_id,
+            background: Color::from_pixel(bootstrap.background),
+        };
+        let limits = RowProgramLimits {
+            items: 32,
+            text_bytes: 512,
+            glyphs: 256,
+        };
+        let program = if RowProgram::supports_deferred_ascii(&captured.items) {
+            let fonts = crate::row_layout::font_measurement::PrimaryFontSnapshot::capture(
+                &faces,
+                realizer
+                    .font_metrics_service_mut()
+                    .ok_or(RowProgramError::Unsupported)?,
+            )?;
+            RowProgram::capture_deferred(geometry, captured.items, faces, fonts, limits)?
+        } else {
+            let mut measurer = DisplayRowGlyphMeasurer::with_mode(
+                &faces,
+                realizer.font_metrics_service_mut(),
+                metrics.char_width(),
+                GlyphAdvanceQuantization::PreserveLogicalPixels,
+                DisplayRowMeasurementMode::ConcreteFont,
+            );
+            RowProgram::capture(
+                geometry,
+                captured.items,
+                faces.clone(),
+                &mut measurer,
+                limits,
+            )?
+        };
+        capture.programs.push(program);
         Ok(())
     }
 }

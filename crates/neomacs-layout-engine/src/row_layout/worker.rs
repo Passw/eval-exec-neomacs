@@ -10,6 +10,7 @@ const MAX_ROWS: usize = 64;
 const MAX_BYTES: usize = 64 * 1024;
 const MAX_GLYPHS: usize = 16 * 1024;
 const MAX_ITEMS: usize = 4096;
+const MAX_FONT_BYTES: usize = 64 * 1024;
 
 /// An opaque receipt. A caller must still validate its full layout key before
 /// admitting the corresponding result; this number says nothing about reuse.
@@ -67,13 +68,19 @@ impl RowWorker {
         let mut bytes = 0usize;
         let mut glyphs = 0usize;
         let mut items = 0usize;
+        let mut font_bytes = 0usize;
         for row in &rows {
             let limits = row.limits();
             bytes = bytes.saturating_add(limits.text_bytes);
             glyphs = glyphs.saturating_add(limits.glyphs);
             items = items.saturating_add(limits.items);
+            font_bytes = font_bytes.saturating_add(row.font_bytes());
         }
-        if bytes > MAX_BYTES || glyphs > MAX_GLYPHS || items > MAX_ITEMS {
+        if bytes > MAX_BYTES
+            || glyphs > MAX_GLYPHS
+            || items > MAX_ITEMS
+            || font_bytes > MAX_FONT_BYTES
+        {
             return Err(RowProgramError::Budget);
         }
         if self.thread.is_none() {
@@ -115,6 +122,7 @@ impl RowWorker {
 }
 
 fn run(shared: Arc<Shared>) {
+    let mut fonts = super::font_measurement::WorkerFontMeasurements::default();
     loop {
         let job = {
             let mut mailbox = shared.mailbox.lock().unwrap();
@@ -127,7 +135,7 @@ fn run(shared: Arc<Shared>) {
             mailbox.pending.take().unwrap()
         };
         let cancelled = || shared.revision.load(Ordering::Acquire) != job.ticket.0;
-        let rows = compute_rows(job.rows, cancelled);
+        let rows = compute_rows(job.rows, &mut fonts, cancelled);
         let mut mailbox = shared.mailbox.lock().unwrap();
         if !mailbox.stopping && !cancelled() {
             mailbox.completed = Some(RowJobResult {
@@ -142,10 +150,12 @@ fn run(shared: Arc<Shared>) {
 // a partial scroll; cancellation invalidates the entire batch.
 fn compute_rows(
     programs: Vec<RowProgram>,
+    fonts: &mut super::font_measurement::WorkerFontMeasurements,
     cancelled: impl Fn() -> bool,
 ) -> Result<Vec<ComputedRow>, RowProgramError> {
     let mut rows = Vec::with_capacity(programs.len());
-    for program in programs {
+    for mut program in programs {
+        program.measure_on_worker(fonts, &cancelled)?;
         match program.compute(&cancelled) {
             Ok(row) => rows.push(row),
             Err(RowProgramError::Overflow | RowProgramError::Budget) if !rows.is_empty() => break,

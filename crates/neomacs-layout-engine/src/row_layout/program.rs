@@ -1,6 +1,7 @@
-//! Complete, bounded row programs. Capture resolves source semantics and font
-//! measurements; execution only calls the canonical glyph writer. In particular,
-//! executing a program never opens a font database or consults evaluator TLS.
+//! Complete, bounded row programs. Capture resolves source semantics. ASCII
+//! rows defer measurement to a worker-local font service; other admitted rows
+//! retain exact measurements from capture. Execution uses the canonical writer
+//! and never consults evaluator TLS.
 
 use super::{ResolvedMappedTextInput, ResolvedSpacingInput, ResolvedTextInput};
 use crate::display_face_ref::render_face_ref_id;
@@ -303,6 +304,7 @@ impl DisplayGlyphMeasurer for Measurements {
 #[derive(Clone, Debug)]
 pub(crate) struct RowProgram {
     geometry: RowProgramGeometry,
+    deferred_fonts: Option<super::font_measurement::PrimaryFontSnapshot>,
     operations: Vec<(Operation, DisplayTextRunMeasurement)>,
     measurements: Measurements,
     faces: Vec<DisplayRowFace>,
@@ -329,6 +331,43 @@ impl RowProgram {
         measurer: &mut dyn DisplayGlyphMeasurer,
         limits: RowProgramLimits,
     ) -> Result<Self, RowProgramError> {
+        Self::capture_inner(geometry, items, faces, Some(measurer), None, limits)
+    }
+
+    pub(crate) fn supports_deferred_ascii(items: &[DisplayItem]) -> bool {
+        items.iter().all(|item| match &item.kind {
+            DisplayItemKind::TextRun(run) => run.text.is_ascii(),
+            DisplayItemKind::SourceMappedText(run) => run.text.is_ascii(),
+            DisplayItemKind::Stretch(DisplayStretch {
+                width: DisplayStretchWidth::RelativeToSource { source, .. },
+                ..
+            }) => source.as_rust_char().is_some_and(|ch| ch.is_ascii()),
+            DisplayItemKind::Stretch(_) | DisplayItemKind::RowBreak(_) => true,
+            _ => false,
+        })
+    }
+
+    pub(crate) fn capture_deferred(
+        geometry: RowProgramGeometry,
+        items: Vec<DisplayItem>,
+        faces: Vec<DisplayRowFace>,
+        fonts: super::font_measurement::PrimaryFontSnapshot,
+        limits: RowProgramLimits,
+    ) -> Result<Self, RowProgramError> {
+        if !Self::supports_deferred_ascii(&items) {
+            return Err(RowProgramError::Unsupported);
+        }
+        Self::capture_inner(geometry, items, faces, None, Some(fonts), limits)
+    }
+
+    fn capture_inner(
+        geometry: RowProgramGeometry,
+        items: impl IntoIterator<Item = DisplayItem>,
+        faces: Vec<DisplayRowFace>,
+        mut measurer: Option<&mut dyn DisplayGlyphMeasurer>,
+        deferred_fonts: Option<super::font_measurement::PrimaryFontSnapshot>,
+        limits: RowProgramLimits,
+    ) -> Result<Self, RowProgramError> {
         if faces.len() > limits.items || !geometry.width.is_finite() || geometry.width <= 0.0 {
             return Err(RowProgramError::Budget);
         }
@@ -350,7 +389,11 @@ impl RowProgram {
             return Err(RowProgramError::Budget);
         }
         let mut measurements = Measurements {
-            backend: measurer.display_geometry_backend(),
+            backend: measurer
+                .as_ref()
+                .map_or(DisplayGeometryBackend::WindowSystemPixels, |m| {
+                    m.display_geometry_backend()
+                }),
             char_width: geometry.metrics.char_width(),
             advances: Default::default(),
             vertical: Default::default(),
@@ -386,12 +429,18 @@ impl RowProgram {
             if !faces.iter().any(|candidate| candidate.face_id == face) {
                 return Err(RowProgramError::Unsupported);
             }
-            let plan = if text.is_empty() {
+            let plan = if text.is_empty() || measurer.is_none() {
                 DisplayTextRunMeasurement::PerChar
             } else {
-                measurer.text_run_advances_px(text, face, geometry.metrics.char_width().max(1.0))
+                measurer.as_mut().unwrap().text_run_advances_px(
+                    text,
+                    face,
+                    geometry.metrics.char_width().max(1.0),
+                )
             };
-            measurements.capture_item(&item, measurer, geometry.base_face);
+            if let Some(measurer) = measurer.as_mut() {
+                measurements.capture_item(&item, *measurer, geometry.base_face);
+            }
             complete = matches!(item.kind, DisplayItemKind::RowBreak(_));
             operations.push((
                 Operation::capture(
@@ -408,11 +457,58 @@ impl RowProgram {
         }
         Ok(Self {
             geometry,
+            deferred_fonts,
             operations,
             measurements,
             faces,
             limits,
         })
+    }
+
+    pub(crate) fn font_bytes(&self) -> usize {
+        self.deferred_fonts
+            .as_ref()
+            .map_or(0, |fonts| fonts.bytes())
+    }
+
+    pub(crate) fn measure_on_worker(
+        &mut self,
+        worker: &mut super::font_measurement::WorkerFontMeasurements,
+        cancelled: &impl Fn() -> bool,
+    ) -> Result<(), RowProgramError> {
+        let Some(snapshot) = self.deferred_fonts.take() else {
+            return Ok(());
+        };
+        let fonts = worker.prepare(&snapshot, &self.faces, cancelled)?;
+        let mut measurer = crate::display_row::face_state::DisplayRowGlyphMeasurer::with_mode(
+            &self.faces,
+            Some(fonts),
+            self.geometry.metrics.char_width(),
+            crate::glyph_advance::GlyphAdvanceQuantization::PreserveLogicalPixels,
+            DisplayRowMeasurementMode::ConcreteFont,
+        );
+        for (operation, plan) in &mut self.operations {
+            if cancelled() {
+                return Err(RowProgramError::Cancelled);
+            }
+            let item = operation.clone().into_item();
+            let face = render_face_ref_id(item.face, self.geometry.base_face);
+            let text = match &item.kind {
+                DisplayItemKind::TextRun(run) => run.text.as_ref(),
+                DisplayItemKind::SourceMappedText(run) => run.text.as_ref(),
+                _ => "",
+            };
+            if !text.is_empty() {
+                *plan = measurer.text_run_advances_px(
+                    text,
+                    face,
+                    self.geometry.metrics.char_width().max(1.0),
+                );
+            }
+            self.measurements
+                .capture_item(&item, &mut measurer, self.geometry.base_face);
+        }
+        Ok(())
     }
 
     pub(crate) fn limits(&self) -> RowProgramLimits {
@@ -426,6 +522,9 @@ impl RowProgram {
         mut self,
         cancelled: impl Fn() -> bool,
     ) -> Result<ComputedRow, RowProgramError> {
+        if self.deferred_fonts.is_some() {
+            return Err(RowProgramError::MissingMeasurement);
+        }
         let layout = self.geometry.layout();
         let mut row = new_display_row(&layout);
         let mut position = DisplayRowPosition::new(0.0, 0);
