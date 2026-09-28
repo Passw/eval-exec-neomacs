@@ -16,6 +16,11 @@ use neomacs_display_protocol::glyph_matrix::GlyphRow;
 #[cfg(test)]
 use neovm_core::emacs_core::Context;
 
+#[cfg(test)]
+thread_local! {
+    pub(crate) static SCRATCH_GLYPHS_COPIED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 pub(crate) struct DisplayRowCurrentRowOutput<'builder> {
     builder: &'builder mut DisplayOutputBuilder,
 }
@@ -67,6 +72,8 @@ impl<'builder> DisplayRowCurrentRowOutput<'builder> {
         M: DisplayCurrentRowMutation,
     {
         let mut row = self.current_row_snapshot()?;
+        #[cfg(test)]
+        SCRATCH_GLYPHS_COPIED.with(|count| count.set(count.get() + row.total_glyphs()));
         Some(mutation.apply(&mut row))
     }
 

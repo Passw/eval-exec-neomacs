@@ -12857,3 +12857,133 @@ fn live_buffer_display_property_mapped_text_replacement_matrix() {
     assert_eq!(outcome.charpos, 3);
     assert_eq!(outcome.byte_idx, 3);
 }
+
+#[test]
+fn independent_source_width_probes_do_not_copy_preceding_glyphs() {
+    use crate::display_current_row_output::SCRATCH_GLYPHS_COPIED;
+    use crate::display_item::{DisplayTextRun, SourceSpan};
+    let mut eval = Context::new();
+    let table = FaceTable::new();
+    let resolver = FaceResolver::new(&table, 0xffffff, 0, 14.0, None);
+    let active = test_active_face_state(FaceId::new(7), 8.0);
+    let mut metrics = None;
+    let mut builder = crate::output::builder::DisplayOutputBuilder::new();
+    builder.begin_window(1, 1, 20, Rect::new(0.0, 0.0, 160.0, 16.0), true);
+    builder.begin_row(0, GlyphRowRole::Text);
+    for i in 0..128 {
+        write_char_to_current_row_with_width(&mut builder, 'W', FaceId::new(7), i, 8.0);
+    }
+    let before = DisplayRowCurrentRowOutput::from_output_builder(&mut builder)
+        .current_row_snapshot()
+        .unwrap();
+    SCRATCH_GLYPHS_COPIED.with(|count| count.set(0));
+    for ch in ' '..='~' {
+        let item = DisplayItem::new(
+            SourceSpan::synthetic(123, 0, 1),
+            RenderFaceRef::FaceId(FaceId::new(7)),
+            DisplayItemKind::TextRun(DisplayTextRun::independent(ch.to_string())),
+        );
+        let request = DisplaySourceNaturalMeasurementRequest::for_range_and_cluster(
+            DisplaySourceTextRange::new(CharPos0::new(128), CharPos0::new(129)),
+            DisplaySourceClusterState::for_char(ch, None),
+        );
+        let width = request.resolve_to_text_row(
+            &mut text_row_source_measure_state(&mut builder, &mut eval, &mut metrics, &resolver),
+            &active,
+            test_append_frame(8.0, 8.0, DisplayTabPolicy::every(8)),
+            DisplayRowPosition::new(1024.0, 128),
+            &item,
+        );
+        assert_eq!(width, 8.0, "{ch}");
+    }
+    assert_eq!(
+        before,
+        DisplayRowCurrentRowOutput::from_output_builder(&mut builder)
+            .current_row_snapshot()
+            .unwrap()
+    );
+    assert_eq!(SCRATCH_GLYPHS_COPIED.with(|count| count.get()), 0);
+}
+
+#[test]
+fn independent_width_probe_matches_full_row_with_modifiers_and_context() {
+    use crate::display_item::{DisplayTextRun, SourceSpan};
+    let mut eval = Context::new();
+    let table = FaceTable::new();
+    let resolver = FaceResolver::new(&table, 0xffffff, 0, 14.0, None);
+    let active = test_active_face_state(FaceId::new(7), 8.0);
+    let mut metrics = None;
+    let mut builder = crate::output::builder::DisplayOutputBuilder::new();
+    builder.begin_window(1, 1, 20, Rect::new(0.0, 0.0, 160.0, 16.0), true);
+    builder.begin_row(0, GlyphRowRole::Text);
+    for prefix in ['W', '中', '\u{200d}'] {
+        builder
+            .edit_current_row_for_test(|row| {
+                row.glyphs[1].clear();
+                row.height_px = 38.0;
+                row.ascent_px = 30.0;
+                row.pixel_x = 7.25;
+                row.start_col = 3;
+            })
+            .unwrap();
+        for i in 0..80 {
+            write_char_to_current_row_with_width(&mut builder, prefix, FaceId::new(7), i, 8.0);
+        }
+        let before = DisplayRowCurrentRowOutput::from_output_builder(&mut builder)
+            .current_row_snapshot()
+            .unwrap();
+        let context = SingleDisplayItemAppendContext::for_source_walk(
+            active.resolved_face(),
+            active.face_id(),
+            test_append_frame(8.0, 8.0, DisplayTabPolicy::every(8)),
+        );
+        for layout in [
+            DisplayItemLayout::default(),
+            DisplayItemLayout {
+                raise: Some(0.3),
+                height: Some(27.0),
+                space_width: Some(2.25),
+                break_after_row: false,
+            },
+        ] {
+            for ch in (' '..='~').chain(['\t', '中', '\u{301}']) {
+                let mut item = DisplayItem::new(
+                    SourceSpan::synthetic(123, 0, 1),
+                    RenderFaceRef::FaceId(active.face_id()),
+                    DisplayItemKind::TextRun(DisplayTextRun::independent(ch.to_string())),
+                );
+                item.layout = layout;
+                let pen = DisplayRowPosition::new(647.25, 83);
+                let kind = if ch == '\t' {
+                    DisplayRowAppendKind::Tab
+                } else {
+                    DisplayRowAppendKind::SourceText
+                };
+                let mut state =
+                    text_row_source_measure_state(&mut builder, &mut eval, &mut metrics, &resolver);
+                let expected = context
+                    .measure_width_with_policy(
+                        &mut state,
+                        item.clone(),
+                        pen,
+                        kind,
+                        &mut NaturalDisplayRowAppendRenderPolicy,
+                    )
+                    .unwrap();
+                let measured = context
+                    .measure_width_naturally(&mut state, item, pen, kind)
+                    .unwrap();
+                assert_eq!(
+                    measured, expected,
+                    "prefix={prefix:?} ch={ch:?} layout={layout:?}"
+                );
+            }
+        }
+        assert_eq!(
+            before,
+            DisplayRowCurrentRowOutput::from_output_builder(&mut builder)
+                .current_row_snapshot()
+                .unwrap()
+        );
+    }
+}

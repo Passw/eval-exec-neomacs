@@ -1815,6 +1815,49 @@ impl<'a> TextRowSourceMeasureState<'a> {
         self.row_output.cluster_tail()
     }
 
+    /// Width-only probe for an independent scalar at the source iterator's
+    /// authoritative pen. The caller proves that no preceding glyph can
+    /// participate in composition; height and source slots do not escape.
+    pub(crate) fn measure_independent_text_width(
+        &mut self,
+        face_ids: &mut FrameFaceAttempt,
+        item: DisplayItem,
+        row_request: DisplayRowSourceRenderRequest<'_>,
+        position: DisplayRowPosition,
+    ) -> Option<f32> {
+        // Preserve the ordinary probe's no-current-row fallback contract.
+        self.row_output.current_row_vertical_metrics()?;
+        let mut row = GlyphRow::new(neomacs_display_protocol::frame_glyphs::GlyphRowRole::Text);
+        let mut source = DisplayItemSegmentSource::new(item);
+        let mut source_state = DisplayRowSourceState::frame_local();
+        let mut policy = crate::display_source_append_plan::NaturalDisplayRowAppendRenderPolicy;
+        let mutation = DisplayRowCurrentSourceStepMutation {
+            row_request,
+            renderer: DisplayRowRenderer::new(self.font_metrics, self.measurement_mode),
+            source: &mut source,
+            source_state: &mut source_state,
+            context: DisplayRowRenderContext::new(
+                self.face_resolver,
+                self.evaluator.display_host.as_deref(),
+                face_ids,
+            )
+            .with_automatic_composition(self.automatic_composition),
+            render_policy: &mut policy,
+        };
+        let (result, row_height_px, row_ascent_px) = mutation.apply(&mut row)?;
+        Some(
+            DisplayRowCurrentTextSourceStepResult {
+                result,
+                row_height_px,
+                row_ascent_px,
+            }
+            .into_measure_outcome()
+            .into_append_progress(position)
+            .metrics()
+            .width_px(),
+        )
+    }
+
     pub(crate) fn measure_display_item_source_against_current_text_row<
         S: DisplayItemSource,
         P: DisplayRowRenderPolicy,
