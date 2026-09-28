@@ -652,3 +652,64 @@ fn ibuffer_alternate_format_shows_the_full_long_and_wide_names() {
         &neo,
     );
 }
+
+/// The truncation glyph over a double-width cell at the window's right edge.
+///
+/// The alternate format prints `eta-...` in full, so a forty-column window
+/// cuts its row inside the last wide character. GNU paints `$` in the two
+/// cells that half-glyph leaves; Neomacs paints a space in the first of them
+/// and `$` in the last, so the row differs by one cell.
+///
+/// This is a real divergence and the test is meant to stay RED: it is not to
+/// be blessed from Neomacs, weakened or skipped. Nothing about it is
+/// specific to `ibuffer-formats`: the same half-cell is reachable through the
+/// default format by narrowing until the elided wide name reaches the edge
+/// (nineteen columns), and it shows up again in the echo area when ibuffer's
+/// own `Filter by buffer name added: ...` message wraps a wide character (a
+/// twenty-four by thirty-six terminal) -- GNU paints its continuation glyph
+/// there, Neomacs a space.
+#[test]
+fn ibuffer_truncated_wide_name_at_the_window_edge() {
+    let (mut gnu, mut neo, _visited) = boot_ibuffer_fixture();
+    resize_both(&mut gnu, &mut neo, 24, 40);
+    read_both(&mut gnu, &mut neo, Duration::from_secs(1));
+    open_ibuffer(&mut gnu, &mut neo);
+
+    // The default format keeps every wide name well inside the window, so it
+    // agrees; the wide name only reaches the edge in the alternate format.
+    assert_both(
+        "elide the wide name inside the window at forty columns",
+        &gnu,
+        &neo,
+        |grid| {
+            grid.iter()
+                .any(|row| row.contains("eta-\u{65e5}\u{672c}\u{8a9e}\u{306e}\u{30d0}"))
+        },
+    );
+    assert_pair_exact_display(
+        "ibuffer_truncated_wide_name_at_the_window_edge/elided",
+        &gnu,
+        &neo,
+    );
+
+    send_both(&mut gnu, &mut neo, "`");
+    step(&mut gnu, &mut neo, |grid| {
+        grid.iter()
+            .any(|row| row.contains("Name") && !row.contains("Size"))
+    });
+    assert_both(
+        "print the wide name up to the last columns of the window",
+        &gnu,
+        &neo,
+        |grid| {
+            grid.iter().any(|row| {
+                row.contains("eta-\u{65e5}\u{672c}\u{8a9e}\u{306e}\u{30d0}") && row.ends_with('$')
+            })
+        },
+    );
+
+    // Prints both editors' full screens before the comparison so a teammate
+    // sees the one cell that differs in context.
+    dump_pair_grids("ibuffer_truncated_wide_name_at_the_window_edge", &gnu, &neo);
+    assert_pair_exact_display("ibuffer_truncated_wide_name_at_the_window_edge", &gnu, &neo);
+}
