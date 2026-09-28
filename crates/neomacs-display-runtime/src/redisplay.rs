@@ -5,6 +5,8 @@
 //! away from an in-progress presentation without weakening either engine's
 //! exclusive mutable state.
 
+mod maintenance;
+
 use std::cell::{Cell, RefCell};
 
 use neomacs_display_protocol::SealedFramePresentation;
@@ -128,10 +130,22 @@ impl RedisplayRuntime {
         self.engine.try_borrow().ok()?.resolved_scroll_preview(evaluator, frame, window, inputs)
     }
 
-    pub fn maintain_scroll_coverage(&self, evaluator: &Context) -> (Option<std::time::Duration>, bool) {
-        let Ok(mut engine) = self.engine.try_borrow_mut() else { return (None, false); };
-        let wake = engine.maintain_scroll_coverage(evaluator);
-        (wake, engine.take_scroll_coverage_publication())
+    pub fn maintain_scroll_coverage(
+        &self,
+        evaluator: &Context,
+    ) -> (Option<std::time::Duration>, bool) {
+        let Ok(mut engine) = self.engine.try_borrow_mut() else {
+            return (None, false);
+        };
+        let started = std::time::Instant::now();
+        let (progress, publish) = maintenance::run_budgeted(
+            || {
+                let progress = engine.maintain_scroll_coverage(evaluator);
+                (progress, engine.take_scroll_coverage_publication())
+            },
+            || started.elapsed(),
+        );
+        (progress.map(|progress| progress.next_wake()), publish)
     }
 
     /// Construct a runtime without the expensive scalable-font database.

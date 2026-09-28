@@ -46,6 +46,22 @@ pub(super) fn inactive_overlay_arrows(evaluator: &neovm_core::emacs_core::Contex
     !tail.is_cons()
 }
 
+/// Whether another bounded maintenance slice can make progress immediately.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScrollCoverageProgress {
+    Continue,
+    WorkerPending,
+}
+
+impl ScrollCoverageProgress {
+    pub fn next_wake(self) -> std::time::Duration {
+        std::time::Duration::from_millis(match self {
+            Self::Continue => 1,
+            Self::WorkerPending => 4,
+        })
+    }
+}
+
 struct Admission {
     roots: Vec<neovm_core::emacs_core::owned_roots::OwnedRoots>,
     reads: CollectionReads,
@@ -212,8 +228,7 @@ impl LayoutEngine {
     pub fn maintain_scroll_coverage(
         &mut self,
         evaluator: &neovm_core::emacs_core::Context,
-    ) -> Option<std::time::Duration> {
-        use std::time::Duration;
+    ) -> Option<ScrollCoverageProgress> {
         self.prepared_viewports.retire_invalid_dependencies();
         if !self.prepared_viewports.invalidated.is_empty() {
             // Retire the old render-thread certificate even before a new
@@ -391,17 +406,17 @@ impl LayoutEngine {
             Ok(true) => {
                 tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", "worker page ready");
                 self.scroll_coverage.last_window = Some(window_id);
-                return Some(Duration::from_millis(1));
+                return Some(ScrollCoverageProgress::Continue);
             }
             Err(error) => {
                 tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", ?error, "worker page rejected");
                 self.scroll_coverage.last_window = Some(window_id);
-                return Some(Duration::from_millis(1));
+                return Some(ScrollCoverageProgress::Continue);
             }
             Ok(false) => {}
         }
         if self.scroll_coverage.admission.is_some() {
-            return Some(Duration::from_millis(4));
+            return Some(ScrollCoverageProgress::WorkerPending);
         }
         if self.scroll_coverage.capture.is_none() {
             let Some(start) = self
@@ -412,12 +427,12 @@ impl LayoutEngine {
                 .pop()
             else {
                 self.scroll_coverage.last_window = Some(window_id);
-                return Some(Duration::from_millis(1));
+                return Some(ScrollCoverageProgress::Continue);
             };
             if let Err(error) = self.begin_scroll_coverage(evaluator, frame.id, window, start) {
                 tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", ?error, start = start.get(), "capture not eligible");
                 self.scroll_coverage.last_window = Some(window_id);
-                return Some(Duration::from_millis(1));
+                return Some(ScrollCoverageProgress::Continue);
             }
             if let Some(capture) = &mut self.scroll_coverage.capture {
                 capture.preview_pending = true;
@@ -427,7 +442,7 @@ impl LayoutEngine {
             tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", ?error, "row capture rejected");
             self.scroll_coverage.last_window = Some(window_id);
         }
-        Some(Duration::from_millis(1))
+        Some(ScrollCoverageProgress::Continue)
     }
 
     /// Capture a bounded unseen page. No live start, point or presentation is

@@ -7,6 +7,7 @@
 mod prepared_viewports;
 mod query_cache;
 mod scroll_coverage;
+pub use scroll_coverage::ScrollCoverageProgress;
 mod scroll_preview;
 use prepared_viewports::PreparedViewports;
 
