@@ -4939,6 +4939,13 @@ impl Buffer {
         }
     }
 
+    /// The actual first alist binding, for the localized-symbol runtime to
+    /// install as its shared valcell. Keep lookup and index coherence owned
+    /// by the buffer; callers must not reconstruct an index of Lisp bindings.
+    pub(crate) fn local_variable_binding_cell(&self, sym_id: SymId) -> Option<Value> {
+        self.local_var_alist.binding_cons(sym_id)
+    }
+
     pub fn ordered_buffer_local_bindings(&self) -> Vec<(SymId, RuntimeBindingValue)> {
         // Returns entries in REVERSED GNU order so the caller can
         // `.rev()' to get GNU's prepend-based final order.

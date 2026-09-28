@@ -1361,6 +1361,15 @@ fn ordinary_query_reuse_ignores_unread_lisp_collection_writes() {
 
 #[test]
 fn ordinary_query_reuse_ignores_unrelated_buffer_local_value_writes() {
+    query_reuse_after_unrelated_local_write(false);
+}
+
+#[test]
+fn ordinary_query_reuse_ignores_local_writes_after_hook_cache_invalidation() {
+    query_reuse_after_unrelated_local_write(true);
+}
+
+fn query_reuse_after_unrelated_local_write(invalidate_hook_cache: bool) {
     use crate::engine::viewport_retry_depth_probe as probe;
     use neovm_core::window::WindowLayoutQueryScope;
     let mut eval = Context::new();
@@ -1377,6 +1386,13 @@ fn ordinary_query_reuse_ignores_unrelated_buffer_local_value_writes() {
     // Native scrolling starts after an ordinary redisplay has resolved the
     // current buffer's localized hook cells and variable index.
     engine.layout_frame_rust(&mut eval, frame);
+    if invalidate_hook_cache {
+        // Timer callbacks commonly create temporary buffers and locals.
+        // This invalidates the runtime's global localized-binding epoch.
+        let observer = eval.buffer_manager_mut().create_buffer("observer");
+        eval.buffer_manager_mut().get_mut(observer).unwrap()
+            .set_buffer_local("observer-local", Value::T);
+    }
     let initial = engine.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
     for value in [Value::T, Value::NIL] {
         eval.buffer_manager_mut().get_mut(buffer).unwrap().set_buffer_local("deactivate-mark", value);

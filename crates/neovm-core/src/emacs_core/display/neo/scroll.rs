@@ -41,7 +41,7 @@ impl Context {
         .ok()?;
         let value = self
             .obarray()
-            .read_localized_for_buffer(symbol, buffer.id, buffer.local_var_alist_value())
+            .read_localized_in_buffer(symbol, buffer)
             .or_else(|| buffer.buffer_local_value_id(symbol))
             .or_else(|| self.obarray().symbol_value_id(symbol).copied())
             .unwrap_or(Value::NIL);

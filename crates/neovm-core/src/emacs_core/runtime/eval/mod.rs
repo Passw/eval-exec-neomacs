@@ -7247,11 +7247,7 @@ impl Context {
             match sym.redirect() {
                 SymbolRedirect::Localized => {
                     if let Some(buf) = self.buffers.current_buffer()
-                        && let Some(value) = self.obarray.read_localized_for_buffer(
-                            resolved,
-                            buf.id,
-                            buf.local_var_alist_value(),
-                        )
+                        && let Some(value) = self.obarray.read_localized_in_buffer(resolved, buf)
                     {
                         if value.is_unbound() {
                             return None;

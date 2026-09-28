@@ -3001,6 +3001,30 @@ impl Obarray {
         target_buf: Value,
         target_alist: Value,
     ) -> Option<Value> {
+        self.read_localized_with_lookup(id, target_buf, || {
+            assq(Value::from_sym_id(id), target_alist)
+        })
+    }
+
+    /// Resolve through the buffer's canonical binding index when its owner
+    /// is available. A cache miss must not scan unrelated binding conses:
+    /// dependency observers would otherwise subscribe to their value writes.
+    pub(crate) fn read_localized_in_buffer(
+        &self,
+        id: SymId,
+        buffer: &crate::buffer::Buffer,
+    ) -> Option<Value> {
+        self.read_localized_with_lookup(id, Value::make_buffer(buffer.id), || {
+            buffer.local_variable_binding_cell(id).unwrap_or(Value::NIL)
+        })
+    }
+
+    fn read_localized_with_lookup(
+        &self,
+        id: SymId,
+        target_buf: Value,
+        binding: impl FnOnce() -> Value,
+    ) -> Option<Value> {
         let blv_ptr = self.blv_ptr(id)?;
         let epoch = blv_alist_epoch();
         // SAFETY: the BLV record is a separate heap allocation reached only
@@ -3029,8 +3053,7 @@ impl Obarray {
             // whole-alist `assq` (~1K Ir on a 65-local buffer) until some
             // write path happened to swap it in -- `parse-sexp-ignore-comments`
             // read per `scan-sexps` in indent-region was the visible case.
-            let key = Value::from_sym_id(id);
-            let found_cell = assq(key, target_alist);
+            let found_cell = binding();
             let found = !found_cell.is_nil();
             let valcell = if found {
                 found_cell
