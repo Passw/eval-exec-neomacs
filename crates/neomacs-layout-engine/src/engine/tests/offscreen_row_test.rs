@@ -2755,3 +2755,43 @@ fn repeated_idle_preview_preserves_a_complete_prepared_page() {
         .expect("short preview must preserve the complete prepared page");
     assert_eq!(before.body_rows.len(), after.body_rows.len());
 }
+
+#[test]
+fn backward_precomputation_connects_fragmented_lines_to_the_viewport() {
+    let line = format!("{}\n", "W".repeat(180));
+    let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    scroll_window_to(
+        &mut eval,
+        frame,
+        window,
+        buffer,
+        (120 * line.len() + 1) as i64,
+        121 * line.len(),
+    );
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let before = selected_window_layout_trace(&eval, &engine, frame);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while engine.maintain_scroll_coverage(&eval).is_some() {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    engine.layout_frame_rust(&mut eval, frame);
+    let coverage = engine
+        .last_frame_display_state
+        .as_ref()
+        .unwrap()
+        .scroll_coverage
+        .iter()
+        .find(|coverage| coverage.content.window_id.get() == window.0 as i64)
+        .expect("prepared coverage");
+    assert!(
+        coverage.anchor_row > 0,
+        "backward preparation must connect to the viewport even when a far page exhausts the fragment budget"
+    );
+    assert_eq!(before, selected_window_layout_trace(&eval, &engine, frame));
+}

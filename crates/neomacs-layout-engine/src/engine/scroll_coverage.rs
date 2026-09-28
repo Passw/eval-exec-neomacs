@@ -104,7 +104,7 @@ pub(super) struct ScrollCoverage {
     admission: Option<Admission>,
     capture: Option<Capture>,
     frame: Option<FrameId>,
-    // At most two targets per retained live window. Glyph storage remains
+    // At most three targets per retained live window. Glyph storage remains
     // subject to PreparedViewports' global byte/row limits.
     windows: rustc_hash::FxHashMap<DisplayWindowId, WindowCoverage>,
     last_window: Option<DisplayWindowId>,
@@ -335,7 +335,7 @@ impl LayoutEngine {
         if !compatible || moved {
             // Placement-only changes retarget future work without starving
             // the page already being captured during continuous scrolling.
-            let mut targets = Vec::with_capacity(2);
+            let mut targets = Vec::with_capacity(3);
             let buffer = evaluator
                 .buffer_manager()
                 .get(neovm_core::buffer::BufferId(retained.key.buffer_id))?;
@@ -353,12 +353,16 @@ impl LayoutEngine {
             let lower = start_byte.saturating_sub(8192).max(begin);
             let mut position = start_byte;
             let mut lines = 0;
+            let mut near_backward = None;
             while position > lower {
                 position -= 1;
                 if buffer.emacs_byte_at_pos(neovm_core::buffer::EmacsBytePos::new(position))
                     == Some(b'\n')
                 {
                     lines += 1;
+                    if lines == 5 {
+                        near_backward = Some(position + 1);
+                    }
                     if lines > rows.len().saturating_sub(2).max(1) {
                         position += 1;
                         break;
@@ -372,6 +376,19 @@ impl LayoutEngine {
                     neovm_core::buffer::EmacsBytePos::new(position),
                 ));
             }
+            // Rich physical lines may consume several source fragments or
+            // visual rows. A distant backward page can exhaust its bounded
+            // job before reaching the live viewport. Prepare a nearer bridge
+            // first; keep the farther target for idle page-up reuse.
+            if let Some(byte) = near_backward {
+                let near = buffer.emacs_byte_pos_to_char_pos_clamped(
+                    neovm_core::buffer::EmacsBytePos::new(byte),
+                );
+                if !targets.contains(&near) {
+                    targets.push(near);
+                }
+            }
+            let mut forward_target = None;
             // Two-row overlap matches the usual page movement and also leaves
             // reusable rows for smaller wheel motions into the next page.
             if let Some(row) = rows.get(rows.len().saturating_sub(2)) {
@@ -397,6 +414,7 @@ impl LayoutEngine {
                         );
                         if !targets.contains(&physical_start) {
                             targets.push(physical_start);
+                            forward_target = Some(physical_start);
                         }
                     }
                 }
@@ -411,7 +429,10 @@ impl LayoutEngine {
                     .get(&window_id)
                     .is_some_and(|observed| retained.key.window_start < observed.key.window_start)
             {
-                targets.reverse();
+                if let Some(forward) = forward_target {
+                    targets.retain(|target| *target != forward);
+                    targets.insert(0, forward);
+                }
             }
             self.scroll_coverage.windows.insert(
                 window_id,
