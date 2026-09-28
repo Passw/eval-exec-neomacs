@@ -6,7 +6,7 @@
 //! split by keeping overlay objects on the GC heap and storing only live object
 //! ids in each buffer's overlay index.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BinaryHeap};
 use std::rc::Rc;
@@ -258,6 +258,10 @@ pub(super) fn record_overlay_full_enumeration_visit() {
 pub struct OverlayList {
     index: OverlayIndex,
     snapshot: RefCell<Option<OverlaySnapshot>>,
+    // Permanent symbol identities only: no additional Lisp roots. A small
+    // negative cache prevents Bloom collisions from causing full scans on
+    // every redisplay. Membership and property writes clear it with snapshots.
+    absent_properties: Cell<[Option<crate::emacs_core::intern::SymId>; 8]>,
 }
 
 /// An evaluator-owned immutable overlay index. Like overlay plist values,
@@ -306,6 +310,7 @@ impl OverlayList {
     }
 
     fn invalidate_snapshot(&mut self) {
+        self.absent_properties.set([None; 8]);
         self.snapshot.get_mut().take();
     }
 
@@ -880,6 +885,7 @@ impl OverlayList {
         Self {
             index: OverlayIndex::new(),
             snapshot: RefCell::new(None),
+            absent_properties: Cell::new([None; 8]),
         }
     }
 
@@ -1040,11 +1046,31 @@ impl OverlayList {
     }
 
     /// Conservative test of direct plist keys across all live overlays.
-    /// False proves absence; true may be a Bloom-signature collision. After
-    /// lazy index construction this reads one aggregate, without walking the
-    /// overlays. Category inheritance is intentionally not followed here.
+    /// False proves absence. A Bloom-signature collision for a symbol key is
+    /// checked once and its absence cached until the next overlay mutation.
+    /// Category inheritance is intentionally not followed here.
     pub fn may_contain_property(&self, property: Value) -> bool {
-        self.index.may_contain_property(property)
+        if !self.index.may_contain_property(property) {
+            return false;
+        }
+        let Some(symbol) = property.as_symbol_id() else {
+            return true;
+        };
+        let mut absent = self.absent_properties.get();
+        if absent.contains(&Some(symbol)) {
+            return false;
+        }
+        if self
+            .index
+            .values()
+            .any(|overlay| self.overlay_get_named(overlay, property).is_some())
+        {
+            return true;
+        }
+        absent.rotate_right(1);
+        absent[0] = Some(symbol);
+        self.absent_properties.set(absent);
+        false
     }
 
     /// A content digest of every live overlay: its span and its whole

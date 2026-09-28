@@ -763,6 +763,48 @@ fn whole_overlay_property_summary_tracks_live_membership_and_nil_keys() {
 }
 
 #[test]
+fn absent_overlay_key_bloom_collision_is_scanned_only_once() {
+    let mut list = OverlayList::new();
+    let category = Value::symbol("category");
+    let first = alloc_overlay(0, 1);
+    list.insert_overlay(first);
+    let collision = (0..4096)
+        .find_map(|index| {
+            let key = Value::symbol(&format!("absent-category-collision-{index}"));
+            list.overlay_put(first, key, Value::T).unwrap();
+            list.index.may_contain_property(category).then_some(key)
+        })
+        .expect("find a signature collision");
+    for index in 1..128 {
+        let overlay = alloc_overlay(index * 2, index * 2 + 1);
+        list.insert_overlay(overlay);
+        list.overlay_put(overlay, collision, Value::T).unwrap();
+    }
+    // Mirror the snapshot category collector's fallback on a possible hit.
+    let scan = |list: &OverlayList| {
+        if list.may_contain_property(category) {
+            for overlay in list.overlays_in_gnu_lists_order() {
+                assert!(list.overlay_get_named(overlay, category).is_none());
+            }
+        }
+    };
+    scan(&list);
+    reset_overlay_full_enumeration_visit_count();
+    scan(&list);
+    assert_eq!(
+        overlay_full_enumeration_visit_count(),
+        0,
+        "warm absent-key lookup repeated the whole overlay scan"
+    );
+    let before = list.snapshot();
+    list.overlay_put(first, category, Value::NIL).unwrap();
+    assert!(list.may_contain_property(category));
+    assert!(!before.may_contain_property(category));
+    list.delete_overlay(first);
+    assert!(!list.may_contain_property(category));
+}
+
+#[test]
 fn cached_overlay_snapshot_survives_exact_evaluator_gc() {
     crate::test_utils::init_test_tracing();
     let mut eval = crate::emacs_core::Context::new();
