@@ -93,6 +93,23 @@ impl PreparedViewports {
         source_roots: Vec<neovm_core::emacs_core::owned_roots::OwnedRoots>,
         complete_viewport: bool,
     ) {
+        // Retargeting can revisit a page that is already prepared. A preview
+        // must never shorten its still-valid coverage while the rest is being
+        // captured again. Freshness and geometry must match before retaining
+        // the old source roots and face namespace.
+        if !complete_viewport
+            && self.entries.iter().any(|entry| {
+                entry.computed
+                    && entry.complete_viewport
+                    && entry.frame == frame
+                    && entry.window == window
+                    && entry.retained.key.window_start == retained.key.window_start
+                    && RetainedWindowKey::row_content_eligible(&entry.retained.key, &retained.key)
+                    && entry.dependencies_valid()
+            })
+        {
+            return;
+        }
         let rows = retained.matrix.rows.len();
         let glyphs = retained
             .matrix

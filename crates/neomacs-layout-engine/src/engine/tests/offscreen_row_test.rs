@@ -2681,3 +2681,54 @@ fn idle_precomputation_prioritizes_the_current_scroll_direction() {
         assert_eq!(actual, selected_window_layout_trace(&eval, &fresh, frame));
     }
 }
+
+#[test]
+fn repeated_idle_preview_preserves_a_complete_prepared_page() {
+    let line = "ordinary offscreen text\n";
+    let (mut eval, frame, _, window) = incr_editing_frame(&line.repeat(300), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    engine.maintain_scroll_coverage(&eval);
+    let start = engine
+        .scroll_coverage
+        .active_capture_start_for_test()
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while engine.maintain_scroll_coverage(&eval).is_some() {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    let owner = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
+    let mut key = engine.retained_window_matrices[&owner].key.clone();
+    key.window_start = start as i64;
+    key.point = (start + 5 * line.len()) as i64;
+    let (before, _) = engine
+        .prepared_viewports
+        .replay(frame, owner, &key, false)
+        .expect("initial full page");
+    assert!(before.body_rows.len() > 10);
+    // Retargeting may repeat a still-valid physical start. Its early preview
+    // must not withdraw the larger page already available to scrolling.
+    engine.scroll_coverage.cancel();
+    for _ in 0..4 {
+        engine.maintain_scroll_coverage(&eval);
+    }
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    while !engine
+        .scroll_coverage
+        .drain(&mut engine.prepared_viewports)
+        .unwrap()
+    {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    let (after, _) = engine
+        .prepared_viewports
+        .replay(frame, owner, &key, false)
+        .expect("short preview must preserve the complete prepared page");
+    assert_eq!(before.body_rows.len(), after.body_rows.len());
+}
