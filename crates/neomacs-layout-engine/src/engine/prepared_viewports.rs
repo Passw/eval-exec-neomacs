@@ -180,7 +180,14 @@ impl PreparedViewports {
                 }
             }
             for (index, row) in above {
-                candidate.matrix.rows[*index] = row.clone();
+                // A fractional offset can reduce the destination's row
+                // capacity while the retained prefix still includes its old
+                // bottom row. Such a prefix cannot be completed here.
+                let destination = candidate.matrix.rows.get_mut(*index)?;
+                if RetainedWindowMatrix::is_chrome_role(destination.role) {
+                    return None;
+                }
+                *destination = row.clone();
             }
             let mut index = last_index + 1;
             let mut y = last_row.pixel_y + last_row.height_px;

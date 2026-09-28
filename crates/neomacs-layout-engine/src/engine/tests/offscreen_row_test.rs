@@ -863,3 +863,57 @@ fn worker_page_with_smaller_font_and_tabs_matches_fresh_layout() {
         None,
     );
 }
+
+#[test]
+fn repeated_fractional_scroll_across_prepared_pages_matches_fresh_layout() {
+    let line = "ordinary offscreen text\n";
+    let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 1000, 700);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.frame_manager_mut().get_mut(frame).unwrap().char_height = 17.0;
+    let mut engine = LayoutEngine::new();
+    for pixels in (0..=96)
+        .map(|step| step * 4)
+        .chain((0..96).rev().map(|step| step * 4))
+    {
+        let start = (pixels / 17) as usize * line.len();
+        scroll_window_to(
+            &mut eval,
+            frame,
+            window,
+            buffer,
+            start as i64 + 1,
+            start + 5 * line.len(),
+        );
+        if let neovm_core::window::Window::Leaf {
+            force_start,
+            vscroll,
+            ..
+        } = eval
+            .frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .find_window_mut(window)
+            .unwrap()
+        {
+            *force_start = true;
+            *vscroll = -(pixels % 17);
+        }
+        engine.layout_frame_rust(&mut eval, frame);
+        let actual = selected_window_layout_trace(&eval, &engine, frame);
+        let mut fresh = LayoutEngine::new();
+        fresh.layout_frame_rust(&mut eval, frame);
+        assert_eq!(
+            actual,
+            selected_window_layout_trace(&eval, &fresh, frame),
+            "offset {pixels}"
+        );
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while engine.maintain_scroll_coverage(&eval).is_some() {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::yield_now();
+        }
+    }
+}
