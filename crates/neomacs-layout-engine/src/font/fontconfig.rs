@@ -1151,6 +1151,7 @@ enum FcQueryKind {
 #[cfg(all(test, unix))]
 thread_local! {
     static NATIVE_CANDIDATE_QUERIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static NATIVE_UNSUPPORTED_PATTERNS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 #[cfg(unix)]
@@ -1235,7 +1236,15 @@ fn fc_query_candidates_uncached(
                 continue;
             }
         }
-        let query_charset = if query_charset_ranges.is_empty() {
+        // Character lookup without a registry already filters these answers
+        // below. Push that same predicate into native enumeration so unrelated
+        // patterns and their large charsets are never copied into the result.
+        // Keep the projection (and therefore candidate order) unchanged; GNU
+        // registry queries and FcFontMatch retain their existing semantics.
+        let required_range = required_char
+            .filter(|_| query_charset_ranges.is_empty() && matches!(kind, FcQueryKind::List))
+            .map(|ch| (ch, ch));
+        let query_charset = if query_charset_ranges.is_empty() && required_range.is_none() {
             None
         } else {
             let charset = unsafe { fontconfig_sys::FcCharSetCreate() };
@@ -1244,7 +1253,7 @@ fn fc_query_candidates_uncached(
             }
             let charset = FcCharSetGuard(charset);
             let mut ok = true;
-            for &(from, to) in query_charset_ranges {
+            for (from, to) in query_charset_ranges.iter().copied().chain(required_range) {
                 for codepoint in from.min(to)..=from.max(to) {
                     let added = unsafe {
                         fontconfig_sys::FcCharSetAddChar(
@@ -1370,6 +1379,8 @@ fn fc_query_candidates_uncached(
             if let Some(required_char) = required_char
                 && !raw_pattern_supports_any_char(candidate_pattern, &[required_char])
             {
+                #[cfg(test)]
+                NATIVE_UNSUPPORTED_PATTERNS.with(|count| count.set(count.get() + 1));
                 continue;
             }
             let Some(candidate) = listed_font_from_raw_pattern(candidate_pattern) else {

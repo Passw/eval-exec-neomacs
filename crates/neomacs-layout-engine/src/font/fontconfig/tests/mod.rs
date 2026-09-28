@@ -646,3 +646,74 @@ fn default_subpixel_order_resolves_to_known_variant() {
             | super::FontconfigSubpixelOrder::VBgr
     ));
 }
+
+#[cfg(unix)]
+#[test]
+fn required_character_filters_native_enumeration_before_returning_patterns() {
+    super::NATIVE_UNSUPPORTED_PATTERNS.with(|count| count.set(0));
+    let candidates = super::fc_query_candidates_uncached(
+        None,
+        &[],
+        Some('好' as u32),
+        &[],
+        super::FcQueryKind::List,
+    );
+    assert!(!candidates.is_empty(), "installed CJK fallback required");
+    assert_eq!(
+        super::NATIVE_UNSUPPORTED_PATTERNS.with(|count| count.get()),
+        0,
+        "unrelated font patterns must be rejected by native discovery"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn required_character_discovery_preserves_postfiltered_candidate_order() {
+    for family in [None, Some("DejaVu Sans Mono"), Some("DejaVu Serif")] {
+        let pattern = FcPatternGuard(unsafe { fontconfig_sys::FcPatternCreate() });
+        assert!(!pattern.0.is_null());
+        if let Some(family) = family {
+            let name = CString::new(family).unwrap();
+            assert_ne!(
+                unsafe {
+                    fontconfig_sys::FcPatternAddString(
+                        pattern.0,
+                        fontconfig::FC_FAMILY.as_ptr(),
+                        name.as_ptr().cast(),
+                    )
+                },
+                0
+            );
+        }
+        let objects = build_candidate_object_set(GnuEntityProjection::MetadataAndCharset).unwrap();
+        let fonts = FcFontSetGuard(unsafe {
+            fontconfig_sys::FcFontList(ptr::null_mut(), pattern.0, objects.0)
+        });
+        assert!(!fonts.0.is_null());
+        let patterns =
+            unsafe { std::slice::from_raw_parts((*fonts.0).fonts, (*fonts.0).nfont as usize) };
+        for ch in ['a', 'é', '\u{301}', '好', 'ש', 'س', '👩', '\u{10ffff}'] {
+            let expected: Vec<_> = patterns
+                .iter()
+                .copied()
+                .filter(|pattern| super::raw_pattern_supports_any_char(*pattern, &[ch as u32]))
+                .filter_map(listed_font_from_raw_pattern)
+                .collect();
+            let actual = super::fc_query_candidates_uncached(
+                family,
+                &[],
+                Some(ch as u32),
+                &[],
+                super::FcQueryKind::List,
+            );
+            assert_eq!(
+                actual.len(),
+                expected.len(),
+                "family={family:?} char={ch:?}"
+            );
+            for (actual, expected) in actual.iter().zip(&expected) {
+                assert_eq!(actual, expected, "family={family:?} char={ch:?}");
+            }
+        }
+    }
+}
