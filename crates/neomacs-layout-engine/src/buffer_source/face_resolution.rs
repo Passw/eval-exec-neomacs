@@ -272,12 +272,14 @@ impl<'a, B: LayoutBufferView> BufferSourceFaceResolutionContext<'a, B> {
     pub(crate) fn install_pending_source_faces(
         self,
         source_render: &mut TextRowSourceRenderState<'_>,
-        row_geometry: &mut DisplayRowGeometryState,
         pending_faces: Vec<PendingDisplaySourceFace>,
     ) {
+        // Pending faces include neighbours inspected for box-run boundaries.
+        // Installing those resources must not enlarge this row: checkpoints
+        // and appended items account for the faces actually used by it.
         for pending in pending_faces {
             let (face_id, resolved) = pending.into_parts();
-            let active_face = {
+            {
                 let bound = source_render.bind_resolved_face(face_id, &resolved);
                 source_render.resolve_and_install_measured_face(
                     self.measurement_policy,
@@ -286,8 +288,6 @@ impl<'a, B: LayoutBufferView> BufferSourceFaceResolutionContext<'a, B> {
                     self.window_metrics,
                 )
             };
-            let metrics = active_face.metrics();
-            row_geometry.include_row_extents(metrics.row_height(), metrics.ascent());
         }
     }
 

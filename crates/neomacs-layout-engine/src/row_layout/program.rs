@@ -90,6 +90,12 @@ enum Operation {
     },
 }
 
+fn preserves_buffer_anchor(source: &DisplaySourcePosition) -> bool {
+    matches!(source, DisplaySourcePosition::LispString { .. })
+        || matches!(source, DisplaySourcePosition::Synthetic { source_id, .. }
+            if source_id.get() == crate::display_row::source_append::SyntheticTextMarker::InvisibleEllipsis.source_id())
+}
+
 impl Operation {
     fn capture(
         item: DisplayItem,
@@ -644,7 +650,7 @@ impl RowProgram {
         let buffer_anchors: Vec<_> = operations
             .iter()
             .map(|(item, _)| {
-                if matches!(item.span.start, DisplaySourcePosition::LispString { .. }) {
+                if preserves_buffer_anchor(&item.span.start) {
                     buffer_position
                         .clone()
                         .unwrap_or_else(|| item.span.start.clone())
@@ -739,10 +745,7 @@ impl RowProgram {
                 crate::display_row::render_item::DisplayRowRenderItem::from_source_item(item);
             let can_split = can_wrap
                 && matches!(render_item.source_item().kind, DisplayItemKind::TextRun(_))
-                && !matches!(
-                    render_item.source_item().span.start,
-                    DisplaySourcePosition::LispString { .. }
-                );
+                && !preserves_buffer_anchor(&render_item.source_item().span.start);
             let checkpoint = DisplayRowGlyphCheckpoint::capture(&row);
             let previous_slots = slots.len();
             let insertion = matches!(

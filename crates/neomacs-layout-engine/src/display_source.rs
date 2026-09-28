@@ -413,6 +413,12 @@ impl SyntheticTextItemSource {
         );
         Self { item: Some(item) }
     }
+
+    /// The source is already owned and resolved; acquisition does not need
+    /// a live render context merely to take its single canonical text item.
+    pub(crate) fn into_item(mut self) -> Option<DisplayItem> {
+        self.item.take()
+    }
 }
 
 impl DisplayItemSource for SyntheticTextItemSource {

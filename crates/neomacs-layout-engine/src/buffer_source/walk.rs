@@ -87,11 +87,7 @@ fn apply_produced_step_to_render_progress<B: LayoutBufferView>(
 ) -> Option<BufferSourceConsumedItem> {
     let (source_item, pending_faces, pending_non_text_area) =
         apply_produced_step_to_progress(step, progress);
-    face_resolution_context.install_pending_source_faces(
-        source_render,
-        row_geometry,
-        pending_faces,
-    );
+    face_resolution_context.install_pending_source_faces(source_render, pending_faces);
     let fallback_metrics =
         DisplayRowFallbackMetrics::from_measured_face(active_face_state.metrics());
     let frame = DisplayRowActiveFaceAppendContext::new(

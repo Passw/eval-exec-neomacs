@@ -368,6 +368,25 @@ fn worker_capture_rejects_overlay_replacements_and_excessive_overlap() {
             "(put-text-property 2761 3100 'display '(raise (+ 1 2)))",
             RowProgramError::Unsupported,
         ),
+        (
+            "(put-text-property 2761 2765 'invisible t)",
+            RowProgramError::Unsupported,
+        ),
+        (
+            "(put-text-property 2766 3100 'invisible t)",
+            RowProgramError::Unsupported,
+        ),
+        (
+            "(progn (setq buffer-invisibility-spec (make-list 33 'worker-hidden))
+                 (put-text-property 2766 2770 'invisible 'worker-hidden))",
+            RowProgramError::Unsupported,
+        ),
+        (
+            "(let ((o (make-overlay 2766 2770)))
+                 (overlay-put o 'invisible t)
+                 (overlay-put o 'window (selected-window)))",
+            RowProgramError::Unsupported,
+        ),
     ] {
         let (mut eval, frame, _, window) =
             incr_editing_frame(&"ordinary offscreen text\n".repeat(300), 800, 600);
@@ -2390,4 +2409,149 @@ fn worker_word_wrap_replays_owned_insertion_before_its_buffer_anchor() {
             true,
         );
     }
+}
+
+#[test]
+fn worker_prepares_bounded_invisible_spans_and_ellipses() {
+    let line = "ordinary offscreen text\n";
+    let start = 120 * line.len() + 1;
+    for overlay in [false, true] {
+        for ellipsis in ["nil", "t"] {
+            let install = if overlay {
+                "(overlay-put (make-overlay (+ p 5) (+ p 9)) 'invisible 'worker-hidden)"
+            } else {
+                "(put-text-property (+ p 5) (+ p 9) 'invisible 'worker-hidden)"
+            };
+            first_visit_with_setup_and_gc(
+                None,
+                line,
+                None,
+                0,
+                2,
+                Some(&format!(
+                    "(progn (setq buffer-invisibility-spec '((worker-hidden . {ellipsis})))
+                    (let ((p {start})) (while (< p {}) {install} (setq p (+ p {})))))",
+                    start + 12 * line.len(),
+                    line.len()
+                )),
+                true,
+            );
+        }
+    }
+}
+
+#[test]
+fn worker_invisible_spans_preserve_wrapping_faces_and_boundary_strings() {
+    for overlay in [false, true] {
+        for wrap in ["nil", "t"] {
+            let line = format!("ordinary offscreen {}\n", "long words ".repeat(24));
+            let start = 120 * line.len() + 1;
+            let install = if overlay {
+                "(overlay-put (make-overlay (+ p 40) (+ p 46)) 'invisible 'worker-hidden)"
+            } else {
+                "(put-text-property (+ p 40) (+ p 46) 'invisible 'worker-hidden)"
+            };
+            first_visit_with_setup_and_gc(
+                None,
+                &line,
+                None,
+                0,
+                2,
+                Some(&format!(
+                    r#"(progn (setq word-wrap {wrap} buffer-invisibility-spec '((worker-hidden . t)))
+                    (let ((p {start})) (while (< p {})
+                        (put-text-property (+ p 12) (+ p 38) 'face
+                            '(:family "DejaVu Serif" :height 130 :box (:line-width 2)))
+                        (put-text-property (+ p 5) (+ p 8) 'display '(raise 0.2))
+                        (let ((o (make-overlay (+ p 20) (+ p 20))))
+                            (overlay-put o 'before-string (propertize "[before]" 'face '(:height 150)))
+                            (overlay-put o 'after-string "[after]"))
+                        (let ((o (make-overlay (+ p 40) (+ p 46))))
+                            (overlay-put o 'before-string "edge-before")
+                            (overlay-put o 'after-string "edge-after"))
+                        {install}
+                        (setq p (+ p {})))))"#,
+                    start + 12 * line.len(),
+                    line.len()
+                )),
+                true,
+            );
+        }
+    }
+}
+
+#[test]
+fn worker_invisible_spans_coalesce_and_invalidate_when_visibility_changes() {
+    let line = "ordinary offscreen text\n";
+    let start = 120 * line.len() + 1;
+    let setup = format!(
+        "(progn (setq buffer-invisibility-spec '((worker-hidden . t) worker-hidden-tail))
+        (let ((p {start})) (while (< p {})
+            (put-text-property (+ p 5) (+ p 7) 'invisible 'worker-hidden)
+            (put-text-property (+ p 7) (+ p 9) 'invisible 'worker-hidden-tail)
+            (setq p (+ p {})))))",
+        start + 12 * line.len(),
+        line.len()
+    );
+    for change in [
+        None,
+        Some("(setq buffer-invisibility-spec nil)"),
+        Some("(put-text-property 2886 2888 'invisible nil)"),
+    ] {
+        first_visit_with_setup_and_gc(None, line, change, 0, 2, Some(&setup), true);
+    }
+}
+
+#[test]
+fn worker_invisible_ellipsis_uses_preceding_buffer_face_not_hidden_face() {
+    let line = "ordinary offscreen text\n";
+    let start = 120 * line.len() + 1;
+    first_visit_with_setup_and_gc(
+        None,
+        line,
+        None,
+        0,
+        2,
+        Some(&format!(
+            r#"(progn (setq buffer-invisibility-spec '((worker-hidden . t)))
+            (let ((p {start})) (while (< p {})
+                (put-text-property p (+ p 5) 'face '(:family "DejaVu Serif" :height 150 :box (:line-width 2)))
+                (put-text-property (+ p 5) (+ p 9) 'face '(:height 240))
+                (put-text-property (+ p 5) (+ p 9) 'invisible 'worker-hidden)
+                (setq p (+ p {})))))"#,
+            start + 12 * line.len(),
+            line.len()
+        )),
+        true,
+    );
+}
+
+#[test]
+fn hidden_box_neighbour_face_does_not_enlarge_visible_rows() {
+    let measure = |hidden_height| {
+        let (mut eval, frame, _, window) =
+            incr_editing_frame(&"ordinary offscreen text\n".repeat(30), 800, 600);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        eval.eval_str(&format!(
+            "(progn (setq buffer-invisibility-spec '((worker-hidden . t)))
+             (put-text-property 1 6 'face '(:height 150 :box (:line-width 2)))
+             (put-text-property 6 10 'face '(:height {hidden_height}))
+             (put-text-property 6 10 'invisible 'worker-hidden))"
+        ))
+        .unwrap();
+        let mut engine = LayoutEngine::new();
+        engine.layout_frame_rust(&mut eval, frame);
+        let owner = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
+        engine.retained_window_matrices[&owner]
+            .matrix
+            .rows
+            .iter()
+            .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+            .map(|row| (row.height_px, row.ascent_px))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(measure(100), measure(240));
 }

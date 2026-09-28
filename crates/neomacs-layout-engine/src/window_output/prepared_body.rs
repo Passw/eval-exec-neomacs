@@ -64,6 +64,11 @@ pub(crate) fn position_buffer_rows(
             if matches!(slot.source(), DisplaySourcePosition::LispString { .. }) {
                 continue;
             }
+            if matches!(slot.source(), DisplaySourcePosition::Synthetic { source_id, .. }
+                if source_id.get() == crate::display_row::source_append::SyntheticTextMarker::InvisibleEllipsis.source_id())
+            {
+                continue;
+            }
             let DisplaySourcePosition::Buffer {
                 buffer_id: slot_buffer,
                 char_pos,

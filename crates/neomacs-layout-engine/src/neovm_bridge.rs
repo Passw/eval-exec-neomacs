@@ -2796,6 +2796,31 @@ impl<'a, B: LayoutBufferView + ?Sized> RustTextPropAccess<'a, B> {
         (status, next_change)
     }
 
+    /// Classify a bounded acquisition span with the same visibility rule as
+    /// the live iterator. A hidden run must close before `limit`; otherwise
+    /// the caller cannot yet know its complete source extent or ellipsis.
+    pub(crate) fn invisible_run_before(
+        &self,
+        charpos: i64,
+        limit: i64,
+    ) -> Option<(InvisibleStatus, i64)> {
+        if charpos >= limit {
+            return None;
+        }
+        let status = self.invisible_status_at(charpos);
+        if !status.hidden() {
+            return Some((status, charpos));
+        }
+        // Acquisition already bounds the number of source characters. Avoid
+        // check_invisible's intentional coalescing all the way to buffer-end.
+        for position in charpos + 1..limit {
+            if !self.invisible_status_at(position).hidden() {
+                return Some((status, position));
+            }
+        }
+        None
+    }
+
     /// Whether a REPLACING `display` spec applies at `charpos`.
     ///
     /// GNU's handler chain runs `handle_display_prop` BEFORE

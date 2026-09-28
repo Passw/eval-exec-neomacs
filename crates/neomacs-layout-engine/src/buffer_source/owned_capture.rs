@@ -1,6 +1,7 @@
 //! Bounded acquisition through the canonical source producer. These values
 //! remain on the evaluator thread until RowProgram removes all Lisp operands.
 
+mod invisibility;
 mod strings;
 
 use super::consumption::BufferSourceConsumedItem;
@@ -107,7 +108,11 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
     let display_lookup = LayoutCharPropertyLookup::new(buffer, Value::symbol("display"));
     let height_lookup = LayoutCharPropertyLookup::new(buffer, Value::symbol("line-height"));
     let spacing_lookup = LayoutCharPropertyLookup::new(buffer, Value::symbol("line-spacing"));
-    let lookups = ["invisible", "composition", "line-prefix", "wrap-prefix"]
+    let invisible_lookup = LayoutCharPropertyLookup::new(buffer, Value::symbol("invisible"));
+    let mut has_invisible = false;
+    let window_lookup = LayoutCharPropertyLookup::new(buffer, Value::symbol("window"));
+    let mut has_scoped_overlay = false;
+    let lookups = ["composition", "line-prefix", "wrap-prefix"]
         .map(|name| LayoutCharPropertyLookup::new(buffer, Value::symbol(name)));
     let string_lookups = ["before-string", "after-string"]
         .map(|name| LayoutCharPropertyLookup::new(buffer, Value::symbol(name)));
@@ -131,6 +136,16 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
             return Err(RowProgramError::Budget);
         }
         roots.push(overlay);
+        has_scoped_overlay |= window_lookup
+            .effective_overlay_value(buffer, overlay)
+            .and_then(|value| value.as_window_id())
+            .is_some();
+        if let Some(value) = invisible_lookup.effective_overlay_value(buffer, overlay) {
+            if !value.is_symbol() {
+                return Err(RowProgramError::Unsupported);
+            }
+            has_invisible |= !value.is_nil();
+        }
         if overlays.overlay_applies_to_window(overlay, Some(window))
             && (height_lookup
                 .effective_overlay_value(buffer, overlay)
@@ -168,6 +183,12 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
         if boundaries > max_items {
             return Err(RowProgramError::Budget);
         }
+        if let Some(value) = invisible_lookup.text_value_at(buffer, pos) {
+            if !value.is_symbol() {
+                return Err(RowProgramError::Unsupported);
+            }
+            has_invisible |= !value.is_nil();
+        }
         if height_lookup
             .text_value_at(buffer, pos)
             .is_some_and(|value| !literal_line_height(value))
@@ -193,6 +214,13 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
             .unwrap_or(end_byte)
             .min(end_byte);
     }
+    // The visible invisible-text checkpoint currently has no window scope.
+    // Do not admit scoped-overlay combinations with different producer and
+    // visibility filtering until both paths share that scope explicitly.
+    if has_invisible && (has_scoped_overlay || !invisibility::bounded_spec(buffer, max_items)) {
+        return Err(RowProgramError::Unsupported);
+    }
+    let mut active_buffer_face = None;
     let mut producer = BufferElementProducer::new_for_window_range(
         buffer_id,
         buffer,
@@ -258,6 +286,21 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
         if items.len() >= max_items {
             break;
         }
+        if has_invisible
+            && invisibility::capture_skip(
+                buffer_id,
+                buffer,
+                start_byte,
+                end,
+                &mut position,
+                &mut producer,
+                active_buffer_face,
+                &mut items,
+                max_items,
+            )?
+        {
+            continue;
+        }
         let step = producer.produce_step(position, context, face_ids);
         if !step.pending_non_text_area.is_empty() {
             return Err(RowProgramError::Unsupported);
@@ -293,6 +336,9 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
                     max_items,
                     &cancelled,
                 )?;
+                // A pushed string can use another paint face; do not infer
+                // the next hidden span's active buffer face from that string.
+                active_buffer_face = None;
                 position = DisplaySourceTextPosition::new(
                     buffer.layout_char_pos_to_emacs_byte_pos(resume).get() - start_byte.get(),
                     resume.get() as i64,
@@ -315,6 +361,7 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
             // policy, even though their source vocabulary is ordinary text.
             return Err(RowProgramError::Unsupported);
         }
+        active_buffer_face = Some(item.face);
         let complete = matches!(item.kind, DisplayItemKind::RowBreak(_));
         if items.len() >= max_items {
             return Err(RowProgramError::Budget);
