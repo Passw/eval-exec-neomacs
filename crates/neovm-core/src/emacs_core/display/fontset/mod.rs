@@ -552,8 +552,19 @@ pub(crate) fn restore_fontset_registry(snapshot: FontsetRegistrySnapshot) {
     }
 }
 
+/// Font selection revision, including family/registry alternatives used while
+/// resolving fontset entries. Captured rows and query caches share this edge.
 pub fn fontset_generation() -> u64 {
     registry().read().map(|slot| slot.generation).unwrap_or(0)
+}
+
+/// Alternative selection policy changed without replacing a fontset rule.
+/// Call after releasing the alternative-list lock so readers cannot invert
+/// the lock order while capturing character policy.
+pub(crate) fn invalidate_font_selection_policy() {
+    if let Ok(mut slot) = registry().write() {
+        slot.generation = slot.generation.wrapping_add(1);
+    }
 }
 
 /// Mutation generation for `char-script-table` snapshots consumed outside
