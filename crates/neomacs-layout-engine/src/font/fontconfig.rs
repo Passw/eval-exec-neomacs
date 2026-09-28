@@ -38,11 +38,18 @@ use std::sync::{Mutex, OnceLock};
 #[cfg(unix)]
 use {fontconfig::Pattern, fontconfig_sys};
 
+#[cfg(unix)]
+mod candidate_cache;
+
 /// Generation-local Fontconfig query results. One owner makes catalog
 /// invalidation exhaustive instead of requiring every new query cache to grow
 /// another unrelated global reset hook.
 #[derive(Default)]
 struct FontconfigCaches {
+    #[cfg(unix)]
+    candidate_epoch: u64,
+    #[cfg(unix)]
+    candidate_queries: candidate_cache::CandidateQueries,
     aliases: Option<HashMap<String, String>>,
     spacing: HashMap<String, Option<i32>>,
     subpixel_order: Option<FontconfigSubpixelOrder>,
@@ -74,9 +81,16 @@ fn fontconfig_caches() -> &'static Mutex<FontconfigCaches> {
 
 /// Drop every answer derived from the previous native catalog generation.
 pub(crate) fn invalidate_catalog_caches() {
-    *fontconfig_caches()
+    let mut caches = fontconfig_caches()
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner()) = FontconfigCaches::default();
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    #[cfg(unix)]
+    let next = caches.candidate_epoch.wrapping_add(1);
+    *caches = FontconfigCaches::default();
+    #[cfg(unix)]
+    {
+        caches.candidate_epoch = next;
+    }
 }
 
 impl FontMatch {
@@ -1128,10 +1142,15 @@ pub(crate) fn fc_match_candidate(
 }
 
 #[cfg(unix)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum FcQueryKind {
     List,
     Match,
+}
+
+#[cfg(all(test, unix))]
+thread_local! {
+    static NATIVE_CANDIDATE_QUERIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 #[cfg(unix)]
@@ -1142,6 +1161,49 @@ fn fc_query_candidates(
     langs: &[String],
     kind: FcQueryKind,
 ) -> Vec<ListedFont> {
+    let Some(query) =
+        candidate_cache::Query::new(family, query_charset_ranges, required_char, langs, kind)
+    else {
+        return fc_query_candidates_uncached(
+            family,
+            query_charset_ranges,
+            required_char,
+            langs,
+            kind,
+        );
+    };
+    let epoch = {
+        let mut caches = fontconfig_caches()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(answer) = caches.candidate_queries.get(&query) {
+            return answer;
+        }
+        caches.candidate_epoch
+    };
+    // Native enumeration stays outside the cache lock. A catalog change during
+    // discovery prevents its old answer from entering the new generation.
+    let answer =
+        fc_query_candidates_uncached(family, query_charset_ranges, required_char, langs, kind);
+    let mut caches = fontconfig_caches()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if caches.candidate_epoch == epoch {
+        caches.candidate_queries.insert(query, &answer);
+    }
+    answer
+}
+
+#[cfg(unix)]
+fn fc_query_candidates_uncached(
+    family: Option<&str>,
+    query_charset_ranges: &[(u32, u32)],
+    required_char: Option<u32>,
+    langs: &[String],
+    kind: FcQueryKind,
+) -> Vec<ListedFont> {
+    #[cfg(test)]
+    NATIVE_CANDIDATE_QUERIES.with(|count| count.set(count.get() + 1));
     if fontconfig_handle().is_none() {
         return Vec::new();
     }

@@ -19,6 +19,26 @@ use std::ffi::CString;
 #[cfg(unix)]
 use std::ptr;
 
+#[cfg(unix)]
+#[test]
+fn identical_native_candidate_queries_are_reused_until_catalog_changes() {
+    if fontconfig_handle().is_none() {
+        return;
+    }
+    super::invalidate_catalog_caches();
+    super::NATIVE_CANDIDATE_QUERIES.with(|count| count.set(0));
+    let first = fc_list_candidates(Some("DejaVu Sans Mono"), &[], None, &[]);
+    let second = fc_list_candidates(Some("DejaVu Sans Mono"), &[], None, &[]);
+    assert_eq!(first, second);
+    assert_eq!(super::NATIVE_CANDIDATE_QUERIES.with(|count| count.get()), 1);
+    super::invalidate_catalog_caches();
+    assert_eq!(
+        first,
+        fc_list_candidates(Some("DejaVu Sans Mono"), &[], None, &[])
+    );
+    assert_eq!(super::NATIVE_CANDIDATE_QUERIES.with(|count| count.get()), 2);
+}
+
 fn font_sym(name: &str) -> neovm_core::emacs_core::SymId {
     intern(name)
 }
