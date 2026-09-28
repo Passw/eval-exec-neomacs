@@ -166,6 +166,13 @@ impl WindowRowGeometry {
         self.current_row_terminator = None;
     }
 
+    pub(super) fn restore_current_row_pen(&mut self, x: f32, col: usize) {
+        if let Some(progress) = &mut self.current_row_progress {
+            progress.x = (x - self.text_x).round() as i64;
+            progress.col = col as i64;
+        }
+    }
+
     pub(super) fn current_row_has_output(&self) -> bool {
         self.current_row_progress.as_ref().is_some_and(|progress| {
             progress.x != progress.start_x

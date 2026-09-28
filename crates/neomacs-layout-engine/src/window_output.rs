@@ -1418,6 +1418,14 @@ impl WindowOutputEmitter {
             .restore_current_row_display_positions(first, last)
     }
 
+    pub(crate) fn restore_current_row_pen(
+        &mut self,
+        position: crate::display_row::builder::DisplayRowPosition,
+    ) {
+        self.geometry
+            .restore_current_row_pen(position.x_px(), position.col());
+    }
+
     pub(crate) fn current_row_has_output(&self) -> bool {
         self.geometry.current_row_has_output()
     }

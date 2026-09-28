@@ -781,7 +781,8 @@ impl LayoutEngine {
         }
         let geometry = RowProgramGeometry {
             inherited_line_spacing: key.extra_line_spacing,
-            character_wrap: key.wrap_mode == crate::types::LineWrapMode::Wrap && !key.word_wrap,
+            character_wrap: key.wrap_mode == crate::types::LineWrapMode::Wrap,
+            word_wrap: key.word_wrap,
             fringe: capture.fringe.clone(),
             width: key.partition.text_body().width,
             metrics,

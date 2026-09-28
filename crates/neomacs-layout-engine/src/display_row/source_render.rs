@@ -453,6 +453,7 @@ impl DisplayCurrentRowMutation for RowExtendFillMutation {
 /// position is rewound to the same boundary.
 struct DisplayRowGlyphCheckpointRestoreMutation {
     checkpoint: DisplayRowGlyphCheckpoint,
+    source_end: Option<usize>,
 }
 
 impl DisplayCurrentRowMutation for DisplayRowGlyphCheckpointRestoreMutation {
@@ -460,6 +461,9 @@ impl DisplayCurrentRowMutation for DisplayRowGlyphCheckpointRestoreMutation {
 
     fn apply(self, row: &mut GlyphRow) -> Self::Output {
         self.checkpoint.restore(row);
+        if let Some(end) = self.source_end {
+            row.end_charpos = end;
+        }
     }
 }
 
@@ -832,10 +836,11 @@ impl<'a> TextRowOutputRenderState<'a> {
 
     /// Truncate the current output row's drawn glyphs back to `checkpoint`,
     /// dropping the partial-word glyphs that the word-wrap break rewinds past.
+    #[cfg(test)]
     fn restore_current_row_glyph_checkpoint(&mut self, checkpoint: DisplayRowGlyphCheckpoint) {
         self.output
             .current_row_output()
-            .apply_current_row_mutation(DisplayRowGlyphCheckpointRestoreMutation { checkpoint });
+            .apply_current_row_mutation(DisplayRowGlyphCheckpointRestoreMutation { checkpoint, source_end: None });
     }
 
     /// Append a trailing `:extend` fill stretch to the current row's TEXT area
@@ -1708,9 +1713,22 @@ impl<'a> TextRowSourceRenderState<'a> {
 
     /// Roll the current row's drawn glyphs back to `checkpoint` when the
     /// word-wrap break rewinds to a word boundary.
+    #[cfg(test)]
     pub(crate) fn restore_glyph_checkpoint(&mut self, checkpoint: DisplayRowGlyphCheckpoint) {
         self.output_render
             .restore_current_row_glyph_checkpoint(checkpoint);
+    }
+
+    pub(crate) fn restore_word_wrap_checkpoint(
+        &mut self,
+        candidate: crate::display_row::walk_state::WordWrapBreakCandidate,
+    ) {
+        self.output_render
+            .current_row_output()
+            .apply_current_row_mutation(DisplayRowGlyphCheckpointRestoreMutation {
+                checkpoint: candidate.glyph_checkpoint(),
+                source_end: Some(candidate.source_position().charpos() as usize),
+            });
     }
 
     /// The source-derived end terminal owned by the last glyph that remains

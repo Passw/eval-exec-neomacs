@@ -42,6 +42,7 @@ pub(crate) enum RowProgramError {
 pub(crate) struct RowProgramGeometry {
     pub inherited_line_spacing: f32,
     pub character_wrap: bool,
+    pub word_wrap: bool,
     pub fringe: Option<crate::buffer_source::fringe_arrows::TruncationContinuationFringeRequest>,
     pub width: f32,
     pub metrics: DisplayRowFallbackMetrics,
@@ -559,7 +560,7 @@ impl RowProgram {
             return Err(RowProgramError::Budget);
         }
         // The first continuation domain has no physical-line tab state,
-        // contextual shaping, word-boundary rewind or box/extend carryover.
+        // contextual shaping or box/extend carryover.
         // A later unsupported item must not silently inherit a reset origin.
         let can_wrap = self.geometry.character_wrap
             && self.geometry.inherited_line_spacing == 0.0
@@ -593,12 +594,27 @@ impl RowProgram {
         let mut terminator_height = self.geometry.metrics.row_height();
         let mut rows = Vec::new();
         let mut completed_glyphs = 0usize;
-        let mut operations: std::collections::VecDeque<_> = self
+        let operations: Vec<_> = self
             .operations
             .into_iter()
             .map(|(operation, plan)| (operation.into_item(), plan))
             .collect();
-        while let Some((item, plan)) = operations.pop_front() {
+        let mut operation_index = 0;
+        let mut operation_offset = 0;
+        let mut word_wrap = crate::display_row::walk_state::WordWrapRenderState::new(
+            can_wrap && self.geometry.word_wrap,
+        );
+        while let Some((original, original_plan)) = operations.get(operation_index) {
+            let item = if operation_offset == 0 {
+                original.clone()
+            } else {
+                crate::display_row::render_item::clipped_display_item_remainder_after_chars(
+                    original.clone(),
+                    operation_offset,
+                )
+                .ok_or(RowProgramError::Unsupported)?
+            };
+            let plan = ascii_measurement_suffix(original_plan, operation_offset);
             if cancelled() {
                 return Err(RowProgramError::Cancelled);
             }
@@ -638,12 +654,55 @@ impl RowProgram {
             let can_split = can_wrap
                 && matches!(render_item.source_item().kind, DisplayItemKind::TextRun(ref run)
                     if run.text.is_ascii() && !run.text.contains('\t'));
+            let checkpoint = DisplayRowGlyphCheckpoint::capture(&row);
+            let previous_slots = slots.len();
             let progress = DisplayRowProgressWriter::with_text_run_measurement_and_glyph_measurer_for_area_and_start_policy(
-                &item_layout, &mut row, plan.clone(), &mut self.measurements, position, self.geometry.width,
+                &item_layout, &mut row, plan, &mut self.measurements, position, self.geometry.width,
                 DisplayRowTextAreaOrigin::row_local(), GlyphArea::Text, DisplayRowAppendStartPolicy::ReconcileWithRowTail,
             ).push_item(render_item.row_item_for_write());
             if self.measurements.missing {
                 return Err(RowProgramError::MissingMeasurement);
+            }
+            if word_wrap.is_enabled()
+                && let DisplayItemKind::TextRun(run) = &render_item.source_item().kind
+            {
+                crate::display_row::word_wrap::record_text_progress(
+                    &run.text,
+                    crate::display_source::DisplaySourceTextOrigin::new(0),
+                    &mut word_wrap,
+                    previous_slots,
+                    (None, None),
+                    checkpoint,
+                    DisplayRowGlyphCheckpoint::capture(&row),
+                    &progress,
+                    None,
+                    None,
+                );
+                // The canonical scalar overflow path records the next word
+                // boundary even when its first glyph did not fit this row.
+                if progress.status() == DisplayRowAppendStatus::Clipped
+                    && let Some(ch) = run.text.chars().nth(progress.slots().len())
+                    && let DisplaySourcePosition::Buffer {
+                        char_pos, byte_pos, ..
+                    } = render_item
+                        .source_item()
+                        .span
+                        .start
+                        .advanced_by(progress.slots().len(), progress.slots().len())
+                {
+                    word_wrap.record_candidate_at(
+                        ch,
+                        crate::display_source::DisplaySourceTextPosition::new(
+                            byte_pos.get(),
+                            char_pos.get() as i64,
+                        ),
+                        previous_slots + progress.slots().len(),
+                        (None, None),
+                        DisplayRowGlyphCheckpoint::capture(&row),
+                        progress.end(),
+                        None,
+                    );
+                }
             }
             position = progress.end();
             slot_heights.extend(std::iter::repeat_n(face_height, progress.slots().len()));
@@ -656,21 +715,54 @@ impl RowProgram {
                 if !can_split || slots.is_empty() || rows.len() + 1 >= row_limit {
                     return Err(RowProgramError::Overflow);
                 }
-                let remainder = render_item
-                    .clipped_remainder(&progress)
-                    .ok_or(RowProgramError::Unsupported)?;
+                let (next_index, next_offset) = if word_wrap.has_candidate() {
+                    let candidate = word_wrap.candidate();
+                    let boundary = candidate.source_position().charpos();
+                    let (index, offset) = operations
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, (item, _))| {
+                            let (
+                                DisplaySourcePosition::Buffer {
+                                    char_pos: start, ..
+                                },
+                                DisplaySourcePosition::Buffer { char_pos: end, .. },
+                            ) = (&item.span.start, &item.span.end)
+                            else {
+                                return None;
+                            };
+                            ((start.get() as i64) <= boundary && boundary < end.get() as i64)
+                                .then_some((index, (boundary - start.get() as i64) as usize))
+                        })
+                        .ok_or(RowProgramError::Unsupported)?;
+                    if candidate.display_point_count() == 0 {
+                        return Err(RowProgramError::Overflow);
+                    }
+                    candidate.glyph_checkpoint().restore(&mut row);
+                    slots.truncate(candidate.display_point_count());
+                    slot_heights.truncate(candidate.display_point_count());
+                    position = candidate.row_position();
+                    (index, offset)
+                } else {
+                    (operation_index, operation_offset + progress.slots().len())
+                };
+                let next_source = operations[next_index]
+                    .0
+                    .span
+                    .start
+                    .advanced_by(next_offset, next_offset);
                 crate::glyph_row_writer::normalize_external_row(&mut row);
                 if let Some(fringe) = &self.geometry.fringe {
                     fringe.decorate_row(&mut row, true, !rows.is_empty());
                 }
-                completed_glyphs += row_glyphs;
+                completed_glyphs += row.glyphs.iter().map(Vec::len).sum::<usize>();
                 rows.push(ComputedRow {
                     row,
                     slots: std::mem::take(&mut slots),
                     slot_heights: std::mem::take(&mut slot_heights),
                     source: SourceSpan::new(
                         source_start.take().ok_or(RowProgramError::Incomplete)?,
-                        remainder.span.start.clone(),
+                        next_source,
                     ),
                     end: position,
                     end_kind: ComputedRowEnd::Continuation,
@@ -679,27 +771,13 @@ impl RowProgram {
                 });
                 row = new_display_row(&layout);
                 position = DisplayRowPosition::new(0.0, 0);
-                let remainder_plan = match plan {
-                    DisplayTextRunMeasurement::PerChar => DisplayTextRunMeasurement::PerChar,
-                    DisplayTextRunMeasurement::Measured(advances) => {
-                        let consumed = progress.slots().len();
-                        DisplayTextRunMeasurement::Measured(
-                            advances
-                                .into_iter()
-                                .filter_map(|mut advance| {
-                                    advance.char_offset =
-                                        advance.char_offset.checked_sub(consumed)?;
-                                    advance.byte_offset =
-                                        advance.byte_offset.checked_sub(consumed)?;
-                                    Some(advance)
-                                })
-                                .collect(),
-                        )
-                    }
-                };
-                operations.push_front((remainder, remainder_plan));
+                operation_index = next_index;
+                operation_offset = next_offset;
+                word_wrap.reset_after_row_transition();
                 continue;
             }
+            operation_index += 1;
+            operation_offset = 0;
             if let Some((value, face, edges, membership)) = newline {
                 if let Some(realized) = self
                     .faces
@@ -784,6 +862,26 @@ impl RowProgram {
     }
 }
 
+fn ascii_measurement_suffix(
+    plan: &DisplayTextRunMeasurement,
+    consumed: usize,
+) -> DisplayTextRunMeasurement {
+    match plan {
+        DisplayTextRunMeasurement::PerChar => DisplayTextRunMeasurement::PerChar,
+        DisplayTextRunMeasurement::Measured(advances) => DisplayTextRunMeasurement::Measured(
+            advances
+                .iter()
+                .filter_map(|advance| {
+                    let mut advance = advance.clone();
+                    advance.char_offset = advance.char_offset.checked_sub(consumed)?;
+                    advance.byte_offset = advance.byte_offset.checked_sub(consumed)?;
+                    Some(advance)
+                })
+                .collect(),
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -796,6 +894,7 @@ mod tests {
         RowProgramGeometry {
             inherited_line_spacing: 0.0,
             character_wrap: false,
+            word_wrap: false,
             fringe: None,
             width,
             metrics: DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),

@@ -7,6 +7,7 @@
 use crate::buffer_source::loop_state::BufferSourceLoopMutableState;
 use crate::buffer_source::walk::{BufferSourceRewind, BufferSourceWalk};
 use crate::display_row::append_context::RightEdgeMarkerColumn;
+#[cfg(test)]
 use crate::display_row::builder::DisplayRowGlyphCheckpoint;
 use crate::display_row::builder::DisplayRowPosition;
 use crate::display_row::geometry::{
@@ -260,7 +261,7 @@ impl<'a> BufferSourceOverflowRenderRequest<'a> {
                 // boundary; this is the glyph-side of that rewind. (The
                 // display-point metadata is rewound to the same boundary by
                 // `apply_before_row_transition` below.)
-                source_render.restore_glyph_checkpoint(word_wrap_action.glyph_checkpoint());
+                source_render.restore_word_wrap_checkpoint(wrap_break);
                 word_wrap_action.restore_row_extend(row_build.row_extend, row_build.row_geometry);
                 {
                     let box_vertical_edges = source_render.trailing_box_run_terminal();
@@ -494,6 +495,7 @@ impl BufferSourceWordWrapAction {
         Self { break_candidate }
     }
 
+    #[cfg(test)]
     pub(crate) fn glyph_checkpoint(self) -> DisplayRowGlyphCheckpoint {
         self.break_candidate.glyph_checkpoint()
     }
@@ -520,6 +522,7 @@ impl BufferSourceWordWrapAction {
             self.break_candidate.row_display_positions();
         output_emitter
             .restore_current_row_display_positions(row_first_display_pos, row_last_display_pos);
+        output_emitter.restore_current_row_pen(self.break_candidate.row_position());
     }
 
     pub(crate) fn source_position(self) -> DisplaySourceTextPosition {

@@ -109,6 +109,7 @@ fn unseen_row_worker_glyphs_match_canonical_window_body() {
         RowProgramGeometry {
             inherited_line_spacing: 0.0,
             character_wrap: false,
+            word_wrap: false,
             fringe: None,
             width: key.partition.text_body().width,
             metrics,
@@ -1797,5 +1798,95 @@ fn worker_prepared_wrapped_mixed_font_page_matches_fresh_layout() {
         Some("(:family \"serif\" :height 150 :weight bold :slant italic)"),
         &format!("{}\n", "W".repeat(100)),
         None,
+    );
+}
+
+#[test]
+fn first_visit_to_worker_prepared_word_wrapped_page_matches_fresh_layout() {
+    first_visit_with_setup(
+        None,
+        &format!("{}\n", "wide words ".repeat(10)),
+        None,
+        0,
+        5,
+        Some("(setq word-wrap t)"),
+    );
+}
+
+#[test]
+fn worker_word_wrapping_rewinds_across_font_changes() {
+    let line = format!("{}\n", "wide words ".repeat(10));
+    let start = 120 * line.len() + 1;
+    for face_at in [80, 90, 95, 100] {
+        first_visit_with_setup(
+            None,
+            &line,
+            None,
+            0,
+            3,
+            Some(&format!(
+                "(progn (setq word-wrap t) (let ((p {start}))
+               (while (< p {})
+                 (put-text-property (+ p {face_at}) (+ p {}) 'face
+                   '(:family \"serif\" :height 130 :weight bold :slant italic))
+                 (setq p (+ p {})))))",
+                start + 12 * line.len(),
+                face_at + 5,
+                line.len()
+            )),
+        );
+    }
+}
+
+#[test]
+fn worker_word_wrapping_preserves_long_words_and_whitespace_boundaries() {
+    for line in [
+        format!("{} short\n", "W".repeat(90)),
+        format!("{}word {}\n", " ".repeat(30), "W".repeat(75)),
+        format!("{}\n", "wide   words ".repeat(9)),
+    ] {
+        first_visit_with_setup(None, &line, None, 0, 3, Some("(setq word-wrap t)"));
+    }
+}
+
+#[test]
+fn worker_wrapped_page_rejects_mutated_fringe_policy() {
+    first_visit_with_setup(
+        None,
+        &format!("{}\n", "W".repeat(100)),
+        Some("(setcar (cdr (assq 'continuation fringe-indicator-alist)) 'left-curly-arrow)"),
+        0,
+        5,
+        Some("(setq fringe-indicator-alist '((continuation left-arrow right-arrow)))"),
+    );
+}
+
+#[test]
+fn canonical_word_wrap_rewinds_source_end_and_output_pen_with_glyphs() {
+    let line = format!("{}word {}\n", " ".repeat(30), "W".repeat(75));
+    let (mut eval, frame, _, _) = incr_editing_frame(&line.repeat(30), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str("(setq word-wrap t)").unwrap();
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let trace = selected_window_layout_trace(&eval, &engine, frame);
+    let row = &trace.matrix_rows[0];
+    assert_eq!(
+        row.end_charpos, 35,
+        "the overflowing word belongs wholly to the next row"
+    );
+    let snapshot = &trace.output_rows[0];
+    assert_eq!(snapshot.end_col, 35);
+    let width: f32 = row.glyph_areas[1]
+        .iter()
+        .map(|glyph| f32::from_bits(glyph.pixel_width_bits))
+        .sum();
+    assert_eq!(
+        snapshot.end_x,
+        width.round() as i64,
+        "the pen stops at the last retained glyph"
     );
 }

@@ -2,29 +2,23 @@
 
 use crate::buffer_source::item_append::BufferSourceRowAppendContext;
 use crate::buffer_source::item_render::BufferSourceItemRenderOutcome;
-use crate::coords::layout_i64_char_pos_to_lisp_char_pos;
 use crate::display_cursor::{
     CapturedCursorInfo, CapturedCursorPlacement, CapturedCursorSlotWidth, CursorCaptureState,
     capture_cursor_info,
 };
 use crate::display_item::DisplaySourcePosition;
 use crate::display_row::append_context::DisplayRowAppendKind;
-use crate::display_row::builder::{
-    DisplayRowAppendProgress, DisplayRowGlyphCheckpoint, DisplayRowGlyphSlot, DisplayRowPosition,
-};
+use crate::display_row::builder::{DisplayRowAppendProgress, DisplayRowPosition};
 use crate::display_row::face_state::DisplayRowActiveFaceState;
 use crate::display_row::face_state::DisplayRowExtendFace;
 use crate::display_row::geometry::DisplayRowGeometryState;
 use crate::display_row::source_render::TextRowSourceRenderState;
 use crate::display_row::walk_state::{TrailingWhitespaceRenderState, WordWrapRenderState};
-use crate::display_source::{
-    DisplaySourceStepItem, DisplaySourceTextOrigin, DisplaySourceTextPosition,
-};
+use crate::display_source::{DisplaySourceStepItem, DisplaySourceTextOrigin};
 use crate::display_source_append_plan::DisplaySourceAppendRenderPolicy;
 use crate::display_source_progress::DisplaySourceProgressState;
 use crate::neovm_bridge::LayoutBufferView;
 use crate::types::LineWrapMode;
-use neovm_core::buffer::LispCharPos1;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum WholeTextRunRenderDecision {
@@ -214,7 +208,7 @@ impl BufferSourceTextRunRenderRequest {
             &self.geometry,
             &append_progress,
         );
-        apply_whole_text_run_word_wrap_state(
+        crate::display_row::word_wrap::record_text_progress(
             &source_text,
             self.text_origin,
             word_wrap,
@@ -280,19 +274,6 @@ impl BufferSourceTextRunRenderRequest {
     }
 }
 
-fn buffer_slot_window_source_position(
-    slot: &DisplayRowGlyphSlot,
-    text_origin: DisplaySourceTextOrigin,
-) -> Option<DisplaySourceTextPosition> {
-    let DisplaySourcePosition::Buffer {
-        char_pos, byte_pos, ..
-    } = slot.source()
-    else {
-        return None;
-    };
-    text_origin.position_from_buffer(byte_pos, char_pos)
-}
-
 fn capture_whole_text_run_cursor_if_point(
     cursor_info: &mut CursorCaptureState,
     active_face_state: &DisplayRowActiveFaceState,
@@ -336,54 +317,5 @@ fn apply_whole_text_run_trailing_whitespace_state(
     }
     for (ch, slot) in text.chars().zip(append_progress.slots()) {
         trailing_whitespace.track_rendered_char(ch, geometry.start_marker_at_x(slot.x_px()));
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn apply_whole_text_run_word_wrap_state(
-    text: &str,
-    text_origin: DisplaySourceTextOrigin,
-    word_wrap: &mut WordWrapRenderState,
-    output_display_point_start: usize,
-    output_row_positions_start: (Option<LispCharPos1>, Option<LispCharPos1>),
-    row_glyph_checkpoint_start: DisplayRowGlyphCheckpoint,
-    row_glyph_checkpoint_after_append: DisplayRowGlyphCheckpoint,
-    append_progress: &DisplayRowAppendProgress,
-    predecessor_row_extend: Option<DisplayRowExtendFace>,
-    active_row_extend: Option<DisplayRowExtendFace>,
-) {
-    if !word_wrap.is_enabled() {
-        return;
-    }
-    let mut first_run_charpos = output_row_positions_start.0;
-    let mut previous_charpos = output_row_positions_start.1;
-    for (char_offset, (ch, slot)) in text.chars().zip(append_progress.slots()).enumerate() {
-        if let Some(source_position) = buffer_slot_window_source_position(slot, text_origin) {
-            let charpos = source_position.charpos();
-            let row_first =
-                first_run_charpos.or_else(|| Some(layout_i64_char_pos_to_lisp_char_pos(charpos)));
-            if word_wrap.can_record_candidate(ch) {
-                word_wrap.record_candidate_at(
-                    ch,
-                    source_position,
-                    output_display_point_start + char_offset,
-                    (row_first, previous_charpos),
-                    // The candidate (word start) sits at `char_offset` text
-                    // glyphs into this run, so the boundary's glyph checkpoint is
-                    // the pre-run snapshot advanced by `char_offset`.
-                    row_glyph_checkpoint_start
-                        .with_added_text_glyphs(char_offset, row_glyph_checkpoint_after_append),
-                    slot.start_position(),
-                    if char_offset == 0 {
-                        predecessor_row_extend
-                    } else {
-                        active_row_extend
-                    },
-                );
-            }
-            first_run_charpos = row_first;
-            previous_charpos = Some(layout_i64_char_pos_to_lisp_char_pos(charpos));
-        }
-        word_wrap.allow_after_current_char(ch);
     }
 }

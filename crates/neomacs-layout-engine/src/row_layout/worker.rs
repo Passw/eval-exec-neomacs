@@ -220,6 +220,7 @@ mod tests {
             RowProgramGeometry {
                 inherited_line_spacing: 0.0,
                 character_wrap,
+                word_wrap: false,
                 fringe: None,
                 width,
                 metrics: DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),

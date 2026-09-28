@@ -803,9 +803,9 @@ impl BufferSourceOutputSetup {
             // Capture the point glyph's metrics from the new cursor row before the
             // rows are moved into the grid (fall back to the window face metrics
             // when point is at EOL / on hidden text with no glyph of its own).
-            // Cursor height/ascent are ROW metrics (`height_px`/`ascent_px`); only
-            // the width comes from the point glyph's advance. Fall back to the
-            // window face metrics when point is at EOL / on hidden text.
+            // Combine row ascent with the point face's descent through the
+            // canonical cursor geometry rule. Width comes from the point glyph.
+            // Fall back to row metrics at EOL or hidden text without a glyph.
             let mut cursor_width = geometry.char_width;
             let mut cursor_height = geometry.char_height;
             let mut cursor_ascent = window_metrics.ascent();
@@ -831,6 +831,27 @@ impl BufferSourceOutputSetup {
                     for glyph in &row.glyphs[GlyphArea::Text.index()] {
                         if row.glyph_covers_buffer_charpos(glyph, replay.new_point as usize) {
                             cursor_width = glyph.pixel_width;
+                            // Use the point face's descent, not the tallest
+                            // neighbouring face's full cell, just as the
+                            // canonical cursor capture path does.
+                            if let Some(face) = output.output_target().builder().output_face(glyph.face_id) {
+                                let face_ascent = face.font_ascent as f32;
+                                let face_height = face_ascent + face.font_descent as f32;
+                                if face_height > 0.0 {
+                                    let (y, height, ascent) = crate::display_cursor::resolve_cursor_vertical_metrics(
+                                        cursor_row_pixel_y,
+                                        face_height,
+                                        face_ascent,
+                                        cursor_height,
+                                        cursor_ascent,
+                                        geometry.char_height,
+                                        row.ends_at_zv,
+                                    );
+                                    cursor_row_pixel_y = y;
+                                    cursor_height = height;
+                                    cursor_ascent = ascent;
+                                }
+                            }
                             break;
                         }
                     }

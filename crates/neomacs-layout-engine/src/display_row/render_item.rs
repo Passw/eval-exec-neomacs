@@ -53,7 +53,7 @@ fn clipped_display_item_remainder(
     clipped_display_item_remainder_after_chars(item, progress.slots().len())
 }
 
-fn clipped_display_item_remainder_after_chars(
+pub(crate) fn clipped_display_item_remainder_after_chars(
     item: DisplayItem,
     emitted_chars: usize,
 ) -> Option<DisplayItem> {
