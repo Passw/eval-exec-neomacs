@@ -8623,7 +8623,7 @@ fn buffer_text_window_visibility_retry_request_detects_partially_visible_point_r
 }
 
 #[test]
-fn buffer_text_window_visibility_retry_request_detects_point_line_continuation() {
+fn buffer_text_window_visibility_retry_keeps_a_fully_visible_continued_point_row() {
     let mut eval = Context::new();
     let buf_id = eval
         .buffer_manager()
@@ -8660,8 +8660,8 @@ fn buffer_text_window_visibility_retry_request_detects_point_line_continuation()
     )
     .decide();
 
-    assert_eq!(outcome.point_line_window_start(), Some(20));
-    assert_eq!(outcome.retry_window_start(), Some(20));
+    assert_eq!(outcome.point_line_window_start(), None);
+    assert_eq!(outcome.retry_window_start(), None);
 }
 
 #[test]

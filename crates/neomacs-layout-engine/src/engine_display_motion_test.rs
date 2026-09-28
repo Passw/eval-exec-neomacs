@@ -4,6 +4,33 @@ use super::*;
 use neovm_core::window::WindowLayoutQueryOutcome;
 
 #[test]
+fn redisplay_keeps_a_fully_visible_cursor_row_when_its_source_line_continues() {
+    use neovm_core::window::WindowLayoutQueryScope;
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    eval.buffer_manager_mut().get_mut(buffer).unwrap().insert(&format!("head\n{}\n", "x".repeat(2000)));
+    let frame = eval.frame_manager_mut().create_frame("visible-wrap-cursor", 160, 160, buffer);
+    eval.frame_manager_mut().get_mut(frame).unwrap().window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str("(setq mode-line-format nil header-line-format nil tab-line-format nil) (goto-char 1) (set-window-start nil 1 t)").unwrap();
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    let snapshot = query.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap().into_geometry().unwrap();
+    let body = snapshot.regions.text_body;
+    let outer = snapshot.regions.outer;
+    let row = snapshot.rows.iter().rev().find(|row| row.start_buffer_pos.is_some()
+        && row.y as f32 + outer.y >= body.y
+        && (row.y + row.height) as f32 + outer.y <= body.bottom()).unwrap();
+    let point = row.start_buffer_pos.unwrap();
+    assert!(point.as_i64() > 6 && point.as_i64() < 2000);
+    eval.eval_str(&format!("(goto-char {}) (set-window-start nil 1 t)", point.as_i64())).unwrap();
+    let mut engine = LayoutEngine::new_without_font_metrics();
+    engine.layout_frame_rust(&mut eval, frame);
+    assert_eq!(eval.eval_str("(window-start)").unwrap(), Value::fixnum(1),
+        "a complete visible screen row must not scroll to expose the rest of its physical line");
+    assert_eq!(eval.eval_str("(point)").unwrap(), Value::fixnum(point.as_i64()));
+}
+
+#[test]
 fn small_vertical_motion_measures_only_the_needed_rows() {
     use neovm_core::window::WindowLayoutQueryScope;
     use std::{cell::RefCell, rc::Rc};

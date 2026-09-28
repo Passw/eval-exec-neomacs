@@ -849,13 +849,31 @@ impl<'a, 'buf, B: LayoutBufferView> TextWindowVisibilityRetryRequest<'a, 'buf, B
             self.text_area_bottom,
             self.window_start,
         );
-        let point_line_window_start = next_window_start_for_point_line_continuation(
-            self.rows,
-            self.point_charpos,
-            self.window_start,
-            self.buf_access,
-            self.accessible_end,
-        );
+        // GNU cursor_row_fully_visible_p tests the screen row, not the
+        // remainder of its physical source line. A wrapped line may continue
+        // below the viewport while point's row is already completely visible.
+        // Scrolling it again undoes a precision-scroll command's destination.
+        let point_row = self.rows.iter()
+            .find(|row| row.start_buffer_pos == Some(point_lisp))
+            .or_else(|| self.rows.iter().find(|row| {
+                row.start_buffer_pos.is_some_and(|start| start <= point_lisp)
+                    && row.end_buffer_pos.is_some_and(|end| point_lisp <= end)
+            }));
+        let point_row_fully_visible = point_row.is_some_and(|row| {
+            row.y >= self.text_area_top
+                && row.y.saturating_add(row.height) <= self.text_area_bottom
+        });
+        let point_line_window_start = if point_row_fully_visible {
+            None
+        } else {
+            next_window_start_for_point_line_continuation(
+                self.rows,
+                self.point_charpos,
+                self.window_start,
+                self.buf_access,
+                self.accessible_end,
+            )
+        };
 
         TextWindowVisibilityRetryOutcome {
             start,
