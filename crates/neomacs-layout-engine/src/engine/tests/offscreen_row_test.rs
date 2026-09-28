@@ -1066,3 +1066,154 @@ fn worker_page_is_rejected_after_category_symbol_properties_change() {
         ),
     );
 }
+
+#[test]
+fn idle_preparation_covers_unselected_windows_even_when_selected_rows_are_unsupported() {
+    for unsupported_selected in [false, true] {
+        let line = "ordinary offscreen text\n";
+        let (mut eval, frame, buffer, selected) = incr_editing_frame(&line.repeat(300), 800, 600);
+        let other_buffer = eval.buffer_manager_mut().create_buffer("offscreen-other");
+        eval.buffer_manager_mut()
+            .get_mut(other_buffer)
+            .unwrap()
+            .insert(&line.repeat(300));
+        let other = eval
+            .frame_manager_mut()
+            .split_window(
+                frame,
+                selected,
+                neovm_core::window::SplitDirection::Horizontal,
+                other_buffer,
+                None,
+                neovm_core::window::SplitPlacement::AfterTarget,
+            )
+            .unwrap();
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        if unsupported_selected {
+            eval.eval_str("(put-text-property 1 (point-max) 'display \"replacement\")")
+                .unwrap();
+        }
+        let mut engine = LayoutEngine::new();
+        engine.layout_frame_rust(&mut eval, frame);
+        let before = selected_window_layout_trace(&eval, &engine, frame);
+        let owner = neomacs_display_protocol::types::DisplayWindowId::new(other.0 as i64);
+        let rows: Vec<_> = engine.retained_window_matrices[&owner]
+            .matrix
+            .rows
+            .iter()
+            .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+            .collect();
+        let target = rows[rows.len() - 2].start_charpos;
+        let mut key = engine.retained_window_matrices[&owner].key.clone();
+        key.window_start = target as i64;
+        key.point = (target + line.len()) as i64;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while engine.maintain_scroll_coverage(&eval).is_some() {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::yield_now();
+        }
+        assert!(
+            engine
+                .prepared_viewports
+                .replay(frame, owner, &key, false)
+                .is_some(),
+            "unselected window must have prepared coverage; unsupported_selected={unsupported_selected}"
+        );
+        assert_eq!(before, selected_window_layout_trace(&eval, &engine, frame));
+        assert_eq!(
+            eval.frame_manager().get(frame).unwrap().selected_window,
+            selected
+        );
+        assert_eq!(eval.buffer_manager().current_buffer().unwrap().id(), buffer);
+    }
+}
+
+#[test]
+fn moving_selected_window_does_not_starve_other_window_preparation() {
+    let line = "ordinary offscreen text\n";
+    let (mut eval, frame, buffer, selected) = incr_editing_frame(&line.repeat(300), 800, 600);
+    let other = eval
+        .frame_manager_mut()
+        .split_window(
+            frame,
+            selected,
+            neovm_core::window::SplitDirection::Horizontal,
+            buffer,
+            None,
+            neovm_core::window::SplitPlacement::AfterTarget,
+        )
+        .unwrap();
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let owner = neomacs_display_protocol::types::DisplayWindowId::new(other.0 as i64);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let mut steps = 0;
+    while !engine.prepared_viewports.has_computed(frame, owner) {
+        assert!(engine.maintain_scroll_coverage(&eval).is_some());
+        assert!(std::time::Instant::now() < deadline);
+        // Change the selected viewport while its bounded page is in flight.
+        // A global "observed window" would continually retarget that window.
+        {
+            let start = (steps % 60 + 1) * line.len();
+            scroll_window_to(&mut eval, frame, selected, buffer, start as i64 + 1, start);
+            if let neovm_core::window::Window::Leaf { force_start, .. } = eval
+                .frame_manager_mut()
+                .get_mut(frame)
+                .unwrap()
+                .find_window_mut(selected)
+                .unwrap()
+            {
+                *force_start = true;
+            }
+            engine.layout_frame_rust(&mut eval, frame);
+        }
+        steps += 1;
+        std::thread::yield_now();
+    }
+}
+
+#[test]
+fn deleting_capture_owner_allows_remaining_window_preparation() {
+    let line = "ordinary offscreen text\n";
+    let (mut eval, frame, buffer, selected) = incr_editing_frame(&line.repeat(300), 800, 600);
+    let other = eval
+        .frame_manager_mut()
+        .split_window(
+            frame,
+            selected,
+            neovm_core::window::SplitDirection::Horizontal,
+            buffer,
+            None,
+            neovm_core::window::SplitPlacement::AfterTarget,
+        )
+        .unwrap();
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    assert!(engine.maintain_scroll_coverage(&eval).is_some());
+    assert!(eval.frame_manager_mut().delete_window(frame, selected));
+    engine.layout_frame_rust(&mut eval, frame);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while engine.maintain_scroll_coverage(&eval).is_some() {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    assert!(engine.prepared_viewports.has_computed(
+        frame,
+        neomacs_display_protocol::types::DisplayWindowId::new(other.0 as i64)
+    ));
+    assert!(!engine.prepared_viewports.has_computed(
+        frame,
+        neomacs_display_protocol::types::DisplayWindowId::new(selected.0 as i64)
+    ));
+}

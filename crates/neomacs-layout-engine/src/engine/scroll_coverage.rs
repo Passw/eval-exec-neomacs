@@ -66,23 +66,43 @@ struct Capture {
     programs: Vec<RowProgram>,
 }
 
+struct WindowCoverage {
+    key: RetainedWindowKey,
+    targets: Vec<CharPos0>,
+}
+
 #[derive(Default)]
 pub(super) struct ScrollCoverage {
     worker: RowWorker,
     admission: Option<Admission>,
     capture: Option<Capture>,
-    observed: Option<(FrameId, DisplayWindowId, RetainedWindowKey)>,
-    targets: Vec<CharPos0>,
+    frame: Option<FrameId>,
+    // At most two targets per retained live window. Glyph storage remains
+    // subject to PreparedViewports' global byte/row limits.
+    windows: rustc_hash::FxHashMap<DisplayWindowId, WindowCoverage>,
+    last_window: Option<DisplayWindowId>,
     publication_pending: bool,
 }
 
 impl ScrollCoverage {
     pub(super) fn cancel(&mut self) {
+        self.cancel_active();
+        self.frame = None;
+        self.windows.clear();
+        self.last_window = None;
+    }
+
+    fn cancel_active(&mut self) {
         self.worker.cancel();
         self.admission = None;
         self.capture = None;
-        self.observed = None;
-        self.targets.clear();
+    }
+
+    fn active_window(&self) -> Option<DisplayWindowId> {
+        self.capture
+            .as_ref()
+            .map(|capture| DisplayWindowId::new(capture.window.0 as i64))
+            .or_else(|| self.admission.as_ref().map(|admission| admission.window))
     }
 
     pub(super) fn drain(
@@ -101,11 +121,16 @@ impl ScrollCoverage {
         let mut rows = result.rows?;
         let regions = &admission.retained.display_snapshot.regions;
         let mut height = 0.0;
-        let visible = rows.iter().take_while(|row| {
-            let take = height < regions.text_body.height;
-            if take { height += row.row.height_px; }
-            take
-        }).count();
+        let visible = rows
+            .iter()
+            .take_while(|row| {
+                let take = height < regions.text_body.height;
+                if take {
+                    height += row.row.height_px;
+                }
+                take
+            })
+            .count();
         rows.truncate(visible);
         let body = position_buffer_rows(
             rows,
@@ -170,34 +195,96 @@ impl LayoutEngine {
     ) -> Option<std::time::Duration> {
         use std::time::Duration;
         let frame = evaluator.frame_manager().selected_frame()?;
-        let window = frame.selected_window;
-        let window_id = DisplayWindowId::new(window.0 as i64);
         if self.retained_frame != Some(frame.id) || self.font_metrics.is_none() {
             self.scroll_coverage.cancel();
             return None;
         }
-        let retained = self.retained_window_matrices.get(&window_id)?;
-        let compatible =
-            self.scroll_coverage
-                .observed
-                .as_ref()
-                .is_some_and(|(old_frame, old_window, key)| {
-                    *old_frame == frame.id
-                        && *old_window == window_id
-                        && RetainedWindowKey::row_content_eligible(key, &retained.key)
-                });
-        let moved = self.scroll_coverage.observed.as_ref()
-            .is_some_and(|(_, _, key)| key.window_start != retained.key.window_start);
-        if !compatible {
+        if self.scroll_coverage.frame != Some(frame.id) {
             self.scroll_coverage.cancel();
+            self.scroll_coverage.frame = Some(frame.id);
+        }
+        // Remove deleted/replaced window owners before consulting in-flight
+        // work. A split or selection change must not cancel another window's
+        // still-valid page.
+        let mut owners: Vec<_> = self
+            .retained_window_matrices
+            .keys()
+            .copied()
+            .filter(|owner| {
+                let window = WindowId(owner.get() as u64);
+                frame.minibuffer_window != Some(window)
+                    && frame
+                        .find_window(window)
+                        .and_then(|window| window.buffer_id())
+                        .is_some()
+            })
+            .collect();
+        owners.sort_unstable_by_key(|owner| owner.get());
+        self.scroll_coverage.windows.retain(|owner, _| {
+            owners
+                .binary_search_by_key(&owner.get(), |owner| owner.get())
+                .is_ok()
+        });
+        if self.scroll_coverage.active_window().is_some_and(|owner| {
+            owners
+                .binary_search_by_key(&owner.get(), |owner| owner.get())
+                .is_err()
+        }) {
+            self.scroll_coverage.cancel_active();
+        }
+        // One worker owns a whole bounded page. Between pages, round-robin
+        // through pending/changed windows, starting with the selected one.
+        let start = self
+            .scroll_coverage
+            .last_window
+            .map(|last| owners.partition_point(|owner| owner.get() <= last.get()))
+            .unwrap_or_else(|| {
+                owners
+                    .iter()
+                    .position(|owner| owner.get() == frame.selected_window.0 as i64)
+                    .unwrap_or(0)
+            });
+        if !owners.is_empty() {
+            let count = owners.len();
+            owners.rotate_left(start % count);
+        }
+        let window_id = self.scroll_coverage.active_window().or_else(|| {
+            owners.iter().copied().find(|owner| {
+                let retained = &self.retained_window_matrices[owner];
+                self.scroll_coverage
+                    .windows
+                    .get(owner)
+                    .is_none_or(|observed| {
+                        !observed.targets.is_empty()
+                            || !RetainedWindowKey::row_content_eligible(
+                                &observed.key,
+                                &retained.key,
+                            )
+                            || observed.key.window_start != retained.key.window_start
+                    })
+            })
+        })?;
+        let window = WindowId(window_id.get() as u64);
+        let retained = self.retained_window_matrices.get(&window_id)?;
+        let compatible = self
+            .scroll_coverage
+            .windows
+            .get(&window_id)
+            .is_some_and(|observed| {
+                RetainedWindowKey::row_content_eligible(&observed.key, &retained.key)
+            });
+        let moved = self
+            .scroll_coverage
+            .windows
+            .get(&window_id)
+            .is_some_and(|observed| observed.key.window_start != retained.key.window_start);
+        if !compatible {
+            self.scroll_coverage.cancel_active();
         }
         if !compatible || moved {
-            // Placement-only changes do not invalidate owned source rows.
-            // Finish the bounded in-flight page while retargeting the next
-            // acquisitions around the latest viewport. Restarting capture on
-            // every crossed row starves the worker during continuous input.
-            self.scroll_coverage.targets.clear();
-            self.scroll_coverage.observed = Some((frame.id, window_id, retained.key.clone()));
+            // Placement-only changes retarget future work without starving
+            // the page already being captured during continuous scrolling.
+            let mut targets = Vec::with_capacity(2);
             let buffer = evaluator
                 .buffer_manager()
                 .get(neovm_core::buffer::BufferId(retained.key.buffer_id))?;
@@ -230,27 +317,36 @@ impl LayoutEngine {
             if position < start_byte
                 && (position == begin || lines > rows.len().saturating_sub(2).max(1))
             {
-                self.scroll_coverage
-                    .targets
-                    .push(buffer.emacs_byte_pos_to_char_pos_clamped(
-                        neovm_core::buffer::EmacsBytePos::new(position),
-                    ));
+                targets.push(buffer.emacs_byte_pos_to_char_pos_clamped(
+                    neovm_core::buffer::EmacsBytePos::new(position),
+                ));
             }
             // Two-row overlap matches the usual page movement and also leaves
             // reusable rows for smaller wheel motions into the next page.
             if let Some(row) = rows.get(rows.len().saturating_sub(2)) {
                 let forward = CharPos0::new(row.start_charpos);
                 if forward > start {
-                    self.scroll_coverage.targets.push(forward);
+                    targets.push(forward);
                 }
             }
+            self.scroll_coverage.windows.insert(
+                window_id,
+                WindowCoverage {
+                    key: retained.key.clone(),
+                    targets,
+                },
+            );
         }
         match self.scroll_coverage.drain(&mut self.prepared_viewports) {
             Ok(true) => {
-                tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", "worker page ready")
+                tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", "worker page ready");
+                self.scroll_coverage.last_window = Some(window_id);
+                return Some(Duration::from_millis(1));
             }
             Err(error) => {
-                tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", ?error, "worker page rejected")
+                tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", ?error, "worker page rejected");
+                self.scroll_coverage.last_window = Some(window_id);
+                return Some(Duration::from_millis(1));
             }
             Ok(false) => {}
         }
@@ -258,20 +354,27 @@ impl LayoutEngine {
             return Some(Duration::from_millis(4));
         }
         if self.scroll_coverage.capture.is_none() {
-            let start = self.scroll_coverage.targets.pop()?;
+            let Some(start) = self
+                .scroll_coverage
+                .windows
+                .get_mut(&window_id)?
+                .targets
+                .pop()
+            else {
+                self.scroll_coverage.last_window = Some(window_id);
+                return Some(Duration::from_millis(1));
+            };
             if let Err(error) = self.begin_scroll_coverage(evaluator, frame.id, window, start) {
                 tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", ?error, start = start.get(), "capture not eligible");
-                return (!self.scroll_coverage.targets.is_empty())
-                    .then_some(Duration::from_millis(1));
+                self.scroll_coverage.last_window = Some(window_id);
+                return Some(Duration::from_millis(1));
             }
         }
         if let Err(error) = self.capture_scroll_step(evaluator) {
             tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", ?error, "row capture rejected");
+            self.scroll_coverage.last_window = Some(window_id);
         }
-        (self.scroll_coverage.capture.is_some()
-            || self.scroll_coverage.admission.is_some()
-            || !self.scroll_coverage.targets.is_empty())
-        .then_some(Duration::from_millis(1))
+        Some(Duration::from_millis(1))
     }
 
     /// Capture a bounded unseen page. No live start, point or presentation is
@@ -493,7 +596,8 @@ impl LayoutEngine {
         // A command or timer may have run between idle capture steps. Never
         // combine measurements from different buffer/display revisions into
         // one job, even though final replay also validates the complete key.
-        if neovm_core::emacs_core::symbol::SymbolPropertyRevision::current() != key.symbol_property_revision
+        if neovm_core::emacs_core::symbol::SymbolPropertyRevision::current()
+            != key.symbol_property_revision
             || buffer.chars_modified_tick() != key.chars_modified_tick
             || buffer.props_modified_tick() != key.props_modified_tick
             || buffer.overlay_modified_tick() != key.overlay_modified_tick
