@@ -2332,3 +2332,62 @@ fn worker_overlay_insertions_preserve_automatic_compositions() {
         true,
     );
 }
+
+#[test]
+fn worker_wraps_buffer_text_after_owned_strings() {
+    for replacement in [false, true] {
+        for wrap in ["nil", "t"] {
+            let line = format!("ordinary offscreen {}\n", "long words ".repeat(24));
+            let start = 120 * line.len() + 1;
+            let install = if replacement {
+                "(put-text-property (+ p 5) (+ p 9) 'display text)"
+            } else {
+                "(overlay-put (make-overlay (+ p 5) (+ p 5)) 'before-string text)"
+            };
+            first_visit_with_setup_and_gc(
+                None,
+                &line,
+                None,
+                0,
+                2,
+                Some(&format!(
+                    "(progn (setq word-wrap {wrap}) (let ((p {start}) (text (propertize \"string\" 'face '(:height 130 :box (:line-width 2))))) (while (< p {}) {install} (setq p (+ p {})))))",
+                    start + 12 * line.len(),
+                    line.len()
+                )),
+                true,
+            );
+        }
+    }
+}
+
+#[test]
+fn worker_word_wrap_replays_owned_insertion_before_its_buffer_anchor() {
+    for prefix in [45, 55, 60, 65] {
+        let line = format!("{} {} tail words\n", "W".repeat(prefix), "x".repeat(45));
+        let start = 120 * line.len() + 1;
+        first_visit_with_setup_and_gc(
+            None,
+            &line,
+            None,
+            0,
+            2,
+            Some(&format!(
+                r#"(progn
+            (setq word-wrap t)
+            (let ((p {start})) (while (< p {})
+                (let ((ov (make-overlay (+ p {}) (+ p {}))))
+                    (overlay-put ov 'before-string
+                        (concat (propertize "AA" 'face '(:height 130 :box (:line-width 2) :background "blue" :extend t))
+                                (propertize "B" 'face '(:height 90))))
+                    (overlay-put ov 'after-string "C"))
+                (setq p (+ p {})))))"#,
+                start + 12 * line.len(),
+                prefix + 1,
+                prefix + 1,
+                line.len()
+            )),
+            true,
+        );
+    }
+}

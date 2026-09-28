@@ -67,6 +67,7 @@ struct Capture {
     faces: Option<PreparedFaceSnapshot>,
     row_base: usize,
     row_count: usize,
+    char_budget: usize,
     position: CharPos0,
     programs: Vec<RowProgram>,
     font_snapshots:
@@ -521,6 +522,7 @@ impl LayoutEngine {
             faces: None,
             row_base,
             row_count,
+            char_budget: 128,
             position: start,
             programs: Vec::with_capacity(row_count),
             font_snapshots: Vec::new(),
@@ -579,6 +581,13 @@ impl LayoutEngine {
         // reject the whole page, including work captured in earlier steps.
         let frontier = match result {
             Ok(()) => false,
+            Err(RowProgramError::Budget) if capture.char_budget > 16 => {
+                // Inserted text and face metadata share the fragment's fixed
+                // storage reservation. Retry with less buffer text on the
+                // next idle step, without consuming the rejected source.
+                capture.char_budget /= 2;
+                false
+            }
             Err(
                 RowProgramError::Unsupported
                 | RowProgramError::Budget
@@ -744,14 +753,13 @@ impl LayoutEngine {
             buffer_id,
             window.0,
             capture.position,
-            128,
+            capture.char_budget,
             32,
             capture.programs.last().is_some_and(|program| !program.is_complete()),
             context,
             &mut capture.attempt,
             || false,
         )?;
-        capture.position = captured.end;
         if !captured.roots.is_empty() {
             capture.roots.push(evaluator.retain_gc_roots(captured.roots));
         }
@@ -884,6 +892,7 @@ impl LayoutEngine {
             )?
         };
         if program.is_complete() != captured.complete { return Err(RowProgramError::Unsupported); }
+        capture.position = captured.end;
         capture.programs.push(program.with_trailing_text_continuation(captured.trailing_text_continues).with_buffer_source_start(captured.source_start));
         Ok(())
     }

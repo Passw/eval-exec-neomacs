@@ -607,17 +607,14 @@ impl RowProgram {
         if row_limit == 0 {
             return Err(RowProgramError::Budget);
         }
-        // Non-text source transitions still require the canonical buffer
-        // walk. A later unsupported item must not inherit a reset origin.
+        // Buffer text may wrap around owned strings. A string that itself
+        // overflows still needs a resumable string-stack row entry point.
         let can_wrap = self.geometry.character_wrap
             && self
                 .operations
                 .iter()
                 .all(|(operation, _)| match operation {
-                    Operation::Text(text) => {
-                        !matches!(text.span.start, DisplaySourcePosition::LispString { .. })
-                    }
-                    Operation::Break { .. } => true,
+                    Operation::Text(_) | Operation::Mapped(_) | Operation::Break { .. } => true,
                     _ => false,
                 });
         let physical_complete = self.is_complete();
@@ -639,6 +636,23 @@ impl RowProgram {
             .operations
             .into_iter()
             .map(|(operation, plan)| (operation.into_item(), plan))
+            .collect();
+        // Insertions preserve the buffer iterator at their attachment. Keep
+        // that origin separately from each string's glyph provenance so a
+        // word-wrap rewind replays the insertion before its anchor character.
+        let mut buffer_position = source_start.clone();
+        let buffer_anchors: Vec<_> = operations
+            .iter()
+            .map(|(item, _)| {
+                if matches!(item.span.start, DisplaySourcePosition::LispString { .. }) {
+                    buffer_position
+                        .clone()
+                        .unwrap_or_else(|| item.span.start.clone())
+                } else {
+                    buffer_position = Some(item.span.end.clone());
+                    item.span.start.clone()
+                }
+            })
             .collect();
         let mut operation_index = 0;
         let mut operation_offset = 0;
@@ -674,7 +688,7 @@ impl RowProgram {
             if cancelled() {
                 return Err(RowProgramError::Cancelled);
             }
-            source_start.get_or_insert_with(|| item.span.start.clone());
+            source_start.get_or_insert_with(|| buffer_anchors[operation_index].clone());
             source_end = Some(item.span.end.clone());
             let newline = if let DisplayItemKind::RowBreak(value) = item.kind {
                 Some((
@@ -723,10 +737,44 @@ impl RowProgram {
             item_layout.ascent_px = row.ascent_px.max(minimum.ascent_px());
             let render_item =
                 crate::display_row::render_item::DisplayRowRenderItem::from_source_item(item);
-            let can_split =
-                can_wrap && matches!(render_item.source_item().kind, DisplayItemKind::TextRun(_));
+            let can_split = can_wrap
+                && matches!(render_item.source_item().kind, DisplayItemKind::TextRun(_))
+                && !matches!(
+                    render_item.source_item().span.start,
+                    DisplaySourcePosition::LispString { .. }
+                );
             let checkpoint = DisplayRowGlyphCheckpoint::capture(&row);
             let previous_slots = slots.len();
+            let insertion = matches!(
+                original.span.start,
+                DisplaySourcePosition::LispString { .. }
+            );
+            if insertion
+                && operation_index.checked_sub(1).is_none_or(|previous| {
+                    !matches!(
+                        operations[previous].0.span.start,
+                        DisplaySourcePosition::LispString { .. }
+                    )
+                })
+                && let DisplayItemKind::TextRun(run) = &original.kind
+                && let Some(first) = run.text.chars().next()
+                && let DisplaySourcePosition::Buffer {
+                    char_pos, byte_pos, ..
+                } = buffer_anchors[operation_index]
+            {
+                word_wrap.record_candidate_at(
+                    first,
+                    crate::display_source::DisplaySourceTextPosition::new(
+                        byte_pos.get(),
+                        char_pos.get() as i64,
+                    ),
+                    previous_slots,
+                    (None, None),
+                    checkpoint,
+                    position,
+                    predecessor_extend,
+                );
+            }
             let progress = DisplayRowProgressWriter::with_text_run_measurement_and_glyph_measurer_for_area_and_start_policy(
                 &item_layout, &mut row, plan, &mut self.measurements, position, self.geometry.width,
                 DisplayRowTextAreaOrigin::row_local(), GlyphArea::Text, DisplayRowAppendStartPolicy::ReconcileWithRowTail,
@@ -746,6 +794,7 @@ impl RowProgram {
                 continue;
             }
             if word_wrap.is_enabled()
+                && !insertion
                 && let DisplayItemKind::TextRun(run) = &render_item.source_item().kind
             {
                 crate::display_row::word_wrap::record_text_progress(
@@ -788,6 +837,15 @@ impl RowProgram {
                         },
                     );
                 }
+            }
+            if insertion
+                && operations.get(operation_index + 1).is_none_or(|(next, _)| {
+                    !matches!(next.span.start, DisplaySourcePosition::LispString { .. })
+                })
+                && let DisplayItemKind::TextRun(run) = &original.kind
+                && let Some(last) = run.text.chars().last()
+            {
+                word_wrap.allow_after_current_char(last);
             }
             position = progress.end();
             if let DisplayItemKind::SourceMappedText(mapped) = &render_item.source_item().kind
@@ -847,6 +905,13 @@ impl RowProgram {
                         .iter()
                         .enumerate()
                         .find_map(|(index, (item, _))| {
+                            if matches!(item.span.start, DisplaySourcePosition::LispString { .. })
+                                && let DisplaySourcePosition::Buffer { char_pos, .. } =
+                                    buffer_anchors[index]
+                                && char_pos.get() as i64 == boundary
+                            {
+                                return Some((index, 0));
+                            }
                             let (
                                 DisplaySourcePosition::Buffer {
                                     char_pos: start, ..
@@ -871,7 +936,7 @@ impl RowProgram {
                 } else {
                     (operation_index, operation_offset + progress.slots().len())
                 };
-                let next_source = operations[next_index].0.span.start.advanced_by(
+                let next_source = buffer_anchors[next_index].advanced_by(
                     next_offset,
                     text_byte_offset(&operations[next_index].0, next_offset)?,
                 );
@@ -897,7 +962,7 @@ impl RowProgram {
                     slot_heights: std::mem::take(&mut slot_heights),
                     source: SourceSpan::new(
                         source_start.take().ok_or(RowProgramError::Incomplete)?,
-                        next_source,
+                        next_source.clone(),
                     ),
                     end: position,
                     end_kind: ComputedRowEnd::Continuation,
@@ -906,6 +971,7 @@ impl RowProgram {
                     terminator_width,
                     terminator_height,
                 });
+                source_start = Some(next_source);
                 if rows.len() == row_limit {
                     return Ok(rows);
                 }
