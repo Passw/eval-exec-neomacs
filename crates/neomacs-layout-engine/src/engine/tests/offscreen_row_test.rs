@@ -2601,3 +2601,27 @@ fn idle_worker_publishes_a_closed_prefix_before_full_page_capture() {
     );
     assert!(!engine.prepared_viewports.has_computed(frame, owner));
 }
+
+#[test]
+fn rich_visible_rows_do_not_clone_the_active_face_per_glyph() {
+    let line = format!("{}\n", "ordinary characters ".repeat(10));
+    let (mut eval, frame, _, _) = incr_editing_frame(&line.repeat(30), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str(
+        "(progn
+        (put-text-property 1 (point-max) 'face '(:height 130 :box (:line-width 2)))
+        (put-text-property 1 (point-max) 'display '(raise 0.2)))",
+    )
+    .unwrap();
+    let mut engine = LayoutEngine::new();
+    crate::display_row::face_state::take_active_face_clone_count();
+    engine.layout_frame_rust(&mut eval, frame);
+    let clones = crate::display_row::face_state::take_active_face_clone_count();
+    assert!(
+        clones < 32,
+        "ordinary source glyphs copied the active face {clones} times"
+    );
+}

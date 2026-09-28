@@ -1097,10 +1097,32 @@ impl DisplayRowActiveFaceMeasurementState {
     }
 }
 
-#[derive(Clone, Debug)]
+#[cfg_attr(not(test), derive(Clone))]
+#[derive(Debug)]
 pub(crate) struct DisplayRowActiveFaceState {
     render: DisplayRowActiveFaceRenderState,
     measurement: DisplayRowActiveFaceMeasurementState,
+}
+
+#[cfg(test)]
+thread_local! {
+    static ACTIVE_FACE_CLONES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn take_active_face_clone_count() -> usize {
+    ACTIVE_FACE_CLONES.with(|count| count.replace(0))
+}
+
+#[cfg(test)]
+impl Clone for DisplayRowActiveFaceState {
+    fn clone(&self) -> Self {
+        ACTIVE_FACE_CLONES.with(|count| count.set(count.get() + 1));
+        Self {
+            render: self.render.clone(),
+            measurement: self.measurement.clone(),
+        }
+    }
 }
 
 struct DisplayRowComplexTextRunAdvancePolicy<'a> {

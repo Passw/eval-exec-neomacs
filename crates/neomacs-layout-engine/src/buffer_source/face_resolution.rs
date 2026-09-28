@@ -367,20 +367,37 @@ impl DisplaySourceNobreakHint {
     }
 }
 
+/// Ordinary items borrow the installed face. Only semantic overlays and
+/// height adjustments own another face; boxing that uncommon case keeps
+/// the per-glyph result small instead of moving a whole face through an enum.
+pub(crate) enum ItemActiveFace<'a> {
+    Current(&'a DisplayRowActiveFaceState),
+    Adjusted(Box<DisplayRowActiveFaceState>),
+}
+
+impl std::ops::Deref for ItemActiveFace<'_> {
+    type Target = DisplayRowActiveFaceState;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Current(face) => face,
+            Self::Adjusted(face) => face,
+        }
+    }
+}
+
 impl BufferSourceItemLayoutResolutionContext<'_> {
-    pub(crate) fn resolve_source_item_layout_for_active_face(
+    pub(crate) fn resolve_source_item_layout_for_active_face<'face>(
         &self,
         source_render: &mut TextRowSourceRenderState<'_>,
         face_ids: &mut FrameFaceAttempt,
         row_geometry: &mut DisplayRowGeometryState,
-        active_face_state: &DisplayRowActiveFaceState,
+        active_face_state: &'face DisplayRowActiveFaceState,
         item: &mut DisplayItem,
         nobreak_hint: DisplaySourceNobreakHint,
-    ) -> DisplayRowActiveFaceState {
+    ) -> ItemActiveFace<'face> {
         item.face =
             RenderFaceRef::FaceId(render_face_ref_id(item.face, active_face_state.face_id()));
-
-        let active_face_state = active_face_state.clone();
 
         // GNU merges semantic faces after resolving the source face:
         // `escape-glyph` for control notation and `glyphless-char` for every
@@ -391,12 +408,12 @@ impl BufferSourceItemLayoutResolutionContext<'_> {
                 source_render,
                 face_ids,
                 row_geometry,
-                &active_face_state,
+                active_face_state,
                 item,
                 overlay.face_name(),
             )
         {
-            return merged;
+            return ItemActiveFace::Adjusted(Box::new(merged));
         }
 
         // GNU `get_next_display_element` (xdisp.c:8594-8617): in highlight mode
@@ -416,12 +433,12 @@ impl BufferSourceItemLayoutResolutionContext<'_> {
                 source_render,
                 face_ids,
                 row_geometry,
-                &active_face_state,
+                active_face_state,
                 item,
                 face_name,
             )
         {
-            return merged;
+            return ItemActiveFace::Adjusted(Box::new(merged));
         }
 
         let Some(factor) = item
@@ -429,7 +446,7 @@ impl BufferSourceItemLayoutResolutionContext<'_> {
             .height
             .filter(|factor| factor.is_finite() && *factor > 0.0)
         else {
-            return active_face_state.clone();
+            return ItemActiveFace::Current(active_face_state);
         };
 
         item.layout.height = None;
@@ -443,7 +460,7 @@ impl BufferSourceItemLayoutResolutionContext<'_> {
             factor,
             source_render.height_face_measurement(),
         ) else {
-            return active_face_state.clone();
+            return ItemActiveFace::Current(active_face_state);
         };
 
         let face_id = stable_face_id_for_resolved(face_ids, &resolved);
@@ -459,7 +476,7 @@ impl BufferSourceItemLayoutResolutionContext<'_> {
         };
         let metrics = resolved_active_face.metrics();
         row_geometry.include_row_extents(metrics.row_height(), metrics.ascent());
-        resolved_active_face
+        ItemActiveFace::Adjusted(Box::new(resolved_active_face))
     }
 
     /// Realize the legacy escape/nobreak face merge.
