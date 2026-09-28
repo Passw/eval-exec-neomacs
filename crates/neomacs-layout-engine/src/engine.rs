@@ -213,7 +213,6 @@ pub struct WindowLayoutQuerySeed {
 /// from mutating or preparing the renderer transaction that invoked Lisp.
 pub struct WindowLayoutQueryEngine {
     inner: LayoutEngine,
-    cache: query_cache::QueryCache,
 }
 
 impl Default for WindowLayoutQueryEngine {
@@ -226,35 +225,30 @@ impl WindowLayoutQueryEngine {
     pub fn new_without_font_metrics() -> Self {
         Self {
             inner: LayoutEngine::new_without_font_metrics(),
-            cache: Default::default(),
         }
     }
 
     pub fn new() -> Self {
         Self {
             inner: LayoutEngine::new(),
-            cache: Default::default(),
         }
     }
 
     pub fn enable_cosmic_metrics(&mut self) {
-        self.cache.clear();
         self.inner.enable_cosmic_metrics();
     }
 
     pub fn disable_cosmic_metrics(&mut self) {
-        self.cache.clear();
         self.inner.disable_cosmic_metrics();
     }
 
     pub fn set_font_sizing(&mut self, font_sizing: FontSizing) {
-        self.cache.clear();
         self.inner.set_font_sizing(font_sizing);
     }
 
     pub fn synchronize(&mut self, seed: WindowLayoutQuerySeed) {
         if self.inner.retained_window_chrome_metrics != seed.retained_window_chrome_metrics {
-            self.cache.clear();
+            self.inner.query_cache.clear();
         }
         self.inner.retained_window_chrome_metrics = seed.retained_window_chrome_metrics;
     }
@@ -267,14 +261,7 @@ impl WindowLayoutQueryEngine {
         scope: neovm_core::window::WindowLayoutQueryScope,
     ) -> Result<neovm_core::window::WindowLayoutQuery, neovm_core::window::WindowLayoutQueryFailure>
     {
-        if let Some(query) = self.cache.get(evaluator, frame_id, window_id, scope) {
-            return Ok(query);
-        }
-        let query = self.inner.query_window_layout(evaluator, frame_id, window_id, scope)?;
-        if self.inner.query_body_reuse_allowed {
-            self.cache.remember(evaluator, frame_id, window_id, scope, &query);
-        }
-        Ok(query)
+        self.inner.query_window_layout(evaluator, frame_id, window_id, scope)
     }
 }
 
@@ -756,6 +743,7 @@ pub struct LayoutEngine {
     /// Granted only by the canonical walk's semantic reuse barrier. Geometry
     /// queries with evaluated Lisp conditions must never skip that walk.
     query_body_reuse_allowed: bool,
+    query_cache: query_cache::QueryCache,
     /// Cosmic-text font metrics service.
     ///
     /// Populated by `enable_cosmic_metrics()` at GUI startup. Left
@@ -1239,6 +1227,7 @@ impl LayoutEngine {
     /// from old font-selection inputs. This is deliberately one exhaustive
     /// owner rather than a list of clears spread across redisplay fast paths.
     fn invalidate_for_font_selection_change(&mut self) {
+        self.query_cache.clear();
         self.frame_visual_histories = FrameVisualHistories::default();
         self.frame_face_arenas.clear();
         self.retained_window_matrices.clear();
@@ -1404,6 +1393,7 @@ impl LayoutEngine {
             text_buf: Vec::with_capacity(64 * 1024), // 64KB initial
             window_snapshots: Vec::new(),
             query_body_reuse_allowed: false,
+            query_cache: Default::default(),
             font_metrics: Some(FontMetricsService::new()),
             font_sizing: FontSizing::native_gui(),
             frame_visual_histories: FrameVisualHistories::default(),
@@ -1441,6 +1431,7 @@ impl LayoutEngine {
             text_buf: Vec::with_capacity(64 * 1024),
             window_snapshots: Vec::new(),
             query_body_reuse_allowed: false,
+            query_cache: Default::default(),
             font_metrics: None,
             font_sizing: FontSizing::native_gui(),
             frame_visual_histories: FrameVisualHistories::default(),
@@ -1473,6 +1464,7 @@ impl LayoutEngine {
     /// to the character-cell grid. Called once at TTY startup from
     /// the binary that constructs the layout engine.
     pub fn disable_cosmic_metrics(&mut self) {
+        self.query_cache.clear();
         self.font_metrics = None;
     }
 
@@ -1491,12 +1483,14 @@ impl LayoutEngine {
     /// engine, matching GNU's per-frame redisplay_interface vtable
     /// dispatch.
     pub fn enable_cosmic_metrics(&mut self) {
+        self.query_cache.clear();
         if self.font_metrics.is_none() {
             self.font_metrics = Some(FontMetricsService::new());
         }
     }
 
     pub fn set_font_sizing(&mut self, font_sizing: FontSizing) {
+        self.query_cache.clear();
         self.font_sizing = font_sizing;
     }
 
@@ -3234,6 +3228,9 @@ impl LayoutEngine {
         // Commit retained state only after the visual, spatial, and revision
         // invariants have sealed. A rejected presentation cannot acknowledge
         // buffer edits or replace the GNU "current matrix" analogue.
+        if self.retained_window_chrome_metrics != accepted_window_chrome_metrics {
+            self.query_cache.clear();
+        }
         self.retained_window_chrome_metrics = accepted_window_chrome_metrics;
         self.layout_stats = next_layout_stats;
         // Admitted work: what the frame SPENT to decide, not what it emitted.
@@ -3364,8 +3361,8 @@ impl LayoutEngine {
         None
     }
 
-    /// Recompute one live window through the canonical row producer, GNU's
-    /// `start_display` + `move_it_to` from `w->start`.
+    /// Answer a live window query from validated geometry or the canonical row
+    /// producer, GNU's `start_display` + `move_it_to` from `w->start`.
     ///
     /// Answers both display questions the walk settles at once:
     /// GNU-compatible `window-end`, and the window's display geometry.
@@ -3377,13 +3374,20 @@ impl LayoutEngine {
         scope: neovm_core::window::WindowLayoutQueryScope,
     ) -> Result<neovm_core::window::WindowLayoutQuery, neovm_core::window::WindowLayoutQueryFailure>
     {
+        if let Some(query) = self.query_cache.get(evaluator, frame_id, window_id, scope) {
+            return Ok(query);
+        }
         self.query_body_reuse_allowed = true;
-        self.layout_frame_rust_for_purpose_inner(
+        let query = self.layout_frame_rust_for_purpose_inner(
             evaluator,
             frame_id,
             LayoutPurpose::SynchronousQuery { window_id, scope },
         )
-        .ok_or(neovm_core::window::WindowLayoutQueryFailure::DidNotConverge)
+        .ok_or(neovm_core::window::WindowLayoutQueryFailure::DidNotConverge)?;
+        if self.query_body_reuse_allowed {
+            self.query_cache.remember(evaluator, frame_id, window_id, scope, &query);
+        }
+        Ok(query)
     }
 
     /// Simplified window layout using neovm-core data.
@@ -3408,6 +3412,7 @@ impl LayoutEngine {
         if self.retained_frame == Some(frame_id) {
             return;
         }
+        self.query_cache.clear();
         if let Some(parked) = self.retained_frame.take() {
             self.retained_by_frame.insert(
                 parked,

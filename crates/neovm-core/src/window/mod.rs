@@ -2748,6 +2748,17 @@ pub struct WindowDisplaySnapshotFreshness {
 }
 
 impl WindowDisplaySnapshotFreshness {
+    /// Exact pixel-placement change for a query over the same source rows.
+    /// Unlike scroll-surface compatibility, this preserves point, start and
+    /// redisplay revisions. The consumer must separately prove row coverage.
+    pub fn query_vscroll_delta(&self, current: &Self) -> Option<i64> {
+        let mut placed = current.clone();
+        placed.window.vscroll = self.window.vscroll;
+        placed.window.preserve_vscroll_p = self.window.preserve_vscroll_p;
+        (self == &placed)
+            .then(|| i64::from(current.window.vscroll) - i64::from(self.window.vscroll))
+    }
+
     /// A committed scroll may move start/point and hide part of the first row.
     /// Every source, font, geometry, topology and mutation revision must still
     /// match before an existing row surface can preview that destination.

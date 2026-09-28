@@ -1277,3 +1277,65 @@ fn geometry_queries_reevaluate_conditional_display_without_source_edits() {
     assert_eq!(actual.rows, expected.rows);
     assert_eq!(actual.points, expected.points);
 }
+
+#[test]
+fn pixel_only_queries_reuse_complete_row_geometry() {
+    use crate::engine::viewport_retry_depth_probe as probe;
+    use neovm_core::window::WindowLayoutQueryScope;
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    eval.buffer_manager_mut().get_mut(buffer).unwrap().insert(&"ordinary row\n".repeat(100));
+    let frame = eval.frame_manager_mut().create_frame("query-pixel-placement", 400, 170, buffer);
+    eval.frame_manager_mut().get_mut(frame).unwrap().window_system = Some(Value::symbol("neomacs"));
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.eval_str("(setq mode-line-format nil header-line-format nil tab-line-format nil) (goto-char 30) (set-window-vscroll nil 2 t t)").unwrap();
+    let mut query = LayoutEngine::new_without_font_metrics();
+    query.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+    eval.eval_str("(set-window-vscroll nil 3 t t)").unwrap();
+    probe::reset();
+    let actual = query.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+    let walks = probe::max_depth();
+    let mut fresh = WindowLayoutQueryEngine::new_without_font_metrics();
+    let expected = fresh.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+    assert_eq!(actual.end(), expected.end());
+    assert_eq!(actual.geometry(), expected.geometry());
+    assert_eq!(walks, 0, "pixel placement rewalked unchanged complete rows");
+}
+
+#[test]
+fn pixel_query_placement_matches_fresh_wrapped_and_decorated_rows() {
+    use crate::engine::viewport_retry_depth_probe as probe;
+    use neovm_core::window::WindowLayoutQueryScope;
+    for decoration in [
+        "nil",
+        "(put-text-property 1 121 'face '(:height 1.5))",
+        r#"(progn (put-text-property 1 121 'line-height 1.3)
+            (put-text-property 31 35 'display '(raise 0.2))
+            (let ((o (make-overlay 90 110)))
+              (overlay-put o 'before-string "prefix")
+              (overlay-put o 'after-string "suffix")
+              (overlay-put o 'face '(:height 1.2))))"#,
+    ] {
+        let mut eval = Context::new();
+        let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+        eval.buffer_manager_mut().get_mut(buffer).unwrap().insert(&format!("{}\n", "abc def ghi ".repeat(20)).repeat(30));
+        let frame = eval.frame_manager_mut().create_frame("query-pixel-differential", 180, 200, buffer);
+        eval.frame_manager_mut().get_mut(frame).unwrap().window_system = Some(Value::symbol("neomacs"));
+        let window = eval.frame_manager().get(frame).unwrap().selected_window;
+        eval.eval_str("(setq mode-line-format nil header-line-format nil tab-line-format nil word-wrap t) (goto-char 55)").unwrap();
+        eval.eval_str(decoration).unwrap();
+        let mut query = LayoutEngine::new_without_font_metrics();
+        let mut reused = 0;
+        for pixels in (0..32).chain((0..32).rev()) {
+            eval.eval_str(&format!("(set-window-vscroll nil {pixels} t t)")).unwrap();
+            probe::reset();
+            let actual = query.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+            reused += usize::from(probe::max_depth() == 0);
+            let mut fresh = WindowLayoutQueryEngine::new_without_font_metrics();
+            let expected = fresh.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+            assert_eq!(actual.end(), expected.end(), "{decoration} pixels={pixels}");
+            assert_eq!(actual.geometry(), expected.geometry(), "{decoration} pixels={pixels}");
+        }
+        assert!(reused > 4, "no pixel placement reuse: {decoration}, reused={reused}");
+    }
+}

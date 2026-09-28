@@ -6,6 +6,8 @@ use neovm_core::{
 };
 use std::collections::VecDeque;
 
+mod placement;
+
 const MAX_ENTRIES: usize = 4;
 const MAX_ROWS: usize = 256;
 const MAX_POINTS: usize = 16_384;
@@ -47,14 +49,22 @@ impl QueryCache {
             .get(buffer)?
             .point_lisp_char_pos();
         self.entries.iter().rev().find_map(|entry| {
-            (entry.frame == frame
+            if !(entry.frame == frame
                 && entry.window == window
                 && entry.scope == scope
                 && entry.source_point == source_point
                 && entry.collections
-                    == neovm_core::tagged::mutate::LispCollectionRevision::current()
-                && entry.query.geometry()?.layout_freshness.as_ref() == Some(&current))
-            .then(|| entry.query.clone())
+                    == neovm_core::tagged::mutate::LispCollectionRevision::current())
+            {
+                return None;
+            }
+            if entry.query.geometry()?.layout_freshness.as_ref() == Some(&current) {
+                return Some(entry.query.clone());
+            }
+            if scope != WindowLayoutQueryScope::Viewport {
+                return None;
+            }
+            placement::reposition(&entry.query, &current, source_point)
         })
     }
 
