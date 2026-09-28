@@ -137,6 +137,26 @@ fn cursor_only_reuses_an_untouched_window_whose_point_sits_on_the_last_row() {
 }
 
 #[test]
+fn cursor_replay_declines_raised_and_lowered_cursor_rows() {
+    for offset in [-4.0, 4.0] {
+        let mut retained = synthetic_matrix(0, 5);
+        let current = retained.key.clone();
+        assert!(retained.cursor_only_replay(&current).is_ok());
+        let row = MatrixRow::make_mut(&mut retained.matrix.rows[0]);
+        let mut glyph = neomacs_display_protocol::glyph_matrix::Glyph::stretch(
+            1,
+            neomacs_display_protocol::types::FaceId::new(1),
+        );
+        glyph.vertical_offset_px = offset;
+        row.glyphs[neomacs_display_protocol::glyph_matrix::GlyphArea::Text.index()].push(glyph);
+        assert_eq!(
+            retained.cursor_only_replay(&current).err(),
+            Some(CursorOnlyDecline::CursorRowNotReDecoratable),
+        );
+    }
+}
+
+#[test]
 fn forced_start_reuse_still_rejects_a_point_move_into_a_clipped_bottom_row() {
     let mut retained = synthetic_matrix(0, 5);
     let mut current = retained.key.clone();

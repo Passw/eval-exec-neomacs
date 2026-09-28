@@ -356,6 +356,14 @@ fn worker_capture_rejects_overlay_replacements_and_excessive_overlap() {
             "(let ((i 0)) (while (< i 33) (make-overlay 2761 3100) (setq i (1+ i))))",
             RowProgramError::Budget,
         ),
+        (
+            "(put-text-property 2761 3100 'display '(when t (raise 0.25)))",
+            RowProgramError::Unsupported,
+        ),
+        (
+            "(put-text-property 2761 3100 'display '(raise (+ 1 2)))",
+            RowProgramError::Unsupported,
+        ),
     ] {
         let (mut eval, frame, _, window) =
             incr_editing_frame(&"ordinary offscreen text\n".repeat(300), 800, 600);
@@ -500,6 +508,90 @@ fn first_visit_with_setup(
     let mut fresh = LayoutEngine::new();
     fresh.layout_frame_rust(&mut eval, frame);
     assert_eq!(actual, selected_window_layout_trace(&eval, &fresh, frame));
+}
+
+#[test]
+fn raised_buffer_rows_preserve_glyph_extents_with_and_without_wrapping() {
+    for width in [120, 800] {
+        let text = format!("{}\n", "raised words ".repeat(30));
+        let (mut eval, frame, _, window) = incr_editing_frame(&text, width, 600);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        eval.eval_str(
+            "(setq truncate-lines nil word-wrap t)
+            (put-text-property 1 361 'face '(:height 150))
+            (put-text-property 1 361 'display '(raise 0.25))",
+        )
+        .unwrap();
+        let mut engine = LayoutEngine::new();
+        engine.layout_frame_rust(&mut eval, frame);
+        let owner = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
+        let rows = &engine.retained_window_matrices[&owner].matrix.rows;
+        let mut raised_rows = 0;
+        for row in rows
+            .iter()
+            .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        {
+            for glyph in row.glyphs.iter().flatten().filter(|glyph| !glyph.padding) {
+                if glyph.vertical_offset_px == 0.0 {
+                    continue;
+                }
+                raised_rows += 1;
+                let ascent = (glyph.pixel_ascent - glyph.vertical_offset_px).max(0.0);
+                let descent =
+                    (glyph.pixel_height - glyph.pixel_ascent + glyph.vertical_offset_px).max(0.0);
+                assert!(
+                    row.ascent_px >= ascent,
+                    "width={width}, row baseline lost raised glyph ascent"
+                );
+                assert!(
+                    row.height_px - row.ascent_px >= descent,
+                    "width={width}, row lost lowered glyph descent"
+                );
+            }
+        }
+        assert!(raised_rows > 0);
+    }
+}
+
+#[test]
+fn unchanged_raised_cursor_reuses_its_authoritative_presentation() {
+    let (mut eval, frame, _, _) =
+        incr_editing_frame(&"ordinary offscreen text\n".repeat(30), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str("(put-text-property 1 20 'display '(raise 0.25))")
+        .unwrap();
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let expected = selected_window_layout_trace(&eval, &engine, frame);
+    engine.layout_frame_rust(&mut eval, frame);
+    assert_eq!(engine.last_layout_stats().cursor_only_windows, 1);
+    assert_eq!(
+        selected_window_layout_trace(&eval, &engine, frame),
+        expected
+    );
+}
+
+#[test]
+fn worker_page_preserves_literal_raised_text_and_overlay_geometry() {
+    for setup in [
+        "(put-text-property 2761 3100 'display '(raise 0.25))",
+        "(overlay-put (make-overlay 2761 3100) 'display '(raise -0.25))",
+    ] {
+        first_visit_with_setup(
+            Some("(:height 150 :weight bold)"),
+            "ordinary offscreen text\n",
+            None,
+            0,
+            16,
+            Some(setup),
+        );
+    }
 }
 
 #[test]

@@ -1167,7 +1167,31 @@ impl RetainedWindowMatrix {
             // even though the underlying number stays absolute.
             return Err(CursorOnlyDecline::LineNumberedCursorRowChanged);
         }
-        if cursor_row.continued
+        let retained_cursor = (self.key.point == curr.point)
+            .then(|| {
+                self.presented_cursor
+                    .clone()
+                    .zip(self.display_snapshot.phys_cursor.clone())
+                    .and_then(|(presented, output)| {
+                        let output_slot_id = DisplaySlotId {
+                            window_id: presented.window_id,
+                            row: u32::try_from(output.row).ok()?,
+                            col: u16::try_from(output.col).ok()?,
+                        };
+                        RetainedTextWindowCursor::new(presented, output_slot_id, output.x)
+                    })
+            })
+            .flatten();
+        // The replay cursor currently reconstructs a row-sized cell. Raised
+        // and lowered glyphs need the canonical cursor capture policy, which
+        // can choose a different height from that row's accumulated extents.
+        if (retained_cursor.is_none()
+            && cursor_row
+                .glyphs
+                .iter()
+                .flatten()
+                .any(|glyph| glyph.vertical_offset_px != 0.0))
+            || cursor_row.continued
             || cursor_row.truncated_left
             || cursor_row.left_fringe_bitmap.is_some()
         {
@@ -1223,21 +1247,7 @@ impl RetainedWindowMatrix {
             // needs the chrome dirty flags off the evaluator. `None` = walk.
             chrome: None,
             chrome_memo: None,
-            retained_cursor: (self.key.point == curr.point)
-                .then(|| {
-                    self.presented_cursor
-                        .clone()
-                        .zip(self.display_snapshot.phys_cursor.clone())
-                        .and_then(|(presented, output)| {
-                            let output_slot_id = DisplaySlotId {
-                                window_id: presented.window_id,
-                                row: u32::try_from(output.row).ok()?,
-                                col: u16::try_from(output.col).ok()?,
-                            };
-                            RetainedTextWindowCursor::new(presented, output_slot_id, output.x)
-                        })
-                })
-                .flatten(),
+            retained_cursor,
             face_generation: self.face_generation,
         })
     }

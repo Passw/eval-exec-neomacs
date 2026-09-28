@@ -2923,6 +2923,7 @@ struct GlyphTrace {
     pixel_width_bits: u32,
     pixel_height_bits: u32,
     pixel_ascent_bits: u32,
+    vertical_offset_bits: u32,
 }
 
 impl GlyphTrace {
@@ -2966,6 +2967,7 @@ impl GlyphTrace {
             pixel_width_bits: glyph.pixel_width.to_bits(),
             pixel_height_bits: glyph.pixel_height.to_bits(),
             pixel_ascent_bits: glyph.pixel_ascent.to_bits(),
+            vertical_offset_bits: glyph.vertical_offset_px.to_bits(),
         }
     }
 }

@@ -326,6 +326,7 @@ impl<'a> BufferSourceItemRenderRequest<'a> {
             &mut source_render,
             &mut progress,
         ) {
+            source_render.include_current_row_metrics(row_build.row_geometry);
             return outcome;
         }
 
@@ -342,7 +343,7 @@ impl<'a> BufferSourceItemRenderRequest<'a> {
             if let Some(resume_charpos) = prefix.source_end_charpos() {
                 source_walk.consume_prefix_to(resume_charpos);
             }
-            return text_run_request.render_and_apply(
+            let outcome = text_run_request.render_and_apply(
                 prefix,
                 &active_face_state,
                 &buffer_row_append_context,
@@ -353,6 +354,8 @@ impl<'a> BufferSourceItemRenderRequest<'a> {
                 &mut source_render,
                 &mut progress,
             );
+            source_render.include_current_row_metrics(row_build.row_geometry);
+            return outcome;
         }
 
         // Neither whole-run path could take this run, so it is rendered one

@@ -49,8 +49,31 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
     if start >= end || max_items == 0 {
         return Err(RowProgramError::Budget);
     }
+    // Inspect only the physical line this job will consume. Scanning the
+    // bounded byte chunks stops at the first newline without copying text;
+    // properties on later lines must not veto this line's admission.
+    let mut offset = start_byte.get();
+    let scan = buffer.layout_try_for_each_emacs_byte_range_chunk(
+        EmacsByteRange::new(start_byte, end_byte),
+        |chunk| {
+            if cancelled() {
+                return Err(None);
+            }
+            if let Some(index) = chunk.iter().position(|byte| *byte == b'\n') {
+                return Err(Some(EmacsBytePos::new(offset + index + 1)));
+            }
+            offset += chunk.len();
+            Ok(())
+        },
+    );
+    let end_byte = match scan {
+        Err(Some(newline_end)) => newline_end,
+        Err(None) => return Err(RowProgramError::Cancelled),
+        Ok(()) => end_byte,
+    };
+    let end = buffer.layout_emacs_byte_pos_to_char_pos(end_byte);
+    let display_lookup = LayoutCharPropertyLookup::new(buffer, Value::symbol("display"));
     let lookups = [
-        "display",
         "invisible",
         "composition",
         "line-prefix",
@@ -80,10 +103,13 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
             return Err(RowProgramError::Budget);
         }
         if overlays.overlay_applies_to_window(overlay, Some(window))
-            && lookups
+            && (lookups
                 .iter()
                 .chain(&string_lookups)
                 .any(|lookup| lookup.effective_overlay_value(buffer, overlay).is_some())
+                || display_lookup
+                    .effective_overlay_value(buffer, overlay)
+                    .is_some_and(|value| !literal_raise_or_nil(value)))
         {
             return Err(RowProgramError::Unsupported);
         }
@@ -100,11 +126,15 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
         if boundaries > max_items {
             return Err(RowProgramError::Budget);
         }
-        if lookups.iter().any(|lookup| {
-            lookup
-                .text_value_at(buffer, pos)
-                .is_some_and(|value| !value.is_nil())
-        }) {
+        if display_lookup
+            .text_value_at(buffer, pos)
+            .is_some_and(|value| !literal_raise_or_nil(value))
+            || lookups.iter().any(|lookup| {
+                lookup
+                    .text_value_at(buffer, pos)
+                    .is_some_and(|value| !value.is_nil())
+            })
+        {
             return Err(RowProgramError::Unsupported);
         }
         pos = buffer
@@ -167,6 +197,25 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
     Err(RowProgramError::Budget)
 }
 
+/// The canonical producer resolves this modifier into owned item geometry.
+/// Admit only a finite literal operand: no conditions, expressions, compound
+/// specs or replacement objects can cross this bounded preflight shortcut.
+fn literal_raise_or_nil(value: Value) -> bool {
+    if value.is_nil() {
+        return true;
+    }
+    if !value.is_cons() || !value.cons_car().is_symbol_named("raise") {
+        return false;
+    }
+    let tail = value.cons_cdr();
+    tail.is_cons()
+        && tail.cons_cdr().is_nil()
+        && tail
+            .cons_car()
+            .as_number_f64()
+            .is_some_and(|number| number.is_finite() && (number as f32).is_finite())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,9 +227,24 @@ mod tests {
     use neovm_core::face::FaceTable;
 
     fn capture(text: &str, chars: usize) -> Result<CapturedPhysicalLine, RowProgramError> {
+        capture_with_properties(text, chars, None)
+    }
+
+    fn capture_with_properties(
+        text: &str,
+        chars: usize,
+        property_start: Option<usize>,
+    ) -> Result<CapturedPhysicalLine, RowProgramError> {
         let mut eval = Context::new();
         let buffer = eval.buffer_manager_mut().current_buffer_mut().unwrap();
         buffer.insert(text);
+        if let Some(start) = property_start {
+            buffer.text_props_put_property_in_emacs_byte_range(
+                EmacsByteRange::new(EmacsBytePos::new(start), EmacsBytePos::new(text.len())),
+                Value::symbol("display"),
+                Value::string("replacement"),
+            );
+        }
         let id = buffer.id();
         let snapshot = LayoutBufferSnapshot::from_buffer(buffer);
         let resolver = FaceResolver::new(&FaceTable::new(), 0xffffff, 0, 14.0, None);
@@ -205,6 +269,16 @@ mod tests {
             &mut FrameFaceAttempt::for_test_with_next_id(2),
             || false,
         )
+    }
+
+    #[test]
+    fn later_line_replacement_does_not_reject_complete_plain_line() {
+        let line = capture_with_properties("好a\nreplaced\n", 32, Some(5)).unwrap();
+        assert_eq!(line.end, CharPos0::new(3));
+        assert!(matches!(
+            capture_with_properties("好a\nreplaced\n", 32, Some(3)),
+            Err(RowProgramError::Unsupported)
+        ));
     }
 
     #[test]

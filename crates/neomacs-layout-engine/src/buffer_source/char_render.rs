@@ -261,6 +261,9 @@ pub(crate) fn render_source_char_and_apply<B: LayoutBufferView>(
     {
         return BufferSourceItemRenderOutcome::Stop;
     }
+    state
+        .source_render
+        .include_current_row_metrics(state.row_build.row_geometry);
     if let Some(end_charpos) = source_end_charpos {
         state.progress.max_charpos(end_charpos);
     }

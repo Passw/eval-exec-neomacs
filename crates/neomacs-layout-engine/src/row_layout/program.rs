@@ -430,14 +430,24 @@ impl RowProgram {
             // Source-slot height describes the active face at this item,
             // not the eventual maximum height of the complete row.
             let face = render_face_ref_id(item.face, self.geometry.base_face);
-            let face_height = self
+            let face_metrics = self
                 .faces
                 .iter()
                 .find(|candidate| candidate.face_id == face)
-                .map(|face| face.metrics.line_height_px())
+                .map(|face| face.metrics)
                 .ok_or(RowProgramError::Unsupported)?;
+            let face_height = face_metrics.line_height_px();
+            // Visible buffer layout installs the active face's minimum
+            // extents before emitting an item. Preserve that descent even
+            // when every glyph in the item is raised above the baseline.
+            let minimum = self.measurements.face_vertical_metrics_px(face).unwrap_or(
+                DisplayRowVerticalMetrics::new(face_height, face_metrics.ascent_px()),
+            );
+            let mut item_layout = layout.clone();
+            item_layout.height_px = row.height_px.max(minimum.height_px());
+            item_layout.ascent_px = row.ascent_px.max(minimum.ascent_px());
             let progress = DisplayRowProgressWriter::with_text_run_measurement_and_glyph_measurer_for_area_and_start_policy(
-                &layout, &mut row, plan, &mut self.measurements, position, self.geometry.width,
+                &item_layout, &mut row, plan, &mut self.measurements, position, self.geometry.width,
                 DisplayRowTextAreaOrigin::row_local(), GlyphArea::Text, DisplayRowAppendStartPolicy::ReconcileWithRowTail,
             ).push_item(item);
             if self.measurements.missing {
@@ -589,12 +599,27 @@ mod tests {
         let mut position = DisplayRowPosition::new(0.0, 0);
         let mut slots = Vec::new();
         for input in inputs {
+            // Match the buffer source's active-face installation before
+            // handing the item to the independent synchronous glyph writer.
+            let face = faces
+                .iter()
+                .find(|face| face.face_id == render_face_ref_id(input.face, geometry.base_face))
+                .unwrap();
+            let minimum = measurer.face_vertical_metrics_px(face.face_id).unwrap_or(
+                DisplayRowVerticalMetrics::new(
+                    face.metrics.line_height_px(),
+                    face.metrics.ascent_px(),
+                ),
+            );
+            let mut item_layout = layout.clone();
+            item_layout.height_px = expected.height_px.max(minimum.height_px());
+            item_layout.ascent_px = expected.ascent_px.max(minimum.ascent_px());
             let newline = match input.kind {
                 DisplayItemKind::RowBreak(value) => Some(value),
                 _ => None,
             };
             let progress = DisplayRowProgressWriter::with_glyph_measurer(
-                &layout,
+                &item_layout,
                 &mut expected,
                 &mut measurer,
                 position,

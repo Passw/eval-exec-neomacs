@@ -45,6 +45,12 @@ impl<'builder> DisplayRowCurrentRowOutput<'builder> {
         }
     }
 
+    pub(crate) fn current_row_vertical_metrics(&self) -> Option<(f32, f32)> {
+        self.builder
+            .current_row_for_render()
+            .map(|row| (row.height_px, row.ascent_px))
+    }
+
     pub(crate) fn current_row_snapshot(&self) -> Option<GlyphRow> {
         self.builder.current_row_for_render().cloned()
     }

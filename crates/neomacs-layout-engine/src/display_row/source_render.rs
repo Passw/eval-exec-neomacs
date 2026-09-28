@@ -949,6 +949,19 @@ impl<'a> TextRowSourceRenderState<'a> {
         self.output_render.reborrow()
     }
 
+    /// Keep the buffer walk's geometry in sync with the glyph writer after
+    /// an ordinary item append. Reading the accumulated extents is O(1) and
+    /// does not clone or rescan the growing row.
+    pub(crate) fn include_current_row_metrics(&mut self, geometry: &mut DisplayRowGeometryState) {
+        if let Some((height, ascent)) = self
+            .output_render
+            .current_row_output()
+            .current_row_vertical_metrics()
+        {
+            geometry.include_glyph_vertical_metrics(height, ascent);
+        }
+    }
+
     pub(crate) fn current_row_snapshot(&mut self) -> Option<GlyphRow> {
         self.output_render
             .current_row_output()
