@@ -75,9 +75,12 @@ impl PreparedViewports {
                     && RetainedWindowKey::row_content_eligible(&entry.retained.key, &current.key)
             })
             .collect();
-        // The canonical visible walk may already own a partial row beyond
-        // the viewport. Export that certified remainder immediately; the
-        // bounds check below rejects scenes with no scrollable remainder.
+        // Build an extra scroll surface only when it adds prepared content.
+        // A current-only surface repeats resource and hit-index work on every
+        // frame for just the clipped remainder of the visible bottom row.
+        if entries.is_empty() {
+            return None;
+        }
         let original = state
             .window_matrices
             .iter()
