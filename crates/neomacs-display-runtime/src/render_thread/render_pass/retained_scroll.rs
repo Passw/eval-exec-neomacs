@@ -21,7 +21,9 @@ fn static_body_effects(effects: &neomacs_display_protocol::EffectsConfig) -> boo
 
 pub(in crate::render_thread) struct RetainedScroll {
     surface: Arc<ScrollSurface>,
-    generation: u64,
+    background: Color,
+    defaults: [f32; 3],
+    font_catalog: neomacs_display_protocol::font::FontCatalogGeneration,
     scale: DeviceScale,
     texture: SnapshotLease,
     origin: (f32, f32),
@@ -103,13 +105,13 @@ fn raster_frame(
         size.height() as f32 / scale.get(),
     );
     raster.presentation_id = frame.presentation_id;
-    raster.clone_font_bindings_from(frame);
-    raster.faces.extend(coverage.faces.clone());
-    raster.fonts.extend(coverage.fonts.clone());
-    raster.char_fonts.extend(coverage.char_fonts.clone());
-    raster
-        .shaped_clusters
-        .extend(coverage.shaped_clusters.clone());
+    // Coverage owns every binding used by its picture. Do not retain hidden
+    // dependencies on unrelated font tables from the current frame.
+    raster.font_catalog_generation = frame.font_catalog_generation;
+    raster.faces = coverage.faces.clone();
+    raster.fonts = coverage.fonts.clone();
+    raster.char_fonts = coverage.char_fonts.clone();
+    raster.shaped_clusters = coverage.shaped_clusters.clone();
     raster.background = background;
     raster.char_width = frame.char_width;
     raster.char_height = frame.char_height;
@@ -163,7 +165,22 @@ pub(super) fn prepare(
     has_gradient: bool,
 ) -> Option<PreparedScrollRaster> {
     let Some((surface, offset)) = render.compositor.input_scroll.staged_projection() else {
-        render.compositor.retained_scroll = None;
+        // Keep one bounded lease through authoritative-only frames while
+        // its coverage epoch remains live. Recheck exact paint before a crop.
+        if render
+            .compositor
+            .retained_scroll
+            .as_ref()
+            .is_some_and(|cache| {
+                !frame.scroll_surfaces.iter().any(|next| {
+                    next.coverage().epoch == cache.surface.coverage().epoch
+                        && next.coverage().content.window_id
+                            == cache.surface.coverage().content.window_id
+                })
+            })
+        {
+            render.compositor.retained_scroll = None;
+        }
         return None;
     };
     // Effects which alter body pixels need their own raster dependencies.
@@ -181,7 +198,7 @@ pub(super) fn prepare(
     let coverage = surface.coverage();
     let background = body_background(frame, coverage.viewport)?;
     let scale = mapping.surface().device_scale();
-    let generation = render.compositor.current_scene_generation;
+    let defaults = [frame.char_width, frame.char_height, frame.font_pixel_size];
     let bounds = coverage.content.text_clip_bounds?;
     let (size, origin) = raster_geometry(
         bounds,
@@ -193,10 +210,22 @@ pub(super) fn prepare(
         .retained_scroll
         .as_ref()
         .is_some_and(|cache| {
-            Arc::ptr_eq(&cache.surface, &surface)
-                && cache.generation == generation
-                && cache.scale == scale
+            let previous = cache.surface.coverage();
+            cache.scale == scale
                 && cache.texture.size() == size
+                && cache.origin == origin
+                && cache.background == background
+                && cache.defaults == defaults
+                && cache.font_catalog == frame.font_catalog_generation
+                && previous.epoch == coverage.epoch
+                && previous.content.window_id == coverage.content.window_id
+                && previous.content.text_clip_bounds == coverage.content.text_clip_bounds
+                && (Arc::ptr_eq(&cache.surface, &surface)
+                    || (cache.surface.coverage_glyphs() == surface.coverage_glyphs()
+                        && previous.faces == coverage.faces
+                        && previous.fonts == coverage.fonts
+                        && previous.char_fonts == coverage.char_fonts
+                        && previous.shaped_clusters == coverage.shaped_clusters))
         });
     if !valid {
         // Release old coverage before admission, allowing its pool slot to be
@@ -249,7 +278,9 @@ pub(super) fn prepare(
         tracing::debug!(target: "neomacs_display_runtime::retained_scroll", window = coverage.content.window_id.get(), "rasterized scroll coverage");
         render.compositor.retained_scroll = Some(RetainedScroll {
             surface: surface.clone(),
-            generation,
+            background,
+            defaults,
+            font_catalog: frame.font_catalog_generation,
             scale,
             texture,
             origin,

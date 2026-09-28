@@ -80,6 +80,7 @@ pub(super) fn render_frame_root_glyphs(
             ))
             .blit_snapshot_region(region);
         frame_stats::count(&frame_stats::SCROLL_RASTER_BLITS);
+        tracing::debug!(target: "neomacs_display_runtime::retained_scroll", "composited retained scroll raster");
     }
 }
 

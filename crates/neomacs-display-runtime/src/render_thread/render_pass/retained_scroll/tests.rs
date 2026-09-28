@@ -3,6 +3,10 @@ use neomacs_display_protocol::input_progress::InputStream;
 use neomacs_display_protocol::*;
 
 fn fixture() -> FrameGlyphBuffer {
+    fixture_with(|_| {})
+}
+
+fn fixture_with(change: impl FnOnce(&mut scroll_coverage::ScrollCoverage)) -> FrameGlyphBuffer {
     let mut state = FrameDisplayState::new(8, 4, 10.0, 10.0);
     state.presentation_id = PresentationId::new(71);
     state.background = Color::RED;
@@ -77,6 +81,7 @@ fn fixture() -> FrameGlyphBuffer {
             shaped_clusters: Default::default(),
             hit_index,
         }));
+    change(Arc::make_mut(&mut state.scroll_coverage[0]));
     let frame = state.materialize();
     assert_eq!(frame.scroll_surfaces.len(), 1);
     frame
@@ -172,10 +177,15 @@ fn retained_scroll_pixels_match_full_render_and_reuse_coverage_during_reversal()
         let mut deliveries = Vec::new();
         let mut cached_id = None;
         let mut held = None;
-        for delta in [4.0, 8.0, -8.0] {
+        for (step, delta) in [4.0, 8.0, -8.0].into_iter().enumerate() {
+            // Every authoritative scene owns a fresh coverage Arc, even when
+            // the bounded coverage still paints exactly the same picture.
+            let refreshed = fixture_with(|coverage| coverage.origin = step as f32 * 4.0);
+            render.compositor.current_scene_generation += 1;
+            render.compositor.input_scroll.reconcile(Some(&refreshed));
             let delivery = stream.issue().unwrap();
             assert!(render.compositor.input_scroll.push(
-                &original,
+                &refreshed,
                 11.0,
                 11.0,
                 delta,
@@ -243,10 +253,24 @@ fn retained_scroll_pixels_match_full_render_and_reuse_coverage_during_reversal()
             false,
         )
         .unwrap();
-        assert_ne!(
+        assert_eq!(
             rebuilt.texture.id(),
             held.as_ref().unwrap().id(),
-            "a live old lease cannot be overwritten"
+            "unchanged paint survives a new scene"
+        );
+        frame.background = Color::new(0.25, 0.5, 0.75, 1.0);
+        let changed = prepare(
+            &mut renderer,
+            &mut render,
+            &frame,
+            mapping(&frame, scale),
+            false,
+        )
+        .unwrap();
+        assert_ne!(
+            changed.texture.id(),
+            held.as_ref().unwrap().id(),
+            "background changes must rebuild without overwriting a live lease"
         );
         renderer.effects.line_highlight.enabled = true;
         assert!(
@@ -284,6 +308,51 @@ fn retained_scroll_pixels_match_full_render_and_reuse_coverage_during_reversal()
             )
             .is_none(),
             "extra spacing and gradients require the full glyph path"
+        );
+        let cached = prepare(
+            &mut renderer,
+            &mut render,
+            &frame,
+            mapping(&frame, scale),
+            false,
+        )
+        .unwrap();
+        render.compositor.input_scroll = Default::default();
+        assert!(
+            prepare(
+                &mut renderer,
+                &mut render,
+                &frame,
+                mapping(&frame, scale),
+                false
+            )
+            .is_none()
+        );
+        assert_eq!(
+            render
+                .compositor
+                .retained_scroll
+                .as_ref()
+                .unwrap()
+                .texture
+                .id(),
+            cached.texture.id(),
+            "acknowledging input must not discard an unchanged picture"
+        );
+        frame.scroll_surfaces.clear();
+        assert!(
+            prepare(
+                &mut renderer,
+                &mut render,
+                &frame,
+                mapping(&frame, scale),
+                false
+            )
+            .is_none()
+        );
+        assert!(
+            render.compositor.retained_scroll.is_none(),
+            "withdrawn coverage releases its lease"
         );
     }
 }
@@ -358,4 +427,66 @@ fn every_enabled_effect_has_an_explicit_static_body_decision() {
     patterned = defaults;
     patterned.mode_line_separator.style = 1;
     assert!(!static_body_effects(&patterned));
+}
+
+#[test]
+fn changed_coverage_pixels_and_font_catalog_rebuild_the_raster() {
+    let Ok(mut renderer) = WgpuRenderer::new(None, 80, 40) else {
+        assert!(std::env::var_os("NEOMACS_REQUIRE_GPU_TESTS").is_none());
+        return;
+    };
+    let mut render = GuiFrameRenderState::new(
+        1,
+        renderer.device(),
+        1.0,
+        false,
+        frame_time::observe_platform_now(),
+    );
+    let stream = InputStream::default();
+    let mut deliveries = Vec::new();
+    let mut previous = None;
+    for change in 0..4 {
+        let mut frame = fixture_with(|coverage| {
+            if change >= 1 {
+                coverage.faces.get_mut(&FaceId::new(1)).unwrap().foreground = Color::BLACK;
+            }
+            if change >= 2 {
+                let mut row = coverage.content.matrix.rows[0].as_ref().clone();
+                row.glyphs[1][0].pixel_width = 59.0;
+                coverage.content.matrix.rows[0] = MatrixRow::new(row);
+            }
+        });
+        if change == 3 {
+            frame.font_catalog_generation = frame.font_catalog_generation.next();
+        }
+        render.compositor.input_scroll = Default::default();
+        let delivery = stream.issue().unwrap();
+        assert!(render.compositor.input_scroll.push(
+            &frame,
+            11.0,
+            11.0,
+            4.0,
+            delivery.receipt(),
+            None
+        ));
+        deliveries.push(delivery);
+        render.compositor.input_scroll.paint(&mut frame);
+        let raster = prepare(
+            &mut renderer,
+            &mut render,
+            &frame,
+            mapping(&frame, 1.0),
+            false,
+        )
+        .unwrap();
+        if let Some(old) = previous.as_ref() {
+            let old: &SnapshotLease = old;
+            assert_ne!(
+                old.id(),
+                raster.texture.id(),
+                "changed paint dependency {change} reused old pixels"
+            );
+        }
+        previous = Some(raster.texture);
+    }
 }
