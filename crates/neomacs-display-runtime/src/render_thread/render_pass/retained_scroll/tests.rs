@@ -259,6 +259,18 @@ fn retained_scroll_pixels_match_full_render_and_reuse_coverage_during_reversal()
             "unchanged paint survives a new scene"
         );
         frame.background = Color::new(0.25, 0.5, 0.75, 1.0);
+        for _ in 0..2 {
+            assert!(
+                prepare(
+                    &mut renderer,
+                    &mut render,
+                    &frame,
+                    mapping(&frame, scale),
+                    false
+                )
+                .is_none()
+            );
+        }
         let changed = prepare(
             &mut renderer,
             &mut render,
@@ -471,6 +483,20 @@ fn changed_coverage_pixels_and_font_catalog_rebuild_the_raster() {
         ));
         deliveries.push(delivery);
         render.compositor.input_scroll.paint(&mut frame);
+        if previous.is_some() {
+            for _ in 0..2 {
+                assert!(
+                    prepare(
+                        &mut renderer,
+                        &mut render,
+                        &frame,
+                        mapping(&frame, 1.0),
+                        false
+                    )
+                    .is_none()
+                );
+            }
+        }
         let raster = prepare(
             &mut renderer,
             &mut render,
@@ -488,5 +514,89 @@ fn changed_coverage_pixels_and_font_catalog_rebuild_the_raster() {
             );
         }
         previous = Some(raster.texture);
+    }
+}
+
+#[test]
+fn changing_coverage_defers_raster_work_until_paint_is_stable() {
+    let Ok(mut renderer) = WgpuRenderer::new(None, 80, 40) else {
+        assert!(std::env::var_os("NEOMACS_REQUIRE_GPU_TESTS").is_none());
+        return;
+    };
+    let mut render = GuiFrameRenderState::new(
+        1,
+        renderer.device(),
+        1.0,
+        false,
+        frame_time::observe_platform_now(),
+    );
+    let stream = InputStream::default();
+    let mut deliveries = Vec::new();
+    let mut original = None;
+    for change in 0..5 {
+        let mut frame = fixture_with(|coverage| {
+            coverage.faces.get_mut(&FaceId::new(1)).unwrap().foreground =
+                Color::new(change as f32 / 8.0, 0.0, 0.0, 1.0);
+        });
+        render.compositor.input_scroll = Default::default();
+        let delivery = stream.issue().unwrap();
+        assert!(render.compositor.input_scroll.push(
+            &frame,
+            11.0,
+            11.0,
+            4.0,
+            delivery.receipt(),
+            None,
+        ));
+        deliveries.push(delivery);
+        render.compositor.input_scroll.paint(&mut frame);
+        let raster = prepare(
+            &mut renderer,
+            &mut render,
+            &frame,
+            mapping(&frame, 1.0),
+            false,
+        );
+        if change == 0 {
+            original = Some(raster.unwrap().texture);
+        } else {
+            assert!(
+                raster.is_none(),
+                "one-off coverage must use the regular draw path"
+            );
+            assert_eq!(
+                render
+                    .compositor
+                    .retained_scroll
+                    .as_ref()
+                    .unwrap()
+                    .texture
+                    .id(),
+                original.as_ref().unwrap().id(),
+                "deferred work must not allocate a raster"
+            );
+        }
+        if change == 4 {
+            // Three viewport areas of coverage require three observations.
+            assert!(
+                prepare(
+                    &mut renderer,
+                    &mut render,
+                    &frame,
+                    mapping(&frame, 1.0),
+                    false
+                )
+                .is_none()
+            );
+            let stable = prepare(
+                &mut renderer,
+                &mut render,
+                &frame,
+                mapping(&frame, 1.0),
+                false,
+            )
+            .unwrap();
+            assert_ne!(stable.texture.id(), original.as_ref().unwrap().id());
+        }
     }
 }
