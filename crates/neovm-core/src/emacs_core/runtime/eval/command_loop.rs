@@ -496,6 +496,8 @@ impl Context {
                 return Ok(Value::NIL);
             }
 
+            self.service_gui_command_boundary()?;
+
             // Retained through hooks, point adjustment and finalization. A
             // mid-command redisplay must not acknowledge unfinished input.
             let _completed_inputs = self.input_progress.begin_command();

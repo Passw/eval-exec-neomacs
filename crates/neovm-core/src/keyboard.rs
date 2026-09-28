@@ -22,6 +22,7 @@ use crate::heap_types::LispString;
 use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, Instant};
 
+mod display_service;
 mod input_method;
 mod keysym;
 mod unread;
@@ -2536,6 +2537,8 @@ pub struct CommandLoop {
     pub keyboard: KeyboardRuntime,
     /// Lisp meanings paired with immutable displayed frame presentations.
     pub presented_interactions: PresentedInteractions,
+    /// Next bounded GUI service opportunity while command input stays queued.
+    gui_display_deadline: Option<Instant>,
     /// Current prefix argument.
     pub prefix_arg: PrefixArg,
     /// Whether we are in a recursive edit.
@@ -2568,6 +2571,7 @@ impl CommandLoop {
         Self {
             keyboard: KeyboardRuntime::new(),
             presented_interactions: PresentedInteractions::default(),
+            gui_display_deadline: None,
             prefix_arg: PrefixArg::None,
             recursive_depth: 0,
             running: false,
