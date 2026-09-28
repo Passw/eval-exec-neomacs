@@ -87,6 +87,7 @@ impl Context {
         ev.eval_task_rx = None;
         ev.redisplay_fn = None;
         ev.display_idle_maintenance_fn = None;
+        ev.scroll_preview_fn = None;
         ev.frame_snapshot_fn = None;
         ev.window_layout_query_adapter = WindowLayoutQueryAdapter::Unavailable;
         ev.scroll_goal = None;
@@ -2243,6 +2244,7 @@ impl Context {
             quit_requested: QuitRequest::new(),
             redisplay_fn: None,
             display_idle_maintenance_fn: None,
+            scroll_preview_fn: None,
             frame_snapshot_fn: None,
             window_layout_query_adapter: WindowLayoutQueryAdapter::Unavailable,
             scroll_goal: None,

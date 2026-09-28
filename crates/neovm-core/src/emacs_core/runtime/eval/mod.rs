@@ -376,6 +376,7 @@ impl EchoAreaMessageText {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct RedisplaySignature {
+    compositor_scrolling_enabled: bool,
     compositor_pixel_scroll: bool,
     input_checkpoint: Vec<neomacs_display_protocol::input_progress::InputCheckpoint>,
     selected_frame: Option<u64>,
@@ -436,6 +437,8 @@ impl RedisplaySignature {
                 }
             };
         }
+        field!(compositor_scrolling_enabled);
+        field!(compositor_pixel_scroll);
         field!(input_checkpoint);
         field!(selected_frame);
         field!(selected_window);
@@ -3313,6 +3316,8 @@ pub struct Context {
     /// command-input wait. The delay requests another idle wakeup; the boolean
     /// requests publication after the engine borrow has been released.
     #[allow(clippy::type_complexity)]
+    /// Optional GUI observer of a complete marker-backed scroll transition.
+    pub scroll_preview_fn: Option<Box<dyn FnMut(&Self, crate::window::FrameId, crate::window::WindowId, Vec<neomacs_display_protocol::input_progress::InputReceipt>)>>,
     pub display_idle_maintenance_fn: Option<Box<dyn FnMut(&Self) -> (Option<std::time::Duration>, bool)>>,
     /// Frontend-installed frame snapshot hook (`neomacs--frame-snapshot`).
     /// Same seam pattern as `redisplay_fn`: neovm-core cannot reach the

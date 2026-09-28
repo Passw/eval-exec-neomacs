@@ -146,6 +146,7 @@ impl Context {
             quit_requested: QuitRequest::new(),
             redisplay_fn: None,
             display_idle_maintenance_fn: None,
+            scroll_preview_fn: None,
             frame_snapshot_fn: None,
             window_layout_query_adapter: WindowLayoutQueryAdapter::Unavailable,
             scroll_goal: None,

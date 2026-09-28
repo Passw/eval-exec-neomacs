@@ -77,6 +77,7 @@ impl WindowScrollUpdate {
             *preserve_vscroll_p = false;
             *force_start = true;
         }
+        eval.publish_committed_scroll_preview(self.frame, self.window);
         Ok(())
     }
 }

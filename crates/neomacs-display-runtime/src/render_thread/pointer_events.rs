@@ -1721,6 +1721,10 @@ impl RenderApp {
             ) {
                 Ok(input) => {
                     let (receipt, token) = self.comms.send_input_with_receipt(input);
+                    if let Some(receipt) = &receipt
+                        && let Some(state) = self.frame_windows.get_by_winit_mut(window_id) {
+                        state.render.compositor.input_scroll.observe_input(receipt.clone(), token);
+                    }
                     if let (ScrollDelta::Pixels { x: horizontal, y: vertical }, Some(receipt)) = (delta, receipt)
                         && self.modifiers == 0 && horizontal.abs() <= vertical.abs()
                         && let Some(state) = self.frame_windows.get_by_winit_mut(window_id)

@@ -47,12 +47,22 @@
     (with-temp-file (getenv "NEOMACS_GUI_STATE_JSON")
       (insert (json-encode state))))
   (let ((gate (getenv "NEOMACS_GUI_SCROLL_STALL")))
-    (when (and gate (file-exists-p gate))
+    (when (and gate (not (getenv "NEOMACS_GUI_SCROLL_RESOLVED_STALL"))
+               (file-exists-p gate))
       (with-temp-file (concat gate ".stalled") (insert "stalled"))
       ;; Deliberately do not enter an input/process wait: native delivery must
       ;; remain queued until the test releases this private evaluator.
       (while (file-exists-p gate))))
   (run-at-time 0.05 nil #'neomacs-scroll-observe))
+(defun neomacs-scroll-stall-resolved-command (&rest _)
+  (let ((gate (getenv "NEOMACS_GUI_SCROLL_STALL")))
+    (when (and gate (file-exists-p gate))
+      (with-temp-file (concat gate ".stalled")
+        (insert (json-encode `((start . ,(window-start))
+                              (vscroll . ,(window-vscroll nil t))))))
+      ;; The scroll primitive has committed its complete destination, but
+      ;; command completion and normal redisplay cannot proceed until release.
+      (while (file-exists-p gate)))))
 (run-at-time
  1 nil
  (lambda ()
@@ -78,5 +88,7 @@
    (setq neomacs-scroll-window (selected-window))
    (when (getenv "NEOMACS_GUI_SCROLL_OTHER_WINDOW")
      (select-window (split-window-right)))
+   (when (getenv "NEOMACS_GUI_SCROLL_RESOLVED_STALL")
+     (advice-add 'scroll-up :after #'neomacs-scroll-stall-resolved-command))
    (neomacs-scroll-observe)))
 (run-at-time 180 nil (lambda () (kill-emacs 2)))

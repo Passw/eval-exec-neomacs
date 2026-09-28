@@ -470,12 +470,16 @@ impl RenderApp {
                             if self.effects.idle_dim.enabled {
                                 self.record_idle_dim_activity(window_id);
                             }
-                            self.comms.send_input(InputEvent::Key {
+                            let (receipt, token) = self.comms.send_input_with_receipt(InputEvent::Key {
                                 keysym,
                                 modifiers: key_modifiers,
                                 pressed: state == ElementState::Pressed,
                                 emacs_frame_id: self.emacs_frame_for_window_event(window_id),
                             });
+                            if let Some(receipt) = receipt
+                                && let Some(window) = self.frame_windows.get_by_winit_mut(window_id) {
+                                window.render.compositor.input_scroll.observe_input(receipt, token);
+                            }
                         } else if state == ElementState::Pressed {
                             tracing::debug!(
                                 "KeyboardInput dropped after translation: logical_key={:?} physical_key={:?} text={:?} mods=0x{:x}",

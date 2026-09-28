@@ -254,3 +254,80 @@ fn exported_backward_coverage_keeps_nonnegative_storage_and_visible_row_hit_coor
             .any(|row| row.height_px > frame.char_height)
     );
 }
+
+#[test]
+fn resolved_scroll_preview_requires_current_source_and_maps_source_start_to_coverage() {
+    let line = "ordinary offscreen text\n";
+    let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
+    eval.eval_str("(setq neomacs-compositor-scrolling t)")
+        .unwrap();
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let owner = DisplayWindowId::new(window.0 as i64);
+    let rows: Vec<_> = engine.retained_window_matrices[&owner]
+        .matrix
+        .rows
+        .iter()
+        .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        .collect();
+    let height = rows[0].height_px;
+    let target = rows[rows.len() - 2].start_charpos;
+    engine
+        .request_scroll_coverage(&eval, frame, window, CharPos0::new(target))
+        .unwrap();
+    await_coverage(&mut engine);
+    let FrameLayoutAttempt::Prepared(published) = engine.redisplay_frame_attempt(&mut eval, frame)
+    else {
+        panic!("frame publication failed")
+    };
+    let old_presentation = published.presentation_id;
+    assert!(
+        engine.last_frame_display_state.is_none(),
+        "production transfers the complete frame to transport"
+    );
+    scroll_window_to(
+        &mut eval,
+        frame,
+        window,
+        buffer,
+        line.len() as i64 + 1,
+        line.len(),
+    );
+    let stream = neomacs_display_protocol::input_progress::InputStream::default();
+    let delivery = stream.issue().unwrap();
+    // Echo/chrome repaint requests do not change the certified body rows.
+    eval.eval_str("(force-mode-line-update t)").unwrap();
+    let intent = engine
+        .resolved_scroll_preview(&eval, frame, window, vec![delivery.receipt()])
+        .expect("unchanged source with a committed destination should preview");
+    assert_eq!(intent.offset, height);
+    assert_eq!(intent.presentation, old_presentation);
+    assert!(engine.last_frame_display_state.is_none());
+    eval.eval_str("(setq neomacs-compositor-scrolling nil)")
+        .unwrap();
+    assert!(
+        engine
+            .resolved_scroll_preview(&eval, frame, window, vec![delivery.receipt()])
+            .is_none()
+    );
+    eval.eval_str("(setq neomacs-compositor-scrolling t)")
+        .unwrap();
+    assert!(
+        engine
+            .resolved_scroll_preview(&eval, frame, window, vec![delivery.receipt()])
+            .is_some()
+    );
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert("changed source");
+    assert!(
+        engine
+            .resolved_scroll_preview(&eval, frame, window, vec![delivery.receipt()])
+            .is_none()
+    );
+}

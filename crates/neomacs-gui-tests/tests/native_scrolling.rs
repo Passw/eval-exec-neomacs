@@ -155,7 +155,7 @@ fn run_native_scroll_in_buffer(kind: ScrollKind, target: ScrollTarget, lines: us
 }
 
 fn run_native_scroll_profile(kind: ScrollKind, target: ScrollTarget, lines: usize, rich: bool) {
-    run_native_scroll_scenario(kind, target, lines, rich, false);
+    run_native_scroll_scenario(kind, target, lines, rich, false, false);
 }
 
 #[test]
@@ -166,6 +166,31 @@ fn precise_scroll_presents_pixels_while_evaluator_is_stalled() {
         400,
         false,
         true,
+        false,
+    );
+}
+
+#[test]
+fn page_scroll_presents_resolved_destination_while_command_is_stalled() {
+    run_native_scroll_scenario(
+        ScrollKind::Page,
+        ScrollTarget::Selected,
+        400,
+        false,
+        true,
+        true,
+    );
+}
+
+#[test]
+fn wheel_scroll_presents_resolved_destination_while_command_is_stalled() {
+    run_native_scroll_scenario(
+        ScrollKind::Wheel,
+        ScrollTarget::Selected,
+        400,
+        false,
+        true,
+        true,
     );
 }
 
@@ -175,6 +200,7 @@ fn run_native_scroll_scenario(
     lines: usize,
     rich: bool,
     stalled: bool,
+    resolved: bool,
 ) {
     let profile = if rich { "rich-v1" } else { "plain" };
     let root = neomacs_infra::workspace_root();
@@ -221,6 +247,10 @@ focus_follows_mouse yes
     let mut command = Command::new(binary);
     let stall_path = artifacts.join("evaluator-stall");
     command.env("NEOMACS_GUI_SCROLL_STALL", &stall_path);
+    command.env_remove("NEOMACS_GUI_SCROLL_RESOLVED_STALL");
+    if resolved {
+        command.env("NEOMACS_GUI_SCROLL_RESOLVED_STALL", "1");
+    }
     command
         .env_remove("NEOMACS_DEBUG_SURFACE_READBACK")
         .env_remove("NEOMACS_DEBUG_SURFACE_READBACK_PNG")
@@ -326,7 +356,11 @@ focus_follows_mouse yes
         let deadline = Instant::now() + Duration::from_secs(8);
         while !fs::read_to_string(artifacts.join("neomacs.log"))
             .unwrap_or_default()
-            .contains("predict_pixels=true")
+            .contains(if resolved {
+                "exported compositor coverage"
+            } else {
+                "predict_pixels=true"
+            })
         {
             assert!(
                 Instant::now() < deadline,
@@ -334,7 +368,24 @@ focus_follows_mouse yes
             );
             thread::sleep(Duration::from_millis(20));
         }
+        let before = text_pixels(&readback(&pixels_path));
+        let sent = Instant::now();
         fs::write(&stall_path, b"hold").unwrap();
+        if resolved {
+            match kind {
+                ScrollKind::Wheel => trackpad.wheel(),
+                ScrollKind::Page => {
+                    let status = Command::new("wtype")
+                        .env("XDG_RUNTIME_DIR", &runtime)
+                        .env("WAYLAND_DISPLAY", &socket)
+                        .args(["-s", "200", "-k", "Next", "-s", "100"])
+                        .status()
+                        .unwrap();
+                    assert!(status.success());
+                }
+                _ => unreachable!(),
+            }
+        }
         while !stall_path.with_extension("stalled").exists() {
             assert!(
                 Instant::now() < deadline,
@@ -343,7 +394,12 @@ focus_follows_mouse yes
             thread::sleep(Duration::from_millis(10));
         }
         let frozen = fs::read(&state_path).unwrap();
-        let before = text_pixels(&readback(&pixels_path));
+        if resolved {
+            let destination: Value =
+                serde_json::from_slice(&fs::read(stall_path.with_extension("stalled")).unwrap())
+                    .unwrap();
+            assert!(destination["start"].as_i64().unwrap() > previous["start"].as_i64().unwrap());
+        }
         let projected_submission = || {
             let log = fs::read_to_string(artifacts.join("neomacs.log")).unwrap_or_default();
             let mut requested = None;
@@ -368,8 +424,9 @@ focus_follows_mouse yes
                 .and_then(|(_, tail)| tail.split_whitespace().next())
                 .and_then(|number| number.parse::<u64>().ok())
         };
-        let sent = Instant::now();
-        trackpad.scroll(4.0);
+        if !resolved {
+            trackpad.scroll(4.0);
+        }
         loop {
             let changed = text_pixels(&readback(&pixels_path)) != before;
             let confirmed = projected_submission()
@@ -405,25 +462,48 @@ focus_follows_mouse yes
         )
         .unwrap();
         fs::remove_file(&stall_path).unwrap();
+        let (counter, count) = match kind {
+            ScrollKind::Page => ("processed-pages", 1.0),
+            ScrollKind::Wheel => ("processed-wheels", 1.0),
+            _ => ("processed-pixels", 4.0),
+        };
         let completed = state_after_input(
             &state_path,
             previous["sample"].as_u64().unwrap(),
-            "processed-pixels",
-            previous["processed-pixels"].as_f64().unwrap() + 4.0,
+            counter,
+            previous[counter].as_f64().unwrap() + count,
         );
         assert!(position(&completed) > position(&previous));
         let deadline = Instant::now() + Duration::from_secs(4);
         loop {
-            let samples: Vec<Value> = fs::read_to_string(&latency_path).unwrap_or_default()
-                .lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
-            if let Some(sample) = samples.iter().find(|sample| sample["input_to_projected_present_ns"].is_u64()) {
-                assert_eq!(sample["projected_submission"].as_u64(), projected_submission());
-                assert!(sample["input_to_projected_present_ns"].as_u64().unwrap()
-                    < sample["input_to_present_ns"].as_u64().unwrap());
-                fs::write(artifacts.join("stalled-latency-proof.json"), serde_json::to_vec_pretty(sample).unwrap()).unwrap();
+            let samples: Vec<Value> = fs::read_to_string(&latency_path)
+                .unwrap_or_default()
+                .lines()
+                .filter_map(|line| serde_json::from_str(line).ok())
+                .collect();
+            if let Some(sample) = samples
+                .iter()
+                .find(|sample| sample["input_to_projected_present_ns"].is_u64())
+            {
+                assert_eq!(
+                    sample["projected_submission"].as_u64(),
+                    projected_submission()
+                );
+                assert!(
+                    sample["input_to_projected_present_ns"].as_u64().unwrap()
+                        < sample["input_to_present_ns"].as_u64().unwrap()
+                );
+                fs::write(
+                    artifacts.join("stalled-latency-proof.json"),
+                    serde_json::to_vec_pretty(sample).unwrap(),
+                )
+                .unwrap();
                 break;
             }
-            assert!(Instant::now() < deadline, "no exact-submission projected latency: {artifacts:?}");
+            assert!(
+                Instant::now() < deadline,
+                "no exact-submission projected latency: {artifacts:?}"
+            );
             thread::sleep(Duration::from_millis(10));
         }
         return;

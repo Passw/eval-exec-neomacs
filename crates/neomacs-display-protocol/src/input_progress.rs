@@ -125,6 +125,10 @@ impl InputReceipt {
         })
     }
 
+    pub fn same_input(&self, other: &Self) -> bool {
+        self.serial == other.serial && self.stream.0.id == other.stream.0.id
+    }
+
     pub fn cancelled(&self) -> bool {
         self.outcome.load(Ordering::Acquire) == 2
     }
@@ -195,6 +199,21 @@ impl InputProgress {
         }
     }
 
+    /// Observe the innermost executing command without retaining delivery
+    /// ownership. Timers and callers outside a command have no preview inputs.
+    pub fn current_command_receipts(&self) -> Vec<InputReceipt> {
+        self.staging
+            .borrow()
+            .scopes
+            .last()
+            .map_or_else(Vec::new, |(_, inputs)| {
+                if inputs.len() > 128 {
+                    return Vec::new();
+                }
+                inputs.iter().map(InputDelivery::receipt).collect()
+            })
+    }
+
     pub fn checkpoint(&self) -> Vec<InputCheckpoint> {
         self.streams
             .values()
@@ -229,6 +248,25 @@ impl Drop for CommandInputs {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preview_observation_belongs_only_to_innermost_command() {
+        let stream = InputStream::default();
+        let outer_input = stream.issue().unwrap();
+        let receipt = outer_input.receipt();
+        let mut progress = InputProgress::default();
+        progress.consumed(outer_input);
+        assert!(progress.current_command_receipts().is_empty());
+        let outer = progress.begin_command();
+        assert!(progress.current_command_receipts()[0].same_input(&receipt));
+        let inner = progress.begin_command();
+        assert!(progress.current_command_receipts().is_empty());
+        drop(inner);
+        assert_eq!(progress.current_command_receipts().len(), 1);
+        drop(outer);
+        assert!(progress.current_command_receipts().is_empty());
+        assert!(receipt.acknowledged_by(&progress.checkpoint()));
+    }
 
     #[test]
     fn old_frame_cannot_acknowledge_a_later_command_completion() {

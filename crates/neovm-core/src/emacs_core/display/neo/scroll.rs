@@ -9,40 +9,57 @@ use crate::emacs_core::keymap::{
 use crate::emacs_core::{Context, Value};
 
 impl Context {
-    pub fn permits_compositor_pixel_scroll(&self, window: crate::window::WindowId) -> bool {
-        let Some(frame) = self.frame_manager().selected_frame() else {
-            return false;
-        };
-        if frame.selected_window != window {
-            return false;
+    pub(crate) fn publish_committed_scroll_preview(
+        &mut self,
+        frame: crate::window::FrameId,
+        window: crate::window::WindowId,
+    ) {
+        if self.scroll_preview_fn.is_none() {
+            return;
         }
-        let Some(buffer) = frame
+        let inputs = self.input_progress.current_command_receipts();
+        if inputs.is_empty() {
+            return;
+        }
+        let Some(mut observer) = self.scroll_preview_fn.take() else {
+            return;
+        };
+        observer(self, frame, window, inputs);
+        self.scroll_preview_fn = Some(observer);
+    }
+
+    fn scroll_variable(&self, window: crate::window::WindowId, name: &str) -> Option<Value> {
+        let frame = self.frame_manager().selected_frame()?;
+        if frame.selected_window != window {
+            return None;
+        }
+        let buffer = frame
             .find_window(window)
             .and_then(|window| window.buffer_id())
-            .and_then(|id| self.buffer_manager().get(id))
-        else {
-            return false;
-        };
-        // Timer redisplay may run with a different current buffer. Permission
-        // belongs to the displayed buffer, not the callback's dynamic context.
-        let variable = |name: &str| {
-            let symbol = Value::symbol(name).as_symbol_id().unwrap();
-            let Ok(symbol) =
-                crate::emacs_core::builtins::symbols::resolve_variable_alias_id_in_obarray(
-                    self.obarray(),
-                    symbol,
-                )
-            else {
-                return None; // unknown policy is never permission
-            };
-            let value = self
-                .obarray()
-                .read_localized_for_buffer(symbol, buffer.id, buffer.local_var_alist_value())
-                .or_else(|| buffer.buffer_local_value_id(symbol))
-                .or_else(|| self.obarray().symbol_value_id(symbol).copied())
-                .unwrap_or(Value::NIL);
-            (!value.is_unbound()).then_some(value)
-        };
+            .and_then(|id| self.buffer_manager().get(id))?;
+        let symbol = crate::emacs_core::builtins::symbols::resolve_variable_alias_id_in_obarray(
+            self.obarray(),
+            Value::symbol(name).as_symbol_id()?,
+        )
+        .ok()?;
+        let value = self
+            .obarray()
+            .read_localized_for_buffer(symbol, buffer.id, buffer.local_var_alist_value())
+            .or_else(|| buffer.buffer_local_value_id(symbol))
+            .or_else(|| self.obarray().symbol_value_id(symbol).copied())
+            .unwrap_or(Value::NIL);
+        (!value.is_unbound()).then_some(value)
+    }
+
+    pub fn compositor_scrolling_enabled(&self, window: crate::window::WindowId) -> bool {
+        self.scroll_variable(window, "neomacs-compositor-scrolling")
+            .is_some_and(|value| !value.is_nil())
+    }
+
+    pub fn permits_compositor_pixel_scroll(&self, window: crate::window::WindowId) -> bool {
+        // Timer redisplay may run with another current buffer. Policy belongs
+        // to the displayed buffer and must not use that callback's locals.
+        let variable = |name: &str| self.scroll_variable(window, name);
         if variable("neomacs-compositor-scrolling").is_none_or(|value| value.is_nil())
             || variable("pixel-scroll-precision-mode").is_none_or(|value| value.is_nil())
         {
@@ -202,6 +219,55 @@ mod tests {
     use super::*;
 
     #[test]
+    fn resolved_scroll_observer_sees_complete_commit_and_current_command_only() {
+        let mut eval = Context::new();
+        let buffer = eval.buffer_manager_mut().create_buffer("preview");
+        eval.buffer_manager_mut()
+            .get_mut(buffer)
+            .unwrap()
+            .insert("one\ntwo\nthree\n");
+        let frame = eval
+            .frame_manager_mut()
+            .create_frame("preview", 800, 600, buffer);
+        let window = eval.frame_manager().get(frame).unwrap().selected_window;
+        let calls = std::rc::Rc::new(std::cell::Cell::new(0));
+        let observed = calls.clone();
+        eval.scroll_preview_fn = Some(Box::new(move |eval, frame, window, inputs| {
+            let state = eval
+                .frame_manager()
+                .get(frame)
+                .unwrap()
+                .find_window(window)
+                .unwrap()
+                .redisplay_state()
+                .unwrap();
+            assert_eq!(state.window_start.as_i64(), 5);
+            assert_eq!(state.point.as_i64(), 5);
+            assert_eq!(state.vscroll, -4);
+            assert_eq!(inputs.len(), 1);
+            observed.set(observed.get() + 1);
+        }));
+        let update = || crate::window::WindowScrollUpdate {
+            frame,
+            window,
+            buffer,
+            start: crate::buffer::LispCharPos1::new(5),
+            point: crate::buffer::LispCharPos1::new(5),
+            hidden_top_pixels: 4,
+        };
+        update().commit(&mut eval).unwrap();
+        assert_eq!(calls.get(), 0);
+        let stream = neomacs_display_protocol::input_progress::InputStream::default();
+        let command = eval.input_progress.begin_command();
+        eval.input_progress.consumed(stream.issue().unwrap());
+        update().commit(&mut eval).unwrap();
+        assert_eq!(calls.get(), 1);
+        drop(command);
+        update().commit(&mut eval).unwrap();
+        assert_eq!(calls.get(), 1);
+    }
+
+    #[test]
     fn compositor_pixel_scroll_policy_requires_definition_and_binding_witnesses() {
         let mut eval = Context::new();
         let buffer = eval.buffer_manager_mut().create_buffer("scroll-policy");
@@ -226,15 +292,23 @@ mod tests {
         let publications = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
         let observed = publications.clone();
         eval.redisplay_fn = Some(Box::new(move |eval| {
-            observed.borrow_mut().push(eval.permits_compositor_pixel_scroll(window));
+            observed
+                .borrow_mut()
+                .push(eval.permits_compositor_pixel_scroll(window));
         }));
         eval.redisplay();
         eval.redisplay();
         assert_eq!(&*publications.borrow(), &[true]);
-        eval.eval_str("(setq neomacs-compositor-scrolling nil)").unwrap();
+        eval.eval_str("(setq neomacs-compositor-scrolling nil)")
+            .unwrap();
         eval.redisplay();
-        assert_eq!(&*publications.borrow(), &[true, false], "policy-only changes must publish revocation");
-        eval.eval_str("(setq neomacs-compositor-scrolling t)").unwrap();
+        assert_eq!(
+            &*publications.borrow(),
+            &[true, false],
+            "policy-only changes must publish revocation"
+        );
+        eval.eval_str("(setq neomacs-compositor-scrolling t)")
+            .unwrap();
         eval.redisplay();
         assert_eq!(&*publications.borrow(), &[true, false, true]);
         eval.eval_str("(define-key (current-global-map) [wheel-down] '(menu-item \"scroll\" pixel-scroll-precision :filter ignore))").unwrap();

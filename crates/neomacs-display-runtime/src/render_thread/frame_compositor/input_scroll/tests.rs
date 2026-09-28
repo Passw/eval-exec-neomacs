@@ -3,6 +3,15 @@ use neomacs_display_protocol::input_progress::{InputProgress, InputStream};
 use neomacs_display_protocol::*;
 
 fn frame(presentation: u64, displacement: f32, epoch: u64) -> FrameGlyphBuffer {
+    frame_with_prediction(presentation, displacement, epoch, true)
+}
+
+fn frame_with_prediction(
+    presentation: u64,
+    displacement: f32,
+    epoch: u64,
+    predict_pixels: bool,
+) -> FrameGlyphBuffer {
     let mut state = FrameDisplayState::new(10, 2, 10.0, 10.0);
     state.presentation_id = PresentationId::new(presentation);
     let window = DisplayWindowId::new(1);
@@ -53,7 +62,8 @@ fn frame(presentation: u64, displacement: f32, epoch: u64) -> FrameGlyphBuffer {
         neomacs_display_protocol::scroll_coverage::ScrollCoverage {
             epoch,
             anchor_row: 0,
-            predict_pixels: true,
+            predict_pixels,
+            compositor_enabled: true,
             viewport,
             origin: displacement,
             content,
@@ -135,5 +145,52 @@ fn input_scroll_cancels_on_revision_and_drop_and_clamps_reversal_at_coverage() {
     scroll.push(&first, 1.0, 1.0, 8.0, delivery.receipt(), None);
     drop(delivery);
     scroll.paint(&mut first.clone());
+    assert!(!scroll.active());
+}
+
+#[test]
+fn resolved_scroll_uses_authoritative_destination_without_predictable_lisp_binding() {
+    let mut first = frame_with_prediction(1, 0.0, 1, false);
+    // Permission for raw input is independent of evaluator-resolved movement.
+    let stream = InputStream::default();
+    let delivery = stream.issue().unwrap();
+    let make_intent =
+        |presentation, epoch| neomacs_display_protocol::scroll_coverage::ResolvedScrollIntent {
+            frame: 1,
+            window: DisplayWindowId::new(1),
+            presentation: PresentationId::new(presentation),
+            epoch,
+            offset: 12.0,
+            inputs: vec![delivery.receipt()],
+        };
+    let mut scroll = InputScroll::default();
+    assert!(!scroll.resolve(&first, make_intent(2, 1)));
+    assert!(!scroll.resolve(&first, make_intent(1, 2)));
+    assert!(scroll.resolve(&first, make_intent(1, 1)));
+    assert!(!scroll.push(&first, 1.0, 1.0, 4.0, delivery.receipt(), None));
+    scroll.paint(&mut first);
+    scroll.submit();
+    assert_eq!(
+        scroll
+            .hit(point(&first, 1.0))
+            .unwrap()
+            .unwrap()
+            .unwrap()
+            .text_position()
+            .unwrap()
+            .buffer_position(),
+        3
+    );
+    let mut progress = InputProgress::default();
+    let command = progress.begin_command();
+    progress.consumed(delivery);
+    let mut mid = frame_with_prediction(2, 5.0, 1, false);
+    mid.input_checkpoint = progress.checkpoint();
+    scroll.reconcile(Some(&mid));
+    assert_eq!(scroll.active.as_ref().unwrap().offset, 7.0);
+    drop(command);
+    let mut done = frame(3, 12.0, 1);
+    done.input_checkpoint = progress.checkpoint();
+    scroll.reconcile(Some(&done));
     assert!(!scroll.active());
 }

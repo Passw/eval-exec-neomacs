@@ -258,6 +258,7 @@ impl PreparedViewports {
         Some(ScrollCoverage {
             epoch,
             predict_pixels: false,
+            compositor_enabled: false,
             anchor_row: anchor_index - begin,
             viewport,
             origin,

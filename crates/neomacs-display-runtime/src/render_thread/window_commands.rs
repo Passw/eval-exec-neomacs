@@ -31,6 +31,27 @@ impl RenderApp {
 
     pub(super) fn handle_window(&mut self, cmd: WindowCommand) {
         match cmd {
+            WindowCommand::ScrollPreview(intent) => {
+                if let Some(state) = self.frame_windows.get_mut(intent.frame)
+                    && matches!(
+                        state.render.compositor.layout,
+                        super::frame_compositor::layout_driver::LayoutDriver::Settled
+                    )
+                    && !state.render.compositor.transitions.has_active()
+                    && !state
+                        .render
+                        .compositor
+                        .renderer_effects
+                        .scroll_effects_active()
+                    && let Some(frame) = state.render.compositor.current_frame.as_ref()
+                    && state.render.compositor.input_scroll.resolve(frame, intent)
+                {
+                    state.render.compositor.current_scene_generation =
+                        super::frame_state::next_scene_generation();
+                    state.render.compositor.current_row_damage = None;
+                    state.render.mark_dirty();
+                }
+            }
             WindowCommand::SetWindowDecorations { decorated } => {
                 if let Some(window) = self.frame_windows.primary_window_mut() {
                     window.set_decorations(decorated);

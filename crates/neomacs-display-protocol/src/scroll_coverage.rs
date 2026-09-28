@@ -9,12 +9,26 @@ use crate::{
     PresentedRegionKind, Rect, WindowMatrixEntry,
 };
 
+/// A destination already chosen by canonical command dispatch. This carries
+/// no command implementation and grants no permission to mutate the evaluator.
+#[derive(Clone, Debug)]
+pub struct ResolvedScrollIntent {
+    pub frame: u64,
+    pub window: crate::DisplayWindowId,
+    pub presentation: crate::PresentationId,
+    pub epoch: u64,
+    pub offset: f32,
+    pub inputs: Vec<crate::input_progress::InputReceipt>,
+}
+
 /// Exact row/font transport, owned separately from authoritative window rows.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ScrollCoverage {
     pub epoch: u64,
     #[serde(default)]
     pub predict_pixels: bool,
+    #[serde(default)]
+    pub compositor_enabled: bool,
     /// Row index whose source body-row number is zero.
     pub anchor_row: usize,
     pub viewport: Rect,
@@ -255,6 +269,7 @@ impl PartialEq for ScrollSurface {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.coverage, &other.coverage)
             || (self.coverage.epoch == other.coverage.epoch
+                && self.coverage.compositor_enabled == other.coverage.compositor_enabled
                 && self.coverage.predict_pixels == other.coverage.predict_pixels
                 && self.coverage.origin == other.coverage.origin
                 && self.coverage.anchor_row == other.coverage.anchor_row

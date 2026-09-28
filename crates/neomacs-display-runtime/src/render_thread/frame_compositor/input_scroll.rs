@@ -10,6 +10,10 @@ use std::sync::Arc;
 #[derive(Default)]
 pub(in crate::render_thread) struct InputScroll {
     active: Option<PendingScroll>,
+    observed: Vec<(
+        InputReceipt,
+        neomacs_display_protocol::input_latency::InputToken,
+    )>,
     /// Only submitted pixels may change pointer observations.
     submitted: Option<(Arc<ScrollSurface>, f32)>,
     staged: Option<Option<(Arc<ScrollSurface>, f32)>>,
@@ -17,6 +21,7 @@ pub(in crate::render_thread) struct InputScroll {
 }
 
 struct PendingScroll {
+    resolved: bool,
     surface: Arc<ScrollSurface>,
     offset: f32,
     receipts: Vec<InputReceipt>,
@@ -33,13 +38,17 @@ impl InputScroll {
         receipt: InputReceipt,
         token: Option<neomacs_display_protocol::input_latency::InputToken>,
     ) -> bool {
+        if self.active.as_ref().is_some_and(|active| active.resolved) {
+            return false;
+        }
         if !delta.is_finite() || delta == 0.0 || receipt.cancelled() {
             return false;
         }
         let Some(surface) = frame.scroll_surfaces.iter().find(|surface| {
             let coverage = surface.coverage();
             let viewport = coverage.viewport;
-            coverage.predict_pixels
+            coverage.compositor_enabled
+                && coverage.predict_pixels
                 && delta.abs() < viewport.height
                 && x >= viewport.x
                 && x < viewport.right()
@@ -54,6 +63,7 @@ impl InputScroll {
             .is_none_or(|active| active.surface.coverage().epoch != surface.coverage().epoch)
         {
             self.active = Some(PendingScroll {
+                resolved: false,
                 surface: surface.clone(),
                 offset: 0.0,
                 receipts: Vec::new(),
@@ -76,6 +86,80 @@ impl InputScroll {
         true
     }
 
+    pub(in crate::render_thread) fn observe_input(
+        &mut self,
+        input: InputReceipt,
+        token: Option<neomacs_display_protocol::input_latency::InputToken>,
+    ) {
+        let Some(token) = token else { return };
+        self.observed.retain(|(input, _)| !input.cancelled());
+        if self.observed.len() == 128 {
+            self.observed.remove(0);
+        }
+        self.observed.push((input, token));
+    }
+
+    pub(in crate::render_thread) fn resolve(
+        &mut self,
+        frame: &FrameGlyphBuffer,
+        mut intent: neomacs_display_protocol::scroll_coverage::ResolvedScrollIntent,
+    ) -> bool {
+        if intent.presentation != frame.presentation_id
+            || !intent.offset.is_finite()
+            || intent.inputs.is_empty()
+            || intent.inputs.len() > 128
+            || self.active.as_ref().is_some_and(|active| !active.resolved)
+        {
+            return false;
+        }
+        if let Some(active) = &self.active
+            && active.surface.coverage().epoch == intent.epoch
+            && active.surface.coverage().content.window_id == intent.window
+        {
+            for input in &active.receipts {
+                if !intent.inputs.iter().any(|new| new.same_input(input)) {
+                    intent.inputs.push(input.clone());
+                }
+            }
+        }
+        if intent.inputs.len() > 128 {
+            self.active = None;
+            return true;
+        }
+        intent
+            .inputs
+            .retain(|input| !input.cancelled() && !input.acknowledged_by(&frame.input_checkpoint));
+        if intent.inputs.is_empty() {
+            return false;
+        }
+        let Some(surface) = frame.scroll_surfaces.iter().find(|surface| {
+            let coverage = surface.coverage();
+            coverage.compositor_enabled
+                && coverage.epoch == intent.epoch
+                && coverage.content.window_id == intent.window
+        }) else {
+            return false;
+        };
+        let offset = surface.clamp_offset(intent.offset);
+        let tokens = if offset != 0.0 {
+            self.observed
+                .iter()
+                .filter(|(input, _)| intent.inputs.iter().any(|owner| owner.same_input(input)))
+                .map(|(_, token)| *token)
+                .collect()
+        } else {
+            Vec::new()
+        };
+        self.active = Some(PendingScroll {
+            resolved: true,
+            surface: surface.clone(),
+            offset,
+            receipts: intent.inputs,
+            tokens,
+        });
+        true
+    }
+
     /// Carry the same visual target across intermediate command redisplays.
     /// Full completion always returns authority to the evaluator, including
     /// no-op commands. A changed revision/policy/geometry cancels immediately.
@@ -83,6 +167,11 @@ impl InputScroll {
         &mut self,
         frame: Option<&FrameGlyphBuffer>,
     ) -> Option<neomacs_display_protocol::DisplayWindowId> {
+        if let Some(frame) = frame {
+            self.observed.retain(|(input, _)| {
+                !input.cancelled() && !input.acknowledged_by(&frame.input_checkpoint)
+            });
+        }
         let mut active = self.active.take()?;
         let window = active.surface.coverage().content.window_id;
         let Some(frame) = frame else {
@@ -96,7 +185,8 @@ impl InputScroll {
         }
         let Some(next) = frame.scroll_surfaces.iter().find(|surface| {
             surface.coverage().epoch == active.surface.coverage().epoch
-                && surface.coverage().predict_pixels
+                && surface.coverage().compositor_enabled
+                && (active.resolved || surface.coverage().predict_pixels)
                 && surface.coverage().viewport == active.surface.coverage().viewport
         }) else {
             return Some(window);

@@ -3827,6 +3827,22 @@ fn run_gui_evaluator_worker(
         runtime.enable_cosmic_metrics();
         runtime.set_font_sizing(bootstrap_display.font_sizing());
     });
+    let preview_tx = emacs_comms.cmd_tx.clone();
+    let preview_waker = render_waker.clone();
+    evaluator.scroll_preview_fn = Some(Box::new(move |eval, frame, window, inputs| {
+        let intent = frame_layout::REDISPLAY_RUNTIME.with(|runtime| {
+            runtime.resolved_scroll_preview(eval, frame, window, inputs)
+        });
+        if let Some(intent) = intent
+            && preview_tx
+                .try_send(neomacs_display_runtime::thread_comm::RenderCommand::Window(
+                    neomacs_display_runtime::thread_comm::WindowCommand::ScrollPreview(intent),
+                ))
+                .is_ok()
+        {
+            preview_waker.wake();
+        }
+    }));
     let frame_tx = emacs_comms.frame_tx;
     let initial_frame_tx = frame_tx.clone();
     let redisplay_waker = render_waker.clone();

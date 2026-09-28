@@ -1748,6 +1748,8 @@ impl Context {
             }
         });
         RedisplaySignature {
+            compositor_scrolling_enabled: selected_window.is_some_and(|window|
+                self.compositor_scrolling_enabled(crate::window::WindowId(window))),
             // Bindings and hooks may change without moving text or point.
             // Republish permission so the renderer cannot keep a stale grant.
             compositor_pixel_scroll: selected_window.is_some_and(|window|

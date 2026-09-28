@@ -2742,6 +2742,24 @@ pub struct WindowDisplaySnapshotFreshness {
     pub(crate) function_epoch: u64,
 }
 
+impl WindowDisplaySnapshotFreshness {
+    /// A committed scroll may move start/point and hide part of the first row.
+    /// Every source, font, geometry, topology and mutation revision must still
+    /// match before an existing row surface can preview that destination.
+    pub fn same_scroll_content(&self, current: &Self) -> bool {
+        let mut placed = current.clone();
+        placed.window.window_start = self.window.window_start;
+        placed.window.point = self.window.point;
+        placed.window.vscroll = self.window.vscroll;
+        placed.window.preserve_vscroll_p = self.window.preserve_vscroll_p;
+        // A request to repaint echo/chrome is not a body-content mutation.
+        // The source, face, display-variable, media and function revisions
+        // below remain authoritative, as do all window and frame inputs.
+        placed.redisplay_generation = self.redisplay_generation;
+        self == &placed
+    }
+}
+
 /// Canonical logical input identity for one speculative layout leaf.
 ///
 /// Inactive minibuffer layout can read the echo-area buffer while the live

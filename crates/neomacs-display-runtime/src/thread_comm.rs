@@ -329,6 +329,8 @@ pub enum LifecycleCommand {
 /// Window and chrome management commands.
 #[derive(Debug)]
 pub enum WindowCommand {
+    /// Paint an evaluator-resolved viewport while canonical layout is pending.
+    ScrollPreview(neomacs_display_protocol::scroll_coverage::ResolvedScrollIntent),
     /// Scroll blit pixels within pixel buffer
     ScrollBlit {
         x: i32,

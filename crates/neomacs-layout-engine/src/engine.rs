@@ -6,6 +6,7 @@
 
 mod prepared_viewports;
 mod scroll_coverage;
+mod scroll_preview;
 use prepared_viewports::PreparedViewports;
 
 #[cfg(test)]
@@ -757,6 +758,8 @@ pub struct LayoutEngine {
     /// The last completed `FrameDisplayState`, produced by `layout_frame_rust()`.
     /// Used by the TTY redisplay path to drive `TtyRif` on the evaluator thread.
     pub last_frame_display_state: Option<neomacs_display_protocol::SealedFramePresentation>,
+    /// Shared paint coverage survives ownership transfer of the full frame.
+    scroll_preview_coverage: Vec<std::sync::Arc<neomacs_display_protocol::scroll_coverage::ScrollCoverage>>,
     /// Last sealed face namespace for each logical frame.
     ///
     /// A speculative layout gets a fresh [`FrameFaceAttempt`] from this arena;
@@ -1224,6 +1227,7 @@ impl LayoutEngine {
         self.scroll_coverage.cancel();
         self.retained_window_chrome_metrics.clear();
         self.last_frame_display_state = None;
+        self.scroll_preview_coverage.clear();
         self.reset_frame_attempt_state();
     }
 
@@ -1386,6 +1390,7 @@ impl LayoutEngine {
             frame_output: FrameOutputOwner::new(),
             pending_tab_bar_pointer: None,
             last_frame_display_state: None,
+            scroll_preview_coverage: Vec::new(),
             frame_face_arenas: rustc_hash::FxHashMap::default(),
             retained_window_matrices: rustc_hash::FxHashMap::default(),
             prepared_viewports: PreparedViewports::default(),
@@ -1421,6 +1426,7 @@ impl LayoutEngine {
             frame_output: FrameOutputOwner::new(),
             pending_tab_bar_pointer: None,
             last_frame_display_state: None,
+            scroll_preview_coverage: Vec::new(),
             frame_face_arenas: rustc_hash::FxHashMap::default(),
             retained_window_matrices: rustc_hash::FxHashMap::default(),
             prepared_viewports: PreparedViewports::default(),
@@ -3172,6 +3178,7 @@ impl LayoutEngine {
             &mut frame_display_state, &sealed_face_arena, &mut self.font_metrics);
         for coverage in &mut frame_display_state.scroll_coverage {
             let window = neovm_core::window::WindowId(coverage.content.window_id.get() as u64);
+            std::sync::Arc::make_mut(coverage).compositor_enabled = evaluator.compositor_scrolling_enabled(window);
             std::sync::Arc::make_mut(coverage).predict_pixels = evaluator.permits_compositor_pixel_scroll(window);
             tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", predict_pixels = coverage.predict_pixels, window = window.0, "exported compositor coverage");
         }
@@ -3283,6 +3290,7 @@ impl LayoutEngine {
             }
         }
         neomacs_display_protocol::input_latency::sealed(frame_id.0, sealed.presentation(), || evaluator.input_latency_viewport(frame_id.0));
+        self.scroll_preview_coverage = sealed.scroll_coverage.clone();
         self.last_frame_display_state = Some(sealed);
         // Acknowledge the chrome dirty flag for exactly the windows whose
         // chrome this layout GENERATED — GNU's `mark_window_display_accurate_1`.
