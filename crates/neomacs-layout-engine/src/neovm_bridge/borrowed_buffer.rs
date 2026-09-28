@@ -28,11 +28,7 @@ impl<'a> BorrowedLayoutBuffer<'a> {
         max_chars: usize,
         target: crate::display_property::DisplayPropertyTarget,
     ) -> Self {
-        let vars = resolve_layout_vars(
-            buffer.local_var_alist_value(),
-            &buffer.slot_values_snapshot(),
-            Some(obarray),
-        );
+        let vars = resolve_layout_vars(buffer, Some(obarray));
         let spans = capture_automatic_composition_spans(
             buffer,
             obarray,

@@ -8,7 +8,6 @@ use super::{
 };
 use neovm_core::buffer::{
     Buffer, BufferTextSnapshot, CharPos0, CharRange, EmacsByteLen, EmacsBytePos, EmacsByteRange,
-    buffer::BUFFER_SLOT_COUNT,
     overlay::{OverlayList, OverlaySnapshot},
 };
 use neovm_core::emacs_core::plist::plist_get;
@@ -58,8 +57,6 @@ impl LayoutBufferSnapshot {
     // available. Window snapshots must not build and then replace a complete
     // buffer-local-only variable table on every layout attempt.
     fn capture_buffer(buffer: &Buffer, obarray: Option<&Obarray>) -> Self {
-        let local_var_alist = buffer.local_var_alist_value();
-        let slots = buffer.slot_values_snapshot();
         Self {
             display_when: crate::display_when::DisplayWhenConditions::structural(),
             display_target: crate::display_property::DisplayPropertyTarget::Graphical,
@@ -68,7 +65,7 @@ impl LayoutBufferSnapshot {
             accessible_start_emacs_byte: buffer.point_min_emacs_byte_pos(),
             accessible_end_emacs_byte: buffer.point_max_emacs_byte_pos(),
             accessible_end_char: buffer.point_max_char_pos(),
-            vars: resolve_layout_vars(local_var_alist, &slots, obarray),
+            vars: resolve_layout_vars(buffer, obarray),
             overlays: buffer.overlays().snapshot(),
             category_symbol_plists: FxHashMap::default(),
             automatic_composition_spans: Vec::new(),
@@ -238,75 +235,32 @@ fn capture_layout_category_symbol_plists(
 /// is unbound shadows nothing — it falls through to the default, exactly
 /// like the old `assq`-then-default sequence.
 pub(super) fn resolve_layout_vars(
-    local_var_alist: Value,
-    slots: &[Value; BUFFER_SLOT_COUNT],
+    buffer: &Buffer,
     obarray: Option<&Obarray>,
 ) -> [Option<Value>; <LayoutVar as strum::EnumCount>::COUNT] {
     use strum::EnumCount;
     use strum::VariantArray;
     const N: usize = <LayoutVar as EnumCount>::COUNT;
     let mut vars: [Option<Value>; N] = [None; N];
-    let mut seen_in_alist = [false; N];
-
+    let slots = buffer.slot_values_snapshot();
     for var in LayoutVar::VARIANTS {
-        if let Some(info) = layout_var_info(*var).slot {
-            vars[*var as usize] = Some(slots[info.offset.index()]);
-        }
-    }
-
-    // One walk over the alist for all variables (first entry per symbol
-    // wins, matching assq).
-    let mut cursor = local_var_alist;
-    while cursor.is_cons() {
-        let entry = cursor.cons_car();
-        cursor = cursor.cons_cdr();
-        if !entry.is_cons() {
-            continue;
-        }
-        let Some(var) = entry
-            .cons_car()
-            .as_symbol_id()
-            .and_then(layout_var_by_sym_id)
-        else {
-            continue;
+        let info = layout_var_info(*var);
+        // The buffer's derived index preserves first-binding and unbound
+        // semantics. Scanning every alist entry here also observes unrelated
+        // binding conses: command-local writes such as deactivate-mark then
+        // invalidate otherwise reusable query geometry.
+        let local = if let Some(slot) = info.slot {
+            Some(slots[slot.offset.index()])
+        } else {
+            buffer.buffer_local_value_id(var.sym_id())
         };
-        let index = var as usize;
-        if vars[index].is_some() || seen_in_alist[index] {
-            continue;
-        }
-        seen_in_alist[index] = true;
-        let value = entry.cons_cdr();
-        if !value.is_unbound() {
-            vars[index] = Some(value);
-        }
+        vars[*var as usize] = local.or_else(|| {
+            info.captures_default
+                .then(|| obarray?.default_value_id(var.sym_id()).copied())
+                .flatten()
+        });
     }
-
-    if let Some(obarray) = obarray {
-        for var in LayoutVar::VARIANTS {
-            let index = *var as usize;
-            if vars[index].is_none() && layout_var_info(*var).captures_default {
-                vars[index] = obarray.default_value_id(var.sym_id()).copied();
-            }
-        }
-    }
-
     vars
-}
-
-/// Reverse map sym_id -> LayoutVar for the single alist walk above.
-fn layout_var_by_sym_id(sym_id: neovm_core::emacs_core::intern::SymId) -> Option<LayoutVar> {
-    use std::sync::OnceLock;
-    use strum::VariantArray;
-    static MAP: OnceLock<rustc_hash::FxHashMap<neovm_core::emacs_core::intern::SymId, LayoutVar>> =
-        OnceLock::new();
-    MAP.get_or_init(|| {
-        LayoutVar::VARIANTS
-            .iter()
-            .map(|var| (var.sym_id(), *var))
-            .collect()
-    })
-    .get(&sym_id)
-    .copied()
 }
 
 impl LayoutBufferView for LayoutBufferSnapshot {

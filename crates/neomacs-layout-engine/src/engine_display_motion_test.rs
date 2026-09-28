@@ -1358,3 +1358,31 @@ fn ordinary_query_reuse_ignores_unread_lisp_collection_writes() {
     assert_eq!(initial.geometry(), actual.geometry());
     assert_eq!(probe::max_depth(), 0, "unread collection writes forced another row walk");
 }
+
+#[test]
+fn ordinary_query_reuse_ignores_unrelated_buffer_local_value_writes() {
+    use crate::engine::viewport_retry_depth_probe as probe;
+    use neovm_core::window::WindowLayoutQueryScope;
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    let buf = eval.buffer_manager_mut().get_mut(buffer).unwrap();
+    buf.insert(&"row\n".repeat(100));
+    buf.set_buffer_local("deactivate-mark", Value::NIL);
+    // The runtime's index is already warm during native input. Its cold
+    // construction can conservatively observe the whole binding list once.
+    assert_eq!(buf.buffer_local_value("deactivate-mark"), Some(Value::NIL));
+    let frame = eval.frame_manager_mut().create_frame("query-local-dependencies", 400, 170, buffer);
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    let mut engine = LayoutEngine::new_without_font_metrics();
+    // Native scrolling starts after an ordinary redisplay has resolved the
+    // current buffer's localized hook cells and variable index.
+    engine.layout_frame_rust(&mut eval, frame);
+    let initial = engine.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+    for value in [Value::T, Value::NIL] {
+        eval.buffer_manager_mut().get_mut(buffer).unwrap().set_buffer_local("deactivate-mark", value);
+        probe::reset();
+        let actual = engine.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+        assert_eq!(initial.geometry(), actual.geometry());
+        assert_eq!(probe::max_depth(), 0, "unrelated local binding forced another row walk");
+    }
+}
