@@ -40,6 +40,14 @@ pub const REQUIRED_TOOLS: &[(&str, &str)] = &[("git", "*"), ("java", "*"), ("nod
 /// The suites' expected values were taken against particular builds, but
 /// requiring the same build everywhere costs more than it buys: it makes
 /// every host that has moved on skip the suite instead of running it.
+///
+/// The consequence is deliberate: a suite whose records need a particular
+/// build now *runs* and fails on a host that provides a different one,
+/// rather than passing while testing nothing.  Those failures are the
+/// standing reminder that a provider carrying the pinned versions -- a
+/// dedicated nixpkgs input, the way `nix-wpe-webkit` is pinned -- is what
+/// they are waiting for.  They are not to be re-recorded against whatever
+/// the host happens to have.
 pub const ANY_VERSION: &str = "*";
 
 /// Directories to prepend to `PATH` for editor sessions, best effort.
