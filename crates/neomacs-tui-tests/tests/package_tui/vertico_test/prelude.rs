@@ -74,6 +74,22 @@ pub(super) fn default_vertico(fixture: &str) -> String {
     format!("(require 'vertico)\n(vertico-mode 1)\n{fixture}")
 }
 
+/// Vertico with `vertico-repeat`, saving each session as it is set up, over
+/// `fixture`.
+///
+/// `vertico-repeat` replays the last completion session, and it only has one to
+/// replay if `vertico-repeat-save` is on `minibuffer-setup-hook` -- that hook
+/// is how the extension documents its use, so it is what this prelude sets.
+pub(super) fn repeat_vertico(fixture: &str) -> String {
+    format!(
+        "(require 'vertico)\n\
+         (require 'vertico-repeat)\n\
+         (vertico-mode 1)\n\
+         (add-hook 'minibuffer-setup-hook #'vertico-repeat-save)\n\
+         {fixture}"
+    )
+}
+
 /// Vertico with the display modes `vertico-multiform` toggles between, over
 /// `fixture`.
 ///

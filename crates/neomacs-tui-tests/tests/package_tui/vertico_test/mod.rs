@@ -11,6 +11,7 @@ mod harness;
 mod multiform;
 mod overflow;
 mod prelude;
+mod repeat_and_sort;
 mod resize;
 mod selection;
 
@@ -25,6 +26,11 @@ fn vertico_multiform_renders_the_grid_and_flat_layouts() {
 #[test]
 fn vertico_overflow_scrolls_the_candidate_window_and_counts_candidates() {
     overflow::run();
+}
+
+#[test]
+fn vertico_repeat_replays_the_last_session() {
+    repeat_and_sort::run();
 }
 
 #[test]

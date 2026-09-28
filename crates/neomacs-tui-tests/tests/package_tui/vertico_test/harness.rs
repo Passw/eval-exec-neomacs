@@ -19,7 +19,9 @@ use super::super::{COMPAT_GNU_ELPA_PIN, CachedMelpaOracle, VERTICO_MELPA_PIN};
 // Re-exported so the scenario modules reach the shared vocabulary the same way
 // they reach this module's own helpers.
 pub(super) use super::super::scenario::PackageTuiPair;
-pub(super) use neomacs_tui_tests::package_harness::{both, catch_phase, exact_row, wait_for};
+pub(super) use neomacs_tui_tests::package_harness::{
+    both, catch_phase, exact_row, invoke, wait_for,
+};
 
 /// The suite's readiness checkpoint: both editors at first scratch screen.
 const READINESS: &str = "initial scratch buffer";
