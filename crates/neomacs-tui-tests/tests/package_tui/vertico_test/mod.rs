@@ -7,13 +7,22 @@ use super::{COMPAT_GNU_ELPA_PIN, CachedMelpaOracle, VERTICO_MELPA_PIN};
 
 use super::scenario::{DisplayCheckpoint, PackageTuiScenario, PairTimeout, ReadinessCheckpoint};
 
+mod annotations;
+mod extended_command;
+mod grid_separator;
+mod growing_window;
 mod harness;
 mod multiform;
+mod multiform_buffer;
+mod narrow_terminal;
 mod overflow;
 mod prelude;
 mod repeat_and_sort;
 mod resize;
 mod selection;
+mod short_terminal;
+mod sort_function;
+mod truncation;
 
 use harness::candidate_rows;
 use prelude::VERTICO_TUI_PRELUDE;
@@ -41,6 +50,51 @@ fn vertico_resize_reflows_the_candidate_window() {
 #[test]
 fn vertico_selection_moves_the_highlight_and_accepts_by_key() {
     selection::run();
+}
+
+#[test]
+fn vertico_sort_function_set_at_the_keyboard_orders_the_candidates() {
+    sort_function::run();
+}
+
+#[test]
+fn vertico_grid_renders_the_packages_default_separator() {
+    grid_separator::run();
+}
+
+#[test]
+fn vertico_multiform_buffer_shows_the_candidates_in_a_window() {
+    multiform_buffer::run();
+}
+
+#[test]
+fn vertico_narrow_terminal_scrolls_the_window_above_the_candidates() {
+    narrow_terminal::run();
+}
+
+#[test]
+fn vertico_short_terminal_takes_rows_from_the_candidate_window() {
+    short_terminal::run();
+}
+
+#[test]
+fn vertico_truncates_candidates_at_the_windows_last_column() {
+    truncation::run();
+}
+
+#[test]
+fn vertico_annotates_candidates_where_the_function_pads_them() {
+    annotations::run();
+}
+
+#[test]
+fn vertico_completes_command_names_through_m_x() {
+    extended_command::run();
+}
+
+#[test]
+fn vertico_grows_the_minibuffer_window_with_its_candidates() {
+    growing_window::run();
 }
 
 #[test]

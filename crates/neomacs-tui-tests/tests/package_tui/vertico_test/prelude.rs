@@ -108,6 +108,49 @@ pub(super) fn repeat_vertico(fixture: &str) -> String {
 /// decides. A separator with no spaces around the bar leaves no blank cells
 /// between candidates for the emissions to disagree about, so the frozen
 /// screens and the wire-state checks pin the layout and nothing else.
+/// Vertico with the display modes `vertico-multiform` toggles between, over
+/// `fixture`, leaving `vertico-grid-separator` at the package's default.
+///
+/// The default separator is a bar with three spaces on either side and an
+/// `:inverse-video` display property on the bar itself, and both of those are
+/// visible in the terminal state the grid leaves behind: the blank cells the
+/// separator's spaces occupy, and the cell the bar is painted on. A scenario
+/// that is about either of them -- rather than about the grid's column
+/// arithmetic -- boots the package the way it ships, which is what this does.
+///
+/// The extension files ship in the package, next to `vertico.el`, so requiring
+/// them by name is how a user gets them.
+pub(super) fn default_grid_separator_vertico(fixture: &str) -> String {
+    format!(
+        "(require 'vertico)\n\
+         (require 'vertico-multiform)\n\
+         (require 'vertico-grid)\n\
+         (vertico-mode 1)\n\
+         (vertico-multiform-mode 1)\n\
+         {fixture}"
+    )
+}
+
+/// Vertico with the display modes `vertico-multiform` toggles between, over
+/// `fixture`, plus `vertico-buffer`.
+///
+/// `vertico-buffer` is the display mode that renders the candidates into a
+/// window of its own rather than into the minibuffer window, and `M-B` is the
+/// key `vertico-multiform` toggles it with.
+pub(super) fn multiform_buffer_vertico(fixture: &str) -> String {
+    format!(
+        "(require 'vertico)\n\
+         (require 'vertico-multiform)\n\
+         (require 'vertico-buffer)\n\
+         (vertico-mode 1)\n\
+         (vertico-multiform-mode 1)\n\
+         {fixture}"
+    )
+}
+
+/// `vertico-quick` is loaded and bound the way its own commentary shows it:
+/// the extension binds no keys itself, so a user adds the key column to
+/// `vertico-map` -- `M-q` for `vertico-quick-insert`.
 pub(super) fn multiform_vertico(fixture: &str) -> String {
     format!(
         "(require 'vertico)\n\
@@ -115,8 +158,10 @@ pub(super) fn multiform_vertico(fixture: &str) -> String {
          (require 'vertico-grid)\n\
          (require 'vertico-flat)\n\
          (require 'vertico-buffer)\n\
+         (require 'vertico-quick)\n\
          (vertico-mode 1)\n\
          (vertico-multiform-mode 1)\n\
+         (keymap-set vertico-map \"M-q\" #'vertico-quick-insert)\n\
          (setq vertico-grid-separator \"|\")\n\
          {fixture}"
     )
