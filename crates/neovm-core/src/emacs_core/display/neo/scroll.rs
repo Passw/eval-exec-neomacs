@@ -30,9 +30,6 @@ impl Context {
 
     fn scroll_variable(&self, window: crate::window::WindowId, name: &str) -> Option<Value> {
         let frame = self.frame_manager().selected_frame()?;
-        if frame.selected_window != window {
-            return None;
-        }
         let buffer = frame
             .find_window(window)
             .and_then(|window| window.buffer_id())
@@ -57,6 +54,16 @@ impl Context {
     }
 
     pub fn permits_compositor_pixel_scroll(&self, window: crate::window::WindowId) -> bool {
+        // Raw input prediction relies on the selected window's keymaps and
+        // command context. A resolved preview already has its destination
+        // from canonical dispatch and only needs the target buffer's opt-in.
+        if self
+            .frame_manager()
+            .selected_frame()
+            .is_none_or(|frame| frame.selected_window != window)
+        {
+            return false;
+        }
         // Timer redisplay may run with another current buffer. Policy belongs
         // to the displayed buffer and must not use that callback's locals.
         let variable = |name: &str| self.scroll_variable(window, name);
@@ -289,6 +296,28 @@ mod tests {
         }
         eval.eval_str("(define-key (current-global-map) [wheel-up] 'pixel-scroll-precision) (define-key (current-global-map) [wheel-down] 'pixel-scroll-precision)").unwrap();
         assert!(eval.permits_compositor_pixel_scroll(window));
+        let other_buffer = eval
+            .buffer_manager_mut()
+            .create_buffer("other-scroll-policy");
+        let other_window = eval
+            .frame_manager_mut()
+            .split_window(
+                frame,
+                window,
+                crate::window::SplitDirection::Horizontal,
+                other_buffer,
+                None,
+                crate::window::SplitPlacement::AfterTarget,
+            )
+            .unwrap();
+        assert!(eval.compositor_scrolling_enabled(other_window));
+        assert!(!eval.permits_compositor_pixel_scroll(other_window));
+        eval.buffer_manager_mut()
+            .get_mut(other_buffer)
+            .unwrap()
+            .set_buffer_local("neomacs-compositor-scrolling", Value::NIL);
+        assert!(!eval.compositor_scrolling_enabled(other_window));
+        assert!(eval.compositor_scrolling_enabled(window));
         let publications = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
         let observed = publications.clone();
         eval.redisplay_fn = Some(Box::new(move |eval| {

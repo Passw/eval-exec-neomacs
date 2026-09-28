@@ -257,8 +257,32 @@ fn exported_backward_coverage_keeps_nonnegative_storage_and_visible_row_hit_coor
 
 #[test]
 fn resolved_scroll_preview_requires_current_source_and_maps_source_start_to_coverage() {
+    resolved_scroll_preview_for_window(false);
+}
+
+#[test]
+fn resolved_scroll_preview_supports_an_unselected_window_without_raw_prediction() {
+    resolved_scroll_preview_for_window(true);
+}
+
+fn resolved_scroll_preview_for_window(other_window: bool) {
     let line = "ordinary offscreen text\n";
     let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
+    let selected = window;
+    let window = if other_window {
+        eval.frame_manager_mut()
+            .split_window(
+                frame,
+                selected,
+                neovm_core::window::SplitDirection::Horizontal,
+                buffer,
+                None,
+                neovm_core::window::SplitPlacement::AfterTarget,
+            )
+            .unwrap()
+    } else {
+        window
+    };
     eval.eval_str("(setq neomacs-compositor-scrolling t)")
         .unwrap();
     eval.frame_manager_mut()
@@ -304,6 +328,14 @@ fn resolved_scroll_preview_requires_current_source_and_maps_source_start_to_cove
     let intent = engine
         .resolved_scroll_preview(&eval, frame, window, vec![delivery.receipt()])
         .expect("unchanged source with a committed destination should preview");
+    assert_eq!(intent.window, owner);
+    assert_eq!(
+        eval.frame_manager().get(frame).unwrap().selected_window,
+        selected
+    );
+    if other_window {
+        assert!(!eval.permits_compositor_pixel_scroll(window));
+    }
     assert_eq!(intent.offset, height);
     assert_eq!(intent.presentation, old_presentation);
     assert!(engine.last_frame_display_state.is_none());
