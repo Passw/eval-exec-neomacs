@@ -177,18 +177,26 @@ impl LayoutEngine {
             return None;
         }
         let retained = self.retained_window_matrices.get(&window_id)?;
-        let unchanged =
+        let compatible =
             self.scroll_coverage
                 .observed
                 .as_ref()
                 .is_some_and(|(old_frame, old_window, key)| {
                     *old_frame == frame.id
                         && *old_window == window_id
-                        && key.window_start == retained.key.window_start
                         && RetainedWindowKey::row_content_eligible(key, &retained.key)
                 });
-        if !unchanged {
+        let moved = self.scroll_coverage.observed.as_ref()
+            .is_some_and(|(_, _, key)| key.window_start != retained.key.window_start);
+        if !compatible {
             self.scroll_coverage.cancel();
+        }
+        if !compatible || moved {
+            // Placement-only changes do not invalidate owned source rows.
+            // Finish the bounded in-flight page while retargeting the next
+            // acquisitions around the latest viewport. Restarting capture on
+            // every crossed row starves the worker during continuous input.
+            self.scroll_coverage.targets.clear();
             self.scroll_coverage.observed = Some((frame.id, window_id, retained.key.clone()));
             let buffer = evaluator
                 .buffer_manager()

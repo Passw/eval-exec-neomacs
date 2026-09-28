@@ -917,3 +917,46 @@ fn repeated_fractional_scroll_across_prepared_pages_matches_fresh_layout() {
         }
     }
 }
+
+#[test]
+fn idle_capture_finishes_while_the_viewport_keeps_moving() {
+    let line = "ordinary offscreen text\n";
+    let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let display_window = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
+    let mut completed = false;
+    // Each service opportunity is separated by a real viewport change and
+    // redisplay. A continuously moving viewport must not restart acquisition
+    // at its first row forever.
+    for step in 0..150 {
+        engine.maintain_scroll_coverage(&eval);
+        if engine
+            .prepared_viewports
+            .has_computed(frame, display_window)
+        {
+            completed = true;
+            break;
+        }
+        let start = (step % 3 + 1) * line.len();
+        scroll_window_to(
+            &mut eval,
+            frame,
+            window,
+            buffer,
+            start as i64 + 1,
+            start + 5 * line.len(),
+        );
+        engine.layout_frame_rust(&mut eval, frame);
+        std::thread::yield_now();
+    }
+    assert!(completed, "viewport motion starved the offscreen worker");
+    let actual = selected_window_layout_trace(&eval, &engine, frame);
+    let mut fresh = LayoutEngine::new();
+    fresh.layout_frame_rust(&mut eval, frame);
+    assert_eq!(actual, selected_window_layout_trace(&eval, &fresh, frame));
+}
