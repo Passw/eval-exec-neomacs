@@ -10,6 +10,8 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+#[path = "native_scrolling/continuous.rs"]
+mod continuous;
 #[path = "native_scrolling/wayland.rs"]
 mod wayland;
 
@@ -132,10 +134,31 @@ fn rich_large_buffer_native_wheel_scroll_advances() {
     run_native_scroll_profile(ScrollKind::Wheel, ScrollTarget::Selected, 100_000, true);
 }
 
+#[test]
+fn continuous_120hz_scroll_in_large_plain_buffer() {
+    run_native_scroll_profile(
+        ScrollKind::PreciseStream,
+        ScrollTarget::Selected,
+        100_000,
+        false,
+    );
+}
+
+#[test]
+fn continuous_120hz_scroll_in_large_rich_buffer() {
+    run_native_scroll_profile(
+        ScrollKind::PreciseStream,
+        ScrollTarget::Selected,
+        100_000,
+        true,
+    );
+}
+
 #[derive(Clone, Copy, Debug)]
 enum ScrollKind {
     Precise,
     PreciseBurst,
+    PreciseStream,
     Wheel,
     Page,
 }
@@ -204,7 +227,10 @@ fn run_native_scroll_scenario(
 ) {
     let profile = if rich { "rich-v1" } else { "plain" };
     let root = neomacs_infra::workspace_root();
-    let artifact_root = root.join("target/neomacs-gui-tests");
+    let artifact_root = std::env::var_os("CARGO_TARGET_DIR")
+        .map(|path| root.join(PathBuf::from(path)))
+        .unwrap_or_else(|| root.join("target"))
+        .join("neomacs-gui-tests");
     fs::create_dir_all(&artifact_root).unwrap();
     let artifacts = artifact_root.join(format!(
         "native-scrolling-{kind:?}-{target:?}-{lines}-{profile}-{}",
@@ -234,7 +260,10 @@ focus_follows_mouse yes
         .unwrap_or_else(|| root.join("target/release/neomacs"));
     // Run the default pixel correctness pass before a timing-only pass.
     // Continuous GPU readback/PNG encoding would dominate input latency.
-    let timing_only = std::env::var_os("NEOMACS_GUI_SCROLL_TIMING_ONLY").is_some();
+    // Sustained streams measure throughput; readback and per-glyph debug
+    // logging would change the workload. Burst tests cover rendered pixels.
+    let timing_only = matches!(kind, ScrollKind::PreciseStream)
+        || std::env::var_os("NEOMACS_GUI_SCROLL_TIMING_ONLY").is_some();
     fs::write(
         artifacts.join("measurement-mode"),
         if timing_only {
@@ -287,11 +316,13 @@ focus_follows_mouse yes
             .env("NEOMACS_INPUT_LATENCY_FILE", &latency_path)
             .env(
                 "RUST_LOG",
-                if timing_only {
-                    "warn"
-                } else {
-                    "warn,neomacs=debug,neomacs_display_runtime=debug,neomacs_layout_engine::scroll_coverage=debug,neovm_core::scroll_prediction=debug"
-                },
+                std::env::var("NEOMACS_GUI_SCROLL_LOG").unwrap_or_else(|_| {
+                    if timing_only {
+                        "warn"
+                    } else {
+                        "warn,neomacs=debug,neomacs_display_runtime=debug,neomacs_layout_engine::scroll_coverage=debug,neovm_core::scroll_prediction=debug"
+                    }.to_owned()
+                }),
             )
             .env("NEOMACS_LOG_FILE", artifacts.join("neomacs.log"))
             .stdout(fs::File::create(artifacts.join("stdout")).unwrap())
@@ -509,13 +540,24 @@ focus_follows_mouse yes
         return;
     }
 
+    if matches!(kind, ScrollKind::PreciseStream) {
+        continuous::run(
+            &mut trackpad,
+            &artifacts,
+            &state_path,
+            &latency_path,
+            previous,
+        );
+        return;
+    }
+
     let initial_position = position(&previous);
     let mut processed_pixels = previous["processed-pixels"].as_f64().unwrap();
     let mut processed_wheels = previous["processed-wheels"].as_f64().unwrap();
     let mut processed_pages = previous["processed-pages"].as_f64().unwrap();
     let mut trace = vec![previous.clone()];
     let steps = match kind {
-        ScrollKind::Precise | ScrollKind::PreciseBurst => 24,
+        ScrollKind::Precise | ScrollKind::PreciseBurst | ScrollKind::PreciseStream => 24,
         ScrollKind::Wheel => 12,
         ScrollKind::Page => 8,
     };
@@ -528,7 +570,7 @@ focus_follows_mouse yes
             };
         match kind {
             ScrollKind::Precise => trackpad.scroll(if down { 4.0 } else { -4.0 }),
-            ScrollKind::PreciseBurst => {
+            ScrollKind::PreciseBurst | ScrollKind::PreciseStream => {
                 // Deliver a burst without waiting for a redisplay between
                 // events. Observe direction and rendered text after each
                 // batch, then reverse while preserving the same device.
@@ -559,7 +601,10 @@ focus_follows_mouse yes
         // A timer sample can precede this batch even after the sleep. Wait
         // for command completion, so delayed input is not mistaken for
         // snapback. This is a correctness test, not a latency measurement.
-        let current = if matches!(kind, ScrollKind::Precise | ScrollKind::PreciseBurst) {
+        let current = if matches!(
+            kind,
+            ScrollKind::Precise | ScrollKind::PreciseBurst | ScrollKind::PreciseStream
+        ) {
             processed_pixels += if matches!(kind, ScrollKind::PreciseBurst) {
                 32.0
             } else {
@@ -621,7 +666,9 @@ focus_follows_mouse yes
         if !timing_only {
             let native_log = fs::read_to_string(artifacts.join("neomacs.log")).unwrap();
             let expected_event = match kind {
-                ScrollKind::Precise | ScrollKind::PreciseBurst => "PixelScroll {",
+                ScrollKind::Precise | ScrollKind::PreciseBurst | ScrollKind::PreciseStream => {
+                    "PixelScroll {"
+                }
                 ScrollKind::Wheel => "MouseScroll {",
                 ScrollKind::Page => "KeyPress {",
             };
@@ -690,7 +737,10 @@ focus_follows_mouse yes
         assert!(sample["presentation"].as_u64().unwrap() > 0);
         assert_eq!(sample["evicted_inputs"], 0);
     }
-    if matches!(kind, ScrollKind::Precise | ScrollKind::PreciseBurst) {
+    if matches!(
+        kind,
+        ScrollKind::Precise | ScrollKind::PreciseBurst | ScrollKind::PreciseStream
+    ) {
         assert_eq!(
             position(&previous),
             initial_position,

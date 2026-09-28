@@ -13,6 +13,8 @@
 (defvar neomacs-scroll-pixels 0)
 (defvar neomacs-scroll-wheels 0)
 (defvar neomacs-scroll-pages 0)
+;; Optional command trace for diagnosis, kept out of latency measurements.
+(defvar neomacs-scroll-trace-path (getenv "NEOMACS_GUI_SCROLL_TRACE"))
 (defvar neomacs-scroll-lines
   (string-to-number (or (getenv "NEOMACS_GUI_SCROLL_LINES") "400")))
 (defun neomacs-scroll-count-command ()
@@ -27,6 +29,21 @@
                (+ neomacs-scroll-pixels (abs (cdr (nth 4 last-command-event))))))
         ((memq this-command '(mwheel-scroll pixel-scroll-precision))
          (setq neomacs-scroll-wheels (1+ neomacs-scroll-wheels)))))
+(defun neomacs-scroll-trace-command (&optional before)
+  (when (and neomacs-scroll-trace-path (eq this-command 'pixel-scroll-precision))
+    (let ((record (list (if before 'before 'after)
+                        neomacs-scroll-pixels (cdr (nth 4 last-command-event))
+                        (window-start) (window-vscroll nil t) (point)
+                        (current-message))))
+      (with-temp-buffer
+        (prin1 record (current-buffer))
+        (insert "\n")
+        (write-region (point-min) (point-max) neomacs-scroll-trace-path t 'silent)))))
+(defun neomacs-scroll-trace-before ()
+  (neomacs-scroll-trace-command t))
+(when neomacs-scroll-trace-path
+  (add-hook 'pre-command-hook #'neomacs-scroll-trace-before)
+  (add-hook 'post-command-hook #'neomacs-scroll-trace-command t))
 (add-hook 'post-command-hook #'neomacs-scroll-count-command)
 (defun neomacs-scroll-observe ()
   (setq neomacs-scroll-sample (1+ neomacs-scroll-sample))
