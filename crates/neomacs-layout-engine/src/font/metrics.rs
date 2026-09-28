@@ -9,7 +9,7 @@
 
 use super::instance::{FontInstanceInterner, FontInstanceProperties};
 use crate::font::frame_metrics::{FrameFontDomain, GraphicFontSizePx};
-use cosmic_text::{Attrs, Buffer, Family, FontSystem, Style, Weight};
+use cosmic_text::{Attrs, AttrsOwned, Buffer, Family, FontSystem, Style, Weight};
 use neomacs_display_protocol::types::FaceId;
 use neomacs_font_materializer::FontFileCache;
 
@@ -630,8 +630,6 @@ pub struct FontMetricsService {
     char_cache: HashMap<(RealizedFaceFontCacheKey, char), f32>,
     /// Cache: face attrs → font metrics (ascent, descent, etc.)
     metrics_cache: HashMap<MetricsCacheKey, FontMetricObservation>,
-    /// Interned font family strings for cosmic-text Attrs (requires 'static)
-    interned_families: HashMap<String, &'static str>,
     /// Cache for pre-loading font files and resolving fontdb family names
     font_file_cache: FontFileCache,
     /// Cache: (face, run text) → shaped glyphs. A run is shaped by BOTH the
@@ -736,7 +734,6 @@ impl FontMetricsService {
             ascii_cache: HashMap::default(),
             char_cache: HashMap::default(),
             metrics_cache: HashMap::default(),
-            interned_families: HashMap::default(),
             font_file_cache: FontFileCache::new(),
             shaped_run_cache: HashMap::default(),
             shaped_run_cache_cap: SHAPED_RUN_CACHE_CAP,
@@ -951,16 +948,6 @@ impl FontMetricsService {
         emacs_family.to_string()
     }
 
-    fn intern_family(&mut self, family: &str) -> &'static str {
-        if let Some(&existing) = self.interned_families.get(family) {
-            existing
-        } else {
-            let leaked: &'static str = Box::leak(family.to_string().into_boxed_str());
-            self.interned_families.insert(family.to_string(), leaked);
-            leaked
-        }
-    }
-
     /// Build cosmic-text `Attrs` from face parameters.
     /// Mirrors the logic in `glyph_atlas.rs:face_to_attrs()`.
     ///
@@ -975,7 +962,7 @@ impl FontMetricsService {
         weight: u16,
         slant: FontSlant,
         font_size: f32,
-    ) -> Attrs<'static> {
+    ) -> AttrsOwned {
         if let Some(synthetic) =
             self.pinned_primary_family(family, weight, slant.is_italic(), font_size)
         {
@@ -991,7 +978,7 @@ impl FontMetricsService {
             if let Some(style) = font_slant_to_cosmic_style(slant) {
                 attrs = attrs.style(style);
             }
-            return attrs;
+            return AttrsOwned::new(&attrs);
         }
         self.build_attrs_unpinned(family, weight, slant)
     }
@@ -1001,13 +988,12 @@ impl FontMetricsService {
         family: &str,
         weight: u16,
         slant: FontSlant,
-    ) -> Attrs<'static> {
+    ) -> AttrsOwned {
         let mut attrs = Attrs::new();
 
         attrs = match crate::font::font_match::select_cosmic_family(&self.font_system, family) {
             crate::font::font_match::CosmicFamilySelection::Name(family) => {
-                let interned = self.intern_family(family);
-                attrs.family(Family::Name(interned))
+                attrs.family(Family::Name(family))
             }
             crate::font::font_match::CosmicFamilySelection::Monospace => {
                 attrs.family(Family::Monospace)
@@ -1032,7 +1018,7 @@ impl FontMetricsService {
             attrs = attrs.style(style)
         }
 
-        attrs
+        AttrsOwned::new(&attrs)
     }
 
     /// Build attributes for an already-resolved character font. Platform
@@ -1043,7 +1029,7 @@ impl FontMetricsService {
         &mut self,
         resolved: &ResolvedCharFont,
         font_size: f32,
-    ) -> Option<Attrs<'static>> {
+    ) -> Option<AttrsOwned> {
         if let Some(platform) = resolved.platform.as_ref() {
             let synthetic = self.pin_outline_as_family(&platform.asset)?;
             let mut attrs = Attrs::new()
@@ -1052,7 +1038,7 @@ impl FontMetricsService {
             if let Some(style) = font_slant_to_cosmic_style(resolved.slant) {
                 attrs = attrs.style(style);
             }
-            return Some(attrs);
+            return Some(AttrsOwned::new(&attrs));
         }
         Some(self.build_attrs(&resolved.family, resolved.weight, resolved.slant, font_size))
     }
@@ -1061,7 +1047,7 @@ impl FontMetricsService {
     fn build_attrs_for_materialized_font(
         &mut self,
         materialized: &LayoutFontHandle,
-    ) -> Option<Attrs<'static>> {
+    ) -> Option<AttrsOwned> {
         if matches!(materialized.source, LayoutFontSource::FreeTypeBitmap(_)) {
             return None;
         }
@@ -1073,7 +1059,7 @@ impl FontMetricsService {
             if let Some(style) = font_slant_to_cosmic_style(materialized.selector_slant) {
                 attrs = attrs.style(style);
             }
-            return Some(attrs);
+            return Some(AttrsOwned::new(&attrs));
         }
         Some(self.build_attrs(
             &materialized.font.family,
@@ -1348,7 +1334,7 @@ impl FontMetricsService {
         buffer.set_text(
             &mut self.font_system,
             "n",
-            &attrs,
+            &attrs.as_attrs(),
             cosmic_text::Shaping::Advanced,
             None,
         );
@@ -1399,7 +1385,7 @@ impl FontMetricsService {
         buffer.set_text(
             &mut self.font_system,
             " ",
-            &attrs,
+            &attrs.as_attrs(),
             cosmic_text::Shaping::Advanced,
             None,
         );
@@ -1516,7 +1502,7 @@ impl FontMetricsService {
         &mut self,
         text: &str,
         metrics_key: MetricsCacheKey,
-        attrs: Attrs<'static>,
+        attrs: AttrsOwned,
         font_size: f32,
     ) -> Vec<ShapedGlyph> {
         let key = (metrics_key, text.to_string());
@@ -1527,7 +1513,7 @@ impl FontMetricsService {
         let glyphs = self.shaper.shape_run(
             &mut self.font_system,
             text,
-            &attrs,
+            &attrs.as_attrs(),
             font_size.max(1.0),
             font_size.max(1.0) * 1.3,
         );
@@ -2150,7 +2136,7 @@ impl FontMetricsService {
         buffer.set_text(
             &mut self.font_system,
             &text,
-            &attrs,
+            &attrs.as_attrs(),
             cosmic_text::Shaping::Advanced,
             None,
         );
@@ -2606,7 +2592,7 @@ impl FontMetricsService {
         buffer.set_text(
             &mut self.font_system,
             &text,
-            &attrs,
+            &attrs.as_attrs(),
             cosmic_text::Shaping::Advanced,
             None,
         );
@@ -2894,7 +2880,7 @@ impl FontMetricsService {
             buffer.set_text(
                 &mut self.font_system,
                 " ",
-                &attrs,
+                &attrs.as_attrs(),
                 cosmic_text::Shaping::Advanced,
                 None,
             );
@@ -2934,7 +2920,7 @@ impl FontMetricsService {
             buffer.set_text(
                 &mut self.font_system,
                 &text,
-                &attrs,
+                &attrs.as_attrs(),
                 cosmic_text::Shaping::Advanced,
                 None,
             );
@@ -3101,7 +3087,7 @@ impl FontMetricsService {
         buffer.set_text(
             &mut self.font_system,
             sample,
-            &attrs,
+            &attrs.as_attrs(),
             cosmic_text::Shaping::Advanced,
             None,
         );

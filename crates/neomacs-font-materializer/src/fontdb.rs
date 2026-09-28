@@ -15,6 +15,22 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+/// The public pin handle carries a static selector. Retain each spelling once,
+/// rather than once per native-cache generation or worker lifetime. The pool
+/// grows with successful selector indices, not cache rebuild count.
+/// Invoke only after a successful pin so failed opens retain no selector.
+fn shared_selector(index: u64, spelling: String) -> &'static str {
+    static SELECTORS: std::sync::OnceLock<std::sync::Mutex<HashMap<u64, &'static str>>> =
+        std::sync::OnceLock::new();
+    let mut selectors = SELECTORS
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    selectors
+        .entry(index)
+        .or_insert_with(|| Box::leak(spelling.into_boxed_str()))
+}
+
 const HEAD_TAG: u32 = u32::from_be_bytes(*b"head");
 const TTCF_TAG: u32 = u32::from_be_bytes(*b"ttcf");
 const CFF_TAG: u32 = u32::from_be_bytes(*b"CFF ");
@@ -324,17 +340,17 @@ impl FontFileCache {
             return cached.clone();
         }
 
-        let synthetic_family = format!("neomacs-pin-{}", self.next_synthetic_family);
+        let selector_index = self.next_synthetic_family;
+        let synthetic_family = format!("neomacs-pin-{selector_index}");
         self.next_synthetic_family = self
             .next_synthetic_family
             .checked_add(1)
             .expect("synthetic font family id overflow");
         let result = Self::pin_asset_as_family(font_system.db_mut(), asset, &synthetic_family).map(
             |fontdb_id| PinnedFontFace {
-                // cosmic-text's `Family::Name` borrows selectors for the shaping
-                // call, so successful cache entries own one process-lifetime
-                // selector. Failed/retried opens do not leak a family string.
-                family: Box::leak(synthetic_family.into_boxed_str()),
+                // Selectors are local to each FontSystem, so independent
+                // caches can share the spelling without sharing a font binding.
+                family: shared_selector(selector_index, synthetic_family),
                 fontdb_id,
             },
         );

@@ -72,3 +72,28 @@ fn native_table_serializer_builds_a_valid_checksummed_sfnt() {
     ttf_parser::Face::parse(&rebuilt, 0).expect("rebuilt font is a standalone face");
     assert_eq!(FontFileCache::checksum(&rebuilt), 0xB1B0_AFBA);
 }
+
+#[test]
+fn rebuilding_font_caches_reuses_process_lifetime_selectors() {
+    let asset = FontOutlineAsset::Memory(
+        FontMemoryAsset::new(
+            "test:selector-lifetime",
+            Arc::new(standalone_spleen_sfnt()),
+            0,
+        )
+        .unwrap(),
+    );
+    let mut previous: Option<&'static str> = None;
+    for _ in 0..3 {
+        let mut system = FontSystem::new();
+        let mut cache = FontFileCache::new();
+        let family = cache.pin_exact_asset(&mut system, &asset).unwrap().family();
+        if let Some(previous) = previous {
+            assert!(
+                std::ptr::eq(previous, family),
+                "rebuilding a worker cache must not leak another identical selector"
+            );
+        }
+        previous = Some(family);
+    }
+}

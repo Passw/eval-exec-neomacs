@@ -328,6 +328,7 @@ fn realized_face_complex_run_shapes_with_the_exact_materialized_fontset_font() {
     let exact_family = match svc
         .build_attrs_for_materialized_font(&materialized)
         .expect("outline font attributes")
+        .as_attrs()
         .family
     {
         cosmic_text::Family::Name(name) => name.to_string(),
@@ -920,7 +921,7 @@ impl crate::text_shaper::TextShaper for RecordingFamilyShaper {
         &mut self,
         _font_system: &mut cosmic_text::FontSystem,
         _text: &str,
-        attrs: &cosmic_text::Attrs<'static>,
+        attrs: &cosmic_text::Attrs<'_>,
         _font_size: f32,
         _line_height: f32,
     ) -> Vec<ShapedGlyph> {

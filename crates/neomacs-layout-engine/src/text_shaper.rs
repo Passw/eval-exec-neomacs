@@ -18,7 +18,7 @@ pub trait TextShaper: Send {
         &mut self,
         font_system: &mut FontSystem,
         text: &str,
-        attrs: &Attrs<'static>,
+        attrs: &Attrs<'_>,
         font_size: f32,
         line_height: f32,
     ) -> Vec<ShapedGlyph>;
@@ -32,7 +32,7 @@ impl TextShaper for CosmicTextShaper {
         &mut self,
         font_system: &mut FontSystem,
         text: &str,
-        attrs: &Attrs<'static>,
+        attrs: &Attrs<'_>,
         font_size: f32,
         line_height: f32,
     ) -> Vec<ShapedGlyph> {
