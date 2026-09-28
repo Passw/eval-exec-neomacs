@@ -161,9 +161,12 @@ fn compute_rows(
 ) -> Result<Vec<ComputedRow>, RowProgramError> {
     let mut rows = Vec::with_capacity(programs.len());
     for mut program in programs {
+        if rows.len() == MAX_ROWS {
+            break;
+        }
         program.measure_on_worker(fonts, &cancelled)?;
-        match program.compute(&cancelled) {
-            Ok(row) => rows.push(row),
+        match program.compute_visual_rows(MAX_ROWS - rows.len(), &cancelled) {
+            Ok(computed) => rows.extend(computed),
             Err(RowProgramError::Overflow | RowProgramError::Budget) if !rows.is_empty() => break,
             Err(error) => return Err(error),
         }
@@ -203,6 +206,10 @@ mod tests {
     use neomacs_display_protocol::types::{Color, FaceId};
 
     fn row(text: &str) -> RowProgram {
+        row_with_wrap(text, 1000.0, false)
+    }
+
+    fn row_with_wrap(text: &str, width: f32, character_wrap: bool) -> RowProgram {
         let face = FaceId::new(1);
         let faces = vec![DisplayRowFace::from_resolved(
             face,
@@ -212,7 +219,9 @@ mod tests {
         RowProgram::capture(
             RowProgramGeometry {
                 inherited_line_spacing: 0.0,
-                width: 1000.0,
+                character_wrap,
+                fringe: None,
+                width,
                 metrics: DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
                 tabs: DisplayTabPolicy::every(4),
                 base_face: face,
@@ -242,6 +251,30 @@ mod tests {
             },
         )
         .unwrap()
+    }
+
+    #[test]
+    fn worker_bounds_visual_rows_instead_of_physical_program_count() {
+        let mut worker = RowWorker::default();
+        let ticket = worker
+            .submit(
+                (0..64)
+                    .map(|_| row_with_wrap("abcdefgh", 16.0, true))
+                    .collect(),
+            )
+            .unwrap();
+        let result = finish(&mut worker);
+        assert_eq!(result.ticket, ticket);
+        let rows = result.rows.unwrap();
+        assert_eq!(rows.len(), MAX_ROWS);
+        assert!(
+            rows.iter()
+                .any(|row| row.end_kind == super::super::program::ComputedRowEnd::Continuation)
+        );
+        assert_eq!(
+            rows.last().unwrap().end_kind,
+            super::super::program::ComputedRowEnd::Newline
+        );
     }
 
     fn finish(worker: &mut RowWorker) -> RowJobResult {

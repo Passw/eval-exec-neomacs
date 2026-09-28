@@ -108,6 +108,8 @@ fn unseen_row_worker_glyphs_match_canonical_window_body() {
     let program = RowProgram::capture(
         RowProgramGeometry {
             inherited_line_spacing: 0.0,
+            character_wrap: false,
+            fringe: None,
             width: key.partition.text_body().width,
             metrics,
             tabs: crate::display_row::builder::DisplayTabPolicy::from_tab_width_and_stops(
@@ -1412,12 +1414,12 @@ fn scaled_line_height_overflow_keeps_finite_geometry() {
 fn worker_keeps_complete_prefix_before_unsupported_rows() {
     let line = "ordinary offscreen text\n";
     let start = 120 * line.len();
-    for boundary in ["replacement", "long-line"] {
+    for boundary in ["replacement", "wrapped-tab"] {
         let mut text = line.repeat(300);
-        if boundary == "long-line" {
+        if boundary == "wrapped-tab" {
             text.replace_range(
                 start + 3 * line.len()..start + 4 * line.len(),
-                &("W".repeat(120) + "\n"),
+                &("W".repeat(119) + "\t\n"),
             );
         }
         let (mut eval, frame, buffer, window) = incr_editing_frame(&text, 800, 600);
@@ -1780,6 +1782,20 @@ fn worker_unicode_page_with_mixed_font_attributes_matches_fresh_layout() {
     first_visit(
         Some("(:family \"serif\" :height 150 :weight bold :slant italic)"),
         "中文 café text\n",
+        None,
+    );
+}
+
+#[test]
+fn first_visit_to_worker_prepared_wrapped_page_matches_fresh_layout() {
+    first_visit(None, &format!("{}\n", "W".repeat(100)), None);
+}
+
+#[test]
+fn worker_prepared_wrapped_mixed_font_page_matches_fresh_layout() {
+    first_visit(
+        Some("(:family \"serif\" :height 150 :weight bold :slant italic)"),
+        &format!("{}\n", "W".repeat(100)),
         None,
     );
 }

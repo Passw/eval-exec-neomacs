@@ -5,7 +5,7 @@ use super::row_geometry::WindowRowGeometry;
 use super::snapshot_rows::PreparedWindowRows;
 use super::{DisplayRowTerminator, DisplayRowTerminatorCell};
 use crate::display_item::DisplaySourcePosition;
-use crate::row_layout::program::{ComputedRow, RowProgramError};
+use crate::row_layout::program::{ComputedRow, ComputedRowEnd, RowProgramError};
 use neomacs_display_protocol::glyph_matrix::GlyphRow;
 use neovm_core::buffer::LispCharPos1;
 
@@ -15,7 +15,8 @@ pub(crate) struct PreparedBody {
 }
 
 /// All origins are in frame pixels, except returned row Y, which is relative
-/// to the owning window. Natural buffer rows only; display strings require
+/// to the owning window. Natural buffer text, including visual continuations;
+/// display strings require
 /// their canonical source-slot projection before they can use this recorder.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn position_buffer_rows(
@@ -86,14 +87,20 @@ pub(crate) fn position_buffer_rows(
             computed.end.x_px().round() as i64,
         );
         // A complete physical line's last consumed character is its newline.
-        geometry.note_row_terminator(DisplayRowTerminator::new(
-            LispCharPos1::from_one_based_usize(end.get()),
-            DisplayRowTerminatorCell::new(computed.terminator_width, computed.terminator_height),
-        ));
+        if computed.end_kind == ComputedRowEnd::Newline {
+            geometry.note_row_terminator(DisplayRowTerminator::new(
+                LispCharPos1::from_one_based_usize(end.get()),
+                DisplayRowTerminatorCell::new(
+                    computed.terminator_width,
+                    computed.terminator_height,
+                ),
+            ));
+        }
         geometry.push_text_row(y, computed.row.height_px, computed.row.ascent_px);
         computed.row.pixel_y = y - window_top;
         computed.row.start_charpos = start.get();
-        computed.row.end_charpos = end.get() - 1;
+        computed.row.end_charpos =
+            end.get() - usize::from(computed.end_kind == ComputedRowEnd::Newline);
         crate::display_row::finalizer::GlyphRowFinalizationContext::new(
             window_id,
             text_row_base + index,

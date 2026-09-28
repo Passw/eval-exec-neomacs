@@ -70,6 +70,7 @@ struct Capture {
     font_snapshots:
         Vec<std::sync::Arc<crate::row_layout::font_measurement::FontMeasurementSnapshot>>,
     font_bytes: usize,
+    fringe: Option<crate::buffer_source::fringe_arrows::TruncationContinuationFringeRequest>,
 }
 
 struct WindowCoverage {
@@ -499,6 +500,7 @@ impl LayoutEngine {
             programs: Vec::with_capacity(row_count),
             font_snapshots: Vec::new(),
             font_bytes: 0,
+            fringe: None,
         });
         Ok(())
     }
@@ -745,8 +747,42 @@ impl LayoutEngine {
                 .import_face(rendered)
                 .map_err(|_| RowProgramError::Unsupported)?;
         }
+        // Resolve once per capture; the read certificate protects this policy
+        // across idle steps, and the reserved face namespace survives them.
+        if capture.programs.is_empty() {
+            let fringe_face = resolver.resolve_named_face("fringe");
+            let fringe_id = stable_face_id_for_resolved(&mut capture.attempt, &fringe_face);
+            let arena = self
+                .frame_face_arenas
+                .get(&frame)
+                .ok_or(RowProgramError::Unsupported)?;
+            match capture
+                .attempt
+                .admit_prepared([fringe_id], &arena.prepared_snapshot(), arena)
+            {
+                Ok(()) | Err(crate::frame_face_arena::FrameFaceReuseError::MissingFace(_)) => {}
+                Err(_) => return Err(RowProgramError::Unsupported),
+            }
+            let fringe_face = capture
+                .attempt
+                .bind_resolved_face(fringe_id, fringe_face)
+                .map_err(|_| RowProgramError::Unsupported)?;
+            capture
+                .attempt
+                .publish_face(&fringe_face.realized(None))
+                .map_err(|_| RowProgramError::Unsupported)?;
+            let regions = capture.retained.display_snapshot.regions;
+            capture.fringe = crate::buffer_source::fringe_arrows::TruncationContinuationFringeRequest::for_fringe_widths(
+                &view, evaluator,
+                regions.left_fringe.map_or(0.0, |rect| rect.width),
+                regions.right_fringe.map_or(0.0, |rect| rect.width),
+                0, fringe_id,
+            );
+        }
         let geometry = RowProgramGeometry {
             inherited_line_spacing: key.extra_line_spacing,
+            character_wrap: key.wrap_mode == crate::types::LineWrapMode::Wrap && !key.word_wrap,
+            fringe: capture.fringe.clone(),
             width: key.partition.text_body().width,
             metrics,
             tabs: crate::display_row::builder::DisplayTabPolicy::from_tab_width_and_stops(

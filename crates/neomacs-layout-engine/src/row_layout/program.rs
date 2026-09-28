@@ -41,6 +41,8 @@ pub(crate) enum RowProgramError {
 #[derive(Clone, Debug)]
 pub(crate) struct RowProgramGeometry {
     pub inherited_line_spacing: f32,
+    pub character_wrap: bool,
+    pub fringe: Option<crate::buffer_source::fringe_arrows::TruncationContinuationFringeRequest>,
     pub width: f32,
     pub metrics: DisplayRowFallbackMetrics,
     pub tabs: DisplayTabPolicy,
@@ -311,12 +313,21 @@ pub(crate) struct RowProgram {
     limits: RowProgramLimits,
 }
 
+/// Source consumption at a visual-row boundary. A continuation consumes no
+/// newline and therefore has neither a newline hit cell nor an end-minus-one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ComputedRowEnd {
+    Newline,
+    Continuation,
+}
+
 pub(crate) struct ComputedRow {
     pub row: GlyphRow,
     pub slots: Vec<DisplayRowGlyphSlot>,
     pub slot_heights: Vec<f32>,
     pub source: SourceSpan,
     pub end: DisplayRowPosition,
+    pub end_kind: ComputedRowEnd,
     pub terminator_width: f32,
     pub terminator_height: f32,
 }
@@ -527,13 +538,50 @@ impl RowProgram {
     /// Cancellation is checked between bounded operations. Overflow rejects
     /// the complete row: wrapping must preserve producer rewind semantics and
     /// is intentionally not invented by this physical-line kernel.
+    #[cfg(test)]
     pub(crate) fn compute(
-        mut self,
+        self,
         cancelled: impl Fn() -> bool,
     ) -> Result<ComputedRow, RowProgramError> {
+        let mut rows = self.compute_visual_rows(1, cancelled)?;
+        rows.pop().ok_or(RowProgramError::Incomplete)
+    }
+
+    pub(crate) fn compute_visual_rows(
+        mut self,
+        row_limit: usize,
+        cancelled: impl Fn() -> bool,
+    ) -> Result<Vec<ComputedRow>, RowProgramError> {
         if self.deferred_fonts.is_some() {
             return Err(RowProgramError::MissingMeasurement);
         }
+        if row_limit == 0 {
+            return Err(RowProgramError::Budget);
+        }
+        // The first continuation domain has no physical-line tab state,
+        // contextual shaping, word-boundary rewind or box/extend carryover.
+        // A later unsupported item must not silently inherit a reset origin.
+        let can_wrap = self.geometry.character_wrap
+            && self.geometry.inherited_line_spacing == 0.0
+            && self.faces.iter().all(|face| {
+                !face.extend && face.box_type == neomacs_display_protocol::face::BoxType::None
+            })
+            && self
+                .operations
+                .iter()
+                .all(|(operation, _)| match operation {
+                    Operation::Text(text) => {
+                        text.run.text.is_ascii()
+                            && !text.run.text.contains('\t')
+                            && text.layout == DisplayItemLayout::default()
+                    }
+                    Operation::Break {
+                        line_height,
+                        line_spacing,
+                        ..
+                    } => *line_height == DisplayLineHeightPolicy::Default && *line_spacing == 0.0,
+                    _ => false,
+                });
         let layout = self.geometry.layout();
         let mut row = new_display_row(&layout);
         let mut position = DisplayRowPosition::new(0.0, 0);
@@ -543,11 +591,17 @@ impl RowProgram {
         let mut source_end = None;
         let mut terminator_width = self.geometry.metrics.char_width();
         let mut terminator_height = self.geometry.metrics.row_height();
-        for (operation, plan) in self.operations {
+        let mut rows = Vec::new();
+        let mut completed_glyphs = 0usize;
+        let mut operations: std::collections::VecDeque<_> = self
+            .operations
+            .into_iter()
+            .map(|(operation, plan)| (operation.into_item(), plan))
+            .collect();
+        while let Some((item, plan)) = operations.pop_front() {
             if cancelled() {
                 return Err(RowProgramError::Cancelled);
             }
-            let item = operation.into_item();
             source_start.get_or_insert_with(|| item.span.start.clone());
             source_end = Some(item.span.end.clone());
             let newline = if let DisplayItemKind::RowBreak(value) = item.kind {
@@ -579,19 +633,73 @@ impl RowProgram {
             let mut item_layout = layout.clone();
             item_layout.height_px = row.height_px.max(minimum.height_px());
             item_layout.ascent_px = row.ascent_px.max(minimum.ascent_px());
+            let render_item =
+                crate::display_row::render_item::DisplayRowRenderItem::from_source_item(item);
+            let can_split = can_wrap
+                && matches!(render_item.source_item().kind, DisplayItemKind::TextRun(ref run)
+                    if run.text.is_ascii() && !run.text.contains('\t'));
             let progress = DisplayRowProgressWriter::with_text_run_measurement_and_glyph_measurer_for_area_and_start_policy(
-                &item_layout, &mut row, plan, &mut self.measurements, position, self.geometry.width,
+                &item_layout, &mut row, plan.clone(), &mut self.measurements, position, self.geometry.width,
                 DisplayRowTextAreaOrigin::row_local(), GlyphArea::Text, DisplayRowAppendStartPolicy::ReconcileWithRowTail,
-            ).push_item(item);
+            ).push_item(render_item.row_item_for_write());
             if self.measurements.missing {
                 return Err(RowProgramError::MissingMeasurement);
-            }
-            if progress.status() == DisplayRowAppendStatus::Clipped {
-                return Err(RowProgramError::Overflow);
             }
             position = progress.end();
             slot_heights.extend(std::iter::repeat_n(face_height, progress.slots().len()));
             slots.extend(progress.slots().iter().cloned());
+            let row_glyphs = row.glyphs.iter().map(Vec::len).sum::<usize>();
+            if completed_glyphs.saturating_add(row_glyphs) > self.limits.glyphs {
+                return Err(RowProgramError::Budget);
+            }
+            if progress.status() == DisplayRowAppendStatus::Clipped {
+                if !can_split || slots.is_empty() || rows.len() + 1 >= row_limit {
+                    return Err(RowProgramError::Overflow);
+                }
+                let remainder = render_item
+                    .clipped_remainder(&progress)
+                    .ok_or(RowProgramError::Unsupported)?;
+                crate::glyph_row_writer::normalize_external_row(&mut row);
+                if let Some(fringe) = &self.geometry.fringe {
+                    fringe.decorate_row(&mut row, true, !rows.is_empty());
+                }
+                completed_glyphs += row_glyphs;
+                rows.push(ComputedRow {
+                    row,
+                    slots: std::mem::take(&mut slots),
+                    slot_heights: std::mem::take(&mut slot_heights),
+                    source: SourceSpan::new(
+                        source_start.take().ok_or(RowProgramError::Incomplete)?,
+                        remainder.span.start.clone(),
+                    ),
+                    end: position,
+                    end_kind: ComputedRowEnd::Continuation,
+                    terminator_width,
+                    terminator_height,
+                });
+                row = new_display_row(&layout);
+                position = DisplayRowPosition::new(0.0, 0);
+                let remainder_plan = match plan {
+                    DisplayTextRunMeasurement::PerChar => DisplayTextRunMeasurement::PerChar,
+                    DisplayTextRunMeasurement::Measured(advances) => {
+                        let consumed = progress.slots().len();
+                        DisplayTextRunMeasurement::Measured(
+                            advances
+                                .into_iter()
+                                .filter_map(|mut advance| {
+                                    advance.char_offset =
+                                        advance.char_offset.checked_sub(consumed)?;
+                                    advance.byte_offset =
+                                        advance.byte_offset.checked_sub(consumed)?;
+                                    Some(advance)
+                                })
+                                .collect(),
+                        )
+                    }
+                };
+                operations.push_front((remainder, remainder_plan));
+                continue;
+            }
             if let Some((value, face, edges, membership)) = newline {
                 if let Some(realized) = self
                     .faces
@@ -649,12 +757,17 @@ impl RowProgram {
                     row.height_px += row.line_spacing_px;
                 }
             }
-            if row.glyphs.iter().map(Vec::len).sum::<usize>() > self.limits.glyphs {
+            if completed_glyphs.saturating_add(row.glyphs.iter().map(Vec::len).sum::<usize>())
+                > self.limits.glyphs
+            {
                 return Err(RowProgramError::Budget);
             }
         }
         crate::glyph_row_writer::normalize_external_row(&mut row);
-        Ok(ComputedRow {
+        if let Some(fringe) = &self.geometry.fringe {
+            fringe.decorate_row(&mut row, false, !rows.is_empty());
+        }
+        rows.push(ComputedRow {
             row,
             slots,
             slot_heights,
@@ -663,9 +776,11 @@ impl RowProgram {
                 source_end.ok_or(RowProgramError::Incomplete)?,
             ),
             end: position,
+            end_kind: ComputedRowEnd::Newline,
             terminator_width,
             terminator_height,
-        })
+        });
+        Ok(rows)
     }
 }
 
@@ -680,6 +795,8 @@ mod tests {
     fn geometry(width: f32) -> RowProgramGeometry {
         RowProgramGeometry {
             inherited_line_spacing: 0.0,
+            character_wrap: false,
+            fringe: None,
             width,
             metrics: DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
             tabs: DisplayTabPolicy::every(4),
@@ -727,6 +844,83 @@ mod tests {
             DisplayRowFace::from_resolved(FaceId::new(1), &base),
             DisplayRowFace::from_resolved(FaceId::new(2), &tall),
         ]
+    }
+
+    fn ascii_wrapped_program(text: &str) -> RowProgram {
+        let face = FaceId::new(1);
+        let faces = vec![DisplayRowFace::from_resolved(
+            face,
+            &ResolvedFace::default(),
+        )];
+        let mut measurer = DisplayRowGlyphMeasurer::new(&faces, None, 8.0);
+        let mut geometry = geometry(32.0);
+        geometry.character_wrap = true;
+        RowProgram::capture(
+            geometry,
+            [
+                DisplayItem::new(
+                    SourceSpan::synthetic(1, 0, text.len()),
+                    RenderFaceRef::FaceId(face),
+                    DisplayItemKind::TextRun(DisplayTextRun::independent(text)),
+                ),
+                DisplayItem::new(
+                    SourceSpan::synthetic(1, text.len(), text.len() + 1),
+                    RenderFaceRef::FaceId(face),
+                    DisplayItemKind::RowBreak(DisplayRowBreak {
+                        line_height: DisplayLineHeightPolicy::Default,
+                        line_spacing: DisplayLineSpacingPolicy::Inherit,
+                    }),
+                ),
+            ],
+            faces.clone(),
+            &mut measurer,
+            limits(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn wrapped_program_bounds_visual_rows_and_total_glyphs() {
+        let program = ascii_wrapped_program("abcdefghijkl");
+        let rows = program.clone().compute_visual_rows(16, || false).unwrap();
+        assert!(rows.len() > 1);
+        assert!(
+            rows[..rows.len() - 1]
+                .iter()
+                .all(|row| row.end_kind == ComputedRowEnd::Continuation)
+        );
+        assert_eq!(rows.last().unwrap().end_kind, ComputedRowEnd::Newline);
+        assert_eq!(rows.iter().map(|row| row.slots.len()).sum::<usize>(), 12);
+        assert!(matches!(
+            program.clone().compute_visual_rows(1, || false),
+            Err(RowProgramError::Overflow)
+        ));
+        assert!(matches!(
+            program.clone().compute_visual_rows(0, || false),
+            Err(RowProgramError::Budget)
+        ));
+        let mut small = program;
+        small.limits.glyphs = 5;
+        assert!(matches!(
+            small.compute_visual_rows(16, || false),
+            Err(RowProgramError::Budget)
+        ));
+    }
+
+    #[test]
+    fn wrapped_program_rejects_tab_after_continuation_and_cancellation() {
+        assert!(matches!(
+            ascii_wrapped_program("abcdefghijkl\tz").compute_visual_rows(16, || false),
+            Err(RowProgramError::Overflow)
+        ));
+        let calls = std::cell::Cell::new(0);
+        assert!(matches!(
+            ascii_wrapped_program("abcdefghijkl").compute_visual_rows(16, || {
+                calls.set(calls.get() + 1);
+                calls.get() > 1
+            }),
+            Err(RowProgramError::Cancelled)
+        ));
     }
 
     #[test]

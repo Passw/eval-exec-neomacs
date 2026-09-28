@@ -76,6 +76,7 @@ impl FringeArrowBitmaps {
 /// Per-row decoration request for the truncation/continuation fringe arrows.
 /// Built for every installed body row from [`DisplayRowFlags`] and applied to
 /// the live `GlyphRow` (which also carries `truncated_left` / `reversed_p`).
+#[derive(Clone, Debug)]
 pub(crate) struct TruncationContinuationFringeRequest {
     /// First text-area display-row index (`display_text_row_base`).
     display_text_row_base: usize,
@@ -100,8 +101,26 @@ impl TruncationContinuationFringeRequest {
         display_text_row_base: usize,
         face_id: FaceId,
     ) -> Option<Self> {
-        let has_left_fringe = params.left_fringe_width > 0.0;
-        let has_right_fringe = params.right_fringe_width > 0.0;
+        Self::for_fringe_widths(
+            buffer,
+            ctx,
+            params.left_fringe_width,
+            params.right_fringe_width,
+            display_text_row_base,
+            face_id,
+        )
+    }
+
+    pub(crate) fn for_fringe_widths<B: LayoutBufferView>(
+        buffer: &B,
+        ctx: &Context,
+        left: f32,
+        right: f32,
+        display_text_row_base: usize,
+        face_id: FaceId,
+    ) -> Option<Self> {
+        let has_left_fringe = left > 0.0;
+        let has_right_fringe = right > 0.0;
         if !has_left_fringe && !has_right_fringe {
             return None;
         }
@@ -116,6 +135,20 @@ impl TruncationContinuationFringeRequest {
             bitmaps,
             face_id,
         })
+    }
+
+    /// Apply the same resolved decoration to a detached worker row.
+    pub(crate) fn decorate_row(&self, row: &mut GlyphRow, continued: bool, continuation: bool) {
+        FringeArrowRowMutation {
+            continued,
+            continuation,
+            truncated_right: false,
+            has_left_fringe: self.has_left_fringe,
+            has_right_fringe: self.has_right_fringe,
+            bitmaps: self.bitmaps,
+            face_id: self.face_id,
+        }
+        .apply(row, 0);
     }
 
     /// Walk every text-area row and install the arrow bitmaps that its state
