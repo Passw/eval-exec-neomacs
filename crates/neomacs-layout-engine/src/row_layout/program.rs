@@ -339,6 +339,7 @@ pub(crate) enum RowMeasurements<'a> {
 }
 
 mod assembly;
+mod continuation;
 
 impl RowProgram {
     /// The iterator must be bounded at acquisition, before it allocates an
@@ -591,26 +592,16 @@ impl RowProgram {
         if row_limit == 0 {
             return Err(RowProgramError::Budget);
         }
-        // Contextual shaping and box/extend carryover still require the
-        // canonical buffer walk.
-        // A later unsupported item must not silently inherit a reset origin.
+        // Contextual shaping and non-text source transitions still require
+        // the canonical buffer walk. A later unsupported item must not
+        // silently inherit a reset origin.
         let can_wrap = self.geometry.character_wrap
-            && self.geometry.inherited_line_spacing == 0.0
-            && self.faces.iter().all(|face| {
-                !face.extend && face.box_type == neomacs_display_protocol::face::BoxType::None
-            })
             && self
                 .operations
                 .iter()
                 .all(|(operation, _)| match operation {
-                    Operation::Text(text) => {
-                        text.run.text.is_ascii() && text.layout == DisplayItemLayout::default()
-                    }
-                    Operation::Break {
-                        line_height,
-                        line_spacing,
-                        ..
-                    } => *line_height == DisplayLineHeightPolicy::Default && *line_spacing == 0.0,
+                    Operation::Text(text) => text.run.text.is_ascii(),
+                    Operation::Break { .. } => true,
                     _ => false,
                 });
         let physical_complete = self.is_complete();
@@ -625,6 +616,7 @@ impl RowProgram {
         let mut terminator_height = self.geometry.metrics.row_height();
         let mut rows = Vec::new();
         let mut completed_glyphs = 0usize;
+        let mut predecessor_extend = None;
         let mut physical_line_tabs =
             crate::display_row::builder::DisplayPhysicalLineTabState::default();
         let operations: Vec<_> = self
@@ -673,6 +665,22 @@ impl RowProgram {
                 .map(|face| face.metrics)
                 .ok_or(RowProgramError::Unsupported)?;
             let face_height = face_metrics.line_height_px();
+            let active_extend = self
+                .faces
+                .iter()
+                .find(|value| value.face_id == face && value.extend)
+                .map(|value| {
+                    crate::display_row::face_state::DisplayRowExtendFace::new(
+                        value.background,
+                        face,
+                        crate::display_row::metrics::DisplayRowMeasuredFaceMetrics::new(
+                            face_metrics.char_width_px(self.geometry.metrics.char_width()),
+                            face_height,
+                            face_metrics.ascent_px(),
+                            0.0,
+                        ),
+                    )
+                });
             // Visible buffer layout installs the active face's minimum
             // extents before emitting an item. Preserve that descent even
             // when every glyph in the item is raised above the baseline.
@@ -708,8 +716,8 @@ impl RowProgram {
                     checkpoint,
                     DisplayRowGlyphCheckpoint::capture(&row),
                     &progress,
-                    None,
-                    None,
+                    predecessor_extend,
+                    active_extend,
                 );
                 // The canonical scalar overflow path records the next word
                 // boundary even when its first glyph did not fit this row.
@@ -733,12 +741,21 @@ impl RowProgram {
                         (None, None),
                         DisplayRowGlyphCheckpoint::capture(&row),
                         progress.end(),
-                        None,
+                        if progress.slots().is_empty() {
+                            predecessor_extend
+                        } else {
+                            active_extend
+                        },
                     );
                 }
             }
             position = progress.end();
-            slot_heights.extend(std::iter::repeat_n(face_height, progress.slots().len()));
+            slot_heights.extend(
+                progress
+                    .slots()
+                    .iter()
+                    .map(|slot| slot.cell_height(face_height, self.geometry.metrics.row_height())),
+            );
             slots.extend(progress.slots().iter().cloned());
             let row_glyphs = row.glyphs.iter().map(Vec::len).sum::<usize>();
             if row_glyphs > 256 || completed_glyphs.saturating_add(row_glyphs) > self.limits.glyphs
@@ -749,8 +766,10 @@ impl RowProgram {
                 if !can_split || slots.is_empty() {
                     return Err(RowProgramError::Overflow);
                 }
+                let mut wrap_extend = active_extend;
                 let (next_index, next_offset) = if word_wrap.has_candidate() {
                     let candidate = word_wrap.candidate();
+                    wrap_extend = candidate.row_extend();
                     let boundary = candidate.source_position().charpos();
                     let (index, offset) = operations
                         .iter()
@@ -785,6 +804,19 @@ impl RowProgram {
                     .span
                     .start
                     .advanced_by(next_offset, next_offset);
+                continuation::extend_background(
+                    &mut row,
+                    wrap_extend,
+                    position,
+                    &self.geometry,
+                    self.measurements.backend,
+                );
+                let row_glyphs = row.glyphs.iter().map(Vec::len).sum::<usize>();
+                if row_glyphs > 256
+                    || completed_glyphs.saturating_add(row_glyphs) > self.limits.glyphs
+                {
+                    return Err(RowProgramError::Budget);
+                }
                 crate::glyph_row_writer::normalize_external_row(&mut row);
                 if let Some(fringe) = &self.geometry.fringe {
                     fringe.decorate_row(&mut row, true, !rows.is_empty());
@@ -813,8 +845,10 @@ impl RowProgram {
                 operation_index = next_index;
                 operation_offset = next_offset;
                 word_wrap.reset_after_row_transition();
+                predecessor_extend = None;
                 continue;
             }
+            predecessor_extend = active_extend;
             operation_index += 1;
             operation_offset = 0;
             if let Some((value, face, edges, membership)) = newline {

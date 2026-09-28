@@ -1186,15 +1186,15 @@ impl RetainedWindowMatrix {
                     })
             })
             .flatten();
-        // The replay cursor currently reconstructs a row-sized cell. Raised
-        // and lowered glyphs need the canonical cursor capture policy, which
-        // can choose a different height from that row's accumulated extents.
+        // Replay combines the point face's metrics with the retained row
+        // through the canonical cursor rule. Unmeasured raised glyphs cannot
+        // establish that geometry and still require a fresh walk.
         if (retained_cursor.is_none()
             && cursor_row
                 .glyphs
                 .iter()
                 .flatten()
-                .any(|glyph| glyph.vertical_offset_px != 0.0))
+                .any(|glyph| glyph.vertical_offset_px != 0.0 && glyph.pixel_height <= 0.0))
             || cursor_row.continued
             || cursor_row.truncated_left
             || cursor_row.left_fringe_bitmap.is_some()

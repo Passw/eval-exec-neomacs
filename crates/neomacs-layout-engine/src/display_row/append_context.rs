@@ -933,7 +933,7 @@ impl DisplayRowAppendFrame {
             self.geometry().y(),
             self.glyph_y(),
             kind.output_height(self),
-        )
+        ).with_default_height(self.default_row_height())
     }
 }
 

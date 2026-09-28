@@ -1107,6 +1107,7 @@ pub(crate) struct DisplayRowGlyphSlot {
     width_px: f32,
     width_cols: usize,
     coverage: DisplayRowGlyphCoverage,
+    default_cell_height: bool,
 }
 
 /// Source positions and paint primitives are not one-to-one. Composition
@@ -1148,7 +1149,19 @@ impl DisplayRowGlyphSlot {
             coverage: DisplayRowGlyphCoverage::Primitive {
                 source_chars: std::num::NonZeroUsize::MIN,
             },
+            default_cell_height: false,
         }
+    }
+
+    /// Buffer TAB hit cells use the window default height, independently
+    /// of the font supplying the tab's horizontal space advance.
+    fn with_default_cell_height(mut self, use_default: bool) -> Self {
+        self.default_cell_height = use_default;
+        self
+    }
+
+    pub(crate) fn cell_height(&self, face_height: f32, default_height: f32) -> f32 {
+        if self.default_cell_height { default_height } else { face_height }
     }
 
     pub(crate) fn source(&self) -> DisplaySourcePosition {
@@ -2036,7 +2049,7 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
                 written.width_px(),
                 written.width_cols(),
                 pointer_appearance.cloned(),
-            ));
+            ).with_default_cell_height(ch == '\t' && matches!(source_mapping, DisplayTextSourceMapping::NaturalText)));
             self.advance(written);
             metrics.add(written);
             byte_offset += ch.len_utf8();

@@ -138,7 +138,7 @@ fn cursor_only_reuses_an_untouched_window_whose_point_sits_on_the_last_row() {
 }
 
 #[test]
-fn cursor_replay_declines_raised_and_lowered_cursor_rows() {
+fn cursor_replay_declines_unmeasured_raised_and_lowered_cursor_rows() {
     for offset in [-4.0, 4.0] {
         let mut retained = synthetic_matrix(0, 5);
         let current = retained.key.clone();

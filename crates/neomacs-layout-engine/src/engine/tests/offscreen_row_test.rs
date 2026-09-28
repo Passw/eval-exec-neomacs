@@ -1908,3 +1908,84 @@ fn worker_prepares_tabs_after_wrapped_text_with_physical_line_origin() {
         }
     }
 }
+
+#[test]
+fn worker_prepares_wrapped_raised_and_spaced_rows() {
+    let line = format!("{}\tend\n", "words W ".repeat(24));
+    let start = 120 * line.len();
+    for properties in [
+        "'display '(raise 0.2)",
+        "'display '(raise -0.2)",
+        "'line-height 1.3",
+        "'line-spacing 3",
+    ] {
+        first_visit_with_setup(
+            None,
+            &line,
+            None,
+            0,
+            2,
+            Some(&format!(
+                "(setq word-wrap t) (put-text-property {} {} {properties})",
+                start + 1,
+                start + 12 * line.len()
+            )),
+        );
+    }
+}
+
+#[test]
+fn worker_prepares_wrapped_box_and_extended_faces() {
+    for face in [
+        "(:background \"red\" :extend t)",
+        "(:box (:line-width 2 :color \"blue\") :background \"red\" :extend t)",
+        "(:family \"DejaVu Serif\" :weight bold :slant italic :height 125)",
+    ] {
+        first_visit_with_setup(
+            Some(face),
+            &format!("{}\tend\n", "words W ".repeat(24)),
+            None,
+            0,
+            1,
+            Some("(setq word-wrap t)"),
+        );
+    }
+}
+
+#[test]
+fn worker_prepares_wrapped_rows_with_inherited_spacing() {
+    for spacing in ["3", "0.5"] {
+        first_visit_with_setup(
+            None,
+            &format!("{}\tend\n", "words W ".repeat(24)),
+            None,
+            0,
+            1,
+            Some(&format!("(setq word-wrap t line-spacing {spacing})")),
+        );
+    }
+}
+
+#[test]
+fn worker_word_wrapping_rewinds_extended_face_boundaries() {
+    let line = format!("{}\n", "wide words ".repeat(18));
+    let start = 120 * line.len() + 1;
+    for face_at in [70, 80, 90, 100] {
+        first_visit_with_setup(
+            None,
+            &line,
+            None,
+            0,
+            1,
+            Some(&format!(
+                "(setq word-wrap t)
+             (let ((p {start}) (i 0))
+               (while (< i 12)
+                 (put-text-property (+ p {face_at}) (+ p {face_at} 20)
+                    'face '(:height 180 :background \"red\" :extend t :box (:line-width 2)))
+                 (setq i (+ i 1) p (+ p {}))))",
+                line.len()
+            )),
+        );
+    }
+}
