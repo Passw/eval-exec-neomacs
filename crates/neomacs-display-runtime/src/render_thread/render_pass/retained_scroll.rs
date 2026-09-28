@@ -8,38 +8,16 @@ use neomacs_display_protocol::{
     scroll_coverage::ScrollSurface,
 };
 use neomacs_renderer_wgpu::{SnapshotLease, SnapshotSize, WgpuRenderer};
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
-// Default startup goes through the Lisp effect gallery. Its public color
-// representation is sRGB text, so that roundtrip quantizes even disabled
-// colors. Admit both representations of the same static body profiles.
-static STATIC_BODY_PROFILES: LazyLock<Vec<neomacs_display_protocol::EffectsConfig>> =
-    LazyLock::new(|| {
-        use neomacs_display_protocol::{EffectOperation, EffectsConfig};
-        let normal = EffectsConfig::default();
-        let operations = normal
-            .effect_names()
-            .into_iter()
-            .map(|name| {
-                let values = normal
-                    .effect_values(&name)
-                    .expect("registered default effect");
-                EffectOperation::set(name, values)
-            })
-            .collect::<Vec<_>>();
-        let gallery = normal
-            .apply_effects(&operations)
-            .expect("default gallery roundtrip");
-        let mut profiles = Vec::with_capacity(6);
-        for normal in [normal, gallery] {
-            let mut quiet = normal.clone();
-            quiet.cursor_color_cycle.enabled = false;
-            let mut software = quiet.clone();
-            software.scroll_bar.width = 0;
-            profiles.extend([normal, quiet, software]);
-        }
-        profiles
-    });
+// Inactive parameters do not affect body pixels. In particular, startup's
+// Lisp gallery rounds colors through sRGB strings even for disabled effects.
+// Check activation rather than comparing complete configuration snapshots.
+fn static_body_effects(effects: &neomacs_display_protocol::EffectsConfig) -> bool {
+    !effects.has_enabled_effects_other_than_cursor_color_cycle()
+        && effects.bg_pattern.style == 0
+        && effects.mode_line_separator.style == 0
+}
 
 pub(in crate::render_thread) struct RetainedScroll {
     surface: Arc<ScrollSurface>,
@@ -189,10 +167,10 @@ pub(super) fn prepare(
         return None;
     };
     // Effects which alter body pixels need their own raster dependencies.
-    // Default effects are static body paint; live effects and custom profiles
-    // conservatively retain the established full-render path.
+    // Enabled body effects and live overlays conservatively retain the
+    // established full-render path. Disabled parameters are not dependencies.
     if has_gradient
-        || !STATIC_BODY_PROFILES.contains(&renderer.effects)
+        || !static_body_effects(&renderer.effects)
         || render.compositor.renderer_effects.needs_redraw()
         || super::retained_static::window_has_active_overlays(render)
         || std::env::var_os("NEOMACS_DISABLE_RETAINED_SCROLL").is_some()

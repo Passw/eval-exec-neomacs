@@ -295,7 +295,9 @@ fn software_quality_profile_allows_retained_scroll() {
         RenderBackendProfile::software(),
         &neomacs_display_protocol::VisualConfig::default(),
     );
-    assert!(STATIC_BODY_PROFILES.contains(&policy.effective_visual_config().effects));
+    assert!(static_body_effects(
+        &policy.effective_visual_config().effects
+    ));
 }
 
 #[test]
@@ -308,10 +310,52 @@ fn gallery_roundtrip_allows_retained_scroll() {
         .map(|name| EffectOperation::set(name.clone(), defaults.effect_values(&name).unwrap()))
         .collect::<Vec<_>>();
     let actual = defaults.apply_effects(&operations).unwrap();
-    assert!(STATIC_BODY_PROFILES.contains(&actual));
+    assert!(static_body_effects(&actual));
     use crate::render_thread::render_quality::{RenderBackendProfile, RenderQualityPolicy};
     let mut requested = neomacs_display_protocol::VisualConfig::default();
     requested.effects = actual;
     let policy = RenderQualityPolicy::negotiate(RenderBackendProfile::software(), &requested);
-    assert!(STATIC_BODY_PROFILES.contains(&policy.effective_visual_config().effects));
+    assert!(static_body_effects(
+        &policy.effective_visual_config().effects
+    ));
+}
+
+#[test]
+fn disabled_effect_parameters_do_not_veto_static_body_rasters() {
+    let mut effects = neomacs_display_protocol::EffectsConfig::default();
+    effects.argyle_pattern.color = (0.2, 0.4, 0.6);
+    effects.bg_pattern.spacing = 37.0;
+    assert!(
+        static_body_effects(&effects),
+        "inactive properties cannot change body pixels"
+    );
+}
+
+#[test]
+fn every_enabled_effect_has_an_explicit_static_body_decision() {
+    use neomacs_display_protocol::{EffectOperation, EffectValue, EffectsConfig};
+    let defaults = EffectsConfig::default();
+    for name in defaults.effect_names() {
+        let values = defaults.effect_values(&name).unwrap();
+        if !values.iter().any(|(property, _)| property == "enabled") {
+            continue;
+        }
+        let enabled = defaults
+            .apply_effects(&[EffectOperation::set(
+                name.clone(),
+                [("enabled", EffectValue::Bool(true))],
+            )])
+            .unwrap();
+        assert_eq!(
+            static_body_effects(&enabled),
+            name == "cursor-color-cycle",
+            "{name}"
+        );
+    }
+    let mut patterned = defaults.clone();
+    patterned.bg_pattern.style = 1;
+    assert!(!static_body_effects(&patterned));
+    patterned = defaults;
+    patterned.mode_line_separator.style = 1;
+    assert!(!static_body_effects(&patterned));
 }
