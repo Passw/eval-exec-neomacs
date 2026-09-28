@@ -801,6 +801,15 @@ impl FontMetricsService {
         })
     }
 
+    pub(crate) fn worker_font_policy_fits_cache(
+        &self,
+        policy: &DetachedFontPolicy,
+        limit: usize,
+    ) -> bool {
+        self.font_resolver
+            .worker_policy_fits_cache(&policy.characters, limit)
+    }
+
     pub(crate) fn install_worker_font_policy(&mut self, policy: &DetachedFontPolicy) {
         // ASCII always selects its face's primary font. Keep the previous
         // symbol classifier/cache warm until a Unicode row actually needs it.

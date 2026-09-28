@@ -177,7 +177,8 @@ pub(crate) struct WorkerFontMeasurements {
     service: Option<FontMetricsService>,
     revision: Option<MeasurementRevision>,
     faces: Vec<(String, u16, bool, u32)>,
-    character_queries: usize,
+    #[cfg(test)]
+    cache_rebuilds: usize,
 }
 
 impl WorkerFontMeasurements {
@@ -190,14 +191,34 @@ impl WorkerFontMeasurements {
         if cancelled() || faces.len() != snapshot.receipts.len() {
             return Err(RowProgramError::Cancelled);
         }
+        let mut new_faces: rustc_hash::FxHashSet<_> = faces
+            .iter()
+            .map(|face| {
+                (
+                    face.font_family.as_str(),
+                    face.font_weight,
+                    face.italic,
+                    face.font_size.to_bits(),
+                )
+            })
+            .collect();
+        for (family, weight, italic, size) in &self.faces {
+            new_faces.remove(&(family.as_str(), *weight, *italic, *size));
+        }
         if self.revision != Some(snapshot.revision)
-            || self.faces.len() + faces.len() > MAX_CACHED_FACES
-            || self.character_queries + snapshot.policy.query_count() > MAX_CACHED_CHARACTER_QUERIES
+            || self.faces.len() + new_faces.len() > MAX_CACHED_FACES
+            || self.service.as_ref().is_none_or(|service| {
+                !service
+                    .worker_font_policy_fits_cache(&snapshot.policy, MAX_CACHED_CHARACTER_QUERIES)
+            })
         {
             self.service = Some(FontMetricsService::new());
+            #[cfg(test)]
+            {
+                self.cache_rebuilds += 1;
+            }
             self.revision = Some(snapshot.revision);
             self.faces.clear();
-            self.character_queries = 0;
         }
         let service = self
             .service
@@ -235,7 +256,6 @@ impl WorkerFontMeasurements {
                 self.faces.push(key);
             }
         }
-        self.character_queries += snapshot.policy.query_count();
         service.install_worker_font_policy(&snapshot.policy);
         Ok(service)
     }
@@ -300,7 +320,7 @@ mod tests {
         }
     }
     #[test]
-    fn worker_character_query_budget_rebuilds_the_native_cache() {
+    fn repeated_worker_unicode_queries_keep_native_font_caches_warm() {
         use crate::display_item::*;
         let mut source = FontMetricsService::new();
         let faces = [face()];
@@ -310,11 +330,47 @@ mod tests {
             DisplayItemKind::TextRun(DisplayTextRun::independent("中")),
         )];
         let snapshot = FontMeasurementSnapshot::capture(&faces, &mut source, &items).unwrap();
-        assert_eq!(snapshot.policy.query_count(), 1);
         let mut worker = WorkerFontMeasurements::default();
-        worker.prepare(&snapshot, &faces, &|| false).unwrap();
-        worker.character_queries = MAX_CACHED_CHARACTER_QUERIES;
-        worker.prepare(&snapshot, &faces, &|| false).unwrap();
-        assert_eq!(worker.character_queries, 1);
+        for _ in 0..MAX_CACHED_CHARACTER_QUERIES + 1 {
+            let service = worker.prepare(&snapshot, &faces, &|| false).unwrap();
+            let face = &faces[0];
+            assert!(
+                service
+                    .resolved_font_for_char(
+                        '中',
+                        &face.font_family,
+                        face.font_weight,
+                        face.italic,
+                        face.font_size
+                    )
+                    .is_some()
+            );
+            assert!(!service.worker_font_policy_missing());
+        }
+        assert_eq!(
+            worker.cache_rebuilds, 1,
+            "repeated use is not working-set growth"
+        );
+    }
+
+    #[test]
+    fn worker_font_face_budget_counts_distinct_selections() {
+        let mut source = FontMetricsService::new();
+        let mut worker = WorkerFontMeasurements::default();
+        for index in 0..MAX_CACHED_FACES {
+            let mut current = face();
+            current.font_size = 10.0 + index as f32;
+            let faces = [current];
+            let snapshot = FontMeasurementSnapshot::capture(&faces, &mut source, &[]).unwrap();
+            worker.prepare(&snapshot, &faces, &|| false).unwrap();
+        }
+        for size in [10.0, 10.0 + MAX_CACHED_FACES as f32] {
+            let mut current = face();
+            current.font_size = size;
+            let faces = [current];
+            let snapshot = FontMeasurementSnapshot::capture(&faces, &mut source, &[]).unwrap();
+            worker.prepare(&snapshot, &faces, &|| false).unwrap();
+            assert_eq!(worker.cache_rebuilds, if size == 10.0 { 1 } else { 2 });
+        }
     }
 }

@@ -600,6 +600,9 @@ impl FontResolver {
     }
 
     pub(crate) fn clear_caches(&mut self) {
+        if let Some(policy) = &mut self.worker_policy {
+            policy.admitted_queries.clear();
+        }
         self.backend.advance_catalog_generation();
         self.primary_cache
             .get_mut()

@@ -13,6 +13,7 @@ pub(crate) struct FrozenCharacterPolicies {
 pub(super) struct WorkerPolicy {
     pub policies: Arc<FrozenCharacterPolicies>,
     missing: AtomicBool,
+    pub(super) admitted_queries: HashSet<CharCacheKey>,
 }
 
 impl FrozenCharacterPolicies {
@@ -175,10 +176,37 @@ impl CapturedCharacterPolicy {
 }
 
 impl FontResolver {
+    /// Bound distinct admitted queries, including primary-font selections
+    /// that populate measurement caches without entering native fallback.
+    /// Repeated requests consume no additional working-set capacity.
+    pub(crate) fn worker_policy_fits_cache(
+        &self,
+        policy: &FrozenCharacterPolicies,
+        limit: usize,
+    ) -> bool {
+        let Some(current) = &self.worker_policy else {
+            return policy.queries.len() <= limit;
+        };
+        current.admitted_queries.len().saturating_add(
+            policy
+                .queries
+                .keys()
+                .filter(|key| !current.admitted_queries.contains(*key))
+                .count(),
+        ) <= limit
+    }
+
     pub(crate) fn install_worker_policy(&mut self, policies: Arc<FrozenCharacterPolicies>) {
+        let mut admitted_queries = self
+            .worker_policy
+            .take()
+            .map(|previous| previous.admitted_queries)
+            .unwrap_or_default();
+        admitted_queries.extend(policies.queries.keys().cloned());
         self.worker_policy = Some(WorkerPolicy {
             policies,
             missing: AtomicBool::new(false),
+            admitted_queries,
         });
     }
     pub(crate) fn worker_policy_missing(&self) -> bool {
@@ -211,5 +239,37 @@ impl FontResolver {
             cache.insert(key, selected.clone());
         }
         selected
+    }
+}
+
+#[cfg(test)]
+mod cache_budget_tests {
+    use super::*;
+
+    #[test]
+    fn worker_query_budget_reserves_distinct_requests_before_native_lookup() {
+        let mut resolver = FontResolver::platform_default();
+        let size = FontSelectionSize::new(
+            14.0,
+            neomacs_display_protocol::DeviceScale::new(1.0).unwrap(),
+        );
+        let policy = Arc::new(
+            FrozenCharacterPolicies::capture(&[("monospace", '中', 400, false, size)], 4096)
+                .unwrap(),
+        );
+        let other = Arc::new(
+            FrozenCharacterPolicies::capture(&[("monospace", '文', 400, false, size)], 4096)
+                .unwrap(),
+        );
+        assert!(resolver.worker_policy_fits_cache(&policy, 1));
+        resolver.install_worker_policy(policy.clone());
+        assert!(resolver.worker_policy_fits_cache(&policy, 1));
+        assert!(!resolver.worker_policy_fits_cache(&other, 1));
+        assert!(resolver.worker_policy_fits_cache(&other, 2));
+        resolver.install_worker_policy(other);
+        assert!(!resolver.worker_policy_fits_cache(&policy, 1));
+        assert!(resolver.worker_policy_fits_cache(&policy, 2));
+        resolver.clear_caches();
+        assert!(resolver.worker_policy_fits_cache(&policy, 1));
     }
 }
