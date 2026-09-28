@@ -19,6 +19,7 @@ impl PreparedViewports {
         arena: &FrameFaceArena,
         metrics: &mut Option<crate::font::metrics::FontMetricsService>,
     ) {
+        self.retire_invalid_dependencies();
         self.export_epochs.retain(|(old_frame, window, _, _)| {
             *old_frame == frame && retained.contains_key(window)
         });
@@ -68,6 +69,7 @@ impl PreparedViewports {
             .iter()
             .filter(|entry| {
                 entry.computed
+                    && entry.dependencies_valid()
                     && entry.frame == frame
                     && entry.window == window
                     && RetainedWindowKey::row_content_eligible(&entry.retained.key, &current.key)

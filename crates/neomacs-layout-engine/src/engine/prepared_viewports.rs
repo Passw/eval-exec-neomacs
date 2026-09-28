@@ -9,6 +9,7 @@ mod export;
 use super::*;
 use crate::frame_face_arena::PreparedFaceSnapshot;
 use crate::incremental_layout::WindowDelta;
+use neovm_core::tagged::collection_reads::CollectionReads;
 use std::collections::VecDeque;
 
 const MAX_VIEWPORTS: usize = 8;
@@ -23,23 +24,56 @@ struct PreparedViewport {
     rows: usize,
     glyphs: usize,
     computed: bool,
+    reads: Option<CollectionReads>,
+}
+
+impl PreparedViewport {
+    fn dependencies_valid(&self) -> bool {
+        self.reads
+            .as_ref()
+            .is_none_or(CollectionReads::unchanged_and_observe)
+    }
 }
 
 #[derive(Default)]
 pub(super) struct PreparedViewports {
     entries: VecDeque<PreparedViewport>,
-    export_epochs: Vec<(neovm_core::window::FrameId, DisplayWindowId, RetainedWindowKey, u64)>,
+    pub(super) invalidated: Vec<(neovm_core::window::FrameId, DisplayWindowId)>,
+    export_epochs: Vec<(
+        neovm_core::window::FrameId,
+        DisplayWindowId,
+        RetainedWindowKey,
+        u64,
+    )>,
 }
 
 impl PreparedViewports {
+    pub(super) fn retire_invalid_dependencies(&mut self) {
+        self.entries.retain(|entry| {
+            if entry.dependencies_valid() {
+                return true;
+            }
+            let owner = (entry.frame, entry.window);
+            if !self.invalidated.contains(&owner) {
+                self.invalidated.push(owner);
+            }
+            self.export_epochs
+                .retain(|(frame, window, _, _)| (*frame, *window) != owner);
+            false
+        });
+    }
+
     pub(super) fn has_computed(
         &self,
         frame: neovm_core::window::FrameId,
         window: DisplayWindowId,
     ) -> bool {
-        self.entries
-            .iter()
-            .any(|entry| entry.computed && entry.frame == frame && entry.window == window)
+        self.entries.iter().any(|entry| {
+            entry.computed
+                && entry.frame == frame
+                && entry.window == window
+                && entry.dependencies_valid()
+        })
     }
 
     pub(super) fn insert_computed(
@@ -48,6 +82,7 @@ impl PreparedViewports {
         window: DisplayWindowId,
         retained: RetainedWindowMatrix,
         faces: PreparedFaceSnapshot,
+        reads: CollectionReads,
     ) {
         let rows = retained.matrix.rows.len();
         let glyphs = retained
@@ -73,6 +108,7 @@ impl PreparedViewports {
             rows,
             glyphs,
             computed: true,
+            reads: Some(reads),
         });
         self.trim();
     }
@@ -94,7 +130,8 @@ impl PreparedViewports {
         force_start: bool,
     ) -> Option<(CursorOnlyReplay, PreparedFaceSnapshot)> {
         self.entries.iter().rev().find_map(|entry| {
-            if entry.frame != frame
+            if !entry.dependencies_valid()
+                || entry.frame != frame
                 || entry.window != window
                 || entry.retained.key.window_start != key.window_start
             {
@@ -127,7 +164,8 @@ impl PreparedViewports {
             return None;
         }
         self.entries.iter().rev().find_map(|entry| {
-            if !entry.computed
+            if !entry.dependencies_valid()
+                || !entry.computed
                 || entry.frame != frame
                 || entry.window != window
                 || entry.retained.key.window_start <= key.window_start
@@ -205,9 +243,7 @@ impl PreparedViewports {
                 if row.start_charpos != next {
                     return None;
                 }
-                if y >= bottom
-                    || index >= geometry.display_text_row_base + geometry.max_rows
-                {
+                if y >= bottom || index >= geometry.display_text_row_base + geometry.max_rows {
                     break;
                 }
                 let destination = candidate.matrix.rows.get_mut(index)?;
@@ -227,7 +263,8 @@ impl PreparedViewports {
             }
             // Any row intersecting the body is laid out in full, then clipped.
             if (y < bottom && index < geometry.display_text_row_base + geometry.max_rows)
-                || index == last_index + 1 {
+                || index == last_index + 1
+            {
                 return None;
             }
             snapshot.rows.extend(
@@ -278,7 +315,8 @@ impl PreparedViewports {
         minimum_reused: usize,
     ) -> Option<(ScrollReplay, PreparedFaceSnapshot)> {
         self.entries.iter().rev().find_map(|entry| {
-            if entry.frame != frame
+            if !entry.dependencies_valid()
+                || entry.frame != frame
                 || entry.window != window
                 || entry.retained.key.window_start >= key.window_start
             {
@@ -313,6 +351,7 @@ impl PreparedViewports {
         next: &rustc_hash::FxHashMap<DisplayWindowId, RetainedWindowMatrix>,
         faces: Option<&FrameFaceArena>,
     ) {
+        self.retire_invalid_dependencies();
         self.entries.retain(|entry| {
             if entry.frame != frame {
                 return true;
@@ -366,6 +405,7 @@ impl PreparedViewports {
                 rows,
                 glyphs,
                 computed: false,
+                reads: None,
             });
         }
         self.trim();

@@ -1217,3 +1217,74 @@ fn deleting_capture_owner_allows_remaining_window_preparation() {
         neomacs_display_protocol::types::DisplayWindowId::new(selected.0 as i64)
     ));
 }
+
+#[test]
+fn worker_page_is_rejected_after_in_place_display_property_mutation() {
+    first_visit_with_setup(
+        None,
+        "ordinary offscreen text\n",
+        Some("(setcar (cdr worker-raise-spec) 0.75)"),
+        0,
+        16,
+        Some(
+            "(progn (setq worker-raise-spec (list 'raise 0.25)) (put-text-property 2761 3100 'display worker-raise-spec))",
+        ),
+    );
+}
+
+#[test]
+fn worker_capture_rejects_mutation_between_idle_steps() {
+    let (mut eval, frame, _, window) =
+        incr_editing_frame(&"ordinary offscreen text\n".repeat(300), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str("(progn (setq worker-raise-spec (list 'raise 0.25)) (put-text-property 2761 3500 'display worker-raise-spec))").unwrap();
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    engine
+        .begin_scroll_coverage(&eval, frame, window, CharPos0::new(2880))
+        .unwrap();
+    assert_eq!(engine.capture_scroll_step(&eval), Ok(true));
+    eval.eval_str("(setcar (cdr worker-raise-spec) 0.75)")
+        .unwrap();
+    assert_eq!(
+        engine.capture_scroll_step(&eval),
+        Err(crate::row_layout::program::RowProgramError::Cancelled)
+    );
+}
+
+#[test]
+fn worker_admission_rejects_mutation_after_capture() {
+    let (mut eval, frame, _, window) =
+        incr_editing_frame(&"ordinary offscreen text\n".repeat(300), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str("(progn (setq worker-raise-spec (list 'raise 0.25)) (put-text-property 2761 3500 'display worker-raise-spec))").unwrap();
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    engine
+        .request_scroll_coverage(&eval, frame, window, CharPos0::new(2880))
+        .unwrap();
+    eval.eval_str("(setcar (cdr worker-raise-spec) 0.75)")
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        match engine.scroll_coverage.drain(&mut engine.prepared_viewports) {
+            Ok(false) => {
+                assert!(std::time::Instant::now() < deadline);
+                std::thread::yield_now();
+            }
+            result => {
+                assert_eq!(
+                    result,
+                    Err(crate::row_layout::program::RowProgramError::Cancelled)
+                );
+                break;
+            }
+        }
+    }
+}

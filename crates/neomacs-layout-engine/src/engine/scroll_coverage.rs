@@ -18,6 +18,7 @@ use crate::row_layout::program::{
 use crate::row_layout::worker::{RowJobTicket, RowWorker};
 use crate::window_output::prepared_body::position_buffer_rows;
 use neovm_core::buffer::CharPos0;
+use neovm_core::tagged::collection_reads::{self, CollectionReads};
 use neovm_core::window::{FrameId, WindowId};
 
 /// Keep speculative work bounded, including cyclic user lists. Recheck at
@@ -46,6 +47,7 @@ pub(super) fn inactive_overlay_arrows(evaluator: &neovm_core::emacs_core::Contex
 }
 
 struct Admission {
+    reads: CollectionReads,
     frame: FrameId,
     window: DisplayWindowId,
     ticket: RowJobTicket,
@@ -55,6 +57,7 @@ struct Admission {
 }
 
 struct Capture {
+    reads: Option<CollectionReads>,
     frame: FrameId,
     window: WindowId,
     retained: RetainedWindowMatrix,
@@ -115,7 +118,7 @@ impl ScrollCoverage {
         let Some(mut admission) = self.admission.take() else {
             return Err(RowProgramError::Cancelled);
         };
-        if admission.ticket != result.ticket {
+        if admission.ticket != result.ticket || !admission.reads.unchanged() {
             return Err(RowProgramError::Cancelled);
         }
         let mut rows = result.rows?;
@@ -176,6 +179,7 @@ impl ScrollCoverage {
             admission.window,
             admission.retained,
             admission.faces,
+            admission.reads,
         );
         Ok(true)
     }
@@ -194,6 +198,10 @@ impl LayoutEngine {
         evaluator: &neovm_core::emacs_core::Context,
     ) -> Option<std::time::Duration> {
         use std::time::Duration;
+        self.prepared_viewports.retire_invalid_dependencies();
+        for (_, window) in self.prepared_viewports.invalidated.drain(..) {
+            self.scroll_coverage.windows.remove(&window);
+        }
         let frame = evaluator.frame_manager().selected_frame()?;
         if self.retained_frame != Some(frame.id) || self.font_metrics.is_none() {
             self.scroll_coverage.cancel();
@@ -465,6 +473,7 @@ impl LayoutEngine {
         self.scroll_coverage.worker.cancel();
         self.scroll_coverage.admission = None;
         self.scroll_coverage.capture = Some(Capture {
+            reads: None,
             frame,
             window,
             retained,
@@ -510,7 +519,20 @@ impl LayoutEngine {
                 .map_err(|_| RowProgramError::Unsupported)?,
             None => arena.begin_attempt(),
         };
-        self.capture_scroll_row(evaluator, &mut capture)?;
+        // Each idle step extends the exact main-thread read certificate.
+        // No Lisp values or collection identities are sent to the worker.
+        let (result, reads) = collection_reads::capture(|| {
+            if capture
+                .reads
+                .as_ref()
+                .is_some_and(|reads| !reads.unchanged_and_observe())
+            {
+                return Err(RowProgramError::Cancelled);
+            }
+            self.capture_scroll_row(evaluator, &mut capture)
+        });
+        result?;
+        capture.reads = Some(reads.ok_or(RowProgramError::Budget)?);
         // Reserve after every bounded step: an intervening timer redisplay
         // may seal another arena generation before the next idle wake.
         let faces = self
@@ -527,6 +549,7 @@ impl LayoutEngine {
         tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", start = capture.retained.key.window_start, rows = capture.programs.len(), "submitting unseen page");
         let ticket = self.scroll_coverage.worker.submit(capture.programs)?;
         self.scroll_coverage.admission = Some(Admission {
+            reads: capture.reads.ok_or(RowProgramError::Unsupported)?,
             frame: capture.frame,
             window: DisplayWindowId::new(capture.window.0 as i64),
             ticket,
