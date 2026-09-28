@@ -31,9 +31,12 @@ struct PreparedViewport {
 
 impl PreparedViewport {
     fn dependencies_valid(&self) -> bool {
-        self.reads
-            .as_ref()
-            .is_none_or(CollectionReads::unchanged_and_observe)
+        self.retained.key.fontset_generation
+            == neovm_core::emacs_core::fontset::fontset_generation()
+            && self
+                .reads
+                .as_ref()
+                .is_none_or(CollectionReads::unchanged_and_observe)
     }
 }
 

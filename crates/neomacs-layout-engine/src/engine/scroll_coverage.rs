@@ -118,7 +118,11 @@ impl ScrollCoverage {
         let Some(mut admission) = self.admission.take() else {
             return Err(RowProgramError::Cancelled);
         };
-        if admission.ticket != result.ticket || !admission.reads.unchanged() {
+        if admission.ticket != result.ticket
+            || admission.retained.key.fontset_generation
+                != neovm_core::emacs_core::fontset::fontset_generation()
+            || !admission.reads.unchanged()
+        {
             return Err(RowProgramError::Cancelled);
         }
         let mut rows = result.rows?;
@@ -639,6 +643,7 @@ impl LayoutEngine {
         // one job, even though final replay also validates the complete key.
         if neovm_core::emacs_core::symbol::SymbolPropertyRevision::current()
             != key.symbol_property_revision
+            || neovm_core::emacs_core::fontset::fontset_generation() != key.fontset_generation
             || buffer.chars_modified_tick() != key.chars_modified_tick
             || buffer.props_modified_tick() != key.props_modified_tick
             || buffer.overlay_modified_tick() != key.overlay_modified_tick

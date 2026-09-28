@@ -4,6 +4,7 @@ use neovm_core::window::{WindowDisplaySnapshot, WindowId};
 
 fn synthetic_key(window_start: i64, point: i64) -> RetainedWindowKey {
     RetainedWindowKey {
+        fontset_generation: 1,
         prefixes: Default::default(),
         invisibility: Default::default(),
         char_table_revision: Default::default(),
@@ -702,4 +703,19 @@ fn edit_replay_delete_reuses_below_rows_with_negative_shift() {
         expected.last_row_end_charpos, 28,
         "old row-2 end 29 + delta -1"
     );
+}
+
+#[test]
+fn fontset_revision_invalidates_every_retained_row_fast_path() {
+    let before = synthetic_key(0, 0);
+    let mut after = before.clone();
+    after.fontset_generation += 1;
+    assert_eq!(before.differing_fields(&after), vec!["fontset_generation"]);
+    assert!(!RetainedWindowKey::cursor_only_eligible(&before, &after));
+    assert!(!RetainedWindowKey::row_content_eligible(&before, &after));
+    after.window_start += 10;
+    assert!(!RetainedWindowKey::scroll_eligible(&before, &after));
+    after.window_start = before.window_start;
+    after.chars_modified_tick += 1;
+    assert!(!RetainedWindowKey::edit_eligible(&before, &after));
 }

@@ -157,6 +157,8 @@ impl WindowDelta {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RetainedWindowKey {
+    /// Fontset rules can change without touching buffer, face, or display ticks.
+    pub fontset_generation: u64,
     pub prefixes: neovm_core::window::LayoutPrefixInputs,
     pub invisibility: neovm_core::window::LayoutInvisibilityInput,
     pub char_table_revision: neovm_core::window::CharTableLayoutRevision,
@@ -290,6 +292,7 @@ impl RetainedWindowKey {
             })
             .unwrap_or((0, 0, 0, false, p.buffer_size, 0));
         Self {
+            fontset_generation: neovm_core::emacs_core::fontset::fontset_generation(),
             media_generation: evaluator.media_generation(),
             char_table_revision: neovm_core::window::CharTableLayoutRevision::current(),
             symbol_property_revision: neovm_core::emacs_core::symbol::SymbolPropertyRevision::current(),
@@ -416,6 +419,7 @@ impl RetainedWindowKey {
             }};
         }
         diff!(
+            fontset_generation,
             prefixes,
             invisibility,
             char_table_revision,
