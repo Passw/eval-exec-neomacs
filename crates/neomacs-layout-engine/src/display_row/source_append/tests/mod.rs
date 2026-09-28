@@ -7989,6 +7989,7 @@ fn buffer_text_window_body_install_request_records_positions_and_edge_markers() 
         TextWindowOutputTarget::from_builder(&mut builder),
         &mut output_emitter,
         crate::window_output::DisplayTextRowMetrics {
+            line_spacing: 0.0,
             y: 2.0,
             height: 20.0,
             ascent: 15.0,
@@ -8097,6 +8098,7 @@ fn buffer_text_window_begin_request_opens_window_and_first_text_row() {
         TextWindowOutputTarget::from_builder(&mut builder),
         &mut output_emitter,
         crate::window_output::DisplayTextRowMetrics {
+            line_spacing: 0.0,
             y: 9.0,
             height: 17.0,
             ascent: 12.0,

@@ -195,6 +195,7 @@ mod tests {
         let mut measurer = DisplayRowGlyphMeasurer::new(&faces, None, 8.0);
         RowProgram::capture(
             RowProgramGeometry {
+                inherited_line_spacing: 0.0,
                 width: 1000.0,
                 metrics: DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
                 tabs: DisplayTabPolicy::every(4),

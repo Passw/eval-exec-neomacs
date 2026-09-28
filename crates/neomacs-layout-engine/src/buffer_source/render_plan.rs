@@ -424,7 +424,7 @@ fn decorate_window_cursor(
                         break;
                     }
                 }
-                (row.pixel_y, row.height_px, row.ascent_px, width)
+                (row.pixel_y, row.height_without_line_spacing(), row.ascent_px, width)
             }
             None => (0.0, default_height, default_ascent, char_w),
         };
@@ -826,7 +826,7 @@ impl BufferSourceOutputSetup {
                     // starting at 0. The full-rebuild path is unaffected: it
                     // captures the cursor y during emission from `row_geometry`.
                     cursor_row_pixel_y = row.pixel_y.max(prev_row_bottom);
-                    cursor_height = row.height_px;
+                    cursor_height = row.height_without_line_spacing();
                     cursor_ascent = row.ascent_px;
                     for glyph in &row.glyphs[GlyphArea::Text.index()] {
                         if row.glyph_covers_buffer_charpos(glyph, replay.new_point as usize) {

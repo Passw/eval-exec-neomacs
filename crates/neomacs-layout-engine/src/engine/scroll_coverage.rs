@@ -417,7 +417,6 @@ impl LayoutEngine {
             || key.display_line_numbers != crate::types::DisplayLineNumbersMode::Off
             || !key.line_prefix.is_empty()
             || !key.wrap_prefix.is_empty()
-            || key.extra_line_spacing != 0.0
             || key.indicate_empty_lines != 0
             || key.display_table != Default::default()
             || key.tab_stop_list.len() > 32
@@ -745,6 +744,7 @@ impl LayoutEngine {
         );
         capture.programs.push(RowProgram::capture(
             RowProgramGeometry {
+                inherited_line_spacing: key.extra_line_spacing,
                 width: key.partition.text_body().width,
                 metrics,
                 tabs: crate::display_row::builder::DisplayTabPolicy::from_tab_width_and_stops(

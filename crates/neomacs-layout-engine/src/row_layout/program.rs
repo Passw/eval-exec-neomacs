@@ -39,6 +39,7 @@ pub(crate) enum RowProgramError {
 /// spacing is the only supported spacing operation at this boundary.
 #[derive(Clone, Debug)]
 pub(crate) struct RowProgramGeometry {
+    pub inherited_line_spacing: f32,
     pub width: f32,
     pub metrics: DisplayRowFallbackMetrics,
     pub tabs: DisplayTabPolicy,
@@ -77,6 +78,7 @@ enum Operation {
         span: SourceSpan,
         face: FaceId,
         line_height: DisplayLineHeightPolicy,
+        line_spacing: f32,
         layout: DisplayItemLayout,
         pointer_appearance: Option<DisplayPointerAppearance>,
         edges: neomacs_display_protocol::face::BoxVerticalEdges,
@@ -85,7 +87,12 @@ enum Operation {
 }
 
 impl Operation {
-    fn capture(item: DisplayItem, base: FaceId) -> Result<Self, RowProgramError> {
+    fn capture(
+        item: DisplayItem,
+        base: FaceId,
+        default_height: f32,
+        inherited_line_spacing: f32,
+    ) -> Result<Self, RowProgramError> {
         match &item.kind {
             DisplayItemKind::TextRun(run)
                 if !matches!(run.composition, DisplayTextComposition::Automatic(_)) =>
@@ -101,12 +108,21 @@ impl Operation {
                 .map(Self::Space)
                 .map_err(|_| RowProgramError::Unsupported),
             DisplayItemKind::RowBreak(value)
-                if value.line_spacing == DisplayLineSpacingPolicy::Inherit =>
+                if !matches!(
+                    value.line_spacing,
+                    DisplayLineSpacingPolicy::Scale {
+                        reference: DisplayLineSpacingReference::Named(_),
+                        ..
+                    }
+                ) =>
             {
                 Ok(Self::Break {
                     span: item.span,
                     face: render_face_ref_id(item.face, base),
                     line_height: value.line_height,
+                    line_spacing: value
+                        .line_spacing
+                        .resolve(default_height, inherited_line_spacing),
                     layout: item.layout,
                     pointer_appearance: item.pointer_appearance,
                     edges: item.box_vertical_edges,
@@ -145,6 +161,7 @@ impl Operation {
                 span,
                 face,
                 line_height,
+                line_spacing,
                 layout,
                 pointer_appearance,
                 edges,
@@ -155,7 +172,7 @@ impl Operation {
                     RenderFaceRef::FaceId(face),
                     DisplayItemKind::RowBreak(DisplayRowBreak {
                         line_height,
-                        line_spacing: DisplayLineSpacingPolicy::Inherit,
+                        line_spacing: DisplayLineSpacingPolicy::Pixels(line_spacing),
                     }),
                 );
                 item.box_vertical_edges = edges;
@@ -376,7 +393,15 @@ impl RowProgram {
             };
             measurements.capture_item(&item, measurer, geometry.base_face);
             complete = matches!(item.kind, DisplayItemKind::RowBreak(_));
-            operations.push((Operation::capture(item, geometry.base_face)?, plan));
+            operations.push((
+                Operation::capture(
+                    item,
+                    geometry.base_face,
+                    geometry.metrics.row_height(),
+                    geometry.inherited_line_spacing,
+                )?,
+                plan,
+            ));
         }
         if !complete {
             return Err(RowProgramError::Incomplete);
@@ -501,6 +526,20 @@ impl RowProgram {
                     );
                     terminator_height = resolved.newline_height;
                 }
+                // As in the canonical row transition, line spacing contributes
+                // to logical descent after newline fills and hit cells are set.
+                if mode.uses_concrete_font_geometry()
+                    && value.line_height != DisplayLineHeightPolicy::ContentOnly
+                {
+                    row.line_spacing_px =
+                        crate::display_row::spacing::ResolvedLineSpacing::from_pixels(
+                            value
+                                .line_spacing
+                                .resolve(self.geometry.metrics.row_height(), 0.0),
+                        )
+                        .pixels();
+                    row.height_px += row.line_spacing_px;
+                }
             }
             if row.glyphs.iter().map(Vec::len).sum::<usize>() > self.limits.glyphs {
                 return Err(RowProgramError::Budget);
@@ -532,6 +571,7 @@ mod tests {
 
     fn geometry(width: f32) -> RowProgramGeometry {
         RowProgramGeometry {
+            inherited_line_spacing: 0.0,
             width,
             metrics: DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
             tabs: DisplayTabPolicy::every(4),

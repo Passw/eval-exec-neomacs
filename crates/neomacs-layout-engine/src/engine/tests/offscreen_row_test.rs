@@ -107,6 +107,7 @@ fn unseen_row_worker_glyphs_match_canonical_window_body() {
     );
     let program = RowProgram::capture(
         RowProgramGeometry {
+            inherited_line_spacing: 0.0,
             width: key.partition.text_body().width,
             metrics,
             tabs: crate::display_row::builder::DisplayTabPolicy::from_tab_width_and_stops(
@@ -1501,5 +1502,41 @@ fn worker_keeps_complete_prefix_before_unsupported_rows() {
             selected_window_layout_trace(&eval, &fresh, frame),
             "{boundary}"
         );
+    }
+}
+
+#[test]
+fn worker_page_preserves_literal_line_spacing() {
+    for spacing in ["3", "0.3", "-2"] {
+        for height in ["nil", "t", "1.3"] {
+            first_visit_with_setup(
+                Some("(:height 150)"),
+                "ordinary offscreen text\n",
+                None,
+                0,
+                5,
+                Some(&format!(
+                    "(progn (put-text-property 2761 3500 'line-spacing {spacing}) (put-text-property 2761 3500 'line-height {height}))"
+                )),
+            );
+        }
+    }
+}
+
+#[test]
+fn worker_page_preserves_inherited_line_spacing_and_overrides() {
+    for spacing in ["nil", "0", "0.3"] {
+        for height in ["nil", "t"] {
+            first_visit_with_setup(
+                Some("(:height 150)"),
+                "ordinary offscreen text\n",
+                None,
+                0,
+                5,
+                Some(&format!(
+                    "(progn (make-local-variable 'line-spacing) (setq line-spacing 3) (put-text-property 2761 3500 'line-spacing {spacing}) (put-text-property 2761 3500 'line-height {height}))"
+                )),
+            );
+        }
     }
 }

@@ -193,6 +193,7 @@ impl ChromeRowProgress {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct DisplayTextRowMetrics {
+    pub(crate) line_spacing: f32,
     pub(crate) y: f32,
     pub(crate) height: f32,
     pub(crate) ascent: f32,
@@ -664,6 +665,7 @@ fn display_text_row_metrics_request(
         metrics.height,
         metrics.ascent,
     )
+    .with_line_spacing(metrics.line_spacing)
 }
 
 fn finish_output_rows(

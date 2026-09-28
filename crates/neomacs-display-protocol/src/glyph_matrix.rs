@@ -1084,6 +1084,9 @@ pub struct GlyphRow {
     ///
     /// Mirrors GNU `struct glyph_row::height`. `0.0` means unset.
     pub height_px: f32,
+    /// Additional logical descent from line spacing. Cursor height excludes it.
+    #[serde(default)]
+    pub line_spacing_px: f32,
     /// Authoritative baseline ascent from row top in pixels.
     ///
     /// Mirrors GNU `struct glyph_row::ascent`. `0.0` means unset.
@@ -1119,6 +1122,11 @@ pub struct FringeBitmapInfo {
 }
 
 impl GlyphRow {
+    /// Height produced by the row before adding inter-line spacing.
+    pub fn height_without_line_spacing(&self) -> f32 {
+        (self.height_px - self.line_spacing_px).max(0.0)
+    }
+
     pub fn new(role: GlyphRowRole) -> Self {
         Self {
             glyphs: std::array::from_fn(|_| Vec::new()),
@@ -1141,6 +1149,7 @@ impl GlyphRow {
             start_col: 0,
             pixel_y: 0.0,
             height_px: 0.0,
+            line_spacing_px: 0.0,
             ascent_px: 0.0,
             start_charpos: 0,
             end_charpos: 0,
@@ -1542,6 +1551,7 @@ impl GlyphRow {
         self.ends_at_zv = false;
         self.pixel_y = 0.0;
         self.height_px = 0.0;
+        self.line_spacing_px = 0.0;
         self.ascent_px = 0.0;
         self.start_charpos = 0;
         self.end_charpos = 0;

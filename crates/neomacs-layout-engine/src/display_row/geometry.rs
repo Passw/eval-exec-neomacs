@@ -937,6 +937,7 @@ impl CurrentDisplayRowMetrics {
 
     pub(crate) fn finish_current_row(&self, y: f32) -> DisplayTextRowMetrics {
         DisplayTextRowMetrics {
+            line_spacing: 0.0,
             y,
             height: self.height,
             ascent: self.ascent,
@@ -983,8 +984,9 @@ impl CurrentDisplayRowMetrics {
         // after the row. Glyph ascent stays unchanged. Painting, hit testing
         // and retained-row replay all consume this same finished height.
         self.height += line_spacing;
-        let finished =
+        let mut finished =
             self.finish_and_reset(advance.y, advance.default_height, advance.default_ascent);
+        finished.line_spacing = line_spacing;
         DisplayRowAdvance {
             finished,
             next_y: advance.text_y + advance.next_row as f32 * advance.default_height + row_extra_y,
