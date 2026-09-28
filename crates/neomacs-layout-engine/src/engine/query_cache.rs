@@ -49,7 +49,7 @@ impl QueryCache {
             .get(buffer)?
             .point_lisp_char_pos();
         self.entries.iter().rev().find_map(|entry| {
-            tracing::trace!(target: "neomacs_layout_engine::query_cache", ?scope,
+            tracing::trace!(target: "neomacs_layout_engine::query_cache", ?scope, entry_scope = ?entry.scope,
                 point_matches = entry.source_point == source_point,
                 collections_match = entry.collections.unchanged(),
                 freshness_matches = entry.query.geometry().and_then(|g| g.layout_freshness.as_ref()) == Some(&current),
@@ -107,8 +107,18 @@ impl QueryCache {
             return;
         };
         let source_point = buffer.point_lisp_char_pos();
-        self.entries
-            .retain(|entry| entry.frame != frame || entry.window != window || entry.scope != scope);
+        // Motion commands temporarily move point while querying the same
+        // viewport. Retain those independent observations within the existing
+        // global bound, so returning from save-excursion does not force a new
+        // row walk. Lookup still validates every input and collection read.
+        self.entries.retain(|entry| {
+            entry.frame != frame
+                || entry.window != window
+                || entry.scope != scope
+                || entry.source_point != source_point
+                || entry.query.geometry().and_then(|g| g.layout_freshness.as_ref())
+                    != snapshot.layout_freshness.as_ref()
+        });
         self.entries.push_back(Entry {
             frame,
             window,

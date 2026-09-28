@@ -1402,3 +1402,59 @@ fn query_reuse_after_unrelated_local_write(invalidate_hook_cache: bool) {
         assert_eq!(probe::max_depth(), 0, "unrelated local binding forced another row walk");
     }
 }
+
+#[test]
+fn repeated_query_points_keep_bounded_independent_observations() {
+    use crate::engine::viewport_retry_depth_probe as probe;
+    use neovm_core::window::WindowLayoutQueryScope;
+    for decoration in [
+        "nil",
+        r#"(progn (put-text-property 1 121 'face '(:height 1.5))
+            (put-text-property 31 35 'display '(raise 0.2))
+            (let ((o (make-overlay 90 110)))
+              (overlay-put o 'before-string "prefix")
+              (overlay-put o 'after-string "suffix")
+              (overlay-put o 'face '(:height 1.2))))"#,
+    ] {
+        let mut eval = Context::new();
+        let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+        eval.buffer_manager_mut()
+            .get_mut(buffer)
+            .unwrap()
+            .insert(&format!("{}\n", "abc def ghi ".repeat(20)).repeat(30));
+        let frame =
+            eval.frame_manager_mut()
+                .create_frame("query-alternating-points", 180, 200, buffer);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        let window = eval.frame_manager().get(frame).unwrap().selected_window;
+        eval.eval_str(
+            "(setq mode-line-format nil header-line-format nil tab-line-format nil word-wrap t)",
+        )
+        .unwrap();
+        eval.eval_str(decoration).unwrap();
+        let mut engine = LayoutEngine::new_without_font_metrics();
+        for (step, point) in [30, 55, 30, 55, 30].into_iter().enumerate() {
+            eval.eval_str(&format!("(goto-char {point})")).unwrap();
+            probe::reset();
+            let actual = engine
+                .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+                .unwrap();
+            let walks = probe::max_depth();
+            let mut fresh = WindowLayoutQueryEngine::new_without_font_metrics();
+            let expected = fresh
+                .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+                .unwrap();
+            assert_eq!(actual.end(), expected.end());
+            assert_eq!(actual.geometry(), expected.geometry());
+            if step >= 2 {
+                assert_eq!(
+                    walks, 0,
+                    "returning to point {point} evicted an unchanged observation: {decoration}"
+                );
+            }
+        }
+    }
+}
