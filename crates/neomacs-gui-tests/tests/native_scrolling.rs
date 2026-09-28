@@ -318,7 +318,9 @@ focus_follows_mouse yes
                 "RUST_LOG",
                 std::env::var("NEOMACS_GUI_SCROLL_LOG").unwrap_or_else(|_| {
                     if timing_only {
-                        "warn"
+                        // One startup record identifies the actual adapter;
+                        // keep per-frame/glyph logging disabled for timing.
+                        "warn,neomacs_display_runtime::render_thread::bootstrap=info"
                     } else {
                         "warn,neomacs=debug,neomacs_display_runtime=debug,neomacs_layout_engine::scroll_coverage=debug,neovm_core::scroll_prediction=debug"
                     }.to_owned()

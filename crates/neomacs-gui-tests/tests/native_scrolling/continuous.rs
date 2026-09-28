@@ -93,6 +93,10 @@ pub(super) fn run(
         artifacts.join("continuous-presentations.json"),
         serde_json::to_vec_pretty(&serde_json::json!({
             "expected_receipts": INPUTS,
+            "sway_renderer_request": fs::read_to_string(artifacts.join("sway-renderer-request")).ok(),
+            "editor_adapter": fs::read_to_string(artifacts.join("neomacs.log"))
+                .ok().and_then(|log| log.lines().find_map(|line|
+                    line.split_once("wgpu adapter: ").map(|(_, adapter)| adapter.to_owned()))),
             "samples": samples,
             "report": report,
             "response_budget_ms": {"p95": 50, "maximum": 250, "maximum_gap": 50},

@@ -602,7 +602,9 @@ impl Drop for PendingXvfbSession {
 /// doubles as the XDG runtime (addressed through /proc so long checkout
 /// paths cannot exceed sockaddr_un's limit).  `config` is sway
 /// configuration text — resolution, seats, and focus policy are scenario
-/// policy, not harness mechanics.
+/// policy, not harness mechanics. Software rendering is the portable default;
+/// set `NEOMACS_GUI_SWAY_RENDERER=gles2` (and, if needed,
+/// `WLR_RENDER_DRM_DEVICE`) for hardware performance measurements.
 pub fn start_sway(artifact_root: &Path, config: &str) -> io::Result<DisplaySession> {
     fs::create_dir_all(artifact_root)?;
     set_owner_only_dir_permissions(artifact_root)?;
@@ -624,13 +626,16 @@ pub fn start_sway(artifact_root: &Path, config: &str) -> io::Result<DisplaySessi
     let runtime = artifact_root.to_string_lossy().into_owned();
 
     let program = std::env::var_os("NEOMACS_GUI_SWAY").unwrap_or_else(|| "sway".into());
+    let renderer = std::env::var("NEOMACS_GUI_SWAY_RENDERER")
+        .unwrap_or_else(|_| "pixman".to_owned());
+    fs::write(artifact_root.join("sway-renderer-request"), &renderer)?;
     let mut pending = PendingSwaySession::default();
     let child = Command::new(&program)
         .args(["--unsupported-gpu", "--config"])
         .arg(&config_path)
         .env("XDG_RUNTIME_DIR", &runtime)
         .env("WLR_BACKENDS", "headless")
-        .env("WLR_RENDERER", "pixman")
+        .env("WLR_RENDERER", &renderer)
         .env("WLR_LIBINPUT_NO_DEVICES", "1")
         .env_remove("WAYLAND_DISPLAY")
         .env_remove("DISPLAY")
