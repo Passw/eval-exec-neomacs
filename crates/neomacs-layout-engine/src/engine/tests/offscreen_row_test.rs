@@ -2149,3 +2149,58 @@ fn worker_overlay_insertions_preserve_unstyled_default_face() {
     first_visit_with_setup_and_gc(None, line, None, 0, 2, Some(&format!(
         "(overlay-put (make-overlay {start} {}) 'before-string \"plain\")", start + 100)), true);
 }
+
+#[test]
+fn worker_prepares_owned_display_replacement_strings() {
+    let line = "ordinary offscreen text\n";
+    let start = 120 * line.len() + 1;
+    for overlay in [false, true] {
+        let install = if overlay {
+            "(overlay-put (make-overlay (+ p 5) (+ p 9)) 'display text)"
+        } else {
+            "(put-text-property (+ p 5) (+ p 9) 'display text)"
+        };
+        first_visit_with_setup_and_gc(None, line, None, 0, 2, Some(&format!(
+            "(let ((p {start}) (text (propertize \"replace\" 'face '(:height 130 :weight bold))))
+                (while (< p {}) {install} (setq p (+ p {}))))", start + 12 * line.len(), line.len())), true);
+    }
+}
+
+#[test]
+fn worker_replacement_strings_preserve_multiple_faces_and_unicode() {
+    let line = "ordinary offscreen text\n";
+    let start = 120 * line.len() + 1;
+    for text in [
+        r#"(concat (propertize "AA" 'face '(:height 140 :box (:line-width 2) :background "blue") 'mouse-face 'highlight) (propertize "BB" 'face '(:height 90 :slant italic)))"#,
+        r#"(propertize "好á" 'face '(:height 130 :weight bold))"#,
+    ] {
+        first_visit_with_setup_and_gc(
+            None,
+            line,
+            None,
+            0,
+            2,
+            Some(&format!(
+                "(let ((p {start}) (text {text})) (while (< p {}) (put-text-property (+ p 5) (+ p 9) 'display text) (setq p (+ p {}))))",
+                start + 12 * line.len(),
+                line.len()
+            )),
+            true,
+        );
+    }
+}
+
+#[test]
+fn worker_replacement_strings_reject_mutated_sources() {
+    let line = "ordinary offscreen text\n";
+    let start = 120 * line.len() + 1;
+    let setup = format!(
+        "(progn (setq worker-replacement (propertize \"replace\" 'face '(:height 130))) (put-text-property (+ {start} 5) (+ {start} 9) 'display worker-replacement))"
+    );
+    for change in [
+        "(aset worker-replacement 0 ?X)",
+        "(put-text-property 0 7 'face '(:height 180) worker-replacement)",
+    ] {
+        first_visit_with_setup_and_gc(None, line, Some(change), 0, 2, Some(&setup), true);
+    }
+}

@@ -474,6 +474,15 @@ fn wrapped_scroll_surface_exports_contiguous_visual_rows() {
 
 #[test]
 fn scroll_surface_translates_rich_hover_to_projected_glyphs() {
+    assert_scroll_surface_hover_projection(false);
+}
+
+#[test]
+fn scroll_surface_translates_owned_insertion_hover_to_projected_glyphs() {
+    assert_scroll_surface_hover_projection(true);
+}
+
+fn assert_scroll_surface_hover_projection(insertions: bool) {
     let line = "ordinary offscreen text\n";
     let (mut eval, frame_id, _, window) = incr_editing_frame(&line.repeat(300), 800, 600);
     eval.frame_manager_mut()
@@ -482,6 +491,12 @@ fn scroll_surface_translates_rich_hover_to_projected_glyphs() {
         .window_system = Some(Value::symbol("neomacs"));
     eval.eval_str("(progn (put-text-property (point-min) (point-max) 'mouse-face 'highlight) (put-text-property 3 8 'face '(:height 2.0)))")
         .unwrap();
+    if insertions {
+        eval.eval_str("(let ((p (point-min))) (while (< p (point-max))
+            (let ((ov (make-overlay (+ p 5) (+ p 5))))
+                (overlay-put ov 'before-string (propertize \"AA\" 'mouse-face 'highlight)))
+            (setq p (+ p 23))))").unwrap();
+    }
     let mut engine = LayoutEngine::new();
     engine.layout_frame_rust(&mut eval, frame_id);
     let owner = DisplayWindowId::new(window.0 as i64);
@@ -518,6 +533,14 @@ fn scroll_surface_translates_rich_hover_to_projected_glyphs() {
     let offset = rows[0].height_px + 0.5;
     surface.paint(&mut frame, offset).unwrap();
     assert!(!frame.presented_pointer().is_empty());
+    if insertions {
+        assert!(surface.coverage().content.matrix.rows.iter().any(|row| {
+            row.pointer_appearances().iter().any(|appearance| {
+                appearance.source.kind
+                    == neomacs_display_protocol::glyph_matrix::GlyphPointerSourceKind::LispString
+            })
+        }));
+    }
     let viewport = surface.coverage().viewport;
     for appearance in frame.presented_pointer().appearances() {
         for span in appearance.paint_spans() {

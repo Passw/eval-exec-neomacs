@@ -96,47 +96,56 @@ impl FontMeasurementSnapshot {
         for item in items {
             let base = faces.first().ok_or(RowProgramError::Unsupported)?.face_id;
             let id = crate::display_face_ref::render_face_ref_id(item.face, base);
-            let face = faces
-                .iter()
-                .find(|face| face.face_id == id)
-                .ok_or(RowProgramError::Unsupported)?;
-            let text = match &item.kind {
-                crate::display_item::DisplayItemKind::TextRun(run) => Some(run.text.as_ref()),
-                crate::display_item::DisplayItemKind::SourceMappedText(run) => {
-                    Some(run.text.as_ref())
+            let measurement = match &item.kind {
+                crate::display_item::DisplayItemKind::SourceMappedText(text) => {
+                    text.measurement_face
                 }
                 _ => None,
             };
-            let source = match &item.kind {
-                crate::display_item::DisplayItemKind::Stretch(
-                    crate::display_item::DisplayStretch {
-                        width:
-                            crate::display_item::DisplayStretchWidth::RelativeToSource {
-                                source, ..
-                            },
-                        ..
-                    },
-                ) => source.as_rust_char(),
-                _ => None,
-            };
-            for ch in text
-                .unwrap_or("")
-                .chars()
-                .chain(source)
-                .filter(|ch| !ch.is_ascii())
-            {
-                let request = (
-                    face.font_family.as_str(),
-                    ch,
-                    face.font_weight,
-                    face.italic,
-                    face.font_size.max(1.0),
-                );
-                if !requests.contains(&request) {
-                    if requests.len() == 128 {
-                        return Err(RowProgramError::Budget);
+            for id in std::iter::once(id).chain(measurement.filter(|other| *other != id)) {
+                let face = faces
+                    .iter()
+                    .find(|face| face.face_id == id)
+                    .ok_or(RowProgramError::Unsupported)?;
+                let text = match &item.kind {
+                    crate::display_item::DisplayItemKind::TextRun(run) => Some(run.text.as_ref()),
+                    crate::display_item::DisplayItemKind::SourceMappedText(run) => {
+                        Some(run.text.as_ref())
                     }
-                    requests.push(request);
+                    _ => None,
+                };
+                let source = match &item.kind {
+                    crate::display_item::DisplayItemKind::Stretch(
+                        crate::display_item::DisplayStretch {
+                            width:
+                                crate::display_item::DisplayStretchWidth::RelativeToSource {
+                                    source,
+                                    ..
+                                },
+                            ..
+                        },
+                    ) => source.as_rust_char(),
+                    _ => None,
+                };
+                for ch in text
+                    .unwrap_or("")
+                    .chars()
+                    .chain(source)
+                    .filter(|ch| !ch.is_ascii())
+                {
+                    let request = (
+                        face.font_family.as_str(),
+                        ch,
+                        face.font_weight,
+                        face.italic,
+                        face.font_size.max(1.0),
+                    );
+                    if !requests.contains(&request) {
+                        if requests.len() == 128 {
+                            return Err(RowProgramError::Budget);
+                        }
+                        requests.push(request);
+                    }
                 }
             }
         }

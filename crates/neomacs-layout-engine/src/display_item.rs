@@ -800,6 +800,10 @@ impl DisplaySourceMappedFaceRun {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct DisplaySourceMappedText {
     pub(crate) text: Box<str>,
+    /// The canonical replacement policy measures advances with the underlying
+    /// buffer face, independently of the string's paint and vertical metrics.
+    /// Detached capture resolves that iterator state into an owned face ID.
+    pub(crate) measurement_face: Option<neomacs_display_protocol::types::FaceId>,
     /// A semantic face introduced by the mapping itself rather than by a text
     /// property. Octal escapes own `escape-glyph` here so the source character
     /// need not be representable as a Rust `char` downstream.
@@ -817,9 +821,18 @@ pub(crate) struct DisplaySourceMappedText {
 }
 
 impl DisplaySourceMappedText {
+    pub(crate) fn with_measurement_face(
+        mut self,
+        face: Option<neomacs_display_protocol::types::FaceId>,
+    ) -> Self {
+        self.measurement_face = face;
+        self
+    }
+
     pub(crate) fn new(text: impl Into<Box<str>>) -> Self {
         Self {
             text: text.into(),
+            measurement_face: None,
             semantic_face_overlay: None,
             glyph_string_start: None,
             lisp_face_runs: None,
@@ -836,6 +849,7 @@ impl DisplaySourceMappedText {
         ));
         Self {
             text: text.into(),
+            measurement_face: None,
             semantic_face_overlay: None,
             glyph_string_start: Some(glyph_string_start),
             lisp_face_runs: None,
@@ -872,6 +886,7 @@ impl DisplaySourceMappedText {
     ) -> Self {
         Self {
             text: text.into(),
+            measurement_face: None,
             semantic_face_overlay: None,
             glyph_string_start,
             lisp_face_runs: None,
@@ -916,6 +931,7 @@ impl DisplaySourceMappedText {
             .nth(emitted_chars)
             .map(|(byte, _)| byte)?;
         Some(Self {
+            measurement_face: self.measurement_face,
             text: self.text[split_byte..].into(),
             semantic_face_overlay: self.semantic_face_overlay,
             glyph_string_start: self

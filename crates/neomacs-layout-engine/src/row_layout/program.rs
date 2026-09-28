@@ -151,10 +151,10 @@ impl Operation {
             Self::Mapped(input) => DisplayItem {
                 span: input.span,
                 face: RenderFaceRef::FaceId(input.face),
-                kind: DisplayItemKind::SourceMappedText(DisplaySourceMappedText::face_segment(
-                    input.text,
-                    input.glyph_string_start,
-                )),
+                kind: DisplayItemKind::SourceMappedText(
+                    DisplaySourceMappedText::face_segment(input.text, input.glyph_string_start)
+                        .with_measurement_face(input.measurement_face),
+                ),
                 layout: input.layout,
                 pointer_appearance: input.pointer_appearance,
                 box_vertical_edges: input.box_vertical_edges,
@@ -471,7 +471,11 @@ impl RowProgram {
                 return Err(RowProgramError::Budget);
             }
             let face = render_face_ref_id(item.face, geometry.base_face);
-            if !faces.iter().any(|candidate| candidate.face_id == face) {
+            if !faces.iter().any(|candidate| candidate.face_id == face)
+                || !faces
+                    .iter()
+                    .any(|candidate| candidate.face_id == item_measurement_face(&item, face))
+            {
                 return Err(RowProgramError::Unsupported);
             }
             let plan = if text.is_empty() || measurer.is_none() {
@@ -479,7 +483,7 @@ impl RowProgram {
             } else {
                 measurer.as_mut().unwrap().text_run_advances_px(
                     text,
-                    face,
+                    item_measurement_face(&item, face),
                     geometry.metrics.char_width().max(1.0),
                 )
             };
@@ -564,7 +568,7 @@ impl RowProgram {
             if !text.is_empty() {
                 *plan = measurer.text_run_advances_px(
                     text,
-                    face,
+                    item_measurement_face(&item, face),
                     self.geometry.metrics.char_width().max(1.0),
                 );
             }
@@ -790,13 +794,45 @@ impl RowProgram {
                 }
             }
             position = progress.end();
-            slot_heights.extend(
-                progress
-                    .slots()
-                    .iter()
-                    .map(|slot| slot.cell_height(face_height, self.geometry.metrics.row_height())),
-            );
-            slots.extend(progress.slots().iter().cloned());
+            if let DisplayItemKind::SourceMappedText(mapped) = &render_item.source_item().kind
+                && let Some(measurement_face) = mapped.measurement_face
+            {
+                // A pushed display string emits one buffer hit span, even
+                // when its own face changes across several measured items.
+                let source = render_item.source_item().span.start.clone();
+                let start = if slots
+                    .last()
+                    .is_some_and(|slot: &DisplayRowGlyphSlot| slot.source() == source)
+                {
+                    slot_heights.pop();
+                    slots.pop().unwrap().start_position()
+                } else {
+                    progress.start()
+                };
+                slots.push(DisplayRowGlyphSlot::with_pointer_appearance(
+                    source,
+                    start.x_px(),
+                    start.col(),
+                    progress.end().x_px() - start.x_px(),
+                    progress.end().col().saturating_sub(start.col()),
+                    None,
+                ));
+                slot_heights.push(
+                    self.faces
+                        .iter()
+                        .find(|face| face.face_id == measurement_face)
+                        .ok_or(RowProgramError::Unsupported)?
+                        .metrics
+                        .line_height_px(),
+                );
+            } else {
+                slot_heights.extend(
+                    progress.slots().iter().map(|slot| {
+                        slot.cell_height(face_height, self.geometry.metrics.row_height())
+                    }),
+                );
+                slots.extend(progress.slots().iter().cloned());
+            }
             let row_glyphs = row.glyphs.iter().map(Vec::len).sum::<usize>();
             if row_glyphs > 256 || completed_glyphs.saturating_add(row_glyphs) > self.limits.glyphs
             {
@@ -978,6 +1014,13 @@ impl RowProgram {
             terminator_height,
         });
         Ok(rows)
+    }
+}
+
+fn item_measurement_face(item: &DisplayItem, paint_face: FaceId) -> FaceId {
+    match &item.kind {
+        DisplayItemKind::SourceMappedText(text) => text.measurement_face.unwrap_or(paint_face),
+        _ => paint_face,
     }
 }
 

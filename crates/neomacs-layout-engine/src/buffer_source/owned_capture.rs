@@ -115,6 +115,7 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
     // Bound intersecting overlays before it can collect them or inspect any
     // replacement strings. Category/alias properties use the same effective
     // lookup as visible layout, so indirect replacements cannot bypass this.
+    let mut roots = Vec::new();
     let overlays = buffer.layout_overlays();
     for (index, overlay) in overlays
         .iter_overlays_in_accessible_emacs_byte_range(
@@ -129,6 +130,7 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
         if index >= max_items {
             return Err(RowProgramError::Budget);
         }
+        roots.push(overlay);
         if overlays.overlay_applies_to_window(overlay, Some(window))
             && (height_lookup
                 .effective_overlay_value(buffer, overlay)
@@ -146,7 +148,10 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
                 })
                 || display_lookup
                     .effective_overlay_value(buffer, overlay)
-                    .is_some_and(|value| !literal_raise_or_nil(value)))
+                    .is_some_and(|value| {
+                        !(literal_raise_or_nil(value)
+                            || strings::bounded_replacement(value, max_chars))
+                    }))
         {
             return Err(RowProgramError::Unsupported);
         }
@@ -171,7 +176,9 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
                 .is_some_and(|value| !literal_line_spacing(value))
             || display_lookup
                 .text_value_at(buffer, pos)
-                .is_some_and(|value| !literal_raise_or_nil(value))
+                .is_some_and(|value| {
+                    !(literal_raise_or_nil(value) || strings::bounded_replacement(value, max_chars))
+                })
             || lookups.iter().any(|lookup| {
                 lookup
                     .text_value_at(buffer, pos)
@@ -197,7 +204,6 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
     let mut position = DisplaySourceTextPosition::new(0, start.get() as i64);
     let mut items: Vec<DisplayItem> = Vec::new();
     let mut faces = Vec::new();
-    let mut roots = Vec::new();
     let source_start =
         crate::display_item::DisplaySourcePosition::buffer(buffer_id, start, start_byte);
     for _ in 0..max_items {
@@ -258,8 +264,29 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
                 )?;
                 continue;
             }
-            BufferSourceConsumedItem::DisplayPropertyReplacement(_) => {
-                return Err(RowProgramError::Unsupported);
+            BufferSourceConsumedItem::DisplayPropertyReplacement(replacement) => {
+                let resume = CharPos0::new(replacement.descriptor().resume_charpos() as usize);
+                // A replacement clipped by the acquisition limit cannot prove
+                // its complete covered span, especially across a newline.
+                if resume >= end {
+                    return Err(RowProgramError::Unsupported);
+                }
+                strings::capture_replacement(
+                    &replacement,
+                    context,
+                    face_ids,
+                    &mut items,
+                    &mut faces,
+                    &mut roots,
+                    max_chars,
+                    max_items,
+                    &cancelled,
+                )?;
+                position = DisplaySourceTextPosition::new(
+                    buffer.layout_char_pos_to_emacs_byte_pos(resume).get() - start_byte.get(),
+                    resume.get() as i64,
+                );
+                continue;
             }
         };
         let (_, end_char, end_byte, item) = item.into_render_parts();
@@ -286,6 +313,7 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
             .chain(std::iter::once(&item))
             .map(|item| match &item.kind {
                 DisplayItemKind::TextRun(run) => run.text.len(),
+                DisplayItemKind::SourceMappedText(run) => run.text.len(),
                 _ => 0,
             })
             .sum::<usize>();

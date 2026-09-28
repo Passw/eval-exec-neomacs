@@ -1948,7 +1948,7 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
                 crate::display_item::DisplaySourceMappedText::face_segment(
                     input.text,
                     input.glyph_string_start,
-                ),
+                ).with_measurement_face(input.measurement_face),
             ),
             layout: input.layout,
             pointer_appearance: input.pointer_appearance,

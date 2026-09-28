@@ -13,6 +13,7 @@ use neomacs_display_protocol::types::FaceId;
 pub(crate) struct ResolvedMappedTextInput {
     pub(crate) span: SourceSpan,
     pub(crate) face: FaceId,
+    pub(crate) measurement_face: Option<FaceId>,
     pub(crate) text: Box<str>,
     pub(crate) glyph_string_start: Option<DisplaySourcePosition>,
     pub(crate) layout: DisplayItemLayout,
@@ -36,6 +37,7 @@ impl ResolvedMappedTextInput {
         Ok(Self {
             span: item.span,
             face: render_face_ref_id(item.face, base_face),
+            measurement_face: mapped.measurement_face,
             text: mapped.text,
             glyph_string_start: mapped.glyph_string_start,
             layout: item.layout,
