@@ -8081,8 +8081,7 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "30.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6b7fb58561a792bc237628ba0792e332de418fefe145f13b5ed8201e6d52f58"
+source = "git+https://github.com/eval-exec/wgpu?rev=9717f9fe277beec2c98df550662a626f8fc0248c#9717f9fe277beec2c98df550662a626f8fc0248c"
 dependencies = [
  "android_system_properties",
  "arrayvec",
