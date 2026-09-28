@@ -2064,6 +2064,7 @@ pub enum PresentedPointerMapError {
     Semantic(PresentedHitError),
     UnknownAppearance(PointerAppearanceId),
     MissingRegionBehavior,
+    MissingSourceMap,
     EmptyAppearance,
     EmptyPaintSpan,
     OverlappingPaintSpans,
@@ -2384,6 +2385,8 @@ fn rect_has_valid_geometry(rect: FrameRect) -> bool {
         && (rect.x() + rect.width()).is_finite()
         && (rect.y() + rect.height()).is_finite()
 }
+
+mod scroll;
 
 #[cfg(test)]
 mod tests;

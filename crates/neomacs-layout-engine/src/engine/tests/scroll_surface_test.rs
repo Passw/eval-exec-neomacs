@@ -64,7 +64,7 @@ fn exported_scroll_surface_moves_paint_and_source_hits_without_changing_viewport
     );
     let offset = surface.clamp_offset(row_height);
     assert_eq!(offset, row_height);
-    surface.paint(&mut frame, offset);
+    surface.paint(&mut frame, offset).unwrap();
     let point = settled_point(frame.presentation_id, viewport.x + 2.0, viewport.y + 2.0);
     let hit = surface.hit(point, offset).unwrap().unwrap();
     assert_eq!(
@@ -426,7 +426,7 @@ fn wrapped_scroll_surface_exports_contiguous_visual_rows() {
         .cloned()
         .collect();
     frame.fringe_bitmaps.clear();
-    surface.paint(&mut frame, offset);
+    surface.paint(&mut frame, offset).unwrap();
     let mut painted = 0;
     for glyph in &frame.glyphs {
         if let FrameGlyph::FringeBitmap {
@@ -470,4 +470,75 @@ fn wrapped_scroll_surface_exports_contiguous_visual_rows() {
         engine.retained_window_matrices[&owner].key.window_start,
         original.key.window_start
     );
+}
+
+#[test]
+fn scroll_surface_translates_rich_hover_to_projected_glyphs() {
+    let line = "ordinary offscreen text\n";
+    let (mut eval, frame_id, _, window) = incr_editing_frame(&line.repeat(300), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame_id)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str("(progn (put-text-property (point-min) (point-max) 'mouse-face 'highlight) (put-text-property 3 8 'face '(:height 2.0)))")
+        .unwrap();
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame_id);
+    let owner = DisplayWindowId::new(window.0 as i64);
+    let original = engine.retained_window_matrices[&owner].clone();
+    let rows: Vec<_> = original
+        .matrix
+        .rows
+        .iter()
+        .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        .collect();
+    engine
+        .request_scroll_coverage(
+            &eval,
+            frame_id,
+            window,
+            CharPos0::new(rows[rows.len() - 2].start_charpos),
+        )
+        .unwrap();
+    await_coverage(&mut engine);
+    engine.layout_frame_rust(&mut eval, frame_id);
+    let state = engine.last_frame_display_state.as_ref().unwrap();
+    let mut frame = state.materialize();
+    assert_eq!(
+        frame.scroll_surfaces.len(),
+        1,
+        "hover faces need owned scroll transport"
+    );
+    let surface = frame.scroll_surfaces[0].clone();
+    for offset in [0.5, rows[0].height_px - 0.5, rows[0].height_px + 0.5] {
+        let mut projected = frame.clone();
+        surface.paint(&mut projected, offset).unwrap();
+        assert!(!projected.presented_pointer().is_empty());
+    }
+    let offset = rows[0].height_px + 0.5;
+    surface.paint(&mut frame, offset).unwrap();
+    assert!(!frame.presented_pointer().is_empty());
+    let viewport = surface.coverage().viewport;
+    for appearance in frame.presented_pointer().appearances() {
+        for span in appearance.paint_spans() {
+            assert!(span.clip().y() >= viewport.y);
+            assert!(span.clip().bottom() <= viewport.bottom());
+            for glyph in &frame.glyphs[span.first() as usize..(span.first() + span.len()) as usize]
+            {
+                assert_eq!(glyph.window_id(), Some(owner));
+                assert_eq!(glyph.row_role(), Some(GlyphRowRole::Text));
+            }
+        }
+    }
+    // A transported primitive-index map has no retained slot ownership.
+    // Reject scrolling before changing pixels rather than reusing stale indices.
+    frame
+        .install_presented_pointer_map(frame.presented_pointer().clone())
+        .unwrap();
+    let unchanged = frame.clone();
+    assert_eq!(
+        surface.paint(&mut frame, offset),
+        Err(neomacs_display_protocol::PresentedPointerMapError::MissingSourceMap)
+    );
+    assert_eq!(frame, unchanged);
 }

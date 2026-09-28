@@ -228,6 +228,7 @@ pub(super) fn prepare(
         || !static_body_effects(&renderer.effects)
         || render.compositor.renderer_effects.needs_redraw()
         || super::retained_static::window_has_active_overlays(render)
+        || render.pointer_selection_for(frame).is_some()
         || std::env::var_os("NEOMACS_DISABLE_RETAINED_SCROLL").is_some()
     {
         render.compositor.retained_scroll = None;

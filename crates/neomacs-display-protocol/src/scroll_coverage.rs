@@ -40,6 +40,8 @@ pub struct ScrollCoverage {
     pub char_fonts: crate::font::CharFontTable,
     pub shaped_clusters: crate::font::ShapedClusterTable,
     pub hit_index: PresentedHitIndex,
+    #[serde(default)]
+    pub pointer_source: crate::PresentedPointerSourceMap,
 }
 
 /// Materialized once on frame ingestion, shared by render clones.
@@ -178,6 +180,24 @@ impl ScrollCoverage {
                 }
             }
         }
+        if !self.pointer_source.is_empty() {
+            self.pointer_source
+                .validate_scroll_source(
+                    window,
+                    FrameRect::new(bounds.x, bounds.y, bounds.width, bounds.height).ok()?,
+                )
+                .ok()?;
+            let mut validation = FrameGlyphBuffer::with_size(bounds.right(), bounds.bottom());
+            validation.presentation_id = frame.presentation_id;
+            validation.faces = self.faces.clone();
+            validation.glyphs = glyphs.clone();
+            validation
+                .install_presented_hit_index(self.hit_index.clone())
+                .ok()?;
+            validation
+                .install_presented_pointer_source_map(&self.pointer_source)
+                .ok()?;
+        }
         Some(Arc::new(ScrollSurface {
             coverage: Arc::clone(self),
             glyphs,
@@ -217,18 +237,34 @@ impl ScrollSurface {
     }
 
     /// Paint and pointer lookup use this exact same offset and viewport.
-    pub fn paint(&self, frame: &mut FrameGlyphBuffer, offset: f32) {
+    pub fn paint(
+        &self,
+        frame: &mut FrameGlyphBuffer,
+        offset: f32,
+    ) -> Result<(), crate::PresentedPointerMapError> {
         let offset = self.clamp_offset(offset) + self.coverage.origin;
         let window = self.coverage.content.window_id;
         let clip = self.coverage.viewport;
-        frame.glyphs.retain(|glyph| {
-            glyph.window_id() != Some(window)
-                || glyph.row_role() != Some(GlyphRowRole::Text)
-                || matches!(
-                    glyph,
-                    FrameGlyph::ScrollBar { .. } | FrameGlyph::Border { .. }
-                )
-        });
+        let pointer_source = frame.scroll_pointer_source()?.replace_scrolled_body(
+            window,
+            &self.coverage.pointer_source,
+            clip,
+            offset,
+        )?;
+        let original_glyphs = std::mem::take(&mut frame.glyphs);
+        frame.glyphs.extend(
+            original_glyphs
+                .iter()
+                .filter(|glyph| {
+                    glyph.window_id() != Some(window)
+                        || glyph.row_role() != Some(GlyphRowRole::Text)
+                        || matches!(
+                            glyph,
+                            FrameGlyph::ScrollBar { .. } | FrameGlyph::Border { .. }
+                        )
+                })
+                .cloned(),
+        );
         for glyph in &self.glyphs {
             let mut glyph = glyph.clone();
             match &mut glyph {
@@ -286,6 +322,11 @@ impl ScrollSurface {
         frame
             .shaped_clusters
             .extend(self.coverage.shaped_clusters.clone());
+        if let Err(error) = frame.install_presented_pointer_source_map(&pointer_source) {
+            frame.glyphs = original_glyphs;
+            return Err(error);
+        }
+        Ok(())
     }
 
     /// A point must first belong to this window's visible body. Inverting a
@@ -344,6 +385,7 @@ impl PartialEq for ScrollSurface {
                 && self.coverage.content.text_clip_bounds
                     == other.coverage.content.text_clip_bounds
                 && self.coverage.hit_index == other.coverage.hit_index
+                && self.coverage.pointer_source == other.coverage.pointer_source
                 && self.coverage.faces == other.coverage.faces
                 && self.coverage.fonts == other.coverage.fonts
                 && self.coverage.char_fonts == other.coverage.char_fonts

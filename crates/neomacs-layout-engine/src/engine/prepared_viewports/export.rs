@@ -184,16 +184,6 @@ impl PreparedViewports {
         }
         for (output_row, (source, index)) in all[begin..end].iter().enumerate() {
             let original_row = &source.matrix.rows[*index];
-            // Pointer appearances require their sidecar paint ownership too;
-            // refusing them here is preferable to publishing stale hover IDs.
-            if original_row
-                .glyphs
-                .iter()
-                .flatten()
-                .any(|glyph| glyph.pointer_appearance.is_some())
-            {
-                return None;
-            }
             let mut row = original_row.as_ref().clone();
             row.pixel_y = y + origin;
             row.cursor_col = None;
@@ -259,6 +249,7 @@ impl PreparedViewports {
         fonts.faces = attempt.faces();
         fonts.window_matrices.push(content.clone());
         crate::font::metrics::realize_frame_fonts(&mut fonts, metrics);
+        let pointer_source = crate::presentation::pointer::window_pointer_source_map(&fonts).ok()?;
         Some(ScrollCoverage {
             epoch,
             predict_pixels: false,
@@ -272,6 +263,7 @@ impl PreparedViewports {
             char_fonts: fonts.char_fonts,
             shaped_clusters: fonts.shaped_clusters,
             hit_index,
+            pointer_source,
         })
     }
 }

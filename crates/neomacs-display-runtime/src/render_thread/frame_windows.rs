@@ -999,10 +999,24 @@ impl GuiFrameRenderState {
         &self,
         frame: &FrameGlyphBuffer,
     ) -> Option<neomacs_display_protocol::PointerAppearanceSelection> {
-        // Projection replaces body glyphs and changes primitive indices.
-        // Canonical appearance spans cannot address this temporary surface.
+        // The projected frame owns a newly resolved pointer map. Appearance
+        // IDs from the authoritative frame cannot address it; resolve hover
+        // against the exact temporary paint geometry instead.
         if self.compositor.input_scroll.active() {
-            return None;
+            if !self.pointer_inside || self.presented_press.is_some() {
+                return None;
+            }
+            let (x, y) =
+                self.root_frame_point_from_surface(self.mouse_pos.0, self.mouse_pos.1)?;
+            let point = self.inverse_map(frame, x, y)?;
+            let appearance = frame
+                .resolve_presented_hit(PresentedHitQuery::new(point))
+                .ok()??
+                .appearance()?;
+            return Some(neomacs_display_protocol::PointerAppearanceSelection::new(
+                appearance,
+                neomacs_display_protocol::PointerAppearancePhase::Hover,
+            ));
         }
         self.pointer_appearance.selection_for(frame)
     }

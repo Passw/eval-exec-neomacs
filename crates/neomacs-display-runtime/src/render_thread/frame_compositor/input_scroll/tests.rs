@@ -72,6 +72,7 @@ fn frame_with_prediction(
             char_fonts: Default::default(),
             shaped_clusters: Default::default(),
             hit_index,
+            pointer_source: Default::default(),
         },
     ));
     let frame = state.materialize();

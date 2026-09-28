@@ -78,6 +78,22 @@ fn fixture_with(change: impl FnOnce(&mut scroll_coverage::ScrollCoverage)) -> Fr
         positions,
     )
     .unwrap();
+    let live_hit_index = PresentedHitIndex::from_parts(
+        state.presentation_id,
+        vec![PresentedHitRegion::new(
+            Some(window),
+            PresentedRegionKind::TextBody,
+            FrameRect::new(viewport.x, viewport.y, viewport.width, viewport.height).unwrap(),
+            0,
+        )],
+        hit_index
+            .text_positions()
+            .iter()
+            .filter(|position| position.bounds().bottom() <= viewport.bottom())
+            .cloned()
+            .collect(),
+    )
+    .unwrap();
     state.window_matrices.push(content.clone());
     state
         .scroll_coverage
@@ -94,9 +110,11 @@ fn fixture_with(change: impl FnOnce(&mut scroll_coverage::ScrollCoverage)) -> Fr
             char_fonts: Default::default(),
             shaped_clusters: Default::default(),
             hit_index,
+            pointer_source: Default::default(),
         }));
     change(Arc::make_mut(&mut state.scroll_coverage[0]));
-    let frame = state.materialize();
+    let mut frame = state.materialize();
+    frame.install_presented_hit_index(live_hit_index).unwrap();
     assert_eq!(frame.scroll_surfaces.len(), 1);
     frame
 }
@@ -613,4 +631,113 @@ fn changing_coverage_defers_raster_work_until_paint_is_stable() {
             assert_ne!(stable.texture.id(), original.as_ref().unwrap().id());
         }
     }
+}
+
+#[test]
+fn scrolling_hover_resolves_projected_slots_and_draws_live_pixels() {
+    let Ok(mut renderer) = WgpuRenderer::new(None, 80, 40) else {
+        assert!(std::env::var_os("NEOMACS_REQUIRE_GPU_TESTS").is_none());
+        return;
+    };
+    let mut frame = fixture_with(|coverage| {
+        let mut regions = Vec::new();
+        let mut appearances = Vec::new();
+        let window = coverage.content.window_id;
+        for row in 0..6 {
+            let bounds = FrameRect::new(10.0, 10.0 + row as f32 * 10.0, 60.0, 10.0).unwrap();
+            regions.push(PresentedPointerRegion::new_owned(
+                PresentedRegionId::new(Some(window), PresentedRegionKind::TextBody),
+                bounds,
+                None,
+                Some(PointerAppearanceId::try_from(row as usize).unwrap()),
+            ));
+            let mode = PointerDrawMode::Face(FaceId::new(1));
+            appearances.push(PresentedPointerSourceAppearance::new(
+                vec![PresentedSourcePaintSpan::new(
+                    PresentedPrimitiveKind::Glyph,
+                    GlyphRowRole::Text,
+                    DisplaySlotId {
+                        window_id: window,
+                        row,
+                        col: 0,
+                    },
+                    bounds,
+                )],
+                mode,
+                mode,
+            ));
+        }
+        coverage.pointer_source = PresentedPointerSourceMap::new(regions, appearances);
+    });
+    let mut render = GuiFrameRenderState::new(
+        1,
+        renderer.device(),
+        1.0,
+        false,
+        frame_time::observe_platform_now(),
+    );
+    render.set_current_frame(
+        Some(frame.clone()),
+        None,
+        Default::default(),
+        Default::default(),
+    );
+    render.set_surface_state(
+        SurfaceState::from_device_size(80, 40, DeviceScale::new(1.0).unwrap()).unwrap(),
+    );
+    render.pointer_inside = true;
+    render.mouse_pos = (11.0, 11.0);
+    let stream = InputStream::default();
+    let delivery = stream.issue().unwrap();
+    assert!(render.compositor.input_scroll.push(
+        &frame,
+        11.0,
+        11.0,
+        10.5,
+        delivery.receipt(),
+        None
+    ));
+    render.compositor.input_scroll.paint(&mut frame);
+    let selection = render
+        .pointer_selection_for(&frame)
+        .expect("hover follows projected pixels");
+    let appearance = frame
+        .presented_pointer()
+        .appearance(selection.appearance())
+        .unwrap();
+    assert_eq!(appearance.hover(), PointerDrawMode::Face(FaceId::new(1)));
+    assert!(
+        prepare(
+            &mut renderer,
+            &mut render,
+            &frame,
+            mapping(&frame, 1.0),
+            false
+        )
+        .is_none(),
+        "live hover must not be covered by the ordinary cached body"
+    );
+    let texture = renderer
+        .acquire_snapshot(SnapshotSize::new(80, 40).unwrap())
+        .unwrap();
+    super::super::scene::render_frame_root_glyphs(
+        &mut renderer,
+        &mut render,
+        texture.view(),
+        &frame,
+        mapping(&frame, 1.0),
+        false,
+        None,
+        None,
+        true,
+    );
+    let data = pixels(&renderer, texture.view().texture());
+    let pixel = &data[(12 * 80 + 12) * 4..(12 * 80 + 12) * 4 + 4];
+    assert_eq!(
+        pixel,
+        &[0, 255, 0, 255],
+        "mouse face replaces the blue source row with green"
+    );
+    render.pointer_inside = false;
+    assert!(render.pointer_selection_for(&frame).is_none());
 }

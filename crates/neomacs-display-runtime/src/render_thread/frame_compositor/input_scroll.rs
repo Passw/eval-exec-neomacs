@@ -240,7 +240,11 @@ impl InputScroll {
         if active.surface.coverage().hit_index.presentation() != frame.presentation_id {
             return;
         }
-        active.surface.paint(frame, active.offset);
+        if let Err(error) = active.surface.paint(frame, active.offset) {
+            tracing::warn!(?error, "scroll pointer projection rejected");
+            self.active = None;
+            return;
+        }
         if active.offset != 0.0 {
             self.staged_tokens.extend_from_slice(&active.tokens);
         }
