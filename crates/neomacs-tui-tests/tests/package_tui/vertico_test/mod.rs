@@ -9,9 +9,15 @@ use super::scenario::{DisplayCheckpoint, PackageTuiScenario, PairTimeout, Readin
 
 mod harness;
 mod prelude;
+mod selection;
 
 use harness::candidate_rows;
 use prelude::VERTICO_TUI_PRELUDE;
+
+#[test]
+fn vertico_selection_moves_the_highlight_and_accepts_by_key() {
+    selection::run();
+}
 
 #[test]
 fn vertico_real_minibuffer_candidates_and_selection_match_gnu_grid() {
