@@ -11,6 +11,7 @@ mod harness;
 mod multiform;
 mod overflow;
 mod prelude;
+mod resize;
 mod selection;
 
 use harness::candidate_rows;
@@ -24,6 +25,11 @@ fn vertico_multiform_renders_the_grid_and_flat_layouts() {
 #[test]
 fn vertico_overflow_scrolls_the_candidate_window_and_counts_candidates() {
     overflow::run();
+}
+
+#[test]
+fn vertico_resize_reflows_the_candidate_window() {
+    resize::run();
 }
 
 #[test]

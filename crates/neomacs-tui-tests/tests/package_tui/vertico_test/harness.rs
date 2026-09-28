@@ -80,13 +80,7 @@ pub(super) fn idle_mode_line_row(rows: u16) -> u16 {
     rows - 2
 }
 
-/// The row the main window's mode line is on.
-pub(super) fn mode_line_row_of(session: &TuiSession) -> u16 {
-    mode_line_row_in(&session.text_grid())
-        .unwrap_or_else(|| panic!("{} did not render a mode line", session.name))
-}
-
-/// [`mode_line_row_of`] against an already-read grid, for use in a wait.
+/// The row the main window's mode line is on, if the screen has one.
 pub(super) fn mode_line_row_in(grid: &[String]) -> Option<u16> {
     grid.iter()
         .position(|row| row.contains(MODE_LINE_MARKER))
@@ -283,4 +277,34 @@ pub(super) fn press_and_wait_for_count(
     })?;
     assert_candidate_state(pair, prefix, prompt, count, expected_current);
     Ok(())
+}
+
+/// The candidate window is where a grown minibuffer window puts it: its prompt
+/// row is the row after the main window's mode line, and its candidates are the
+/// rows after that, without a gap.
+///
+/// How tall the window grows is the package's decision and is pinned by the
+/// frozen screens; that the window starts here is what this checks.
+pub(super) fn assert_candidates_start_under_mode_line(
+    pair: &PackageTuiPair,
+    prefix: &str,
+    prompt: &str,
+) {
+    for session in [&pair.gnu, &pair.neo] {
+        let grid = session.text_grid();
+        let prompt_row = prompt_row_in(&grid)
+            .unwrap_or_else(|| panic!("{} rendered no mode line", session.name));
+        assert!(
+            grid[usize::from(prompt_row)].contains(prompt),
+            "{}: the row under the mode line is not the prompt row:\n{}",
+            session.name,
+            grid.join("\n")
+        );
+        assert_eq!(
+            candidate_rows(&grid, prefix).first().copied(),
+            Some(prompt_row + 1),
+            "{}: the candidates do not start directly under the prompt",
+            session.name
+        );
+    }
 }

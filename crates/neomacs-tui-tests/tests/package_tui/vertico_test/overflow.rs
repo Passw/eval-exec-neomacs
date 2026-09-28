@@ -67,7 +67,7 @@ fn run_body(pair: &mut PackageTuiPair) -> Result<(), String> {
     // mode line has moved up by the prompt row and the ten candidate rows.
     assert_candidate_state(pair, PREFIX, PROMPT, "1/14", Some("facet-01"));
     assert_window(pair, "facet-01", "facet-10");
-    assert_window_starts_under_mode_line(pair);
+    assert_candidates_start_under_mode_line(pair, PREFIX, PROMPT);
     record_checkpoint(
         pair,
         "Vertico overflow first screen",
@@ -147,27 +147,4 @@ fn assert_window(pair: &PackageTuiPair, first: &str, last: &str) {
         texts,
         "the visible candidate window differs from GNU's"
     );
-}
-
-/// The candidate window is where a grown minibuffer window puts it: its prompt
-/// row is the row after the main window's mode line, and its candidates are the
-/// rows after that, without a gap.
-fn assert_window_starts_under_mode_line(pair: &PackageTuiPair) {
-    for session in [&pair.gnu, &pair.neo] {
-        let grid = session.text_grid();
-        let prompt = prompt_row_in(&grid)
-            .unwrap_or_else(|| panic!("{} rendered no mode line", session.name));
-        assert!(
-            grid[usize::from(prompt)].contains(PROMPT),
-            "{}: the row under the mode line is not the prompt row:\n{}",
-            session.name,
-            grid.join("\n")
-        );
-        assert_eq!(
-            candidate_rows(&grid, PREFIX).first().copied(),
-            Some(prompt + 1),
-            "{}: the candidates do not start directly under the prompt",
-            session.name
-        );
-    }
 }

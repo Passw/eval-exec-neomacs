@@ -52,6 +52,19 @@ pub(super) fn numbered_names(prefix: &str, count: usize) -> Vec<String> {
         .collect()
 }
 
+/// The buffer a scenario can display while it drives the minibuffer.
+///
+/// It holds one short line, so a terminal narrowing wraps nothing: the window
+/// above the candidate window is then the same window at every width, which is
+/// what a scenario that resizes the terminal wants to be looking at.
+pub(super) const VERTICO_HELD_BUFFER: &str = "held";
+pub(super) const VERTICO_HELD_PRELUDE: &str = r#"
+(with-current-buffer (get-buffer-create "held")
+  (erase-buffer)
+  (insert "held buffer line
+"))
+"#;
+
 /// Vertico as the package ships it: `vertico-mode` on, `vertico-count` and
 /// `vertico-cycle` left at their defaults, over `fixture`.
 ///
