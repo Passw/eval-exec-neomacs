@@ -43,12 +43,24 @@ use crate::thread_comm::WindowFullscreenMode;
 /// How close together two titlebar clicks must be to count as a double click.
 const TITLEBAR_DOUBLE_CLICK_INTERVAL: std::time::Duration = std::time::Duration::from_millis(400);
 
+/// Unique across resize, device loss, destruction and recreation (no handle ABA).
+pub(super) fn next_surface_generation() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    NEXT.fetch_update(
+        std::sync::atomic::Ordering::Relaxed,
+        std::sync::atomic::Ordering::Relaxed,
+        |id| id.checked_add(1),
+    )
+    .expect("surface generation exhausted")
+}
+
 /// Native window/surface state for a top-level GUI frame.
 pub(crate) struct GuiFrameNativeWindowState {
     pub(super) window_chrome: crate::window_chrome::WindowChromeController,
     pub(super) content_insets: neomacs_display_protocol::ContentInsets,
     pub window: Arc<dyn Window>,
     pub surface: wgpu::Surface<'static>,
+    pub surface_generation: u64,
     /// Backend of the adapter this surface presents through; wgpu surfaces
     /// do not expose it, and the GL resize quirk needs it.
     pub surface_backend: wgpu::Backend,
@@ -101,6 +113,7 @@ impl GuiFrameNativeWindowState {
         device: &wgpu::Device,
         instance: &wgpu::Instance,
     ) -> bool {
+        self.surface_generation = next_surface_generation();
         if self.surface_backend == wgpu::Backend::Gl {
             let rebuilt = instance
                 .create_surface(self.window.clone())
@@ -111,6 +124,14 @@ impl GuiFrameNativeWindowState {
             match rebuilt {
                 Ok(surface) => {
                     self.surface = surface;
+                    #[cfg(target_os = "linux")]
+                    // SAFETY: the rebuilt surface and device share this renderer instance.
+                    unsafe {
+                        neomacs_renderer_wgpu::native_presentation::prepare_surface(
+                            device,
+                            &self.surface,
+                        );
+                    }
                     self.surface.configure(device, &self.surface_config);
                     return true;
                 }
@@ -120,6 +141,11 @@ impl GuiFrameNativeWindowState {
                     // window's present path entirely.
                 }
             }
+        }
+        #[cfg(target_os = "linux")]
+        // SAFETY: this surface and device share the renderer instance; configure follows immediately.
+        unsafe {
+            neomacs_renderer_wgpu::native_presentation::prepare_surface(device, &self.surface);
         }
         self.surface.configure(device, &self.surface_config);
         false
@@ -2090,6 +2116,13 @@ impl GuiFrameWindowManager {
                         view_formats: vec![],
                         desired_maximum_frame_latency: 2,
                     };
+                    #[cfg(target_os = "linux")]
+                    // SAFETY: this surface and device share the renderer instance; configure follows immediately.
+                    unsafe {
+                        neomacs_renderer_wgpu::native_presentation::prepare_surface(
+                            device, &surface,
+                        );
+                    }
                     surface.configure(device, &config);
 
                     NativeTextInputPolicy::for_gui_frame().apply_to_window(window.as_ref());
@@ -2141,6 +2174,7 @@ impl GuiFrameWindowManager {
                                     content_insets: Default::default(),
                                     window,
                                     surface,
+                                    surface_generation: next_surface_generation(),
                                     surface_backend: adapter.get_info().backend,
                                     surface_config: config,
                                     width: phys.width,
@@ -2620,7 +2654,13 @@ impl GuiFrameWindowManager {
                 view_formats: vec![],
                 desired_maximum_frame_latency: 2,
             };
+            #[cfg(target_os = "linux")]
+            // SAFETY: this surface and device share the renderer instance; configure follows immediately.
+            unsafe {
+                neomacs_renderer_wgpu::native_presentation::prepare_surface(device, &surface);
+            }
             surface.configure(device, &config);
+            native.surface_generation = next_surface_generation();
             // Replacing the fields drops the old-instance surface in place.
             native.surface = surface;
             native.surface_config = config;

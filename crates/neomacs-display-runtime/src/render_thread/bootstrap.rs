@@ -176,6 +176,11 @@ impl RenderApp {
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         };
+        #[cfg(target_os = "linux")]
+        // SAFETY: this surface and device share the renderer instance; configure follows immediately.
+        unsafe {
+            neomacs_renderer_wgpu::native_presentation::prepare_surface(&device, &surface);
+        }
         surface.configure(&device, &config);
 
         #[cfg(feature = "video")]
@@ -232,6 +237,7 @@ impl RenderApp {
                 content_insets: Default::default(),
                 window,
                 surface,
+                surface_generation: super::frame_windows::next_surface_generation(),
                 surface_backend: adapter_info.backend,
                 surface_config: config,
                 width: pending_width,

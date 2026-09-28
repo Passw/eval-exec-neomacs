@@ -27,6 +27,27 @@ pub struct PlatformTimestamp {
     pub nanoseconds: u64,
 }
 
+/// What the platform actually timed; neither variant claims photon visibility.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PresentationObservation {
+    Compositor,
+    FirstPixelOutput { uncertainty_ns: u64 },
+}
+impl PresentationObservation {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Compositor => "compositor-confirmed",
+            Self::FirstPixelOutput { .. } => "native-first-pixel-output",
+        }
+    }
+    fn uncertainty(self) -> Option<u64> {
+        match self {
+            Self::Compositor => None,
+            Self::FirstPixelOutput { uncertainty_ns } => Some(uncertainty_ns),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ScrollViewport {
     pub window: u64,
@@ -46,7 +67,7 @@ struct Pending {
     completed: bool,
     layouts: VecDeque<PresentationId>,
     projected_submissions: VecDeque<u64>,
-    projected: Option<(u64, PlatformTimestamp)>,
+    projected: Option<(u64, PlatformTimestamp, PresentationObservation)>,
 }
 
 #[derive(Default)]
@@ -143,7 +164,18 @@ impl Measurements {
         }
     }
 
+    #[cfg(test)]
     fn projected_confirmed(&mut self, frame: u64, serial: u64, time: PlatformTimestamp) {
+        self.projected_observed(frame, serial, time, PresentationObservation::Compositor);
+    }
+
+    fn projected_observed(
+        &mut self,
+        frame: u64,
+        serial: u64,
+        time: PlatformTimestamp,
+        observation: PresentationObservation,
+    ) {
         for item in &mut self.pending {
             if item.frame == frame
                 && item.projected_submissions.contains(&serial)
@@ -151,17 +183,27 @@ impl Measurements {
                 && time.nanoseconds >= item.received.nanoseconds
                 && item
                     .projected
-                    .is_none_or(|(_, previous)| time.nanoseconds < previous.nanoseconds)
+                    .is_none_or(|(_, previous, _)| time.nanoseconds < previous.nanoseconds)
             {
-                item.projected = Some((serial, time));
+                item.projected = Some((serial, time, observation));
             }
         }
     }
 
+    #[cfg(test)]
     fn confirmed(
         &mut self,
         layout: PresentationId,
         time: PlatformTimestamp,
+    ) -> Vec<serde_json::Value> {
+        self.observed(layout, time, PresentationObservation::Compositor)
+    }
+
+    fn observed(
+        &mut self,
+        layout: PresentationId,
+        time: PlatformTimestamp,
+        observation: PresentationObservation,
     ) -> Vec<serde_json::Value> {
         let mut samples = Vec::new();
         self.pending.retain(|item| {
@@ -175,11 +217,14 @@ impl Measurements {
             samples.push(serde_json::json!({
                 "input": item.token.0, "frame": item.frame, "kind": item.kind,
                 "presentation": layout.get(), "clock_id": time.clock_id,
+                "observation": observation.label(), "timestamp_uncertainty_ns": observation.uncertainty(),
+                "projected_observation": item.projected.map(|(_, _, kind)| kind.label()),
+                "projected_timestamp_uncertainty_ns": item.projected.and_then(|(_, _, kind)| kind.uncertainty()),
                 "received_ns": item.received.nanoseconds, "presented_ns": time.nanoseconds,
                 "input_to_present_ns": latency, "evicted_inputs": self.dropped,
-                "projected_submission": item.projected.map(|(serial, _)| serial),
-                "projected_presented_ns": item.projected.map(|(_, time)| time.nanoseconds),
-                "input_to_projected_present_ns": item.projected.map(|(_, time)| time.nanoseconds - item.received.nanoseconds),
+                "projected_submission": item.projected.map(|(serial, _, _)| serial),
+                "projected_presented_ns": item.projected.map(|(_, time, _)| time.nanoseconds),
+                "input_to_projected_present_ns": item.projected.map(|(_, time, _)| time.nanoseconds - item.received.nanoseconds),
             }));
             false
         });
@@ -303,22 +348,39 @@ pub fn projected_requested(tokens: &[InputToken], frame: u64, serial: u64) {
 }
 
 pub fn projected_confirmed(frame: u64, serial: u64, time: PlatformTimestamp) {
+    projected_observed(frame, serial, time, PresentationObservation::Compositor);
+}
+
+pub fn projected_observed(
+    frame: u64,
+    serial: u64,
+    time: PlatformTimestamp,
+    observation: PresentationObservation,
+) {
     if let Some(recorder) = recorder() {
         recorder
             .measurements
             .lock()
             .unwrap()
-            .projected_confirmed(frame, serial, time);
+            .projected_observed(frame, serial, time, observation);
     }
 }
 
 pub fn confirmed(layout: PresentationId, time: PlatformTimestamp) {
+    observed(layout, time, PresentationObservation::Compositor);
+}
+
+pub fn observed(
+    layout: PresentationId,
+    time: PlatformTimestamp,
+    observation: PresentationObservation,
+) {
     let Some(recorder) = recorder() else { return };
     let samples = recorder
         .measurements
         .lock()
         .unwrap()
-        .confirmed(layout, time);
+        .observed(layout, time, observation);
     if samples.is_empty() {
         return;
     }
@@ -354,6 +416,26 @@ mod tests {
             nanoseconds,
         }
     }
+    #[test]
+    fn output_confirmation_preserves_its_measurement_kind_and_uncertainty() {
+        let mut measurements = Measurements::default();
+        let token = measurements.receive(7, "precise", time(100));
+        let kind = PresentationObservation::FirstPixelOutput { uncertainty_ns: 70 };
+        measurements.start(&[token], |_| viewport(1));
+        measurements.projected_requested(&[token], 7, 41);
+        measurements.projected_observed(7, 41, time(150), kind);
+        measurements.seal(7, PresentationId::new(2), &viewport(2));
+        let samples = measurements.observed(PresentationId::new(2), time(300), kind);
+        assert_eq!(samples[0]["observation"], "native-first-pixel-output");
+        assert_eq!(
+            samples[0]["projected_observation"],
+            "native-first-pixel-output"
+        );
+        assert_eq!(samples[0]["timestamp_uncertainty_ns"], 70);
+        assert_eq!(samples[0]["projected_timestamp_uncertainty_ns"], 70);
+        assert_eq!(samples[0]["input_to_present_ns"], 200);
+    }
+
     #[test]
     fn projected_latency_requires_exact_native_submission_and_keeps_authoritative_completion() {
         let mut measurements = Measurements::default();

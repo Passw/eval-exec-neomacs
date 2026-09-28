@@ -14,6 +14,8 @@ mod gpu_frame_timing;
 pub mod image_cache;
 mod image_sequence;
 pub mod media_budget;
+#[cfg(target_os = "linux")]
+pub mod native_presentation;
 pub mod renderer;
 pub mod shader_surface;
 pub mod shader_surface_cache;

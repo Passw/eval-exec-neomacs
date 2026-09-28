@@ -169,6 +169,17 @@ impl RenderApp {
             );
             self.presentation_observer.before_present(
                 window.as_ref(),
+                renderer.device(),
+                &window_state
+                    .lifecycle
+                    .native()
+                    .expect("live window")
+                    .surface,
+                window_state
+                    .lifecycle
+                    .native()
+                    .expect("live window")
+                    .surface_generation,
                 emacs_frame_id,
                 frame.presentation_id,
                 logical_size,

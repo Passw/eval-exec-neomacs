@@ -324,7 +324,18 @@ impl RenderApp {
         }
         self.refresh_monitor_snapshot(event_loop, true);
         self.complete_pending_scale_changes();
-        self.presentation_observer.dispatch_pending();
+        self.presentation_observer.dispatch_pending(
+            self.renderer
+                .as_ref()
+                .map(|renderer| renderer.device().as_ref()),
+            |frame| {
+                self.frame_windows
+                    .get(frame)?
+                    .lifecycle
+                    .native()
+                    .map(|native| (&native.surface, native.surface_generation))
+            },
+        );
         if self.process_commands() {
             self.handle_exiting();
             event_loop.exit();
