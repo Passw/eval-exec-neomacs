@@ -591,8 +591,8 @@ impl RowProgram {
         if row_limit == 0 {
             return Err(RowProgramError::Budget);
         }
-        // The first continuation domain has no physical-line tab state,
-        // contextual shaping or box/extend carryover.
+        // Contextual shaping and box/extend carryover still require the
+        // canonical buffer walk.
         // A later unsupported item must not silently inherit a reset origin.
         let can_wrap = self.geometry.character_wrap
             && self.geometry.inherited_line_spacing == 0.0
@@ -604,9 +604,7 @@ impl RowProgram {
                 .iter()
                 .all(|(operation, _)| match operation {
                     Operation::Text(text) => {
-                        text.run.text.is_ascii()
-                            && !text.run.text.contains('\t')
-                            && text.layout == DisplayItemLayout::default()
+                        text.run.text.is_ascii() && text.layout == DisplayItemLayout::default()
                     }
                     Operation::Break {
                         line_height,
@@ -627,6 +625,8 @@ impl RowProgram {
         let mut terminator_height = self.geometry.metrics.row_height();
         let mut rows = Vec::new();
         let mut completed_glyphs = 0usize;
+        let mut physical_line_tabs =
+            crate::display_row::builder::DisplayPhysicalLineTabState::default();
         let operations: Vec<_> = self
             .operations
             .into_iter()
@@ -686,13 +686,13 @@ impl RowProgram {
                 crate::display_row::render_item::DisplayRowRenderItem::from_source_item(item);
             let can_split = can_wrap
                 && matches!(render_item.source_item().kind, DisplayItemKind::TextRun(ref run)
-                    if run.text.is_ascii() && !run.text.contains('\t'));
+                    if run.text.is_ascii());
             let checkpoint = DisplayRowGlyphCheckpoint::capture(&row);
             let previous_slots = slots.len();
             let progress = DisplayRowProgressWriter::with_text_run_measurement_and_glyph_measurer_for_area_and_start_policy(
                 &item_layout, &mut row, plan, &mut self.measurements, position, self.geometry.width,
                 DisplayRowTextAreaOrigin::row_local(), GlyphArea::Text, DisplayRowAppendStartPolicy::ReconcileWithRowTail,
-            ).push_item(render_item.row_item_for_write());
+            ).with_buffer_tab_admission().push_item(render_item.row_item_for_write());
             if self.measurements.missing {
                 return Err(RowProgramError::MissingMeasurement);
             }
@@ -806,8 +806,10 @@ impl RowProgram {
                 if rows.len() == row_limit {
                     return Ok(rows);
                 }
+                physical_line_tabs.continue_after_visual_row(position.x_px());
                 row = new_display_row(&layout);
-                position = DisplayRowPosition::new(0.0, 0);
+                position = DisplayRowPosition::new(0.0, 0)
+                    .with_tab_coordinates(physical_line_tabs.coordinates());
                 operation_index = next_index;
                 operation_offset = next_offset;
                 word_wrap.reset_after_row_transition();
@@ -1153,11 +1155,11 @@ mod tests {
     }
 
     #[test]
-    fn wrapped_program_rejects_tab_after_continuation_and_cancellation() {
-        assert!(matches!(
-            ascii_wrapped_program("abcdefghijkl\tz").compute_visual_rows(16, || false),
-            Err(RowProgramError::Overflow)
-        ));
+    fn wrapped_program_supports_tab_after_continuation_and_rejects_cancellation() {
+        let rows = ascii_wrapped_program("abcdefghijkl\tz")
+            .compute_visual_rows(16, || false)
+            .unwrap();
+        assert_eq!(rows.last().unwrap().end_kind, ComputedRowEnd::Newline);
         let calls = std::cell::Cell::new(0);
         assert!(matches!(
             ascii_wrapped_program("abcdefghijkl").compute_visual_rows(16, || {

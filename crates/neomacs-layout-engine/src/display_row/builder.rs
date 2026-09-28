@@ -1375,6 +1375,7 @@ pub(crate) struct DisplayRowProgressWriter<'layout, 'row, 'measurer> {
     /// window-local terms; see `DisplayRowTextAreaOrigin`.
     text_area_origin: DisplayRowTextAreaOrigin,
     text_run_measurement: Option<DisplayTextRunMeasurement>,
+    buffer_tab_admission: bool,
 }
 
 #[cfg(test)]
@@ -1550,6 +1551,7 @@ impl<'layout, 'row> DisplayRowProgressWriter<'layout, 'row, '_> {
             max_x_px,
             text_area_origin: DisplayRowTextAreaOrigin::row_local(),
             text_run_measurement: None,
+            buffer_tab_admission: false,
         }
     }
 }
@@ -1615,6 +1617,7 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
             max_x_px,
             text_area_origin,
             text_run_measurement: None,
+            buffer_tab_admission: false,
         }
     }
 
@@ -1654,6 +1657,7 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
             max_x_px,
             text_area_origin: DisplayRowTextAreaOrigin::row_local(),
             text_run_measurement: Some(text_run_measurement),
+            buffer_tab_admission: false,
         }
     }
 
@@ -1679,12 +1683,21 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
             max_x_px,
             text_area_origin,
             text_run_measurement: Some(text_run_measurement),
+            buffer_tab_admission: false,
         }
     }
 
     #[cfg(test)]
     pub(crate) fn position(&self) -> DisplayRowPosition {
         self.position
+    }
+
+    /// Buffer tabs follow DisplayRowTextOverflowDecision::for_char: their
+    /// complete advance is admitted even past the right edge. Structural
+    /// lanes and string writers retain their own clipping policy.
+    pub(crate) fn with_buffer_tab_admission(mut self) -> Self {
+        self.buffer_tab_admission = true;
+        self
     }
 
     pub(crate) fn push_item(&mut self, item: DisplayItem) -> DisplayRowAppendProgress {
@@ -1968,7 +1981,8 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
             let advance =
                 self.writer
                     .item_horizontal_advance_px(ch, face_id, natural_advance, item_layout);
-            let overflowing = advance > 0.0 && self.position.x_px + advance > self.max_x_px;
+            let overflowing = !(self.buffer_tab_admission && ch == '\t')
+                && advance > 0.0 && self.position.x_px + advance > self.max_x_px;
             if overflowing
                 && (self.writer.overflow_policy()
                     == DisplayRowOverflowPolicy::RejectOverflowingGlyph

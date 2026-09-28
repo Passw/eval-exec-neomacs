@@ -1415,12 +1415,12 @@ fn scaled_line_height_overflow_keeps_finite_geometry() {
 fn worker_keeps_complete_prefix_before_unsupported_rows() {
     let line = "ordinary offscreen text\n";
     let start = 120 * line.len();
-    for boundary in ["replacement", "wrapped-tab"] {
+    for boundary in ["replacement", "wrapped-contextual"] {
         let mut text = line.repeat(300);
-        if boundary == "wrapped-tab" {
+        if boundary == "wrapped-contextual" {
             text.replace_range(
                 start + 3 * line.len()..start + 4 * line.len(),
-                &("W".repeat(119) + "\t\n"),
+                &("W".repeat(119) + "好\n"),
             );
         }
         let (mut eval, frame, buffer, window) = incr_editing_frame(&text, 800, 600);
@@ -1895,4 +1895,16 @@ fn canonical_word_wrap_rewinds_source_end_and_output_pen_with_glyphs() {
 fn worker_prepares_long_physical_lines_across_bounded_capture_steps() {
     first_visit_with_setup(None, &format!("{}\n", "W".repeat(180)),
         None, 0, 2, Some("(setq word-wrap t)"));
+}
+
+#[test]
+fn worker_prepares_tabs_after_wrapped_text_with_physical_line_origin() {
+    for word_wrap in ["nil", "t"] {
+        for width in [48, 49, 50, 51, 74, 75, 76, 180] {
+            for tail in ["\tend", "\t\tend", "word \t tail"] {
+                first_visit_with_setup(None, &format!("{}{}\n", "W".repeat(width), tail),
+                    None, 0, 2, Some(&format!("(setq word-wrap {word_wrap})")));
+            }
+        }
+    }
 }
