@@ -17,7 +17,7 @@ struct Entry {
     window: WindowId,
     scope: WindowLayoutQueryScope,
     source_point: neovm_core::buffer::LispCharPos1,
-    collections: neovm_core::tagged::mutate::LispCollectionRevision,
+    collections: neovm_core::tagged::collection_reads::CollectionReads,
     query: WindowLayoutQuery,
 }
 
@@ -49,12 +49,16 @@ impl QueryCache {
             .get(buffer)?
             .point_lisp_char_pos();
         self.entries.iter().rev().find_map(|entry| {
+            tracing::trace!(target: "neomacs_layout_engine::query_cache", ?scope,
+                point_matches = entry.source_point == source_point,
+                collections_match = entry.collections.unchanged(),
+                freshness_matches = entry.query.geometry().and_then(|g| g.layout_freshness.as_ref()) == Some(&current),
+                "query cache lookup");
             if !(entry.frame == frame
                 && entry.window == window
                 && entry.scope == scope
                 && entry.source_point == source_point
-                && entry.collections
-                    == neovm_core::tagged::mutate::LispCollectionRevision::current())
+                && entry.collections.unchanged_and_observe())
             {
                 return None;
             }
@@ -75,6 +79,7 @@ impl QueryCache {
         window: WindowId,
         scope: WindowLayoutQueryScope,
         query: &WindowLayoutQuery,
+        collections: neovm_core::tagged::collection_reads::CollectionReads,
     ) {
         let Some(snapshot) = query.geometry() else {
             return;
@@ -109,7 +114,7 @@ impl QueryCache {
             window,
             scope,
             source_point,
-            collections: neovm_core::tagged::mutate::LispCollectionRevision::current(),
+            collections,
             query: query.clone(),
         });
         while self.entries.len() > MAX_ENTRIES {

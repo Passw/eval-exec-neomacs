@@ -1602,7 +1602,11 @@ impl LayoutEngine {
             .then(|| PreparedGuiChromeSemantics::collect(evaluator, frame_id, &gui_chrome_gc_roots))
             .flatten();
 
-        evaluator.sync_runtime_faces_for_frame(frame_id);
+        // Queries normalize faces inside their dependency observation before
+        // entering the row producer; redisplay normalizes after chrome Lisp.
+        if query_window.is_none() {
+            evaluator.sync_runtime_faces_for_frame(frame_id);
+        }
 
         let (bootstrap_bg, bootstrap_font_size, window_system, device_scale) = {
             let Some(frame) = evaluator.frame_manager().get(frame_id) else {
@@ -3378,14 +3382,21 @@ impl LayoutEngine {
             return Ok(query);
         }
         self.query_body_reuse_allowed = true;
-        let query = self.layout_frame_rust_for_purpose_inner(
+        let (query, collections) = neovm_core::tagged::collection_reads::capture_normalized(
             evaluator,
-            frame_id,
-            LayoutPurpose::SynchronousQuery { window_id, scope },
-        )
-        .ok_or(neovm_core::window::WindowLayoutQueryFailure::DidNotConverge)?;
-        if self.query_body_reuse_allowed {
-            self.query_cache.remember(evaluator, frame_id, window_id, scope, &query);
+            |evaluator| { evaluator.sync_runtime_faces_for_frame(frame_id); },
+            |evaluator| self.layout_frame_rust_for_purpose_inner(
+                evaluator,
+                frame_id,
+                LayoutPurpose::SynchronousQuery { window_id, scope },
+            ),
+        );
+        let query = query.ok_or(neovm_core::window::WindowLayoutQueryFailure::DidNotConverge)?;
+        tracing::trace!(target: "neomacs_layout_engine::query_cache",
+            body_reuse_allowed = self.query_body_reuse_allowed,
+            collections_captured = collections.is_some(), "query completed");
+        if self.query_body_reuse_allowed && let Some(collections) = collections {
+            self.query_cache.remember(evaluator, frame_id, window_id, scope, &query, collections);
         }
         Ok(query)
     }

@@ -1339,3 +1339,22 @@ fn pixel_query_placement_matches_fresh_wrapped_and_decorated_rows() {
         assert!(reused > 4, "no pixel placement reuse: {decoration}, reused={reused}");
     }
 }
+
+#[test]
+fn ordinary_query_reuse_ignores_unread_lisp_collection_writes() {
+    use crate::engine::viewport_retry_depth_probe as probe;
+    use neovm_core::window::WindowLayoutQueryScope;
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    eval.buffer_manager_mut().get_mut(buffer).unwrap().insert(&"row\n".repeat(100));
+    let frame = eval.frame_manager_mut().create_frame("query-collections", 400, 170, buffer);
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.eval_str("(setq unrelated-scroll-state (vector 0 (list 1 2)))").unwrap();
+    let mut engine = LayoutEngine::new_without_font_metrics();
+    let initial = engine.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+    eval.eval_str("(aset unrelated-scroll-state 0 1) (setcar (aref unrelated-scroll-state 1) 3)").unwrap();
+    probe::reset();
+    let actual = engine.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+    assert_eq!(initial.geometry(), actual.geometry());
+    assert_eq!(probe::max_depth(), 0, "unread collection writes forced another row walk");
+}

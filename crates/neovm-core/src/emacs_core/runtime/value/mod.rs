@@ -3649,6 +3649,7 @@ impl TaggedValue {
         // dumped char-table → heap edges through this single mutation
         // chokepoint. Fired before `f` (conservative: any `_mut` borrow may
         // store a heap pointer). No-op unless write tracking is enabled.
+        mutate::LispCollectionRevision::changed(self);
         note_heap_write(self, HeapWriteKind::CharTableData);
         let ptr = self.as_veclike_ptr().unwrap() as *mut CharTableObj;
         Some(f(unsafe { &mut *ptr }))
@@ -3674,6 +3675,7 @@ impl TaggedValue {
         }
         // Write barrier — see `with_char_table_mut`. Sub-char-tables are the
         // dumped char-table interior nodes and are mutated the same way.
+        mutate::LispCollectionRevision::changed(self);
         note_heap_write(self, HeapWriteKind::SubCharTableData);
         let ptr = self.as_veclike_ptr().unwrap() as *mut SubCharTableObj;
         Some(f(unsafe { &mut *ptr }))
@@ -3797,6 +3799,7 @@ impl TaggedValue {
         }
         // Write barrier — see `with_char_table_mut`. Obarrays are dumped and
         // mutated by `intern`; this chokepoint feeds the GC remembered set.
+        mutate::LispCollectionRevision::changed(self);
         note_heap_write(self, HeapWriteKind::ObarrayData);
         let ptr = self.as_veclike_ptr().unwrap() as *mut ObarrayObj;
         Some(f(unsafe { &mut *ptr }))
@@ -5377,6 +5380,7 @@ pub fn lexenv_declares_special(lexenv: Value, sym_id: SymId) -> bool {
 
 #[inline(always)]
 fn cons_ptr_unchecked(value: Value) -> *const ConsCell {
+    crate::tagged::collection_reads::observe(value);
     (value.bits() & !TAG_MASK) as *const ConsCell
 }
 
