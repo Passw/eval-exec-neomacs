@@ -34,21 +34,15 @@ const PREFIX: &str = "quartz-";
 /// The `C-x b` prompt, whose row holds the count indicator and the input.
 const PROMPT: &str = "Switch to buffer";
 
-/// The fixture: the first and third names are the same length, the second is
-/// longer, so the default sort puts the second one last and the alphabetical
-/// sort puts it first.
+/// The fixture: two of the names are the same length and the third is longer,
+/// so the default sort function's order is not the names' own order.
 const NAMES: [&str; 3] = ["quartz-zz", "quartz-aaa", "quartz-mm"];
 
 /// What the package's default sort function makes of them.
 const DEFAULT_ORDER: [&str; 3] = ["quartz-mm", "quartz-zz", "quartz-aaa"];
 
 pub(super) fn run() {
-    let names = NAMES.map(str::to_owned).to_vec();
-    let prelude = repeat_vertico(&format!(
-        "{}{}",
-        fixture_buffers(&names),
-        VERTICO_HELD_PRELUDE
-    ));
+    let prelude = repeat_vertico(&fixture_buffers(&NAMES.map(str::to_owned)));
     let mut pair = spawn_pair("vertico-repeat", &prelude, 24, 80);
     let outcome =
         catch_phase("Vertico repeat scenario", || run_body(&mut pair)).and_then(|result| result);
