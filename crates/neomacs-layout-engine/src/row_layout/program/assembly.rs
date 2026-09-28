@@ -20,11 +20,11 @@ impl RowProgram {
     }
 
     /// Fragment reservations were checked at mailbox submission. Assembly
-    /// preserves their sum and the same batch ceilings, without another copy
-    /// of their source text or native font handles.
+    /// preserves their sum and the same batch ceilings. Joined text remains
+    /// bounded by that reservation; native font handles never move between jobs.
     pub(crate) fn append_measured_fragment(
         &mut self,
-        fragment: Self,
+        mut fragment: Self,
         maximum: RowProgramLimits,
     ) -> Result<(), RowProgramError> {
         if self.is_complete()
@@ -85,6 +85,55 @@ impl RowProgram {
         )?;
         merge_measurements(&mut self.measurements.faces, fragment.measurements.faces)?;
         self.measurements.missing |= fragment.measurements.missing;
+        // Restore the producer run split only by the acquisition budget.
+        // Keeping this artificial boundary would change whole-run admission
+        // and scalar fallback near a visual edge (notably emoji metrics).
+        if let (
+            Some((Operation::Text(left), left_plan)),
+            Some((Operation::Text(right), right_plan)),
+        ) = (self.operations.last_mut(), fragment.operations.first())
+            && self.trailing_text_continues
+            && left.span.end == right.span.start
+            && left.face == right.face
+            && left.run.composition == right.run.composition
+            && left.layout == right.layout
+            && left.pointer_appearance == right.pointer_appearance
+            && left.box_run_membership == right.box_run_membership
+            && (!left.box_run_membership.is_boxed()
+                || (!left.box_vertical_edges.owns_right() && !right.box_vertical_edges.owns_left()))
+        {
+            let chars = left.run.text.chars().count();
+            let bytes = left.run.text.len();
+            let mut advances =
+                match std::mem::replace(left_plan, DisplayTextRunMeasurement::PerChar) {
+                    DisplayTextRunMeasurement::Measured(advances) => advances,
+                    DisplayTextRunMeasurement::PerChar => Vec::new(),
+                };
+            advances.extend(
+                right_plan
+                    .measured_advances()
+                    .unwrap_or_default()
+                    .iter()
+                    .cloned()
+                    .map(|mut advance| {
+                        advance.char_offset += chars;
+                        advance.byte_offset += bytes;
+                        advance
+                    }),
+            );
+            if !advances.is_empty() {
+                *left_plan = DisplayTextRunMeasurement::Measured(advances);
+            }
+            left.run.text = format!("{}{}", left.run.text, right.run.text).into();
+            left.span.end = right.span.end.clone();
+            left.box_vertical_edges =
+                neomacs_display_protocol::face::BoxVerticalEdges::from_ownership(
+                    left.box_vertical_edges.owns_left(),
+                    right.box_vertical_edges.owns_right(),
+                );
+            fragment.operations.remove(0);
+        }
+        self.trailing_text_continues = fragment.trailing_text_continues;
         self.operations.extend(fragment.operations);
         self.limits = limits;
         Ok(())

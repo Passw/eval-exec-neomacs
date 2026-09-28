@@ -18,6 +18,7 @@ pub(crate) struct CapturedPhysicalLine {
     pub faces: Vec<PendingDisplaySourceFace>,
     pub end: CharPos0,
     pub complete: bool,
+    pub trailing_text_continues: bool,
 }
 
 /// A conservative first source domain: complete physical lines, ordinary
@@ -186,26 +187,45 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
         start_byte.get(),
     );
     let mut position = DisplaySourceTextPosition::new(0, start.get() as i64);
-    let mut items = Vec::new();
+    let mut items: Vec<DisplayItem> = Vec::new();
     let mut faces = Vec::new();
     for _ in 0..max_items {
         if cancelled() {
             return Err(RowProgramError::Cancelled);
         }
         if position.charpos() >= end.get() as i64 && !items.is_empty() {
-            // Contextual text cannot be shaped independently on either side
-            // of an idle boundary. Complete Unicode lines retain their path.
-            if items.iter().any(|item: &DisplayItem| {
-                matches!(&item.kind,
-                DisplayItemKind::TextRun(run) if !run.text.is_ascii())
-            }) {
+            // The bounded producer may stop inside a shaping cluster. Retain
+            // only spans closed by inspected source, and resume from that
+            // certified boundary on the next idle slice.
+            let last = items.last_mut().ok_or(RowProgramError::Incomplete)?;
+            let DisplayItemKind::TextRun(run) = &mut last.kind else {
                 return Err(RowProgramError::Unsupported);
+            };
+            let (chars, bytes) =
+                crate::display_text_run_measurement::closed_measurement_prefix(&run.text);
+            if chars == 0 {
+                items.pop();
+            } else {
+                run.text = run.text[..bytes].into();
+                last.span.end = last.span.start.advanced_by(chars, bytes);
+                last.box_vertical_edges =
+                    neomacs_display_protocol::face::BoxVerticalEdges::from_ownership(
+                        last.box_vertical_edges.owns_left(),
+                        false,
+                    );
             }
+            let Some(crate::display_item::DisplaySourcePosition::Buffer { char_pos: end, .. }) =
+                items.last().map(|item| &item.span.end)
+            else {
+                return Err(RowProgramError::Unsupported);
+            };
+            let end = *end;
             return Ok(CapturedPhysicalLine {
                 items,
                 faces,
-                end: CharPos0::new(position.charpos() as usize),
+                end,
                 complete: false,
+                trailing_text_continues: chars > 0,
             });
         }
         let step = producer.produce_step(position, context, face_ids);
@@ -234,10 +254,6 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
             // policy, even though their source vocabulary is ordinary text.
             return Err(RowProgramError::Unsupported);
         }
-        if continuing && matches!(&item.kind, DisplayItemKind::TextRun(run) if !run.text.is_ascii())
-        {
-            return Err(RowProgramError::Unsupported);
-        }
         let complete = matches!(item.kind, DisplayItemKind::RowBreak(_));
         items.push(item);
         if complete {
@@ -246,6 +262,7 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
                 faces,
                 end: CharPos0::new(position.charpos() as usize),
                 complete: true,
+                trailing_text_continues: false,
             });
         }
     }

@@ -306,6 +306,7 @@ impl DisplayGlyphMeasurer for Measurements {
 
 #[derive(Clone, Debug)]
 pub(crate) struct RowProgram {
+    trailing_text_continues: bool,
     geometry: RowProgramGeometry,
     deferred_fonts: Option<std::sync::Arc<super::font_measurement::FontMeasurementSnapshot>>,
     operations: Vec<(Operation, DisplayTextRunMeasurement)>,
@@ -499,6 +500,7 @@ impl RowProgram {
             return Err(RowProgramError::Incomplete);
         }
         Ok(Self {
+            trailing_text_continues: false,
             geometry,
             deferred_fonts,
             operations,
@@ -506,6 +508,11 @@ impl RowProgram {
             faces,
             limits,
         })
+    }
+
+    pub(crate) fn with_trailing_text_continuation(mut self, continues: bool) -> Self {
+        self.trailing_text_continues = continues;
+        self
     }
 
     pub(crate) fn font_snapshot_identity(&self) -> Option<usize> {

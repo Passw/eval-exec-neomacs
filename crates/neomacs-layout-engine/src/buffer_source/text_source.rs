@@ -328,7 +328,7 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
         self.char_granularity_end = end_charpos;
     }
 
-    fn produces_single_chars_at(&self, char_pos: CharPos0) -> bool {
+    pub(crate) fn produces_single_chars_at(&self, char_pos: CharPos0) -> bool {
         self.char_granularity_end.is_some_and(|end| char_pos < end)
     }
 

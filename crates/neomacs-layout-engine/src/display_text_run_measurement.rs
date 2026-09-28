@@ -284,6 +284,24 @@ fn measurement_spans(text: &str) -> Vec<DisplayTextRunMeasurementSpan> {
     spans
 }
 
+/// Leave the final measurement span for the next bounded acquisition: its
+/// shaping context may extend past the captured text. Every earlier span is
+/// closed by a character already inspected by the canonical planner.
+pub(crate) fn closed_measurement_prefix(text: &str) -> (usize, usize) {
+    match measurement_spans(text).last() {
+        Some(DisplayTextRunMeasurementSpan::OrdinaryChar {
+            char_offset,
+            byte_offset,
+            ..
+        }) => (*char_offset, *byte_offset),
+        Some(DisplayTextRunMeasurementSpan::ShapedSpan {
+            char_offset,
+            byte_range,
+        }) => (*char_offset, byte_range.start),
+        None => (0, 0),
+    }
+}
+
 impl DisplayTextRunMeasurement {
     /// The buffer's scalar fallback retains contextual-script advances, but
     /// independent non-script characters take their opened-font glyph metrics.

@@ -95,7 +95,12 @@ impl<'rows, 'emit, 'surface>
         } = request;
         let buffer = face_resolution_context.buffer();
 
-        if route_refusals.covers(self.progress.charpos()) {
+        // Once whole-run admission declined, the canonical producer renders
+        // scalar items until the next row or source boundary. Re-entering
+        // bulk measurement here changes grapheme advances mid-row.
+        if source_walk.produces_single_chars_at(self.progress.charpos())
+            || route_refusals.covers(self.progress.charpos())
+        {
             note_route_skipped();
             return PlainRowRouteOutcome::NotRouted;
         }

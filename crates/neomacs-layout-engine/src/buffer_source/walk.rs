@@ -172,6 +172,10 @@ impl<'request, B: LayoutBufferView> BufferSourceWalk<'request, B> {
             .remember_resolved_source_face_if_absent(face_id, face);
     }
 
+    pub(crate) fn produces_single_chars_at(&self, charpos: i64) -> bool {
+        self.producer.produces_single_chars_at(charpos)
+    }
+
     /// Decline run batching until `end_charpos`. See
     /// [`BufferElementProducer::request_char_granularity_until`].
     pub(crate) fn request_char_granularity_until(&mut self, end_charpos: i64) {

@@ -847,7 +847,7 @@ impl LayoutEngine {
             )?
         };
         if program.is_complete() != captured.complete { return Err(RowProgramError::Unsupported); }
-        capture.programs.push(program);
+        capture.programs.push(program.with_trailing_text_continuation(captured.trailing_text_continues));
         Ok(())
     }
 }

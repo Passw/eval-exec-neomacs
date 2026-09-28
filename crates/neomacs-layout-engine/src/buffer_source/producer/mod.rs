@@ -187,6 +187,10 @@ impl<'request, B: LayoutBufferView> BufferElementProducer<'request, B> {
             .request_char_granularity_until(CharPos0::new(end_charpos.max(0) as usize));
     }
 
+    pub(crate) fn produces_single_chars_at(&self, charpos: i64) -> bool {
+        self.source_cursor.produces_single_chars_at(CharPos0::new(charpos.max(0) as usize))
+    }
+
     /// Whether production at `source_position` must first yield an anchored
     /// overlay-string insertion.  This does not move or mark the cursor; the
     /// regular production step remains the sole consumer of the element.

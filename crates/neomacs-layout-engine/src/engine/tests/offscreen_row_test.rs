@@ -1420,7 +1420,7 @@ fn worker_keeps_complete_prefix_before_unsupported_rows() {
         if boundary == "contextual-fragment" {
             text.replace_range(
                 start + 3 * line.len()..start + 4 * line.len(),
-                &("好".repeat(129) + "\n"),
+                &("س".repeat(129) + "\n"),
             );
         }
         let (mut eval, frame, buffer, window) = incr_editing_frame(&text, 800, 600);
@@ -2037,6 +2037,52 @@ fn worker_unicode_wrap_boundaries_and_mixed_fonts_match_fresh_layout() {
                     prefix + 1,
                     prefix + 9
                 )),
+            );
+        }
+    }
+}
+
+#[test]
+fn worker_prepares_long_unicode_source_fragments() {
+    for text in [
+        "café words ",
+        "好好 words ",
+        "á words ",
+        "שלום words ",
+        "سلام words ",
+        "👩‍💻 words ",
+    ] {
+        for wrap in ["nil", "t"] {
+            first_visit_with_setup(
+                None,
+                &format!("{}\n", text.repeat(30)),
+                None,
+                0,
+                2,
+                Some(&format!("(setq word-wrap {wrap})")),
+            );
+        }
+    }
+}
+
+#[test]
+fn worker_long_unicode_capture_boundaries_preserve_rich_faces() {
+    for prefix in 124..=129 {
+        let line = format!(
+            "{}á 👩‍💻 سلام 好 {}\n",
+            "W".repeat(prefix),
+            "á words ".repeat(20)
+        );
+        for wrap in ["nil", "t"] {
+            first_visit_with_setup(
+                Some(
+                    "(:family \"serif\" :height 130 :weight bold :box (:line-width 2) :background \"red\" :extend t)",
+                ),
+                &line,
+                None,
+                0,
+                2,
+                Some(&format!("(setq word-wrap {wrap})")),
             );
         }
     }
