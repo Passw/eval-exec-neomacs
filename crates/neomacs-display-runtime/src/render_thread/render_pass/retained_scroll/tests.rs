@@ -287,3 +287,31 @@ fn retained_scroll_pixels_match_full_render_and_reuse_coverage_during_reversal()
         );
     }
 }
+
+#[test]
+fn software_quality_profile_allows_retained_scroll() {
+    use crate::render_thread::render_quality::{RenderBackendProfile, RenderQualityPolicy};
+    let policy = RenderQualityPolicy::negotiate(
+        RenderBackendProfile::software(),
+        &neomacs_display_protocol::VisualConfig::default(),
+    );
+    assert!(STATIC_BODY_PROFILES.contains(&policy.effective_visual_config().effects));
+}
+
+#[test]
+fn gallery_roundtrip_allows_retained_scroll() {
+    use neomacs_display_protocol::{EffectOperation, EffectsConfig};
+    let defaults = EffectsConfig::default();
+    let operations = defaults
+        .effect_names()
+        .into_iter()
+        .map(|name| EffectOperation::set(name.clone(), defaults.effect_values(&name).unwrap()))
+        .collect::<Vec<_>>();
+    let actual = defaults.apply_effects(&operations).unwrap();
+    assert!(STATIC_BODY_PROFILES.contains(&actual));
+    use crate::render_thread::render_quality::{RenderBackendProfile, RenderQualityPolicy};
+    let mut requested = neomacs_display_protocol::VisualConfig::default();
+    requested.effects = actual;
+    let policy = RenderQualityPolicy::negotiate(RenderBackendProfile::software(), &requested);
+    assert!(STATIC_BODY_PROFILES.contains(&policy.effective_visual_config().effects));
+}

@@ -472,6 +472,12 @@ focus_follows_mouse yes
             );
             thread::sleep(Duration::from_millis(10));
         }
+        if !resolved {
+            assert!(
+                fs::read_to_string(artifacts.join("neomacs.log")).unwrap().contains("rasterized scroll coverage"),
+                "stalled precision scroll must exercise the pooled body raster: {artifacts:?}"
+            );
+        }
         assert_eq!(
             fs::read(&state_path).unwrap(),
             frozen,

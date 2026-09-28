@@ -10,16 +10,35 @@ use neomacs_display_protocol::{
 use neomacs_renderer_wgpu::{SnapshotLease, SnapshotSize, WgpuRenderer};
 use std::sync::{Arc, LazyLock};
 
-// These profiles differ only in cursor animation and scroll-bar width; both
-// are drawn by the ordinary base pass. Other custom effects remain a fallback.
-static STATIC_BODY_PROFILES: LazyLock<[neomacs_display_protocol::EffectsConfig; 3]> =
+// Default startup goes through the Lisp effect gallery. Its public color
+// representation is sRGB text, so that roundtrip quantizes even disabled
+// colors. Admit both representations of the same static body profiles.
+static STATIC_BODY_PROFILES: LazyLock<Vec<neomacs_display_protocol::EffectsConfig>> =
     LazyLock::new(|| {
-        let normal = neomacs_display_protocol::EffectsConfig::default();
-        let mut quiet = normal.clone();
-        quiet.cursor_color_cycle.enabled = false;
-        let mut software = quiet.clone();
-        software.scroll_bar.width = 0;
-        [normal, quiet, software]
+        use neomacs_display_protocol::{EffectOperation, EffectsConfig};
+        let normal = EffectsConfig::default();
+        let operations = normal
+            .effect_names()
+            .into_iter()
+            .map(|name| {
+                let values = normal
+                    .effect_values(&name)
+                    .expect("registered default effect");
+                EffectOperation::set(name, values)
+            })
+            .collect::<Vec<_>>();
+        let gallery = normal
+            .apply_effects(&operations)
+            .expect("default gallery roundtrip");
+        let mut profiles = Vec::with_capacity(6);
+        for normal in [normal, gallery] {
+            let mut quiet = normal.clone();
+            quiet.cursor_color_cycle.enabled = false;
+            let mut software = quiet.clone();
+            software.scroll_bar.width = 0;
+            profiles.extend([normal, quiet, software]);
+        }
+        profiles
     });
 
 pub(in crate::render_thread) struct RetainedScroll {
