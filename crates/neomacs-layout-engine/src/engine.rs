@@ -3170,6 +3170,11 @@ impl LayoutEngine {
         frame_display_state.input_checkpoint = input_checkpoint;
         self.prepared_viewports.export(frame_id, &next_retained_window_matrices,
             &mut frame_display_state, &sealed_face_arena, &mut self.font_metrics);
+        for coverage in &mut frame_display_state.scroll_coverage {
+            let window = neovm_core::window::WindowId(coverage.content.window_id.get() as u64);
+            std::sync::Arc::make_mut(coverage).predict_pixels = evaluator.permits_compositor_pixel_scroll(window);
+            tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", predict_pixels = coverage.predict_pixels, window = window.0, "exported compositor coverage");
+        }
         let resolved = match crate::frame_presentation::ResolvedFrame::new(frame_display_state) {
             Ok(resolved) => resolved,
             Err(error) => {

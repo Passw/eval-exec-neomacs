@@ -25,6 +25,7 @@ use neomacs_renderer_wgpu::{FullFrameTexture, RendererFrameEffects, WgpuGlyphAtl
 mod child_frames;
 pub(in crate::render_thread) mod continuity;
 mod cursor;
+mod input_scroll;
 pub(in crate::render_thread) mod layout_continuity;
 pub(in crate::render_thread) mod layout_driver;
 mod media;
@@ -34,6 +35,7 @@ mod overlays;
 /// Glyph composition and rendering state for a frame window.
 pub(crate) struct FrameCompositor {
     pub current_frame: Option<FrameGlyphBuffer>,
+    pub(in crate::render_thread) input_scroll: input_scroll::InputScroll,
     /// Video identities present in the root or any accepted child
     /// presentation. Rebuilt only when editor presentation data changes, so
     /// decoder wakeups do not rescan every glyph at video frame rate.
@@ -186,6 +188,7 @@ impl FrameCompositor {
     pub(super) fn new(glyph_atlas: Option<WgpuGlyphAtlas>) -> Self {
         Self {
             current_frame: None,
+            input_scroll: input_scroll::InputScroll::default(),
             #[cfg(feature = "video")]
             visible_videos: HashSet::new(),
             current_scene_generation: 0,

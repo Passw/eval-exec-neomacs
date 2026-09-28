@@ -15,22 +15,24 @@
 (defvar neomacs-scroll-pages 0)
 (defvar neomacs-scroll-lines
   (string-to-number (or (getenv "NEOMACS_GUI_SCROLL_LINES") "400")))
-(dolist (command '(scroll-up-command scroll-down-command
-                   pixel-scroll-interpolate-down pixel-scroll-interpolate-up))
-  (advice-add command :after
-              (lambda (&rest _args)
-                (setq neomacs-scroll-pages (1+ neomacs-scroll-pages)))))
-(advice-add 'mwheel-scroll :after
-            (lambda (&rest _args)
-              (setq neomacs-scroll-wheels (1+ neomacs-scroll-wheels))))
-(advice-add 'pixel-scroll-precision :after
-            (lambda (event)
-              (when (consp (nth 4 event))
-                (setq neomacs-scroll-pixels
-                      (+ neomacs-scroll-pixels (abs (cdr (nth 4 event))))))))
+(defun neomacs-scroll-count-command ()
+  ;; Observe completed commands without advising the scroll implementation:
+  ;; advice deliberately revokes the compositor's prediction contract.
+  (cond ((memq this-command '(scroll-up-command scroll-down-command
+                              pixel-scroll-interpolate-down pixel-scroll-interpolate-up))
+         (setq neomacs-scroll-pages (1+ neomacs-scroll-pages)))
+        ((and (eq this-command 'pixel-scroll-precision)
+              (consp last-command-event) (consp (nth 4 last-command-event)))
+         (setq neomacs-scroll-pixels
+               (+ neomacs-scroll-pixels (abs (cdr (nth 4 last-command-event))))))
+        ((memq this-command '(mwheel-scroll pixel-scroll-precision))
+         (setq neomacs-scroll-wheels (1+ neomacs-scroll-wheels)))))
+(add-hook 'post-command-hook #'neomacs-scroll-count-command)
 (defun neomacs-scroll-observe ()
   (setq neomacs-scroll-sample (1+ neomacs-scroll-sample))
-  (let ((state `((sample . ,neomacs-scroll-sample)
+  (let ((state `((pre-command-hook . ,(with-current-buffer (window-buffer neomacs-scroll-window)
+                                        (format "%S" pre-command-hook)))
+                 (sample . ,neomacs-scroll-sample)
                  (content . ,neomacs-scroll-content-metadata)
                  (buffer-size . ,(with-current-buffer (window-buffer neomacs-scroll-window)
                                    (buffer-size)))
@@ -44,6 +46,12 @@
                  (selected-start . ,(window-start)))))
     (with-temp-file (getenv "NEOMACS_GUI_STATE_JSON")
       (insert (json-encode state))))
+  (let ((gate (getenv "NEOMACS_GUI_SCROLL_STALL")))
+    (when (and gate (file-exists-p gate))
+      (with-temp-file (concat gate ".stalled") (insert "stalled"))
+      ;; Deliberately do not enter an input/process wait: native delivery must
+      ;; remain queued until the test releases this private evaluator.
+      (while (file-exists-p gate))))
   (run-at-time 0.05 nil #'neomacs-scroll-observe))
 (run-at-time
  1 nil

@@ -12,7 +12,7 @@ cfg_select! {
         pub(crate) struct PresentationObserver;
         impl PresentationObserver {
             pub(crate) fn new() -> Self { Self }
-            pub(crate) fn before_present(&mut self, _: &dyn winit::window::Window, _: u64, _: neomacs_display_protocol::PresentationId, _: (u32, u32), _: f64) {}
+            pub(crate) fn before_present(&mut self, _: &dyn winit::window::Window, _: u64, _: neomacs_display_protocol::PresentationId, _: (u32, u32), _: f64, _: &[neomacs_display_protocol::input_latency::InputToken]) {}
             pub(crate) fn dispatch_deadline(&mut self, _: neomacs_display_protocol::frame_time::EventTime) -> Option<neomacs_display_protocol::frame_time::EventTime> { None }
             pub(crate) fn dispatch_pending(&mut self) {}
             pub(crate) fn shutdown(&mut self) {}

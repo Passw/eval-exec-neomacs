@@ -98,6 +98,10 @@ impl Receipts {
             .checked_mul(1_000_000_000)
             .and_then(|seconds| seconds.checked_add(u64::from(timestamp.nanoseconds)))
         {
+            neomacs_display_protocol::input_latency::projected_confirmed(
+                submission.frame, submission.serial,
+                neomacs_display_protocol::input_latency::PlatformTimestamp { clock_id: timestamp.clock_id, nanoseconds },
+            );
             neomacs_display_protocol::input_latency::confirmed(
                 submission.layout,
                 neomacs_display_protocol::input_latency::PlatformTimestamp {
@@ -245,6 +249,7 @@ impl Session {
         layout: neomacs_display_protocol::PresentationId,
         size: (u32, u32),
         scale: f64,
+        projected: &[neomacs_display_protocol::input_latency::InputToken],
     ) -> Result<(), String> {
         let RawWindowHandle::Wayland(handle) = window
             .window_handle()
@@ -273,6 +278,7 @@ impl Session {
             height: size.1,
             scale,
         };
+        neomacs_display_protocol::input_latency::projected_requested(projected, frame, submission.serial);
         self.receipts
             .pending
             .requested(submission.serial, observe_platform_now());
@@ -317,6 +323,7 @@ impl PresentationObserver {
         layout: neomacs_display_protocol::PresentationId,
         size: (u32, u32),
         scale: f64,
+        projected: &[neomacs_display_protocol::input_latency::InputToken],
     ) {
         if matches!(self.state, ObserverState::Uninitialized(_)) {
             let ObserverState::Uninitialized(path) =
@@ -330,7 +337,7 @@ impl PresentationObserver {
             }
         }
         if let ObserverState::Active(session) = &mut self.state
-            && let Err(error) = session.request(window, frame, layout, size, scale)
+            && let Err(error) = session.request(window, frame, layout, size, scale, projected)
         {
             tracing::warn!(%error, "cannot request native presentation feedback");
         }

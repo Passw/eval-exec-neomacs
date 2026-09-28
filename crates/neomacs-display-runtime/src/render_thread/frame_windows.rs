@@ -779,6 +779,8 @@ impl GuiFrameRenderState {
                 requested: presentation,
             });
         }
+        if target_frame_id == self.emacs_frame_id
+            && let Some(hit) = self.compositor.input_scroll.hit(point) { return hit; }
         frame
             .resolve_presented_hit(PresentedHitQuery::new(point))
             .map(|hit| hit.and_then(|hit| hit.semantic()))
@@ -997,6 +999,11 @@ impl GuiFrameRenderState {
         &self,
         frame: &FrameGlyphBuffer,
     ) -> Option<neomacs_display_protocol::PointerAppearanceSelection> {
+        // Projection replaces body glyphs and changes primitive indices.
+        // Canonical appearance spans cannot address this temporary surface.
+        if self.compositor.input_scroll.active() {
+            return None;
+        }
         self.pointer_appearance.selection_for(frame)
     }
 
@@ -1182,6 +1189,10 @@ impl GuiFrameRenderState {
             installed_at,
         )
         .apply(self);
+        if let Some(window) = self.compositor.input_scroll.reconcile(frame.as_ref()) {
+            // Projected motion has already been drawn; do not animate it twice.
+            self.compositor.pending.scrolls.retain(|scroll| scroll.window != window);
+        }
         // Staged, not installed: these describe the incoming presentation, and
         // they become the baseline only if a frame is actually drawn from it.
         self.compositor.incoming_reflow_imprints = reflow_imprints;
@@ -1246,6 +1257,7 @@ impl GuiFrameRenderState {
     ) -> Option<FrameGlyphBuffer> {
         let current_frame = self.compositor.current_frame.as_mut()?;
         let mut frame = Self::take_frame_for_render(current_frame);
+        self.compositor.input_scroll.paint(&mut frame);
         #[cfg(feature = "neo-term")]
         self.compositor.terminal_expansion.compose_into(&mut frame);
         Some(frame)

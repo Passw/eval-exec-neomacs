@@ -1720,7 +1720,21 @@ impl RenderApp {
                 action,
             ) {
                 Ok(input) => {
-                    self.comms.send_input(input);
+                    let (receipt, token) = self.comms.send_input_with_receipt(input);
+                    if let (ScrollDelta::Pixels { x: horizontal, y: vertical }, Some(receipt)) = (delta, receipt)
+                        && self.modifiers == 0 && horizontal.abs() <= vertical.abs()
+                        && let Some(state) = self.frame_windows.get_by_winit_mut(window_id)
+                        && state.render.emacs_frame_id == target_fid
+                        && matches!(state.render.compositor.layout, super::frame_compositor::layout_driver::LayoutDriver::Settled)
+                        && !state.render.compositor.transitions.has_active()
+                        && !state.render.compositor.renderer_effects.scroll_effects_active()
+                        && let Some(frame) = state.render.compositor.current_frame.as_ref()
+                        && state.render.compositor.input_scroll.push(frame, ev_x, ev_y, -vertical.round(), receipt, token)
+                    {
+                        state.render.compositor.current_scene_generation = super::frame_state::next_scene_generation();
+                        state.render.compositor.current_row_damage = None;
+                        state.render.mark_dirty();
+                    }
                 }
                 Err(error) => {
                     tracing::error!(

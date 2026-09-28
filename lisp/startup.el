@@ -46,6 +46,12 @@
   (remove-hook 'pre-command-hook #'neomacs--release-startup-gc-ceiling)
   (setq neomacs--startup-gc-ceiling-active nil))
 
+;; This standard hook changes auxiliary UI/startup state, not the viewport.
+;; Prediction is revoked if its function definition changes.
+(when (or (not (fboundp 'advice--p))
+          (not (advice--p (symbol-function 'neomacs--release-startup-gc-ceiling))))
+  (put 'neomacs--release-startup-gc-ceiling 'neomacs--scroll-definition (symbol-function 'neomacs--release-startup-gc-ceiling)))
+
 (defgroup initialization nil
   "Emacs start-up procedure."
   :group 'environment)

@@ -1163,6 +1163,10 @@ impl RenderComms {
     /// After converting the display event, the bridge owns notifying the
     /// evaluator's wait backend.
     pub fn send_input(&self, event: InputEvent) {
+        let _ = self.send_input_with_receipt(event);
+    }
+
+    pub fn send_input_with_receipt(&self, event: InputEvent) -> (Option<neomacs_display_protocol::input_progress::InputReceipt>, Option<neomacs_display_protocol::input_latency::InputToken>) {
         let receipt = if matches!(
             &event,
             InputEvent::Key {
@@ -1178,7 +1182,9 @@ impl RenderComms {
         } else {
             None
         };
+        let observer = receipt.as_ref().map(|delivery| delivery.receipt());
         let event = Self::observe_scroll_input(event);
+        let token = match &event { InputEvent::Observed { token, .. } => Some(*token), _ => None };
         let event = if let Some(receipt) = receipt {
             InputEvent::Tracked {
                 receipt,
@@ -1209,7 +1215,7 @@ impl RenderComms {
                     );
                 }
             }
-            return;
+            return (observer, token);
         }
 
         match self.input_tx.send(event) {
@@ -1225,6 +1231,7 @@ impl RenderComms {
                 );
             }
         }
+        (observer, token)
     }
 }
 

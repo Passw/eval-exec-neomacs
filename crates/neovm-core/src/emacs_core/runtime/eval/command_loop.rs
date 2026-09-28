@@ -1748,6 +1748,10 @@ impl Context {
             }
         });
         RedisplaySignature {
+            // Bindings and hooks may change without moving text or point.
+            // Republish permission so the renderer cannot keep a stale grant.
+            compositor_pixel_scroll: selected_window.is_some_and(|window|
+                self.permits_compositor_pixel_scroll(crate::window::WindowId(window))),
             input_checkpoint: self.input_progress.checkpoint(),
             selected_frame,
             selected_window,

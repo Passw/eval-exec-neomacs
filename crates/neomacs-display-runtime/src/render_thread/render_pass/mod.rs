@@ -181,7 +181,8 @@ fn render_frame_window_contents_to_surface(
         .ok_or(FrameRenderFailure::AwaitingContent)?;
     let animated_cursor = render.cursor.animated_cursor();
     let root_animated_cursor = animated_cursor
-        .filter(|cursor| cursor.frame_id == DisplayFrameId::new(render.emacs_frame_id));
+        .filter(|cursor| cursor.frame_id == DisplayFrameId::new(render.emacs_frame_id)
+            && !render.compositor.input_scroll.active());
     // The slide animation is composed at draw time: emit_cursor_visual reads
     // the interpolated rect from animated_cursor for the active window's
     // cursor. The frame's stored cursor geometry is no longer mutated here,

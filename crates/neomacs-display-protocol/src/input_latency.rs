@@ -45,6 +45,8 @@ struct Pending {
     baseline: Option<Vec<ScrollViewport>>,
     completed: bool,
     layouts: VecDeque<PresentationId>,
+    projected_submissions: VecDeque<u64>,
+    projected: Option<(u64, PlatformTimestamp)>,
 }
 
 #[derive(Default)]
@@ -75,6 +77,8 @@ impl Measurements {
             baseline: None,
             completed: false,
             layouts: VecDeque::new(),
+            projected_submissions: VecDeque::new(),
+            projected: None,
         });
         token
     }
@@ -128,6 +132,32 @@ impl Measurements {
         }
     }
 
+    fn projected_requested(&mut self, tokens: &[InputToken], frame: u64, serial: u64) {
+        for item in &mut self.pending {
+            if item.frame == frame && item.projected.is_none() && tokens.contains(&item.token) {
+                if item.projected_submissions.len() == MAX_PRESENTATIONS {
+                    item.projected_submissions.pop_front();
+                }
+                item.projected_submissions.push_back(serial);
+            }
+        }
+    }
+
+    fn projected_confirmed(&mut self, frame: u64, serial: u64, time: PlatformTimestamp) {
+        for item in &mut self.pending {
+            if item.frame == frame
+                && item.projected_submissions.contains(&serial)
+                && item.received.clock_id == time.clock_id
+                && time.nanoseconds >= item.received.nanoseconds
+                && item
+                    .projected
+                    .is_none_or(|(_, previous)| time.nanoseconds < previous.nanoseconds)
+            {
+                item.projected = Some((serial, time));
+            }
+        }
+    }
+
     fn confirmed(
         &mut self,
         layout: PresentationId,
@@ -147,6 +177,9 @@ impl Measurements {
                 "presentation": layout.get(), "clock_id": time.clock_id,
                 "received_ns": item.received.nanoseconds, "presented_ns": time.nanoseconds,
                 "input_to_present_ns": latency, "evicted_inputs": self.dropped,
+                "projected_submission": item.projected.map(|(serial, _)| serial),
+                "projected_presented_ns": item.projected.map(|(_, time)| time.nanoseconds),
+                "input_to_projected_present_ns": item.projected.map(|(_, time)| time.nanoseconds - item.received.nanoseconds),
             }));
             false
         });
@@ -254,6 +287,31 @@ pub fn sealed(frame: u64, layout: PresentationId, viewport: impl FnOnce() -> Vec
     }
 }
 
+/// Associate diagnostic inputs with the exact native submission that paints
+/// their projection. Layout IDs alone cannot distinguish repeated submissions.
+pub fn projected_requested(tokens: &[InputToken], frame: u64, serial: u64) {
+    if tokens.is_empty() {
+        return;
+    }
+    if let Some(recorder) = recorder() {
+        recorder
+            .measurements
+            .lock()
+            .unwrap()
+            .projected_requested(tokens, frame, serial);
+    }
+}
+
+pub fn projected_confirmed(frame: u64, serial: u64, time: PlatformTimestamp) {
+    if let Some(recorder) = recorder() {
+        recorder
+            .measurements
+            .lock()
+            .unwrap()
+            .projected_confirmed(frame, serial, time);
+    }
+}
+
 pub fn confirmed(layout: PresentationId, time: PlatformTimestamp) {
     let Some(recorder) = recorder() else { return };
     let samples = recorder
@@ -296,6 +354,39 @@ mod tests {
             nanoseconds,
         }
     }
+    #[test]
+    fn projected_latency_requires_exact_native_submission_and_keeps_authoritative_completion() {
+        let mut measurements = Measurements::default();
+        let token = measurements.receive(7, "precise", time(100));
+        measurements.projected_requested(&[token], 7, 41);
+        measurements.projected_confirmed(8, 41, time(110));
+        measurements.projected_confirmed(7, 40, time(120));
+        measurements.projected_confirmed(
+            7,
+            41,
+            PlatformTimestamp {
+                clock_id: 2,
+                nanoseconds: 130,
+            },
+        );
+        assert!(measurements.pending[0].projected.is_none());
+        measurements.projected_confirmed(7, 41, time(150));
+        measurements.projected_confirmed(7, 41, time(160));
+        assert!(
+            measurements
+                .confirmed(PresentationId::new(1), time(170))
+                .is_empty()
+        );
+        measurements.start(&[token], |_| viewport(1));
+        measurements.seal(7, PresentationId::new(2), &viewport(2));
+        let samples = measurements.confirmed(PresentationId::new(2), time(300));
+        assert_eq!(samples.len(), 1);
+        assert_eq!(samples[0]["input_to_projected_present_ns"], 50);
+        assert_eq!(samples[0]["projected_submission"], 41);
+        assert_eq!(samples[0]["input_to_present_ns"], 200);
+        assert!(measurements.pending.is_empty());
+    }
+
     #[test]
     fn queued_input_and_other_frames_cannot_complete_a_latency_sample() {
         let mut measurements = Measurements::default();
