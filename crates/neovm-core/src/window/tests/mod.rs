@@ -230,6 +230,60 @@ fn snapshot_window_geometry_keeps_pixel_spaces_and_cell_origin_distinct() {
 }
 
 #[test]
+fn presented_coordinate_queries_cover_the_full_mixed_font_row() {
+    use super::geometry::{PresentationGeometry, PresentationId, WindowCoordinateQuery};
+    use neomacs_display_protocol::types::Rect as TransportRect;
+    let presentation = PresentationId::new(1);
+    let window = WindowId(1);
+    // Short glyphs still own the full line's hit area. The first row is
+    // partially scrolled, with only its extra descent/spacing visible.
+    for vscroll in [0, 29] {
+        let snapshot = WindowDisplaySnapshot {
+            window_id: window,
+            regions: PresentedWindowRegions {
+                outer: TransportRect::new(0.0, 0.0, 800.0, 600.0),
+                text_body: TransportRect::new(0.0, 0.0, 800.0, 600.0),
+                ..PresentedWindowRegions::default()
+            },
+            regions_materialized: true,
+            rows: vec![DisplayRowSnapshot {
+                row: 0,
+                y: -vscroll,
+                height: 35,
+                start_buffer_pos: Some(LispCharPos1::ONE),
+                end_buffer_pos: Some(LispCharPos1::new(3)),
+                ..DisplayRowSnapshot::default()
+            }],
+            body_rows: vec![PresentedBodyRowSnapshot {
+                output_row: 0, body_row: 0, body_y: -vscroll,
+            }],
+            points: vec![
+                DisplayPointSnapshot {
+                    role: DisplayPointRole::Glyph, buffer_pos: LispCharPos1::ONE,
+                    x: 0, y: -vscroll, width: 10, height: 12, row: 0, col: 0,
+                },
+                DisplayPointSnapshot {
+                    role: DisplayPointRole::Glyph, buffer_pos: LispCharPos1::new(2),
+                    x: 10, y: -vscroll, width: 20, height: 29, row: 0, col: 1,
+                },
+            ],
+            ..WindowDisplaySnapshot::default()
+        };
+        let geometry = PresentationGeometry::new(FrameId(1), presentation, [snapshot]).unwrap();
+        for y in 0..35-vscroll {
+            for (x, expected, glyph_height) in [(0, 1, 12.0), (15, 2, 29.0)] {
+                let point = geometry.resolve(WindowCoordinateQuery::in_text_body(
+                    presentation, window, x, y,
+                )).unwrap_or_else(|error| panic!("vscroll={vscroll}, ({x},{y}): {error:?}"));
+                assert_eq!(point.buffer_pos(), LispCharPos1::new(expected),
+                    "vscroll={vscroll}, ({x},{y}) selected another font's glyph");
+                assert_eq!(point.height().get(), glyph_height);
+            }
+        }
+    }
+}
+
+#[test]
 fn sealed_geometry_queries_reject_stale_presentations_and_use_explicit_regions() {
     use super::geometry::{
         GeometryQueryError, PresentationGeometry, PresentationId, WindowCoordinateQuery,
