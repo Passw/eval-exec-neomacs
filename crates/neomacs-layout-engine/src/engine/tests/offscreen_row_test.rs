@@ -2625,3 +2625,59 @@ fn rich_visible_rows_do_not_clone_the_active_face_per_glyph() {
         "ordinary source glyphs copied the active face {clones} times"
     );
 }
+
+#[test]
+fn idle_precomputation_prioritizes_the_current_scroll_direction() {
+    let line = "ordinary offscreen text\n";
+    for next_line in [119usize, 121] {
+        let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 800, 600);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        scroll_window_to(
+            &mut eval,
+            frame,
+            window,
+            buffer,
+            (120 * line.len() + 1) as i64,
+            125 * line.len(),
+        );
+        let mut engine = LayoutEngine::new();
+        engine.layout_frame_rust(&mut eval, frame);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while engine.maintain_scroll_coverage(&eval).is_some() {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::yield_now();
+        }
+        scroll_window_to(
+            &mut eval,
+            frame,
+            window,
+            buffer,
+            (next_line * line.len() + 1) as i64,
+            (next_line + 5) * line.len(),
+        );
+        engine.layout_frame_rust(&mut eval, frame);
+        engine.maintain_scroll_coverage(&eval);
+        let start = engine
+            .scroll_coverage
+            .active_capture_start_for_test()
+            .expect("new page capture");
+        if next_line < 120 {
+            assert!(
+                start < next_line * line.len(),
+                "backward scrolling prioritized a forward page at {start}"
+            );
+        } else {
+            assert!(
+                start > next_line * line.len(),
+                "forward scrolling prioritized a backward page at {start}"
+            );
+        }
+        let actual = selected_window_layout_trace(&eval, &engine, frame);
+        let mut fresh = LayoutEngine::new();
+        fresh.layout_frame_rust(&mut eval, frame);
+        assert_eq!(actual, selected_window_layout_trace(&eval, &fresh, frame));
+    }
+}

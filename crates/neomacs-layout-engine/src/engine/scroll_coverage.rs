@@ -112,6 +112,13 @@ pub(super) struct ScrollCoverage {
 }
 
 impl ScrollCoverage {
+    #[cfg(test)]
+    pub(super) fn active_capture_start_for_test(&self) -> Option<usize> {
+        self.capture
+            .as_ref()
+            .map(|capture| capture.retained.key.window_start as usize)
+    }
+
     pub(super) fn cancel(&mut self) {
         self.cancel_active();
         self.frame = None;
@@ -393,6 +400,18 @@ impl LayoutEngine {
                         }
                     }
                 }
+            }
+            // Targets are consumed from the end. Follow the observed motion
+            // so repeated backward redisplays cannot keep replacing the queue
+            // with another forward page. An already active page still finishes.
+            if compatible
+                && self
+                    .scroll_coverage
+                    .windows
+                    .get(&window_id)
+                    .is_some_and(|observed| retained.key.window_start < observed.key.window_start)
+            {
+                targets.reverse();
             }
             self.scroll_coverage.windows.insert(
                 window_id,
