@@ -3574,6 +3574,14 @@ impl OrderedFaceSources {
         self.sources.is_empty()
     }
 
+    pub(crate) fn single_value(&self) -> Option<Value> {
+        if self.sources.len() == 1 {
+            self.values().next()
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn values(&self) -> impl Iterator<Item = Value> + '_ {
         self.sources.iter().map(|source| match source {
             OrderedFaceSource::TextProperty(value) | OrderedFaceSource::Overlay(value) => *value,

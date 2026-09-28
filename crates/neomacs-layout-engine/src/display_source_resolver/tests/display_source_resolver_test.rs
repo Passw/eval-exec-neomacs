@@ -450,3 +450,67 @@ fn display_media_face_metrics_prefer_active_face_extents() {
     assert_eq!(metrics.ascent(), 20.0);
     assert_eq!(metrics.char_width(), 11.0);
 }
+
+#[test]
+fn single_source_face_resolution_reuses_its_realization() {
+    let table = dashboard_like_face_table();
+    let face_resolver = test_face_resolver(&table);
+    let mut state = DisplaySourceResolveState::default();
+    let mut face_ids = FrameFaceAttempt::for_test_with_next_id(20);
+    let mut pending = Vec::new();
+    let params = DisplaySourceResolveParams::new(
+        DisplaySourceFaceBasis::new(
+            &face_resolver,
+            FaceId::new(0),
+            face_resolver.default_face(),
+            DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
+        ),
+        None,
+        ImageScaleEnvironment::default(),
+    );
+    let source = OrderedFaceSources::from_text_and_overlays(
+        Some(Value::symbol("dashboard-title-blue")),
+        Vec::new(),
+    );
+    let mut resolver =
+        DisplaySourcePropertyResolver::frame_local(params, &mut state, &mut face_ids, &mut pending);
+    let first = resolver.resolve_face_sources(RenderFaceRef::Inherit, &source);
+    for _ in 0..512 {
+        assert_eq!(
+            resolver.resolve_face_sources(RenderFaceRef::Inherit, &source),
+            first
+        );
+    }
+    assert_eq!(
+        pending.len(),
+        1,
+        "repeated source lookups must not rebuild and republish the same realized face"
+    );
+    assert_eq!(state.resolved_face(face_id(first)).unwrap().fg, 0x0051afef);
+}
+
+#[test]
+fn source_face_observations_borrow_the_existing_realization() {
+    let table = dashboard_like_face_table();
+    let face_resolver = test_face_resolver(&table);
+    let base = face_resolver.default_face();
+    let mut state = DisplaySourceResolveState::default();
+    state.remember_face(FaceId::new(3), base);
+    for reference in [
+        RenderFaceRef::Inherit,
+        RenderFaceRef::FaceId(FaceId::new(3)),
+        RenderFaceRef::FaceId(FaceId::new(99)),
+    ] {
+        let observed = state.resolved_face_for(reference, base);
+        let borrowed: &ResolvedFace = std::borrow::Borrow::borrow(&observed);
+        let expected = if reference == RenderFaceRef::FaceId(FaceId::new(3)) {
+            state.resolved_face(FaceId::new(3)).unwrap()
+        } else {
+            base
+        };
+        assert!(
+            std::ptr::eq(borrowed, expected),
+            "read-only face observation cloned the realized face"
+        );
+    }
+}

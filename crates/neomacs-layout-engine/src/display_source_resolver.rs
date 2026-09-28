@@ -186,14 +186,15 @@ impl DisplaySourceResolveState {
         self.remember_face(face_id, resolved);
     }
 
-    fn resolved_face_for(&self, face: RenderFaceRef, base_face: &ResolvedFace) -> ResolvedFace {
+    fn resolved_face_for<'a>(
+        &'a self,
+        face: RenderFaceRef,
+        base_face: &'a ResolvedFace,
+    ) -> &'a ResolvedFace {
         let RenderFaceRef::FaceId(face_id) = face else {
-            return base_face.clone();
+            return base_face;
         };
-        self.resolved_faces
-            .get(&face_id)
-            .cloned()
-            .unwrap_or_else(|| base_face.clone())
+        self.resolved_faces.get(&face_id).unwrap_or(base_face)
     }
 }
 
@@ -827,6 +828,7 @@ fn resolve_source_face_ref(
     };
 
     if same_resolved_face(&resolved, &base_resolved) {
+        let base_resolved = base_resolved.clone();
         state.cache_face(base_face_id, face_value, base_face_id, &base_resolved);
         return RenderFaceRef::FaceId(base_face_id);
     }
@@ -881,18 +883,36 @@ fn resolve_source_face_sources(
     }
 
     let base_face_id = render_face_ref_id(base, face_basis.base_face_id());
+    // A single logical source has the same merge policy as resolve_face_ref.
+    // Reuse its existing, resolver-local cache; multi-source stacks must still
+    // merge every attribute before inverse-video and other terminal effects.
+    let single = sources.single_value();
+    if let Some(value) = single
+        && let Some(cached) = state.cached_face(base_face_id, &value)
+    {
+        return cached;
+    }
     let base_resolved = state.resolved_face_for(base, face_basis.base_face());
     let Some(resolved) = resolve(&base_resolved, sources) else {
         return base;
     };
 
     if same_resolved_face(&resolved, &base_resolved) {
-        state.remember_face(base_face_id, &base_resolved);
+        let base_resolved = base_resolved.clone();
+        if let Some(value) = single {
+            state.cache_face(base_face_id, value, base_face_id, &base_resolved);
+        } else {
+            state.remember_face(base_face_id, &base_resolved);
+        }
         return RenderFaceRef::FaceId(base_face_id);
     }
 
     let face_id = crate::display_row::face_state::stable_face_id_for_resolved(face_ids, &resolved);
-    state.remember_face(face_id, &resolved);
+    if let Some(value) = single {
+        state.cache_face(base_face_id, value, face_id, &resolved);
+    } else {
+        state.remember_face(face_id, &resolved);
+    }
     pending_faces.push(PendingDisplaySourceFace::new(face_id, resolved));
     RenderFaceRef::FaceId(face_id)
 }
