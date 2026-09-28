@@ -133,7 +133,11 @@ pub(super) fn resolve(
         0
     };
     let mut start = backtrack(buffer, request.origin, backtrack_lines);
-    let mut count = NonZeroUsize::new(64).expect("nonzero initial row budget");
+    // Start with the requested displacement plus boundary context. Wrapped
+    // source lines can require more rows; the measured result below, rather
+    // than a fixed 64-row minimum, decides when to expand.
+    let initial_rows = request.rows.unsigned_abs().saturating_add(2).clamp(4, 64) as usize;
+    let mut count = NonZeroUsize::new(initial_rows).expect("nonzero initial row budget");
     loop {
         let Some(snapshot) = query(eval, frame, window, request.buffer, start, count)? else {
             return Ok(None);

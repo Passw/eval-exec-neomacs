@@ -4,6 +4,51 @@ use super::*;
 use neovm_core::window::WindowLayoutQueryOutcome;
 
 #[test]
+fn small_vertical_motion_measures_only_the_needed_rows() {
+    use neovm_core::window::WindowLayoutQueryScope;
+    use std::{cell::RefCell, rc::Rc};
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert(&"row\n".repeat(1000));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("motion-budget", 400, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let counts = Rc::new(RefCell::new(Vec::new()));
+    let observed = counts.clone();
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        if let WindowLayoutQueryScope::Rows { count, .. } = &scope {
+            observed.borrow_mut().push(count.get());
+        }
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let result = eval.eval_str("(progn (goto-char 2001) (let ((noninteractive nil)) (list (vertical-motion 1) (point) (vertical-motion -1) (point))))").unwrap();
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "(1 2005 -1 2001)"
+    );
+    let counts = counts.borrow();
+    assert!(
+        !counts.is_empty(),
+        "must exercise offscreen row measurement"
+    );
+    assert!(
+        counts.iter().all(|count| *count <= 4),
+        "one-row motion overmeasured: {counts:?}"
+    );
+}
+
+#[test]
 fn backward_pixel_measurement_uses_the_offscreen_rows_actual_height() {
     let mut eval = Context::new();
     let buffer = eval.buffer_manager().current_buffer().expect("buffer").id();
