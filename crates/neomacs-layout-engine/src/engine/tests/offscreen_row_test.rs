@@ -1288,3 +1288,38 @@ fn worker_admission_rejects_mutation_after_capture() {
         }
     }
 }
+
+#[test]
+fn idle_mutation_withdraws_published_worker_coverage() {
+    let (mut eval, frame, _, window) =
+        incr_editing_frame(&"ordinary offscreen text\n".repeat(300), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str("(progn (setq worker-raise-spec (list 'raise 0.25)) (put-text-property 2761 3500 'display worker-raise-spec))").unwrap();
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    // Establish idle ownership before manually requesting the distant page.
+    engine.maintain_scroll_coverage(&eval);
+    engine
+        .request_scroll_coverage(&eval, frame, window, CharPos0::new(2880))
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !engine
+        .scroll_coverage
+        .drain(&mut engine.prepared_viewports)
+        .unwrap()
+    {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    assert!(engine.take_scroll_coverage_publication());
+    eval.eval_str("(setcar (cdr worker-raise-spec) 0.75)")
+        .unwrap();
+    engine.maintain_scroll_coverage(&eval);
+    assert!(
+        engine.take_scroll_coverage_publication(),
+        "discarding prepared rows must also withdraw the compositor's old certificate"
+    );
+}

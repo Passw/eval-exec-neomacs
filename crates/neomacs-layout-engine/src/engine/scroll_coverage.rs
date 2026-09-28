@@ -199,6 +199,11 @@ impl LayoutEngine {
     ) -> Option<std::time::Duration> {
         use std::time::Duration;
         self.prepared_viewports.retire_invalid_dependencies();
+        if !self.prepared_viewports.invalidated.is_empty() {
+            // Retire the old render-thread certificate even before a new
+            // worker page is ready. Cache eviction alone cannot revoke it.
+            self.scroll_coverage.publication_pending = true;
+        }
         for (_, window) in self.prepared_viewports.invalidated.drain(..) {
             self.scroll_coverage.windows.remove(&window);
         }
