@@ -2555,3 +2555,49 @@ fn hidden_box_neighbour_face_does_not_enlarge_visible_rows() {
     };
     assert_eq!(measure(100), measure(240));
 }
+
+#[test]
+fn idle_worker_publishes_a_closed_prefix_before_full_page_capture() {
+    let line = "ordinary offscreen text\n";
+    let (mut eval, frame, _, window) = incr_editing_frame(&line.repeat(300), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str(
+        "(progn (setq worker-raise-spec (list 'raise 0.25))
+        (put-text-property 1 (point-max) 'display worker-raise-spec))",
+    )
+    .unwrap();
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let before = selected_window_layout_trace(&eval, &engine, frame);
+    for _ in 0..4 {
+        assert!(engine.maintain_scroll_coverage(&eval).is_some());
+    }
+    eval.gc_collect_exact();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    while !engine
+        .scroll_coverage
+        .drain(&mut engine.prepared_viewports)
+        .unwrap()
+    {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "four closed rows should be published before acquiring the rest of the page"
+        );
+        std::thread::yield_now();
+    }
+    assert!(engine.take_scroll_coverage_publication());
+    let owner = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
+    assert!(engine.prepared_viewports.has_computed(frame, owner));
+    assert_eq!(before, selected_window_layout_trace(&eval, &engine, frame));
+    eval.eval_str("(setcar (cdr worker-raise-spec) 0.75)")
+        .unwrap();
+    engine.maintain_scroll_coverage(&eval);
+    assert!(
+        engine.take_scroll_coverage_publication(),
+        "withdraw stale prefix"
+    );
+    assert!(!engine.prepared_viewports.has_computed(frame, owner));
+}

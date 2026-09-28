@@ -67,6 +67,7 @@ struct Capture {
     faces: Option<PreparedFaceSnapshot>,
     row_base: usize,
     row_count: usize,
+    preview_pending: bool,
     char_budget: usize,
     position: CharPos0,
     programs: Vec<RowProgram>,
@@ -418,6 +419,9 @@ impl LayoutEngine {
                 self.scroll_coverage.last_window = Some(window_id);
                 return Some(Duration::from_millis(1));
             }
+            if let Some(capture) = &mut self.scroll_coverage.capture {
+                capture.preview_pending = true;
+            }
         }
         if let Err(error) = self.capture_scroll_step(evaluator) {
             tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", ?error, "row capture rejected");
@@ -522,6 +526,7 @@ impl LayoutEngine {
             faces: None,
             row_base,
             row_count,
+            preview_pending: false,
             char_budget: 128,
             position: start,
             programs: Vec::with_capacity(row_count),
@@ -613,6 +618,49 @@ impl LayoutEngine {
                 .count()
                 < capture.row_count
         {
+            // Publish one closed prefix early, then resume acquisition after
+            // its admission drains. The full page still gets prepared. Both
+            // copies obey the existing batch limits, and font snapshots and
+            // evaluator root leases share ownership rather than duplicating
+            // their underlying resources. There is still only one worker job.
+            if capture.preview_pending
+                && capture.programs.last().is_some_and(RowProgram::is_complete)
+                && capture
+                    .programs
+                    .iter()
+                    .filter(|program| program.is_complete())
+                    .count()
+                    >= 4
+            {
+                let (valid, reads) = collection_reads::capture(|| {
+                    capture
+                        .reads
+                        .as_ref()
+                        .is_some_and(CollectionReads::unchanged_and_observe)
+                });
+                if !valid {
+                    return Err(RowProgramError::Cancelled);
+                }
+                let reads = reads.ok_or(RowProgramError::Budget)?;
+                let ticket = self
+                    .scroll_coverage
+                    .worker
+                    .submit(capture.programs.clone())?;
+                tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
+                    start = capture.retained.key.window_start, rows = capture.programs.len(),
+                    "submitting early closed prefix");
+                self.scroll_coverage.admission = Some(Admission {
+                    roots: capture.roots.clone(),
+                    reads,
+                    frame: capture.frame,
+                    window: DisplayWindowId::new(capture.window.0 as i64),
+                    ticket,
+                    retained: capture.retained.clone(),
+                    faces: faces.clone(),
+                    row_base: capture.row_base,
+                });
+                capture.preview_pending = false;
+            }
             capture.faces = Some(faces);
             self.scroll_coverage.capture = Some(capture);
             return Ok(true);
