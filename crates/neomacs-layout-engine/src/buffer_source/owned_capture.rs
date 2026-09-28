@@ -17,12 +17,14 @@ pub(crate) struct CapturedPhysicalLine {
     pub items: Vec<DisplayItem>,
     pub faces: Vec<PendingDisplaySourceFace>,
     pub end: CharPos0,
+    pub complete: bool,
 }
 
 /// A conservative first source domain: complete physical lines, ordinary
 /// resolved faces and literal item geometry. Window policy (prefixes, bidi,
 /// display tables, trailing-whitespace and indicators) is checked by the
 /// caller before entering this source-only operation.
+#[cfg(test)]
 pub(crate) fn capture_physical_line<B: LayoutBufferView>(
     buffer_id: BufferId,
     window: u64,
@@ -33,12 +35,37 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
     face_ids: &mut FrameFaceAttempt,
     cancelled: impl Fn() -> bool,
 ) -> Result<CapturedPhysicalLine, RowProgramError> {
+    let fragment = capture_source_fragment(
+        buffer_id, window, start, max_chars, max_items, false, context, face_ids, cancelled,
+    )?;
+    if fragment.complete {
+        Ok(fragment)
+    } else {
+        Err(RowProgramError::Incomplete)
+    }
+}
+
+/// Acquire one bounded fragment. Only the caller's preceding owned fragment
+/// permits continuation entry; no evaluator operands may survive this call.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
+    buffer_id: BufferId,
+    window: u64,
+    start: CharPos0,
+    max_chars: usize,
+    max_items: usize,
+    continuing: bool,
+    context: BufferSourceFaceResolutionContext<'_, B>,
+    face_ids: &mut FrameFaceAttempt,
+    cancelled: impl Fn() -> bool,
+) -> Result<CapturedPhysicalLine, RowProgramError> {
     let buffer = context.buffer();
     let start_byte = buffer.layout_char_pos_to_emacs_byte_pos(start);
     if start_byte < buffer.layout_point_min_emacs_byte_pos() {
         return Err(RowProgramError::Unsupported);
     }
-    if start_byte > buffer.layout_point_min_emacs_byte_pos()
+    if !continuing
+        && start_byte > buffer.layout_point_min_emacs_byte_pos()
         && buffer.layout_emacs_byte_at_pos(EmacsBytePos::new(start_byte.get() - 1)) != Some(b'\n')
     {
         return Err(RowProgramError::Unsupported);
@@ -165,6 +192,22 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
         if cancelled() {
             return Err(RowProgramError::Cancelled);
         }
+        if position.charpos() >= end.get() as i64 && !items.is_empty() {
+            // Contextual text cannot be shaped independently on either side
+            // of an idle boundary. Complete Unicode lines retain their path.
+            if items.iter().any(|item: &DisplayItem| {
+                matches!(&item.kind,
+                DisplayItemKind::TextRun(run) if !run.text.is_ascii())
+            }) {
+                return Err(RowProgramError::Unsupported);
+            }
+            return Ok(CapturedPhysicalLine {
+                items,
+                faces,
+                end: CharPos0::new(position.charpos() as usize),
+                complete: false,
+            });
+        }
         let step = producer.produce_step(position, context, face_ids);
         if !step.pending_non_text_area.is_empty() {
             return Err(RowProgramError::Unsupported);
@@ -191,6 +234,10 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
             // policy, even though their source vocabulary is ordinary text.
             return Err(RowProgramError::Unsupported);
         }
+        if continuing && matches!(&item.kind, DisplayItemKind::TextRun(run) if !run.text.is_ascii())
+        {
+            return Err(RowProgramError::Unsupported);
+        }
         let complete = matches!(item.kind, DisplayItemKind::RowBreak(_));
         items.push(item);
         if complete {
@@ -198,6 +245,7 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
                 items,
                 faces,
                 end: CharPos0::new(position.charpos() as usize),
+                complete: true,
             });
         }
     }

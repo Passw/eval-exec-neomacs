@@ -36,7 +36,7 @@ use neovm_core::emacs_core::{Context, Value};
 
 /// The four logical arrow bitmaps resolved once per window for the body rows.
 /// `None` means the indicator resolves to no bitmap (GNU `NO_FRINGE_BITMAP`).
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 struct FringeArrowBitmaps {
     /// `truncation` left element — `left-arrow`.
     truncation_left: Option<u16>,
@@ -76,7 +76,7 @@ impl FringeArrowBitmaps {
 /// Per-row decoration request for the truncation/continuation fringe arrows.
 /// Built for every installed body row from [`DisplayRowFlags`] and applied to
 /// the live `GlyphRow` (which also carries `truncated_left` / `reversed_p`).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TruncationContinuationFringeRequest {
     /// First text-area display-row index (`display_text_row_base`).
     display_text_row_base: usize,

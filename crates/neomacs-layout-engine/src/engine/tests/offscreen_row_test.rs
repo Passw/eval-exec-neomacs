@@ -1890,3 +1890,9 @@ fn canonical_word_wrap_rewinds_source_end_and_output_pen_with_glyphs() {
         "the pen stops at the last retained glyph"
     );
 }
+
+#[test]
+fn worker_prepares_long_physical_lines_across_bounded_capture_steps() {
+    first_visit_with_setup(None, &format!("{}\n", "W".repeat(180)),
+        None, 0, 2, Some("(setq word-wrap t)"));
+}

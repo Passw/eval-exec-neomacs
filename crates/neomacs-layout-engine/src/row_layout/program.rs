@@ -38,7 +38,7 @@ pub(crate) enum RowProgramError {
 
 /// No pixel-calculation expressions, image catalogs, or Lisp values. Literal
 /// spacing is the only supported spacing operation at this boundary.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct RowProgramGeometry {
     pub inherited_line_spacing: f32,
     pub character_wrap: bool,
@@ -333,6 +333,13 @@ pub(crate) struct ComputedRow {
     pub terminator_height: f32,
 }
 
+pub(crate) enum RowMeasurements<'a> {
+    Captured(&'a mut dyn DisplayGlyphMeasurer),
+    Deferred(std::sync::Arc<super::font_measurement::FontMeasurementSnapshot>),
+}
+
+mod assembly;
+
 impl RowProgram {
     /// The iterator must be bounded at acquisition, before it allocates an
     /// item. These limits additionally bound everything retained in the job.
@@ -343,7 +350,7 @@ impl RowProgram {
         measurer: &mut dyn DisplayGlyphMeasurer,
         limits: RowProgramLimits,
     ) -> Result<Self, RowProgramError> {
-        Self::capture_inner(geometry, items, faces, Some(measurer), None, limits)
+        Self::capture_inner(geometry, items, faces, Some(measurer), None, limits, false)
     }
 
     pub(crate) fn supports_deferred_text(items: &[DisplayItem]) -> bool {
@@ -359,6 +366,7 @@ impl RowProgram {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn capture_deferred(
         geometry: RowProgramGeometry,
         items: Vec<DisplayItem>,
@@ -369,7 +377,26 @@ impl RowProgram {
         if !Self::supports_deferred_text(&items) {
             return Err(RowProgramError::Unsupported);
         }
-        Self::capture_inner(geometry, items, faces, None, Some(fonts), limits)
+        Self::capture_inner(geometry, items, faces, None, Some(fonts), limits, false)
+    }
+
+    pub(crate) fn capture_fragment(
+        geometry: RowProgramGeometry,
+        items: Vec<DisplayItem>,
+        faces: Vec<DisplayRowFace>,
+        measurements: RowMeasurements<'_>,
+        limits: RowProgramLimits,
+    ) -> Result<Self, RowProgramError> {
+        let (measurer, fonts) = match measurements {
+            RowMeasurements::Captured(measurer) => (Some(measurer), None),
+            RowMeasurements::Deferred(fonts) => {
+                if !Self::supports_deferred_text(&items) {
+                    return Err(RowProgramError::Unsupported);
+                }
+                (None, Some(fonts))
+            }
+        };
+        Self::capture_inner(geometry, items, faces, measurer, fonts, limits, true)
     }
 
     fn capture_inner(
@@ -379,6 +406,7 @@ impl RowProgram {
         mut measurer: Option<&mut dyn DisplayGlyphMeasurer>,
         deferred_fonts: Option<std::sync::Arc<super::font_measurement::FontMeasurementSnapshot>>,
         limits: RowProgramLimits,
+        permit_fragment: bool,
     ) -> Result<Self, RowProgramError> {
         if faces.len() > limits.items || !geometry.width.is_finite() || geometry.width <= 0.0 {
             return Err(RowProgramError::Budget);
@@ -464,7 +492,7 @@ impl RowProgram {
                 plan,
             ));
         }
-        if !complete {
+        if operations.is_empty() || (!complete && !permit_fragment) {
             return Err(RowProgramError::Incomplete);
         }
         Ok(Self {
@@ -545,7 +573,11 @@ impl RowProgram {
         cancelled: impl Fn() -> bool,
     ) -> Result<ComputedRow, RowProgramError> {
         let mut rows = self.compute_visual_rows(1, cancelled)?;
-        rows.pop().ok_or(RowProgramError::Incomplete)
+        let row = rows.pop().ok_or(RowProgramError::Incomplete)?;
+        if row.end_kind == ComputedRowEnd::Continuation {
+            return Err(RowProgramError::Overflow);
+        }
+        Ok(row)
     }
 
     pub(crate) fn compute_visual_rows(
@@ -583,6 +615,7 @@ impl RowProgram {
                     } => *line_height == DisplayLineHeightPolicy::Default && *line_spacing == 0.0,
                     _ => false,
                 });
+        let physical_complete = self.is_complete();
         let layout = self.geometry.layout();
         let mut row = new_display_row(&layout);
         let mut position = DisplayRowPosition::new(0.0, 0);
@@ -708,11 +741,12 @@ impl RowProgram {
             slot_heights.extend(std::iter::repeat_n(face_height, progress.slots().len()));
             slots.extend(progress.slots().iter().cloned());
             let row_glyphs = row.glyphs.iter().map(Vec::len).sum::<usize>();
-            if completed_glyphs.saturating_add(row_glyphs) > self.limits.glyphs {
+            if row_glyphs > 256 || completed_glyphs.saturating_add(row_glyphs) > self.limits.glyphs
+            {
                 return Err(RowProgramError::Budget);
             }
             if progress.status() == DisplayRowAppendStatus::Clipped {
-                if !can_split || slots.is_empty() || rows.len() + 1 >= row_limit {
+                if !can_split || slots.is_empty() {
                     return Err(RowProgramError::Overflow);
                 }
                 let (next_index, next_offset) = if word_wrap.has_candidate() {
@@ -769,6 +803,9 @@ impl RowProgram {
                     terminator_width,
                     terminator_height,
                 });
+                if rows.len() == row_limit {
+                    return Ok(rows);
+                }
                 row = new_display_row(&layout);
                 position = DisplayRowPosition::new(0.0, 0);
                 operation_index = next_index;
@@ -835,11 +872,18 @@ impl RowProgram {
                     row.height_px += row.line_spacing_px;
                 }
             }
-            if completed_glyphs.saturating_add(row.glyphs.iter().map(Vec::len).sum::<usize>())
-                > self.limits.glyphs
+            let row_glyphs = row.glyphs.iter().map(Vec::len).sum::<usize>();
+            if row_glyphs > 256 || completed_glyphs.saturating_add(row_glyphs) > self.limits.glyphs
             {
                 return Err(RowProgramError::Budget);
             }
+        }
+        if !physical_complete {
+            return if rows.is_empty() {
+                Err(RowProgramError::Incomplete)
+            } else {
+                Ok(rows)
+            };
         }
         crate::glyph_row_writer::normalize_external_row(&mut row);
         if let Some(fringe) = &self.geometry.fringe {
@@ -978,6 +1022,105 @@ mod tests {
         .unwrap()
     }
 
+    fn measured_fragment(text: &str, start: usize, complete: bool) -> RowProgram {
+        let mut program = ascii_wrapped_program(text);
+        for (operation, _) in &mut program.operations {
+            let offset = if matches!(operation, Operation::Break { .. }) {
+                text.len()
+            } else {
+                0
+            };
+            let span = match operation {
+                Operation::Text(input) => &mut input.span,
+                Operation::Break { span, .. } => span,
+                _ => unreachable!(),
+            };
+            let length = if offset == 0 { text.len() } else { 1 };
+            *span = SourceSpan::synthetic(1, start + offset, start + offset + length);
+        }
+        if !complete {
+            program.operations.pop();
+        }
+        program
+    }
+
+    #[test]
+    fn fragment_assembly_preserves_visual_rows_and_drops_unfinished_tail() {
+        let mut prefix = measured_fragment("abcdef", 0, false);
+        let partial = prefix.clone().compute_visual_rows(16, || false).unwrap();
+        assert!(
+            partial
+                .iter()
+                .all(|row| row.end_kind == ComputedRowEnd::Continuation)
+        );
+        assert!(partial.iter().map(|row| row.slots.len()).sum::<usize>() < 6);
+        prefix
+            .append_measured_fragment(
+                measured_fragment("ghijkl", 6, true),
+                RowProgramLimits {
+                    items: 64,
+                    text_bytes: 16384,
+                    glyphs: 4096,
+                },
+            )
+            .unwrap();
+        let joined = prefix.compute_visual_rows(16, || false).unwrap();
+        let whole = ascii_wrapped_program("abcdefghijkl")
+            .compute_visual_rows(16, || false)
+            .unwrap();
+        assert_eq!(joined.len(), whole.len());
+        for (joined, whole) in joined.iter().zip(&whole) {
+            assert_eq!(joined.source, whole.source);
+            assert_eq!(joined.end_kind, whole.end_kind);
+            assert_eq!(joined.slots.len(), whole.slots.len());
+            assert_eq!(format!("{:?}", joined.row), format!("{:?}", whole.row));
+        }
+    }
+
+    #[test]
+    fn fragment_assembly_rejects_gaps_geometry_changes_and_budget_overflow() {
+        let maximum = RowProgramLimits {
+            items: 64,
+            text_bytes: 16384,
+            glyphs: 4096,
+        };
+        let prefix = measured_fragment("abcd", 0, false);
+        assert!(matches!(
+            prefix
+                .clone()
+                .append_measured_fragment(measured_fragment("efgh", 5, true), maximum),
+            Err(RowProgramError::Unsupported)
+        ));
+        let mut next = measured_fragment("efgh", 4, true);
+        next.geometry.width += 1.0;
+        assert!(matches!(
+            prefix.clone().append_measured_fragment(next, maximum),
+            Err(RowProgramError::Unsupported)
+        ));
+        assert!(matches!(
+            prefix
+                .clone()
+                .append_measured_fragment(measured_fragment("efgh", 4, true), limits()),
+            Err(RowProgramError::Budget)
+        ));
+        let mut next = measured_fragment("efgh", 4, true);
+        next.measurements.char_width += 1.0;
+        assert!(matches!(
+            prefix.clone().append_measured_fragment(next, maximum),
+            Err(RowProgramError::Unsupported)
+        ));
+        let mut next = measured_fragment("efgh", 4, true);
+        next.faces[0].font_size += 1.0;
+        assert!(matches!(
+            prefix.clone().append_measured_fragment(next, maximum),
+            Err(RowProgramError::Cancelled)
+        ));
+        assert!(matches!(
+            prefix.compute_visual_rows(16, || true),
+            Err(RowProgramError::Cancelled)
+        ));
+    }
+
     #[test]
     fn wrapped_program_bounds_visual_rows_and_total_glyphs() {
         let program = ascii_wrapped_program("abcdefghijkl");
@@ -990,8 +1133,11 @@ mod tests {
         );
         assert_eq!(rows.last().unwrap().end_kind, ComputedRowEnd::Newline);
         assert_eq!(rows.iter().map(|row| row.slots.len()).sum::<usize>(), 12);
+        let prefix = program.clone().compute_visual_rows(1, || false).unwrap();
+        assert_eq!(prefix.len(), 1);
+        assert_eq!(prefix[0].end_kind, ComputedRowEnd::Continuation);
         assert!(matches!(
-            program.clone().compute_visual_rows(1, || false),
+            program.clone().compute(|| false),
             Err(RowProgramError::Overflow)
         ));
         assert!(matches!(

@@ -160,14 +160,31 @@ fn compute_rows(
     cancelled: impl Fn() -> bool,
 ) -> Result<Vec<ComputedRow>, RowProgramError> {
     let mut rows = Vec::with_capacity(programs.len());
-    for mut program in programs {
+    let mut programs = programs.into_iter();
+    while let Some(mut program) = programs.next() {
         if rows.len() == MAX_ROWS {
             break;
         }
         program.measure_on_worker(fonts, &cancelled)?;
+        while !program.is_complete() {
+            let Some(mut fragment) = programs.next() else {
+                break;
+            };
+            fragment.measure_on_worker(fonts, &cancelled)?;
+            program.append_measured_fragment(
+                fragment,
+                super::program::RowProgramLimits {
+                    items: MAX_ITEMS,
+                    text_bytes: MAX_BYTES,
+                    glyphs: MAX_GLYPHS,
+                },
+            )?;
+        }
         match program.compute_visual_rows(MAX_ROWS - rows.len(), &cancelled) {
             Ok(computed) => rows.extend(computed),
-            Err(RowProgramError::Overflow | RowProgramError::Budget) if !rows.is_empty() => break,
+            Err(
+                RowProgramError::Overflow | RowProgramError::Budget | RowProgramError::Incomplete,
+            ) if !rows.is_empty() => break,
             Err(error) => return Err(error),
         }
     }

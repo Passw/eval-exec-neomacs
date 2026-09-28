@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::buffer_source::face_resolution::BufferSourceFaceResolutionContext;
-use crate::buffer_source::owned_capture::capture_physical_line;
+use crate::buffer_source::owned_capture::capture_source_fragment;
 use crate::display_row::face_state::{
     DisplayRowFaceRealizer, DisplayRowGlyphMeasurer, DisplayRowMeasurementMode,
     DisplayRowMeasurementPolicy, stable_face_id_for_resolved,
@@ -13,7 +13,7 @@ use crate::frame_face_arena::{FrameFaceAttempt, PreparedFaceSnapshot};
 use crate::glyph_advance::GlyphAdvanceQuantization;
 use crate::neovm_bridge::{BorrowedLayoutBuffer, LayoutBufferView, LayoutVar};
 use crate::row_layout::program::{
-    RowProgram, RowProgramError, RowProgramGeometry, RowProgramLimits,
+    RowMeasurements, RowProgram, RowProgramError, RowProgramGeometry, RowProgramLimits,
 };
 use crate::row_layout::worker::{RowJobTicket, RowWorker};
 use crate::window_output::prepared_body::position_buffer_rows;
@@ -706,12 +706,13 @@ impl LayoutEngine {
             metrics,
             Default::default(),
         );
-        let captured = capture_physical_line(
+        let captured = capture_source_fragment(
             buffer_id,
             window.0,
             capture.position,
             128,
             32,
+            capture.programs.last().is_some_and(|program| !program.is_complete()),
             context,
             &mut capture.attempt,
             || false,
@@ -828,7 +829,7 @@ impl LayoutEngine {
                 capture.font_snapshots.push(shared.clone());
                 shared
             };
-            RowProgram::capture_deferred(geometry, captured.items, faces, fonts, limits)?
+            RowProgram::capture_fragment(geometry, captured.items, faces, RowMeasurements::Deferred(fonts), limits)?
         } else {
             let mut measurer = DisplayRowGlyphMeasurer::with_mode(
                 &faces,
@@ -837,14 +838,15 @@ impl LayoutEngine {
                 GlyphAdvanceQuantization::PreserveLogicalPixels,
                 DisplayRowMeasurementMode::ConcreteFont,
             );
-            RowProgram::capture(
+            RowProgram::capture_fragment(
                 geometry,
                 captured.items,
                 faces.clone(),
-                &mut measurer,
+                RowMeasurements::Captured(&mut measurer),
                 limits,
             )?
         };
+        if program.is_complete() != captured.complete { return Err(RowProgramError::Unsupported); }
         capture.programs.push(program);
         Ok(())
     }

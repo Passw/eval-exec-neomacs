@@ -53,6 +53,10 @@ pub(crate) struct ResolvedSpacingInput {
 }
 
 impl ResolvedSpacingInput {
+    pub(crate) fn source_span(&self) -> &SourceSpan {
+        &self.span
+    }
+
     #[allow(clippy::result_large_err)]
     pub(crate) fn capture(item: DisplayItem, base_face: FaceId) -> Result<Self, DisplayItem> {
         let DisplayItemKind::Stretch(stretch) = &item.kind else {
