@@ -7,30 +7,11 @@ use super::{COMPAT_GNU_ELPA_PIN, CachedMelpaOracle, VERTICO_MELPA_PIN};
 
 use super::scenario::{DisplayCheckpoint, PackageTuiScenario, PairTimeout, ReadinessCheckpoint};
 
-const VERTICO_TUI_PRELUDE: &str = r#"
-(require 'vertico)
-(setq vertico-count 5
-      vertico-cycle t)
-(vertico-mode 1)
-(dolist (fixture '(("project-alpha" . "ALPHA BUFFER\n")
-                   ("project-beta" . "BETA BUFFER\n")
-                   ("project-notes" . "NOTES BUFFER\n")))
-  (with-current-buffer (get-buffer-create (car fixture))
-    (erase-buffer)
-    (insert (cdr fixture))))
-"#;
+mod harness;
+mod prelude;
 
-fn candidate_rows(grid: &[String]) -> Vec<u16> {
-    grid.iter()
-        .enumerate()
-        .filter_map(|(row, contents)| {
-            contents
-                .trim_start()
-                .starts_with("project-")
-                .then_some(row as u16)
-        })
-        .collect()
-}
+use harness::candidate_rows;
+use prelude::VERTICO_TUI_PRELUDE;
 
 #[test]
 fn vertico_real_minibuffer_candidates_and_selection_match_gnu_grid() {
@@ -59,12 +40,12 @@ fn vertico_real_minibuffer_candidates_and_selection_match_gnu_grid() {
     pair.send_both(b"project-");
     for session in [&mut pair.gnu, &mut pair.neo] {
         session.read_until(Duration::from_secs(8), |grid| {
-            candidate_rows(grid).len() >= 3
+            candidate_rows(grid, "project-").len() >= 3
         });
     }
 
-    let gnu_rows = candidate_rows(&pair.gnu.text_grid());
-    let neo_rows = candidate_rows(&pair.neo.text_grid());
+    let gnu_rows = candidate_rows(&pair.gnu.text_grid(), "project-");
+    let neo_rows = candidate_rows(&pair.neo.text_grid(), "project-");
     assert_eq!(neo_rows, gnu_rows, "Vertico candidate rows differ from GNU");
     let gnu_snapshot = RawTerminalSnapshot::capture_full_screen(pair.gnu.screen());
 
@@ -74,6 +55,9 @@ fn vertico_real_minibuffer_candidates_and_selection_match_gnu_grid() {
     expected_plain_grid.assert_eq(&gnu_snapshot.plain_grid());
 
     pair.assert_display(DisplayCheckpoint::new("Vertico full-screen terminal state"));
+    pair.assert_display(DisplayCheckpoint::raw_terminal(
+        "Vertico full-screen terminal wire state",
+    ));
 
     pair.send_both(b"beta");
     pair.send_key_both("RET");
