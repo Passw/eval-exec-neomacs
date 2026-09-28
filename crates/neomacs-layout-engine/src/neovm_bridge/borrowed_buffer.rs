@@ -157,6 +157,7 @@ impl LayoutBufferView for BorrowedLayoutBuffer<'_> {
     }
     fn layout_category_symbol_property(&self, category: Value, property: Value) -> Option<Value> {
         let id = category.as_symbol_id()?;
+        neovm_core::emacs_core::symbol::SymbolPropertyRevision::observe(id);
         neovm_core::emacs_core::plist::plist_get(self.obarray.symbol_plist_id(id), &property)
     }
     fn layout_automatic_composition_starting_at(&self, pos: CharPos0) -> Option<CharRange> {

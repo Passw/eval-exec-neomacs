@@ -90,4 +90,6 @@ fn category_symbol_writes_invalidate_idle_redisplay() {
     assert_eq!(layouts.get(), 2, "category face mutation must repaint");
     eval.eval_str("(redisplay)").unwrap();
     assert_eq!(layouts.get(), 2, "unchanged category must remain idle");
+    eval.eval_str("(progn (put 'unrelated-wheel-event 'event-kind 'mouse-click) (redisplay))").unwrap();
+    assert_eq!(layouts.get(), 2, "event metadata is not a layout dependency");
 }

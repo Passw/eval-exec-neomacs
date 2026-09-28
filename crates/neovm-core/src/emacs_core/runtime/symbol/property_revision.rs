@@ -1,9 +1,12 @@
-//! Evaluator-thread revision of symbol property-list writes. Layout can read
-//! faces and display properties indirectly through overlay/text categories.
-use std::cell::Cell;
+//! Evaluator-thread revision of property-list writes to layout dependencies.
+//! Category and overlay-arrow symbols are observed when attached/read. Event
+//! metadata and other unrelated symbol properties do not invalidate rows.
+use super::{SymId, Value};
+use std::cell::{Cell, RefCell};
 
 thread_local! {
     static REVISION: Cell<u64> = const { Cell::new(0) };
+    static OBSERVED: RefCell<rustc_hash::FxHashSet<SymId>> = RefCell::new(Default::default());
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -14,7 +17,26 @@ impl SymbolPropertyRevision {
         Self(REVISION.with(Cell::get))
     }
 
-    pub(super) fn changed() {
-        REVISION.with(|revision| revision.set(revision.get().wrapping_add(1)));
+    /// Symbol identities are permanent; remembering a dependency never roots
+    /// a Lisp property value or leaves a dangling object after collection.
+    pub fn observe(symbol: SymId) {
+        OBSERVED.with(|observed| {
+            observed.borrow_mut().insert(symbol);
+        });
+    }
+
+    pub fn observe_category_property(property: Value, value: Value) {
+        if property.is_symbol_named("category")
+            && !value.is_nil()
+            && let Some(symbol) = value.as_symbol_id()
+        {
+            Self::observe(symbol);
+        }
+    }
+
+    pub(super) fn changed(symbol: SymId) {
+        if OBSERVED.with(|observed| observed.borrow().contains(&symbol)) {
+            REVISION.with(|revision| revision.set(revision.get().wrapping_add(1)));
+        }
     }
 }

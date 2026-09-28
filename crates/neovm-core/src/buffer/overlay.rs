@@ -934,6 +934,7 @@ impl OverlayList {
     }
 
     pub fn overlay_put(&mut self, overlay: Value, prop: Value, value: Value) -> Result<bool, Flow> {
+        crate::emacs_core::symbol::SymbolPropertyRevision::observe_category_property(prop, value);
         let (changed, plist_replaced) = overlay
             .with_overlay_data_mut(|data| {
                 let (plist, changed) = overlay_plist_put(data.plist, prop, value);

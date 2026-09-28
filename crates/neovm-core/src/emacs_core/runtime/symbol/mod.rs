@@ -4198,7 +4198,7 @@ impl Obarray {
         // SATB: retain the plist cell's pre-image during a concurrent mark.
         crate::tagged::gc::note_root_overwrite(sym.plist);
         store_value_atomic(&mut sym.plist, new_plist);
-        SymbolPropertyRevision::changed();
+        SymbolPropertyRevision::changed(symbol);
         Ok(())
     }
 
@@ -4219,7 +4219,7 @@ impl Obarray {
         // SATB: retain the plist cell's pre-image during a concurrent mark.
         crate::tagged::gc::note_root_overwrite(sym.plist);
         store_value_atomic(&mut sym.plist, new_plist);
-        SymbolPropertyRevision::changed();
+        SymbolPropertyRevision::changed(symbol);
         Ok(())
     }
 
@@ -4243,7 +4243,7 @@ impl Obarray {
         // SATB: retain the plist cell's pre-image during a concurrent mark.
         crate::tagged::gc::note_root_overwrite(sym.plist);
         store_value_atomic(&mut sym.plist, new_plist);
-        SymbolPropertyRevision::changed();
+        SymbolPropertyRevision::changed(symbol);
     }
 
     /// Store `plist` verbatim as the symbol's property list. Matches GNU
@@ -4255,7 +4255,7 @@ impl Obarray {
         // SATB: retain the plist cell's pre-image during a concurrent mark.
         crate::tagged::gc::note_root_overwrite(sym.plist);
         store_value_atomic(&mut sym.plist, plist);
-        SymbolPropertyRevision::changed();
+        SymbolPropertyRevision::changed(symbol);
     }
 
     /// Get the symbol's full plist as a flat list.

@@ -188,6 +188,7 @@ fn capture_layout_category_symbol_plists(
 ) -> FxHashMap<SymId, Value> {
     fn remember(category: Value, obarray: &Obarray, plists: &mut FxHashMap<SymId, Value>) {
         if let Some(category_id) = category.as_symbol_id() {
+            neovm_core::emacs_core::symbol::SymbolPropertyRevision::observe(category_id);
             plists
                 .entry(category_id)
                 .or_insert_with(|| obarray.symbol_plist_id(category_id));
