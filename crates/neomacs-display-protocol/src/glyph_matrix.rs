@@ -1122,6 +1122,16 @@ pub struct FringeBitmapInfo {
 }
 
 impl GlyphRow {
+    /// The next natural buffer row begins at the same boundary after a visual
+    /// wrap; a physical line end additionally consumes its newline.
+    pub fn next_buffer_row_start(&self) -> Option<usize> {
+        if self.continued {
+            Some(self.end_charpos)
+        } else {
+            self.end_charpos.checked_add(1)
+        }
+    }
+
     /// Height produced by the row before adding inter-line spacing.
     pub fn height_without_line_spacing(&self) -> f32 {
         (self.height_px - self.line_spacing_px).max(0.0)

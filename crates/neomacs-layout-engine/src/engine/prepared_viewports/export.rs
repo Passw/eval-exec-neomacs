@@ -94,13 +94,12 @@ impl PreparedViewports {
         let mut attempt = arena.begin_attempt();
         attempt
             .admit_prepared(
-                body.iter()
-                    .flat_map(|(_, row)| row.glyphs.iter().flatten().map(|glyph| glyph.face_id)),
+                body.iter().flat_map(|(_, row)| scroll_row_faces(row)),
                 &arena.prepared_snapshot(),
                 arena,
             )
             .ok()?;
-        // Only complete, natural physical rows may extend this scroll surface.
+        // Complete physical rows and certified visual continuations may extend this surface.
         // Source continuity is proved again after selecting the connected set.
         for (index, row) in &body {
             if rows.insert(row.start_charpos, (current, *index)).is_some() {
@@ -116,7 +115,7 @@ impl PreparedViewports {
                         .rows
                         .iter()
                         .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
-                        .flat_map(|row| row.glyphs.iter().flatten().map(|glyph| glyph.face_id)),
+                        .flat_map(|row| scroll_row_faces(row)),
                     &entry.faces,
                     arena,
                 )
@@ -131,7 +130,10 @@ impl PreparedViewports {
             {
                 if let Some((source, old_index)) = rows.get(&row.start_charpos) {
                     let old = &source.matrix.rows[*old_index];
-                    if old.height_px != row.height_px || old.end_charpos != row.end_charpos {
+                    if old.height_px != row.height_px
+                        || old.end_charpos != row.end_charpos
+                        || old.continued != row.continued
+                    {
                         return None;
                     }
                 }
@@ -145,7 +147,7 @@ impl PreparedViewports {
         let adjacent = |left: usize, right: usize| {
             let (a, ai) = all[left];
             let (b, bi) = all[right];
-            a.matrix.rows[ai].end_charpos.checked_add(1) == Some(b.matrix.rows[bi].start_charpos)
+            a.matrix.rows[ai].next_buffer_row_start() == Some(b.matrix.rows[bi].start_charpos)
         };
         let mut begin = anchor_index;
         while begin > 0 && adjacent(begin - 1, begin) {
@@ -277,4 +279,19 @@ impl PreparedViewports {
 fn next_epoch() -> u64 {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
     NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+}
+
+fn scroll_row_faces(
+    row: &neomacs_display_protocol::GlyphRow,
+) -> impl Iterator<Item = neomacs_display_protocol::FaceId> + '_ {
+    row.referenced_face_ids().chain(
+        [
+            row.left_fringe_bitmap,
+            row.right_fringe_bitmap,
+            row.overlay_arrow_bitmap,
+        ]
+        .into_iter()
+        .flatten()
+        .map(|bitmap| bitmap.face_id),
+    )
 }

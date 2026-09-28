@@ -74,8 +74,18 @@ use neovm_core::emacs_core::Value;
 use neovm_core::emacs_core::eval::DisplayHost;
 use neovm_core::window::DisplayRowSnapshot;
 
-/// Current-row mutation that attaches a resolved fringe bitmap to the row's
-/// left or right fringe slot.
+/// Preserve the source boundary independently of fringe decoration.
+struct MarkVisualContinuation;
+
+impl DisplayCurrentRowMutation for MarkVisualContinuation {
+    type Output = ();
+
+    fn apply(self, row: &mut GlyphRow) {
+        row.continued = true;
+    }
+}
+
+/// Attach a resolved fringe bitmap to the row's left or right slot.
 struct SetRowFringeBitmapMutation {
     side: DisplayFringeSide,
     info: FringeBitmapInfo,
@@ -720,6 +730,11 @@ impl<'a> TextRowOutputRenderState<'a> {
         f: impl FnOnce(TextWindowOutputTarget<'_>, &mut WindowOutputEmitter, &mut Context) -> R,
     ) -> R {
         f(self.output, self.output_emitter, self.evaluator)
+    }
+
+    pub(crate) fn mark_visual_continuation(&mut self) {
+        self.current_row_output()
+            .apply_current_row_mutation(MarkVisualContinuation);
     }
 
     pub(crate) fn transition_text_row_with_limit(

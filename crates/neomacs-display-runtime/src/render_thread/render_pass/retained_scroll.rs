@@ -157,7 +157,14 @@ fn raster_frame(
         bounds.width,
         bounds.height,
     );
-    raster.glyphs = surface.coverage_glyphs().to_vec();
+    // Fringe arrows move with the rows but occupy columns outside the text
+    // raster. The root frame paints them using their own vertical clip.
+    raster.glyphs = surface
+        .coverage_glyphs()
+        .iter()
+        .filter(|glyph| !matches!(glyph, FrameGlyph::FringeBitmap { .. }))
+        .cloned()
+        .collect();
     for glyph in &mut raster.glyphs {
         match glyph {
             FrameGlyph::Char {
@@ -342,7 +349,14 @@ pub(super) fn prepare(
     let mut base = frame.clone();
     let window = coverage.content.window_id;
     base.glyphs.retain(|glyph| {
-        glyph.window_id() != Some(window) || glyph.row_role() != Some(GlyphRowRole::Text)
+        glyph.window_id() != Some(window)
+            || glyph.row_role() != Some(GlyphRowRole::Text)
+            || matches!(
+                glyph,
+                FrameGlyph::FringeBitmap { .. }
+                    | FrameGlyph::ScrollBar { .. }
+                    | FrameGlyph::Border { .. }
+            )
     });
     Some(PreparedScrollRaster {
         frame: base,

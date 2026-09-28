@@ -363,3 +363,111 @@ fn resolved_scroll_preview_for_window(other_window: bool) {
             .is_none()
     );
 }
+
+#[test]
+fn wrapped_scroll_surface_exports_contiguous_visual_rows() {
+    let line = format!("{}\n", "wide words ".repeat(18));
+    let (mut eval, frame_id, _, window) = incr_editing_frame(&line.repeat(300), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame_id)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str("(setq word-wrap t)").unwrap();
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame_id);
+    let owner = DisplayWindowId::new(window.0 as i64);
+    let original = engine.retained_window_matrices[&owner].clone();
+    let rows: Vec<_> = original
+        .matrix
+        .rows
+        .iter()
+        .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        .collect();
+    assert!(
+        rows[0].continued,
+        "visual wrapping must be recorded on the transported row"
+    );
+    let target = rows
+        .iter()
+        .rev()
+        .find(|row| row.start_charpos % line.len() == 0)
+        .unwrap()
+        .start_charpos;
+    engine
+        .request_scroll_coverage(&eval, frame_id, window, CharPos0::new(target))
+        .unwrap();
+    await_coverage(&mut engine);
+    engine.layout_frame_rust(&mut eval, frame_id);
+    let state = engine.last_frame_display_state.as_ref().unwrap();
+    assert_eq!(
+        state.scroll_coverage.len(),
+        1,
+        "wrapped seams must join the worker page"
+    );
+    let mut frame = state.materialize();
+    assert_eq!(frame.scroll_surfaces.len(), 1);
+    let surface = frame.scroll_surfaces[0].clone();
+    let viewport = surface.coverage().viewport;
+    let offset = surface.clamp_offset(rows[0].height_px);
+    assert_eq!(offset, rows[0].height_px);
+    let fringe_count = surface
+        .coverage_glyphs()
+        .iter()
+        .filter(|glyph| matches!(glyph, FrameGlyph::FringeBitmap { .. }))
+        .count();
+    assert!(
+        fringe_count > 0,
+        "wrapped coverage owns its continuation arrows"
+    );
+    let bars: Vec<_> = frame
+        .glyphs
+        .iter()
+        .filter(|glyph| matches!(glyph, FrameGlyph::ScrollBar { .. }))
+        .cloned()
+        .collect();
+    frame.fringe_bitmaps.clear();
+    surface.paint(&mut frame, offset);
+    let mut painted = 0;
+    for glyph in &frame.glyphs {
+        if let FrameGlyph::FringeBitmap {
+            window_id,
+            y,
+            height,
+            clip_rect,
+            bitmap_index,
+            ..
+        } = glyph
+        {
+            if *window_id != owner {
+                continue;
+            }
+            painted += 1;
+            assert!(*y < viewport.bottom() && *y + *height > viewport.y);
+            let clip = clip_rect.unwrap();
+            assert_eq!(clip.y, viewport.y);
+            assert_eq!(clip.height, viewport.height);
+            assert!(clip.x <= viewport.x && clip.right() >= viewport.right());
+            assert!(frame.fringe_bitmaps.contains_key(bitmap_index));
+        }
+    }
+    assert!(painted > 0 && painted < fringe_count);
+    assert_eq!(
+        frame
+            .glyphs
+            .iter()
+            .filter(|glyph| matches!(glyph, FrameGlyph::ScrollBar { .. }))
+            .cloned()
+            .collect::<Vec<_>>(),
+        bars
+    );
+    let point = settled_point(frame.presentation_id, viewport.x + 1.0, viewport.y + 1.0);
+    let hit = surface.hit(point, offset).unwrap().unwrap();
+    assert_eq!(
+        hit.text_position().unwrap().buffer_position(),
+        rows[1].start_charpos as i64 + 1
+    );
+    assert_eq!(
+        engine.retained_window_matrices[&owner].key.window_start,
+        original.key.window_start
+    );
+}

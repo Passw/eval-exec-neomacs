@@ -1149,7 +1149,10 @@ impl RetainedWindowMatrix {
             }
             let start = row.start_charpos as i64;
             let end = row.end_charpos as i64;
-            if new_cursor.is_none() && start <= new_point && new_point <= end {
+            if new_cursor.is_none()
+                && start <= new_point
+                && (new_point < end || (new_point == end && !row.continued))
+            {
                 new_cursor = Some((idx, row.as_ref()));
             }
             body_indices.insert(idx);
@@ -1195,9 +1198,13 @@ impl RetainedWindowMatrix {
                 .iter()
                 .flatten()
                 .any(|glyph| glyph.vertical_offset_px != 0.0 && glyph.pixel_height <= 0.0))
-            || cursor_row.continued
             || cursor_row.truncated_left
-            || cursor_row.left_fringe_bitmap.is_some()
+            || (retained_cursor.is_none()
+                && (cursor_row.continued || cursor_row.left_fringe_bitmap.is_some())
+                && !self.display_snapshot.points.iter().any(|point| {
+                    point.row == new_cursor_row_index as i64
+                        && point.buffer_pos.as_i64() == new_point + 1
+                }))
         {
             return Err(CursorOnlyDecline::CursorRowNotReDecoratable);
         }

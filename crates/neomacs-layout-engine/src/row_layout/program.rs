@@ -804,6 +804,7 @@ impl RowProgram {
                     .span
                     .start
                     .advanced_by(next_offset, next_offset);
+                row.continued = true;
                 continuation::extend_background(
                     &mut row,
                     wrap_extend,

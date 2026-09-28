@@ -47,6 +47,7 @@ pub struct ScrollCoverage {
 pub struct ScrollSurface {
     coverage: Arc<ScrollCoverage>,
     glyphs: Vec<FrameGlyph>,
+    fringe_bitmaps: rustc_hash::FxHashMap<u16, crate::frame_glyphs::FringeBitmapData>,
 }
 
 impl ScrollCoverage {
@@ -115,7 +116,7 @@ impl ScrollCoverage {
                 return None;
             }
             bottom += row.height_px;
-            next_source = row.end_charpos.checked_add(1);
+            next_source = row.next_buffer_row_start();
         }
         if (bottom - bounds.bottom()).abs() > 0.01 {
             return None;
@@ -126,8 +127,20 @@ impl ScrollCoverage {
         source.char_fonts = self.char_fonts.clone();
         source.shaped_clusters = self.shaped_clusters.clone();
         source.window_matrices.push(self.content.clone());
+        source.scroll_bars.extend(
+            frame
+                .scroll_bars
+                .iter()
+                .filter(|bar| bar.window_id == window)
+                .cloned(),
+        );
         let mut glyphs = Vec::with_capacity(glyph_count);
-        source.for_each_glyph(|glyph| glyphs.push(glyph));
+        // Scroll bars supply fringe geometry but remain stationary frame chrome.
+        source.for_each_glyph(|glyph| {
+            if !matches!(glyph, FrameGlyph::ScrollBar { .. }) {
+                glyphs.push(glyph);
+            }
+        });
         if glyphs.iter().any(|glyph| {
             !matches!(
                 glyph,
@@ -137,14 +150,38 @@ impl ScrollCoverage {
                 } | FrameGlyph::Stretch {
                     row_role: GlyphRowRole::Text,
                     ..
+                } | FrameGlyph::FringeBitmap {
+                    row_role: GlyphRowRole::Text,
+                    ..
                 }
             )
         }) {
             return None;
         }
+        let mut fringe_bitmaps = rustc_hash::FxHashMap::default();
+        let mut bitmap_bytes = 0usize;
+        for glyph in &glyphs {
+            if let FrameGlyph::FringeBitmap {
+                bitmap_index,
+                face_id,
+                ..
+            } = glyph
+            {
+                self.faces.get(face_id)?;
+                if !fringe_bitmaps.contains_key(bitmap_index) {
+                    let bitmap = frame.fringe_bitmaps.get(bitmap_index)?;
+                    bitmap_bytes = bitmap_bytes.checked_add(bitmap.bits.len().checked_mul(2)?)?;
+                    if bitmap_bytes > 65_536 {
+                        return None;
+                    }
+                    fringe_bitmaps.insert(*bitmap_index, bitmap.clone());
+                }
+            }
+        }
         Some(Arc::new(ScrollSurface {
             coverage: Arc::clone(self),
             glyphs,
+            fringe_bitmaps,
         }))
     }
 }
@@ -185,7 +222,12 @@ impl ScrollSurface {
         let window = self.coverage.content.window_id;
         let clip = self.coverage.viewport;
         frame.glyphs.retain(|glyph| {
-            glyph.window_id() != Some(window) || glyph.row_role() != Some(GlyphRowRole::Text)
+            glyph.window_id() != Some(window)
+                || glyph.row_role() != Some(GlyphRowRole::Text)
+                || matches!(
+                    glyph,
+                    FrameGlyph::ScrollBar { .. } | FrameGlyph::Border { .. }
+                )
         });
         for glyph in &self.glyphs {
             let mut glyph = glyph.clone();
@@ -216,10 +258,28 @@ impl ScrollSurface {
                         continue;
                     }
                 }
+                FrameGlyph::FringeBitmap {
+                    y,
+                    height,
+                    clip_rect,
+                    ..
+                } => {
+                    *y -= offset;
+                    *clip_rect = Some(Rect::new(
+                        self.coverage.content.pixel_bounds.x,
+                        clip.y,
+                        self.coverage.content.pixel_bounds.width,
+                        clip.height,
+                    ));
+                    if *y >= clip.bottom() || *y + *height <= clip.y {
+                        continue;
+                    }
+                }
                 _ => unreachable!("validated text coverage"),
             }
             frame.glyphs.push(glyph);
         }
+        frame.fringe_bitmaps.extend(self.fringe_bitmaps.clone());
         frame.faces.extend(self.coverage.faces.clone());
         frame.fonts.extend(self.coverage.fonts.clone());
         frame.char_fonts.extend(self.coverage.char_fonts.clone());
@@ -288,6 +348,7 @@ impl PartialEq for ScrollSurface {
                 && self.coverage.fonts == other.coverage.fonts
                 && self.coverage.char_fonts == other.coverage.char_fonts
                 && self.coverage.shaped_clusters == other.coverage.shaped_clusters
+                && self.fringe_bitmaps == other.fringe_bitmaps
                 && self.glyphs == other.glyphs)
     }
 }

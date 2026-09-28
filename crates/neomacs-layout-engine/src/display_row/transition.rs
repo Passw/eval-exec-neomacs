@@ -644,7 +644,7 @@ impl<'a> DisplayRowOverflowTransitionRequest<'a> {
         row_geometry: &mut DisplayRowGeometryState,
         row_flags: &mut DisplayRowFlags,
         row_limit: DisplayRowLimit,
-        output_render: TextRowOutputRenderState<'_>,
+        mut output_render: TextRowOutputRenderState<'_>,
     ) -> DisplayTextRowTransition {
         match self.kind {
             DisplayRowOverflowTransitionKind::Truncation => {
@@ -655,6 +655,7 @@ impl<'a> DisplayRowOverflowTransitionRequest<'a> {
                 );
             }
             DisplayRowOverflowTransitionKind::VisualWrap(break_kind) => {
+                output_render.mark_visual_continuation();
                 // GNU sets row->continued_p on every wrap branch; only the
                 // mid-element branches also produce the IT_CONTINUATION glyph.
                 row_geometry.mark_current_row_flag_kind(

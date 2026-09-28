@@ -10,6 +10,16 @@ fn fixture_with(change: impl FnOnce(&mut scroll_coverage::ScrollCoverage)) -> Fr
     let mut state = FrameDisplayState::new(8, 4, 10.0, 10.0);
     state.presentation_id = PresentationId::new(71);
     state.background = Color::RED;
+    state.fringe_bitmaps.insert(
+        1,
+        frame_glyphs::FringeBitmapData {
+            bits: vec![0x8000, 0xc000, 0xe000],
+            width: 3,
+            height: 3,
+            period: 0,
+            align: 0,
+        },
+    );
     let window = DisplayWindowId::new(1);
     let viewport = Rect::new(10.0, 10.0, 60.0, 20.0);
     let bounds = Rect::new(10.0, 10.0, 60.0, 60.0);
@@ -28,6 +38,10 @@ fn fixture_with(change: impl FnOnce(&mut scroll_coverage::ScrollCoverage)) -> Fr
         row.pixel_y = index as f32 * 10.0;
         row.height_px = 10.0;
         row.ascent_px = 8.0;
+        row.right_fringe_bitmap = Some(glyph_matrix::FringeBitmapInfo {
+            bitmap_index: 1,
+            face_id,
+        });
         row.start_charpos = index * 2;
         row.end_charpos = index * 2 + 1;
         let mut glyph =
@@ -48,7 +62,7 @@ fn fixture_with(change: impl FnOnce(&mut scroll_coverage::ScrollCoverage)) -> Fr
     let content = WindowMatrixEntry {
         window_id: window,
         matrix,
-        pixel_bounds: viewport,
+        pixel_bounds: Rect::new(0.0, 10.0, 80.0, 20.0),
         text_pixel_bounds: viewport,
         text_clip_bounds: Some(bounds),
         selected: true,

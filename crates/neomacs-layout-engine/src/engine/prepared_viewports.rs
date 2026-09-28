@@ -188,7 +188,7 @@ impl PreparedViewports {
                 .take_while(|(_, row)| row.start_charpos < seam)
                 .collect();
             let (last_index, last_row) = *above.last()?;
-            if last_row.end_charpos.checked_add(1)? != seam {
+            if last_row.next_buffer_row_start()? != seam {
                 return None;
             }
             let mut candidate = entry.retained.clone();
@@ -265,7 +265,7 @@ impl PreparedViewports {
                 shifted.cursor_type = None;
                 *destination = neomacs_display_protocol::glyph_matrix::MatrixRow::new(shifted);
                 remap.insert(source_index as i64, (index as i64, dy.round() as i64));
-                next = row.end_charpos.checked_add(1)?;
+                next = row.next_buffer_row_start()?;
                 y += row.height_px;
                 index += 1;
             }
