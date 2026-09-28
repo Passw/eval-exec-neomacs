@@ -16,8 +16,32 @@ use super::header::{
 };
 use super::value::TaggedValue;
 
+thread_local! {
+    static COLLECTION_REVISION: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Short-lived observations can depend on mutable Lisp collections nested
+/// inside display properties without a buffer-property write. Allocating a
+/// fresh object does not change this revision; mutating an existing one does.
+/// Keep this separate from retained-row revisions: unrelated temporary-list
+/// edits must not cancel off-screen acquisition.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LispCollectionRevision(u64);
+
+impl LispCollectionRevision {
+    pub fn current() -> Self {
+        Self(COLLECTION_REVISION.with(std::cell::Cell::get))
+    }
+
+    #[inline]
+    fn changed() {
+        COLLECTION_REVISION.with(|revision| revision.set(revision.get().wrapping_add(1)));
+    }
+}
+
 #[inline]
 pub fn set_cons_car(cell: TaggedValue, value: TaggedValue) -> bool {
+    LispCollectionRevision::changed();
     if !cell.is_cons() {
         return false;
     }
@@ -30,6 +54,7 @@ pub fn set_cons_car(cell: TaggedValue, value: TaggedValue) -> bool {
 
 #[inline]
 pub fn set_cons_cdr(cell: TaggedValue, value: TaggedValue) -> bool {
+    LispCollectionRevision::changed();
     if !cell.is_cons() {
         return false;
     }
@@ -45,6 +70,7 @@ pub fn with_vector_data_mut<R>(
     value: TaggedValue,
     f: impl FnOnce(&mut Vec<TaggedValue>) -> R,
 ) -> Option<R> {
+    LispCollectionRevision::changed();
     if value.veclike_type()? != VecLikeType::Vector {
         return None;
     }
@@ -71,6 +97,7 @@ pub fn replace_vector_data(value: TaggedValue, items: Vec<TaggedValue>) -> bool 
 
 #[inline]
 pub fn set_vector_slot(value: TaggedValue, index: usize, item: TaggedValue) -> bool {
+    LispCollectionRevision::changed();
     if value.veclike_type() != Some(VecLikeType::Vector) {
         return false;
     }
@@ -90,6 +117,7 @@ pub fn with_record_data_mut<R>(
     value: TaggedValue,
     f: impl FnOnce(&mut Vec<TaggedValue>) -> R,
 ) -> Option<R> {
+    LispCollectionRevision::changed();
     if value.veclike_type()? != VecLikeType::Record {
         return None;
     }
@@ -105,6 +133,7 @@ pub fn replace_record_data(value: TaggedValue, items: Vec<TaggedValue>) -> bool 
 
 #[inline]
 pub fn set_record_slot(value: TaggedValue, index: usize, item: TaggedValue) -> bool {
+    LispCollectionRevision::changed();
     if value.veclike_type() != Some(VecLikeType::Record) {
         return false;
     }
@@ -125,6 +154,7 @@ pub fn with_closure_slots_mut<R>(
     value: TaggedValue,
     f: impl FnOnce(&mut Vec<TaggedValue>) -> R,
 ) -> Option<R> {
+    LispCollectionRevision::changed();
     note_heap_write(value, HeapWriteKind::ClosureBulk);
     match value.veclike_type()? {
         VecLikeType::Lambda => {
@@ -154,6 +184,7 @@ pub fn replace_closure_slots(value: TaggedValue, slots: Vec<TaggedValue>) -> boo
 
 #[inline]
 pub fn set_closure_slot(value: TaggedValue, index: usize, item: TaggedValue) -> bool {
+    LispCollectionRevision::changed();
     match value.veclike_type() {
         // Atomic stores, as for vector slots: a concurrent reader of the slot
         // (the GC thread, once closures are traced there) sees a whole value.
@@ -188,6 +219,7 @@ pub fn with_string_text_props_mut<R>(
     value: TaggedValue,
     f: impl FnOnce(&mut TextPropertyTable) -> R,
 ) -> Option<R> {
+    LispCollectionRevision::changed();
     let ptr = value.as_string_ptr()? as *mut StringObj;
     note_heap_write(value, HeapWriteKind::StringTextProps);
     Some(f(unsafe { (*ptr).data.intervals_mut() }))
@@ -198,6 +230,7 @@ pub fn with_lisp_string_mut<R>(
     value: TaggedValue,
     f: impl FnOnce(&mut LispString) -> R,
 ) -> Option<R> {
+    LispCollectionRevision::changed();
     let ptr = value.as_string_ptr()? as *mut StringObj;
     note_heap_write(value, HeapWriteKind::StringData);
     Some(f(unsafe { &mut (*ptr).data }))
@@ -212,6 +245,7 @@ pub fn with_lisp_string_mut<R>(
 /// full barrier -- 43 instructions per character on dhrystone.
 #[inline]
 pub fn set_string_byte_same_char_count(value: TaggedValue, byte_pos: usize, byte: u8) -> bool {
+    LispCollectionRevision::changed();
     let Some(ptr) = value.as_string_ptr() else {
         return false;
     };
@@ -226,6 +260,7 @@ pub fn with_hash_table_mut<R>(
     value: TaggedValue,
     f: impl FnOnce(&mut LispHashTable) -> R,
 ) -> Option<R> {
+    LispCollectionRevision::changed();
     if value.veclike_type()? != VecLikeType::HashTable {
         return None;
     }
@@ -336,6 +371,7 @@ pub fn with_overlay_data_mut<R>(
     value: TaggedValue,
     f: impl FnOnce(&mut OverlayData) -> R,
 ) -> Option<R> {
+    LispCollectionRevision::changed();
     if value.veclike_type()? != VecLikeType::Overlay {
         return None;
     }

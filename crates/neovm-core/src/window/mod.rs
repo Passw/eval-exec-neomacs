@@ -1038,6 +1038,10 @@ impl WindowLayoutQuery {
         self.end
     }
 
+    pub fn geometry(&self) -> Option<&WindowDisplaySnapshot> {
+        self.geometry.as_deref()
+    }
+
     pub fn into_geometry(self) -> Option<WindowDisplaySnapshot> {
         self.geometry.map(|geometry| *geometry)
     }

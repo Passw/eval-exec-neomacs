@@ -1103,3 +1103,123 @@ fn graphical_posn_queries_follow_live_scroll_before_presentation() {
         "Lisp coordinate queries must follow live scrolling before renderer acknowledgement"
     );
 }
+
+#[test]
+fn identical_geometry_queries_reuse_rows_and_mutations_force_a_new_walk() {
+    use crate::engine::viewport_retry_depth_probe as probe;
+    use neovm_core::window::WindowLayoutQueryScope;
+    use std::num::NonZeroUsize;
+    for scope in [
+        WindowLayoutQueryScope::Viewport,
+        WindowLayoutQueryScope::Rows {
+            start: LispCharPos1::ONE,
+            count: NonZeroUsize::new(8).unwrap(),
+        },
+    ] {
+        let mut eval = Context::new();
+        let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+        eval.buffer_manager_mut()
+            .get_mut(buffer)
+            .unwrap()
+            .insert(&"ordinary row\n".repeat(100));
+        let frame = eval
+            .frame_manager_mut()
+            .create_frame("query-cache", 400, 160, buffer);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        let window = eval.frame_manager().get(frame).unwrap().selected_window;
+        let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+        let initial = query
+            .query_window_layout(&mut eval, frame, window, scope)
+            .unwrap();
+        probe::reset();
+        let repeated = query
+            .query_window_layout(&mut eval, frame, window, scope)
+            .unwrap();
+        assert_eq!(initial.end(), repeated.end());
+        assert_eq!(
+            probe::max_depth(),
+            0,
+            "identical query walked the body again: {scope:?}"
+        );
+        for change in [
+            "(put-text-property 1 8 'face '(:height 175))",
+            r#"(overlay-put (make-overlay 1 20) 'display "replacement")"#,
+            "(goto-char 20)",
+            "(set-window-vscroll nil 3 t)",
+            "(setq tab-width 3)",
+            "(narrow-to-region 1 100)",
+            "(progn (overlay-put (make-overlay 30 40) 'category 'query-face-category) (put 'query-face-category 'face '(:height 125)))",
+            "(put 'query-face-category 'face '(:height 200))",
+            r#"(progn (setq query-replacement (copy-sequence "a")) (put-text-property 50 51 'display query-replacement))"#,
+            "(aset query-replacement 0 9)",
+            "(progn (setq query-face (list :height 100)) (put-text-property 50 51 'face query-face))",
+            "(setcar (cdr query-face) 200)",
+        ] {
+            eval.eval_str(change).unwrap();
+            probe::reset();
+            let actual = query
+                .query_window_layout(&mut eval, frame, window, scope)
+                .unwrap();
+            assert!(
+                probe::max_depth() > 0,
+                "mutation reused stale rows: {change}"
+            );
+            let mut fresh = WindowLayoutQueryEngine::new_without_font_metrics();
+            let expected = fresh
+                .query_window_layout(&mut eval, frame, window, scope)
+                .unwrap();
+            assert_eq!(actual.end(), expected.end(), "{change}");
+            let actual = actual.into_geometry().unwrap();
+            let expected = expected.into_geometry().unwrap();
+            assert_eq!(actual.rows, expected.rows, "{change}");
+            assert_eq!(actual.points, expected.points, "{change}");
+        }
+    }
+}
+
+#[test]
+fn geometry_queries_reevaluate_conditional_display_without_source_edits() {
+    use neovm_core::window::WindowLayoutQueryScope;
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert("ordinary row\nnext row\n");
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("query-conditions", 400, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.eval_str(r#"(progn (setq query-condition t query-calls 0) (put-text-property 1 2 'display '(when (progn (setq query-calls (1+ query-calls)) query-condition) . "REPLACED")))"#).unwrap();
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    query
+        .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+        .unwrap();
+    let before = eval.eval_str("query-calls").unwrap().as_fixnum().unwrap();
+    eval.eval_str("(setq query-condition nil)").unwrap();
+    let actual = query
+        .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+        .unwrap()
+        .into_geometry()
+        .unwrap();
+    let after = eval.eval_str("query-calls").unwrap().as_fixnum().unwrap();
+    assert!(
+        after > before,
+        "query cache skipped Lisp display conditions"
+    );
+    let mut fresh = WindowLayoutQueryEngine::new_without_font_metrics();
+    let expected = fresh
+        .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+        .unwrap()
+        .into_geometry()
+        .unwrap();
+    assert_eq!(actual.rows, expected.rows);
+    assert_eq!(actual.points, expected.points);
+}

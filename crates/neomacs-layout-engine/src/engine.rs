@@ -5,6 +5,7 @@
 //! grid, and publishes `FrameDisplayState` snapshots for render backends.
 
 mod prepared_viewports;
+mod query_cache;
 mod scroll_coverage;
 mod scroll_preview;
 use prepared_viewports::PreparedViewports;
@@ -212,6 +213,7 @@ pub struct WindowLayoutQuerySeed {
 /// from mutating or preparing the renderer transaction that invoked Lisp.
 pub struct WindowLayoutQueryEngine {
     inner: LayoutEngine,
+    cache: query_cache::QueryCache,
 }
 
 impl Default for WindowLayoutQueryEngine {
@@ -224,28 +226,36 @@ impl WindowLayoutQueryEngine {
     pub fn new_without_font_metrics() -> Self {
         Self {
             inner: LayoutEngine::new_without_font_metrics(),
+            cache: Default::default(),
         }
     }
 
     pub fn new() -> Self {
         Self {
             inner: LayoutEngine::new(),
+            cache: Default::default(),
         }
     }
 
     pub fn enable_cosmic_metrics(&mut self) {
+        self.cache.clear();
         self.inner.enable_cosmic_metrics();
     }
 
     pub fn disable_cosmic_metrics(&mut self) {
+        self.cache.clear();
         self.inner.disable_cosmic_metrics();
     }
 
     pub fn set_font_sizing(&mut self, font_sizing: FontSizing) {
+        self.cache.clear();
         self.inner.set_font_sizing(font_sizing);
     }
 
     pub fn synchronize(&mut self, seed: WindowLayoutQuerySeed) {
+        if self.inner.retained_window_chrome_metrics != seed.retained_window_chrome_metrics {
+            self.cache.clear();
+        }
         self.inner.retained_window_chrome_metrics = seed.retained_window_chrome_metrics;
     }
 
@@ -257,8 +267,14 @@ impl WindowLayoutQueryEngine {
         scope: neovm_core::window::WindowLayoutQueryScope,
     ) -> Result<neovm_core::window::WindowLayoutQuery, neovm_core::window::WindowLayoutQueryFailure>
     {
-        self.inner
-            .query_window_layout(evaluator, frame_id, window_id, scope)
+        if let Some(query) = self.cache.get(evaluator, frame_id, window_id, scope) {
+            return Ok(query);
+        }
+        let query = self.inner.query_window_layout(evaluator, frame_id, window_id, scope)?;
+        if self.inner.query_body_reuse_allowed {
+            self.cache.remember(evaluator, frame_id, window_id, scope, &query);
+        }
+        Ok(query)
     }
 }
 
@@ -737,6 +753,9 @@ pub struct LayoutEngine {
     /// inactive echo area from being detached from their cache policy while
     /// the frame converges.
     window_snapshots: Vec<WindowPresentationSnapshot>,
+    /// Granted only by the canonical walk's semantic reuse barrier. Geometry
+    /// queries with evaluated Lisp conditions must never skip that walk.
+    query_body_reuse_allowed: bool,
     /// Cosmic-text font metrics service.
     ///
     /// Populated by `enable_cosmic_metrics()` at GUI startup. Left
@@ -1384,6 +1403,7 @@ impl LayoutEngine {
         Self {
             text_buf: Vec::with_capacity(64 * 1024), // 64KB initial
             window_snapshots: Vec::new(),
+            query_body_reuse_allowed: false,
             font_metrics: Some(FontMetricsService::new()),
             font_sizing: FontSizing::native_gui(),
             frame_visual_histories: FrameVisualHistories::default(),
@@ -1420,6 +1440,7 @@ impl LayoutEngine {
         Self {
             text_buf: Vec::with_capacity(64 * 1024),
             window_snapshots: Vec::new(),
+            query_body_reuse_allowed: false,
             font_metrics: None,
             font_sizing: FontSizing::native_gui(),
             frame_visual_histories: FrameVisualHistories::default(),
@@ -3356,6 +3377,7 @@ impl LayoutEngine {
         scope: neovm_core::window::WindowLayoutQueryScope,
     ) -> Result<neovm_core::window::WindowLayoutQuery, neovm_core::window::WindowLayoutQueryFailure>
     {
+        self.query_body_reuse_allowed = true;
         self.layout_frame_rust_for_purpose_inner(
             evaluator,
             frame_id,
@@ -3901,6 +3923,7 @@ impl LayoutEngine {
         // dependencies. A newly evaluated condition can change glyphs without
         // moving any of those ticks. This applies to cursor, scroll, and edit
         // replay alike; static windows keep their existing fast paths.
+        self.query_body_reuse_allowed &= display_when.allows_body_reuse();
         let (cursor_only_replay, scroll_replay, is_edit) = if display_when.allows_body_reuse() {
             (cursor_only_replay, scroll_replay, is_edit)
         } else {
