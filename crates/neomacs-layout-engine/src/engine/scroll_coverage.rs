@@ -83,7 +83,7 @@ struct Capture {
     faces: Option<PreparedFaceSnapshot>,
     row_base: usize,
     row_count: usize,
-    preview_pending: bool,
+    next_preview_programs: Option<usize>,
     char_budget: usize,
     position: CharPos0,
     programs: Vec<RowProgram>,
@@ -454,7 +454,7 @@ impl LayoutEngine {
                 return Some(ScrollCoverageProgress::Continue);
             }
             if let Some(capture) = &mut self.scroll_coverage.capture {
-                capture.preview_pending = true;
+                capture.next_preview_programs = Some(4);
             }
         }
         if let Err(error) = self.capture_scroll_step(evaluator) {
@@ -560,7 +560,7 @@ impl LayoutEngine {
             faces: None,
             row_base,
             row_count,
-            preview_pending: false,
+            next_preview_programs: None,
             char_budget: 128,
             position: start,
             programs: Vec::with_capacity(row_count),
@@ -652,12 +652,14 @@ impl LayoutEngine {
                 .count()
                 < capture.row_count
         {
-            // Publish one closed prefix early, then resume acquisition after
-            // its admission drains. The full page still gets prepared. Both
-            // copies obey the existing batch limits, and font snapshots and
-            // evaluator root leases share ownership rather than duplicating
-            // their underlying resources. There is still only one worker job.
-            if capture.preview_pending
+            // Publish growing closed prefixes while acquisition continues.
+            // Doubling the fragment frontier bounds total preview replay by
+            // the final page size, including long fragmented physical lines.
+            // Snapshots and root leases share ownership, every copy obeys the
+            // batch limits, and the previous admission must drain first.
+            if capture
+                .next_preview_programs
+                .is_some_and(|next| capture.programs.len() >= next)
                 && capture.programs.last().is_some_and(RowProgram::is_complete)
                 && capture
                     .programs
@@ -693,7 +695,7 @@ impl LayoutEngine {
                     faces: faces.clone(),
                     row_base: capture.row_base,
                 });
-                capture.preview_pending = false;
+                capture.next_preview_programs = Some(capture.programs.len().saturating_mul(2));
             }
             capture.faces = Some(faces);
             self.scroll_coverage.capture = Some(capture);

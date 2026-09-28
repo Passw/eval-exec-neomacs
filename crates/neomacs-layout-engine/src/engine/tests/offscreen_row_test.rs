@@ -2592,6 +2592,29 @@ fn idle_worker_publishes_a_closed_prefix_before_full_page_capture() {
     let owner = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
     assert!(engine.prepared_viewports.has_computed(frame, owner));
     assert_eq!(before, selected_window_layout_trace(&eval, &engine, frame));
+    // Growing closed prefixes extend coverage during acquisition instead of
+    // waiting for the whole page. Double the publication frontier so total
+    // worker replay remains linear in the final page size.
+    for additional_rows in [4, 8] {
+        for _ in 0..additional_rows {
+            assert!(engine.maintain_scroll_coverage(&eval).is_some());
+        }
+        eval.gc_collect_exact();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        while !engine
+            .scroll_coverage
+            .drain(&mut engine.prepared_viewports)
+            .unwrap()
+        {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "a growing closed prefix should publish before full-page acquisition"
+            );
+            std::thread::yield_now();
+        }
+        assert!(engine.take_scroll_coverage_publication());
+        assert_eq!(before, selected_window_layout_trace(&eval, &engine, frame));
+    }
     eval.eval_str("(setcar (cdr worker-raise-spec) 0.75)")
         .unwrap();
     engine.maintain_scroll_coverage(&eval);
