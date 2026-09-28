@@ -84,8 +84,10 @@ impl<'builder> DisplayRowCurrentRowOutput<'builder> {
     }
 
     pub(crate) fn cluster_tail(&self) -> Option<(char, bool)> {
-        self.current_row_snapshot()
-            .as_ref()
+        // This is inspected before each source character. Borrow the row;
+        // cloning its growing glyph vectors makes a line quadratic to walk.
+        self.builder
+            .current_row_for_render()
             .and_then(last_text_cluster_tail_in_row)
     }
 }
