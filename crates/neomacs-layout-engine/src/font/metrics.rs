@@ -802,7 +802,9 @@ impl FontMetricsService {
     }
 
     pub(crate) fn install_worker_font_policy(&mut self, policy: &DetachedFontPolicy) {
-        if self.symbol_font_policy != policy.symbols {
+        // ASCII always selects its face's primary font. Keep the previous
+        // symbol classifier/cache warm until a Unicode row actually needs it.
+        if policy.query_count() != 0 && self.symbol_font_policy != policy.symbols {
             self.clear_caches();
             self.symbol_font_policy = policy.symbols.clone();
         }

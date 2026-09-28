@@ -3767,3 +3767,27 @@ fn glyph_vertical_metrics_match_canonical_font_selection_across_cache_changes() 
         }
     }
 }
+
+#[test]
+fn ascii_worker_policy_keeps_unicode_font_caches_warm() {
+    let source = FontMetricsService::new();
+    let mut unicode = source
+        .capture_worker_font_policy(&[("monospace", '中', 400, false, 13.0)], 4096)
+        .unwrap();
+    unicode.symbols.key.use_primary_font = true;
+    unicode.symbols.symbol_ranges = vec![(0x4e2d, 0x4e2d)];
+    let ascii = source.capture_worker_font_policy(&[], 4096).unwrap();
+    let mut worker = FontMetricsService::new();
+    worker.install_worker_font_policy(&unicode);
+    worker.font_metrics("monospace", 400, false, 13.0);
+    let cached = worker.metrics_cache.len();
+    assert!(cached > 0);
+    worker.install_worker_font_policy(&ascii);
+    assert_eq!(
+        worker.metrics_cache.len(),
+        cached,
+        "ASCII does not consume symbol-font policy and must not clear the native cache"
+    );
+    worker.install_worker_font_policy(&unicode);
+    assert_eq!(worker.metrics_cache.len(), cached);
+}
