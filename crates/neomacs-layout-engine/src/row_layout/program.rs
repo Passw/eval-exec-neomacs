@@ -307,6 +307,7 @@ impl DisplayGlyphMeasurer for Measurements {
 #[derive(Clone, Debug)]
 pub(crate) struct RowProgram {
     trailing_text_continues: bool,
+    buffer_source_start: Option<DisplaySourcePosition>,
     geometry: RowProgramGeometry,
     deferred_fonts: Option<std::sync::Arc<super::font_measurement::FontMeasurementSnapshot>>,
     operations: Vec<(Operation, DisplayTextRunMeasurement)>,
@@ -501,6 +502,7 @@ impl RowProgram {
         }
         Ok(Self {
             trailing_text_continues: false,
+            buffer_source_start: None,
             geometry,
             deferred_fonts,
             operations,
@@ -508,6 +510,11 @@ impl RowProgram {
             faces,
             limits,
         })
+    }
+
+    pub(crate) fn with_buffer_source_start(mut self, start: DisplaySourcePosition) -> Self {
+        self.buffer_source_start = Some(start);
+        self
     }
 
     pub(crate) fn with_trailing_text_continuation(mut self, continues: bool) -> Self {
@@ -607,7 +614,9 @@ impl RowProgram {
                 .operations
                 .iter()
                 .all(|(operation, _)| match operation {
-                    Operation::Text(_) => true,
+                    Operation::Text(text) => {
+                        !matches!(text.span.start, DisplaySourcePosition::LispString { .. })
+                    }
                     Operation::Break { .. } => true,
                     _ => false,
                 });
@@ -617,7 +626,7 @@ impl RowProgram {
         let mut position = DisplayRowPosition::new(0.0, 0);
         let mut slots = Vec::new();
         let mut slot_heights = Vec::new();
-        let mut source_start = None;
+        let mut source_start = self.buffer_source_start;
         let mut source_end = None;
         let mut terminator_width = self.geometry.metrics.char_width();
         let mut terminator_height = self.geometry.metrics.row_height();

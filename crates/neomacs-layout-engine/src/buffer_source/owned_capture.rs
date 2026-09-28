@@ -1,6 +1,8 @@
 //! Bounded acquisition through the canonical source producer. These values
 //! remain on the evaluator thread until RowProgram removes all Lisp operands.
 
+mod strings;
+
 use super::consumption::BufferSourceConsumedItem;
 use super::face_resolution::BufferSourceFaceResolutionContext;
 use super::producer::BufferElementProducer;
@@ -15,6 +17,8 @@ use neovm_core::emacs_core::Value;
 
 pub(crate) struct CapturedPhysicalLine {
     pub items: Vec<DisplayItem>,
+    pub roots: Vec<Value>,
+    pub source_start: crate::display_item::DisplaySourcePosition,
     pub faces: Vec<PendingDisplaySourceFace>,
     pub end: CharPos0,
     pub complete: bool,
@@ -134,8 +138,12 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
                     .is_some_and(|value| !literal_line_spacing(value))
                 || lookups
                     .iter()
-                    .chain(&string_lookups)
                     .any(|lookup| lookup.effective_overlay_value(buffer, overlay).is_some())
+                || string_lookups.iter().any(|lookup| {
+                    lookup
+                        .effective_overlay_value(buffer, overlay)
+                        .is_some_and(|value| !strings::bounded_string(value, max_chars))
+                })
                 || display_lookup
                     .effective_overlay_value(buffer, overlay)
                     .is_some_and(|value| !literal_raise_or_nil(value)))
@@ -189,6 +197,9 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
     let mut position = DisplaySourceTextPosition::new(0, start.get() as i64);
     let mut items: Vec<DisplayItem> = Vec::new();
     let mut faces = Vec::new();
+    let mut roots = Vec::new();
+    let source_start =
+        crate::display_item::DisplaySourcePosition::buffer(buffer_id, start, start_byte);
     for _ in 0..max_items {
         if cancelled() {
             return Err(RowProgramError::Cancelled);
@@ -222,6 +233,8 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
             let end = *end;
             return Ok(CapturedPhysicalLine {
                 items,
+                roots,
+                source_start,
                 faces,
                 end,
                 complete: false,
@@ -236,8 +249,18 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
         let Some(item) = step.source_item else {
             return Err(RowProgramError::Incomplete);
         };
-        let BufferSourceConsumedItem::Renderable(item) = item else {
-            return Err(RowProgramError::Unsupported);
+        let item = match item {
+            BufferSourceConsumedItem::Renderable(item) => item,
+            BufferSourceConsumedItem::OverlayStrings(strings) => {
+                strings::capture_insertions(
+                    &strings, context, face_ids, &mut items, &mut faces, &mut roots, max_chars,
+                    max_items, &cancelled,
+                )?;
+                continue;
+            }
+            BufferSourceConsumedItem::DisplayPropertyReplacement(_) => {
+                return Err(RowProgramError::Unsupported);
+            }
         };
         let (_, end_char, end_byte, item) = item.into_render_parts();
         position = DisplaySourceTextPosition::new(
@@ -255,10 +278,26 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
             return Err(RowProgramError::Unsupported);
         }
         let complete = matches!(item.kind, DisplayItemKind::RowBreak(_));
+        if items.len() >= max_items {
+            return Err(RowProgramError::Budget);
+        }
+        let text_bytes = items
+            .iter()
+            .chain(std::iter::once(&item))
+            .map(|item| match &item.kind {
+                DisplayItemKind::TextRun(run) => run.text.len(),
+                _ => 0,
+            })
+            .sum::<usize>();
+        if text_bytes > max_chars.saturating_mul(4) {
+            return Err(RowProgramError::Budget);
+        }
         items.push(item);
         if complete {
             return Ok(CapturedPhysicalLine {
                 items,
+                roots,
+                source_start,
                 faces,
                 end: CharPos0::new(position.charpos() as usize),
                 complete: true,

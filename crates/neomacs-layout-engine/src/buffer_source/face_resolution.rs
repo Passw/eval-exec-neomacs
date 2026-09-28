@@ -259,6 +259,16 @@ impl<'a, B: LayoutBufferView> BufferSourceFaceResolutionContext<'a, B> {
         .with_automatic_composition(self.buffer().layout_string_composition_rules())
     }
 
+    pub(crate) fn string_source_resolve_params<'s>(
+        &'s self,
+        base: &'s DisplayStringBaseFace,
+    ) -> DisplaySourceResolveParams<'s> {
+        DisplaySourceResolveParams::new(
+            DisplaySourceFaceBasis::new(self.face_resolver, base.face_id(), base.face(), self.default_face_metrics),
+            None, self.image_scale_environment,
+        ).with_automatic_composition(self.buffer().layout_string_composition_rules())
+    }
+
     pub(crate) fn install_pending_source_faces(
         self,
         source_render: &mut TextRowSourceRenderState<'_>,

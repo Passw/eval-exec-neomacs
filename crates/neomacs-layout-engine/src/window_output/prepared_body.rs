@@ -59,6 +59,11 @@ pub(crate) fn position_buffer_rows(
             return Err(RowProgramError::Unsupported);
         }
         for (slot, slot_height) in computed.slots.into_iter().zip(computed.slot_heights) {
+            // Overlay insertions carry glyph provenance, but do not consume
+            // buffer positions or add ordinary buffer point cells.
+            if matches!(slot.source(), DisplaySourcePosition::LispString { .. }) {
+                continue;
+            }
             let DisplaySourcePosition::Buffer {
                 buffer_id: slot_buffer,
                 char_pos,

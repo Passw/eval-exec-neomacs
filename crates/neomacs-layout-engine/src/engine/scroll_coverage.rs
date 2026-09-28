@@ -47,6 +47,7 @@ pub(super) fn inactive_overlay_arrows(evaluator: &neovm_core::emacs_core::Contex
 }
 
 struct Admission {
+    roots: Vec<neovm_core::emacs_core::owned_roots::OwnedRoots>,
     reads: CollectionReads,
     frame: FrameId,
     window: DisplayWindowId,
@@ -57,6 +58,7 @@ struct Admission {
 }
 
 struct Capture {
+    roots: Vec<neovm_core::emacs_core::owned_roots::OwnedRoots>,
     reads: Option<CollectionReads>,
     frame: FrameId,
     window: WindowId,
@@ -190,6 +192,7 @@ impl ScrollCoverage {
             admission.retained,
             admission.faces,
             admission.reads,
+            admission.roots,
             complete_viewport,
         );
         Ok(true)
@@ -488,6 +491,7 @@ impl LayoutEngine {
         self.scroll_coverage.worker.cancel();
         self.scroll_coverage.admission = None;
         self.scroll_coverage.capture = Some(Capture {
+            roots: Vec::new(),
             reads: None,
             frame,
             window,
@@ -578,6 +582,7 @@ impl LayoutEngine {
         tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", start = capture.retained.key.window_start, rows = capture.programs.len(), "submitting unseen page");
         let ticket = self.scroll_coverage.worker.submit(capture.programs)?;
         self.scroll_coverage.admission = Some(Admission {
+            roots: capture.roots,
             reads: capture.reads.ok_or(RowProgramError::Unsupported)?,
             frame: capture.frame,
             window: DisplayWindowId::new(capture.window.0 as i64),
@@ -718,6 +723,9 @@ impl LayoutEngine {
             || false,
         )?;
         capture.position = captured.end;
+        if !captured.roots.is_empty() {
+            capture.roots.push(evaluator.retain_gc_roots(captured.roots));
+        }
         let mut realizer = DisplayRowFaceRealizer::new(&mut self.font_metrics);
         let mut faces = vec![realizer.realize_face(
             base_id,
@@ -847,7 +855,7 @@ impl LayoutEngine {
             )?
         };
         if program.is_complete() != captured.complete { return Err(RowProgramError::Unsupported); }
-        capture.programs.push(program.with_trailing_text_continuation(captured.trailing_text_continues));
+        capture.programs.push(program.with_trailing_text_continuation(captured.trailing_text_continues).with_buffer_source_start(captured.source_start));
         Ok(())
     }
 }

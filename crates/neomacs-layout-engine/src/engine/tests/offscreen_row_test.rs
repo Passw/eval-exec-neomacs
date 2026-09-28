@@ -344,7 +344,7 @@ fn worker_capture_rejects_overlay_replacements_and_excessive_overlap() {
             RowProgramError::Unsupported,
         ),
         (
-            "(overlay-put (make-overlay 2761 3100) 'before-string \"prefix\")",
+            "(overlay-put (make-overlay 2761 3100) 'before-string (make-string 129 ?p))",
             RowProgramError::Unsupported,
         ),
         (
@@ -352,7 +352,7 @@ fn worker_capture_rejects_overlay_replacements_and_excessive_overlap() {
             RowProgramError::Unsupported,
         ),
         (
-            "(progn (put 'worker-overlay-category 'after-string \"suffix\")
+            "(progn (put 'worker-overlay-category 'after-string (make-string 129 ?s))
                  (overlay-put (make-overlay 2761 3100) 'category 'worker-overlay-category))",
             RowProgramError::Unsupported,
         ),
@@ -394,6 +394,13 @@ fn first_visit_with_setup(
     point_row: usize,
     setup: Option<&str>,
 ) {
+    first_visit_with_setup_and_gc(face, line, change, shift, point_row, setup, false);
+}
+
+fn first_visit_with_setup_and_gc(
+    face: Option<&str>, line: &str, change: Option<&str>, shift: usize,
+    point_row: usize, setup: Option<&str>, collect: bool,
+) {
     let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
     eval.frame_manager_mut()
         .get_mut(frame)
@@ -418,6 +425,7 @@ fn first_visit_with_setup(
     engine
         .request_scroll_coverage(&eval, frame, window, CharPos0::new(start))
         .unwrap();
+    if collect { eval.gc_collect_exact(); }
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     while !engine
         .scroll_coverage
@@ -430,6 +438,7 @@ fn first_visit_with_setup(
         );
         std::thread::yield_now();
     }
+    if collect { eval.gc_collect_exact(); }
     let start = start + shift * line_chars;
     let start_byte = start_byte + shift * line.len();
     let display_window = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
@@ -1430,7 +1439,7 @@ fn worker_keeps_complete_prefix_before_unsupported_rows() {
             .window_system = Some(Value::symbol("neomacs"));
         if boundary == "replacement" {
             eval.eval_str(&format!(
-                "(overlay-put (make-overlay {} {}) 'before-string \"prefix\")",
+                "(overlay-put (make-overlay {} {}) 'before-string (propertize \"prefix\" 'cursor 1))",
                 start + 3 * line.len() + 1,
                 start + 4 * line.len()
             ))
@@ -2086,4 +2095,57 @@ fn worker_long_unicode_capture_boundaries_preserve_rich_faces() {
             );
         }
     }
+}
+
+#[test]
+fn worker_prepares_owned_overlay_insertions() {
+    let line = "ordinary offscreen text\n";
+    let start = 120 * line.len() + 1;
+    for offset in [0, 5] {
+        first_visit_with_setup_and_gc(None, line, None, 0, 2, Some(&format!(
+            "(let ((p {start}) (i 0))
+               (while (< i 12)
+                 (let ((ov (make-overlay (+ p {offset}) (+ p {offset}))))
+                   (overlay-put ov 'before-string (propertize \"[before]\" 'face '(:family \"serif\" :height 130 :weight bold)))
+                   (overlay-put ov 'after-string (propertize \"[after]\" 'face '(:foreground \"red\"))))
+                 (setq i (+ i 1) p (+ p {}))))", line.len())), true);
+    }
+}
+
+#[test]
+fn worker_overlay_insertions_reject_mutated_captured_sources() {
+    let line = "ordinary offscreen text\n";
+    let start = 120 * line.len() + 1;
+    let setup = format!(
+        "(progn (setq worker-insertion (propertize \"before\" 'face '(:height 130)))
+        (setq worker-overlay (make-overlay {start} {start}))
+        (overlay-put worker-overlay 'before-string worker-insertion))"
+    );
+    for change in [
+        "(aset worker-insertion 0 ?X)",
+        "(put-text-property 0 6 'face '(:height 180) worker-insertion)",
+        "(progn (delete-overlay worker-overlay) (setq worker-overlay nil worker-insertion nil) (garbage-collect))",
+    ] {
+        first_visit_with_setup_and_gc(None, line, Some(change), 0, 2, Some(&setup), true);
+    }
+}
+
+#[test]
+fn worker_overlay_insertions_preserve_box_and_hover_faces() {
+    let line = "ordinary offscreen text\n";
+    let start = 120 * line.len() + 1;
+    first_visit_with_setup_and_gc(None, line, None, 0, 2, Some(&format!(
+        "(let ((p {start})) (while (< p {})
+            (let ((ov (make-overlay (+ p 5) (+ p 5))))
+                (overlay-put ov 'before-string (propertize \"AA\" 'face '(:height 140 :box (:line-width 2) :background \"blue\") 'mouse-face 'highlight))
+                (overlay-put ov 'after-string (propertize \"BB\" 'face '(:height 90 :slant italic))))
+            (setq p (+ p {}))))", start + 12 * line.len(), line.len())), true);
+}
+
+#[test]
+fn worker_overlay_insertions_preserve_unstyled_default_face() {
+    let line = "ordinary offscreen text\n";
+    let start = 120 * line.len() + 1;
+    first_visit_with_setup_and_gc(None, line, None, 0, 2, Some(&format!(
+        "(overlay-put (make-overlay {start} {}) 'before-string \"plain\")", start + 100)), true);
 }

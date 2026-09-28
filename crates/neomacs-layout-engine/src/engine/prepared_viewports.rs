@@ -2,7 +2,8 @@
 //!
 //! Entries own their original face namespace and are admitted only after the
 //! full layout key matches. This is content reuse, not a replay of old input or
-//! old chrome. No live evaluator state is retained here.
+//! old chrome. Opaque evaluator-side leases retain captured source objects;
+//! they grant lifetime, while the read certificate grants freshness.
 
 mod export;
 
@@ -27,6 +28,7 @@ struct PreparedViewport {
     // Partial worker pages may extend coverage, but cannot replace a viewport.
     complete_viewport: bool,
     reads: Option<CollectionReads>,
+    _source_roots: Vec<neovm_core::emacs_core::owned_roots::OwnedRoots>,
 }
 
 impl PreparedViewport {
@@ -88,6 +90,7 @@ impl PreparedViewports {
         retained: RetainedWindowMatrix,
         faces: PreparedFaceSnapshot,
         reads: CollectionReads,
+        source_roots: Vec<neovm_core::emacs_core::owned_roots::OwnedRoots>,
         complete_viewport: bool,
     ) {
         let rows = retained.matrix.rows.len();
@@ -116,6 +119,7 @@ impl PreparedViewports {
             computed: true,
             complete_viewport,
             reads: Some(reads),
+            _source_roots: source_roots,
         });
         self.trim();
     }
@@ -425,6 +429,7 @@ impl PreparedViewports {
                 computed: false,
                 complete_viewport: true,
                 reads: None,
+                _source_roots: Vec::new(),
             });
         }
         self.trim();
