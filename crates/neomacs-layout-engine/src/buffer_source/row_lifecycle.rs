@@ -1610,6 +1610,7 @@ pub(crate) struct BufferSourceLineBreakRenderRequest<'a> {
     context: BufferSourceLineBreakRenderContext<'a>,
     box_vertical_edges: neomacs_display_protocol::face::BoxVerticalEdges,
     line_spacing: crate::display_item::DisplayLineSpacingPolicy,
+    line_height: crate::display_item::DisplayLineHeightPolicy,
     display_string_line_break: Option<DisplayReplacementStringLineBreak>,
 }
 
@@ -1697,6 +1698,7 @@ impl<'a> BufferSourceLineBreakRenderRequest<'a> {
             context,
             box_vertical_edges: neomacs_display_protocol::face::BoxVerticalEdges::Neither,
             line_spacing: crate::display_item::DisplayLineSpacingPolicy::Inherit,
+            line_height: crate::display_item::DisplayLineHeightPolicy::Default,
             display_string_line_break: None,
         }
     }
@@ -1714,6 +1716,14 @@ impl<'a> BufferSourceLineBreakRenderRequest<'a> {
         line_spacing: crate::display_item::DisplayLineSpacingPolicy,
     ) -> Self {
         self.line_spacing = line_spacing;
+        self
+    }
+
+    pub(crate) fn with_line_height(
+        mut self,
+        policy: crate::display_item::DisplayLineHeightPolicy,
+    ) -> Self {
+        self.line_height = policy;
         self
     }
 
@@ -1745,11 +1755,43 @@ impl<'a> BufferSourceLineBreakRenderRequest<'a> {
         let mut source_render = source_render;
         let context = self.context;
 
+        let resolved_height = if self.line_height
+            != crate::display_item::DisplayLineHeightPolicy::Default
+            && source_render
+                .measurement_mode()
+                .uses_concrete_font_geometry()
+        {
+            let defaults = context.row_geometry_defaults;
+            let fallback =
+                crate::display_row::metrics::DisplayRowFallbackMetrics::from_default_face_extents(
+                    context.default_char_width,
+                    defaults.height,
+                    defaults.ascent,
+                );
+            let content = source_render.current_row_visible_content_metrics(face_ids, fallback);
+            let face = context.active_face_state.metrics();
+            let metrics = crate::display_row::metrics::resolve_line_height(
+                self.line_height,
+                (content.height_px(), content.ascent_px()),
+                (face.row_height(), face.ascent()),
+                (defaults.height, defaults.ascent),
+            );
+            row_build
+                .row_geometry
+                .replace_current_row_metrics(metrics.height, metrics.ascent);
+            Some(metrics)
+        } else {
+            None
+        };
         let line_break_action = BufferSourceLineBreakSourceAction::for_source_step_newline(
             self.source_char,
             context.char_h,
             context.extra_line_spacing,
-            self.line_spacing,
+            if self.line_height == crate::display_item::DisplayLineHeightPolicy::ContentOnly {
+                crate::display_item::DisplayLineSpacingPolicy::Pixels(0.0)
+            } else {
+                self.line_spacing
+            },
         );
         // Strings anchored at the newline position are emitted by the producer's
         // element arm before this line-break step runs (P4.6), in the same order
@@ -1813,8 +1855,12 @@ impl<'a> BufferSourceLineBreakRenderRequest<'a> {
             };
             let line_end_geometry = LineEndFillGeometry {
                 content_x: context.content_x,
-                height_px: metrics.row_height(),
-                ascent_px: metrics.ascent(),
+                height_px: resolved_height
+                    .as_ref()
+                    .map_or(metrics.row_height(), |height| height.newline_height),
+                ascent_px: resolved_height
+                    .as_ref()
+                    .map_or(metrics.ascent(), |height| height.newline_ascent),
                 fill_char_width: metrics.char_width(),
                 indicator_char_width: context.default_char_width,
             };
@@ -1825,7 +1871,12 @@ impl<'a> BufferSourceLineBreakRenderRequest<'a> {
         // would have appended, which is the face active at the line end.
         let terminator_cell = {
             let metrics = context.active_face_state.metrics();
-            DisplayRowTerminatorCell::new(metrics.char_width(), metrics.row_height())
+            DisplayRowTerminatorCell::new(
+                metrics.char_width(),
+                resolved_height
+                    .as_ref()
+                    .map_or(metrics.row_height(), |height| height.newline_height),
+            )
         };
         line_break_action.apply_before_row_transition(
             row_build.row_geometry,

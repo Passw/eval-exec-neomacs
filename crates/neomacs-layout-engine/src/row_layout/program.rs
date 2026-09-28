@@ -489,6 +489,18 @@ impl RowProgram {
                     membership,
                 )
                 .finalize(&mut row, &self.faces);
+                if value.line_height != DisplayLineHeightPolicy::Default {
+                    let resolved = crate::display_row::metrics::resolve_line_height(
+                        value.line_height,
+                        (row.height_px, row.ascent_px),
+                        (face_metrics.line_height_px(), face_metrics.ascent_px()),
+                        (
+                            self.geometry.metrics.row_height(),
+                            self.geometry.metrics.ascent(),
+                        ),
+                    );
+                    terminator_height = resolved.newline_height;
+                }
             }
             if row.glyphs.iter().map(Vec::len).sum::<usize>() > self.limits.glyphs {
                 return Err(RowProgramError::Budget);

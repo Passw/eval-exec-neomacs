@@ -92,6 +92,10 @@ impl<'a> BufferSourceItemRenderRequest<'a> {
             DisplayItemKind::RowBreak(row_break) => row_break.line_spacing,
             _ => crate::display_item::DisplayLineSpacingPolicy::Inherit,
         };
+        let line_height = match source_item.item().kind {
+            DisplayItemKind::RowBreak(row_break) => row_break.line_height,
+            _ => crate::display_item::DisplayLineHeightPolicy::Default,
+        };
         let mut state = state;
         let selective_display_outcome = self.render_selective_display_tail_for_context(
             &mut state,
@@ -119,6 +123,7 @@ impl<'a> BufferSourceItemRenderRequest<'a> {
                     source_step_char,
                     box_vertical_edges,
                     line_spacing,
+                    line_height,
                     buffer,
                 )
                 .should_break()
@@ -189,6 +194,7 @@ impl<'a> BufferSourceItemRenderRequest<'a> {
         source_char: DisplaySourceStepChar,
         box_vertical_edges: neomacs_display_protocol::face::BoxVerticalEdges,
         line_spacing: crate::display_item::DisplayLineSpacingPolicy,
+        line_height: crate::display_item::DisplayLineHeightPolicy,
         buffer: &B,
     ) -> DisplayRowTransitionContinuation {
         let request = self
@@ -200,7 +206,8 @@ impl<'a> BufferSourceItemRenderRequest<'a> {
                 self.active_face_state,
             )
             .with_box_vertical_edges(box_vertical_edges)
-            .with_line_spacing(line_spacing);
+            .with_line_spacing(line_spacing)
+            .with_line_height(line_height);
         self.render_line_break(state, source_walk, request, buffer)
     }
 

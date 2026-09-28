@@ -309,7 +309,7 @@ impl DisplayReplacementStringRowSession {
             &mut render_policy,
             self.base_face.face_id(),
         )?;
-        let stop = if let Some(line_break) = render_policy.produced_row_break {
+        let stop = if let Some(mut line_break) = render_policy.produced_row_break {
             match line_break.line_height() {
                 DisplayLineHeightPolicy::Default => {
                     outcome.include_vertical_metrics(row_geometry);
@@ -317,15 +317,35 @@ impl DisplayReplacementStringRowSession {
                     row_geometry
                         .include_glyph_vertical_metrics(metrics.row_height(), metrics.ascent());
                 }
-                DisplayLineHeightPolicy::ContentOnly => {
+                policy => {
                     let metrics = state.current_row_visible_content_metrics(
                         face_ids,
                         crate::display_row::metrics::DisplayRowFallbackMetrics::from_measured_face(
                             replacement_append_context.active_face.metrics(),
                         ),
                     );
-                    row_geometry
-                        .replace_current_row_metrics(metrics.height_px(), metrics.ascent_px());
+                    let face = line_break.metrics();
+                    let fallback = replacement_append_context.fallback_metrics;
+                    let resolved = crate::display_row::metrics::resolve_line_height(
+                        policy,
+                        (metrics.height_px(), metrics.ascent_px()),
+                        (face.row_height(), face.ascent()),
+                        (fallback.row_height(), fallback.ascent()),
+                    );
+                    row_geometry.replace_current_row_metrics(resolved.height, resolved.ascent);
+                    line_break.metrics = DisplayRowMeasuredFaceMetrics::new(
+                        face.char_width(),
+                        resolved.newline_height,
+                        resolved.newline_ascent,
+                        face.space_width(),
+                    );
+                    line_break.extend_face = line_break.extend_face.map(|face| {
+                        DisplayRowExtendFace::new(
+                            face.background(),
+                            line_break.face_id,
+                            line_break.metrics,
+                        )
+                    });
                 }
             }
             DisplayReplacementStringRowStop::RowBreak(line_break)

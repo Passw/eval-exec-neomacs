@@ -73,12 +73,12 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
     };
     let end = buffer.layout_emacs_byte_pos_to_char_pos(end_byte);
     let display_lookup = LayoutCharPropertyLookup::new(buffer, Value::symbol("display"));
+    let height_lookup = LayoutCharPropertyLookup::new(buffer, Value::symbol("line-height"));
     let lookups = [
         "invisible",
         "composition",
         "line-prefix",
         "wrap-prefix",
-        "line-height",
         "line-spacing",
     ]
     .map(|name| LayoutCharPropertyLookup::new(buffer, Value::symbol(name)));
@@ -103,10 +103,13 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
             return Err(RowProgramError::Budget);
         }
         if overlays.overlay_applies_to_window(overlay, Some(window))
-            && (lookups
-                .iter()
-                .chain(&string_lookups)
-                .any(|lookup| lookup.effective_overlay_value(buffer, overlay).is_some())
+            && (height_lookup
+                .effective_overlay_value(buffer, overlay)
+                .is_some_and(|value| !literal_line_height(value))
+                || lookups
+                    .iter()
+                    .chain(&string_lookups)
+                    .any(|lookup| lookup.effective_overlay_value(buffer, overlay).is_some())
                 || display_lookup
                     .effective_overlay_value(buffer, overlay)
                     .is_some_and(|value| !literal_raise_or_nil(value)))
@@ -126,9 +129,12 @@ pub(crate) fn capture_physical_line<B: LayoutBufferView>(
         if boundaries > max_items {
             return Err(RowProgramError::Budget);
         }
-        if display_lookup
+        if height_lookup
             .text_value_at(buffer, pos)
-            .is_some_and(|value| !literal_raise_or_nil(value))
+            .is_some_and(|value| !literal_line_height(value))
+            || display_lookup
+                .text_value_at(buffer, pos)
+                .is_some_and(|value| !literal_raise_or_nil(value))
             || lookups.iter().any(|lookup| {
                 lookup
                     .text_value_at(buffer, pos)
@@ -321,4 +327,11 @@ mod tests {
             );
         }
     }
+}
+
+fn literal_line_height(value: Value) -> bool {
+    value.is_nil()
+        || value.is_t()
+        || value.is_fixnum()
+        || (value.is_float() && (value.xfloat() as f32).is_finite())
 }

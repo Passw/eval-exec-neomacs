@@ -1444,7 +1444,7 @@ pub(crate) struct DisplayRowBreak {
     pub(crate) line_spacing: DisplayLineSpacingPolicy,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) enum DisplayLineHeightPolicy {
     /// The newline contributes its face's normal height and configured line
     /// spacing to the display row.
@@ -1453,12 +1453,26 @@ pub(crate) enum DisplayLineHeightPolicy {
     /// GNU `line-height t`: the newline contributes no default height or line
     /// spacing; visible row contents alone determine the row geometry.
     ContentOnly,
+    /// A minimum in pixels, retaining the newline face's descent.
+    Pixels(f32),
+    /// A multiple of the default frame font, overriding the newline font's
+    /// vertical metrics while preserving its horizontal advance.
+    Scale(f32),
 }
 
 impl DisplayLineHeightPolicy {
     pub(crate) fn from_property(value: Option<Value>) -> Self {
         if value.is_some_and(|value| value.is_t()) {
             Self::ContentOnly
+        } else if let Some(value) = value.and_then(|value| value.as_fixnum()) {
+            Self::Pixels(value as f32)
+        } else if let Some(value) = value.filter(|value| value.is_float()) {
+            let factor = value.xfloat() as f32;
+            if factor.is_finite() {
+                Self::Scale(factor)
+            } else {
+                Self::Default
+            }
         } else {
             Self::Default
         }

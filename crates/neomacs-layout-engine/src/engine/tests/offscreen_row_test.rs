@@ -1323,3 +1323,86 @@ fn idle_mutation_withdraws_published_worker_coverage() {
         "discarding prepared rows must also withdraw the compositor's old certificate"
     );
 }
+
+#[test]
+fn worker_page_preserves_numeric_line_height() {
+    for height in ["1.3", "30"] {
+        first_visit_with_setup(
+            None,
+            "ordinary offscreen text\n",
+            None,
+            0,
+            16,
+            Some(&format!(
+                "(put-text-property 2761 3500 'line-height {height})"
+            )),
+        );
+    }
+}
+
+#[test]
+fn buffer_newline_numeric_height_uses_default_font_for_factors() {
+    let (mut eval, frame, _, window) = incr_editing_frame("small\nnext\n", 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let owner = DisplayWindowId::new(window.0 as i64);
+    let first_row = |engine: &LayoutEngine| {
+        let row = engine.retained_window_matrices[&owner]
+            .matrix
+            .rows
+            .iter()
+            .find(|row| row.enabled && row.role == GlyphRowRole::Text)
+            .unwrap();
+        (row.height_px, row.ascent_px)
+    };
+    let baseline = first_row(&engine);
+    eval.eval_str("(put-text-property 6 7 'line-height 2.0)")
+        .unwrap();
+    engine.layout_frame_rust(&mut eval, frame);
+    let enlarged = first_row(&engine);
+    let newline_cell_height = |engine: &LayoutEngine| {
+        engine.retained_window_matrices[&owner]
+            .display_snapshot
+            .points
+            .iter()
+            .find(|point| {
+                point.buffer_pos == neovm_core::buffer::LispCharPos1::from_one_based_usize(6)
+            })
+            .unwrap()
+            .height
+    };
+    assert_eq!(newline_cell_height(&engine), enlarged.0 as i64);
+    assert_eq!(enlarged.0, (baseline.0 * 2.0).floor());
+    assert_eq!(
+        enlarged.0 - enlarged.1,
+        baseline.0 - baseline.1,
+        "extra height belongs above the baseline"
+    );
+    eval.eval_str("(progn (put-text-property 6 7 'face '(:height 3.0)) (put-text-property 6 7 'line-height 1.0))").unwrap();
+    engine.layout_frame_rust(&mut eval, frame);
+    assert_eq!(
+        first_row(&engine),
+        baseline,
+        "a float overrides the newline's face with the frame default metrics"
+    );
+    assert_eq!(newline_cell_height(&engine), baseline.0 as i64);
+}
+
+#[test]
+fn scaled_line_height_overflow_keeps_finite_geometry() {
+    let metrics = crate::display_row::metrics::resolve_line_height(
+        crate::display_item::DisplayLineHeightPolicy::Scale(f32::MAX),
+        (23.0, 17.0),
+        (23.0, 17.0),
+        (23.0, 17.0),
+    );
+    assert_eq!((metrics.height, metrics.ascent), (23.0, 17.0));
+    assert_eq!(
+        (metrics.newline_height, metrics.newline_ascent),
+        (23.0, 17.0)
+    );
+}
