@@ -2243,3 +2243,92 @@ fn idle_capture_aligns_forward_wrapped_rows_to_physical_source_start() {
     }
     assert!(checked_continuation);
 }
+
+#[test]
+fn worker_prepares_lisp_selected_automatic_compositions() {
+    for line in [
+        "ordinary é xy text\n".to_owned(),
+        format!("{}\n", "words é xy ".repeat(24)),
+    ] {
+        first_visit_with_setup(
+            None,
+            &line,
+            None,
+            0,
+            2,
+            Some(
+                r#"(progn
+            (setq auto-composition-mode t auto-composition-function 'auto-compose-chars
+                  composition-function-table (make-char-table nil))
+            (aset composition-function-table #x301 (list (vector ".́" 1 'font-shape-gstring)))
+            (aset composition-function-table ?x (list (vector "xy" 0 'font-shape-gstring))))"#,
+            ),
+        );
+    }
+}
+
+#[test]
+fn worker_automatic_compositions_preserve_wrap_and_capture_boundaries() {
+    for prefix in [70, 71, 72, 125, 126, 127, 128] {
+        for wrap in ["nil", "t"] {
+            let line = format!("{}xy é {}\n", "W".repeat(prefix), "words xy ".repeat(12));
+            first_visit_with_setup(
+                Some("(:height 130 :box (:line-width 2) :background \"blue\")"),
+                &line,
+                None,
+                0,
+                2,
+                Some(&format!(
+                    r#"(progn
+                (setq word-wrap {wrap} auto-composition-mode t auto-composition-function 'auto-compose-chars
+                      composition-function-table (make-char-table nil))
+                (aset composition-function-table #x301 (list (vector ".́" 1 'font-shape-gstring)))
+                (aset composition-function-table ?x (list (vector "xy" 0 'font-shape-gstring))))"#
+                )),
+            );
+        }
+    }
+}
+
+#[test]
+fn worker_automatic_composition_rule_mutation_invalidates_coverage() {
+    first_visit_with_setup(
+        None,
+        "ordinary xy xyz é text\n",
+        Some("(aset composition-function-table ?x (list (vector \"xyz\" 0 'font-shape-gstring)))"),
+        0,
+        2,
+        Some(
+            r#"(progn
+            (setq auto-composition-mode t auto-composition-function 'auto-compose-chars
+                  composition-function-table (make-char-table nil))
+            (aset composition-function-table ?x (list (vector "xy" 0 'font-shape-gstring))))"#,
+        ),
+    );
+}
+
+#[test]
+fn worker_overlay_insertions_preserve_automatic_compositions() {
+    let line = "ordinary offscreen text\n";
+    let start = 120 * line.len() + 1;
+    first_visit_with_setup_and_gc(
+        None,
+        line,
+        None,
+        0,
+        2,
+        Some(&format!(
+            r#"(progn
+        (setq auto-composition-mode t auto-composition-function 'auto-compose-chars
+              composition-function-table (make-char-table nil))
+        (aset composition-function-table #x301 (list (vector ".́" 1 'font-shape-gstring)))
+        (let ((p {start})) (while (< p {})
+            (overlay-put (make-overlay (+ p 5) (+ p 5)) 'before-string
+                (propertize "é" 'face '(:height 130)))
+            (setq p (+ p {})))))"#,
+            start + 12 * line.len(),
+            line.len()
+        )),
+        true,
+    );
+}

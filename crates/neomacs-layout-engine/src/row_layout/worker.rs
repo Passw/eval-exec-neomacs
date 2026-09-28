@@ -7,6 +7,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
 
 const MAX_ROWS: usize = 64;
+pub(crate) const MAX_PROGRAMS: usize = 64;
 const MAX_BYTES: usize = 64 * 1024;
 const MAX_GLYPHS: usize = 16 * 1024;
 const MAX_ITEMS: usize = 4096;
@@ -60,7 +61,7 @@ impl RowWorker {
         &mut self,
         rows: Vec<RowProgram>,
     ) -> Result<RowJobTicket, RowProgramError> {
-        if rows.is_empty() || rows.len() > MAX_ROWS {
+        if rows.is_empty() || rows.len() > MAX_PROGRAMS {
             return Err(RowProgramError::Budget);
         }
         // Reserve worst-case output, not merely the number of glyphs capture

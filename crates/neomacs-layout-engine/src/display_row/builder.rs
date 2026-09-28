@@ -2088,9 +2088,12 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
         slots: &mut Vec<DisplayRowGlyphSlot>,
     ) -> DisplayRowAppendStatus {
         let face_id = self.writer.face_id(face);
-        let advance = self
-            .writer
-            .automatic_composition_advance_px(text, face_id, &terminal);
+        let advance = self.writer.automatic_composition_advance_px(
+            text,
+            face_id,
+            &terminal,
+            self.text_run_measurement.clone(),
+        );
         if advance > 0.0 && self.position.x_px() + advance > self.max_x_px {
             return DisplayRowAppendStatus::Clipped;
         }
@@ -2289,7 +2292,7 @@ impl<'layout, 'row, 'measurer> DisplayRowWriter<'layout, 'row, 'measurer> {
                     let mapping =
                         DisplayTextSourceMapping::NaturalText.resolve(&item.span, self.row);
                     let advance =
-                        self.automatic_composition_advance_px(&run.text, face_id, &terminal);
+                        self.automatic_composition_advance_px(&run.text, face_id, &terminal, None);
                     self.push_automatic_composition(&run.text, terminal, face_id, mapping, advance);
                 }
             },
@@ -2386,6 +2389,7 @@ impl<'layout, 'row, 'measurer> DisplayRowWriter<'layout, 'row, 'measurer> {
         text: &str,
         face_id: FaceId,
         terminal: &TerminalComposition,
+        measurement: Option<DisplayTextRunMeasurement>,
     ) -> f32 {
         let backend = self
             .glyph_measurer
@@ -2396,7 +2400,8 @@ impl<'layout, 'row, 'measurer> DisplayRowWriter<'layout, 'row, 'measurer> {
             return f32::from(terminal.width_cols) * self.layout.char_width_px.max(1.0);
         }
 
-        self.text_run_measurement(text, face_id)
+        measurement
+            .unwrap_or_else(|| self.text_run_measurement(text, face_id))
             .measured_advances()
             .map(|advances| advances.iter().map(|advance| advance.advance_px).sum())
             .filter(|width: &f32| width.is_finite() && *width > 0.0)

@@ -165,9 +165,10 @@ fn append_source<B: LayoutBufferView, S: DisplayItemSource>(
         if items.len() >= max_items {
             return Err(RowProgramError::Budget);
         }
-        if !matches!(&item.kind, DisplayItemKind::TextRun(run) if !matches!(run.composition, crate::display_item::DisplayTextComposition::Automatic(_)))
-            && !matches!(&item.kind, DisplayItemKind::SourceMappedText(_))
-        {
+        if !matches!(
+            &item.kind,
+            DisplayItemKind::TextRun(_) | DisplayItemKind::SourceMappedText(_)
+        ) {
             return Err(RowProgramError::Unsupported);
         }
         items.push(item);

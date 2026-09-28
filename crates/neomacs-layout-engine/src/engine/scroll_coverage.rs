@@ -595,7 +595,15 @@ impl LayoutEngine {
             .ok_or(RowProgramError::Unsupported)?
             .reserve_prepared(&capture.attempt)
             .map_err(|_| RowProgramError::Unsupported)?;
-        if !frontier && capture.programs.len() < capture.row_count {
+        if !frontier
+            && capture.programs.len() < crate::row_layout::worker::MAX_PROGRAMS
+            && capture
+                .programs
+                .iter()
+                .filter(|program| program.is_complete())
+                .count()
+                < capture.row_count
+        {
             capture.faces = Some(faces);
             self.scroll_coverage.capture = Some(capture);
             return Ok(true);

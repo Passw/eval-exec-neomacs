@@ -218,8 +218,16 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
             let DisplayItemKind::TextRun(run) = &mut last.kind else {
                 return Err(RowProgramError::Unsupported);
             };
-            let (chars, bytes) =
-                crate::display_text_run_measurement::closed_measurement_prefix(&run.text);
+            let (chars, bytes) = if matches!(
+                run.composition,
+                crate::display_item::DisplayTextComposition::Automatic(_)
+            ) {
+                // Never trim a selected composition's owned cell plan. Retry
+                // the whole final item with lookahead in the next slice.
+                (0, 0)
+            } else {
+                crate::display_text_run_measurement::closed_measurement_prefix(&run.text)
+            };
             if chars == 0 {
                 items.pop();
             } else {
@@ -246,6 +254,9 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
                 complete: false,
                 trailing_text_continues: chars > 0,
             });
+        }
+        if items.len() >= max_items {
+            break;
         }
         let step = producer.produce_step(position, context, face_ids);
         if !step.pending_non_text_area.is_empty() {
@@ -333,7 +344,29 @@ pub(crate) fn capture_source_fragment<B: LayoutBufferView>(
             });
         }
     }
-    Err(RowProgramError::Budget)
+    // A composition-rich line can exhaust the item budget before the byte
+    // budget. Every completed producer item ends at a semantic boundary, so
+    // retain that bounded prefix and continue acquisition on the next idle
+    // step. An insertion-only suffix has no independent buffer resume point.
+    let Some(crate::display_item::DisplaySourcePosition::Buffer {
+        char_pos: resume, ..
+    }) = items.last().map(|item| &item.span.end)
+    else {
+        return Err(RowProgramError::Budget);
+    };
+    let resume = *resume;
+    if resume <= start || resume >= end {
+        return Err(RowProgramError::Budget);
+    }
+    Ok(CapturedPhysicalLine {
+        items,
+        roots,
+        source_start,
+        faces,
+        end: resume,
+        complete: false,
+        trailing_text_continues: false,
+    })
 }
 
 /// The canonical producer resolves this modifier into owned item geometry.

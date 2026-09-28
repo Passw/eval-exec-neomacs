@@ -98,13 +98,9 @@ impl Operation {
         inherited_line_spacing: f32,
     ) -> Result<Self, RowProgramError> {
         match &item.kind {
-            DisplayItemKind::TextRun(run)
-                if !matches!(run.composition, DisplayTextComposition::Automatic(_)) =>
-            {
-                ResolvedTextInput::capture(item, base)
-                    .map(Self::Text)
-                    .map_err(|_| RowProgramError::Unsupported)
-            }
+            DisplayItemKind::TextRun(_) => ResolvedTextInput::capture(item, base)
+                .map(Self::Text)
+                .map_err(|_| RowProgramError::Unsupported),
             DisplayItemKind::SourceMappedText(_) => ResolvedMappedTextInput::capture(item, base)
                 .map(Self::Mapped)
                 .map_err(|_| RowProgramError::Unsupported),
