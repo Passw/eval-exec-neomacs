@@ -7,7 +7,7 @@
 //! operation is explicit: its native winner bypasses enumeration's style
 //! filters without changing shared fontset selection.
 
-use crate::font::policy::GnuFontPolicy;
+use crate::font::policy::{CapturedFontFamilyPolicy, FontFamilySource, GnuFontPolicy};
 use crate::font::selection::{CandidateSelectionScore, candidate_selection_score};
 use crate::font_backend::{
     FontBackend, FontCandidate, FontCandidateQuery, FontCandidateScope, FontFamilyName,
@@ -620,46 +620,55 @@ impl FontResolver {
         size: FontSelectionSize,
         spec: &StoredFontSpec,
     ) -> Option<PlatformFontCandidate> {
-        let effective_weight = spec
-            .weight
-            .map(|weight| weight.css_weight())
-            .unwrap_or(requested_weight);
-        let effective_slant = spec.slant.unwrap_or(requested_slant);
-        let effective_width = spec.width.unwrap_or(requested_width);
-        let constraints = GnuFontPolicy::constraints_for_character(spec, ch);
-        let charset_ranges = constraints.coverage().ranges().to_vec();
-        let languages: Vec<String> = constraints
-            .languages()
-            .iter()
-            .map(|language| language.as_str().to_owned())
-            .collect();
-        let search_order = family_search_order(self.backend.as_ref(), requested_family, spec);
+        let policy = CapturedCharacterPolicy::capture(
+            requested_family,
+            ch,
+            requested_weight,
+            requested_slant,
+            requested_width,
+            size,
+            spec,
+        );
+        self.resolve_from_policy(&policy, prefer_monospace)
+    }
 
+    /// Native discovery and scoring use only owned policy, never Lisp symbols
+    /// or the current fontset. The caller owns generation validation.
+    fn resolve_from_policy(
+        &self,
+        policy: &CapturedCharacterPolicy,
+        prefer_monospace: bool,
+    ) -> Option<PlatformFontCandidate> {
+        let search_order = policy
+            .families
+            .search_order(|family| self.backend.resolve_family(family));
         for family in search_order {
             let scope = match family.as_deref() {
                 Some(family) => FontCandidateScope::Family(FontFamilyName::new(family)?),
                 None => FontCandidateScope::NativeFallback {
-                    base_family: FontFamilyName::new(self.resolve_family(requested_family))?,
+                    base_family: FontFamilyName::new(
+                        self.resolve_family(&policy.requested_family),
+                    )?,
                 },
             };
             let query = FontCandidateQuery {
                 scope,
-                required: RequiredFontCoverage::Character(ch),
-                charset_ranges: charset_ranges.clone(),
-                languages: languages.clone(),
-                requested_weight: effective_weight,
-                requested_slant: effective_slant,
-                requested_width: effective_width,
-                direction: TextDirection::for_char(ch),
+                required: RequiredFontCoverage::Character(policy.ch),
+                charset_ranges: policy.charset_ranges.clone(),
+                languages: policy.languages.clone(),
+                requested_weight: policy.weight,
+                requested_slant: policy.slant,
+                requested_width: policy.width,
+                direction: TextDirection::for_char(policy.ch),
             };
             let request = SelectionRequest {
-                weight: effective_weight,
-                slant: effective_slant,
-                width: spec.width,
+                weight: policy.weight,
+                slant: policy.slant,
+                width: policy.explicit_width,
                 spacing: None,
                 prefer_monospace,
                 queried_family: family.as_deref(),
-                size,
+                size: policy.size,
             };
             if let Some(matched) = select_best_candidate(
                 self.classify_unknown_candidate_sizes(self.backend.list_candidates(&query)),
@@ -690,6 +699,55 @@ impl FontResolver {
             .get_mut()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clear();
+    }
+}
+
+/// One fontset alternative, detached from the evaluator. Keep capture per
+/// alternative so the live resolver does not inspect rules after its winner.
+#[derive(Clone, Debug)]
+struct CapturedCharacterPolicy {
+    requested_family: String,
+    ch: char,
+    families: CapturedFontFamilyPolicy,
+    charset_ranges: Vec<(u32, u32)>,
+    languages: Vec<String>,
+    weight: u16,
+    slant: FontSlant,
+    width: FontWidth,
+    explicit_width: Option<FontWidth>,
+    size: FontSelectionSize,
+}
+
+impl CapturedCharacterPolicy {
+    fn capture(
+        family: &str,
+        ch: char,
+        weight: u16,
+        slant: FontSlant,
+        width: FontWidth,
+        size: FontSelectionSize,
+        spec: &StoredFontSpec,
+    ) -> Self {
+        let constraints = GnuFontPolicy::constraints_for_character(spec, ch);
+        Self {
+            requested_family: family.to_owned(),
+            ch,
+            families: FontFamilySource::for_spec(family, spec).capture(),
+            charset_ranges: constraints.coverage().ranges().to_vec(),
+            languages: constraints
+                .languages()
+                .iter()
+                .map(|language| language.as_str().to_owned())
+                .collect(),
+            weight: spec
+                .weight
+                .map(|weight| weight.css_weight())
+                .unwrap_or(weight),
+            slant: spec.slant.unwrap_or(slant),
+            width: spec.width.unwrap_or(width),
+            explicit_width: spec.width,
+            size,
+        }
     }
 }
 
@@ -783,15 +841,6 @@ fn select_best_candidate(
         );
     }
     selected.map(|(_, _, matched)| matched)
-}
-
-fn family_search_order(
-    backend: &dyn FontBackend,
-    requested_family: &str,
-    spec: &StoredFontSpec,
-) -> Vec<Option<String>> {
-    crate::font::policy::FontFamilySource::for_spec(requested_family, spec)
-        .search_order(|family| backend.resolve_family(family))
 }
 
 fn candidate_score(
