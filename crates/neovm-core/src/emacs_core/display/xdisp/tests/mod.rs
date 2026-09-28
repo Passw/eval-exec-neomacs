@@ -3743,6 +3743,7 @@ fn test_posn_at_point_eval_uses_exact_redisplay_snapshot() {
     {
         let buf = eval.buffers.get_mut(buf_id).expect("buffer");
         buf.insert("abcdef\n");
+        buf.insert(&"long off-screen tail 中文\n".repeat(100_000));
         buf.goto_emacs_byte_pos(crate::buffer::EmacsBytePos::new(4));
     }
     {
@@ -3813,11 +3814,17 @@ fn test_posn_at_point_eval_uses_exact_redisplay_snapshot() {
             .expect("presented geometry");
     }
 
+    APPROX_WINDOW_TEXT_COPIED_CHARS.with(|count| count.set(0));
     let result = builtin_posn_at_point(
         &mut eval,
         vec![Value::fixnum(5), Value::make_window(selected_window.0)],
     )
     .unwrap();
+    assert_eq!(
+        APPROX_WINDOW_TEXT_COPIED_CHARS.with(std::cell::Cell::get),
+        0,
+        "exact position queries must not copy an approximate buffer-text context"
+    );
     assert_eq!(
         super::super::print::print_value(&result),
         "(#<window 1> 5 (72 . 34) 0 nil 5 (9 . 2) nil (0 . 0) (7 . 17))"
@@ -3910,6 +3917,7 @@ fn posn_at_point_recomputes_a_terminal_window_redisplay_has_not_drawn_yet() {
     {
         let buf = eval.buffers.get_mut(buf_id).expect("buffer");
         buf.insert("completion");
+        buf.insert(&"long off-screen tail 中文\n".repeat(100_000));
     }
     // No `commit_redisplay_cache_for_test`: redisplay has never run for this
     // window, which is exactly the state a `-l` script sees before the command
@@ -3961,12 +3969,18 @@ fn posn_at_point_recomputes_a_terminal_window_redisplay_has_not_drawn_yet() {
         ))
     });
 
+    APPROX_WINDOW_TEXT_COPIED_CHARS.with(|count| count.set(0));
     let result = builtin_posn_at_point(
         &mut eval,
         vec![Value::fixnum(1), Value::make_window(window_id.0)],
     )
     .expect("posn-at-point");
 
+    assert_eq!(
+        APPROX_WINDOW_TEXT_COPIED_CHARS.with(std::cell::Cell::get),
+        0,
+        "exact position queries must not copy an approximate buffer-text context"
+    );
     assert_eq!(
         super::super::print::print_value(&result),
         "(#<window 1> 1 (54 . 17) 0 nil 1 (0 . 1) nil (0 . 0) (7 . 17))",

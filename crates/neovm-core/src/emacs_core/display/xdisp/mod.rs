@@ -5967,6 +5967,11 @@ fn live_window_display_context_with_all_text(
     Ok(Some(ctx))
 }
 
+#[cfg(test)]
+thread_local! {
+    static APPROX_WINDOW_TEXT_COPIED_CHARS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// The buffer's characters in `[start, end)` (0-based, clamped to Z).
 fn approx_window_text(
     buffer: &crate::buffer::Buffer,
@@ -5976,6 +5981,8 @@ fn approx_window_text(
     let total_chars = buffer.total_char_len().get();
     let end = end.min(total_chars);
     let start = start.min(end);
+    #[cfg(test)]
+    APPROX_WINDOW_TEXT_COPIED_CHARS.with(|count| count.set(count.get() + end - start));
     let byte = |char_pos: usize| {
         buffer.char_pos_to_emacs_byte_pos_clamped(crate::buffer::CharPos0::new(char_pos))
     };
@@ -6062,35 +6069,84 @@ fn resolve_pos_visible_target_lisp_pos(
     ctx: &ApproxWindowDisplayContext,
     pos: Option<&Value>,
 ) -> Result<Option<LispCharPos1>, Flow> {
-    match pos {
+    resolve_target_position_value(pos, ctx.total_chars, ctx.window_point, || {
+        ctx.last_visible_row_start
+    })
+}
+
+/// Decode only the target position. Exact geometry consumers do not need an
+/// approximate text copy, and ordinary point/integer queries need no line scan.
+fn resolve_target_position_value(
+    pos: Option<&Value>,
+    total_chars: usize,
+    window_point: LispCharPos1,
+    last_visible_row_start: impl FnOnce() -> usize,
+) -> Result<Option<LispCharPos1>, Flow> {
+    let lisp_pos = match pos {
         Some(value) if value.is_t() || value.is_symbol_named("t") => {
-            Ok(Some(last_visible_row_start_lisp_pos(ctx)))
+            last_visible_row_start().saturating_add(1)
         }
         Some(value) if !value.is_nil() => {
             expect_integer_or_marker(value)?;
-            let lisp_pos = value.as_int().unwrap_or(0).max(1) as usize;
-            Ok(Some(LispCharPos1::from_one_based_usize(
-                lisp_pos.min(ctx.total_chars.saturating_add(1)),
-            )))
+            value.as_int().unwrap_or(0).max(1) as usize
         }
-        _ => Ok(Some(current_window_point_lisp(ctx))),
-    }
+        _ => window_point.to_one_based_usize(),
+    };
+    Ok(Some(LispCharPos1::from_one_based_usize(
+        lisp_pos.min(total_chars.saturating_add(1)),
+    )))
 }
 
-fn current_window_point_lisp(ctx: &ApproxWindowDisplayContext) -> LispCharPos1 {
-    LispCharPos1::from_one_based_usize(
-        ctx.window_point
+fn resolve_live_target_position(
+    frames: &crate::window::FrameManager,
+    buffers: &crate::buffer::BufferManager,
+    fid: FrameId,
+    wid: WindowId,
+    pos: Option<&Value>,
+) -> Result<Option<LispCharPos1>, Flow> {
+    let Some(frame) = frames.get(fid) else {
+        return Ok(None);
+    };
+    let Some(window) = frame.find_window(wid) else {
+        return Ok(None);
+    };
+    let Some(buffer) = window.buffer_id().and_then(|id| buffers.get(id)) else {
+        return Ok(None);
+    };
+    let Window::Leaf {
+        bounds,
+        window_start,
+        point,
+        ..
+    } = window
+    else {
+        return Ok(None);
+    };
+    let window_point = if frame.selected_window == wid {
+        buffer.point_char_pos().to_lisp()
+    } else {
+        (*point).max(LispCharPos1::ONE)
+    };
+    let total_chars = buffer.total_char_len().get();
+    resolve_target_position_value(pos, total_chars, window_point, || {
+        // Preserve the approximate POS=t convention without materializing text.
+        // This scan is lazy: the common point and integer cases are O(1).
+        let char_height = frame.char_height.max(1.0).round() as i64;
+        let body_top = bounds.y.max(0.0) as i64;
+        let body_bottom = (bounds.y + bounds.height).max(0.0) as i64
+            - if frame.minibuffer_window == Some(wid) {
+                0
+            } else {
+                char_height
+            };
+        let body_height = (body_bottom - body_top).max(1);
+        let body_lines = ((body_height + char_height - 1) / char_height).max(1);
+        let start = window_start
             .to_one_based_usize()
-            .min(ctx.total_chars.saturating_add(1)),
-    )
-}
-
-fn last_visible_row_start_lisp_pos(ctx: &ApproxWindowDisplayContext) -> LispCharPos1 {
-    LispCharPos1::from_one_based_usize(
-        ctx.last_visible_row_start
-            .saturating_add(1)
-            .min(ctx.total_chars.saturating_add(1)),
-    )
+            .saturating_sub(1)
+            .min(total_chars);
+        nth_line_start_in_buffer(buffer, start, body_lines.saturating_sub(1), total_chars)
+    })
 }
 
 /// The visual row and column of `lisp_pos` counted from `start_char`.
@@ -6580,11 +6636,9 @@ fn resolve_exact_visible_metrics_with_layout(
         return Ok(Some(found));
     }
     if let Some(geometry) = compute_live_window_geometry(eval, fid, wid)? {
-        let Some(ctx) = resolve_live_window_display_context(&eval.frames, &eval.buffers, window)?
+        let Some(pos_lisp) =
+            resolve_live_target_position(&eval.frames, &eval.buffers, fid, wid, pos)?
         else {
-            return Ok(None);
-        };
-        let Some(pos_lisp) = resolve_pos_visible_target_lisp_pos(&ctx, pos)? else {
             return Ok(None);
         };
         return Ok(geometry
@@ -6648,10 +6702,7 @@ fn resolve_exact_visible_metrics(
     let Some(frame) = frames.get(fid) else {
         return Ok(None);
     };
-    let Some(ctx) = resolve_live_window_display_context(frames, buffers, window)? else {
-        return Ok(None);
-    };
-    let Some(pos_lisp) = resolve_pos_visible_target_lisp_pos(&ctx, pos)? else {
+    let Some(pos_lisp) = resolve_live_target_position(frames, buffers, fid, wid, pos)? else {
         return Ok(None);
     };
     if frame.effective_window_system().is_none() {
