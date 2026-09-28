@@ -7,6 +7,7 @@ fn synthetic_key(window_start: i64, point: i64) -> RetainedWindowKey {
         prefixes: Default::default(),
         invisibility: Default::default(),
         char_table_revision: Default::default(),
+        symbol_property_revision: Default::default(),
         display_table: Default::default(),
         media_generation: 0,
         buffer_id: 1,

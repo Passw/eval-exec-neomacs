@@ -856,6 +856,7 @@ impl crate::emacs_core::eval::Context {
             redisplay_generation: self.redisplay_generation(),
             media_generation: self.media_generation(),
             function_epoch: self.obarray().function_epoch(),
+            symbol_property_revision: crate::emacs_core::symbol::SymbolPropertyRevision::current(),
         })
     }
 

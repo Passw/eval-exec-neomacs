@@ -387,6 +387,7 @@ struct RedisplaySignature {
     minibuffer_selected_window: Option<u64>,
     face_change_count: u64,
     obarray_function_epoch: u64,
+    symbol_property_revision: crate::emacs_core::symbol::SymbolPropertyRevision,
     redisplay_generation: u64,
     frame: Option<RedisplayFrameSignature>,
 }
@@ -448,6 +449,7 @@ impl RedisplaySignature {
         field!(minibuffer_selected_window);
         field!(face_change_count);
         field!(obarray_function_epoch);
+        field!(symbol_property_revision);
         field!(redisplay_generation);
         match (&self.frame, &other.frame) {
             (Some(a), Some(b)) => {

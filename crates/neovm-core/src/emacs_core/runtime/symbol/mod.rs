@@ -27,6 +27,9 @@
 //! the legacy `SymbolValue` enum during the transition; Phases 4-8 cut them
 //! over to the redirect dispatch and Phase 10 deletes the legacy enum.
 
+mod property_revision;
+pub use property_revision::SymbolPropertyRevision;
+
 use super::defvar_bool::ByteBooleanVars;
 use super::intern::{
     NameId, SymId, intern, intern_lisp_string, is_canonical_id, lookup_interned,
@@ -4195,6 +4198,7 @@ impl Obarray {
         // SATB: retain the plist cell's pre-image during a concurrent mark.
         crate::tagged::gc::note_root_overwrite(sym.plist);
         store_value_atomic(&mut sym.plist, new_plist);
+        SymbolPropertyRevision::changed();
         Ok(())
     }
 
@@ -4215,6 +4219,7 @@ impl Obarray {
         // SATB: retain the plist cell's pre-image during a concurrent mark.
         crate::tagged::gc::note_root_overwrite(sym.plist);
         store_value_atomic(&mut sym.plist, new_plist);
+        SymbolPropertyRevision::changed();
         Ok(())
     }
 
@@ -4238,6 +4243,7 @@ impl Obarray {
         // SATB: retain the plist cell's pre-image during a concurrent mark.
         crate::tagged::gc::note_root_overwrite(sym.plist);
         store_value_atomic(&mut sym.plist, new_plist);
+        SymbolPropertyRevision::changed();
     }
 
     /// Store `plist` verbatim as the symbol's property list. Matches GNU
@@ -4249,6 +4255,7 @@ impl Obarray {
         // SATB: retain the plist cell's pre-image during a concurrent mark.
         crate::tagged::gc::note_root_overwrite(sym.plist);
         store_value_atomic(&mut sym.plist, plist);
+        SymbolPropertyRevision::changed();
     }
 
     /// Get the symbol's full plist as a flat list.

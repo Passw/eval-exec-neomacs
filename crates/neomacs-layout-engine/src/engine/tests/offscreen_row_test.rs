@@ -960,3 +960,17 @@ fn idle_capture_finishes_while_the_viewport_keeps_moving() {
     fresh.layout_frame_rust(&mut eval, frame);
     assert_eq!(actual, selected_window_layout_trace(&eval, &fresh, frame));
 }
+
+#[test]
+fn worker_page_is_rejected_after_category_symbol_properties_change() {
+    first_visit_with_setup(
+        None,
+        "ordinary offscreen text\n",
+        Some("(put 'worker-overlay-category 'face '(:height 200))"),
+        0,
+        5,
+        Some(
+            "(progn (put 'worker-overlay-category 'face '(:height 125)) (overlay-put (make-overlay 2761 3100) 'category 'worker-overlay-category))",
+        ),
+    );
+}

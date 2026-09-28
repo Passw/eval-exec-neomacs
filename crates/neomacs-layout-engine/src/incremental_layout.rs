@@ -160,6 +160,7 @@ pub struct RetainedWindowKey {
     pub prefixes: neovm_core::window::LayoutPrefixInputs,
     pub invisibility: neovm_core::window::LayoutInvisibilityInput,
     pub char_table_revision: neovm_core::window::CharTableLayoutRevision,
+    pub symbol_property_revision: neovm_core::emacs_core::symbol::SymbolPropertyRevision,
     pub display_table: neovm_core::window::LayoutDisplayTableInput,
     /// Generation of asynchronously decoded media (see
     /// `Context::invalidate_media`). An image that finishes decoding changes
@@ -291,6 +292,7 @@ impl RetainedWindowKey {
         Self {
             media_generation: evaluator.media_generation(),
             char_table_revision: neovm_core::window::CharTableLayoutRevision::current(),
+            symbol_property_revision: neovm_core::emacs_core::symbol::SymbolPropertyRevision::current(),
             display_table: evaluator
                 .layout_display_table_input(neovm_core::buffer::BufferId(p.buffer_id))
                 .unwrap_or_default(),
@@ -417,6 +419,7 @@ impl RetainedWindowKey {
             prefixes,
             invisibility,
             char_table_revision,
+            symbol_property_revision,
             display_table,
             media_generation,
             buffer_id,

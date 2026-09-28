@@ -493,7 +493,8 @@ impl LayoutEngine {
         // A command or timer may have run between idle capture steps. Never
         // combine measurements from different buffer/display revisions into
         // one job, even though final replay also validates the complete key.
-        if buffer.chars_modified_tick() != key.chars_modified_tick
+        if neovm_core::emacs_core::symbol::SymbolPropertyRevision::current() != key.symbol_property_revision
+            || buffer.chars_modified_tick() != key.chars_modified_tick
             || buffer.props_modified_tick() != key.props_modified_tick
             || buffer.overlay_modified_tick() != key.overlay_modified_tick
             || buffer.point_max_char_pos().get() as i64 != key.buffer_size

@@ -2740,6 +2740,7 @@ pub struct WindowDisplaySnapshotFreshness {
     pub(crate) redisplay_generation: u64,
     pub(crate) media_generation: u64,
     pub(crate) function_epoch: u64,
+    pub(crate) symbol_property_revision: crate::emacs_core::symbol::SymbolPropertyRevision,
 }
 
 impl WindowDisplaySnapshotFreshness {
