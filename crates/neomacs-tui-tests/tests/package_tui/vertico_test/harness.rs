@@ -118,6 +118,32 @@ pub(super) fn candidate_rows(grid: &[String], prefix: &str) -> Vec<u16> {
         .collect()
 }
 
+/// Every candidate the screen shows as `(row, column, text)`.
+///
+/// The layouts that put several candidates on one row -- the grid, the flat
+/// display -- need the column a candidate starts at as much as the row it is
+/// on. A candidate here is the fixture's prefix and the characters that follow
+/// it up to the next separator or space: what the fixture's names are made of,
+/// which is also what tells a candidate apart from the minibuffer's own input
+/// (the prefix with nothing after it).
+pub(super) fn candidate_cells(grid: &[String], prefix: &str) -> Vec<(u16, usize, String)> {
+    let mut cells = Vec::new();
+    for (row, contents) in grid.iter().enumerate() {
+        for (column, _) in contents.match_indices(prefix) {
+            let after = &contents[column + prefix.len()..];
+            let text = after
+                .chars()
+                .take_while(|c| !c.is_whitespace() && *c != '|' && *c != '│')
+                .collect::<String>();
+            if text.is_empty() {
+                continue;
+            }
+            cells.push((row as u16, column, format!("{prefix}{text}")));
+        }
+    }
+    cells
+}
+
 /// The candidate texts the screen shows, in screen order.
 pub(super) fn candidate_texts(grid: &[String], prefix: &str) -> Vec<String> {
     candidate_rows(grid, prefix)
