@@ -24,6 +24,8 @@ struct PreparedViewport {
     rows: usize,
     glyphs: usize,
     computed: bool,
+    // Partial worker pages may extend coverage, but cannot replace a viewport.
+    complete_viewport: bool,
     reads: Option<CollectionReads>,
 }
 
@@ -83,6 +85,7 @@ impl PreparedViewports {
         retained: RetainedWindowMatrix,
         faces: PreparedFaceSnapshot,
         reads: CollectionReads,
+        complete_viewport: bool,
     ) {
         let rows = retained.matrix.rows.len();
         let glyphs = retained
@@ -108,6 +111,7 @@ impl PreparedViewports {
             rows,
             glyphs,
             computed: true,
+            complete_viewport,
             reads: Some(reads),
         });
         self.trim();
@@ -130,7 +134,8 @@ impl PreparedViewports {
         force_start: bool,
     ) -> Option<(CursorOnlyReplay, PreparedFaceSnapshot)> {
         self.entries.iter().rev().find_map(|entry| {
-            if !entry.dependencies_valid()
+            if !entry.complete_viewport
+                || !entry.dependencies_valid()
                 || entry.frame != frame
                 || entry.window != window
                 || entry.retained.key.window_start != key.window_start
@@ -339,7 +344,17 @@ impl PreparedViewports {
             if potential <= minimum_reused {
                 return None;
             }
-            let replay = entry.retained.scroll_replay(key)?;
+            let mut replay = entry.retained.scroll_replay(key)?;
+            if !entry.complete_viewport {
+                // The synchronous walk must fill the rest of the viewport,
+                // not merely replace the rows shifted out of this prefix.
+                replay.exposed_row_count = entry
+                    .retained
+                    .matrix
+                    .rows
+                    .len()
+                    .checked_sub(replay.exposed_row_base)?;
+            }
             (replay.reused_rows.len() > minimum_reused).then(|| (replay, entry.faces.clone()))
         })
     }
@@ -405,6 +420,7 @@ impl PreparedViewports {
                 rows,
                 glyphs,
                 computed: false,
+                complete_viewport: true,
                 reads: None,
             });
         }

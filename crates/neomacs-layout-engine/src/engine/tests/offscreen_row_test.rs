@@ -1406,3 +1406,100 @@ fn scaled_line_height_overflow_keeps_finite_geometry() {
         (23.0, 17.0)
     );
 }
+
+#[test]
+fn worker_keeps_complete_prefix_before_unsupported_rows() {
+    let line = "ordinary offscreen text\n";
+    let start = 120 * line.len();
+    for boundary in ["replacement", "long-line"] {
+        let mut text = line.repeat(300);
+        if boundary == "long-line" {
+            text.replace_range(
+                start + 3 * line.len()..start + 4 * line.len(),
+                &("W".repeat(120) + "\n"),
+            );
+        }
+        let (mut eval, frame, buffer, window) = incr_editing_frame(&text, 800, 600);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        if boundary == "replacement" {
+            eval.eval_str(&format!(
+                "(overlay-put (make-overlay {} {}) 'before-string \"prefix\")",
+                start + 3 * line.len() + 1,
+                start + 4 * line.len()
+            ))
+            .unwrap();
+        }
+        let mut engine = LayoutEngine::new();
+        engine.layout_frame_rust(&mut eval, frame);
+        engine
+            .request_scroll_coverage(&eval, frame, window, CharPos0::new(start))
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !engine
+            .scroll_coverage
+            .drain(&mut engine.prepared_viewports)
+            .unwrap()
+        {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::yield_now();
+        }
+        let owner = DisplayWindowId::new(window.0 as i64);
+        assert!(engine.prepared_viewports.has_computed(frame, owner));
+        let mut key = engine.retained_window_matrices[&owner].key.clone();
+        key.window_start = start as i64;
+        key.point = start as i64;
+        assert!(
+            engine
+                .prepared_viewports
+                .replay(frame, owner, &key, true)
+                .is_none(),
+            "three complete rows are useful coverage, not a complete viewport"
+        );
+        key.window_start += line.len() as i64;
+        key.point = key.window_start;
+        let (prefix, _) = engine
+            .prepared_viewports
+            .scroll_replay(frame, owner, &key, 0)
+            .unwrap();
+        assert_eq!(prefix.reused_rows.len(), 2, "{boundary}");
+        assert_eq!(
+            prefix.reused_rows.last().unwrap().1.end_charpos + 1,
+            start + 3 * line.len()
+        );
+        assert!(
+            prefix.exposed_row_count > 1,
+            "the rest of the viewport still needs layout"
+        );
+        let destination = start + line.len();
+        scroll_window_to(
+            &mut eval,
+            frame,
+            window,
+            buffer,
+            destination as i64 + 1,
+            destination + 16 * line.len(),
+        );
+        if let neovm_core::window::Window::Leaf { force_start, .. } = eval
+            .frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .find_window_mut(window)
+            .unwrap()
+        {
+            *force_start = true;
+        }
+        engine.layout_frame_rust(&mut eval, frame);
+        assert_eq!(engine.last_layout_stats().reused_shifted_rows, 2, "{boundary}");
+        let actual = selected_window_layout_trace(&eval, &engine, frame);
+        let mut fresh = LayoutEngine::new();
+        fresh.layout_frame_rust(&mut eval, frame);
+        assert_eq!(
+            actual,
+            selected_window_layout_trace(&eval, &fresh, frame),
+            "{boundary}"
+        );
+    }
+}

@@ -127,11 +127,7 @@ fn run(shared: Arc<Shared>) {
             mailbox.pending.take().unwrap()
         };
         let cancelled = || shared.revision.load(Ordering::Acquire) != job.ticket.0;
-        let rows = job
-            .rows
-            .into_iter()
-            .map(|row| row.compute(cancelled))
-            .collect();
+        let rows = compute_rows(job.rows, cancelled);
         let mut mailbox = shared.mailbox.lock().unwrap();
         if !mailbox.stopping && !cancelled() {
             mailbox.completed = Some(RowJobResult {
@@ -139,6 +135,27 @@ fn run(shared: Arc<Shared>) {
                 rows,
             });
         }
+    }
+}
+
+// A failed row is never published. Earlier complete rows remain useful for
+// a partial scroll; cancellation invalidates the entire batch.
+fn compute_rows(
+    programs: Vec<RowProgram>,
+    cancelled: impl Fn() -> bool,
+) -> Result<Vec<ComputedRow>, RowProgramError> {
+    let mut rows = Vec::with_capacity(programs.len());
+    for program in programs {
+        match program.compute(&cancelled) {
+            Ok(row) => rows.push(row),
+            Err(RowProgramError::Overflow | RowProgramError::Budget) if !rows.is_empty() => break,
+            Err(error) => return Err(error),
+        }
+    }
+    if cancelled() {
+        Err(RowProgramError::Cancelled)
+    } else {
+        Ok(rows)
     }
 }
 

@@ -1256,6 +1256,31 @@ impl BufferSourceOutputSetup {
                 render_services.reborrow(),
                 &tail_context,
             );
+            // The exposed walk can wrap even when its reused prefix contains
+            // only natural rows. Finalize its fringe indicators through the
+            // same installer as a full walk, at the exposed output-row base.
+            if let Some(arrows) = TruncationContinuationFringeRequest::new(
+                buffer,
+                evaluator,
+                params,
+                geometry.display_text_row_base,
+                {
+                    let resolved = FrameFaces::new(face_resolver)
+                        .for_window(buffer)
+                        .resolve_named_face("fringe");
+                    let face_id = crate::display_row::face_state::stable_face_id_for_resolved(
+                        render_services.face_ids(),
+                        &resolved,
+                    );
+                    {
+                        let bound = output.builder().bind_resolved_face(face_id, &resolved);
+                        output.install_resolved_face(&bound, None)
+                    };
+                    face_id
+                },
+            ) {
+                arrows.install(output.builder(), &walk_setup.row_flags);
+            }
             record_text_window_display_range(
                 output.reborrow(),
                 redisplay_positions.display_range(output_window_id),

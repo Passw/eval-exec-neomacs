@@ -134,6 +134,8 @@ impl ScrollCoverage {
                 take
             })
             .count();
+        let complete_viewport = height >= regions.text_body.height
+            || rows.len() == admission.retained.matrix.rows.len() - admission.row_base;
         rows.truncate(visible);
         let body = position_buffer_rows(
             rows,
@@ -180,6 +182,7 @@ impl ScrollCoverage {
             admission.retained,
             admission.faces,
             admission.reads,
+            complete_viewport,
         );
         Ok(true)
     }
@@ -429,8 +432,8 @@ impl LayoutEngine {
             .ok_or(RowProgramError::Unsupported)?;
         // Retained matrices can keep spare rows after geometry changes and
         // incremental walks. Their allocation is not the visible row count.
-        // Programs start at the default row height and can only grow, so this
-        // ceiling includes every complete row and the next frontier row.
+        // Match the canonical window's row capacity, including its partially
+        // visible frontier. Measured rows can stop earlier at the pixel bottom.
         let needed = (retained.display_snapshot.regions.text_body.height / key.char_height).ceil();
         if !needed.is_finite() || needed < 1.0 || needed > 64.0 || row_base > 64 {
             return Err(RowProgramError::Budget);
@@ -536,7 +539,18 @@ impl LayoutEngine {
             }
             self.capture_scroll_row(evaluator, &mut capture)
         });
-        result?;
+        // Unsupported source syntax ends this page, not its already complete
+        // prefix. Cancellation and a failed dependency certificate still
+        // reject the whole page, including work captured in earlier steps.
+        let frontier = match result {
+            Ok(()) => false,
+            Err(
+                RowProgramError::Unsupported
+                | RowProgramError::Budget
+                | RowProgramError::Incomplete,
+            ) if !capture.programs.is_empty() => true,
+            Err(error) => return Err(error),
+        };
         capture.reads = Some(reads.ok_or(RowProgramError::Budget)?);
         // Reserve after every bounded step: an intervening timer redisplay
         // may seal another arena generation before the next idle wake.
@@ -546,7 +560,7 @@ impl LayoutEngine {
             .ok_or(RowProgramError::Unsupported)?
             .reserve_prepared(&capture.attempt)
             .map_err(|_| RowProgramError::Unsupported)?;
-        if capture.programs.len() < capture.row_count {
+        if !frontier && capture.programs.len() < capture.row_count {
             capture.faces = Some(faces);
             self.scroll_coverage.capture = Some(capture);
             return Ok(true);
