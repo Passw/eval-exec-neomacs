@@ -8,12 +8,18 @@ use super::{COMPAT_GNU_ELPA_PIN, CachedMelpaOracle, VERTICO_MELPA_PIN};
 use super::scenario::{DisplayCheckpoint, PackageTuiScenario, PairTimeout, ReadinessCheckpoint};
 
 mod harness;
+mod multiform;
 mod overflow;
 mod prelude;
 mod selection;
 
 use harness::candidate_rows;
 use prelude::VERTICO_TUI_PRELUDE;
+
+#[test]
+fn vertico_multiform_renders_the_grid_and_flat_layouts() {
+    multiform::run();
+}
 
 #[test]
 fn vertico_overflow_scrolls_the_candidate_window_and_counts_candidates() {

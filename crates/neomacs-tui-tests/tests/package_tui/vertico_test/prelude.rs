@@ -60,3 +60,35 @@ pub(super) fn numbered_names(prefix: &str, count: usize) -> Vec<String> {
 pub(super) fn default_vertico(fixture: &str) -> String {
     format!("(require 'vertico)\n(vertico-mode 1)\n{fixture}")
 }
+
+/// Vertico with the display modes `vertico-multiform` toggles between, over
+/// `fixture`.
+///
+/// The extension files ship in the package, next to `vertico.el`, so requiring
+/// them by name is how a user gets them; loading them also defines the minor
+/// modes `vertico-multiform-mode`'s toggles call.
+///
+/// `vertico-grid-separator` is set to a single bar. The default is a bar with
+/// three spaces on either side and an `:inverse-video` display property on the
+/// bar itself, and the two editors do not render it alike: Neomacs paints the
+/// cell behind the bar where GNU leaves it at the terminal's default
+/// background, and where GNU writes the separator's leading spaces Neomacs
+/// moves the cursor over them and leaves the cells unwritten. Neither
+/// difference is visible on screen, and neither is what this scenario is about
+/// -- the grid's column arithmetic, which the separator's *length* alone
+/// decides. A separator with no spaces around the bar leaves no blank cells
+/// between candidates for the emissions to disagree about, so the frozen
+/// screens and the wire-state checks pin the layout and nothing else.
+pub(super) fn multiform_vertico(fixture: &str) -> String {
+    format!(
+        "(require 'vertico)\n\
+         (require 'vertico-multiform)\n\
+         (require 'vertico-grid)\n\
+         (require 'vertico-flat)\n\
+         (require 'vertico-buffer)\n\
+         (vertico-mode 1)\n\
+         (vertico-multiform-mode 1)\n\
+         (setq vertico-grid-separator \"|\")\n\
+         {fixture}"
+    )
+}
