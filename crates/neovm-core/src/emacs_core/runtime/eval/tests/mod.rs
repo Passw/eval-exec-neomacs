@@ -27950,3 +27950,30 @@ fn native_input_progress_completion_requires_a_fresh_presentation() {
     );
     assert_eq!(completed, ev.redisplay_signature());
 }
+
+#[test]
+fn fontset_changes_invalidate_redisplay_skip_signature() {
+    let mut ev = Context::new();
+    let calls = Rc::new(RefCell::new(0usize));
+    let observed = Rc::clone(&calls);
+    ev.redisplay_fn = Some(Box::new(move |_ev: &mut Context| {
+        *observed.borrow_mut() += 1;
+    }));
+    ev.redisplay();
+    ev.redisplay();
+    assert_eq!(*calls.borrow(), 1);
+    ev.eval_str("(set-fontset-font t #x25cb '(nil . \"iso10646-1\"))")
+        .unwrap();
+    ev.redisplay();
+    assert_eq!(
+        *calls.borrow(),
+        2,
+        "a font-rule change must schedule fresh layout"
+    );
+    ev.redisplay();
+    assert_eq!(
+        *calls.borrow(),
+        2,
+        "unchanged font policy still permits the idle skip"
+    );
+}

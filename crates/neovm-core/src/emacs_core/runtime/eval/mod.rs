@@ -376,6 +376,7 @@ impl EchoAreaMessageText {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct RedisplaySignature {
+    fontset_generation: u64,
     compositor_scrolling_enabled: bool,
     compositor_pixel_scroll: bool,
     input_checkpoint: Vec<neomacs_display_protocol::input_progress::InputCheckpoint>,

@@ -1750,6 +1750,7 @@ impl Context {
             }
         });
         RedisplaySignature {
+            fontset_generation: crate::emacs_core::fontset::fontset_generation(),
             compositor_scrolling_enabled: selected_window.is_some_and(|window|
                 self.compositor_scrolling_enabled(crate::window::WindowId(window))),
             // Bindings and hooks may change without moving text or point.

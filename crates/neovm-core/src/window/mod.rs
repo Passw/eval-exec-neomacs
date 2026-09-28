@@ -2734,6 +2734,7 @@ pub struct WindowDisplaySnapshot {
 /// checks that drift apart.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WindowDisplaySnapshotFreshness {
+    pub(crate) fontset_generation: u64,
     pub(crate) context_instance_id: u64,
     pub(crate) window_topology_generation: u64,
     pub(crate) frame: FrameLayoutInputState,
@@ -2790,6 +2791,7 @@ impl WindowDisplaySnapshotFreshness {
 /// a scoped binding that restores its original value did not stale the rows.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WindowLayoutAttemptFreshness {
+    fontset_generation: u64,
     context_instance_id: u64,
     window_topology_generation: u64,
     frame: FrameLayoutInputState,

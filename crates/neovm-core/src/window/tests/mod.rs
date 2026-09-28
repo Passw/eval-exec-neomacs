@@ -3822,3 +3822,39 @@ fn grow_mini_window_always_moves_from_a_whole_row_count_at_a_fractional_unit() {
         .height;
     assert!((h - 4.0 * 11.9).abs() < 0.01, "expected four rows, got {h}");
 }
+
+#[test]
+fn fontset_changes_invalidate_window_query_and_attempt_freshness() {
+    let mut eval = crate::emacs_core::Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("fontset-freshness", 800, 600, buffer);
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    let before = eval
+        .window_display_snapshot_freshness(frame, window, buffer)
+        .unwrap();
+    let attempt = eval
+        .window_layout_attempt_freshness(frame, window, buffer)
+        .unwrap();
+    eval.eval_str("(set-fontset-font t #x25cb '(nil . \"iso10646-1\"))")
+        .unwrap();
+    let after = eval
+        .window_display_snapshot_freshness(frame, window, buffer)
+        .unwrap();
+    let after_attempt = eval
+        .window_layout_attempt_freshness(frame, window, buffer)
+        .unwrap();
+    assert_ne!(
+        before, after,
+        "geometry queries must not return old font measurements"
+    );
+    assert!(!before.same_scroll_content(&after));
+    assert!(before.query_vscroll_delta(&after).is_none());
+    for boundary in [
+        WindowLayoutLispBoundary::BufferBody,
+        WindowLayoutLispBoundary::WindowChrome,
+    ] {
+        assert!(!attempt.remains_valid_across(&after_attempt, boundary));
+    }
+}

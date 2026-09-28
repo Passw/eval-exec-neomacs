@@ -548,6 +548,7 @@ impl crate::emacs_core::eval::Context {
                 .map(crate::window::WindowLayoutValueIdentity::of);
         }
         Some(crate::window::WindowLayoutAttemptFreshness {
+            fontset_generation: crate::emacs_core::fontset::fontset_generation(),
             context_instance_id: self.context_instance_id(),
             window_topology_generation: self.frames.window_topology_generation(),
             frame: frame.layout_inputs(),
@@ -846,6 +847,7 @@ impl crate::emacs_core::eval::Context {
             return None;
         }
         Some(WindowDisplaySnapshotFreshness {
+            fontset_generation: crate::emacs_core::fontset::fontset_generation(),
             context_instance_id: self.context_instance_id(),
             window_topology_generation: self.frames.window_topology_generation(),
             frame: frame.layout_inputs(),
