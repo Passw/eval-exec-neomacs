@@ -2204,3 +2204,42 @@ fn worker_replacement_strings_reject_mutated_sources() {
         first_visit_with_setup_and_gc(None, line, Some(change), 0, 2, Some(&setup), true);
     }
 }
+
+#[test]
+fn idle_capture_aligns_forward_wrapped_rows_to_physical_source_start() {
+    let mut checked_continuation = false;
+    for length in [100, 180, 240] {
+        let line = format!("{}\n", "W".repeat(length));
+        let (mut eval, frame, _, window) = incr_editing_frame(&line.repeat(300), 800, 600);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        let mut engine = LayoutEngine::new();
+        engine.layout_frame_rust(&mut eval, frame);
+        let display_window = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
+        let rows: Vec<_> = engine.retained_window_matrices[&display_window]
+            .matrix
+            .rows
+            .iter()
+            .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+            .collect();
+        let anchor = rows[rows.len() - 2].start_charpos;
+        if anchor % line.len() == 0 {
+            continue;
+        }
+        checked_continuation = true;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while engine.maintain_scroll_coverage(&eval).is_some() {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::yield_now();
+        }
+        assert!(
+            engine
+                .prepared_viewports
+                .has_computed(frame, display_window),
+            "forward visual row {anchor} inside a {length}-character physical line must produce coverage"
+        );
+    }
+    assert!(checked_continuation);
+}

@@ -353,7 +353,28 @@ impl LayoutEngine {
             if let Some(row) = rows.get(rows.len().saturating_sub(2)) {
                 let forward = CharPos0::new(row.start_charpos);
                 if forward > start {
-                    targets.push(forward);
+                    // A visual continuation is not an independent source
+                    // entry point: capture must acquire its physical line so
+                    // shaping, tabs and word-wrap state have their true origin.
+                    let mut byte = buffer.char_pos_to_emacs_byte_pos_clamped(forward).get();
+                    let lower = byte.saturating_sub(8192).max(begin);
+                    while byte > lower
+                        && buffer.emacs_byte_at_pos(neovm_core::buffer::EmacsBytePos::new(byte - 1))
+                            != Some(b'\n')
+                    {
+                        byte -= 1;
+                    }
+                    if byte == begin
+                        || buffer.emacs_byte_at_pos(neovm_core::buffer::EmacsBytePos::new(byte - 1))
+                            == Some(b'\n')
+                    {
+                        let physical_start = buffer.emacs_byte_pos_to_char_pos_clamped(
+                            neovm_core::buffer::EmacsBytePos::new(byte),
+                        );
+                        if !targets.contains(&physical_start) {
+                            targets.push(physical_start);
+                        }
+                    }
                 }
             }
             self.scroll_coverage.windows.insert(
