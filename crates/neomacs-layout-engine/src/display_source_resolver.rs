@@ -146,8 +146,18 @@ impl<'a> DisplaySourceResolveParams<'a> {
 #[derive(Default)]
 pub(crate) struct DisplaySourceResolveState {
     face_cache: HashMap<DisplayFaceCacheKey, FaceId>,
+    last_face_lookup: Option<ObservedFaceLookup>,
+    #[cfg(test)]
+    structural_face_lookups: usize,
     height_face_cache: HashMap<DisplayHeightFaceKey, FaceId>,
     resolved_faces: HashMap<FaceId, ResolvedFace>,
+}
+
+struct ObservedFaceLookup {
+    base_face_id: FaceId,
+    value_bits: usize,
+    face_id: FaceId,
+    reads: neovm_core::tagged::collection_reads::CollectionReads,
 }
 
 impl DisplaySourceResolveState {
@@ -171,14 +181,39 @@ impl DisplaySourceResolveState {
         self.resolved_faces.get(&face_id)
     }
 
-    fn cached_face(&self, base_face_id: FaceId, face_value: &Value) -> Option<RenderFaceRef> {
-        self.face_cache
-            .get(&DisplayFaceCacheKey {
+    fn cached_face(&mut self, base_face_id: FaceId, face_value: &Value) -> Option<RenderFaceRef> {
+        if let Some(last) = &self.last_face_lookup
+            && last.base_face_id == base_face_id
+            && last.value_bits == face_value.bits()
+            && last.reads.unchanged_and_observe()
+        {
+            return Some(RenderFaceRef::FaceId(last.face_id));
+        }
+        #[cfg(test)]
+        {
+            self.structural_face_lookups += 1;
+        }
+        let (entry, reads) = neovm_core::tagged::collection_reads::capture(|| {
+            self.face_cache
+                .get_key_value(&DisplayFaceCacheKey {
+                    base_face_id,
+                    face_value: *face_value,
+                })
+                .map(|(key, id)| (key.face_value.bits(), *id))
+        });
+        // Consecutive characters commonly reference the exact same face list.
+        // Keep structural equality for other values and observe every nested
+        // collection on hits so enclosing layout caches retain dependencies.
+        // Only retain identities already held by the structural cache itself.
+        self.last_face_lookup = entry.zip(reads).and_then(|((bits, face_id), reads)| {
+            (bits == face_value.bits()).then_some(ObservedFaceLookup {
                 base_face_id,
-                face_value: *face_value,
+                value_bits: bits,
+                face_id,
+                reads,
             })
-            .copied()
-            .map(RenderFaceRef::FaceId)
+        });
+        entry.map(|(_, id)| RenderFaceRef::FaceId(id))
     }
 
     fn cache_face(
@@ -188,6 +223,7 @@ impl DisplaySourceResolveState {
         face_id: FaceId,
         resolved: &ResolvedFace,
     ) {
+        self.last_face_lookup = None;
         self.face_cache.insert(
             DisplayFaceCacheKey {
                 base_face_id,

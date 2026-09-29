@@ -577,3 +577,45 @@ fn source_face_observations_borrow_the_existing_realization() {
         );
     }
 }
+
+#[test]
+fn consecutive_face_lookups_reuse_hashing_and_replay_mutable_dependencies() {
+    let _context = Context::new();
+    use neovm_core::tagged::collection_reads::capture;
+    let table = FaceTable::new();
+    let resolver = test_face_resolver(&table);
+    let mut state = DisplaySourceResolveState::default();
+    let base = FaceId::new(0);
+    let result = FaceId::new(20);
+    let value = Value::list(vec![Value::symbol(":height"), Value::fixnum(120)]);
+    state.cache_face(base, value, result, resolver.default_face());
+    for _ in 0..512 {
+        assert_eq!(state.cached_face(base, &value), Some(RenderFaceRef::FaceId(result)));
+    }
+    assert_eq!(state.structural_face_lookups, 1, "one structural lookup per unchanged face run");
+    let (_, reads) = capture(|| state.cached_face(base, &value));
+    let reads = reads.expect("lookup dependencies");
+    value.cons_cdr().set_car(Value::fixnum(180));
+    assert!(!reads.unchanged(), "fast hits must expose nested dependencies");
+    let lookups = state.structural_face_lookups;
+    state.cached_face(base, &value);
+    assert_eq!(state.structural_face_lookups, lookups + 1, "mutation must retry structural lookup");
+}
+
+#[test]
+fn consecutive_face_lookup_preserves_structural_equality_and_base_identity() {
+    let _context = Context::new();
+    let table = FaceTable::new();
+    let resolver = test_face_resolver(&table);
+    let mut state = DisplaySourceResolveState::default();
+    let base = FaceId::new(0);
+    let result = FaceId::new(20);
+    let value = Value::list(vec![Value::symbol(":height"), Value::fixnum(120)]);
+    let equal = Value::list(vec![Value::symbol(":height"), Value::fixnum(120)]);
+    state.cache_face(base, value, result, resolver.default_face());
+    assert_eq!(state.cached_face(base, &value), Some(RenderFaceRef::FaceId(result)));
+    assert_eq!(state.cached_face(base, &equal), Some(RenderFaceRef::FaceId(result)));
+    assert_eq!(state.cached_face(FaceId::new(1), &value), None);
+    state.cache_face(base, value, FaceId::new(21), resolver.default_face());
+    assert_eq!(state.cached_face(base, &value), Some(RenderFaceRef::FaceId(FaceId::new(21))));
+}
