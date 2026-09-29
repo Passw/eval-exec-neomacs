@@ -12,7 +12,24 @@
 //!   Call [`TuiSession::send`] to type keys and [`TuiSession::read`] to
 //!   advance the parser. [`TuiSession::screen`] returns the current
 //!   virtual screen. With `NEOMACS_TUI_RECORD=on`, each session also writes an
-//!   asciicast v3 recording under `target/tui-recordings`.
+//!   asciicast v3 recording under `target/tui-recordings`, and brackets every
+//!   key it sends with `NEOMACS_TUI_RECORD_DELAY_MS` -- `sleep, key, sleep` --
+//!   so the cast is watchable instead of a blur. The default is 2000 ms, `0`
+//!   turns pacing off, and the variable is only read while recording, so a
+//!   normal run sleeps nowhere. The leading wait is why the first key lands on
+//!   a screen the editor has finished painting rather than mid-redraw, and the
+//!   trailing one holds the response to the last key; between two consecutive
+//!   sends the gap is therefore twice the delay. A recorded run is not free:
+//!   at the default, a scenario driving a hundred keys takes about 400 s, so
+//!   lower the value when the pacing is not what you are inspecting.
+//!
+//!   A recorded run is also a *different execution*, not an observation of the
+//!   graded one: inserting seconds between keys changes what the editor does
+//!   -- idle timers fire, the echo area clears, which-key pops up, async
+//!   completion lands mid-command -- so a recorded run may pass or fail
+//!   differently from the same scenario without recording. It is a
+//!   diagnostic for a human; CI must never set it, and a green recorded run
+//!   is not evidence that the graded run is green.
 //!
 //! - [`emacs_key`] translates Emacs key descriptions (`"C-x"`, `"M-x"`,
 //!   `"RET"`) into the raw bytes a terminal would send.
@@ -39,7 +56,7 @@ mod recording;
 pub use launch::TuiLaunch;
 use pty_output::{PtyOutputEvent, PtyOutputPump};
 pub use recording::TuiRecordingScope;
-use recording::{RecordingIdentity, RecordingPolicy, SessionRecording, TerminalSize};
+use recording::{RecordingConfig, RecordingIdentity, SessionRecording, TerminalSize};
 
 // ── Session ──────────────────────────────────────────────────────────
 
@@ -303,6 +320,9 @@ pub struct TuiSession {
     parser: vt100::Parser,
     recent_output: Vec<u8>,
     recording: SessionRecording,
+    // Pacing around every recorded key send. Zero -- so `send` sleeps at all
+    // -- unless this session records, which only `RecordingConfig` decides.
+    recording_delay: Duration,
     home: SessionDirectory,
     // Keep TMPDIR isolated per session: interactive Org chooses one of only
     // 1,000 babel-stable names there and cleans it from kill-emacs-hook. A
@@ -384,15 +404,18 @@ impl TuiSession {
         terminal: TuiTerminalConfig,
         erase: PtyEraseChar,
     ) -> Self {
-        let policy = RecordingPolicy::parse(std::env::var_os(NEOMACS_TUI_RECORD).as_deref())
-            .unwrap_or_else(|message| panic!("{message}"));
+        let config = RecordingConfig::parse(
+            std::env::var_os(NEOMACS_TUI_RECORD).as_deref(),
+            std::env::var_os(NEOMACS_TUI_RECORD_DELAY_MS).as_deref(),
+        )
+        .unwrap_or_else(|message| panic!("{message}"));
         let root = tui_recording_root();
         Self::spawn_launch_with_recording(
             launch,
             name,
             terminal,
             erase,
-            policy,
+            config,
             &root,
             scope.session(name),
         )
@@ -403,7 +426,7 @@ impl TuiSession {
         name: &str,
         terminal: TuiTerminalConfig,
         erase: PtyEraseChar,
-        recording_policy: RecordingPolicy,
+        recording: RecordingConfig,
         recording_root: &Path,
         recording_identity: RecordingIdentity,
     ) -> Self {
@@ -411,8 +434,8 @@ impl TuiSession {
         pty.resize(pty_process::Size::new(terminal.rows, terminal.columns))
             .expect("resize pty");
         set_pty_erase_char(&pts, erase);
-        let recording = SessionRecording::start(
-            recording_policy,
+        let session_recording = SessionRecording::start(
+            recording.policy(),
             recording_root,
             recording_identity,
             &terminal.terminal_type,
@@ -493,7 +516,8 @@ impl TuiSession {
             _child: child,
             parser,
             recent_output: Vec::new(),
-            recording,
+            recording: session_recording,
+            recording_delay: recording.delay(),
             home,
             _tmp: tmp,
             name: name.to_string(),
@@ -505,7 +529,7 @@ impl TuiSession {
         launch: TuiLaunch,
         name: &str,
         terminal: TuiTerminalConfig,
-        policy: RecordingPolicy,
+        recording: RecordingConfig,
         root: &Path,
         identity: RecordingIdentity,
     ) -> Self {
@@ -514,7 +538,7 @@ impl TuiSession {
             name,
             terminal,
             PtyEraseChar::TerminalDefault,
-            policy,
+            recording,
             root,
             identity,
         )
@@ -662,7 +686,16 @@ impl TuiSession {
     }
 
     /// Send raw bytes to the PTY.
+    ///
+    /// Every key the harness types funnels through here: [`Self::send_key`],
+    /// [`Self::send_keys`], [`Self::paste`] and the paired drivers are all
+    /// this method. While a session records, it brackets the write with
+    /// `NEOMACS_TUI_RECORD_DELAY_MS`, so the recorded run is watchable rather
+    /// than a blur.
     pub fn send(&mut self, data: &[u8]) {
+        // Before: the key lands on a screen the editor has finished painting,
+        // not in the middle of the previous key's redraw.
+        self.pace_recording();
         let deadline = Instant::now() + Duration::from_secs(10);
         let mut written = 0;
 
@@ -696,6 +729,17 @@ impl TuiSession {
             }
         }
         self.recording.input(data);
+        // After: the editor's response to this key is drawn -- and recorded at
+        // its own observation time -- before the next key arrives, and the
+        // final key of a scenario leaves the last screen on display.
+        self.pace_recording();
+    }
+
+    /// Wait out the recording delay, if this session has one.
+    fn pace_recording(&self) {
+        if !self.recording_delay.is_zero() {
+            std::thread::sleep(self.recording_delay);
+        }
     }
 
     /// Paste text through the terminal's bracketed-paste protocol.
@@ -865,6 +909,7 @@ impl TuiSession {
 const NEOMACS_TUI_NEOMACS_BIN: &str = "NEOMACS_TUI_NEOMACS_BIN";
 const NEOMACS_TUI_RECORD: &str = "NEOMACS_TUI_RECORD";
 const NEOMACS_TUI_RECORD_DIR: &str = "NEOMACS_TUI_RECORD_DIR";
+const NEOMACS_TUI_RECORD_DELAY_MS: &str = "NEOMACS_TUI_RECORD_DELAY_MS";
 
 fn tui_recording_root() -> PathBuf {
     let workspace = workspace_root();

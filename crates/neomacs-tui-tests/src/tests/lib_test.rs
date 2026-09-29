@@ -1,7 +1,7 @@
 use super::{
     TuiLaunch, TuiProcessOutcome, TuiSession, TuiTempDirectory, TuiTerminalConfig, emacs_key,
     neomacs_binary_path_from_override,
-    recording::{RecordingIdentity, RecordingPolicy},
+    recording::{RecordingConfig, RecordingIdentity, RecordingPolicy},
 };
 use std::ffi::OsString;
 use std::io::{Read as _, Write as _};
@@ -138,7 +138,7 @@ fn tui_session_records_the_pty_interaction_at_its_public_artifact_path() {
         launch,
         "GNU",
         TuiTerminalConfig::new("xterm-256color", 24, 80),
-        RecordingPolicy::On,
+        RecordingConfig::new(RecordingPolicy::On, std::time::Duration::ZERO),
         artifacts.path(),
         RecordingIdentity::new("neomacs-tui-tests", "pty interaction", "GNU"),
     );
@@ -200,7 +200,7 @@ fn tui_session_recording_is_disabled_by_default() {
         TuiLaunch::new("sh").args(["-c", "printf ignored"]),
         "NEO",
         TuiTerminalConfig::default(),
-        RecordingPolicy::default(),
+        RecordingConfig::new(RecordingPolicy::default(), std::time::Duration::ZERO),
         artifacts.path(),
         RecordingIdentity::new("neomacs-tui-tests", "recording off", "NEO"),
     );
