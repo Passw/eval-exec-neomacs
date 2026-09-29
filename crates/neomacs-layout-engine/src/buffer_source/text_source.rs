@@ -359,19 +359,35 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
             return None;
         }
         let start = self.byte_pos(char_pos);
-        let end = self.byte_pos(char_pos.add_len(CharLen::new(1)).min(self.end));
-        let mut bytes = Vec::new();
-        self.buffer
-            .layout_copy_emacs_byte_range_to(EmacsByteRange::new(start, end), &mut bytes);
-        decode_emacs_char(
-            &bytes,
-            if self.buffer.layout_is_multibyte() {
-                EmacsTextStorage::Multibyte
-            } else {
-                EmacsTextStorage::Unibyte
-            },
-        )
-        .map(|(character, _)| character)
+        let first = self.buffer.layout_emacs_byte_at_pos(start)?;
+        let storage = if self.buffer.layout_is_multibyte() {
+            EmacsTextStorage::Multibyte
+        } else {
+            EmacsTextStorage::Unibyte
+        };
+        if first.is_ascii() || storage == EmacsTextStorage::Unibyte {
+            return decode_emacs_char(&[first], storage).map(|(character, _)| character);
+        }
+
+        // Decode a bounded prefix directly from the immutable view. A single
+        // Emacs character needs at most five bytes; neither a heap allocation
+        // nor a second character-to-byte lookup is needed to find its end.
+        let mut bytes = [0; neovm_core::emacs_core::emacs_char::MAX_MULTIBYTE_LENGTH];
+        let end = EmacsBytePos::new(
+            start
+                .get()
+                .saturating_add(bytes.len())
+                .min(self.buffer.layout_point_max_emacs_byte_pos().get()),
+        );
+        let mut len = 0;
+        let _: Result<(), std::convert::Infallible> = self
+            .buffer
+            .layout_try_for_each_emacs_byte_range_chunk(EmacsByteRange::new(start, end), |chunk| {
+                bytes[len..len + chunk.len()].copy_from_slice(chunk);
+                len += chunk.len();
+                Ok(())
+            });
+        decode_emacs_char(&bytes[..len], storage).map(|(character, _)| character)
     }
 
     fn text_slice(&self, start: CharPos0, end: CharPos0) -> String {

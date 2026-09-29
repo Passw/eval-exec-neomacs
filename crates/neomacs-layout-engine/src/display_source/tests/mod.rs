@@ -97,6 +97,66 @@ fn snapshot_with_text(text: &str) -> (BufferId, LayoutBufferSnapshot, CharPos0) 
 }
 
 #[test]
+fn buffer_character_lookahead_preserves_encoding_and_cursor_end() {
+    fn check<B: LayoutBufferView>(id: BufferId, view: &B, expected: &[EmacsChar]) {
+        for (index, &character) in expected.iter().enumerate() {
+            // Limit the cursor to this character even when more source follows.
+            let end = CharPos0::new(index + 1);
+            let source = BufferTextSourceCursor::new(
+                id,
+                view,
+                CharPos0::new(index),
+                end,
+                RenderFaceRef::FaceId(FaceId::new(0)),
+            );
+            assert_eq!(source.char_at(CharPos0::new(index)), Some(character));
+            assert_eq!(source.char_at(end), None);
+        }
+    }
+
+    for multibyte in [false, true] {
+        let codes = if multibyte {
+            vec![
+                0x41,
+                0xe9,
+                0x754c,
+                0x1f642,
+                MAX_5_BYTE_CHAR,
+                EmacsChar::from_byte8(0x80).code(),
+                EmacsChar::from_byte8(0xff).code(),
+            ]
+        } else {
+            vec![0x41, 0x80, 0xff]
+        };
+        let expected: Vec<_> = codes
+            .iter()
+            .map(|&code| {
+                if multibyte {
+                    EmacsChar::from_code(code).unwrap()
+                } else {
+                    EmacsChar::from_unibyte_byte(code as u8)
+                }
+            })
+            .collect();
+        let text = if multibyte {
+            LispString::from_emacs_bytes(
+                expected.iter().flat_map(|ch| ch.to_emacs_bytes()).collect(),
+            )
+        } else {
+            LispString::from_unibyte(codes.iter().map(|&code| code as u8).collect())
+        };
+        let mut eval = Context::new();
+        let id = eval.buffer_manager().current_buffer().unwrap().id();
+        let buffer = eval.buffer_manager_mut().get_mut(id).unwrap();
+        buffer.set_multibyte_value(multibyte);
+        buffer.insert_lisp_string(&text);
+        let buffer = eval.buffer_manager().get(id).unwrap();
+        check(id, buffer, &expected);
+        check(id, &LayoutBufferSnapshot::from_buffer(buffer), &expected);
+    }
+}
+
+#[test]
 fn text_sources_preserve_emacs_non_unicode_and_raw_byte_characters_for_display() {
     let mut bytes = Vec::new();
     for character in [
