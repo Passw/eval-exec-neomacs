@@ -1469,8 +1469,13 @@ fn backward_page_does_not_treat_bounded_wrapped_rows_as_covering_the_origin() {
     eval.frame_manager_mut().get_mut(frame).unwrap().window_system = Some(Value::symbol("neomacs"));
     let start = 201 * 90 + 1;
     eval.eval_str(&format!("(setq mode-line-format nil auto-window-vscroll nil scroll-preserve-screen-position nil) (put-text-property 1 200 'face '(:height 2.0)) (goto-char {start}) (set-window-start nil {start} t)")).unwrap();
+    let measured = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let observed = measured.clone();
     let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
     eval.install_window_layout_query(move |eval, frame, window, scope| {
+        if let neovm_core::window::WindowLayoutQueryScope::Rows { count, .. } = scope {
+            observed.borrow_mut().push(count.get());
+        }
         match query.query_window_layout(eval, frame, window, scope) {
             Ok(query) => WindowLayoutQueryOutcome::Ready(query),
             Err(error) => WindowLayoutQueryOutcome::Failed(error),
@@ -1479,6 +1484,8 @@ fn backward_page_does_not_treat_bounded_wrapped_rows_as_covering_the_origin() {
     let actual = eval.eval_str("(let ((noninteractive nil)) (scroll-down) (window-start))").unwrap().as_fixnum().unwrap();
     assert!(actual < start && actual > start - 201 * 3,
         "one wrapped screen page must stay near its origin: {start} -> {actual}");
+    assert!(measured.borrow().iter().sum::<usize>() < 128,
+        "a nearby page should not measure dozens of physical lines: {:?}", measured.borrow());
 }
 
 #[test]

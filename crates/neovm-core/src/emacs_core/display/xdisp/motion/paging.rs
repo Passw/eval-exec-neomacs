@@ -105,8 +105,10 @@ impl RowMeasurer {
         delta: i64,
         line_height: i64,
     ) -> Result<LispCharPos1, Flow> {
-        let mut count = 64usize;
-        let mut start = self.backtrack(eval, origin, if delta < 0 { count } else { 0 })?;
+        // Start small; actual measured heights decide whether to extend.
+        // A physical source line may span many visual rows.
+        let mut count = 8usize;
+        let mut start = self.backtrack(eval, origin, if delta < 0 { 1 } else { 0 })?;
         loop {
             let snapshot = self
                 .query(eval, start, count)?
@@ -169,7 +171,9 @@ impl RowMeasurer {
         start: LispCharPos1,
         height: i64,
     ) -> Result<Option<WindowDisplaySnapshot>, Flow> {
-        let mut count = 64usize;
+        // Start small; actual measured heights decide whether to extend.
+        // A physical source line may span many visual rows.
+        let mut count = 8usize;
         loop {
             let Some(snapshot) = self.query(eval, start, count)? else {
                 return Ok(None);
