@@ -327,8 +327,9 @@ pub struct TuiSession {
     parser: vt100::Parser,
     recent_output: Vec<u8>,
     recording: SessionRecording,
-    // Pacing around every recorded key send. Zero -- so `send` sleeps at all
-    // -- unless this session records, which only `RecordingConfig` decides.
+    // Pacing around every recorded key send: zero unless this session
+    // records, so `send` sleeps nowhere on a graded run. Only
+    // `RecordingConfig` can produce a non-zero value.
     recording_delay: Duration,
     home: SessionDirectory,
     // Keep TMPDIR isolated per session: interactive Org chooses one of only
