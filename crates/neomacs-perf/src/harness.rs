@@ -1415,6 +1415,14 @@ fn frontend_command(
         &prepared.sandbox,
         request.benchmark_environment(),
     );
+    if matches!(frontend, Frontend::Gui { .. }) {
+        // Keep adapter identity in stdout.log, including any software fallback,
+        // without enabling per-frame diagnostic logging during measurement.
+        command.env(
+            "RUST_LOG",
+            "warn,neomacs_display_runtime::render_thread::bootstrap=info",
+        );
+    }
     match frontend {
         Frontend::Batch => {}
         Frontend::Tui { rows, columns } => {

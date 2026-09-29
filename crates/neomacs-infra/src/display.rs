@@ -281,7 +281,10 @@ impl WestonBenchSession {
         }
         let child = command
             .arg("--backend=headless")
-            .arg("--renderer=pixman")
+            // GL exposes the GPU-backed Wayland surface capabilities clients
+            // need to select a hardware adapter. Pixman made Neomacs choose
+            // llvmpipe even on hosts with a working discrete Vulkan GPU.
+            .arg("--renderer=gl")
             // Xwayland is opt-in because only X11 clients need it; when absent
             // the session has no X server to wait for or tear down.
             .args(config.xwayland.then_some("--xwayland"))
