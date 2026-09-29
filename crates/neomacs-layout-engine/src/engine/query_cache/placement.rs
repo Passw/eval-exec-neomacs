@@ -89,3 +89,24 @@ pub(super) fn reposition(
     placed.layout_freshness = Some(current.clone());
     Some(WindowLayoutQuery::new(query.end(), Some(placed)))
 }
+
+/// An explicit Rows query already chooses its own start and zero vscroll.
+/// Moving the live viewport cannot move these pixels; point and every source
+/// dependency still have to match. The owner rejects fontification callbacks.
+pub(super) fn absolute_rows(
+    query: &WindowLayoutQuery,
+    current: &WindowDisplaySnapshotFreshness,
+) -> Option<WindowLayoutQuery> {
+    let snapshot = query.geometry()?;
+    if !snapshot
+        .layout_freshness
+        .as_ref()?
+        .same_query_row_content(current)
+        || !snapshot.chrome_strings.is_empty()
+    {
+        return None;
+    }
+    let mut snapshot = snapshot.clone();
+    snapshot.layout_freshness = Some(current.clone());
+    Some(WindowLayoutQuery::new(query.end(), Some(snapshot)))
+}

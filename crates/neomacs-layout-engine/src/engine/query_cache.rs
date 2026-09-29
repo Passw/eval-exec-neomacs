@@ -8,7 +8,12 @@ use std::collections::VecDeque;
 
 mod placement;
 
-const MAX_ENTRIES: usize = 4;
+// A page plan uses several row budgets at both ends. Bound payload as well
+// as entry count so these small observations can coexist without increasing
+// the previous worst-case point allocation (4 * 16,384).
+const MAX_ENTRIES: usize = 16;
+const MAX_TOTAL_ROWS: usize = 512;
+const MAX_TOTAL_POINTS: usize = 65_536;
 const MAX_ROWS: usize = 256;
 const MAX_POINTS: usize = 16_384;
 
@@ -65,8 +70,14 @@ impl QueryCache {
             if entry.query.geometry()?.layout_freshness.as_ref() == Some(&current) {
                 return Some(entry.query.clone());
             }
-            if scope != WindowLayoutQueryScope::Viewport {
-                return None;
+            if matches!(scope, WindowLayoutQueryScope::Rows { .. }) {
+                let source = evaluator.buffer_manager().get(buffer)?;
+                let fontification = source.buffer_local_value("fontification-functions")
+                    .or_else(|| evaluator.obarray().symbol_value("fontification-functions").copied());
+                if fontification.is_some_and(|value| !value.is_nil()) {
+                    return None;
+                }
+                return placement::absolute_rows(&entry.query, &current);
             }
             placement::reposition(&entry.query, &current, source_point)
         })
@@ -116,7 +127,10 @@ impl QueryCache {
                 || entry.window != window
                 || entry.scope != scope
                 || entry.source_point != source_point
-                || entry.query.geometry().and_then(|g| g.layout_freshness.as_ref())
+                || entry
+                    .query
+                    .geometry()
+                    .and_then(|g| g.layout_freshness.as_ref())
                     != snapshot.layout_freshness.as_ref()
         });
         self.entries.push_back(Entry {
@@ -127,7 +141,22 @@ impl QueryCache {
             collections,
             query: query.clone(),
         });
-        while self.entries.len() > MAX_ENTRIES {
+        while self.entries.len() > MAX_ENTRIES
+            || self
+                .entries
+                .iter()
+                .filter_map(|entry| entry.query.geometry())
+                .map(|s| s.rows.len())
+                .sum::<usize>()
+                > MAX_TOTAL_ROWS
+            || self
+                .entries
+                .iter()
+                .filter_map(|entry| entry.query.geometry())
+                .map(|s| s.points.len())
+                .sum::<usize>()
+                > MAX_TOTAL_POINTS
+        {
             self.entries.pop_front();
         }
     }

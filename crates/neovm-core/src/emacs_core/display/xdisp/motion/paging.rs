@@ -108,7 +108,8 @@ impl RowMeasurer {
         // Start small; actual measured heights decide whether to extend.
         // A physical source line may span many visual rows.
         let mut count = 8usize;
-        let mut start = self.backtrack(eval, origin, if delta < 0 { 1 } else { 0 })?;
+        let mut backtracked_lines = usize::from(delta < 0);
+        let mut start = self.backtrack(eval, origin, backtracked_lines)?;
         loop {
             let snapshot = self
                 .query(eval, start, count)?
@@ -124,7 +125,25 @@ impl RowMeasurer {
             {
                 let goal = rows[index].y.saturating_add(delta);
                 if delta < 0 && goal < rows[0].y && start > accessible.start_lisp() {
-                    start = self.backtrack(eval, start, count)?;
+                    // Physical lines can contain many visual rows. Extend
+                    // by the measured pixel deficit instead of interpreting
+                    // the current visual-row budget as a source-line count.
+                    let missing = rows[0].y.saturating_sub(goal).max(1) as u64;
+                    let covered = (rows[index].y - rows[0].y).max(line_height).max(1) as u64;
+                    let lines = missing
+                        .saturating_mul(backtracked_lines as u64)
+                        .div_ceil(covered)
+                        .clamp(1, 64) as usize;
+                    start = self.backtrack(eval, start, lines)?;
+                    backtracked_lines = backtracked_lines.saturating_add(lines);
+                    let minimum_height =
+                        rows.iter().map(|row| row.height.max(1)).min().unwrap() as u64;
+                    let extra = usize::try_from(missing.div_ceil(minimum_height))
+                        .map_err(|_| failure("Scroll measurement exceeds the row address space"))?;
+                    count = count.checked_add(extra.max(1)).ok_or_else(|| {
+                        failure("Scroll measurement exceeds the row address space")
+                    })?;
+                    continue;
                 } else if goal >= rows.last().expect("origin row").y
                     && rows.last().and_then(|row| row.end_buffer_pos) != Some(accessible.end_lisp())
                 {

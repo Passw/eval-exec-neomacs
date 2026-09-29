@@ -1217,10 +1217,16 @@ fn identical_geometry_queries_reuse_rows_and_mutations_force_a_new_walk() {
             let actual = query
                 .query_window_layout(&mut eval, frame, window, scope)
                 .unwrap();
-            assert!(
-                probe::max_depth() > 0,
-                "mutation reused stale rows: {change}"
-            );
+            if matches!(scope, WindowLayoutQueryScope::Rows { .. })
+                && change == "(set-window-vscroll nil 3 t)"
+            {
+                assert_eq!(probe::max_depth(), 0, "absolute rows moved with the viewport");
+            } else {
+                assert!(
+                    probe::max_depth() > 0,
+                    "mutation reused stale rows: {change}"
+                );
+            }
             let mut fresh = WindowLayoutQueryEngine::new_without_font_metrics();
             let expected = fresh
                 .query_window_layout(&mut eval, frame, window, scope)
@@ -1505,4 +1511,30 @@ fn bounded_truncated_rows_publish_only_their_consumed_line_tail() {
         let row = result.geometry().unwrap().rows.iter().find(|row| row.start_buffer_pos.is_some()).unwrap();
         assert_eq!(row.truncated_end_buffer_pos, Some(LispCharPos1::new(301)), "newline={newline}");
     }
+}
+
+#[test]
+fn absolute_row_queries_survive_viewport_placement_but_not_source_changes() {
+    use crate::engine::viewport_retry_depth_probe as probe;
+    use neovm_core::{buffer::LispCharPos1, window::WindowLayoutQueryScope};
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    eval.buffer_manager_mut().get_mut(buffer).unwrap().insert(&"short row\n".repeat(100));
+    let frame = eval.frame_manager_mut().create_frame("absolute-query", 400, 160, buffer);
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.eval_str("(goto-char 51) (setq mode-line-format nil)").unwrap();
+    let scope = WindowLayoutQueryScope::Rows { start: LispCharPos1::ONE, count: std::num::NonZeroUsize::new(8).unwrap() };
+    let mut engine = LayoutEngine::new_without_font_metrics();
+    engine.query_window_layout(&mut eval, frame, window, scope).unwrap();
+    eval.eval_str("(set-window-start nil 41 t) (set-window-vscroll nil 3 t)").unwrap();
+    probe::reset();
+    let actual = engine.query_window_layout(&mut eval, frame, window, scope).unwrap();
+    assert_eq!(probe::max_depth(), 0, "absolute rows do not depend on live viewport placement");
+    let mut fresh = WindowLayoutQueryEngine::new_without_font_metrics();
+    let expected = fresh.query_window_layout(&mut eval, frame, window, scope).unwrap();
+    assert_eq!(actual.geometry(), expected.geometry());
+    eval.eval_str("(put-text-property 1 5 'display \"changed\")").unwrap();
+    probe::reset();
+    engine.query_window_layout(&mut eval, frame, window, scope).unwrap();
+    assert!(probe::max_depth() > 0);
 }
