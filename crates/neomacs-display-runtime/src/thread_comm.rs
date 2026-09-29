@@ -1168,7 +1168,13 @@ impl RenderComms {
         let _ = self.send_input_with_receipt(event);
     }
 
-    pub fn send_input_with_receipt(&self, event: InputEvent) -> (Option<neomacs_display_protocol::input_progress::InputReceipt>, Option<neomacs_display_protocol::input_latency::InputToken>) {
+    pub fn send_input_with_receipt(
+        &self,
+        event: InputEvent,
+    ) -> (
+        Option<neomacs_display_protocol::input_progress::InputReceipt>,
+        Option<neomacs_display_protocol::input_latency::InputToken>,
+    ) {
         let receipt = if matches!(
             &event,
             InputEvent::Key {
@@ -1186,7 +1192,10 @@ impl RenderComms {
         };
         let observer = receipt.as_ref().map(|delivery| delivery.receipt());
         let event = Self::observe_scroll_input(event);
-        let token = match &event { InputEvent::Observed { token, .. } => Some(*token), _ => None };
+        let token = match &event {
+            InputEvent::Observed { token, .. } => Some(*token),
+            _ => None,
+        };
         let event = if let Some(receipt) = receipt {
             InputEvent::Tracked {
                 receipt,

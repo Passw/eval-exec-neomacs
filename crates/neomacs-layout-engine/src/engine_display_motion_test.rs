@@ -8,26 +8,55 @@ fn redisplay_keeps_a_fully_visible_cursor_row_when_its_source_line_continues() {
     use neovm_core::window::WindowLayoutQueryScope;
     let mut eval = Context::new();
     let buffer = eval.buffer_manager().current_buffer().unwrap().id();
-    eval.buffer_manager_mut().get_mut(buffer).unwrap().insert(&format!("head\n{}\n", "x".repeat(2000)));
-    let frame = eval.frame_manager_mut().create_frame("visible-wrap-cursor", 160, 160, buffer);
-    eval.frame_manager_mut().get_mut(frame).unwrap().window_system = Some(Value::symbol("neomacs"));
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert(&format!("head\n{}\n", "x".repeat(2000)));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("visible-wrap-cursor", 160, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
     eval.eval_str("(setq mode-line-format nil header-line-format nil tab-line-format nil) (goto-char 1) (set-window-start nil 1 t)").unwrap();
     let window = eval.frame_manager().get(frame).unwrap().selected_window;
     let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
-    let snapshot = query.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap().into_geometry().unwrap();
+    let snapshot = query
+        .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+        .unwrap()
+        .into_geometry()
+        .unwrap();
     let body = snapshot.regions.text_body;
     let outer = snapshot.regions.outer;
-    let row = snapshot.rows.iter().rev().find(|row| row.start_buffer_pos.is_some()
-        && row.y as f32 + outer.y >= body.y
-        && (row.y + row.height) as f32 + outer.y <= body.bottom()).unwrap();
+    let row = snapshot
+        .rows
+        .iter()
+        .rev()
+        .find(|row| {
+            row.start_buffer_pos.is_some()
+                && row.y as f32 + outer.y >= body.y
+                && (row.y + row.height) as f32 + outer.y <= body.bottom()
+        })
+        .unwrap();
     let point = row.start_buffer_pos.unwrap();
     assert!(point.as_i64() > 6 && point.as_i64() < 2000);
-    eval.eval_str(&format!("(goto-char {}) (set-window-start nil 1 t)", point.as_i64())).unwrap();
+    eval.eval_str(&format!(
+        "(goto-char {}) (set-window-start nil 1 t)",
+        point.as_i64()
+    ))
+    .unwrap();
     let mut engine = LayoutEngine::new_without_font_metrics();
     engine.layout_frame_rust(&mut eval, frame);
-    assert_eq!(eval.eval_str("(window-start)").unwrap(), Value::fixnum(1),
-        "a complete visible screen row must not scroll to expose the rest of its physical line");
-    assert_eq!(eval.eval_str("(point)").unwrap(), Value::fixnum(point.as_i64()));
+    assert_eq!(
+        eval.eval_str("(window-start)").unwrap(),
+        Value::fixnum(1),
+        "a complete visible screen row must not scroll to expose the rest of its physical line"
+    );
+    assert_eq!(
+        eval.eval_str("(point)").unwrap(),
+        Value::fixnum(point.as_i64())
+    );
 }
 
 #[test]
@@ -81,9 +110,17 @@ fn small_backward_pixel_measurement_starts_with_bounded_rows() {
     use std::{cell::RefCell, rc::Rc};
     let mut eval = Context::new();
     let buffer = eval.buffer_manager().current_buffer().unwrap().id();
-    eval.buffer_manager_mut().get_mut(buffer).unwrap().insert(&"row\n".repeat(1000));
-    let frame = eval.frame_manager_mut().create_frame("pixel-budget", 400, 160, buffer);
-    eval.frame_manager_mut().get_mut(frame).unwrap().window_system = Some(Value::symbol("neomacs"));
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert(&"row\n".repeat(1000));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("pixel-budget", 400, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
     let counts = Rc::new(RefCell::new(Vec::new()));
     let observed = counts.clone();
     let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
@@ -97,9 +134,16 @@ fn small_backward_pixel_measurement_starts_with_bounded_rows() {
         }
     });
     let result = eval.eval_str("(progn (goto-char 2001) (cdr (window-text-pixel-size nil '(2001 . -1) 2001 nil nil nil t)))").unwrap();
-    assert_eq!(neovm_core::emacs_core::print::print_value(&result), "(16 1997)");
+    assert_eq!(
+        neovm_core::emacs_core::print::print_value(&result),
+        "(16 1997)"
+    );
     assert!(!counts.borrow().is_empty());
-    assert!(counts.borrow().iter().all(|count| *count <= 4), "one-pixel measurement overmeasured: {:?}", counts.borrow());
+    assert!(
+        counts.borrow().iter().all(|count| *count <= 4),
+        "one-pixel measurement overmeasured: {:?}",
+        counts.borrow()
+    );
 }
 
 #[test]
@@ -1220,7 +1264,11 @@ fn identical_geometry_queries_reuse_rows_and_mutations_force_a_new_walk() {
             if matches!(scope, WindowLayoutQueryScope::Rows { .. })
                 && change == "(set-window-vscroll nil 3 t)"
             {
-                assert_eq!(probe::max_depth(), 0, "absolute rows moved with the viewport");
+                assert_eq!(
+                    probe::max_depth(),
+                    0,
+                    "absolute rows moved with the viewport"
+                );
             } else {
                 assert!(
                     probe::max_depth() > 0,
@@ -1290,19 +1338,33 @@ fn pixel_only_queries_reuse_complete_row_geometry() {
     use neovm_core::window::WindowLayoutQueryScope;
     let mut eval = Context::new();
     let buffer = eval.buffer_manager().current_buffer().unwrap().id();
-    eval.buffer_manager_mut().get_mut(buffer).unwrap().insert(&"ordinary row\n".repeat(100));
-    let frame = eval.frame_manager_mut().create_frame("query-pixel-placement", 400, 170, buffer);
-    eval.frame_manager_mut().get_mut(frame).unwrap().window_system = Some(Value::symbol("neomacs"));
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert(&"ordinary row\n".repeat(100));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("query-pixel-placement", 400, 170, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
     let window = eval.frame_manager().get(frame).unwrap().selected_window;
     eval.eval_str("(setq mode-line-format nil header-line-format nil tab-line-format nil) (goto-char 30) (set-window-vscroll nil 2 t t)").unwrap();
     let mut query = LayoutEngine::new_without_font_metrics();
-    query.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+    query
+        .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+        .unwrap();
     eval.eval_str("(set-window-vscroll nil 3 t t)").unwrap();
     probe::reset();
-    let actual = query.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+    let actual = query
+        .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+        .unwrap();
     let walks = probe::max_depth();
     let mut fresh = WindowLayoutQueryEngine::new_without_font_metrics();
-    let expected = fresh.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+    let expected = fresh
+        .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+        .unwrap();
     assert_eq!(actual.end(), expected.end());
     assert_eq!(actual.geometry(), expected.geometry());
     assert_eq!(walks, 0, "pixel placement rewalked unchanged complete rows");
@@ -1324,25 +1386,45 @@ fn pixel_query_placement_matches_fresh_wrapped_and_decorated_rows() {
     ] {
         let mut eval = Context::new();
         let buffer = eval.buffer_manager().current_buffer().unwrap().id();
-        eval.buffer_manager_mut().get_mut(buffer).unwrap().insert(&format!("{}\n", "abc def ghi ".repeat(20)).repeat(30));
-        let frame = eval.frame_manager_mut().create_frame("query-pixel-differential", 180, 200, buffer);
-        eval.frame_manager_mut().get_mut(frame).unwrap().window_system = Some(Value::symbol("neomacs"));
+        eval.buffer_manager_mut()
+            .get_mut(buffer)
+            .unwrap()
+            .insert(&format!("{}\n", "abc def ghi ".repeat(20)).repeat(30));
+        let frame =
+            eval.frame_manager_mut()
+                .create_frame("query-pixel-differential", 180, 200, buffer);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
         let window = eval.frame_manager().get(frame).unwrap().selected_window;
         eval.eval_str("(setq mode-line-format nil header-line-format nil tab-line-format nil word-wrap t) (goto-char 55)").unwrap();
         eval.eval_str(decoration).unwrap();
         let mut query = LayoutEngine::new_without_font_metrics();
         let mut reused = 0;
         for pixels in (0..32).chain((0..32).rev()) {
-            eval.eval_str(&format!("(set-window-vscroll nil {pixels} t t)")).unwrap();
+            eval.eval_str(&format!("(set-window-vscroll nil {pixels} t t)"))
+                .unwrap();
             probe::reset();
-            let actual = query.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+            let actual = query
+                .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+                .unwrap();
             reused += usize::from(probe::max_depth() == 0);
             let mut fresh = WindowLayoutQueryEngine::new_without_font_metrics();
-            let expected = fresh.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+            let expected = fresh
+                .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+                .unwrap();
             assert_eq!(actual.end(), expected.end(), "{decoration} pixels={pixels}");
-            assert_eq!(actual.geometry(), expected.geometry(), "{decoration} pixels={pixels}");
+            assert_eq!(
+                actual.geometry(),
+                expected.geometry(),
+                "{decoration} pixels={pixels}"
+            );
         }
-        assert!(reused > 4, "no pixel placement reuse: {decoration}, reused={reused}");
+        assert!(
+            reused > 4,
+            "no pixel placement reuse: {decoration}, reused={reused}"
+        );
     }
 }
 
@@ -1352,17 +1434,32 @@ fn ordinary_query_reuse_ignores_unread_lisp_collection_writes() {
     use neovm_core::window::WindowLayoutQueryScope;
     let mut eval = Context::new();
     let buffer = eval.buffer_manager().current_buffer().unwrap().id();
-    eval.buffer_manager_mut().get_mut(buffer).unwrap().insert(&"row\n".repeat(100));
-    let frame = eval.frame_manager_mut().create_frame("query-collections", 400, 170, buffer);
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert(&"row\n".repeat(100));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("query-collections", 400, 170, buffer);
     let window = eval.frame_manager().get(frame).unwrap().selected_window;
-    eval.eval_str("(setq unrelated-scroll-state (vector 0 (list 1 2)))").unwrap();
+    eval.eval_str("(setq unrelated-scroll-state (vector 0 (list 1 2)))")
+        .unwrap();
     let mut engine = LayoutEngine::new_without_font_metrics();
-    let initial = engine.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
-    eval.eval_str("(aset unrelated-scroll-state 0 1) (setcar (aref unrelated-scroll-state 1) 3)").unwrap();
+    let initial = engine
+        .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+        .unwrap();
+    eval.eval_str("(aset unrelated-scroll-state 0 1) (setcar (aref unrelated-scroll-state 1) 3)")
+        .unwrap();
     probe::reset();
-    let actual = engine.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+    let actual = engine
+        .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+        .unwrap();
     assert_eq!(initial.geometry(), actual.geometry());
-    assert_eq!(probe::max_depth(), 0, "unread collection writes forced another row walk");
+    assert_eq!(
+        probe::max_depth(),
+        0,
+        "unread collection writes forced another row walk"
+    );
 }
 
 #[test]
@@ -1386,7 +1483,9 @@ fn query_reuse_after_unrelated_local_write(invalidate_hook_cache: bool) {
     // The runtime's index is already warm during native input. Its cold
     // construction can conservatively observe the whole binding list once.
     assert_eq!(buf.buffer_local_value("deactivate-mark"), Some(Value::NIL));
-    let frame = eval.frame_manager_mut().create_frame("query-local-dependencies", 400, 170, buffer);
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("query-local-dependencies", 400, 170, buffer);
     let window = eval.frame_manager().get(frame).unwrap().selected_window;
     let mut engine = LayoutEngine::new_without_font_metrics();
     // Native scrolling starts after an ordinary redisplay has resolved the
@@ -1396,16 +1495,29 @@ fn query_reuse_after_unrelated_local_write(invalidate_hook_cache: bool) {
         // Timer callbacks commonly create temporary buffers and locals.
         // This invalidates the runtime's global localized-binding epoch.
         let observer = eval.buffer_manager_mut().create_buffer("observer");
-        eval.buffer_manager_mut().get_mut(observer).unwrap()
+        eval.buffer_manager_mut()
+            .get_mut(observer)
+            .unwrap()
             .set_buffer_local("observer-local", Value::T);
     }
-    let initial = engine.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+    let initial = engine
+        .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+        .unwrap();
     for value in [Value::T, Value::NIL] {
-        eval.buffer_manager_mut().get_mut(buffer).unwrap().set_buffer_local("deactivate-mark", value);
+        eval.buffer_manager_mut()
+            .get_mut(buffer)
+            .unwrap()
+            .set_buffer_local("deactivate-mark", value);
         probe::reset();
-        let actual = engine.query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport).unwrap();
+        let actual = engine
+            .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+            .unwrap();
         assert_eq!(initial.geometry(), actual.geometry());
-        assert_eq!(probe::max_depth(), 0, "unrelated local binding forced another row walk");
+        assert_eq!(
+            probe::max_depth(),
+            0,
+            "unrelated local binding forced another row walk"
+        );
     }
 }
 
@@ -1469,10 +1581,17 @@ fn repeated_query_points_keep_bounded_independent_observations() {
 fn backward_page_does_not_treat_bounded_wrapped_rows_as_covering_the_origin() {
     let mut eval = Context::new();
     let buffer = eval.buffer_manager().current_buffer().unwrap().id();
-    eval.buffer_manager_mut().get_mut(buffer).unwrap()
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
         .insert(&format!("{}\n", "x".repeat(200)).repeat(120));
-    let frame = eval.frame_manager_mut().create_frame("bounded-page", 160, 160, buffer);
-    eval.frame_manager_mut().get_mut(frame).unwrap().window_system = Some(Value::symbol("neomacs"));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("bounded-page", 160, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
     let start = 201 * 90 + 1;
     eval.eval_str(&format!("(setq mode-line-format nil auto-window-vscroll nil scroll-preserve-screen-position nil) (put-text-property 1 200 'face '(:height 2.0)) (goto-char {start}) (set-window-start nil {start} t)")).unwrap();
     let measured = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
@@ -1481,17 +1600,28 @@ fn backward_page_does_not_treat_bounded_wrapped_rows_as_covering_the_origin() {
     eval.install_window_layout_query(move |eval, frame, window, scope| {
         match query.query_window_layout(eval, frame, window, scope) {
             Ok(query) => {
-                observed.borrow_mut().push(query.geometry().map_or(0, |snapshot| snapshot.rows.len()));
+                observed
+                    .borrow_mut()
+                    .push(query.geometry().map_or(0, |snapshot| snapshot.rows.len()));
                 WindowLayoutQueryOutcome::Ready(query)
-            },
+            }
             Err(error) => WindowLayoutQueryOutcome::Failed(error),
         }
     });
-    let actual = eval.eval_str("(let ((noninteractive nil)) (scroll-down) (window-start))").unwrap().as_fixnum().unwrap();
-    assert!(actual < start && actual > start - 201 * 3,
-        "one wrapped screen page must stay near its origin: {start} -> {actual}");
-    assert!(measured.borrow().iter().sum::<usize>() < 128,
-        "a nearby page should not measure dozens of physical lines: {:?}", measured.borrow());
+    let actual = eval
+        .eval_str("(let ((noninteractive nil)) (scroll-down) (window-start))")
+        .unwrap()
+        .as_fixnum()
+        .unwrap();
+    assert!(
+        actual < start && actual > start - 201 * 3,
+        "one wrapped screen page must stay near its origin: {start} -> {actual}"
+    );
+    assert!(
+        measured.borrow().iter().sum::<usize>() < 128,
+        "a nearby page should not measure dozens of physical lines: {:?}",
+        measured.borrow()
+    );
 }
 
 #[test]
@@ -1500,16 +1630,45 @@ fn bounded_truncated_rows_publish_only_their_consumed_line_tail() {
     for newline in [false, true] {
         let mut eval = Context::new();
         let buffer = eval.buffer_manager().current_buffer().unwrap().id();
-        let text = format!("{}{}", "x".repeat(300), if newline { "\nlater\n" } else { "" });
-        eval.buffer_manager_mut().get_mut(buffer).unwrap().insert(&text);
-        let frame = eval.frame_manager_mut().create_frame("truncated-tail", 160, 160, buffer);
+        let text = format!(
+            "{}{}",
+            "x".repeat(300),
+            if newline { "\nlater\n" } else { "" }
+        );
+        eval.buffer_manager_mut()
+            .get_mut(buffer)
+            .unwrap()
+            .insert(&text);
+        let frame = eval
+            .frame_manager_mut()
+            .create_frame("truncated-tail", 160, 160, buffer);
         let window = eval.frame_manager().get(frame).unwrap().selected_window;
-        eval.eval_str("(setq truncate-lines t mode-line-format nil) (goto-char 1)").unwrap();
+        eval.eval_str("(setq truncate-lines t mode-line-format nil) (goto-char 1)")
+            .unwrap();
         let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
-        let result = query.query_window_layout(&mut eval, frame, window,
-            WindowLayoutQueryScope::Rows { start: LispCharPos1::ONE, count: std::num::NonZeroUsize::new(1).unwrap() }).unwrap();
-        let row = result.geometry().unwrap().rows.iter().find(|row| row.start_buffer_pos.is_some()).unwrap();
-        assert_eq!(row.truncated_end_buffer_pos, Some(LispCharPos1::new(301)), "newline={newline}");
+        let result = query
+            .query_window_layout(
+                &mut eval,
+                frame,
+                window,
+                WindowLayoutQueryScope::Rows {
+                    start: LispCharPos1::ONE,
+                    count: std::num::NonZeroUsize::new(1).unwrap(),
+                },
+            )
+            .unwrap();
+        let row = result
+            .geometry()
+            .unwrap()
+            .rows
+            .iter()
+            .find(|row| row.start_buffer_pos.is_some())
+            .unwrap();
+        assert_eq!(
+            row.truncated_end_buffer_pos,
+            Some(LispCharPos1::new(301)),
+            "newline={newline}"
+        );
     }
 }
 
@@ -1519,23 +1678,46 @@ fn absolute_row_queries_survive_viewport_placement_but_not_source_changes() {
     use neovm_core::{buffer::LispCharPos1, window::WindowLayoutQueryScope};
     let mut eval = Context::new();
     let buffer = eval.buffer_manager().current_buffer().unwrap().id();
-    eval.buffer_manager_mut().get_mut(buffer).unwrap().insert(&"short row\n".repeat(100));
-    let frame = eval.frame_manager_mut().create_frame("absolute-query", 400, 160, buffer);
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert(&"short row\n".repeat(100));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("absolute-query", 400, 160, buffer);
     let window = eval.frame_manager().get(frame).unwrap().selected_window;
-    eval.eval_str("(goto-char 51) (setq mode-line-format nil)").unwrap();
-    let scope = WindowLayoutQueryScope::Rows { start: LispCharPos1::ONE, count: std::num::NonZeroUsize::new(8).unwrap() };
+    eval.eval_str("(goto-char 51) (setq mode-line-format nil)")
+        .unwrap();
+    let scope = WindowLayoutQueryScope::Rows {
+        start: LispCharPos1::ONE,
+        count: std::num::NonZeroUsize::new(8).unwrap(),
+    };
     let mut engine = LayoutEngine::new_without_font_metrics();
-    engine.query_window_layout(&mut eval, frame, window, scope).unwrap();
-    eval.eval_str("(set-window-start nil 41 t) (set-window-vscroll nil 3 t)").unwrap();
+    engine
+        .query_window_layout(&mut eval, frame, window, scope)
+        .unwrap();
+    eval.eval_str("(set-window-start nil 41 t) (set-window-vscroll nil 3 t)")
+        .unwrap();
     probe::reset();
-    let actual = engine.query_window_layout(&mut eval, frame, window, scope).unwrap();
-    assert_eq!(probe::max_depth(), 0, "absolute rows do not depend on live viewport placement");
+    let actual = engine
+        .query_window_layout(&mut eval, frame, window, scope)
+        .unwrap();
+    assert_eq!(
+        probe::max_depth(),
+        0,
+        "absolute rows do not depend on live viewport placement"
+    );
     let mut fresh = WindowLayoutQueryEngine::new_without_font_metrics();
-    let expected = fresh.query_window_layout(&mut eval, frame, window, scope).unwrap();
+    let expected = fresh
+        .query_window_layout(&mut eval, frame, window, scope)
+        .unwrap();
     assert_eq!(actual.geometry(), expected.geometry());
-    eval.eval_str("(put-text-property 1 5 'display \"changed\")").unwrap();
+    eval.eval_str("(put-text-property 1 5 'display \"changed\")")
+        .unwrap();
     probe::reset();
-    engine.query_window_layout(&mut eval, frame, window, scope).unwrap();
+    engine
+        .query_window_layout(&mut eval, frame, window, scope)
+        .unwrap();
     assert!(probe::max_depth() > 0);
 }
 

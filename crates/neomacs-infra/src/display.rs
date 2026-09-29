@@ -629,8 +629,8 @@ pub fn start_sway(artifact_root: &Path, config: &str) -> io::Result<DisplaySessi
     let runtime = artifact_root.to_string_lossy().into_owned();
 
     let program = std::env::var_os("NEOMACS_GUI_SWAY").unwrap_or_else(|| "sway".into());
-    let renderer = std::env::var("NEOMACS_GUI_SWAY_RENDERER")
-        .unwrap_or_else(|_| "pixman".to_owned());
+    let renderer =
+        std::env::var("NEOMACS_GUI_SWAY_RENDERER").unwrap_or_else(|_| "pixman".to_owned());
     fs::write(artifact_root.join("sway-renderer-request"), &renderer)?;
     let mut pending = PendingSwaySession::default();
     let child = Command::new(&program)

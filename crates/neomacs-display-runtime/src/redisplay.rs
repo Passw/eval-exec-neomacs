@@ -124,10 +124,17 @@ pub struct RedisplayRuntime {
 }
 
 impl RedisplayRuntime {
-    pub fn resolved_scroll_preview(&self, evaluator: &Context, frame: FrameId, window: WindowId,
-        inputs: Vec<neomacs_display_protocol::input_progress::InputReceipt>)
-        -> Option<neomacs_display_protocol::scroll_coverage::ResolvedScrollIntent> {
-        self.engine.try_borrow().ok()?.resolved_scroll_preview(evaluator, frame, window, inputs)
+    pub fn resolved_scroll_preview(
+        &self,
+        evaluator: &Context,
+        frame: FrameId,
+        window: WindowId,
+        inputs: Vec<neomacs_display_protocol::input_progress::InputReceipt>,
+    ) -> Option<neomacs_display_protocol::scroll_coverage::ResolvedScrollIntent> {
+        self.engine
+            .try_borrow()
+            .ok()?
+            .resolved_scroll_preview(evaluator, frame, window, inputs)
     }
 
     pub fn maintain_scroll_coverage(

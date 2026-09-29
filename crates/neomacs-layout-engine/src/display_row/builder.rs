@@ -1165,7 +1165,11 @@ impl DisplayRowGlyphSlot {
     }
 
     pub(crate) fn cell_height(&self, face_height: f32, default_height: f32) -> f32 {
-        if self.default_cell_height { default_height } else { face_height }
+        if self.default_cell_height {
+            default_height
+        } else {
+            face_height
+        }
     }
 
     pub(crate) fn with_text_glyph_offset(mut self, offset: usize) -> Self {
@@ -1948,7 +1952,8 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
                 crate::display_item::DisplaySourceMappedText::face_segment(
                     input.text,
                     input.glyph_string_start,
-                ).with_measurement_face(input.measurement_face),
+                )
+                .with_measurement_face(input.measurement_face),
             ),
             layout: input.layout,
             pointer_appearance: input.pointer_appearance,
@@ -2009,7 +2014,8 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
                 self.writer
                     .item_horizontal_advance_px(ch, face_id, natural_advance, item_layout);
             let overflowing = !(self.buffer_tab_admission && ch == '\t')
-                && advance > 0.0 && self.position.x_px + advance > self.max_x_px;
+                && advance > 0.0
+                && self.position.x_px + advance > self.max_x_px;
             if overflowing
                 && (self.writer.overflow_policy()
                     == DisplayRowOverflowPolicy::RejectOverflowingGlyph
@@ -2056,15 +2062,20 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
                 &self.writer.row.glyphs[self.writer.area_index()],
                 self.writer.layout.char_width_px,
             );
-            slots.push(DisplayRowGlyphSlot::with_pointer_appearance(
-                source_mapping.slot_source(&span.start, char_offset, byte_offset),
-                slot_start.x_px(),
-                slot_start.col(),
-                written.width_px(),
-                written.width_cols(),
-                pointer_appearance.cloned(),
-            ).with_default_cell_height(ch == '\t' && matches!(source_mapping, DisplayTextSourceMapping::NaturalText))
-                .with_text_glyph_offset(before_len - glyph_start));
+            slots.push(
+                DisplayRowGlyphSlot::with_pointer_appearance(
+                    source_mapping.slot_source(&span.start, char_offset, byte_offset),
+                    slot_start.x_px(),
+                    slot_start.col(),
+                    written.width_px(),
+                    written.width_cols(),
+                    pointer_appearance.cloned(),
+                )
+                .with_default_cell_height(
+                    ch == '\t' && matches!(source_mapping, DisplayTextSourceMapping::NaturalText),
+                )
+                .with_text_glyph_offset(before_len - glyph_start),
+            );
             self.advance(written);
             metrics.add(written);
             byte_offset += ch.len_utf8();

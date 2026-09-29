@@ -5,8 +5,8 @@
 //! prepares a snapshot. Production recording is speculative; focused lifecycle
 //! tests can also mirror output-cursor moves into a live window.
 
-mod row_geometry;
 pub(crate) mod prepared_body;
+mod row_geometry;
 mod snapshot_rows;
 use row_geometry::WindowRowGeometry;
 

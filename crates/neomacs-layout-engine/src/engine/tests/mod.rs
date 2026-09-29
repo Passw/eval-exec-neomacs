@@ -2956,7 +2956,8 @@ impl GlyphTrace {
                     // Resource IDs are local to each font service, too. Keep
                     // binding presence and the exact font path/attributes;
                     // allocation order is not a rendering difference.
-                    f.default_resolved_font_id = f.default_resolved_font_id
+                    f.default_resolved_font_id = f
+                        .default_resolved_font_id
                         .map(|_| neomacs_display_protocol::font::ResolvedFontId(0));
                     format!("{f:?}")
                 })

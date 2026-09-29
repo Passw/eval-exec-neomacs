@@ -99,8 +99,12 @@ impl Receipts {
             .and_then(|seconds| seconds.checked_add(u64::from(timestamp.nanoseconds)))
         {
             neomacs_display_protocol::input_latency::projected_confirmed(
-                submission.frame, submission.serial,
-                neomacs_display_protocol::input_latency::PlatformTimestamp { clock_id: timestamp.clock_id, nanoseconds },
+                submission.frame,
+                submission.serial,
+                neomacs_display_protocol::input_latency::PlatformTimestamp {
+                    clock_id: timestamp.clock_id,
+                    nanoseconds,
+                },
             );
             neomacs_display_protocol::input_latency::confirmed(
                 submission.layout,
@@ -278,7 +282,11 @@ impl Session {
             height: size.1,
             scale,
         };
-        neomacs_display_protocol::input_latency::projected_requested(projected, frame, submission.serial);
+        neomacs_display_protocol::input_latency::projected_requested(
+            projected,
+            frame,
+            submission.serial,
+        );
         self.receipts
             .pending
             .requested(submission.serial, observe_platform_now());

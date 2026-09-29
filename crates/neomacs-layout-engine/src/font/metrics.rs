@@ -1058,12 +1058,7 @@ impl FontMetricsService {
         self.build_attrs_unpinned(family, weight, slant)
     }
 
-    fn build_attrs_unpinned(
-        &mut self,
-        family: &str,
-        weight: u16,
-        slant: FontSlant,
-    ) -> AttrsOwned {
+    fn build_attrs_unpinned(&mut self, family: &str, weight: u16, slant: FontSlant) -> AttrsOwned {
         let mut attrs = Attrs::new();
 
         attrs = match crate::font::font_match::select_cosmic_family(&self.font_system, family) {

@@ -656,7 +656,11 @@ impl LayoutEngine {
         end: CharPos0,
     ) -> Result<(), RowProgramError> {
         self.begin_scroll_coverage(evaluator, frame, window, start)?;
-        self.scroll_coverage.capture.as_mut().unwrap().stop_at_source = Some(end);
+        self.scroll_coverage
+            .capture
+            .as_mut()
+            .unwrap()
+            .stop_at_source = Some(end);
         while self.capture_scroll_step(evaluator)? {}
         Ok(())
     }
@@ -921,13 +925,18 @@ impl LayoutEngine {
             capture.position,
             capture.char_budget,
             32,
-            capture.programs.last().is_some_and(|program| !program.is_complete()),
+            capture
+                .programs
+                .last()
+                .is_some_and(|program| !program.is_complete()),
             context,
             &mut capture.attempt,
             || false,
         )?;
         if !captured.roots.is_empty() {
-            capture.roots.push(evaluator.retain_gc_roots(captured.roots));
+            capture
+                .roots
+                .push(evaluator.retain_gc_roots(captured.roots));
         }
         let mut realizer = DisplayRowFaceRealizer::new(&mut self.font_metrics);
         let mut faces = vec![realizer.realize_face(
@@ -1040,7 +1049,13 @@ impl LayoutEngine {
                 capture.font_snapshots.push(shared.clone());
                 shared
             };
-            RowProgram::capture_fragment(geometry, captured.items, faces, RowMeasurements::Deferred(fonts), limits)?
+            RowProgram::capture_fragment(
+                geometry,
+                captured.items,
+                faces,
+                RowMeasurements::Deferred(fonts),
+                limits,
+            )?
         } else {
             let mut measurer = DisplayRowGlyphMeasurer::with_mode(
                 &faces,
@@ -1057,9 +1072,15 @@ impl LayoutEngine {
                 limits,
             )?
         };
-        if program.is_complete() != captured.complete { return Err(RowProgramError::Unsupported); }
+        if program.is_complete() != captured.complete {
+            return Err(RowProgramError::Unsupported);
+        }
         capture.position = captured.end;
-        capture.programs.push(program.with_trailing_text_continuation(captured.trailing_text_continues).with_buffer_source_start(captured.source_start));
+        capture.programs.push(
+            program
+                .with_trailing_text_continuation(captured.trailing_text_continues)
+                .with_buffer_source_start(captured.source_start),
+        );
         Ok(())
     }
 }

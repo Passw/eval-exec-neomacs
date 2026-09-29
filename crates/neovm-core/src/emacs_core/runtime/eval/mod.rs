@@ -3318,13 +3318,23 @@ pub struct Context {
     pub redisplay_fn: Option<Box<dyn FnMut(&mut Self)>>,
     /// Optional GUI observer of a complete marker-backed scroll transition.
     #[allow(clippy::type_complexity)]
-    pub scroll_preview_fn: Option<Box<dyn FnMut(&Self, crate::window::FrameId, crate::window::WindowId, Vec<neomacs_display_protocol::input_progress::InputReceipt>)>>,
+    pub scroll_preview_fn: Option<
+        Box<
+            dyn FnMut(
+                &Self,
+                crate::window::FrameId,
+                crate::window::WindowId,
+                Vec<neomacs_display_protocol::input_progress::InputReceipt>,
+            ),
+        >,
+    >,
     /// One bounded, read-only display maintenance step during idle input waits
     /// or a GUI command boundary when input remains queued. The delay requests
     /// another idle wakeup; the boolean requests publication after releasing
     /// the engine borrow. Installing this also enables periodic GUI service.
     #[allow(clippy::type_complexity)]
-    pub display_idle_maintenance_fn: Option<Box<dyn FnMut(&Self) -> (Option<std::time::Duration>, bool)>>,
+    pub display_idle_maintenance_fn:
+        Option<Box<dyn FnMut(&Self) -> (Option<std::time::Duration>, bool)>>,
     /// Frontend-installed frame snapshot hook (`neomacs--frame-snapshot`).
     /// Same seam pattern as `redisplay_fn`: neovm-core cannot reach the
     /// layout engine, so the frontend lays out the requested frames on

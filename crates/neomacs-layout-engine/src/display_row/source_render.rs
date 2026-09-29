@@ -853,9 +853,12 @@ impl<'a> TextRowOutputRenderState<'a> {
     /// dropping the partial-word glyphs that the word-wrap break rewinds past.
     #[cfg(test)]
     fn restore_current_row_glyph_checkpoint(&mut self, checkpoint: DisplayRowGlyphCheckpoint) {
-        self.output
-            .current_row_output()
-            .apply_current_row_mutation(DisplayRowGlyphCheckpointRestoreMutation { checkpoint, source_end: None });
+        self.output.current_row_output().apply_current_row_mutation(
+            DisplayRowGlyphCheckpointRestoreMutation {
+                checkpoint,
+                source_end: None,
+            },
+        );
     }
 
     /// Append a trailing `:extend` fill stretch to the current row's TEXT area

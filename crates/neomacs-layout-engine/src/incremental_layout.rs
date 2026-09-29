@@ -295,7 +295,8 @@ impl RetainedWindowKey {
             fontset_generation: neovm_core::emacs_core::fontset::fontset_generation(),
             media_generation: evaluator.media_generation(),
             char_table_revision: neovm_core::window::CharTableLayoutRevision::current(),
-            symbol_property_revision: neovm_core::emacs_core::symbol::SymbolPropertyRevision::current(),
+            symbol_property_revision:
+                neovm_core::emacs_core::symbol::SymbolPropertyRevision::current(),
             display_table: evaluator
                 .layout_display_table_input(neovm_core::buffer::BufferId(p.buffer_id))
                 .unwrap_or_default(),

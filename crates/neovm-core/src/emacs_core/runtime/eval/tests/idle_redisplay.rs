@@ -86,10 +86,16 @@ fn category_symbol_writes_invalidate_idle_redisplay() {
     let (mut eval, layouts) = idle_context();
     eval.eval_str("(progn (put 'idle-category 'face '(:height 100)) (overlay-put (make-overlay 1 20) 'category 'idle-category) (redisplay))").unwrap();
     assert_eq!(layouts.get(), 1);
-    eval.eval_str("(progn (put 'idle-category 'face '(:height 200)) (redisplay))").unwrap();
+    eval.eval_str("(progn (put 'idle-category 'face '(:height 200)) (redisplay))")
+        .unwrap();
     assert_eq!(layouts.get(), 2, "category face mutation must repaint");
     eval.eval_str("(redisplay)").unwrap();
     assert_eq!(layouts.get(), 2, "unchanged category must remain idle");
-    eval.eval_str("(progn (put 'unrelated-wheel-event 'event-kind 'mouse-click) (redisplay))").unwrap();
-    assert_eq!(layouts.get(), 2, "event metadata is not a layout dependency");
+    eval.eval_str("(progn (put 'unrelated-wheel-event 'event-kind 'mouse-click) (redisplay))")
+        .unwrap();
+    assert_eq!(
+        layouts.get(),
+        2,
+        "event metadata is not a layout dependency"
+    );
 }

@@ -9,11 +9,11 @@ mod export;
 mod measurement;
 
 use super::*;
-use neomacs_display_protocol::GlyphRowRole;
 use crate::frame_face_arena::PreparedFaceSnapshot;
 use crate::incremental_layout::WindowDelta;
-use neovm_core::tagged::collection_reads::CollectionReads;
+use neomacs_display_protocol::GlyphRowRole;
 use neovm_core::buffer::CharPos0;
+use neovm_core::tagged::collection_reads::CollectionReads;
 use std::collections::VecDeque;
 
 const MAX_VIEWPORTS: usize = 8;
@@ -205,7 +205,9 @@ impl PreparedViewports {
             };
             if self.entries[victim].computed {
                 let owner = (self.entries[victim].frame, self.entries[victim].window);
-                if let Some(export) = self.exports.iter()
+                if let Some(export) = self
+                    .exports
+                    .iter()
                     .find(|export| (export.frame, export.window) == owner)
                 {
                     // FIFO can remove the only bridge beside the viewport
@@ -217,7 +219,10 @@ impl PreparedViewports {
                     // upcoming command rather than the current viewport.
                     let distance = |entry: &PreparedViewport| {
                         let source = text_source_range(&entry.retained);
-                        export.visible_source.start.saturating_sub(source.end)
+                        export
+                            .visible_source
+                            .start
+                            .saturating_sub(source.end)
                             .max(source.start.saturating_sub(export.visible_source.end))
                     };
                     let mut farthest = distance(&self.entries[victim]);

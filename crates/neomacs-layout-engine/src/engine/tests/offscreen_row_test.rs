@@ -417,8 +417,13 @@ fn first_visit_with_setup(
 }
 
 fn first_visit_with_setup_and_gc(
-    face: Option<&str>, line: &str, change: Option<&str>, shift: usize,
-    point_row: usize, setup: Option<&str>, collect: bool,
+    face: Option<&str>,
+    line: &str,
+    change: Option<&str>,
+    shift: usize,
+    point_row: usize,
+    setup: Option<&str>,
+    collect: bool,
 ) {
     let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
     eval.frame_manager_mut()
@@ -444,7 +449,9 @@ fn first_visit_with_setup_and_gc(
     engine
         .request_scroll_coverage(&eval, frame, window, CharPos0::new(start))
         .unwrap();
-    if collect { eval.gc_collect_exact(); }
+    if collect {
+        eval.gc_collect_exact();
+    }
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     while !engine
         .scroll_coverage
@@ -457,7 +464,9 @@ fn first_visit_with_setup_and_gc(
         );
         std::thread::yield_now();
     }
-    if collect { eval.gc_collect_exact(); }
+    if collect {
+        eval.gc_collect_exact();
+    }
     let start = start + shift * line_chars;
     let start_byte = start_byte + shift * line.len();
     let display_window = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
@@ -1524,7 +1533,11 @@ fn worker_keeps_complete_prefix_before_unsupported_rows() {
             *force_start = true;
         }
         engine.layout_frame_rust(&mut eval, frame);
-        assert_eq!(engine.last_layout_stats().reused_shifted_rows, 2, "{boundary}");
+        assert_eq!(
+            engine.last_layout_stats().reused_shifted_rows,
+            2,
+            "{boundary}"
+        );
         let actual = selected_window_layout_trace(&eval, &engine, frame);
         let mut fresh = LayoutEngine::new();
         fresh.layout_frame_rust(&mut eval, frame);
@@ -1921,8 +1934,14 @@ fn canonical_word_wrap_rewinds_source_end_and_output_pen_with_glyphs() {
 
 #[test]
 fn worker_prepares_long_physical_lines_across_bounded_capture_steps() {
-    first_visit_with_setup(None, &format!("{}\n", "W".repeat(180)),
-        None, 0, 2, Some("(setq word-wrap t)"));
+    first_visit_with_setup(
+        None,
+        &format!("{}\n", "W".repeat(180)),
+        None,
+        0,
+        2,
+        Some("(setq word-wrap t)"),
+    );
 }
 
 #[test]
@@ -1930,8 +1949,14 @@ fn worker_prepares_tabs_after_wrapped_text_with_physical_line_origin() {
     for word_wrap in ["nil", "t"] {
         for width in [48, 49, 50, 51, 74, 75, 76, 180] {
             for tail in ["\tend", "\t\tend", "word \t tail"] {
-                first_visit_with_setup(None, &format!("{}{}\n", "W".repeat(width), tail),
-                    None, 0, 2, Some(&format!("(setq word-wrap {word_wrap})")));
+                first_visit_with_setup(
+                    None,
+                    &format!("{}{}\n", "W".repeat(width), tail),
+                    None,
+                    0,
+                    2,
+                    Some(&format!("(setq word-wrap {word_wrap})")),
+                );
             }
         }
     }
@@ -2165,8 +2190,18 @@ fn worker_overlay_insertions_preserve_box_and_hover_faces() {
 fn worker_overlay_insertions_preserve_unstyled_default_face() {
     let line = "ordinary offscreen text\n";
     let start = 120 * line.len() + 1;
-    first_visit_with_setup_and_gc(None, line, None, 0, 2, Some(&format!(
-        "(overlay-put (make-overlay {start} {}) 'before-string \"plain\")", start + 100)), true);
+    first_visit_with_setup_and_gc(
+        None,
+        line,
+        None,
+        0,
+        2,
+        Some(&format!(
+            "(overlay-put (make-overlay {start} {}) 'before-string \"plain\")",
+            start + 100
+        )),
+        true,
+    );
 }
 
 #[test]
@@ -3193,7 +3228,10 @@ fn full_height_worker_preview_finishes_acquisition() {
         engine.maintain_scroll_coverage(&eval);
         if engine.prepared_viewports.has_computed(frame, owner) {
             assert!(
-                engine.scroll_coverage.active_capture_start_for_test().is_none(),
+                engine
+                    .scroll_coverage
+                    .active_capture_start_for_test()
+                    .is_none(),
                 "a full-height preview must release acquisition for the next coverage target"
             );
             break;

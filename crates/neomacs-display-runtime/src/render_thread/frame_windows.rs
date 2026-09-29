@@ -806,7 +806,10 @@ impl GuiFrameRenderState {
             });
         }
         if target_frame_id == self.emacs_frame_id
-            && let Some(hit) = self.compositor.input_scroll.hit(point) { return hit; }
+            && let Some(hit) = self.compositor.input_scroll.hit(point)
+        {
+            return hit;
+        }
         frame
             .resolve_presented_hit(PresentedHitQuery::new(point))
             .map(|hit| hit.and_then(|hit| hit.semantic()))
@@ -1032,8 +1035,7 @@ impl GuiFrameRenderState {
             if !self.pointer_inside || self.presented_press.is_some() {
                 return None;
             }
-            let (x, y) =
-                self.root_frame_point_from_surface(self.mouse_pos.0, self.mouse_pos.1)?;
+            let (x, y) = self.root_frame_point_from_surface(self.mouse_pos.0, self.mouse_pos.1)?;
             let point = self.inverse_map(frame, x, y)?;
             let appearance = frame
                 .resolve_presented_hit(PresentedHitQuery::new(point))
@@ -1231,7 +1233,10 @@ impl GuiFrameRenderState {
         .apply(self);
         if let Some(window) = self.compositor.input_scroll.reconcile(frame.as_ref()) {
             // Projected motion has already been drawn; do not animate it twice.
-            self.compositor.pending.scrolls.retain(|scroll| scroll.window != window);
+            self.compositor
+                .pending
+                .scrolls
+                .retain(|scroll| scroll.window != window);
         }
         // Staged, not installed: these describe the incoming presentation, and
         // they become the baseline only if a frame is actually drawn from it.
@@ -2111,10 +2116,13 @@ impl GuiFrameWindowManager {
                         color_space: wgpu::SurfaceColorSpace::Auto,
                         width: phys.width,
                         height: phys.height,
-                        present_mode: crate::presentation::pacing::present_mode(&caps.present_modes),
+                        present_mode: crate::presentation::pacing::present_mode(
+                            &caps.present_modes,
+                        ),
                         alpha_mode,
                         view_formats: vec![],
-                        desired_maximum_frame_latency: crate::presentation::pacing::MAXIMUM_FRAME_LATENCY,
+                        desired_maximum_frame_latency:
+                            crate::presentation::pacing::MAXIMUM_FRAME_LATENCY,
                     };
                     #[cfg(target_os = "linux")]
                     // SAFETY: this surface and device share the renderer instance; configure follows immediately.

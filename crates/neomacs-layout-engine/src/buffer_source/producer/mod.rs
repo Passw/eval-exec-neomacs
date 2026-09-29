@@ -188,7 +188,8 @@ impl<'request, B: LayoutBufferView> BufferElementProducer<'request, B> {
     }
 
     pub(crate) fn produces_single_chars_at(&self, charpos: i64) -> bool {
-        self.source_cursor.produces_single_chars_at(CharPos0::new(charpos.max(0) as usize))
+        self.source_cursor
+            .produces_single_chars_at(CharPos0::new(charpos.max(0) as usize))
     }
 
     /// Whether production at `source_position` must first yield an anchored

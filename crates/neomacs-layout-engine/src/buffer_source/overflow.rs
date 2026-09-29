@@ -214,9 +214,11 @@ impl<'a> BufferSourceOverflowRenderRequest<'a> {
                 let truncation_skip = source_walk
                     .consume_truncation_skip(text, progress.source_position())
                     .apply_to_progress(&mut progress);
-                source_render.output_emitter().note_truncated_end(LispCharPos1::new(
-                    truncation_skip.charpos + i64::from(!truncation_skip.reached_line_break),
-                ));
+                source_render
+                    .output_emitter()
+                    .note_truncated_end(LispCharPos1::new(
+                        truncation_skip.charpos + i64::from(!truncation_skip.reached_line_break),
+                    ));
                 truncation_skip.apply_before_row_transition(
                     row_carryover.line_numbers,
                     row_build.row_extend,
@@ -844,9 +846,11 @@ impl<'a> BufferSourceSpecialOverflowRenderRequest<'a> {
                 let truncation_skip = source_walk
                     .consume_truncation_skip(context.text, progress.source_position())
                     .apply_to_progress(&mut progress);
-                source_render.output_emitter().note_truncated_end(LispCharPos1::new(
-                    truncation_skip.charpos + i64::from(!truncation_skip.reached_line_break),
-                ));
+                source_render
+                    .output_emitter()
+                    .note_truncated_end(LispCharPos1::new(
+                        truncation_skip.charpos + i64::from(!truncation_skip.reached_line_break),
+                    ));
                 let mut source_position = truncation_skip.source_position();
                 truncation_skip.apply_before_row_transition(
                     row_carryover.line_numbers,

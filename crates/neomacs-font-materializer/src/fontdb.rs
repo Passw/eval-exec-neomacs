@@ -412,8 +412,8 @@ impl FontFileCache {
         // publish that final face, so unrelated cached metadata stays valid
         // and failed opens do not invalidate the live font system at all.
         let mut staging = fontdb::Database::new();
-        let result = Self::pin_asset_as_family(&mut staging, asset, &synthetic_family).map(
-            |selected_id| {
+        let result =
+            Self::pin_asset_as_family(&mut staging, asset, &synthetic_family).map(|selected_id| {
                 let mut info = staging
                     .face(selected_id)
                     .expect("successful exact-face pin remains in its staging database")
@@ -426,8 +426,7 @@ impl FontFileCache {
                     family: shared_selector(selector_index, synthetic_family),
                     fontdb_id,
                 }
-            },
-        );
+            });
         self.exact_faces.insert(key, result.clone());
         result
     }

@@ -764,9 +764,8 @@ impl CommandInputWaitOutcome {
                 Self::DeadlineElapsed
             }
             WaitCompletion::DisplayActivity
-            | WaitCompletion::ProcessActivity | WaitCompletion::SpecialInputActivity => {
-                Self::Interrupted
-            }
+            | WaitCompletion::ProcessActivity
+            | WaitCompletion::SpecialInputActivity => Self::Interrupted,
         }
     }
 }

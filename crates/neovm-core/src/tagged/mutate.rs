@@ -34,7 +34,9 @@ impl LispCollectionRevision {
     }
 
     #[inline]
-    pub(super) fn sequence(self) -> u64 { self.0 }
+    pub(super) fn sequence(self) -> u64 {
+        self.0
+    }
 
     #[inline]
     pub(crate) fn changed(value: TaggedValue) {

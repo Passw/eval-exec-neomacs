@@ -492,10 +492,13 @@ fn assert_scroll_surface_hover_projection(insertions: bool) {
     eval.eval_str("(progn (put-text-property (point-min) (point-max) 'mouse-face 'highlight) (put-text-property 3 8 'face '(:height 2.0)))")
         .unwrap();
     if insertions {
-        eval.eval_str("(let ((p (point-min))) (while (< p (point-max))
+        eval.eval_str(
+            "(let ((p (point-min))) (while (< p (point-max))
             (let ((ov (make-overlay (+ p 5) (+ p 5))))
                 (overlay-put ov 'before-string (propertize \"AA\" 'mouse-face 'highlight)))
-            (setq p (+ p 23))))").unwrap();
+            (setq p (+ p 23))))",
+        )
+        .unwrap();
     }
     let mut engine = LayoutEngine::new();
     engine.layout_frame_rust(&mut eval, frame_id);
@@ -568,38 +571,72 @@ fn assert_scroll_surface_hover_projection(insertions: bool) {
 
 #[test]
 fn certified_worker_rows_answer_motion_without_a_new_walk() {
-    use neovm_core::{buffer::LispCharPos1, window::WindowLayoutQueryScope};
     use crate::engine::viewport_retry_depth_probe as probe;
-    for decoration in ["nil", "(put-text-property 1 (point-max) 'face '(:height 1.5 :weight bold))",
-        "(let ((o (make-overlay 921 930))) (overlay-put o 'before-string \"prefix \") (overlay-put o 'face '(:height 2.0)))"] {
-    let line = "ordinary offscreen text\n";
-    let (mut eval, frame, _buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
-    eval.frame_manager_mut().get_mut(frame).unwrap().window_system = Some(Value::symbol("neomacs"));
-    eval.eval_str(decoration).unwrap();
-    let mut engine = LayoutEngine::new();
-    engine.layout_frame_rust(&mut eval, frame);
-    let target = line.len() * 40;
-    engine.request_scroll_coverage(&eval, frame, window, CharPos0::new(target)).unwrap();
-    await_coverage(&mut engine);
-    let scope = WindowLayoutQueryScope::Rows {
-        start: LispCharPos1::from_one_based_usize(target + 1),
-        count: std::num::NonZeroUsize::new(8).unwrap(),
-    };
-    probe::reset();
-    let actual = engine.query_window_layout(&mut eval, frame, window, scope).unwrap();
-    assert_eq!(probe::max_depth(), 0, "certified rows should avoid synchronous interpretation");
-    let mut fresh = WindowLayoutQueryEngine::new();
-    let expected = fresh.query_window_layout(&mut eval, frame, window, scope).unwrap();
-    assert_eq!(actual.end(), expected.end());
-    assert_eq!(actual.geometry().unwrap().rows, expected.geometry().unwrap().rows);
-    assert_eq!(actual.geometry().unwrap().points, expected.geometry().unwrap().points);
-    eval.eval_str(&format!("(put-text-property {} {} 'display \"replacement\")", target + 1, target + 5)).unwrap();
-    probe::reset();
-    let changed = engine.query_window_layout(&mut eval, frame, window, scope).unwrap();
-    assert!(probe::max_depth() > 0, "changed properties must reject the worker certificate");
-    let expected = fresh.query_window_layout(&mut eval, frame, window, scope).unwrap();
-    assert_eq!(changed.geometry(), expected.geometry());
-}
+    use neovm_core::{buffer::LispCharPos1, window::WindowLayoutQueryScope};
+    for decoration in [
+        "nil",
+        "(put-text-property 1 (point-max) 'face '(:height 1.5 :weight bold))",
+        "(let ((o (make-overlay 921 930))) (overlay-put o 'before-string \"prefix \") (overlay-put o 'face '(:height 2.0)))",
+    ] {
+        let line = "ordinary offscreen text\n";
+        let (mut eval, frame, _buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        eval.eval_str(decoration).unwrap();
+        let mut engine = LayoutEngine::new();
+        engine.layout_frame_rust(&mut eval, frame);
+        let target = line.len() * 40;
+        engine
+            .request_scroll_coverage(&eval, frame, window, CharPos0::new(target))
+            .unwrap();
+        await_coverage(&mut engine);
+        let scope = WindowLayoutQueryScope::Rows {
+            start: LispCharPos1::from_one_based_usize(target + 1),
+            count: std::num::NonZeroUsize::new(8).unwrap(),
+        };
+        probe::reset();
+        let actual = engine
+            .query_window_layout(&mut eval, frame, window, scope)
+            .unwrap();
+        assert_eq!(
+            probe::max_depth(),
+            0,
+            "certified rows should avoid synchronous interpretation"
+        );
+        let mut fresh = WindowLayoutQueryEngine::new();
+        let expected = fresh
+            .query_window_layout(&mut eval, frame, window, scope)
+            .unwrap();
+        assert_eq!(actual.end(), expected.end());
+        assert_eq!(
+            actual.geometry().unwrap().rows,
+            expected.geometry().unwrap().rows
+        );
+        assert_eq!(
+            actual.geometry().unwrap().points,
+            expected.geometry().unwrap().points
+        );
+        eval.eval_str(&format!(
+            "(put-text-property {} {} 'display \"replacement\")",
+            target + 1,
+            target + 5
+        ))
+        .unwrap();
+        probe::reset();
+        let changed = engine
+            .query_window_layout(&mut eval, frame, window, scope)
+            .unwrap();
+        assert!(
+            probe::max_depth() > 0,
+            "changed properties must reject the worker certificate"
+        );
+        let expected = fresh
+            .query_window_layout(&mut eval, frame, window, scope)
+            .unwrap();
+        assert_eq!(changed.geometry(), expected.geometry());
+    }
 }
 
 #[test]

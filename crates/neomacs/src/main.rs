@@ -3830,9 +3830,8 @@ fn run_gui_evaluator_worker(
     let preview_tx = emacs_comms.cmd_tx.clone();
     let preview_waker = render_waker.clone();
     evaluator.scroll_preview_fn = Some(Box::new(move |eval, frame, window, inputs| {
-        let intent = frame_layout::REDISPLAY_RUNTIME.with(|runtime| {
-            runtime.resolved_scroll_preview(eval, frame, window, inputs)
-        });
+        let intent = frame_layout::REDISPLAY_RUNTIME
+            .with(|runtime| runtime.resolved_scroll_preview(eval, frame, window, inputs));
         if let Some(intent) = intent
             && preview_tx
                 .try_send(neomacs_display_runtime::thread_comm::RenderCommand::Window(

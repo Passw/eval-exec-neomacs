@@ -255,28 +255,50 @@ fn presented_coordinate_queries_cover_the_full_mixed_font_row() {
                 ..DisplayRowSnapshot::default()
             }],
             body_rows: vec![PresentedBodyRowSnapshot {
-                output_row: 0, body_row: 0, body_y: -vscroll,
+                output_row: 0,
+                body_row: 0,
+                body_y: -vscroll,
             }],
             points: vec![
                 DisplayPointSnapshot {
-                    role: DisplayPointRole::Glyph, buffer_pos: LispCharPos1::ONE,
-                    x: 0, y: -vscroll, width: 10, height: 12, row: 0, col: 0,
+                    role: DisplayPointRole::Glyph,
+                    buffer_pos: LispCharPos1::ONE,
+                    x: 0,
+                    y: -vscroll,
+                    width: 10,
+                    height: 12,
+                    row: 0,
+                    col: 0,
                 },
                 DisplayPointSnapshot {
-                    role: DisplayPointRole::Glyph, buffer_pos: LispCharPos1::new(2),
-                    x: 10, y: -vscroll, width: 20, height: 29, row: 0, col: 1,
+                    role: DisplayPointRole::Glyph,
+                    buffer_pos: LispCharPos1::new(2),
+                    x: 10,
+                    y: -vscroll,
+                    width: 20,
+                    height: 29,
+                    row: 0,
+                    col: 1,
                 },
             ],
             ..WindowDisplaySnapshot::default()
         };
         let geometry = PresentationGeometry::new(FrameId(1), presentation, [snapshot]).unwrap();
-        for y in 0..35-vscroll {
+        for y in 0..35 - vscroll {
             for (x, expected, glyph_height) in [(0, 1, 12.0), (15, 2, 29.0)] {
-                let point = geometry.resolve(WindowCoordinateQuery::in_text_body(
-                    presentation, window, x, y,
-                )).unwrap_or_else(|error| panic!("vscroll={vscroll}, ({x},{y}): {error:?}"));
-                assert_eq!(point.buffer_pos(), LispCharPos1::new(expected),
-                    "vscroll={vscroll}, ({x},{y}) selected another font's glyph");
+                let point = geometry
+                    .resolve(WindowCoordinateQuery::in_text_body(
+                        presentation,
+                        window,
+                        x,
+                        y,
+                    ))
+                    .unwrap_or_else(|error| panic!("vscroll={vscroll}, ({x},{y}): {error:?}"));
+                assert_eq!(
+                    point.buffer_pos(),
+                    LispCharPos1::new(expected),
+                    "vscroll={vscroll}, ({x},{y}) selected another font's glyph"
+                );
                 assert_eq!(point.height().get(), glyph_height);
             }
         }

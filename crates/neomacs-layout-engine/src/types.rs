@@ -431,11 +431,12 @@ impl WindowParams {
     pub(crate) fn source_interpretation_rows(&self) -> usize {
         self.measurement_rows.map_or_else(
             || {
-                (self.measurement_pixels
+                (self
+                    .measurement_pixels
                     .map_or(self.text_bounds.height, |height| height.get() as f32)
                     / self.char_height.max(1.0))
-                    .ceil()
-                    .max(1.0) as usize
+                .ceil()
+                .max(1.0) as usize
             },
             std::num::NonZeroUsize::get,
         )

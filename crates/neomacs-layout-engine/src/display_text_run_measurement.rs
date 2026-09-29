@@ -328,8 +328,11 @@ impl DisplayTextRunMeasurement {
             advances
                 .iter()
                 .filter(|advance| {
-                    let index = contextual.partition_point(|range| range.end <= advance.byte_offset);
-                    contextual.get(index).is_some_and(|range| range.contains(&advance.byte_offset))
+                    let index =
+                        contextual.partition_point(|range| range.end <= advance.byte_offset);
+                    contextual
+                        .get(index)
+                        .is_some_and(|range| range.contains(&advance.byte_offset))
                 })
                 .cloned()
                 .collect(),

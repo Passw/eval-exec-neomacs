@@ -5,8 +5,8 @@
 //! GNU's intentionally different batch engine stays in `editing/indent`.
 
 mod measurement;
-pub(crate) mod pixels;
 pub(crate) mod paging;
+pub(crate) mod pixels;
 mod policy;
 pub(crate) use policy::ScrollGoal;
 
@@ -215,7 +215,9 @@ fn snapshot_row_index_for_pos_or_truncated_line(
         // one, only an explicitly measured truncation boundary grants ownership.
         let inside_line = match rows.get(index + 1).and_then(|next| next.start_buffer_pos) {
             Some(next_start) => pos < next_start,
-            None => row.truncated_end_buffer_pos.is_some_and(|end| pos <= end.min(end_lisp)),
+            None => row
+                .truncated_end_buffer_pos
+                .is_some_and(|end| pos <= end.min(end_lisp)),
         };
         (row.start_buffer_pos.is_some_and(|start| start <= pos) && inside_line).then_some(index)
     })

@@ -2671,7 +2671,11 @@ impl FrameDisplayState {
         let mut buf = FrameGlyphBuffer::with_size(self.frame_pixel_width, self.frame_pixel_height);
         buf.presentation_id = self.presentation_id;
         buf.input_checkpoint = self.input_checkpoint.clone();
-        buf.scroll_surfaces = self.scroll_coverage.iter().filter_map(|coverage| coverage.materialize(self)).collect();
+        buf.scroll_surfaces = self
+            .scroll_coverage
+            .iter()
+            .filter_map(|coverage| coverage.materialize(self))
+            .collect();
         buf.frame_placement = self.frame_placement;
         buf.origin = self.origin;
         buf.char_width = self.char_width;

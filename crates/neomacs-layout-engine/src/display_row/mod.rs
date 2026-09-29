@@ -1325,5 +1325,5 @@ pub(crate) mod text_output;
 pub(crate) mod trailing_whitespace;
 pub(crate) mod transition;
 pub(crate) mod walk_state;
-pub(crate) mod word_wrap;
 pub(crate) mod width;
+pub(crate) mod word_wrap;

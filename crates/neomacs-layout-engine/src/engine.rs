@@ -262,7 +262,8 @@ impl WindowLayoutQueryEngine {
         scope: neovm_core::window::WindowLayoutQueryScope,
     ) -> Result<neovm_core::window::WindowLayoutQuery, neovm_core::window::WindowLayoutQueryFailure>
     {
-        self.inner.query_window_layout(evaluator, frame_id, window_id, scope)
+        self.inner
+            .query_window_layout(evaluator, frame_id, window_id, scope)
     }
 }
 
@@ -483,7 +484,9 @@ fn resolve_window_display_source_params(
             WindowLayoutQueryScope::Viewport => None,
         };
         if let Some(start) = start {
-            params.window_start = start.as_i64().saturating_sub(1)
+            params.window_start = start
+                .as_i64()
+                .saturating_sub(1)
                 .clamp(params.buffer_begv, params.buffer_size);
             params.vscroll = 0;
             params.previous_visible_end = None;
@@ -775,7 +778,8 @@ pub struct LayoutEngine {
     /// Used by the TTY redisplay path to drive `TtyRif` on the evaluator thread.
     pub last_frame_display_state: Option<neomacs_display_protocol::SealedFramePresentation>,
     /// Shared paint coverage survives ownership transfer of the full frame.
-    scroll_preview_coverage: Vec<std::sync::Arc<neomacs_display_protocol::scroll_coverage::ScrollCoverage>>,
+    scroll_preview_coverage:
+        Vec<std::sync::Arc<neomacs_display_protocol::scroll_coverage::ScrollCoverage>>,
     /// Last sealed face namespace for each logical frame.
     ///
     /// A speculative layout gets a fresh [`FrameFaceAttempt`] from this arena;
@@ -2141,25 +2145,50 @@ impl LayoutEngine {
                             is_edit = false;
                         }
                     }
-                    if cursor_only.is_none() && !is_edit && !params.is_minibuffer()
-                        && self.prepared_viewports.has_computed(frame_id, DisplayWindowId::new(params.window_id))
+                    if cursor_only.is_none()
+                        && !is_edit
+                        && !params.is_minibuffer()
+                        && self
+                            .prepared_viewports
+                            .has_computed(frame_id, DisplayWindowId::new(params.window_id))
                         && params.display_line_numbers == crate::types::DisplayLineNumbersMode::Off
                     {
                         let geometry = BufferWindowGeometryRequest::new(
-                            params, layout_box, params.char_width, params.char_height,
-                        ).into_geometry(crate::display_row::walk_state::LineNumberFieldLayout::new(
-                            0, params.char_width,
-                        ));
-                        let projected = scroll.is_none().then(|| self.retained_window_matrices
-                            .get(&DisplayWindowId::new(params.window_id))
-                            .and_then(|previous| previous.prepared_projection_prefix(
-                                key, geometry.text_y - geometry.vscroll - params.bounds.y,
-                            ))).flatten();
+                            params,
+                            layout_box,
+                            params.char_width,
+                            params.char_height,
+                        )
+                        .into_geometry(
+                            crate::display_row::walk_state::LineNumberFieldLayout::new(
+                                0,
+                                params.char_width,
+                            ),
+                        );
+                        let projected = scroll
+                            .is_none()
+                            .then(|| {
+                                self.retained_window_matrices
+                                    .get(&DisplayWindowId::new(params.window_id))
+                                    .and_then(|previous| {
+                                        previous.prepared_projection_prefix(
+                                            key,
+                                            geometry.text_y - geometry.vscroll - params.bounds.y,
+                                        )
+                                    })
+                            })
+                            .flatten();
                         if let Some(prefix) = scroll.as_ref().or(projected.as_ref())
-                            && let Some((replay, faces)) = self.prepared_viewports.complete_forward_scroll(
-                                frame_id, DisplayWindowId::new(params.window_id), key,
-                                prefix, geometry, &committed_face_arena, params.force_start,
-                            )
+                            && let Some((replay, faces)) =
+                                self.prepared_viewports.complete_forward_scroll(
+                                    frame_id,
+                                    DisplayWindowId::new(params.window_id),
+                                    key,
+                                    prefix,
+                                    geometry,
+                                    &committed_face_arena,
+                                    params.force_start,
+                                )
                         {
                             cursor_only = Some(replay);
                             prepared_faces = Some(faces);
@@ -2647,7 +2676,8 @@ impl LayoutEngine {
                 // geometry rather than inventing a second approximation.
                 let mut geometry = query_snapshot.cloned();
                 if let LayoutPurpose::SynchronousQuery {
-                    scope: neovm_core::window::WindowLayoutQueryScope::Pixels { height, .. }, ..
+                    scope: neovm_core::window::WindowLayoutQueryScope::Pixels { height, .. },
+                    ..
                 } = purpose
                     && let Some(snapshot) = &mut geometry
                     && let Some(first) = snapshot.rows.first()
@@ -2655,11 +2685,15 @@ impl LayoutEngine {
                     // An inserted string can stage the next row before the
                     // source loop observes its pixel stop. It is outside this
                     // observation and may not yet contain the complete row.
-                    let bottom = first.y.saturating_add(i64::try_from(height.get()).unwrap_or(i64::MAX));
+                    let bottom = first
+                        .y
+                        .saturating_add(i64::try_from(height.get()).unwrap_or(i64::MAX));
                     snapshot.rows.retain(|row| row.y < bottom);
                     let last = snapshot.rows.last().map(|row| row.row);
                     snapshot.points.retain(|point| Some(point.row) <= last);
-                    snapshot.body_rows.retain(|row| Some(row.output_row) <= last);
+                    snapshot
+                        .body_rows
+                        .retain(|row| Some(row.output_row) <= last);
                 }
                 for face_name in face_resolver.take_invalid_face_references() {
                     evaluator.add_to_log(&format!("Invalid face reference: {face_name}"));
@@ -3217,12 +3251,19 @@ impl LayoutEngine {
         // compositor may animate toward it.
         frame_display_state.origin = evaluator.presentation_origin();
         frame_display_state.input_checkpoint = input_checkpoint;
-        self.prepared_viewports.export(frame_id, &next_retained_window_matrices,
-            &mut frame_display_state, &sealed_face_arena, &mut self.font_metrics);
+        self.prepared_viewports.export(
+            frame_id,
+            &next_retained_window_matrices,
+            &mut frame_display_state,
+            &sealed_face_arena,
+            &mut self.font_metrics,
+        );
         for coverage in &mut frame_display_state.scroll_coverage {
             let window = neovm_core::window::WindowId(coverage.content.window_id.get() as u64);
-            std::sync::Arc::make_mut(coverage).compositor_enabled = evaluator.compositor_scrolling_enabled(window);
-            std::sync::Arc::make_mut(coverage).predict_pixels = evaluator.permits_compositor_pixel_scroll(window);
+            std::sync::Arc::make_mut(coverage).compositor_enabled =
+                evaluator.compositor_scrolling_enabled(window);
+            std::sync::Arc::make_mut(coverage).predict_pixels =
+                evaluator.permits_compositor_pixel_scroll(window);
             tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", predict_pixels = coverage.predict_pixels, window = window.0, "exported compositor coverage");
         }
         let resolved = match crate::frame_presentation::ResolvedFrame::new(frame_display_state) {
@@ -3335,7 +3376,9 @@ impl LayoutEngine {
                 buffer.reset_unchanged_region();
             }
         }
-        neomacs_display_protocol::input_latency::sealed(frame_id.0, sealed.presentation(), || evaluator.input_latency_viewport(frame_id.0));
+        neomacs_display_protocol::input_latency::sealed(frame_id.0, sealed.presentation(), || {
+            evaluator.input_latency_viewport(frame_id.0)
+        });
         self.scroll_preview_coverage = sealed.scroll_coverage.clone();
         self.last_frame_display_state = Some(sealed);
         // Acknowledge the chrome dirty flag for exactly the windows whose
@@ -3405,25 +3448,35 @@ impl LayoutEngine {
         if let Some(query) = self.query_cache.get(evaluator, frame_id, window_id, scope) {
             return Ok(query);
         }
-        if let Some(query) = self.prepared_viewports.measure_rows(evaluator, frame_id, window_id, scope) {
+        if let Some(query) = self
+            .prepared_viewports
+            .measure_rows(evaluator, frame_id, window_id, scope)
+        {
             return Ok(query);
         }
         self.query_body_reuse_allowed = true;
         let (query, collections) = neovm_core::tagged::collection_reads::capture_normalized(
             evaluator,
-            |evaluator| { evaluator.sync_runtime_faces_for_frame(frame_id); },
-            |evaluator| self.layout_frame_rust_for_purpose_inner(
-                evaluator,
-                frame_id,
-                LayoutPurpose::SynchronousQuery { window_id, scope },
-            ),
+            |evaluator| {
+                evaluator.sync_runtime_faces_for_frame(frame_id);
+            },
+            |evaluator| {
+                self.layout_frame_rust_for_purpose_inner(
+                    evaluator,
+                    frame_id,
+                    LayoutPurpose::SynchronousQuery { window_id, scope },
+                )
+            },
         );
         let query = query.ok_or(neovm_core::window::WindowLayoutQueryFailure::DidNotConverge)?;
         tracing::trace!(target: "neomacs_layout_engine::query_cache",
             body_reuse_allowed = self.query_body_reuse_allowed,
             collections_captured = collections.is_some(), "query completed");
-        if self.query_body_reuse_allowed && let Some(collections) = collections {
-            self.query_cache.remember(evaluator, frame_id, window_id, scope, &query, collections);
+        if self.query_body_reuse_allowed
+            && let Some(collections) = collections
+        {
+            self.query_cache
+                .remember(evaluator, frame_id, window_id, scope, &query, collections);
         }
         Ok(query)
     }

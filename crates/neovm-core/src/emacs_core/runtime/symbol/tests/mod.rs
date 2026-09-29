@@ -781,23 +781,54 @@ fn indexed_localized_reads_preserve_shared_cells_defaults_and_void_values() {
     let mut buffers = crate::buffer::BufferManager::new();
     let a = buffers.create_buffer("binding-a");
     let b = buffers.create_buffer("binding-b");
-    buffers.get_mut(a).unwrap().set_buffer_local_by_sym_id(id, Value::fixnum(42));
-    let a_cell = buffers.get(a).unwrap().local_variable_binding_cell(id).unwrap();
-    assert_eq!(ob.read_localized_in_buffer(id, buffers.get(a).unwrap()), Some(Value::fixnum(42)));
+    buffers
+        .get_mut(a)
+        .unwrap()
+        .set_buffer_local_by_sym_id(id, Value::fixnum(42));
+    let a_cell = buffers
+        .get(a)
+        .unwrap()
+        .local_variable_binding_cell(id)
+        .unwrap();
+    assert_eq!(
+        ob.read_localized_in_buffer(id, buffers.get(a).unwrap()),
+        Some(Value::fixnum(42))
+    );
     assert_eq!(ob.blv(id).unwrap().valcell, a_cell);
 
     a_cell.set_cdr(Value::UNBOUND);
-    assert_eq!(ob.read_localized_in_buffer(id, buffers.get(a).unwrap()), Some(Value::UNBOUND));
-    assert_eq!(ob.read_localized_in_buffer(id, buffers.get(b).unwrap()), Some(Value::fixnum(7)));
+    assert_eq!(
+        ob.read_localized_in_buffer(id, buffers.get(a).unwrap()),
+        Some(Value::UNBOUND)
+    );
+    assert_eq!(
+        ob.read_localized_in_buffer(id, buffers.get(b).unwrap()),
+        Some(Value::fixnum(7))
+    );
     assert!(!ob.blv(id).unwrap().found);
     // Switching back must preserve voidness rather than falling through to
     // the default, and subsequent writes must reach the same shared cell.
-    assert_eq!(ob.read_localized_in_buffer(id, buffers.get(a).unwrap()), Some(Value::UNBOUND));
-    buffers.get_mut(a).unwrap().set_buffer_local_by_sym_id(id, Value::T);
-    assert_eq!(ob.read_localized_in_buffer(id, buffers.get(a).unwrap()), Some(Value::T));
+    assert_eq!(
+        ob.read_localized_in_buffer(id, buffers.get(a).unwrap()),
+        Some(Value::UNBOUND)
+    );
+    buffers
+        .get_mut(a)
+        .unwrap()
+        .set_buffer_local_by_sym_id(id, Value::T);
+    assert_eq!(
+        ob.read_localized_in_buffer(id, buffers.get(a).unwrap()),
+        Some(Value::T)
+    );
     assert_eq!(ob.blv(id).unwrap().valcell, a_cell);
-    buffers.get_mut(a).unwrap().set_buffer_local_void_by_sym_id(id);
-    assert_eq!(ob.read_localized_in_buffer(id, buffers.get(a).unwrap()), Some(Value::fixnum(7)));
+    buffers
+        .get_mut(a)
+        .unwrap()
+        .set_buffer_local_void_by_sym_id(id);
+    assert_eq!(
+        ob.read_localized_in_buffer(id, buffers.get(a).unwrap()),
+        Some(Value::fixnum(7))
+    );
     assert!(!ob.blv(id).unwrap().found);
 }
 

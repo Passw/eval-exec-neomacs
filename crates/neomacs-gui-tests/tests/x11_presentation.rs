@@ -220,7 +220,9 @@ fn x11_rich_scroll_inputs_have_native_output_receipts_across_resize() {
         .take(WHEEL_INPUTS)
         .enumerate()
     {
-        let before = wait(&artifacts, "no complete state before wheel input", || state(&state_path));
+        let before = wait(&artifacts, "no complete state before wheel input", || {
+            state(&state_path)
+        });
         xdotool(&["click", button]);
         wait(&artifacts, "wheel did not change the viewport", || {
             let current = state(&state_path)?;

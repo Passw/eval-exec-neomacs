@@ -1751,12 +1751,14 @@ impl Context {
         });
         RedisplaySignature {
             fontset_generation: crate::emacs_core::fontset::fontset_generation(),
-            compositor_scrolling_enabled: selected_window.is_some_and(|window|
-                self.compositor_scrolling_enabled(crate::window::WindowId(window))),
+            compositor_scrolling_enabled: selected_window.is_some_and(|window| {
+                self.compositor_scrolling_enabled(crate::window::WindowId(window))
+            }),
             // Bindings and hooks may change without moving text or point.
             // Republish permission so the renderer cannot keep a stale grant.
-            compositor_pixel_scroll: selected_window.is_some_and(|window|
-                self.permits_compositor_pixel_scroll(crate::window::WindowId(window))),
+            compositor_pixel_scroll: selected_window.is_some_and(|window| {
+                self.permits_compositor_pixel_scroll(crate::window::WindowId(window))
+            }),
             input_checkpoint: self.input_progress.checkpoint(),
             selected_frame,
             selected_window,

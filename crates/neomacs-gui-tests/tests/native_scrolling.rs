@@ -220,14 +220,24 @@ fn wheel_scroll_presents_resolved_destination_while_command_is_stalled() {
 #[test]
 fn rich_large_buffer_page_presents_while_command_is_stalled() {
     run_native_scroll_scenario(
-        ScrollKind::Page, ScrollTarget::Selected, 100_000, true, true, true,
+        ScrollKind::Page,
+        ScrollTarget::Selected,
+        100_000,
+        true,
+        true,
+        true,
     );
 }
 
 #[test]
 fn rich_large_buffer_wheel_presents_while_command_is_stalled() {
     run_native_scroll_scenario(
-        ScrollKind::Wheel, ScrollTarget::Selected, 100_000, true, true, true,
+        ScrollKind::Wheel,
+        ScrollTarget::Selected,
+        100_000,
+        true,
+        true,
+        true,
     );
 }
 
@@ -490,7 +500,9 @@ focus_follows_mouse yes
         }
         if !resolved {
             assert!(
-                fs::read_to_string(artifacts.join("neomacs.log")).unwrap().contains("composited retained scroll raster"),
+                fs::read_to_string(artifacts.join("neomacs.log"))
+                    .unwrap()
+                    .contains("composited retained scroll raster"),
                 "stalled precision scroll must exercise the pooled body raster: {artifacts:?}"
             );
         }
