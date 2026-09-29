@@ -20,6 +20,7 @@
 
 use std::fs::File;
 use std::io::BufReader;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use neomacs_display_protocol::{
     ImageIntrinsicExtent, ImageLayoutExtent, ImageNativeExtent, ImageRealization, ImageRotation,
@@ -40,10 +41,15 @@ pub enum ImageProbeSource<'a> {
 /// `None` means the source carries no extent this crate can read without
 /// decoding it; the caller keeps whatever placeholder it would have used.
 pub(crate) fn probe_intrinsic_extent(source: ImageProbeSource<'_>) -> Option<ImageIntrinsicExtent> {
-    match source {
+    // A decoder that panics on malformed input must not take the prober thread
+    // down with it: one thread serves every image a session ever displays, and
+    // a dead prober would silently leave every later image on its placeholder.
+    catch_unwind(AssertUnwindSafe(|| match source {
         ImageProbeSource::File(path) => file_intrinsic_extent(path),
         ImageProbeSource::Data(data) => data_intrinsic_extent(data),
-    }
+    }))
+    .ok()
+    .flatten()
 }
 
 /// Layout extent for `source` resolved from its encoded header alone.
