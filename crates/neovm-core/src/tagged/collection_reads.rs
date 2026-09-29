@@ -13,13 +13,15 @@ const MAX_DEPTH: usize = 8;
 
 thread_local! {
     static ACTIVE: Cell<bool> = const { Cell::new(false) };
+    static RECENT_READS: [Cell<usize>; 256] = const { [const { Cell::new(0) }; 256] };
     static STATE: RefCell<State> = RefCell::new(State::default());
+    #[cfg(test)]
+    static OBSERVATION_STATE_ACCESSES: Cell<usize> = const { Cell::new(0) };
 }
 
 struct State {
     writes: Box<[usize; JOURNAL_SIZE]>,
     captures: Vec<Capture>,
-    recent_reads: [usize; 256],
 }
 
 impl Default for State {
@@ -27,7 +29,6 @@ impl Default for State {
         Self {
             writes: Box::new([0; JOURNAL_SIZE]),
             captures: Vec::new(),
-            recent_reads: [0; 256],
         }
     }
 }
@@ -97,7 +98,7 @@ impl CollectionReadScope {
                 }
                 return false;
             }
-            state.recent_reads.fill(0);
+            clear_recent_reads();
             state.captures.push(Capture {
                 reads: FxHashMap::default(),
                 started: LispCollectionRevision::current(),
@@ -153,7 +154,7 @@ impl CollectionReadScope {
         STATE.with(|state| {
             let mut state = state.borrow_mut();
             let capture = state.captures.pop().expect("collection read scope");
-            state.recent_reads.fill(0);
+            clear_recent_reads();
             ACTIVE.with(|active| active.set(!state.captures.is_empty()));
             capture
         })
@@ -176,16 +177,34 @@ pub(crate) fn observe(value: TaggedValue) {
     observe_bits(value.bits());
 }
 
+fn clear_recent_reads() {
+    RECENT_READS.with(|recent| {
+        for slot in recent {
+            slot.set(0);
+        }
+    });
+}
+
+#[inline]
 fn observe_bits(bits: usize) {
+    // Keep exact-identity hits outside the mutable capture state. Ordinary
+    // cons/vector access can inline this check without entering the slow
+    // dependency recorder. Scope changes clear it so every active scope
+    // still observes nested reads; collisions only cause another lookup.
+    let seen = RECENT_READS.with(|recent| {
+        let slot = &recent[((bits >> 3) ^ (bits >> 11)) & 255];
+        bits != 0 && slot.replace(bits) == bits
+    });
+    if !seen {
+        observe_uncached(bits);
+    }
+}
+
+fn observe_uncached(bits: usize) {
+    #[cfg(test)]
+    OBSERVATION_STATE_ACCESSES.with(|count| count.set(count.get() + 1));
     STATE.with(|state| {
         let mut state = state.borrow_mut();
-        // Exact identity only: collisions merely fall through to the map.
-        // Scope changes clear this filter so inner reads reach every scope.
-        let slot = ((bits >> 3) ^ (bits >> 11)) & 255;
-        if bits != 0 && state.recent_reads[slot] == bits {
-            return;
-        }
-        state.recent_reads[slot] = bits;
         for capture in &mut state.captures {
             if capture.overflow {
                 continue;
@@ -244,6 +263,32 @@ pub fn capture_normalized<S, T>(
 mod tests {
     use super::*;
     use crate::emacs_core::Value;
+
+    #[test]
+    fn repeated_reads_skip_capture_state_but_preserve_nested_dependencies() {
+        let source = Value::cons(Value::NIL, Value::NIL);
+        let (_, outer) = capture(|| {
+            OBSERVATION_STATE_ACCESSES.with(|count| count.set(0));
+            for _ in 0..1024 {
+                source.cons_car();
+            }
+            assert_eq!(OBSERVATION_STATE_ACCESSES.with(Cell::get), 1);
+            let (_, inner) = capture(|| {
+                for _ in 0..1024 {
+                    source.cons_cdr();
+                }
+            });
+            assert_eq!(OBSERVATION_STATE_ACCESSES.with(Cell::get), 2);
+            source.set_car(Value::T);
+            assert!(!inner.unwrap().unchanged());
+            source.cons_car();
+            assert_eq!(OBSERVATION_STATE_ACCESSES.with(Cell::get), 3);
+        });
+        assert!(
+            outer.is_none(),
+            "the first read must still precede the mutation"
+        );
+    }
 
     #[test]
     fn observed_cons_survives_unrelated_mutation_but_not_its_own() {
