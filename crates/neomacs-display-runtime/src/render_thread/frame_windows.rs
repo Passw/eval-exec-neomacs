@@ -2111,10 +2111,10 @@ impl GuiFrameWindowManager {
                         color_space: wgpu::SurfaceColorSpace::Auto,
                         width: phys.width,
                         height: phys.height,
-                        present_mode: wgpu::PresentMode::Fifo,
+                        present_mode: crate::presentation::pacing::present_mode(&caps.present_modes),
                         alpha_mode,
                         view_formats: vec![],
-                        desired_maximum_frame_latency: 2,
+                        desired_maximum_frame_latency: crate::presentation::pacing::MAXIMUM_FRAME_LATENCY,
                     };
                     #[cfg(target_os = "linux")]
                     // SAFETY: this surface and device share the renderer instance; configure follows immediately.
@@ -2649,10 +2649,10 @@ impl GuiFrameWindowManager {
                 color_space: wgpu::SurfaceColorSpace::Auto,
                 width: native.width,
                 height: native.height,
-                present_mode: wgpu::PresentMode::Fifo,
+                present_mode: crate::presentation::pacing::present_mode(&caps.present_modes),
                 alpha_mode,
                 view_formats: vec![],
-                desired_maximum_frame_latency: 2,
+                desired_maximum_frame_latency: crate::presentation::pacing::MAXIMUM_FRAME_LATENCY,
             };
             #[cfg(target_os = "linux")]
             // SAFETY: this surface and device share the renderer instance; configure follows immediately.

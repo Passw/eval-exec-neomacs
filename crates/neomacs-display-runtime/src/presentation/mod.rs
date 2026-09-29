@@ -1,6 +1,7 @@
 //! Native presentation ownership. Menu behavior and GPU painting stay elsewhere.
 mod host;
 mod platform;
+pub(crate) mod pacing;
 mod retirement;
 mod surface;
 pub(crate) use host::PopupHost;
