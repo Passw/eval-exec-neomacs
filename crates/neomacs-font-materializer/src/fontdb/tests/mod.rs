@@ -8,21 +8,21 @@ fn standalone_spleen_sfnt() -> Vec<u8> {
         .expect("decode fixture as standalone SFNT")
 }
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+struct CountedFont {
+    bytes: Vec<u8>,
+    reads: Arc<AtomicUsize>,
+}
+impl AsRef<[u8]> for CountedFont {
+    fn as_ref(&self) -> &[u8] {
+        self.reads.fetch_add(1, Ordering::Relaxed);
+        &self.bytes
+    }
+}
+
 #[test]
 fn exact_face_insertion_does_not_reread_existing_font_metadata() {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    struct CountedFont {
-        bytes: Vec<u8>,
-        reads: Arc<AtomicUsize>,
-    }
-    impl AsRef<[u8]> for CountedFont {
-        fn as_ref(&self) -> &[u8] {
-            self.reads.fetch_add(1, Ordering::Relaxed);
-            &self.bytes
-        }
-    }
-
     let bytes = standalone_spleen_sfnt();
     let reads = Arc::new(AtomicUsize::new(0));
     let mut db = fontdb::Database::new();
@@ -87,6 +87,58 @@ fn rejected_exact_face_preserves_existing_font_matches() {
     assert!(
         Arc::ptr_eq(&before, &after),
         "failed opening must not invalidate matching"
+    );
+}
+
+#[test]
+fn file_preloading_preserves_existing_font_metadata() {
+    for resolve_family in [false, true] {
+        let reads = Arc::new(AtomicUsize::new(0));
+        let mut db = fontdb::Database::new();
+        let original = db.load_font_source(fontdb::Source::Binary(Arc::new(CountedFont {
+            bytes: standalone_spleen_sfnt(),
+            reads: Arc::clone(&reads),
+        })))[0];
+        let mut system = FontSystem::new_with_locale_and_db("en-US".into(), db);
+        let attrs = cosmic_text::Attrs::new();
+        let before = system.get_font_matches(&attrs);
+        let warmed_reads = reads.load(Ordering::Relaxed);
+        let path = neomacs_test_fonts::spleen_2_2_0().woff();
+        let path = path.to_str().unwrap();
+        let mut cache = FontFileCache::new();
+        if resolve_family {
+            assert!(cache.resolve_family(&mut system, path).is_some());
+        } else {
+            assert!(cache.prime_file(&mut system, path));
+        }
+        let after = system.get_font_matches(&attrs);
+        assert_eq!(
+            reads.load(Ordering::Relaxed),
+            warmed_reads,
+            "preloading must not reread unchanged font metadata"
+        );
+        assert!(!Arc::ptr_eq(&before, &after));
+        assert_eq!(after.len(), before.len() + 1);
+        assert!(system.db().face(original).is_some());
+        assert!(cache.prime_file(&mut system, path));
+        assert!(cache.resolve_family(&mut system, path).is_some());
+        assert!(Arc::ptr_eq(&after, &system.get_font_matches(&attrs)));
+    }
+}
+
+#[test]
+fn rejected_file_preloading_preserves_existing_font_matches() {
+    let mut db = fontdb::Database::new();
+    db.load_font_source(fontdb::Source::Binary(Arc::new(standalone_spleen_sfnt())));
+    let mut system = FontSystem::new_with_locale_and_db("en-US".into(), db);
+    let attrs = cosmic_text::Attrs::new();
+    let before = system.get_font_matches(&attrs);
+    let mut cache = FontFileCache::new();
+    assert!(!cache.prime_file(&mut system, ""));
+    assert!(cache.resolve_family(&mut system, "").is_none());
+    assert!(
+        Arc::ptr_eq(&before, &system.get_font_matches(&attrs)),
+        "failed preloading must not invalidate matching"
     );
 }
 

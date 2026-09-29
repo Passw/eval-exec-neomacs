@@ -487,8 +487,10 @@ impl FontFileCache {
     }
 
     fn load_and_resolve(font_system: &mut FontSystem, file_path: &str) -> FontDbLoadOutcome {
-        let db = font_system.db_mut();
-        let ids = match Self::open_file(db, file_path, 0) {
+        // Stage loading so failure leaves the live caches untouched. Appending
+        // faces changes matching, but not metadata for existing font IDs.
+        let mut db = fontdb::Database::new();
+        let ids = match Self::open_file(&mut db, file_path, 0) {
             Ok(ids) => ids,
             Err(FontDbSourceError::Unsupported { format }) => {
                 tracing::debug!(?format, %file_path, "fontdb adapter does not own bitmap source");
@@ -505,6 +507,11 @@ impl FontFileCache {
             db.face(id)
                 .and_then(|face_info| face_info.families.first().map(|(name, _)| name.clone()))
         });
+
+        for id in ids {
+            let face = db.face(id).expect("opened font face must exist").clone();
+            font_system.push_font_face(face);
+        }
 
         if family.is_some() {
             tracing::debug!(
