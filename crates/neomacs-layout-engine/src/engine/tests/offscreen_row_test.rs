@@ -3080,3 +3080,77 @@ fn scroll_history_does_not_evict_prepared_compositor_coverage() {
         "previously prepared rows remain above the viewport"
     );
 }
+
+#[test]
+fn connected_prepared_pages_export_a_bounded_surface_around_the_viewport() {
+    let line = "bounded coverage\n";
+    for anchor in [0, 140, 300] {
+        let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(500), 800, 1200);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        scroll_window_to(
+            &mut eval,
+            frame,
+            window,
+            buffer,
+            (anchor * line.len()) as i64 + 1,
+            anchor * line.len(),
+        );
+        if let neovm_core::window::Window::Leaf { force_start, .. } = eval
+            .frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .find_window_mut(window)
+            .unwrap()
+        {
+            *force_start = true;
+        }
+        let mut engine = LayoutEngine::new();
+        engine.layout_frame_rust(&mut eval, frame);
+        for page in 0..8 {
+            engine
+                .request_scroll_coverage(
+                    &eval,
+                    frame,
+                    window,
+                    CharPos0::new(page * 40 * line.len()),
+                )
+                .unwrap();
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while !engine
+                .scroll_coverage
+                .drain(&mut engine.prepared_viewports)
+                .unwrap()
+            {
+                assert!(std::time::Instant::now() < deadline);
+                std::thread::yield_now();
+            }
+        }
+        engine.layout_frame_rust(&mut eval, frame);
+        let state = engine.last_frame_display_state.as_ref().unwrap();
+        let coverage = state
+            .scroll_coverage
+            .iter()
+            .find(|coverage| coverage.content.window_id.get() == window.0 as i64)
+            .expect("extra connected pages must not remove all compositor coverage");
+        assert!(coverage.content.matrix.rows.len() <= 192);
+        assert_eq!(
+            coverage.content.matrix.rows[coverage.anchor_row].start_charpos,
+            anchor * line.len()
+        );
+        let current = &engine.retained_window_matrices[&DisplayWindowId::new(window.0 as i64)];
+        let last_visible = current
+            .matrix
+            .rows
+            .iter()
+            .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+            .last()
+            .unwrap();
+        assert!(
+            coverage.content.matrix.rows.last().unwrap().end_charpos >= last_visible.end_charpos
+        );
+        assert!(anchor == 0 || coverage.anchor_row > 0);
+    }
+}

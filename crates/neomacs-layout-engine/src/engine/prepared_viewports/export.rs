@@ -10,6 +10,8 @@ use neomacs_display_protocol::{
 use neovm_core::window::{PresentedBodyRowSnapshot, WindowDisplaySnapshot};
 use std::sync::Arc;
 
+const MAX_COVERAGE_ROWS: usize = 192;
+
 impl PreparedViewports {
     pub(in crate::engine) fn export(
         &mut self,
@@ -160,8 +162,22 @@ impl PreparedViewports {
         while end < all.len() && adjacent(end - 1, end) {
             end += 1;
         }
-        if end - begin > 192 {
-            return None;
+        if end - begin > MAX_COVERAGE_ROWS {
+            // More prepared pages must not revoke an already usable surface.
+            // Keep the complete visible body, divide spare rows around it,
+            // then use any unfilled allowance on the available side.
+            let last_visible = body.last()?.1.start_charpos;
+            let visible_end = all.iter().position(|(source, index)| {
+                source.matrix.rows[*index].start_charpos == last_visible
+            })? + 1;
+            let visible_rows = visible_end.checked_sub(anchor_index)?;
+            if visible_end > end || visible_rows > MAX_COVERAGE_ROWS {
+                return None;
+            }
+            let above = (MAX_COVERAGE_ROWS - visible_rows) / 2;
+            let first = anchor_index.saturating_sub(above).max(begin);
+            end = end.min(first + MAX_COVERAGE_ROWS);
+            begin = begin.max(end.saturating_sub(MAX_COVERAGE_ROWS));
         }
         let mut y = anchor.pixel_y
             - all[begin..anchor_index]
