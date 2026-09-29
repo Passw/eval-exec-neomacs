@@ -2485,6 +2485,10 @@ pub struct DisplayRowSnapshot {
     pub start_buffer_pos: Option<LispCharPos1>,
     /// Last visible/source position associated with this row, if any.
     pub end_buffer_pos: Option<LispCharPos1>,
+    /// Last source position skipped by right truncation, including the line
+    /// terminator but never the following line. None means no truncated tail.
+    /// A bounded query's final row must not implicitly own the rest of a buffer.
+    pub truncated_end_buffer_pos: Option<LispCharPos1>,
     /// Whether the row ended in buffer text or in pushed display text. A
     /// newline or wrap in a display string does not consume its buffer anchor.
     pub end_source: DisplayRowEndSource,

@@ -639,6 +639,7 @@ fn preparing_accepted_presentation_commits_live_window_output() {
                 window_id,
                 logical_cursor: Some(logical_cursor),
                 rows: vec![DisplayRowSnapshot {
+                    truncated_end_buffer_pos: None,
                     row: 1,
                     y: 29,
                     height: 16,
@@ -2619,6 +2620,7 @@ fn completed_redisplay_syncs_live_window_cursor_state() {
         window_id: wid,
         phys_cursor: Some(cursor.clone()),
         rows: vec![DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 1,
             y: 29,
             height: 16,
@@ -2658,6 +2660,7 @@ fn completed_redisplay_replaces_old_output_cursor_progress() {
     frame.commit_redisplay_cache_for_test(vec![WindowDisplaySnapshot {
         window_id: wid,
         rows: vec![DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 1,
             y: 29,
             height: 16,
@@ -2676,6 +2679,7 @@ fn completed_redisplay_replaces_old_output_cursor_progress() {
     frame.commit_redisplay_cache_for_test(vec![WindowDisplaySnapshot {
         window_id: wid,
         rows: vec![DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 3,
             y: 61,
             height: 16,
@@ -2732,6 +2736,7 @@ fn cache_only_fixture_preserves_live_window_cursor_state() {
         window_id: wid,
         phys_cursor: Some(cursor.clone()),
         rows: vec![DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 1,
             y: 29,
             height: 16,
@@ -2792,6 +2797,7 @@ fn no_op_set_window_vscroll_preserves_display_snapshot() {
                 col: 4,
             }],
             rows: vec![DisplayRowSnapshot {
+                truncated_end_buffer_pos: None,
                 row: 0,
                 y: 0,
                 height: 33,
@@ -2839,6 +2845,7 @@ fn completed_redisplay_preserves_logical_cursor_without_physical_cursor() {
         window_id: wid,
         logical_cursor: Some(logical_cursor),
         rows: vec![DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 1,
             y: 16,
             height: 16,
@@ -2926,6 +2933,7 @@ fn clear_physical_cursor_state_preserves_committed_cursor_history() {
         window_id: WindowId(1),
         phys_cursor: Some(cursor.clone()),
         rows: vec![DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 2,
             y: 21,
             height: 16,
@@ -3092,6 +3100,7 @@ fn output_pass_commits_output_cursor_from_row_geometry() {
         window_id: WindowId(1),
         phys_cursor: Some(cursor.clone()),
         rows: vec![DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 2,
             y: 32,
             height: 16,
@@ -3240,6 +3249,7 @@ fn explicit_window_output_finalization_preserves_live_logical_and_physical_curso
         logical_cursor: Some(WindowCursorPos::from_snapshot(&snapshot_phys)),
         phys_cursor: Some(snapshot_phys),
         rows: vec![DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 4,
             y: 64,
             height: 16,
@@ -3304,6 +3314,7 @@ fn finish_window_output_update_preserves_live_cursor_state_with_snapshot_output_
     let snapshot = WindowDisplaySnapshot {
         window_id: wid,
         rows: vec![DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 4,
             y: 64,
             height: 16,
@@ -3362,6 +3373,7 @@ fn output_pass_keeps_cursor_target_and_output_progress_separate() {
         phys_cursor: Some(cursor.clone()),
         rows: vec![
             DisplayRowSnapshot {
+                truncated_end_buffer_pos: None,
                 row: 0,
                 y: 0,
                 height: 16,
@@ -3375,6 +3387,7 @@ fn output_pass_keeps_cursor_target_and_output_progress_separate() {
                 fringe: Default::default(),
             },
             DisplayRowSnapshot {
+                truncated_end_buffer_pos: None,
                 row: 1,
                 y: 16,
                 height: 16,
@@ -3388,6 +3401,7 @@ fn output_pass_keeps_cursor_target_and_output_progress_separate() {
                 fringe: Default::default(),
             },
             DisplayRowSnapshot {
+                truncated_end_buffer_pos: None,
                 row: 2,
                 y: 32,
                 height: 16,

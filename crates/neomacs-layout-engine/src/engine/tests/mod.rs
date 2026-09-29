@@ -18776,6 +18776,7 @@ fn layout_frame_rust_retries_window_when_point_starts_below_visible_span() {
 fn next_window_start_from_visible_rows_uses_visual_row_boundaries() {
     let rows = vec![
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 0,
             y: 0,
             height: 16,
@@ -18789,6 +18790,7 @@ fn next_window_start_from_visible_rows_uses_visual_row_boundaries() {
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 1,
             y: 16,
             height: 16,
@@ -18802,6 +18804,7 @@ fn next_window_start_from_visible_rows_uses_visual_row_boundaries() {
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 2,
             y: 32,
             height: 16,
@@ -18815,6 +18818,7 @@ fn next_window_start_from_visible_rows_uses_visual_row_boundaries() {
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 3,
             y: 48,
             height: 16,
@@ -18860,6 +18864,7 @@ fn next_window_start_from_visible_rows_uses_visual_row_boundaries() {
 fn next_window_start_for_partially_visible_point_row_scrolls_enough_to_fit_row() {
     let rows = vec![
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 0,
             y: 0,
             height: 20,
@@ -18873,6 +18878,7 @@ fn next_window_start_for_partially_visible_point_row_scrolls_enough_to_fit_row()
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 1,
             y: 20,
             height: 20,
@@ -18886,6 +18892,7 @@ fn next_window_start_for_partially_visible_point_row_scrolls_enough_to_fit_row()
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 2,
             y: 40,
             height: 30,
@@ -18932,6 +18939,7 @@ fn next_window_start_for_point_line_continuation_advances_last_visible_row() {
     };
     let rows = vec![
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 0,
             y: 0,
             height: 16,
@@ -18945,6 +18953,7 @@ fn next_window_start_for_point_line_continuation_advances_last_visible_row() {
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 1,
             y: 16,
             height: 16,
@@ -18958,6 +18967,7 @@ fn next_window_start_for_point_line_continuation_advances_last_visible_row() {
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 2,
             y: 32,
             height: 16,
@@ -18980,6 +18990,7 @@ fn next_window_start_for_point_line_continuation_advances_last_visible_row() {
 
     let terminated_rows = vec![
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 0,
             y: 0,
             height: 16,
@@ -18993,6 +19004,7 @@ fn next_window_start_for_point_line_continuation_advances_last_visible_row() {
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 1,
             y: 16,
             height: 16,
@@ -19038,6 +19050,7 @@ fn next_window_start_for_point_line_continuation_ignores_newline_terminated_rows
         RustBufferAccess::new(buf)
     };
     let rows = vec![DisplayRowSnapshot {
+        truncated_end_buffer_pos: None,
         row: 0,
         y: 0,
         height: 16,
@@ -19079,6 +19092,7 @@ fn next_window_start_for_point_line_continuation_ignores_tail_clipping_when_poin
     };
     let rows = vec![
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 0,
             y: 0,
             height: 16,
@@ -19092,6 +19106,7 @@ fn next_window_start_for_point_line_continuation_ignores_tail_clipping_when_poin
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 1,
             y: 16,
             height: 16,
@@ -19105,6 +19120,7 @@ fn next_window_start_for_point_line_continuation_ignores_tail_clipping_when_poin
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 2,
             y: 32,
             height: 16,
@@ -19118,6 +19134,7 @@ fn next_window_start_for_point_line_continuation_ignores_tail_clipping_when_poin
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 3,
             y: 48,
             height: 16,
@@ -19131,6 +19148,7 @@ fn next_window_start_for_point_line_continuation_ignores_tail_clipping_when_poin
             fringe: Default::default(),
         },
         DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: 4,
             y: 64,
             height: 16,

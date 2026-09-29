@@ -9568,6 +9568,7 @@ fn window_end_reads_the_atomic_record_when_a_snapshot_disagrees() {
         frame.commit_redisplay_cache_for_test(vec![crate::window::WindowDisplaySnapshot {
             window_id: wid,
             rows: vec![crate::window::DisplayRowSnapshot {
+                truncated_end_buffer_pos: None,
                 row: 0,
                 y: 0,
                 height: 16,

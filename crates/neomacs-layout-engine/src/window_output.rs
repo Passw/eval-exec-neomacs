@@ -1705,6 +1705,10 @@ impl WindowOutputEmitter {
         );
     }
 
+    pub(crate) fn note_truncated_end(&mut self, end: LispCharPos1) {
+        self.geometry.note_truncated_end(end);
+    }
+
     pub(crate) fn push_text_row(&mut self, row_y_start: f32, row_height: f32, row_ascent: f32) {
         self.geometry
             .push_text_row(row_y_start, row_height, row_ascent)

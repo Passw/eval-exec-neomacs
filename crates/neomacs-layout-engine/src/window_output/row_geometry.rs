@@ -31,6 +31,7 @@ pub(super) struct WindowRowGeometry {
     current_row_first_display_pos: Option<LispCharPos1>,
     current_row_last_display_pos: Option<LispCharPos1>,
     current_row_end_source: DisplayRowEndSource,
+    truncated_end_buffer_pos: Option<LispCharPos1>,
     /// The end this row was closed at, when it is a position that draws no
     /// glyph of its own. Recorded rather than published on the spot so that
     /// closing the row is the only thing that can publish it.
@@ -50,6 +51,7 @@ impl WindowRowGeometry {
             current_row_first_display_pos: None,
             current_row_last_display_pos: None,
             current_row_end_source: DisplayRowEndSource::Buffer,
+            truncated_end_buffer_pos: None,
             current_row_terminator: None,
             current_row_progress: None,
         }
@@ -441,6 +443,10 @@ impl WindowRowGeometry {
             .expect("text row must have display row progress before finishing")
     }
 
+    pub(super) fn note_truncated_end(&mut self, end: LispCharPos1) {
+        self.truncated_end_buffer_pos = Some(end);
+    }
+
     pub(super) fn push_text_row(&mut self, row_y_start: f32, row_height: f32, row_ascent: f32) {
         let row_progress = self
             .current_row_progress
@@ -463,6 +469,7 @@ impl WindowRowGeometry {
             start_buffer_pos: self.current_row_first_display_pos.take(),
             end_buffer_pos: self.current_row_last_display_pos.take(),
             end_source: std::mem::take(&mut self.current_row_end_source),
+            truncated_end_buffer_pos: self.truncated_end_buffer_pos.take(),
             // Fringe bitmaps are stamped onto the matrix row after the walk
             // that pushes this snapshot row, so they are filled in later from
             // the finished matrix (`fringe_snapshot::publish_row_fringe_bitmaps`).
@@ -506,6 +513,7 @@ impl WindowRowGeometry {
             start_buffer_pos: None,
             end_buffer_pos: None,
             end_source: DisplayRowEndSource::Buffer,
+            truncated_end_buffer_pos: None,
             fringe: Default::default(),
         });
     }

@@ -4437,6 +4437,7 @@ fn read_char_mouse_press_uses_clicked_window_geometry() {
                 col: 2,
             }],
             rows: vec![crate::window::DisplayRowSnapshot {
+                truncated_end_buffer_pos: None,
                 row: 0,
                 y: 0,
                 height: 16,
@@ -4561,6 +4562,7 @@ fn read_key_sequence_uses_clicked_window_local_map_for_mouse_event() {
                 col: 2,
             }],
             rows: vec![crate::window::DisplayRowSnapshot {
+                truncated_end_buffer_pos: None,
                 row: 0,
                 y: 0,
                 height: 16,
@@ -4670,6 +4672,7 @@ fn read_key_sequence_drops_unbound_down_mouse_before_bound_click() {
                 col: 2,
             }],
             rows: vec![crate::window::DisplayRowSnapshot {
+                truncated_end_buffer_pos: None,
                 row: 0,
                 y: 0,
                 height: 16,
@@ -5250,6 +5253,7 @@ fn read_key_sequence_uses_clicked_window_buffer_local_minor_mode_maps() {
                 col: 2,
             }],
             rows: vec![crate::window::DisplayRowSnapshot {
+                truncated_end_buffer_pos: None,
                 row: 0,
                 y: 0,
                 height: 16,

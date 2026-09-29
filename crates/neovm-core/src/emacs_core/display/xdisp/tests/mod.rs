@@ -3496,6 +3496,7 @@ fn test_window_line_height_eval_returns_live_gui_row_metrics() {
     }
     {
         let row = |index: i64, start: usize, end: usize| crate::window::DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row: index,
             y: index * 16,
             height: 16,
@@ -3557,6 +3558,7 @@ fn test_window_line_height_eval_uses_exact_chrome_rows() {
                     mode_line_height: 9,
                     rows: vec![
                         crate::window::DisplayRowSnapshot {
+                            truncated_end_buffer_pos: None,
                             row: 0,
                             y: 0,
                             height: 5,
@@ -3570,6 +3572,7 @@ fn test_window_line_height_eval_uses_exact_chrome_rows() {
                             fringe: Default::default(),
                         },
                         crate::window::DisplayRowSnapshot {
+                            truncated_end_buffer_pos: None,
                             row: 1,
                             y: 5,
                             height: 7,
@@ -3583,6 +3586,7 @@ fn test_window_line_height_eval_uses_exact_chrome_rows() {
                             fringe: Default::default(),
                         },
                         crate::window::DisplayRowSnapshot {
+                            truncated_end_buffer_pos: None,
                             row: 2,
                             y: 12,
                             height: 11,
@@ -3596,6 +3600,7 @@ fn test_window_line_height_eval_uses_exact_chrome_rows() {
                             fringe: Default::default(),
                         },
                         crate::window::DisplayRowSnapshot {
+                            truncated_end_buffer_pos: None,
                             row: 3,
                             y: 23,
                             height: 9,
@@ -3662,6 +3667,7 @@ fn test_window_line_height_eval_reports_text_rows_relative_to_text_area() {
             header_line_height: 7,
             rows: vec![
                 crate::window::DisplayRowSnapshot {
+                    truncated_end_buffer_pos: None,
                     row: 0,
                     y: 0,
                     height: 5,
@@ -3675,6 +3681,7 @@ fn test_window_line_height_eval_reports_text_rows_relative_to_text_area() {
                     fringe: Default::default(),
                 },
                 crate::window::DisplayRowSnapshot {
+                    truncated_end_buffer_pos: None,
                     row: 1,
                     y: 5,
                     height: 7,
@@ -3688,6 +3695,7 @@ fn test_window_line_height_eval_reports_text_rows_relative_to_text_area() {
                     fringe: Default::default(),
                 },
                 crate::window::DisplayRowSnapshot {
+                    truncated_end_buffer_pos: None,
                     row: 2,
                     y: 12,
                     height: 11,
@@ -3701,6 +3709,7 @@ fn test_window_line_height_eval_reports_text_rows_relative_to_text_area() {
                     fringe: Default::default(),
                 },
                 crate::window::DisplayRowSnapshot {
+                    truncated_end_buffer_pos: None,
                     row: 3,
                     y: 23,
                     height: 13,
@@ -3796,6 +3805,7 @@ fn test_posn_at_point_eval_uses_exact_redisplay_snapshot() {
                         body_y: 34,
                     }],
                     rows: vec![crate::window::DisplayRowSnapshot {
+                        truncated_end_buffer_pos: None,
                         row: 1,
                         y: 18,
                         height: 30,
@@ -3861,6 +3871,7 @@ fn test_posn_at_point_reports_text_area_relative_y_below_window_chrome() {
                 col: 0,
             }],
             rows: vec![crate::window::DisplayRowSnapshot {
+                truncated_end_buffer_pos: None,
                 row: 17,
                 y: 313,
                 height: 17,
@@ -3952,6 +3963,7 @@ fn posn_at_point_recomputes_a_terminal_window_redisplay_has_not_drawn_yet() {
                     col: 0,
                 }],
                 rows: vec![crate::window::DisplayRowSnapshot {
+                    truncated_end_buffer_pos: None,
                     row: 1,
                     y: 17,
                     height: 17,
@@ -4403,6 +4415,7 @@ fn test_posn_at_x_y_eval_uses_exact_redisplay_snapshot() {
                 col: 3,
             }],
             rows: vec![crate::window::DisplayRowSnapshot {
+                truncated_end_buffer_pos: None,
                 row: 1,
                 y: 18,
                 height: 30,
@@ -4489,6 +4502,7 @@ fn fixture_text_row(
             col: 0,
         },
         crate::window::DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row,
             y,
             height: 16,
@@ -4508,6 +4522,7 @@ fn fixture_text_row(
 /// inside the window lands on one of its glyphs.
 fn fixture_chrome_row(row: i64, y: i64, width: i64) -> crate::window::DisplayRowSnapshot {
     crate::window::DisplayRowSnapshot {
+        truncated_end_buffer_pos: None,
         row,
         y,
         height: 16,
@@ -4966,6 +4981,7 @@ fn test_posn_at_point_eval_returns_nil_outside_visible_snapshot_span() {
                 },
             ],
             rows: vec![crate::window::DisplayRowSnapshot {
+                truncated_end_buffer_pos: None,
                 row: 0,
                 y: 18,
                 height: 16,
@@ -5059,6 +5075,7 @@ fn test_posn_at_point_eval_returns_nil_for_positions_missing_entire_visible_row(
             ],
             rows: vec![
                 crate::window::DisplayRowSnapshot {
+                    truncated_end_buffer_pos: None,
                     row: 0,
                     y: 0,
                     height: 16,
@@ -5072,6 +5089,7 @@ fn test_posn_at_point_eval_returns_nil_for_positions_missing_entire_visible_row(
                     fringe: Default::default(),
                 },
                 crate::window::DisplayRowSnapshot {
+                    truncated_end_buffer_pos: None,
                     row: 1,
                     y: 18,
                     height: 16,
@@ -5124,6 +5142,7 @@ fn test_vertical_motion_eval_uses_live_redisplay_rows() {
             window_id: selected_window,
             rows: vec![
                 crate::window::DisplayRowSnapshot {
+                    truncated_end_buffer_pos: None,
                     row: 0,
                     y: 0,
                     height: 16,
@@ -5137,6 +5156,7 @@ fn test_vertical_motion_eval_uses_live_redisplay_rows() {
                     fringe: Default::default(),
                 },
                 crate::window::DisplayRowSnapshot {
+                    truncated_end_buffer_pos: None,
                     row: 1,
                     y: 16,
                     height: 16,
@@ -5150,6 +5170,7 @@ fn test_vertical_motion_eval_uses_live_redisplay_rows() {
                     fringe: Default::default(),
                 },
                 crate::window::DisplayRowSnapshot {
+                    truncated_end_buffer_pos: None,
                     row: 2,
                     y: 32,
                     height: 16,
@@ -5245,6 +5266,7 @@ fn test_vertical_motion_eval_uses_live_redisplay_goal_column() {
             ],
             rows: vec![
                 crate::window::DisplayRowSnapshot {
+                    truncated_end_buffer_pos: None,
                     row: 0,
                     y: 0,
                     height: 16,
@@ -5258,6 +5280,7 @@ fn test_vertical_motion_eval_uses_live_redisplay_goal_column() {
                     fringe: Default::default(),
                 },
                 crate::window::DisplayRowSnapshot {
+                    truncated_end_buffer_pos: None,
                     row: 1,
                     y: 16,
                     height: 16,
@@ -5338,6 +5361,7 @@ fn test_vertical_motion_goal_column_past_row_end_lands_on_the_row_end_like_gnu()
             window_id: selected_window,
             points,
             rows: vec![crate::window::DisplayRowSnapshot {
+                truncated_end_buffer_pos: None,
                 row: 0,
                 y: 0,
                 height: 16,
@@ -6055,6 +6079,7 @@ fn fringe_bitmaps_at_pos_fixture() -> (Context, crate::window::FrameId) {
 
     let row = |row: i64, start: usize, end: usize, fringe: crate::window::RowFringeBitmaps| {
         crate::window::DisplayRowSnapshot {
+            truncated_end_buffer_pos: None,
             row,
             y: row * 10,
             height: 10,

@@ -1458,3 +1458,44 @@ fn repeated_query_points_keep_bounded_independent_observations() {
         }
     }
 }
+
+#[test]
+fn backward_page_does_not_treat_bounded_wrapped_rows_as_covering_the_origin() {
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    eval.buffer_manager_mut().get_mut(buffer).unwrap()
+        .insert(&format!("{}\n", "x".repeat(200)).repeat(120));
+    let frame = eval.frame_manager_mut().create_frame("bounded-page", 160, 160, buffer);
+    eval.frame_manager_mut().get_mut(frame).unwrap().window_system = Some(Value::symbol("neomacs"));
+    let start = 201 * 90 + 1;
+    eval.eval_str(&format!("(setq mode-line-format nil auto-window-vscroll nil scroll-preserve-screen-position nil) (put-text-property 1 200 'face '(:height 2.0)) (goto-char {start}) (set-window-start nil {start} t)")).unwrap();
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    let actual = eval.eval_str("(let ((noninteractive nil)) (scroll-down) (window-start))").unwrap().as_fixnum().unwrap();
+    assert!(actual < start && actual > start - 201 * 3,
+        "one wrapped screen page must stay near its origin: {start} -> {actual}");
+}
+
+#[test]
+fn bounded_truncated_rows_publish_only_their_consumed_line_tail() {
+    use neovm_core::{buffer::LispCharPos1, window::WindowLayoutQueryScope};
+    for newline in [false, true] {
+        let mut eval = Context::new();
+        let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+        let text = format!("{}{}", "x".repeat(300), if newline { "\nlater\n" } else { "" });
+        eval.buffer_manager_mut().get_mut(buffer).unwrap().insert(&text);
+        let frame = eval.frame_manager_mut().create_frame("truncated-tail", 160, 160, buffer);
+        let window = eval.frame_manager().get(frame).unwrap().selected_window;
+        eval.eval_str("(setq truncate-lines t mode-line-format nil) (goto-char 1)").unwrap();
+        let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+        let result = query.query_window_layout(&mut eval, frame, window,
+            WindowLayoutQueryScope::Rows { start: LispCharPos1::ONE, count: std::num::NonZeroUsize::new(1).unwrap() }).unwrap();
+        let row = result.geometry().unwrap().rows.iter().find(|row| row.start_buffer_pos.is_some()).unwrap();
+        assert_eq!(row.truncated_end_buffer_pos, Some(LispCharPos1::new(301)), "newline={newline}");
+    }
+}

@@ -254,6 +254,7 @@ fn emitted_row(
     end_lisp: i64,
 ) -> neovm_core::window::DisplayRowSnapshot {
     neovm_core::window::DisplayRowSnapshot {
+        truncated_end_buffer_pos: None,
         row,
         y,
         height,
