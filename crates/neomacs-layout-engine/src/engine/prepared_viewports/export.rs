@@ -137,24 +137,35 @@ impl PreparedViewports {
                     arena,
                 )
                 .ok()?;
-            for (index, row) in entry
+            let prepared: Vec<_> = entry
                 .retained
                 .matrix
                 .rows
                 .iter()
                 .enumerate()
                 .filter(|(_, row)| row.enabled && row.role == GlyphRowRole::Text)
-            {
-                if let Some((source, old_index)) = rows.get(&row.start_charpos) {
-                    let old = &source.matrix.rows[*old_index];
-                    if old.height_px != row.height_px
-                        || old.end_charpos != row.end_charpos
-                        || old.continued != row.continued
-                    {
-                        return None;
-                    }
+                .collect();
+            // A viewport can begin inside a physical line, changing tab/wrap
+            // context for that paragraph. Keep the accepted body authoritative.
+            // Reject the whole conflicting continuation chain; rows after its
+            // completed line boundary have independent layout context.
+            for paragraph in prepared.split_inclusive(|(_, row)| !row.continued) {
+                let conflicts = paragraph.iter().any(|(_, row)| {
+                    rows.get(&row.start_charpos)
+                        .is_some_and(|(source, old_index)| {
+                            let old = &source.matrix.rows[*old_index];
+                            old.height_px != row.height_px
+                                || old.end_charpos != row.end_charpos
+                                || old.continued != row.continued
+                        })
+                });
+                if conflicts {
+                    continue;
                 }
-                rows.insert(row.start_charpos, (&entry.retained, index));
+                for (index, row) in paragraph {
+                    rows.entry(row.start_charpos)
+                        .or_insert((&entry.retained, *index));
+                }
             }
         }
         let all: Vec<_> = rows.into_values().collect();
@@ -280,7 +291,8 @@ impl PreparedViewports {
         fonts.faces = attempt.faces();
         fonts.window_matrices.push(content.clone());
         crate::font::metrics::realize_frame_fonts(&mut fonts, metrics);
-        let pointer_source = crate::presentation::pointer::window_pointer_source_map(&fonts).ok()?;
+        let pointer_source =
+            crate::presentation::pointer::window_pointer_source_map(&fonts).ok()?;
         Some(ScrollCoverage {
             epoch,
             predict_pixels: false,
@@ -318,3 +330,7 @@ fn scroll_row_faces(
         .map(|bitmap| bitmap.face_id),
     )
 }
+
+#[cfg(test)]
+#[path = "export_test.rs"]
+mod tests;
