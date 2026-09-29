@@ -36,6 +36,7 @@ pub(crate) struct BufferWindowGeometryRequest {
     /// up to this many rows even when the window is currently one row tall.
     max_mini_window_rows: Option<usize>,
     measurement_rows: Option<std::num::NonZeroUsize>,
+    measurement_pixels: Option<std::num::NonZeroUsize>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -160,6 +161,7 @@ impl BufferWindowGeometryRequest {
             char_height,
             max_mini_window_rows: None,
             measurement_rows: params.measurement_rows,
+            measurement_pixels: params.measurement_pixels,
         }
     }
 
@@ -227,7 +229,9 @@ impl BufferWindowGeometryRequest {
         // to the real text area (`text_y .. text_y + text_height`).  Otherwise the
         // physical text-area bottom is the limit.
         let physical_bottom_y = self.text_y + self.text_height;
-        let visibility_bottom_y = if self.measurement_rows.is_some() {
+        let visibility_bottom_y = if let Some(height) = self.measurement_pixels {
+            self.text_y + height.get() as f32
+        } else if self.measurement_rows.is_some() {
             // A tall image is still one row. A pixel-height estimate cannot
             // bound a row query; the independent row budget bounds this walk.
             f32::INFINITY
@@ -264,6 +268,10 @@ impl BufferWindowGeometryRequest {
     }
 
     fn visible_max_rows(self) -> usize {
+        if let Some(height) = self.measurement_pixels {
+            // A canonical row occupies at least one pixel.
+            return height.get();
+        }
         if let Some(count) = self.measurement_rows {
             return count.get();
         }

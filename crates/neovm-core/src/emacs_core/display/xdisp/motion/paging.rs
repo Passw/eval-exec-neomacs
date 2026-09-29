@@ -190,26 +190,17 @@ impl RowMeasurer {
         start: LispCharPos1,
         height: i64,
     ) -> Result<Option<WindowDisplaySnapshot>, Flow> {
-        // Start small; actual measured heights decide whether to extend.
-        // A physical source line may span many visual rows.
-        let mut count = 8usize;
-        loop {
-            let Some(snapshot) = self.query(eval, start, count)? else {
-                return Ok(None);
-            };
-            let rows = snapshot_text_rows(&snapshot);
-            let (Some(first), Some(last)) = (rows.first(), rows.last()) else {
-                return Err(failure("Scroll measurement has no source rows"));
-            };
-            if last.y - first.y >= height
-                || last.end_buffer_pos == Some(self.accessible(eval)?.end_lisp())
-            {
-                return Ok(Some(snapshot));
-            }
-            count = count
-                .checked_mul(2)
-                .ok_or_else(|| failure("Scroll measurement exceeds the row address space"))?;
-        }
+        let height = usize::try_from(height.max(1))
+            .ok()
+            .and_then(NonZeroUsize::new)
+            .ok_or_else(|| failure("Scroll pixel extent exceeds the address space"))?;
+        measurement::query_scope(
+            eval,
+            self.frame,
+            self.window,
+            self.buffer,
+            crate::window::WindowLayoutQueryScope::Pixels { start, height },
+        )
     }
 }
 

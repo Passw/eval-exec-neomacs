@@ -1538,3 +1538,115 @@ fn absolute_row_queries_survive_viewport_placement_but_not_source_changes() {
     engine.query_window_layout(&mut eval, frame, window, scope).unwrap();
     assert!(probe::max_depth() > 0);
 }
+
+#[test]
+fn page_viewports_measure_their_pixel_extent_in_one_walk() {
+    use std::{cell::Cell, rc::Rc};
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert(&"ordinary row\n".repeat(100));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("page-pixel-budget", 400, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str("(setq mode-line-format nil header-line-format nil tab-line-format nil) (goto-char 1) (set-window-start nil 1 t)").unwrap();
+    let calls = Rc::new(Cell::new(0));
+    let observed = calls.clone();
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        observed.set(observed.get() + 1);
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    eval.eval_str("(let ((noninteractive nil)) (scroll-up))")
+        .unwrap();
+    assert!(
+        eval.eval_str("(window-start)")
+            .unwrap()
+            .as_fixnum()
+            .unwrap()
+            > 1
+    );
+    assert!(
+        calls.get() <= 4,
+        "page plan restarted viewport walks: {}",
+        calls.get()
+    );
+}
+
+#[test]
+fn pixel_extent_queries_match_complete_rows_with_mixed_heights_and_overlays() {
+    use neovm_core::window::WindowLayoutQueryScope;
+    use std::num::NonZeroUsize;
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert(&"mixed\twords wrap around the edge\n".repeat(100));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("pixel-extent-parity", 160, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.eval_str("(put-text-property 1 6 'face '(:height 250)) (put-text-property 20 80 'face '(:height 75)) (overlay-put (make-overlay 80 100) 'before-string (propertize \"inserted\" 'face '(:height 175)))").unwrap();
+    for start in [1, 4, 33] {
+        for height in [1, 17, 80, 350] {
+            let start = LispCharPos1::from_one_based_usize(start);
+            let mut query = WindowLayoutQueryEngine::new();
+            let pixels = query
+                .query_window_layout(
+                    &mut eval,
+                    frame,
+                    window,
+                    WindowLayoutQueryScope::Pixels {
+                        start,
+                        height: NonZeroUsize::new(height).unwrap(),
+                    },
+                )
+                .unwrap()
+                .into_geometry()
+                .unwrap();
+            let mut fresh = WindowLayoutQueryEngine::new();
+            let rows = fresh
+                .query_window_layout(
+                    &mut eval,
+                    frame,
+                    window,
+                    WindowLayoutQueryScope::Rows {
+                        start,
+                        count: NonZeroUsize::new(128).unwrap(),
+                    },
+                )
+                .unwrap()
+                .into_geometry()
+                .unwrap();
+            let bottom = rows.rows[0].y + height as i64;
+            let expected: Vec<_> = rows
+                .rows
+                .iter()
+                .filter(|row| row.y < bottom)
+                .cloned()
+                .collect();
+            assert_eq!(pixels.rows, expected, "start={start:?}, height={height}");
+            let last = pixels.rows.last().unwrap().row;
+            let expected: Vec<_> = rows
+                .points
+                .into_iter()
+                .filter(|point| point.row <= last)
+                .collect();
+            assert_eq!(pixels.points, expected, "start={start:?}, height={height}");
+        }
+    }
+}

@@ -90,7 +90,7 @@ pub(super) fn reposition(
     Some(WindowLayoutQuery::new(query.end(), Some(placed)))
 }
 
-/// An explicit Rows query already chooses its own start and zero vscroll.
+/// An explicit row/pixel query already chooses its own start and zero vscroll.
 /// Moving the live viewport cannot move these pixels; point and every source
 /// dependency still have to match. The owner rejects fontification callbacks.
 pub(super) fn absolute_rows(

@@ -85,12 +85,24 @@ pub(super) fn query(
     start: LispCharPos1,
     count: NonZeroUsize,
 ) -> Result<Option<WindowDisplaySnapshot>, Flow> {
-    eval.maybe_quit()?;
-    let snapshot = match eval.query_window_layout_scope(
+    query_scope(
+        eval,
         frame,
         window,
+        buffer,
         WindowLayoutQueryScope::Rows { start, count },
-    ) {
+    )
+}
+
+pub(super) fn query_scope(
+    eval: &mut Context,
+    frame: FrameId,
+    window: WindowId,
+    buffer: BufferId,
+    scope: WindowLayoutQueryScope,
+) -> Result<Option<WindowDisplaySnapshot>, Flow> {
+    eval.maybe_quit()?;
+    let snapshot = match eval.query_window_layout_scope(frame, window, scope) {
         WindowLayoutQueryOutcome::Ready(query) => query
             .into_geometry()
             .ok_or_else(|| failed("Display motion query produced no rows"))?,

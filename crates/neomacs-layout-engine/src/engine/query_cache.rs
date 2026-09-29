@@ -70,7 +70,7 @@ impl QueryCache {
             if entry.query.geometry()?.layout_freshness.as_ref() == Some(&current) {
                 return Some(entry.query.clone());
             }
-            if matches!(scope, WindowLayoutQueryScope::Rows { .. }) {
+            if matches!(scope, WindowLayoutQueryScope::Rows { .. } | WindowLayoutQueryScope::Pixels { .. }) {
                 let source = evaluator.buffer_manager().get(buffer)?;
                 let fontification = source.buffer_local_value("fontification-functions")
                     .or_else(|| evaluator.obarray().symbol_value("fontification-functions").copied());

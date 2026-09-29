@@ -1682,6 +1682,7 @@ fn test_window_params() -> WindowParams {
         top_line: 0,
         window_start: 1,
         measurement_rows: None,
+        measurement_pixels: None,
         force_start: false,
         previous_visible_end: None,
         point: 1,

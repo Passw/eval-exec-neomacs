@@ -243,6 +243,8 @@ pub struct WindowParams {
     /// A stack-local measurement is bounded by rows, not viewport pixels.
     /// Redisplay leaves this absent and uses the physical window extent.
     pub measurement_rows: Option<std::num::NonZeroUsize>,
+    /// Explicit pixel extent for a synchronous query, independent of the viewport.
+    pub measurement_pixels: Option<std::num::NonZeroUsize>,
     /// GNU `w->force_start`: `window_start` was set explicitly (scroll /
     /// set-window-start), so layout must display from it and move POINT into
     /// the window when point ended up outside — never recompute the start
@@ -429,7 +431,9 @@ impl WindowParams {
     pub(crate) fn source_interpretation_rows(&self) -> usize {
         self.measurement_rows.map_or_else(
             || {
-                (self.text_bounds.height / self.char_height.max(1.0))
+                (self.measurement_pixels
+                    .map_or(self.text_bounds.height, |height| height.get() as f32)
+                    / self.char_height.max(1.0))
                     .ceil()
                     .max(1.0) as usize
             },

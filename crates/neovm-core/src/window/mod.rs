@@ -992,6 +992,11 @@ pub enum WindowLayoutQueryScope {
         start: LispCharPos1,
         count: std::num::NonZeroUsize,
     },
+    /// Complete rows intersecting a pixel extent at an explicit source start.
+    Pixels {
+        start: LispCharPos1,
+        height: std::num::NonZeroUsize,
+    },
 }
 
 /// Why an installed frontend query could not produce a coherent row walk.

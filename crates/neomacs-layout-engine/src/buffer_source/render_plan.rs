@@ -493,7 +493,7 @@ impl BufferSourceOutputSetup {
         setup.row_visibility_limit.allow_partial = params.window_system
             && !params.kind.is_minibuffer()
             && params.measurement_rows.is_none();
-        if setup.row_visibility_limit.allow_partial {
+        if setup.row_visibility_limit.allow_partial && params.measurement_pixels.is_none() {
             setup.row_visibility_limit.bottom_y = layout_box.body().bottom();
         }
         setup

@@ -469,17 +469,25 @@ fn resolve_window_display_source_params(
     // (GNU resolves it inline with `lookup_image`). This is the single point
     // every window's params pass through that also holds the evaluator.
     let mut params = params.clone();
-    if let WindowLayoutWalkPurpose::SynchronousQuery(
-        neovm_core::window::WindowLayoutQueryScope::Rows { start, count },
-    ) = purpose
-    {
-        params.window_start = start
-            .as_i64()
-            .saturating_sub(1)
-            .clamp(params.buffer_begv, params.buffer_size);
-        params.measurement_rows = Some(count);
-        params.vscroll = 0;
-        params.previous_visible_end = None;
+    if let WindowLayoutWalkPurpose::SynchronousQuery(scope) = purpose {
+        use neovm_core::window::WindowLayoutQueryScope;
+        let start = match scope {
+            WindowLayoutQueryScope::Rows { start, count } => {
+                params.measurement_rows = Some(count);
+                Some(start)
+            }
+            WindowLayoutQueryScope::Pixels { start, height } => {
+                params.measurement_pixels = Some(height);
+                Some(start)
+            }
+            WindowLayoutQueryScope::Viewport => None,
+        };
+        if let Some(start) = start {
+            params.window_start = start.as_i64().saturating_sub(1)
+                .clamp(params.buffer_begv, params.buffer_size);
+            params.vscroll = 0;
+            params.previous_visible_end = None;
+        }
     }
     params.space_image_catalog = evaluator
         .display_host
@@ -2637,7 +2645,22 @@ impl LayoutEngine {
                 // GNU's `pos_visible_p` and `buffer_posn_from_coords` use the
                 // same on-demand walk from `w->start`; return that walk's
                 // geometry rather than inventing a second approximation.
-                let geometry = query_snapshot.cloned();
+                let mut geometry = query_snapshot.cloned();
+                if let LayoutPurpose::SynchronousQuery {
+                    scope: neovm_core::window::WindowLayoutQueryScope::Pixels { height, .. }, ..
+                } = purpose
+                    && let Some(snapshot) = &mut geometry
+                    && let Some(first) = snapshot.rows.first()
+                {
+                    // An inserted string can stage the next row before the
+                    // source loop observes its pixel stop. It is outside this
+                    // observation and may not yet contain the complete row.
+                    let bottom = first.y.saturating_add(i64::try_from(height.get()).unwrap_or(i64::MAX));
+                    snapshot.rows.retain(|row| row.y < bottom);
+                    let last = snapshot.rows.last().map(|row| row.row);
+                    snapshot.points.retain(|point| Some(point.row) <= last);
+                    snapshot.body_rows.retain(|row| Some(row.output_row) <= last);
+                }
                 for face_name in face_resolver.take_invalid_face_references() {
                     evaluator.add_to_log(&format!("Invalid face reference: {face_name}"));
                 }
