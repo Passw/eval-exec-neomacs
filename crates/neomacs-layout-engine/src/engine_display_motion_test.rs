@@ -1479,11 +1479,11 @@ fn backward_page_does_not_treat_bounded_wrapped_rows_as_covering_the_origin() {
     let observed = measured.clone();
     let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
     eval.install_window_layout_query(move |eval, frame, window, scope| {
-        if let neovm_core::window::WindowLayoutQueryScope::Rows { count, .. } = scope {
-            observed.borrow_mut().push(count.get());
-        }
         match query.query_window_layout(eval, frame, window, scope) {
-            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Ok(query) => {
+                observed.borrow_mut().push(query.geometry().map_or(0, |snapshot| snapshot.rows.len()));
+                WindowLayoutQueryOutcome::Ready(query)
+            },
             Err(error) => WindowLayoutQueryOutcome::Failed(error),
         }
     });
@@ -1714,4 +1714,49 @@ fn forward_page_uses_the_visible_wrap_context_with_tabs_and_overlays() {
             "forward page must use the measured viewport at start {start}"
         );
     }
+}
+
+#[test]
+fn backward_page_grows_pixel_coverage_without_guessing_row_counts() {
+    use std::{cell::Cell, rc::Rc};
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert(&format!("{}\n", "x".repeat(200)).repeat(120));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("page-pixel-budget", 160, 600, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str("(setq mode-line-format nil header-line-format nil tab-line-format nil) (goto-char 18191) (set-window-start nil 18191 t)").unwrap();
+    let calls = Rc::new(Cell::new(0));
+    let observed = calls.clone();
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        observed.set(observed.get() + 1);
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    eval.eval_str("(let ((noninteractive nil)) (scroll-down))")
+        .unwrap();
+    let actual = eval
+        .eval_str("(window-start)")
+        .unwrap()
+        .as_fixnum()
+        .unwrap();
+    assert!(
+        (17000..18191).contains(&actual),
+        "page must move backward by a nearby viewport: {actual}"
+    );
+    assert!(
+        calls.get() <= 4,
+        "backward page restarted row-count guesses: {}",
+        calls.get()
+    );
 }

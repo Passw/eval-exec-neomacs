@@ -62,22 +62,6 @@ struct RowMeasurer {
 }
 
 impl RowMeasurer {
-    fn query(
-        &self,
-        eval: &mut Context,
-        start: LispCharPos1,
-        count: usize,
-    ) -> Result<Option<WindowDisplaySnapshot>, Flow> {
-        measurement::query(
-            eval,
-            self.frame,
-            self.window,
-            self.buffer,
-            start,
-            NonZeroUsize::new(count).ok_or_else(|| failure("Empty display row budget"))?,
-        )
-    }
-
     fn accessible(&self, eval: &Context) -> Result<AccessibleCharRange, Flow> {
         eval.buffers
             .get(self.buffer)
@@ -105,14 +89,18 @@ impl RowMeasurer {
         delta: i64,
         line_height: i64,
     ) -> Result<LispCharPos1, Flow> {
-        // Start small; actual measured heights decide whether to extend.
-        // A physical source line may span many visual rows.
-        let mut count = 8usize;
+        // The goal is in pixels. Measure its extent directly instead of
+        // repeatedly guessing a visual-row count for mixed-height text.
+        let mut height = i64::try_from(delta.unsigned_abs())
+            .ok()
+            .and_then(|pixels| pixels.checked_add(line_height.max(1)))
+            .ok_or_else(|| failure("Scroll measurement exceeds the pixel address space"))?;
+        let origin_line = self.backtrack(eval, origin, 0)?;
         let mut backtracked_lines = usize::from(delta < 0);
         let mut start = self.backtrack(eval, origin, backtracked_lines)?;
         loop {
             let snapshot = self
-                .query(eval, start, count)?
+                .pixel_rows(eval, start, height)?
                 .ok_or_else(|| failure("Scroll row producer disappeared"))?;
             let rows = snapshot_text_rows(&snapshot);
             let accessible = self.accessible(eval)?;
@@ -126,23 +114,31 @@ impl RowMeasurer {
                 let goal = rows[index].y.saturating_add(delta);
                 if delta < 0 && goal < rows[0].y && start > accessible.start_lisp() {
                     // Physical lines can contain many visual rows. Extend
-                    // by the measured pixel deficit instead of interpreting
-                    // the current visual-row budget as a source-line count.
+                    // by the pixel deficit and the measured source density.
                     let missing = rows[0].y.saturating_sub(goal).max(1) as u64;
-                    let covered = (rows[index].y - rows[0].y).max(line_height).max(1) as u64;
+                    // Estimate from complete preceding physical lines,
+                    // excluding the origin line's partial visual prefix.
+                    // Counting that prefix as one of the backtracked lines
+                    // underestimates how many more source lines we need.
+                    let preceding_end = snapshot_row_index_for_pos_or_truncated_line(
+                        &rows,
+                        origin_line,
+                        accessible.end_lisp(),
+                    )
+                    .map_or(rows[index].y, |line| rows[line].y);
+                    let covered = (preceding_end - rows[0].y).max(line_height).max(1) as u64;
                     let lines = missing
                         .saturating_mul(backtracked_lines as u64)
                         .div_ceil(covered)
                         .clamp(1, 64) as usize;
                     start = self.backtrack(eval, start, lines)?;
                     backtracked_lines = backtracked_lines.saturating_add(lines);
-                    let minimum_height =
-                        rows.iter().map(|row| row.height.max(1)).min().unwrap() as u64;
-                    let extra = usize::try_from(missing.div_ceil(minimum_height))
-                        .map_err(|_| failure("Scroll measurement exceeds the row address space"))?;
-                    count = count.checked_add(extra.max(1)).ok_or_else(|| {
-                        failure("Scroll measurement exceeds the row address space")
-                    })?;
+                    height = i64::try_from(missing)
+                        .ok()
+                        .and_then(|extra| height.checked_add(extra))
+                        .ok_or_else(|| {
+                            failure("Scroll measurement exceeds the pixel address space")
+                        })?;
                     continue;
                 } else if goal >= rows.last().expect("origin row").y
                     && rows.last().and_then(|row| row.end_buffer_pos) != Some(accessible.end_lisp())
@@ -178,13 +174,13 @@ impl RowMeasurer {
             {
                 return Err(failure("Scroll origin is outside measured source coverage"));
             }
-            count = count
+            height = height
                 .checked_mul(2)
-                .ok_or_else(|| failure("Scroll measurement exceeds the row address space"))?;
+                .ok_or_else(|| failure("Scroll measurement exceeds the pixel address space"))?;
         }
     }
 
-    fn viewport(
+    fn pixel_rows(
         &self,
         eval: &mut Context,
         start: LispCharPos1,
@@ -309,7 +305,7 @@ fn plan_scroll(
     };
     let accessible = measurer.accessible(eval)?;
     start = start.clamp(accessible.start_lisp(), accessible.end_lisp());
-    let Some(snapshot) = measurer.viewport(eval, start, height + hidden_top)? else {
+    let Some(snapshot) = measurer.pixel_rows(eval, start, height + hidden_top)? else {
         return Ok(None);
     };
     let rows = snapshot_text_rows(&snapshot);
@@ -419,7 +415,7 @@ fn plan_scroll(
         return Err(signal(LispCondition::BeginningOfBuffer, vec![]));
     }
     let candidate = measurer
-        .viewport(eval, new_start, height)?
+        .pixel_rows(eval, new_start, height)?
         .ok_or_else(|| failure("Scroll row producer disappeared"))?;
     let candidate_rows = snapshot_text_rows(&candidate);
     let first_y = candidate_rows[0].y;
