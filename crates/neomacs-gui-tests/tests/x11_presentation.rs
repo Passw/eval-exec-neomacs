@@ -163,7 +163,12 @@ fn x11_rich_scroll_inputs_have_native_output_receipts_across_resize() {
     // --window targets XSendEvent at this owned window; no global focus change
     // or key injection into whichever application the user happens to use.
     let mut previous = initial;
-    for (index, key) in ["Next", "Next", "Prior", "Prior"].into_iter().enumerate() {
+    const PAGE_INPUTS: usize = 24;
+    const WHEEL_INPUTS: usize = 20;
+    let page_keys = ["Next", "Next", "Prior", "Prior"]
+        .into_iter()
+        .chain(["Next", "Prior"].into_iter().cycle().take(PAGE_INPUTS - 4));
+    for (index, key) in page_keys.enumerate() {
         if index == 2 {
             let old_receipt = fs::read_to_string(&receipt_path).unwrap();
             xdotool(&["windowsize", &window, "860", "640"]);
@@ -209,7 +214,12 @@ fn x11_rich_scroll_inputs_have_native_output_receipts_across_resize() {
     // X11 wheel input uses XI2/XTest; core XSendEvent button events do not
     // reach winit's XI2 wheel path. Restore the pointer even if an assertion fails.
     let _restore_pointer = position_pointer_in_owned_window(&window);
-    for (index, button) in ["5", "4"].into_iter().enumerate() {
+    for (index, button) in ["5", "4"]
+        .into_iter()
+        .cycle()
+        .take(WHEEL_INPUTS)
+        .enumerate()
+    {
         let before = state(&state_path).unwrap();
         xdotool(&["click", button]);
         wait(&artifacts, "wheel did not change the viewport", || {
@@ -223,13 +233,55 @@ fn x11_rich_scroll_inputs_have_native_output_receipts_across_resize() {
             "wheel input has no native timing evidence",
             || {
                 let all = samples(&latency_path);
-                (all.len() >= 5 + index).then_some(all)
+                (all.len() >= PAGE_INPUTS + index + 1).then_some(all)
             },
         );
         let sample = evidence.last().unwrap();
         assert_eq!(sample["kind"], "wheel");
         assert_eq!(sample["observation"], "native-first-pixel-output");
         assert!(sample["input_to_present_ns"].as_u64().is_some());
+    }
+    let evidence = samples(&latency_path);
+    assert_eq!(evidence.len(), PAGE_INPUTS + WHEEL_INPUTS);
+    // Keep the first startup/font-warming input distinct. Resize and all later
+    // page/wheel commands remain in the warm performance gate.
+    let mut summary = serde_json::Map::new();
+    summary.insert(
+        "cold_page_ns".into(),
+        evidence[0]["input_to_present_ns"].clone(),
+    );
+    for kind in ["page", "wheel"] {
+        let mut times: Vec<u64> = evidence
+            .iter()
+            .skip(1)
+            .filter(|sample| sample["kind"] == kind)
+            .map(|sample| {
+                sample["input_to_present_ns"]
+                    .as_u64()
+                    .expect("valid native clock")
+            })
+            .collect();
+        times.sort_unstable();
+        let p95 = times[(times.len() * 95).div_ceil(100) - 1];
+        let maximum = *times.last().unwrap();
+        summary.insert(
+            kind.into(),
+            serde_json::json!({"count": times.len(), "p95_ns": p95, "max_ns": maximum}),
+        );
+    }
+    fs::write(
+        artifacts.join("latency-summary.json"),
+        serde_json::to_vec_pretty(&summary).unwrap(),
+    )
+    .unwrap();
+    for kind in ["page", "wheel"] {
+        let stats = &summary[kind];
+        assert!(
+            stats["p95_ns"].as_u64().unwrap() <= 50_000_000
+                && stats["max_ns"].as_u64().unwrap() <= 250_000_000,
+            "warm {kind} latency exceeds p95 50 ms / max 250 ms: {stats}; artifacts: {}",
+            artifacts.display()
+        );
     }
     fs::write(
         artifacts.join("validated"),
