@@ -220,7 +220,7 @@ use neovm_core::window::{
     FrameDisplayIdentity, FrameFullscreen, FrameId, FrameParam, FrameVisibility, Window,
 };
 
-use image_catalog::AsyncImageCatalog;
+use image_catalog::{AsyncImageCatalog, RedisplayWaker};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 // Variants share a `Print*` prefix by design (all are print-and-exit CLI
@@ -3694,6 +3694,10 @@ fn run_gui_evaluator_worker(
     configure_gnu_startup_state(&mut evaluator, frame_id, &startup);
     maybe_install_startup_phase_trace(&mut evaluator);
 
+    // Created before the display host: the image catalog resolves geometry
+    // off-thread and must be able to ask for the redisplay that publishes it.
+    let (input_tx, input_rx) = crossbeam_channel::unbounded();
+    let image_redisplay_waker = RedisplayWaker::new(input_tx.clone(), evaluator.wait_notifier());
     evaluator.set_display_host(Box::new(PrimaryWindowDisplayHost {
         resources,
         system_fonts: bootstrap_display.font_defaults.system_fonts(),
@@ -3712,6 +3716,7 @@ fn run_gui_evaluator_worker(
             emacs_comms.cmd_tx.clone(),
             Some(render_waker.clone()),
             Arc::clone(&gui_image_metadata),
+            Some(image_redisplay_waker),
         )),
         #[cfg(feature = "video")]
         resolved_videos: Mutex::new(ResolvedVideoRegistry::default()),
@@ -3727,7 +3732,6 @@ fn run_gui_evaluator_worker(
 
     prime_initial_monitor_snapshot(&shared_monitors);
 
-    let (input_tx, input_rx) = crossbeam_channel::unbounded();
     let secondary_ttys = secondary_tty::SecondaryTtyRegistry::default();
     let display_input_rx = emacs_comms.input_rx;
     let mut font_changes = font_observer.take_changes();

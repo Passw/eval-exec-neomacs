@@ -188,6 +188,17 @@ pub enum ImageDataSource {
     WithBaseUri { data: Vec<u8>, base_uri: LispString },
 }
 
+impl ImageDataSource {
+    /// The encoded bytes, whichever authority they carry.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        match self {
+            Self::Isolated(data) => data,
+            Self::WithBaseUri { data, .. } => data,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ImageResolveSource {
     File(LispString),
@@ -372,7 +383,14 @@ impl ImagePlacement {
     }
 }
 
-/// Stable placeholder geometry while an image is decoded asynchronously.
+/// Geometry for an image that is still being decoded.
+///
+/// The layout is the best the implementation can know without pixels: an
+/// encoded header when one can be read off-thread, otherwise the request's
+/// pinned placeholder. It must agree with the layout the completed decode
+/// reports — a pending slot that moves when the pixels land is worse than a
+/// slot that stayed at the placeholder — so implementations resolve it through
+/// the same sizing inputs the decoder will use, and must not block to get it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PendingImage {
     load: ImageLoadToken,
@@ -465,7 +483,9 @@ impl ImageLookup {
 pub trait ImageCatalog {
     /// Return the current state immediately. A cache miss schedules decoding
     /// and returns [`ImageLookup::Pending`]. Implementations must not wait for
-    /// renderer queue capacity, metadata locks, file I/O, decode, or upload.
+    /// renderer queue capacity, metadata locks, file I/O, decode, or upload —
+    /// including while resolving the pending layout, which is why header
+    /// geometry arrives from a producer thread rather than from this call.
     fn lookup(&self, request: ImageResolveRequest) -> ImageLookup;
 
     /// Apply one explicitly typed cache operation. The next matching lookup

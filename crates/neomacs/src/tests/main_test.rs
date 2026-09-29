@@ -1597,7 +1597,12 @@ fn test_image_catalog(
     cmd_tx: &crossbeam_channel::Sender<RenderCommand>,
     image_metadata: SharedImageRenderState,
 ) -> Rc<AsyncImageCatalog> {
-    Rc::new(AsyncImageCatalog::new(cmd_tx.clone(), None, image_metadata))
+    Rc::new(AsyncImageCatalog::new(
+        cmd_tx.clone(),
+        None,
+        image_metadata,
+        None,
+    ))
 }
 
 #[test]
@@ -2646,7 +2651,7 @@ fn primary_image_catalog_lookup_returns_pending_without_waiting_for_render_threa
 #[test]
 fn animation_frames_share_sequence_identity_and_retirement_advances_generation() {
     let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
-    let catalog = AsyncImageCatalog::new(cmd_tx, None, Arc::new(ImageRenderState::default()));
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, Arc::new(ImageRenderState::default()), None);
     let source = ImageResolveSource::Data(ImageDataSource::Isolated(vec![b'G', b'I', b'F']));
     let mut request = ImageResolveRequest {
         spec: test_image_spec_identity("animated.gif"),

@@ -7,6 +7,7 @@ use neovm_core::emacs_core::image_catalog::{
     ImageSizeSpec, ImageSpecIdentity,
 };
 use std::sync::Arc;
+use std::time::Instant;
 
 thread_local! {
     static IMAGE_SPEC_TEST_CONTEXT: Context = Context::new();
@@ -37,7 +38,7 @@ fn file_request(path: &str) -> ImageResolveRequest {
 fn classify(file: &str) -> (ImageResolveRequest, Option<ImageFileRequest>) {
     let (cmd_tx, _cmd_rx) = crossbeam_channel::unbounded();
     let metadata = Arc::new(ImageRenderState::default());
-    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata);
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata, None);
     catalog.classify_request(file_request(file))
 }
 
@@ -84,7 +85,7 @@ fn named_user_file_is_deferred_off_thread() {
 fn pending_slot_and_decode_command_share_one_resolved_realization() {
     let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
     let metadata = Arc::new(ImageRenderState::default());
-    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata);
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata, None);
     let mut request = file_request("/tmp/icon.svg");
     // Neither axis pinned: the placeholder falls back to the realization.
     request.size = ImageSizeSpec::new(AxisSize::Native, AxisSize::AtMost(24));
@@ -109,7 +110,7 @@ fn pending_slot_and_decode_command_share_one_resolved_realization() {
 fn invalidate_all_requeues_every_entry_under_its_existing_id() {
     let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
     let metadata = Arc::new(ImageRenderState::default());
-    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata);
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata, None);
 
     let first = catalog
         .lookup(file_request("/tmp/one.png"))
@@ -152,7 +153,7 @@ fn invalidate_all_requeues_every_entry_under_its_existing_id() {
 fn invalidating_dependency_retires_old_identity_and_next_lookup_reloads() {
     let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
     let metadata = Arc::new(ImageRenderState::default());
-    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata);
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata, None);
     let request = file_request("/tmp/watched.svg");
 
     let first = catalog.lookup(request.clone()).placement().image_id();
@@ -181,7 +182,7 @@ fn invalidating_dependency_retires_old_identity_and_next_lookup_reloads() {
 fn invalidating_spec_preserves_other_spec_that_uses_same_dependency() {
     let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
     let metadata = Arc::new(ImageRenderState::default());
-    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata);
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata, None);
     let first = file_request("/tmp/multi-page.png");
     let mut second = first.clone();
     let second_spec = Value::list(vec![
@@ -233,7 +234,7 @@ fn renderer_reconciliation_upgrades_pending_to_ready_geometry() {
 
     let (cmd_tx, _cmd_rx) = crossbeam_channel::unbounded();
     let metadata = Arc::new(ImageRenderState::default());
-    let catalog = AsyncImageCatalog::new(cmd_tx, None, Arc::clone(&metadata));
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, Arc::clone(&metadata), None);
     let request = file_request("/tmp/promote.png");
 
     let ImageLookup::Pending(pending) = catalog.lookup(request.clone()) else {
@@ -270,7 +271,7 @@ fn renderer_eviction_requeues_ready_image_under_its_stable_id() {
 
     let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
     let metadata = Arc::new(ImageRenderState::default());
-    let catalog = AsyncImageCatalog::new(cmd_tx, None, Arc::clone(&metadata));
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, Arc::clone(&metadata), None);
     let request = file_request("/tmp/room-avatar.png");
 
     let ImageLookup::Pending(pending) = catalog.lookup(request.clone()) else {
@@ -322,7 +323,7 @@ fn renderer_eviction_requeues_ready_image_under_its_stable_id() {
 fn eviction_after_decode_but_before_evaluator_service_does_not_strand_pending_image() {
     let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
     let metadata = Arc::new(ImageRenderState::default());
-    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata);
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata, None);
     let request = file_request("/tmp/large-chat-photo.png");
 
     let ImageLookup::Pending(first_load) = catalog.lookup(request.clone()) else {
@@ -357,7 +358,7 @@ fn stale_decode_completion_cannot_promote_a_replacement_load() {
 
     let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
     let metadata = Arc::new(ImageRenderState::default());
-    let catalog = AsyncImageCatalog::new(cmd_tx, None, Arc::clone(&metadata));
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, Arc::clone(&metadata), None);
     let request = file_request("/tmp/replaced-avatar.png");
 
     let ImageLookup::Pending(first) = catalog.lookup(request.clone()) else {
@@ -391,4 +392,124 @@ fn stale_decode_completion_cannot_promote_a_replacement_load() {
         panic!("a stale completion must not promote the replacement attempt");
     };
     assert_eq!(still_replacement.load(), replacement_load);
+}
+
+/// The invariant this catalog's header probe exists for: geometry resolves
+/// while the decode is still pending — no pixels, no terminal — and it is the
+/// geometry the decode reports for the same image.
+///
+/// The renderer-side half of that equality
+/// (`header_layout_equals_the_decoded_layout_for_every_probed_format` and the
+/// fixture case beside it, in `neomacs-renderer-wgpu`) pins the decode's own
+/// answer for this very file, so the slot asserted here is the slot the decode
+/// will confirm rather than a slot that moves when the pixels land.
+#[test]
+fn pending_geometry_resolves_from_the_header_before_any_pixel_exists() {
+    let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
+    let metadata = Arc::new(ImageRenderState::default());
+    let (redisplay_tx, redisplay_rx) = crossbeam_channel::unbounded();
+    let catalog = AsyncImageCatalog::new(
+        cmd_tx,
+        None,
+        Arc::clone(&metadata),
+        Some(RedisplayWaker::new(redisplay_tx, None)),
+    );
+    let fixture = neomacs_infra::workspace_root().join("test/data/image/blank-100x200.png");
+    let mut request = file_request(fixture.to_str().expect("utf8 fixture path"));
+    // 100x200 with only a width clamp: the decoded layout is 50x100, where the
+    // pre-header placeholder reserves the clamp square 50x50 instead.
+    request.size = ImageSizeSpec::new(AxisSize::AtMost(50), AxisSize::Native);
+
+    let ImageLookup::Pending(placeholder) = catalog.lookup(request.clone()) else {
+        panic!("a new image lookup begins pending");
+    };
+    assert_eq!(
+        (
+            placeholder.placement().width(),
+            placeholder.placement().height()
+        ),
+        (50, 50),
+        "the slot starts on the request's pinned placeholder"
+    );
+    let RenderCommand::Asset(AssetCommand::ImageLoadFile { load, .. }) =
+        cmd_rx.try_recv().expect("image load command")
+    else {
+        panic!("a file source loads through ImageLoadFile");
+    };
+    assert!(
+        metadata.terminal(load).is_none(),
+        "no decode terminal exists yet"
+    );
+
+    // The probe runs off-thread; wait for it without ever consulting the
+    // renderer, which is what makes the resolution independent of the decode.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let pending = loop {
+        let lookup = catalog.lookup(request.clone());
+        if lookup.placement().height() == 100 {
+            break lookup;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the header probe never resolved this image's geometry"
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    };
+
+    assert!(
+        matches!(pending, ImageLookup::Pending(_)),
+        "geometry must resolve while the decode is still pending"
+    );
+    assert!(
+        metadata.terminal(load).is_none(),
+        "no pixel exists when the geometry does"
+    );
+    assert_eq!(
+        (pending.placement().width(), pending.placement().height()),
+        (50, 100),
+        "the slot is the decoded geometry, not the placeholder"
+    );
+    assert_eq!(
+        pending.placement().image_id(),
+        load.image(),
+        "the slot keeps its identity across the refinement"
+    );
+    assert!(
+        matches!(
+            redisplay_rx.recv_timeout(Duration::from_secs(1)),
+            Ok(neovm_core::keyboard::InputEvent::LayoutInvalidated)
+        ),
+        "resolved geometry must ask the evaluator to republish layout"
+    );
+}
+
+/// A source with no readable header keeps the placeholder it always had.
+#[test]
+fn pending_geometry_without_a_header_keeps_the_request_placeholder() {
+    let (cmd_tx, _cmd_rx) = crossbeam_channel::unbounded();
+    let metadata = Arc::new(ImageRenderState::default());
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata, None);
+    let request = file_request("/nonexistent/neomacs/not-an-image.png");
+
+    let ImageLookup::Pending(pending) = catalog.lookup(request.clone()) else {
+        panic!("a new image lookup begins pending");
+    };
+    assert_eq!(
+        (pending.placement().width(), pending.placement().height()),
+        (24, 24)
+    );
+
+    // Let any probe for the unreadable path land before re-checking.
+    std::thread::sleep(Duration::from_millis(200));
+    let ImageLookup::Pending(unchanged) = catalog.lookup(request) else {
+        panic!("an unreadable image stays pending until it fails");
+    };
+    assert_eq!(
+        (
+            unchanged.placement().width(),
+            unchanged.placement().height()
+        ),
+        (24, 24),
+        "no header means no refinement"
+    );
 }
