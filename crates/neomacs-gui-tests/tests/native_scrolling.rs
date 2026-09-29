@@ -217,6 +217,20 @@ fn wheel_scroll_presents_resolved_destination_while_command_is_stalled() {
     );
 }
 
+#[test]
+fn rich_large_buffer_page_presents_while_command_is_stalled() {
+    run_native_scroll_scenario(
+        ScrollKind::Page, ScrollTarget::Selected, 100_000, true, true, true,
+    );
+}
+
+#[test]
+fn rich_large_buffer_wheel_presents_while_command_is_stalled() {
+    run_native_scroll_scenario(
+        ScrollKind::Wheel, ScrollTarget::Selected, 100_000, true, true, true,
+    );
+}
+
 fn run_native_scroll_scenario(
     kind: ScrollKind,
     target: ScrollTarget,
