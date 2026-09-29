@@ -17,8 +17,10 @@ impl PreparedViewports {
         window: WindowId,
         scope: WindowLayoutQueryScope,
     ) -> Option<WindowLayoutQuery> {
-        let WindowLayoutQueryScope::Rows { start, count } = scope else {
-            return None;
+        let start = match scope {
+            WindowLayoutQueryScope::Rows { start, .. }
+            | WindowLayoutQueryScope::Pixels { start, .. } => start,
+            WindowLayoutQueryScope::Viewport => return None,
         };
         if !scroll_coverage::inactive_overlay_arrows(evaluator) {
             return None;
@@ -62,7 +64,25 @@ impl PreparedViewports {
                 .rows
                 .iter()
                 .position(|row| row.start_buffer_pos == Some(start))?;
-            let selected = original.rows.get(first..first.checked_add(count.get())?)?;
+            let available = original.rows.get(first..)?;
+            let pixel_bottom = match scope {
+                WindowLayoutQueryScope::Pixels { height, .. } => Some(
+                    available
+                        .first()?
+                        .y
+                        .checked_add(i64::try_from(height.get()).ok()?)?,
+                ),
+                _ => None,
+            };
+            let count = match scope {
+                WindowLayoutQueryScope::Rows { count, .. } => count.get(),
+                WindowLayoutQueryScope::Pixels { .. } => available
+                    .iter()
+                    .take_while(|row| row.y < pixel_bottom.expect("pixel extent"))
+                    .count(),
+                WindowLayoutQueryScope::Viewport => return None,
+            };
+            let selected = available.get(..count)?;
             let first_row = selected.first()?;
             let last_row = selected.last()?;
             // Starting in a continuation can change prefix/tab/bidi context.
@@ -92,6 +112,14 @@ impl PreparedViewports {
                 last_glyph.next_buffer_row_start()?.checked_add(1)?,
             )
             .min(buffer.accessible_char_region().end_lisp());
+            // Worker admission can hold only a prefix of the requested
+            // extent. Never confuse that storage boundary with buffer EOB.
+            if let Some(bottom) = pixel_bottom
+                && last_row.y.checked_add(last_row.height)? < bottom
+                && end != buffer.accessible_char_region().end_lisp()
+            {
+                return None;
+            }
             let top = (original.regions.text_body.y - original.regions.outer.y).round() as i64;
             let dy = top.checked_sub(first_row.y)?;
             let base = original.rows.first()?.row;
