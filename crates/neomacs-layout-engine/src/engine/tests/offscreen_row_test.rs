@@ -3282,7 +3282,7 @@ fn backward_bridge_stops_acquisition_at_existing_coverage() {
 #[test]
 fn distant_worker_bridges_do_not_evict_the_connected_viewport_seam() {
     let line = "nearby prepared row\n";
-    for backward in [true, false] {
+    for (backward, full_bridge) in [(true, false), (false, false), (true, true), (false, true)] {
         let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 800, 600);
         eval.frame_manager_mut()
             .get_mut(frame)
@@ -3302,8 +3302,9 @@ fn distant_worker_bridges_do_not_evict_the_connected_viewport_seam() {
             .unwrap()
             .next_buffer_row_start()
             .unwrap();
-        // Each real worker result contributes four adjacent physical rows,
-        // as the nearby backward scheduler does. Keep the live viewport
+        // The nearest bridge may be a full page or a four-line prefix.
+        // Farther worker results contribute four adjacent physical rows.
+        // Keep the live viewport
         // fixed while enough pages arrive to exhaust the bounded cache.
         for page in 0..12 {
             let start = if backward {
@@ -3311,15 +3312,21 @@ fn distant_worker_bridges_do_not_evict_the_connected_viewport_seam() {
             } else {
                 visible_end + page * 4 * line.len()
             };
-            engine
-                .request_scroll_bridge(
-                    &eval,
-                    frame,
-                    window,
-                    CharPos0::new(start),
-                    CharPos0::new(start + 4 * line.len()),
-                )
-                .unwrap();
+            if full_bridge && page == 0 {
+                engine
+                    .request_scroll_coverage(&eval, frame, window, CharPos0::new(start))
+                    .unwrap();
+            } else {
+                engine
+                    .request_scroll_bridge(
+                        &eval,
+                        frame,
+                        window,
+                        CharPos0::new(start),
+                        CharPos0::new(start + 4 * line.len()),
+                    )
+                    .unwrap();
+            }
             let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
             while !engine
                 .scroll_coverage

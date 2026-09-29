@@ -203,7 +203,7 @@ impl PreparedViewports {
             } else {
                 0
             };
-            if self.entries[victim].computed && !self.entries[victim].complete_viewport {
+            if self.entries[victim].computed {
                 let owner = (self.entries[victim].frame, self.entries[victim].window);
                 if let Some(export) = self.exports.iter()
                     .find(|export| (export.frame, export.window) == owner)
@@ -211,9 +211,10 @@ impl PreparedViewports {
                     // FIFO can remove the only bridge beside the viewport
                     // while retaining farther pages that depended on it.
                     // Preserve owner fairness and the history allowance;
-                    // within that owner's partial bridges, drop the farthest.
-                    // Complete pages also answer future commands: retain
-                    // their recency instead of discarding new query results.
+                    // within that owner's pages, drop the farthest. A full
+                    // page can be the only bridge too. Protect the newest
+                    // full page from immediate eviction: it may answer the
+                    // upcoming command rather than the current viewport.
                     let distance = |entry: &PreparedViewport| {
                         let source = text_source_range(&entry.retained);
                         export.visible_source.start.saturating_sub(source.end)
@@ -221,7 +222,8 @@ impl PreparedViewports {
                     };
                     let mut farthest = distance(&self.entries[victim]);
                     for (index, entry) in self.entries.iter().enumerate() {
-                        if entry.computed && !entry.complete_viewport
+                        if entry.computed
+                            && !(entry.complete_viewport && index + 1 == self.entries.len())
                             && (entry.frame, entry.window) == owner
                         {
                             let gap = distance(entry);
