@@ -442,5 +442,6 @@ strip = "none"
 [patch.crates-io]
 # Native presentation IDs/timestamps; see the Vulkan timing seam in this fork.
 wgpu-hal = { git = "https://github.com/eval-exec/wgpu", rev = "9717f9fe277beec2c98df550662a626f8fc0248c" }
-cosmic-text = { git = "https://github.com/eval-exec/cosmic-text", rev = "5dd3fec8572e771794e3f203ab6780d828e9ce09" }
+# Scoped font-cache insertion is maintained in the cosmic-text fork.
+cosmic-text = { git = "https://github.com/eval-exec/cosmic-text", rev = "5951ae9b0a4c794e594c56f596ba04e5f57416a1" }
 freetype-sys = { git = "https://github.com/eval-exec/freetype-sys", rev = "a4eb0a7cf08d9b503bda7d7261c97f8973d34bf1" }
