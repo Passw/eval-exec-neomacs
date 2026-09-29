@@ -3208,3 +3208,31 @@ fn row_string_provenance_survives_json_without_losing_its_coordinate_space() {
         ))
     );
 }
+
+#[test]
+fn unused_matrix_rows_share_storage_but_writes_are_isolated() {
+    use super::{GlyphMatrix, MatrixRow};
+    let mut matrix = GlyphMatrix::new(1200, 80);
+    let retained = matrix.clone();
+    assert!(
+        std::sync::Arc::ptr_eq(&matrix.rows[0].0, &matrix.rows[1199].0),
+        "pixel-bounded capacity must not allocate an empty GlyphRow per slot"
+    );
+    let row = MatrixRow::make_mut(&mut matrix.rows[17]);
+    row.enabled = true;
+    row.height_px = 42.0;
+    assert!(matrix.rows[17].enabled);
+    assert!(!matrix.rows[16].enabled);
+    assert!(!matrix.rows[18].enabled);
+    assert!(!retained.rows[17].enabled);
+    assert_ne!(retained.rows[17].height_px, 42.0);
+    assert!(std::sync::Arc::ptr_eq(
+        &matrix.rows[16].0,
+        &matrix.rows[18].0
+    ));
+    assert!(!std::sync::Arc::ptr_eq(
+        &matrix.rows[17].0,
+        &retained.rows[17].0
+    ));
+    assert!(GlyphMatrix::new(0, 80).rows.is_empty());
+}

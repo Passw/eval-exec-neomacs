@@ -1653,13 +1653,16 @@ impl GlyphMatrix {
         // and `TtyRif::rasterize` know not to touch them. Matches
         // GNU's `MATRIX_ROW_ENABLED_P` discipline where disabled
         // rows are inert until the walker marks them valid.
-        let rows = (0..nrows)
-            .map(|_| {
-                let mut row = GlyphRow::new(GlyphRowRole::Text);
-                row.enabled = false;
-                MatrixRow::new(row)
-            })
-            .collect();
+        // A pixel extent is a conservative row-capacity bound, often much
+        // larger than the populated viewport. Unused slots share one inert
+        // row; make_mut isolates each slot when the producer enables it.
+        let rows = if nrows == 0 {
+            Vec::new()
+        } else {
+            let mut row = GlyphRow::new(GlyphRowRole::Text);
+            row.enabled = false;
+            vec![MatrixRow::new(row); nrows]
+        };
         Self {
             row_damage: vec![RowDamage::New; nrows],
             rows,
