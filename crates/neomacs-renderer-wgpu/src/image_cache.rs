@@ -15,8 +15,6 @@ use neomacs_display_protocol::{
 };
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
-use std::fs::File;
-use std::io::BufReader;
 use std::num::NonZeroUsize;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
@@ -1193,16 +1191,10 @@ impl ImageCache {
     }
 
     fn query_file_intrinsic_extent(path: &str) -> Option<ImageIntrinsicExtent> {
-        let file = File::open(path).ok()?;
-        let reader = BufReader::new(file);
-
-        // Use image crate's dimension reader (reads header only)
-        if let Ok(dims) = image::ImageReader::new(reader)
-            .with_guessed_format()
-            .ok()?
-            .into_dimensions()
-        {
-            return Some(ImageNativeExtent::new(dims.0, dims.1).into());
+        if let Some(extent) = crate::image_probe::probe_intrinsic_extent(
+            crate::image_probe::ImageProbeSource::File(path),
+        ) {
+            return Some(extent);
         }
 
         // Fallback: try SVG.
@@ -1218,27 +1210,8 @@ impl ImageCache {
     }
 
     fn query_data_intrinsic_extent(data: &[u8]) -> Option<ImageIntrinsicExtent> {
-        let cursor = std::io::Cursor::new(data);
-        if let Ok(dims) = image::ImageReader::new(BufReader::new(cursor))
-            .with_guessed_format()
-            .ok()?
-            .into_dimensions()
-        {
-            return Some(ImageNativeExtent::new(dims.0, dims.1).into());
-        }
-
-        // Fallback: try XPM header
-        if let Some((w, h)) = crate::xpm::query_xpm_dimensions(data) {
-            return Some(ImageNativeExtent::new(w, h).into());
-        }
-
-        // Fallback: try XBM header
-        if let Some((w, h)) = crate::xbm::query_xbm_dimensions(data) {
-            return Some(ImageNativeExtent::new(w, h).into());
-        }
-
-        // Fallback: try SVG.
-        crate::svg::query_intrinsic_extent(data)
+        crate::image_probe::probe_intrinsic_extent(crate::image_probe::ImageProbeSource::Data(data))
+            .or_else(|| crate::svg::query_intrinsic_extent(data))
     }
 
     /// Preserve the pixel-query contract: return a bounding integer extent.

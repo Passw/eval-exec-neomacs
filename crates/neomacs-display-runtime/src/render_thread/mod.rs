@@ -66,6 +66,10 @@ pub use state::{
 };
 pub use thread_handle::RenderThread;
 
+/// Header-only image geometry, for placing an image whose pixels have not been
+/// decoded yet (see `neomacs_renderer_wgpu::image_probe`).
+pub use neomacs_renderer_wgpu::image_probe::{ImageProbeSource, probe_image_layout};
+
 use winit::event_loop::EventLoopProxy;
 
 pub type RenderEventLoopProxy = EventLoopProxy;

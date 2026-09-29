@@ -1012,9 +1012,13 @@ impl ImageRotation {
     }
 }
 
-/// This is GNU's `compute_image_size` input set (src/image.c:2750). The size
-/// cannot be resolved until the native size is known, i.e. after decoding, so
-/// this travels to the decoder rather than being applied up front.
+/// This is GNU's `compute_image_size` input set (src/image.c:2750). It travels
+/// to the decoder because the native size it is resolved against is the
+/// decoder's — but for every raster format that size is already in the encoded
+/// header, so layout can resolve the same geometry from the header while the
+/// decode is still running (see `neomacs_renderer_wgpu::image_probe`). Both
+/// resolutions must produce the identical extent: they are the same
+/// [`ImageRealization::resolve_geometry`] call over the same native size.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct ImageSizeSpec {
     width: AxisSize,

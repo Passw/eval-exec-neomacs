@@ -12,6 +12,7 @@ pub mod glyph_atlas;
 #[cfg(feature = "video")]
 mod gpu_frame_timing;
 pub mod image_cache;
+pub mod image_probe;
 mod image_sequence;
 pub mod media_budget;
 #[cfg(target_os = "linux")]
@@ -53,6 +54,7 @@ pub use glyph_atlas::{
     allocator, pages, types,
 };
 pub use image_cache::{CachedImage, ImageCache, ImageCacheEvent, ImageMetadata, ImageState};
+pub use image_probe::{ImageProbeSource, probe_image_layout};
 pub use renderer::{
     BudgetExceeded, CompositionRing, FrameRowDamage, FullFrameTexture, GpuBudget, GpuBudgetOwner,
     PaneBlit, PaneSource, RendererFrameEffects, RowDamageInfo, RowReuseStats, SnapshotId,

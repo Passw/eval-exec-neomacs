@@ -1,4 +1,5 @@
 use super::*;
+use crate::image_probe::{ImageProbeSource, probe_image_layout};
 use neomacs_display_protocol::{
     AxisSize, ImageFrameDelay, ImageFrameIndex, ImageRotation, ImageSizeSpec,
 };
@@ -1590,5 +1591,176 @@ fn lru_never_selects_an_image_referenced_by_an_active_presentation() {
     assert_eq!(
         lru_unpresented_victim(entries.into_iter(), &retained),
         Some(ImageId::new(2))
+    );
+}
+
+/// Encode a non-square image so a swapped or mis-derived axis is visible.
+fn encoded_sized_image(format: image::ImageFormat, width: u32, height: u32) -> Vec<u8> {
+    let pixels = (0..width * height)
+        .flat_map(|index| [index as u8, 0x40, 0x80, 0xff])
+        .collect::<Vec<u8>>();
+    let image = image::RgbaImage::from_raw(width, height, pixels).expect("pixel buffer");
+    let mut bytes = Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgba8(image)
+        .write_to(&mut bytes, format)
+        .expect("format is encodable");
+    bytes.into_inner()
+}
+
+/// The invariant header-first geometry exists to protect: a layout resolved
+/// from the encoded header must equal the layout the full decode reports, or a
+/// pending image would move when its pixels land. Every realization input that
+/// scales the native extent is exercised, because agreement must hold for the
+/// pair of extents and not merely for the default spec.
+#[test]
+fn header_layout_equals_the_decoded_layout_for_every_probed_format() {
+    let formats = [
+        ("png", image::ImageFormat::Png),
+        ("jpeg", image::ImageFormat::Jpeg),
+        ("gif", image::ImageFormat::Gif),
+        ("webp", image::ImageFormat::WebP),
+        ("bmp", image::ImageFormat::Bmp),
+        ("tiff", image::ImageFormat::Tiff),
+        ("ico", image::ImageFormat::Ico),
+    ];
+    let sizes = [
+        ImageSizeSpec::default(),
+        ImageSizeSpec::new(AxisSize::AtMost(3), AxisSize::AtMost(9)),
+        ImageSizeSpec::new(AxisSize::Exact(4), AxisSize::Native),
+        ImageSizeSpec::new(AxisSize::Native, AxisSize::Exact(2)),
+        ImageSizeSpec::new(AxisSize::Exact(6), AxisSize::AtMost(2)),
+    ];
+    let rotations = [
+        ImageRotation::None,
+        ImageRotation::Quarter,
+        ImageRotation::Half,
+        ImageRotation::ThreeQuarter,
+    ];
+    let realizations = [
+        ImageRealization::default(),
+        ImageRealization::with_device_scale(1.0, 2.0),
+        ImageRealization::new(1.30 / 1.75, 1.75, 1.75),
+    ];
+
+    for (name, format) in formats {
+        let data = encoded_sized_image(format, 5, 3);
+        for size in sizes {
+            for rotation in rotations {
+                for realization in realizations {
+                    let decoded = ImageCache::decode_data_with_metadata_at_full_realization(
+                        &data,
+                        size,
+                        rotation,
+                        (0xffff_ffff, 0),
+                        realization,
+                    )
+                    .unwrap_or_else(|| panic!("{name} should decode"));
+                    let probed = probe_image_layout(
+                        ImageProbeSource::Data(&data),
+                        size,
+                        rotation,
+                        realization,
+                    )
+                    .unwrap_or_else(|| panic!("{name} header should resolve"));
+
+                    assert_eq!(
+                        probed, decoded.metadata.layout,
+                        "{name} header layout moved at decode ({size:?} {rotation:?} {realization:?})"
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// The repository fixture the catalog's pending-geometry test uses, probed as
+/// a *file* rather than as bytes: the two halves of the invariant meet on one
+/// file, and both extents come from one image.
+#[test]
+fn header_layout_of_the_repository_image_fixture_equals_its_decode() {
+    let fixture = neomacs_infra::workspace_root().join("test/data/image/blank-100x200.png");
+    let path = fixture.to_str().expect("utf8 fixture path");
+    let data = std::fs::read(&fixture).expect("fixture bytes");
+    let size = ImageSizeSpec::new(AxisSize::AtMost(50), AxisSize::Native);
+    let realization = ImageRealization::default();
+
+    let decoded = ImageCache::decode_data_with_metadata_at_full_realization(
+        &data,
+        size,
+        ImageRotation::None,
+        (0xffff_ffff, 0),
+        realization,
+    )
+    .expect("fixture should decode");
+    let probed = probe_image_layout(
+        ImageProbeSource::File(path),
+        size,
+        ImageRotation::None,
+        realization,
+    )
+    .expect("fixture header should resolve");
+
+    // 100x200 clamped to a 50px width keeps the aspect ratio: 50x100.
+    assert_eq!(probed, decoded.metadata.layout);
+    assert_eq!(probed.dimensions(), (50, 100));
+}
+
+/// An animated source's frames are composited onto the canvas its header
+/// names, so a non-zero `:index` cannot change the extent.
+#[test]
+fn header_layout_of_a_selected_animation_frame_uses_the_canvas() {
+    let data = animated_gif_bytes();
+
+    let decoded = ImageCache::decode_data_with_metadata_for_frame(&data, ImageFrameIndex::new(1))
+        .expect("frame 1 should decode");
+    let probed = probe_image_layout(
+        ImageProbeSource::Data(&data),
+        ImageSizeSpec::default(),
+        ImageRotation::None,
+        ImageRealization::default(),
+    )
+    .expect("animated GIF header should resolve");
+
+    assert_eq!(probed, decoded.metadata.layout);
+}
+
+/// The placeholder fallback must stay available: a source with no header to
+/// read keeps whatever slot its request already had.
+#[test]
+fn probe_declines_sources_it_cannot_measure_without_decoding() {
+    let spec = ImageSizeSpec::default();
+    let realization = ImageRealization::default();
+
+    assert!(
+        probe_image_layout(
+            ImageProbeSource::Data(b"not an image at all"),
+            spec,
+            ImageRotation::None,
+            realization
+        )
+        .is_none()
+    );
+    assert!(
+        probe_image_layout(
+            ImageProbeSource::File("/nonexistent/neomacs/probe.png"),
+            spec,
+            ImageRotation::None,
+            realization
+        )
+        .is_none()
+    );
+    // A vector document's extent comes from parsing the document, including a
+    // bounding-box fallback that depends on resolved resources and colors, so
+    // it is not a header and is deliberately not probed.
+    assert!(
+        probe_image_layout(
+            ImageProbeSource::Data(
+                br#"<svg xmlns="http://www.w3.org/2000/svg" width="3" height="1"/>"#
+            ),
+            spec,
+            ImageRotation::None,
+            realization
+        )
+        .is_none()
     );
 }
