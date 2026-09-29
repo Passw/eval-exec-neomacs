@@ -407,12 +407,25 @@ impl FontFileCache {
             .next_synthetic_family
             .checked_add(1)
             .expect("synthetic font family id overflow");
-        let result = Self::pin_asset_as_family(font_system.db_mut(), asset, &synthetic_family).map(
-            |fontdb_id| PinnedFontFace {
-                // Selectors are local to each FontSystem, so independent
-                // caches can share the spelling without sharing a font binding.
-                family: shared_selector(selector_index, synthetic_family),
-                fontdb_id,
+        // Parse/select in a temporary database: opening a collection may add
+        // several faces before retaining just the exact requested one. Only
+        // publish that final face, so unrelated cached metadata stays valid
+        // and failed opens do not invalidate the live font system at all.
+        let mut staging = fontdb::Database::new();
+        let result = Self::pin_asset_as_family(&mut staging, asset, &synthetic_family).map(
+            |selected_id| {
+                let mut info = staging
+                    .face(selected_id)
+                    .expect("successful exact-face pin remains in its staging database")
+                    .clone();
+                info.id = fontdb::ID::dummy();
+                let fontdb_id = font_system.push_font_face(info);
+                PinnedFontFace {
+                    // Selectors are local to each FontSystem, so independent
+                    // caches can share spelling without sharing a font binding.
+                    family: shared_selector(selector_index, synthetic_family),
+                    fontdb_id,
+                }
             },
         );
         self.exact_faces.insert(key, result.clone());

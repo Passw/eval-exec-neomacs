@@ -9,6 +9,88 @@ fn standalone_spleen_sfnt() -> Vec<u8> {
 }
 
 #[test]
+fn exact_face_insertion_does_not_reread_existing_font_metadata() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct CountedFont {
+        bytes: Vec<u8>,
+        reads: Arc<AtomicUsize>,
+    }
+    impl AsRef<[u8]> for CountedFont {
+        fn as_ref(&self) -> &[u8] {
+            self.reads.fetch_add(1, Ordering::Relaxed);
+            &self.bytes
+        }
+    }
+
+    let bytes = standalone_spleen_sfnt();
+    let reads = Arc::new(AtomicUsize::new(0));
+    let mut db = fontdb::Database::new();
+    let original = db.load_font_source(fontdb::Source::Binary(Arc::new(CountedFont {
+        bytes: bytes.clone(),
+        reads: Arc::clone(&reads),
+    })))[0];
+    let mut system = FontSystem::new_with_locale_and_db("en-US".into(), db);
+    let attrs = cosmic_text::Attrs::new();
+    let before = system.get_font_matches(&attrs);
+    let warmed_reads = reads.load(Ordering::Relaxed);
+    assert!(warmed_reads > 0);
+
+    let asset = FontOutlineAsset::Memory(
+        FontMemoryAsset::new("test:append-face", Arc::new(bytes), 0).unwrap(),
+    );
+    let pinned = FontFileCache::new()
+        .pin_exact_asset(&mut system, &asset)
+        .unwrap();
+    let after = system.get_font_matches(&attrs);
+    assert_eq!(
+        reads.load(Ordering::Relaxed),
+        warmed_reads,
+        "adding a face must not reread an unchanged font's weight axes"
+    );
+    assert!(
+        !Arc::ptr_eq(&before, &after),
+        "font matching must see the new face"
+    );
+    assert_eq!(after.len(), before.len() + 1);
+    assert!(system.db().face(original).is_some());
+    assert_eq!(
+        system.db().query(&fontdb::Query {
+            families: &[fontdb::Family::Name(pinned.family())],
+            ..fontdb::Query::default()
+        }),
+        Some(pinned.fontdb_id())
+    );
+
+    // Arbitrary database mutation still invalidates existing metadata.
+    system.db_mut().set_sans_serif_family(pinned.family());
+    system.get_font_matches(&attrs);
+    assert!(reads.load(Ordering::Relaxed) > warmed_reads);
+}
+
+#[test]
+fn rejected_exact_face_preserves_existing_font_matches() {
+    let mut db = fontdb::Database::new();
+    db.load_font_source(fontdb::Source::Binary(Arc::new(standalone_spleen_sfnt())));
+    let mut system = FontSystem::new_with_locale_and_db("en-US".into(), db);
+    let attrs = cosmic_text::Attrs::new();
+    let before = system.get_font_matches(&attrs);
+    let asset = FontOutlineAsset::Memory(
+        FontMemoryAsset::new("test:invalid-face", Arc::new(vec![0; 16]), 0).unwrap(),
+    );
+    assert!(
+        FontFileCache::new()
+            .pin_exact_asset(&mut system, &asset)
+            .is_err()
+    );
+    let after = system.get_font_matches(&attrs);
+    assert!(
+        Arc::ptr_eq(&before, &after),
+        "failed opening must not invalidate matching"
+    );
+}
+
+#[test]
 fn native_memory_asset_replays_in_independent_font_systems() {
     let sfnt = Arc::new(standalone_spleen_sfnt());
     let asset = FontOutlineAsset::Memory(
