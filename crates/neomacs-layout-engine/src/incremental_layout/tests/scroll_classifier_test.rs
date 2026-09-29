@@ -719,3 +719,20 @@ fn fontset_revision_invalidates_every_retained_row_fast_path() {
     after.chars_modified_tick += 1;
     assert!(!RetainedWindowKey::edit_eligible(&before, &after));
 }
+
+#[test]
+fn wrapped_projection_requires_the_same_source_origin_and_a_complete_join() {
+    let mut retained = synthetic_matrix(0, 5);
+    MatrixRow::make_mut(&mut retained.matrix.rows[0]).continued = true;
+    let mut same_origin = retained.key.clone();
+    same_origin.vscroll = -4;
+    assert!(
+        retained
+            .prepared_projection_prefix(&same_origin, -4.0)
+            .is_some()
+    );
+    assert!(retained.scroll_replay(&same_origin).is_none());
+    let moved = synthetic_key(20, 25);
+    assert!(retained.prepared_projection_prefix(&moved, -4.0).is_none());
+    assert!(retained.scroll_replay(&moved).is_none());
+}

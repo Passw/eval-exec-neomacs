@@ -836,7 +836,30 @@ fn idle_first_visit_projected(
     styled: bool,
     hidden: i32,
 ) {
-    let line = "ordinary offscreen text\n";
+    idle_first_visit_projected_text(
+        backward,
+        redisplay_between_steps,
+        step,
+        styled,
+        hidden,
+        "ordinary offscreen text\n",
+    );
+}
+
+#[test]
+fn idle_worker_fractional_scroll_preserves_wrapped_rows_at_the_same_source_start() {
+    let line = format!("{}\n", "ordinary offscreen text ".repeat(8));
+    idle_first_visit_projected_text(false, false, Some(0), true, 4, &line);
+}
+
+fn idle_first_visit_projected_text(
+    backward: bool,
+    redisplay_between_steps: bool,
+    step: Option<usize>,
+    styled: bool,
+    hidden: i32,
+    line: &str,
+) {
     let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
     eval.frame_manager_mut()
         .get_mut(frame)
@@ -938,6 +961,37 @@ fn idle_first_visit_projected(
         let mut fresh = LayoutEngine::new();
         fresh.layout_frame_rust(&mut eval, frame);
         assert_eq!(actual, selected_window_layout_trace(&eval, &fresh, frame));
+        let fringes = |engine: &LayoutEngine| {
+            let state = engine.last_frame_display_state.as_ref().unwrap();
+            state
+                .window_matrices
+                .iter()
+                .find(|entry| entry.window_id == display_window)
+                .unwrap()
+                .matrix
+                .rows
+                .iter()
+                .filter(|row| row.enabled)
+                .map(|row| {
+                    [
+                        row.left_fringe_bitmap,
+                        row.right_fringe_bitmap,
+                        row.overlay_arrow_bitmap,
+                    ]
+                    .map(|bitmap| {
+                        bitmap.map(|bitmap| {
+                            let face = &state.faces[&bitmap.face_id];
+                            (bitmap.bitmap_index, face.foreground, face.background)
+                        })
+                    })
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            fringes(&engine),
+            fringes(&fresh),
+            "fractional offset {hidden}"
+        );
     }
 }
 

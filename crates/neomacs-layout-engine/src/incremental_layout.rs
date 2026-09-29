@@ -1302,16 +1302,18 @@ impl RetainedWindowMatrix {
         if !eligible {
             return None;
         }
-        // Collect body rows in matrix order; bail on anything that the uniform
-        // shift cannot reproduce (line numbers renumber; continuation/truncation
-        // /fringe rows have position-dependent decoration).
+        // A complete prepared join at the same source origin can translate
+        // wrapped rows and their fringes without restarting line layout. Other
+        // shifts still require the ordinary conservative decoration guards.
+        let same_origin_projection =
+            projected_y.is_some() && curr.window_start == self.key.window_start;
         let mut body: Vec<(usize, &MatrixRow)> = Vec::new();
         for (idx, row) in self.matrix.rows.iter().enumerate() {
             if !row.enabled || Self::is_chrome_role(row.role) {
                 continue;
             }
             if !row.glyphs[GlyphArea::LeftMargin.index()].is_empty()
-                || row.continued
+                || (row.continued && !same_origin_projection)
                 || row.truncated_left
             {
                 return None;
@@ -1322,6 +1324,7 @@ impl RetainedWindowMatrix {
             // and carry real ZV bounds, so they reuse like the placeholder.
             if (row.left_fringe_bitmap.is_some() || row.right_fringe_bitmap.is_some())
                 && row.displays_text
+                && !same_origin_projection
             {
                 return None;
             }
