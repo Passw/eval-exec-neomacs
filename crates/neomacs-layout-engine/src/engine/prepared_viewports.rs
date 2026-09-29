@@ -203,7 +203,7 @@ impl PreparedViewports {
             } else {
                 0
             };
-            if self.entries[victim].computed {
+            if self.entries[victim].computed && !self.entries[victim].complete_viewport {
                 let owner = (self.entries[victim].frame, self.entries[victim].window);
                 if let Some(export) = self.exports.iter()
                     .find(|export| (export.frame, export.window) == owner)
@@ -211,7 +211,9 @@ impl PreparedViewports {
                     // FIFO can remove the only bridge beside the viewport
                     // while retaining farther pages that depended on it.
                     // Preserve owner fairness and the history allowance;
-                    // within that owner's worker pages, drop the farthest.
+                    // within that owner's partial bridges, drop the farthest.
+                    // Complete pages also answer future commands: retain
+                    // their recency instead of discarding new query results.
                     let distance = |entry: &PreparedViewport| {
                         let source = text_source_range(&entry.retained);
                         export.visible_source.start.saturating_sub(source.end)
@@ -219,7 +221,9 @@ impl PreparedViewports {
                     };
                     let mut farthest = distance(&self.entries[victim]);
                     for (index, entry) in self.entries.iter().enumerate() {
-                        if entry.computed && (entry.frame, entry.window) == owner {
+                        if entry.computed && !entry.complete_viewport
+                            && (entry.frame, entry.window) == owner
+                        {
                             let gap = distance(entry);
                             if gap > farthest {
                                 victim = index;

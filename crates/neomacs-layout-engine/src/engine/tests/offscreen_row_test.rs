@@ -3351,6 +3351,45 @@ fn distant_worker_bridges_do_not_evict_the_connected_viewport_seam() {
                 );
             }
         }
+        // A full page is also a query/replay result for an upcoming command.
+        // Keep its insertion recency even when partial paint bridges are
+        // closer to the currently visible source range.
+        let target = 250 * line.len();
+        engine
+            .request_scroll_coverage(&eval, frame, window, CharPos0::new(target))
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        while !engine
+            .scroll_coverage
+            .drain(&mut engine.prepared_viewports)
+            .unwrap()
+        {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::yield_now();
+        }
+        scroll_window_to(
+            &mut eval,
+            frame,
+            window,
+            buffer,
+            target as i64 + 1,
+            target + 5 * line.len(),
+        );
+        if let neovm_core::window::Window::Leaf { force_start, .. } = eval
+            .frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .find_window_mut(window)
+            .unwrap()
+        {
+            *force_start = true;
+        }
+        engine.layout_frame_rust(&mut eval, frame);
+        assert_eq!(
+            engine.last_layout_stats().prepared_windows,
+            1,
+            "new full page must remain reusable after admission under bridge pressure"
+        );
         let actual = selected_window_layout_trace(&eval, &engine, frame);
         let mut fresh = LayoutEngine::new();
         fresh.layout_frame_rust(&mut eval, frame);
