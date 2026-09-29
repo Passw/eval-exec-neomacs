@@ -3296,8 +3296,17 @@ fn full_height_worker_preview_finishes_acquisition() {
 
 #[test]
 fn backward_bridge_stops_acquisition_at_existing_coverage() {
-    let line = "ordinary offscreen text\n";
-    let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 800, 600);
+    backward_bridge_connects("ordinary offscreen text\n", 800, 600);
+}
+
+#[test]
+fn backward_bridge_preserves_its_connected_tail_when_taller_than_the_viewport() {
+    let line = format!("{}\n", "wrapped offscreen text ".repeat(6));
+    backward_bridge_connects(&line, 320, 200);
+}
+
+fn backward_bridge_connects(line: &str, width: u32, height: u32) {
+    let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), width, height);
     eval.frame_manager_mut()
         .get_mut(frame)
         .unwrap()
@@ -3308,7 +3317,7 @@ fn backward_bridge_stops_acquisition_at_existing_coverage() {
         window,
         buffer,
         (120 * line.len() + 1) as i64,
-        125 * line.len(),
+        120 * line.len() + 5,
     );
     let mut engine = LayoutEngine::new();
     engine.layout_frame_rust(&mut eval, frame);
@@ -3323,7 +3332,7 @@ fn backward_bridge_stops_acquisition_at_existing_coverage() {
         window,
         buffer,
         (119 * line.len() + 1) as i64,
-        124 * line.len(),
+        119 * line.len() + 5,
     );
     engine.layout_frame_rust(&mut eval, frame);
     let frontier = engine
@@ -3333,11 +3342,13 @@ fn backward_bridge_stops_acquisition_at_existing_coverage() {
         .scroll_coverage
         .iter()
         .find(|coverage| coverage.content.window_id.get() == window.0 as i64)
-        .unwrap()
-        .content
-        .matrix
-        .rows[0]
-        .start_charpos;
+        .map(|coverage| coverage.content.matrix.rows[0].start_charpos)
+        .unwrap_or_else(|| {
+            engine.retained_window_matrices
+                [&neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64)]
+                .key
+                .window_start as usize
+        });
     engine.take_scroll_coverage_publication();
     engine.maintain_scroll_coverage(&eval);
     let start = engine
@@ -3345,7 +3356,7 @@ fn backward_bridge_stops_acquisition_at_existing_coverage() {
         .active_capture_start_for_test()
         .unwrap();
     assert_eq!(
-        frontier - start,
+        frontier / line.len() * line.len() - start,
         4 * line.len(),
         "prepare the missing bridge"
     );
@@ -3365,6 +3376,19 @@ fn backward_bridge_stops_acquisition_at_existing_coverage() {
         std::thread::yield_now();
     }
     engine.layout_frame_rust(&mut eval, frame);
+    let extended = engine
+        .last_frame_display_state
+        .as_ref()
+        .unwrap()
+        .scroll_coverage
+        .iter()
+        .find(|coverage| coverage.content.window_id.get() == window.0 as i64)
+        .map(|coverage| coverage.content.matrix.rows[0].start_charpos)
+        .unwrap_or(frontier);
+    assert!(
+        extended < frontier,
+        "the backward bridge must connect to existing coverage, not publish a disconnected prefix: {extended} >= {frontier}"
+    );
     let actual = selected_window_layout_trace(&eval, &engine, frame);
     let mut fresh = LayoutEngine::new();
     fresh.layout_frame_rust(&mut eval, frame);

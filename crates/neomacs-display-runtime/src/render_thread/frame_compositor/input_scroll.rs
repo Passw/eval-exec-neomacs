@@ -75,7 +75,16 @@ impl InputScroll {
             self.active = None;
             return true;
         }
-        let offset = surface.clamp_offset(active.offset + delta);
+        let requested = active.offset + delta;
+        let offset = surface.clamp_offset(requested);
+        if offset != requested {
+            tracing::debug!(target: "neomacs_display_runtime::input_scroll",
+                window = surface.coverage().content.window_id.get(),
+                epoch = surface.coverage().epoch, requested, offset,
+                lower = surface.clamp_offset(-f32::MAX),
+                upper = surface.clamp_offset(f32::MAX),
+                "input-driven scroll reached prepared coverage boundary");
+        }
         if offset != active.offset
             && let Some(token) = token
         {

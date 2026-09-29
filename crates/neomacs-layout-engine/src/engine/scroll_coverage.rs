@@ -71,6 +71,7 @@ struct Admission {
     retained: RetainedWindowMatrix,
     faces: PreparedFaceSnapshot,
     row_base: usize,
+    bridge_end: Option<CharPos0>,
 }
 
 struct Capture {
@@ -164,6 +165,49 @@ impl ScrollCoverage {
         }
         let mut rows = result.rows?;
         let regions = &admission.retained.display_snapshot.regions;
+        let bridge = admission.bridge_end.is_some();
+        if let Some(end) = admission.bridge_end {
+            // A backward bridge is useful at its connecting end. A tall or
+            // wrapped prefix can fill a viewport before reaching that seam.
+            // Keep acquiring until a closed row actually reaches the seam;
+            // then retain its bounded suffix instead of discarding the join.
+            let Some(last) = rows.iter().position(|row| {
+                matches!(&row.source.end,
+                        crate::display_item::DisplaySourcePosition::Buffer { char_pos, .. }
+                        if *char_pos == end)
+            }) else {
+                return Ok(false);
+            };
+            rows.truncate(last + 1);
+            let capacity = admission
+                .retained
+                .matrix
+                .rows
+                .iter()
+                .skip(admission.row_base)
+                .filter(|row| !RetainedWindowMatrix::is_chrome_role(row.role))
+                .count();
+            let mut height = 0.0;
+            let keep = rows
+                .iter()
+                .rev()
+                .take(capacity)
+                .take_while(|row| {
+                    let take = height < regions.text_body.height;
+                    if take {
+                        height += row.row.height_px;
+                    }
+                    take
+                })
+                .count();
+            rows.drain(..rows.len() - keep);
+            let Some(crate::display_item::DisplaySourcePosition::Buffer { char_pos, .. }) =
+                rows.first().map(|row| &row.source.start)
+            else {
+                return Err(RowProgramError::Unsupported);
+            };
+            admission.retained.key.window_start = char_pos.get() as i64;
+        }
         let mut height = 0.0;
         let visible = rows
             .iter()
@@ -176,9 +220,14 @@ impl ScrollCoverage {
             })
             .count();
         let fills_viewport = height >= regions.text_body.height;
-        let complete_viewport = fills_viewport
-            || rows.len() == admission.retained.matrix.rows.len() - admission.row_base;
-        rows.truncate(visible);
+        // A suffix can start in a visual continuation: it certifies scroll
+        // coverage, not a fresh viewport starting at that buffer character.
+        let complete_viewport = !bridge
+            && (fills_viewport
+                || rows.len() == admission.retained.matrix.rows.len() - admission.row_base);
+        if !bridge {
+            rows.truncate(visible);
+        }
         let body = position_buffer_rows(
             rows,
             admission.row_base,
@@ -217,12 +266,10 @@ impl ScrollCoverage {
         let query_freshness = snapshot.layout_freshness.take();
         snapshot.window_end_record = None;
         admission.retained.presented_cursor = None;
-        // A closed preview can already fill the bounded page, especially
-        // with wrapping or tall faces. Admission truncates every result at
-        // this height, so further acquisition cannot extend its coverage.
-        // Release the producer for the next target instead of capturing and
-        // replaying a suffix that will only be discarded.
-        if fills_viewport {
+        // A full regular preview cannot extend its admitted prefix further.
+        // A backward bridge has already reached its connecting seam. Release
+        // the producer instead of acquiring rows that neither case can use.
+        if fills_viewport || bridge {
             self.capture = None;
         }
         self.publication_pending = true;
@@ -607,6 +654,9 @@ impl LayoutEngine {
             chrome_modified_flag: retained.chrome_modified_flag,
             chrome_fingerprints: None,
         };
+        tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
+            window = window.0, start = start.get(), row_count,
+            "starting offscreen capture");
         retained.key.window_start = start.get() as i64;
         retained.key.vscroll = 0;
         self.scroll_coverage.worker.cancel();
@@ -706,6 +756,10 @@ impl LayoutEngine {
                 // storage reservation. Retry with less buffer text on the
                 // next idle step, without consuming the rejected source.
                 capture.char_budget /= 2;
+                tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
+                    start = capture.retained.key.window_start,
+                    position = capture.position.get(), char_budget = capture.char_budget,
+                    "reducing offscreen capture fragment budget");
                 false
             }
             Err(
@@ -780,6 +834,7 @@ impl LayoutEngine {
                     retained: capture.retained.clone(),
                     faces: faces.clone(),
                     row_base: capture.row_base,
+                    bridge_end: capture.stop_at_source,
                 });
                 capture.next_preview_programs = Some(capture.programs.len().saturating_mul(2));
             }
@@ -798,6 +853,7 @@ impl LayoutEngine {
             retained: capture.retained,
             faces,
             row_base: capture.row_base,
+            bridge_end: capture.stop_at_source,
         });
         Ok(false)
     }
