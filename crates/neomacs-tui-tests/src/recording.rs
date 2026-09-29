@@ -57,8 +57,11 @@ pub(crate) enum CastEvent {
 /// hundreds of keys in a few seconds otherwise produces a cast nobody can
 /// follow.
 ///
-/// One send is `sleep, key, sleep`, so the cost of a scenario is
-/// `2 * delay * sends` -- 400 s for a hundred keys at this default.
+/// One send is `sleep, key, sleep`, so a single-session scenario costs
+/// `2 * delay` per key and a paired one `4 * delay`: the paired drivers send
+/// to both editors from one thread, so each `send_both` key pays the leading
+/// and trailing wait of two sessions. At this default that is 4 s and 8 s a
+/// key -- about 150 or 75 keys to reach the 600 s nextest slow-timeout.
 pub(crate) const DEFAULT_RECORDING_DELAY: Duration = Duration::from_millis(2000);
 
 /// Whether TUI sessions emit replayable terminal recordings.

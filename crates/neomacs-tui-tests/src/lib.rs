@@ -19,9 +19,16 @@
 //!   normal run sleeps nowhere. The leading wait is why the first key lands on
 //!   a screen the editor has finished painting rather than mid-redraw, and the
 //!   trailing one holds the response to the last key; between two consecutive
-//!   sends the gap is therefore twice the delay. A recorded run is not free:
-//!   at the default, a scenario driving a hundred keys takes about 400 s, so
-//!   lower the value when the pacing is not what you are inspecting.
+//!   sends in one session the pacing alone is twice the delay.
+//!
+//!   Pacing is charged per `send`, and a paced run is not free. The paired
+//!   drivers work both editors from one thread, so a single `send_both` key
+//!   costs four delays -- 8 s at the default -- and a scenario of a few dozen
+//!   keys spends minutes on the clock, long enough to trip
+//!   `.config/nextest.toml`'s 600 s slow-timeout. (Roughly 75 paired keys, or
+//!   150 single-session keys, is that ceiling.) A paced test that runs past it
+//!   was killed, not hung; lower `NEOMACS_TUI_RECORD_DELAY_MS` whenever the
+//!   pacing is not the thing being inspected.
 //!
 //!   A recorded run is also a *different execution*, not an observation of the
 //!   graded one: inserting seconds between keys changes what the editor does
