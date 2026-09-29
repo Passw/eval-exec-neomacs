@@ -3201,3 +3201,80 @@ fn full_height_worker_preview_finishes_acquisition() {
         std::thread::yield_now();
     }
 }
+
+#[test]
+fn backward_bridge_stops_acquisition_at_existing_coverage() {
+    let line = "ordinary offscreen text\n";
+    let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    scroll_window_to(
+        &mut eval,
+        frame,
+        window,
+        buffer,
+        (120 * line.len() + 1) as i64,
+        125 * line.len(),
+    );
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while engine.maintain_scroll_coverage(&eval).is_some() {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    scroll_window_to(
+        &mut eval,
+        frame,
+        window,
+        buffer,
+        (119 * line.len() + 1) as i64,
+        124 * line.len(),
+    );
+    engine.layout_frame_rust(&mut eval, frame);
+    let frontier = engine
+        .last_frame_display_state
+        .as_ref()
+        .unwrap()
+        .scroll_coverage
+        .iter()
+        .find(|coverage| coverage.content.window_id.get() == window.0 as i64)
+        .unwrap()
+        .content
+        .matrix
+        .rows[0]
+        .start_charpos;
+    engine.take_scroll_coverage_publication();
+    engine.maintain_scroll_coverage(&eval);
+    let start = engine
+        .scroll_coverage
+        .active_capture_start_for_test()
+        .unwrap();
+    assert_eq!(
+        frontier - start,
+        4 * line.len(),
+        "prepare the missing bridge"
+    );
+    loop {
+        assert!(std::time::Instant::now() < deadline);
+        engine.maintain_scroll_coverage(&eval);
+        if engine.take_scroll_coverage_publication() {
+            assert!(
+                engine
+                    .scroll_coverage
+                    .active_capture_start_for_test()
+                    .is_none(),
+                "a connected backward bridge must yield acquisition instead of recapturing covered rows"
+            );
+            break;
+        }
+        std::thread::yield_now();
+    }
+    engine.layout_frame_rust(&mut eval, frame);
+    let actual = selected_window_layout_trace(&eval, &engine, frame);
+    let mut fresh = LayoutEngine::new();
+    fresh.layout_frame_rust(&mut eval, frame);
+    assert_eq!(actual, selected_window_layout_trace(&eval, &fresh, frame));
+}

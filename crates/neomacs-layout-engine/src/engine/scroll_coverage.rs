@@ -84,6 +84,9 @@ struct Capture {
     row_base: usize,
     row_count: usize,
     next_preview_programs: Option<usize>,
+    // Scheduling bound only; admission and export still prove freshness and
+    // row adjacency. A backward bridge need not recapture the covered suffix.
+    stop_at_source: Option<CharPos0>,
     char_budget: usize,
     position: CharPos0,
     programs: Vec<RowProgram>,
@@ -96,6 +99,9 @@ struct Capture {
 struct WindowCoverage {
     key: RetainedWindowKey,
     targets: Vec<CharPos0>,
+    // Only the nearby bridge stops at this seam. The farther backward job
+    // still prepares a complete viewport for page-up measurement and reuse.
+    backward_bridge: Option<(CharPos0, CharPos0)>,
 }
 
 #[derive(Default)]
@@ -408,12 +414,14 @@ impl LayoutEngine {
             // visual rows. A distant backward page can exhaust its bounded
             // job before reaching the live viewport. Prepare a nearer bridge
             // first; keep the farther target for idle page-up reuse.
+            let mut backward_bridge = None;
             if let Some(byte) = near_backward {
                 let near = buffer.emacs_byte_pos_to_char_pos_clamped(
                     neovm_core::buffer::EmacsBytePos::new(byte),
                 );
                 if !targets.contains(&near) {
                     targets.push(near);
+                    backward_bridge = Some((near, backward_start));
                 }
             }
             let mut forward_target = None;
@@ -461,6 +469,7 @@ impl LayoutEngine {
                 WindowCoverage {
                     key: retained.key.clone(),
                     targets,
+                    backward_bridge,
                 },
             );
         }
@@ -491,6 +500,13 @@ impl LayoutEngine {
                 self.scroll_coverage.last_window = Some(window_id);
                 return Some(ScrollCoverageProgress::Continue);
             };
+            let bridge_end = self
+                .scroll_coverage
+                .windows
+                .get(&window_id)?
+                .backward_bridge
+                .filter(|(bridge, _)| *bridge == start)
+                .map(|(_, end)| end);
             if let Err(error) = self.begin_scroll_coverage(evaluator, frame.id, window, start) {
                 tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", ?error, start = start.get(), "capture not eligible");
                 self.scroll_coverage.last_window = Some(window_id);
@@ -498,6 +514,7 @@ impl LayoutEngine {
             }
             if let Some(capture) = &mut self.scroll_coverage.capture {
                 capture.next_preview_programs = Some(4);
+                capture.stop_at_source = bridge_end;
             }
         }
         if let Err(error) = self.capture_scroll_step(evaluator) {
@@ -605,6 +622,7 @@ impl LayoutEngine {
             row_base,
             row_count,
             next_preview_programs: None,
+            stop_at_source: None,
             char_budget: 128,
             position: start,
             programs: Vec::with_capacity(row_count),
@@ -687,7 +705,12 @@ impl LayoutEngine {
             .ok_or(RowProgramError::Unsupported)?
             .reserve_prepared(&capture.attempt)
             .map_err(|_| RowProgramError::Unsupported)?;
+        let bridge_complete = capture
+            .stop_at_source
+            .is_some_and(|end| capture.position >= end)
+            && capture.programs.last().is_some_and(RowProgram::is_complete);
         if !frontier
+            && !bridge_complete
             && capture.programs.len() < crate::row_layout::worker::MAX_PROGRAMS
             && capture
                 .programs
