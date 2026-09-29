@@ -202,6 +202,8 @@ pub(crate) struct BufferTextSourceCursor<'a, B: LayoutBufferView + ?Sized> {
     property_boundary_run: Cell<Option<(CharPos0, CharPos0)>>,
     #[cfg(test)]
     property_boundary_queries: Cell<usize>,
+    #[cfg(test)]
+    text_slice_queries: Cell<usize>,
     face_property: LayoutCharPropertyLookup,
     display_property: LayoutCharPropertyLookup,
     /// The walk's evaluated `(when FORM . SPEC)` results (from the view).
@@ -264,6 +266,8 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
             property_boundary_run: Cell::new(None),
             #[cfg(test)]
             property_boundary_queries: Cell::new(0),
+            #[cfg(test)]
+            text_slice_queries: Cell::new(0),
             face_property: LayoutCharPropertyLookup::new(buffer, Value::symbol("face")),
             display_property: LayoutCharPropertyLookup::new(buffer, Value::symbol("display")),
             line_height_property: LayoutCharPropertyLookup::new(
@@ -430,7 +434,15 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
         decode_emacs_char(&bytes[..len], storage).map(|(character, _)| character)
     }
 
+    #[cfg(test)]
+    pub(crate) fn text_slice_queries(&self) -> usize {
+        self.text_slice_queries.get()
+    }
+
     fn text_slice(&self, start: CharPos0, end: CharPos0) -> String {
+        #[cfg(test)]
+        self.text_slice_queries
+            .set(self.text_slice_queries.get() + 1);
         let mut bytes = Vec::new();
         self.buffer.layout_copy_emacs_byte_range_to(
             EmacsByteRange::new(self.byte_pos(start), self.byte_pos(end)),
@@ -987,14 +999,22 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
         };
         self.debug_assert_no_overlay_string_anchor_inside(start, end);
         self.char_pos = end;
+        // The ordinary single-character path has already decoded and classified
+        // this character. Avoid copying its buffer range and decoding it again.
+        let text = if end == start.add_len(CharLen::new(1))
+            && let TextSourceCharClassification::Text(ch) = classify_text_source_char(character)
+        {
+            let mut encoded = [0; 4];
+            Box::<str>::from(&*ch.encode_utf8(&mut encoded))
+        } else {
+            self.text_slice(start, end).into_boxed_str()
+        };
         Some(
             self.bind_box_run_topology(
                 DisplayItem::new(
                     self.span(start, end),
                     face,
-                    DisplayItemKind::TextRun(DisplayTextRun::independent(
-                        self.text_slice(start, end),
-                    )),
+                    DisplayItemKind::TextRun(DisplayTextRun::independent(text)),
                 )
                 .with_layout(layout),
                 start,

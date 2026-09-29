@@ -3512,3 +3512,34 @@ fn character_source_reuses_property_boundaries_and_recovers_after_rewinds() {
     source.next_item(&mut context).unwrap();
     assert_eq!(source.property_boundary_queries(), 8);
 }
+
+#[test]
+fn character_source_reuses_decoded_text_without_extracting_ranges() {
+    let mut eval = Context::new();
+    let buffer_id = eval.buffer_manager().current_buffer().unwrap().id();
+    let buffer = eval.buffer_manager_mut().get_mut(buffer_id).unwrap();
+    let text = "aé中🦀".repeat(32);
+    buffer.insert(&text);
+    let snapshot = LayoutBufferSnapshot::from_buffer(buffer);
+    let end = buffer.total_char_end_pos();
+    let mut source = BufferTextSourceCursor::new(
+        buffer_id,
+        &snapshot,
+        CharPos0::ZERO,
+        end,
+        RenderFaceRef::Inherit,
+    );
+    source.request_char_granularity_until(end);
+    let items = collect_items(&mut source);
+    assert_eq!(items.len(), text.chars().count());
+    let mut actual = String::new();
+    for item in items {
+        let DisplayItemKind::TextRun(run) = item.kind else {
+            panic!("ordinary character must remain a text run");
+        };
+        assert_eq!(run.text.chars().count(), 1);
+        actual.push_str(&run.text);
+    }
+    assert_eq!(actual, text);
+    assert_eq!(source.text_slice_queries(), 0);
+}
