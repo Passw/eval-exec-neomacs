@@ -223,6 +223,40 @@ fn spacing_score_is_neutral_without_requested_spacing() {
     assert_eq!(spacing_score(None, Some(FONT_SPACING_MONO), true), 0);
 }
 
+#[cfg(unix)]
+#[test]
+fn registry_candidates_preserve_coverage_for_required_character_filtering() {
+    let (pattern, _charset, _langset, langs, ranges) = gb2312_registry_pattern();
+    let objects = build_candidate_object_set(GnuEntityProjection::MetadataAndCharset).unwrap();
+    let fonts = FcFontSetGuard(unsafe {
+        fontconfig_sys::FcFontList(ptr::null_mut(), pattern.0, objects.0)
+    });
+    assert!(!fonts.0.is_null());
+    let patterns =
+        unsafe { std::slice::from_raw_parts((*fonts.0).fonts, (*fonts.0).nfont as usize) };
+    for ch in ['好', '\u{10ffff}'] {
+        let expected: Vec<_> = patterns
+            .iter()
+            .copied()
+            .filter(|pattern| super::raw_pattern_supports_any_char(*pattern, &[ch as u32]))
+            .filter_map(listed_font_from_raw_pattern)
+            .collect();
+        if ch == '好' {
+            assert!(!expected.is_empty(), "installed CJK fallback required");
+        } else {
+            assert!(expected.is_empty());
+        }
+        let actual = super::fc_query_candidates_uncached(
+            None,
+            &ranges,
+            Some(ch as u32),
+            &langs,
+            super::FcQueryKind::List,
+        );
+        assert_eq!(actual, expected, "registry query for {ch:?}");
+    }
+}
+
 #[test]
 fn registry_and_spec_langs_are_deduplicated() {
     assert_eq!(

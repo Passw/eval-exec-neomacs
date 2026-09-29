@@ -1338,7 +1338,11 @@ fn fc_query_candidates_uncached(
             }
             continue;
         }
-        let projection = if required_char.is_some() && query_charset_ranges.is_empty() {
+        // The postfilter below needs coverage even when a registry/repertory
+        // already constrained native discovery. Omitting FC_CHARSET makes
+        // every returned pattern appear unsupported and forces fallback.
+        // Registry-only enumeration keeps GNU's metadata-only projection.
+        let projection = if required_char.is_some() {
             GnuEntityProjection::MetadataAndCharset
         } else {
             GnuEntityProjection::Metadata
