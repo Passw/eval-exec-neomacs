@@ -6,6 +6,7 @@
 //! they grant lifetime, while the read certificate grants freshness.
 
 mod export;
+mod measurement;
 
 use super::*;
 use crate::frame_face_arena::PreparedFaceSnapshot;
@@ -29,6 +30,7 @@ struct PreparedViewport {
     // Partial worker pages may extend coverage, but cannot replace a viewport.
     complete_viewport: bool,
     reads: Option<CollectionReads>,
+    query_freshness: Option<neovm_core::window::WindowDisplaySnapshotFreshness>,
     _source_roots: Vec<neovm_core::emacs_core::owned_roots::OwnedRoots>,
 }
 
@@ -115,6 +117,7 @@ impl PreparedViewports {
         reads: CollectionReads,
         source_roots: Vec<neovm_core::emacs_core::owned_roots::OwnedRoots>,
         complete_viewport: bool,
+        query_freshness: Option<neovm_core::window::WindowDisplaySnapshotFreshness>,
     ) {
         // Retargeting can revisit a page that is already prepared. A preview
         // must never shorten its still-valid coverage while the rest is being
@@ -173,6 +176,7 @@ impl PreparedViewports {
             computed: true,
             complete_viewport,
             reads: Some(reads),
+            query_freshness,
             _source_roots: source_roots,
         });
         self.trim();
@@ -511,6 +515,7 @@ impl PreparedViewports {
                 computed: false,
                 complete_viewport: true,
                 reads: None,
+                query_freshness: None,
                 _source_roots: Vec::new(),
             });
         }

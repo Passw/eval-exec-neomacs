@@ -2764,6 +2764,12 @@ impl WindowDisplaySnapshotFreshness {
             .then(|| i64::from(current.window.vscroll) - i64::from(self.window.vscroll))
     }
 
+    /// Row measurements may change placement, but not the point-dependent
+    /// source context. The producer must also validate its captured reads.
+    pub fn same_query_row_content(&self, current: &Self) -> bool {
+        self.window.point == current.window.point && self.same_scroll_content(current)
+    }
+
     /// A committed scroll may move start/point and hide part of the first row.
     /// Every source, font, geometry, topology and mutation revision must still
     /// match before an existing row surface can preview that destination.

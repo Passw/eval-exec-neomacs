@@ -205,9 +205,9 @@ impl ScrollCoverage {
         snapshot.body_rows = body.geometry.body_rows;
         snapshot.logical_cursor = None;
         snapshot.phys_cursor = None;
-        // Prepared geometry is private coverage, never a query certificate.
-        // Redisplay reconstructs these fields after full-key admission.
-        snapshot.layout_freshness = None;
+        // Geometry remains private; keep the captured source identity separately
+        // so bounded measurement can validate it together with the read certificate.
+        let query_freshness = snapshot.layout_freshness.take();
         snapshot.window_end_record = None;
         admission.retained.presented_cursor = None;
         self.publication_pending = true;
@@ -219,6 +219,7 @@ impl ScrollCoverage {
             admission.reads,
             admission.roots,
             complete_viewport,
+            query_freshness,
         );
         Ok(true)
     }
@@ -565,6 +566,7 @@ impl LayoutEngine {
             validity: retained.validity,
             display_snapshot: neovm_core::window::WindowDisplaySnapshot {
                 window_id: window,
+                layout_freshness: snapshot.layout_freshness.clone(),
                 cell_origin: snapshot.cell_origin,
                 regions: snapshot.regions,
                 text_area_left_offset: snapshot.text_area_left_offset,

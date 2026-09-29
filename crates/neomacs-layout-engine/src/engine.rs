@@ -3382,6 +3382,9 @@ impl LayoutEngine {
         if let Some(query) = self.query_cache.get(evaluator, frame_id, window_id, scope) {
             return Ok(query);
         }
+        if let Some(query) = self.prepared_viewports.measure_rows(evaluator, frame_id, window_id, scope) {
+            return Ok(query);
+        }
         self.query_body_reuse_allowed = true;
         let (query, collections) = neovm_core::tagged::collection_reads::capture_normalized(
             evaluator,
