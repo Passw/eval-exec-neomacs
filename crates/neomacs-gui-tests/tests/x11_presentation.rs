@@ -274,6 +274,15 @@ fn x11_rich_scroll_inputs_have_native_output_receipts_across_resize() {
         serde_json::to_vec_pretty(&summary).unwrap(),
     )
     .unwrap();
+    // Inject the first page as soon as fixture construction completes, without
+    // waiting for its first redisplay or warming its mixed-font fallbacks.
+    // This catches whole-font-collection copies delaying queued input.
+    assert!(
+        summary["cold_page_ns"].as_u64().unwrap() <= 250_000_000,
+        "cold page latency exceeds 250 ms: {}; artifacts: {}",
+        summary["cold_page_ns"],
+        artifacts.display()
+    );
     for kind in ["page", "wheel"] {
         let stats = &summary[kind];
         assert!(
