@@ -10,19 +10,30 @@ pub(super) fn run(
     latency_path: &Path,
     initial: Value,
 ) {
-    const INPUTS: usize = 480;
+    // Longer opt-in runs expose intermittent stalls across coverage turnover.
+    let inputs = std::env::var("NEOMACS_GUI_SCROLL_STREAM_INPUTS")
+        .map(|value| {
+            value
+                .parse::<usize>()
+                .expect("stream input count must be an integer")
+        })
+        .unwrap_or(480);
+    assert!(
+        (480..=12_000).contains(&inputs) && inputs.is_multiple_of(2),
+        "stream input count must be even and between 480 and 12000"
+    );
     const PIXELS: f64 = 4.0;
     let period = Duration::from_nanos(1_000_000_000 / 120);
     let started = Instant::now();
-    let mut sent_ns = Vec::with_capacity(INPUTS);
+    let mut sent_ns = Vec::with_capacity(inputs);
     let mut observations = vec![initial.clone()];
-    for index in 0..INPUTS {
+    for index in 0..inputs {
         let deadline = started + period * index as u32;
         if let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
             thread::sleep(remaining);
         }
         sent_ns.push(started.elapsed().as_nanos() as u64);
-        trackpad.scroll(if index < INPUTS / 2 { PIXELS } else { -PIXELS });
+        trackpad.scroll(if index < inputs / 2 { PIXELS } else { -PIXELS });
         // Observe progress without waiting for a timer or a command. Sampling
         // files is outside the editor and does not force its redisplay.
         if let Ok(bytes) = fs::read(state_path)
@@ -38,7 +49,7 @@ pub(super) fn run(
             artifacts.join("continuous-input.json"),
             serde_json::to_vec_pretty(&serde_json::json!({
                 "requested_hz": 120,
-                "inputs": INPUTS,
+                "inputs": inputs,
                 "injected_ms": injected_ms,
                 "drained_ms": drained_ms,
                 "sent_ns": sent_ns,
@@ -50,7 +61,7 @@ pub(super) fn run(
     };
     // Keep injection/progress evidence even if draining times out.
     save(&observations, None);
-    let expected_pixels = initial["processed-pixels"].as_f64().unwrap() + INPUTS as f64 * PIXELS;
+    let expected_pixels = initial["processed-pixels"].as_f64().unwrap() + inputs as f64 * PIXELS;
     let drain_deadline = Instant::now() + Duration::from_secs(8);
     loop {
         if let Ok(bytes) = fs::read(state_path)
@@ -83,7 +94,7 @@ pub(super) fn run(
             .lines()
             .filter_map(|line| serde_json::from_str(line).ok())
             .collect();
-        if samples.len() >= INPUTS || Instant::now() >= deadline {
+        if samples.len() >= inputs || Instant::now() >= deadline {
             break samples;
         }
         thread::sleep(Duration::from_millis(20));
@@ -92,7 +103,7 @@ pub(super) fn run(
     fs::write(
         artifacts.join("continuous-presentations.json"),
         serde_json::to_vec_pretty(&serde_json::json!({
-            "expected_receipts": INPUTS,
+            "expected_receipts": inputs,
             "sway_renderer_request": fs::read_to_string(artifacts.join("sway-renderer-request")).ok(),
             "editor_adapter": fs::read_to_string(artifacts.join("neomacs.log"))
                 .ok().and_then(|log| log.lines().find_map(|line|
@@ -124,7 +135,7 @@ pub(super) fn run(
     );
 
     // Preserve partial evidence before reporting missing or evicted receipts.
-    assert_eq!(samples.len(), INPUTS);
+    assert_eq!(samples.len(), inputs);
     for sample in &samples {
         assert_eq!(sample["kind"], "precise");
         assert_eq!(
