@@ -1056,19 +1056,12 @@ fn select_automatic_composition_spans(
                     continue;
                 };
                 let suffix = &text[byte_offsets[start]..];
-                let mut match_data = None;
-                let Ok(true) = super::regex::looking_at_lisp_pattern_with_syntax(
-                    pattern,
-                    suffix,
-                    syntax,
-                    &mut match_data,
+                let Ok(Some(match_len)) = super::regex::looking_at_lisp_pattern_length_with_syntax(
+                    pattern, suffix, syntax,
                 ) else {
                     continue;
                 };
-                let Some(group) = match_data.and_then(|data| data.group(0)) else {
-                    continue;
-                };
-                group.end()
+                match_len
             };
             let end = start.saturating_add(match_len).min(char_count);
             if start < end && trigger < end {
