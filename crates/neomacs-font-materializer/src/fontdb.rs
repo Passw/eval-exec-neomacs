@@ -11,7 +11,7 @@ use cosmic_text::FontSystem;
 use flate2::read::GzDecoder;
 use neomacs_display_protocol::font::{FontFileAsset, FontMemoryAsset, FontOutlineAsset};
 use std::collections::HashMap;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -134,6 +134,67 @@ impl ExactFaceKey {
 }
 
 impl FontContainer {
+    fn read_source(
+        source: &mut (impl Read + Seek),
+        path: &Path,
+        face_index: u32,
+    ) -> std::io::Result<(Self, Vec<u8>)> {
+        // SFNT classification uses only table tags and lengths. In particular,
+        // a TTC directory can sit far into a large collection: seek to it
+        // instead of copying every preceding font into an evaluator buffer.
+        let mut header = Vec::with_capacity(12);
+        source.take(12).read_to_end(&mut header)?;
+        if is_sfnt(&header) {
+            let raster: std::io::Result<SfntRasterSource> = (|| {
+                let directory = if header.starts_with(b"ttcf") {
+                    if read_be_u32(&header, 8).is_none_or(|count| face_index >= count) {
+                        return Ok(SfntRasterSource::Unknown);
+                    }
+                    source.seek(SeekFrom::Start(12 + u64::from(face_index) * 4))?;
+                    let mut offset = [0; 4];
+                    source.read_exact(&mut offset)?;
+                    u64::from(u32::from_be_bytes(offset))
+                } else if face_index == 0 {
+                    0
+                } else {
+                    return Ok(SfntRasterSource::Unknown);
+                };
+                source.seek(SeekFrom::Start(directory))?;
+                let mut table_directory = vec![0; 12];
+                source.read_exact(&mut table_directory)?;
+                let count = read_be_u16(&table_directory, 4).unwrap() as usize;
+                table_directory.resize(12 + count * 16, 0);
+                source.read_exact(&mut table_directory[12..])?;
+                Ok(sfnt_raster_directory(&table_directory, 0).unwrap_or(SfntRasterSource::Unknown))
+            })();
+            let raster = match raster {
+                Ok(raster) => raster,
+                // Preserve the slice classifier's handling of truncated SFNT:
+                // fontdb remains responsible for accepting or rejecting it.
+                Err(error) if error.kind() == std::io::ErrorKind::UnexpectedEof => {
+                    SfntRasterSource::Unknown
+                }
+                Err(error) => return Err(error),
+            };
+            return Ok((Self::from_raster_source(raster), Vec::new()));
+        }
+        // Webfont decoding needs the complete payload. Legacy bitmap probing
+        // also retains its existing compressed-container handling.
+        source.seek(SeekFrom::Start(0))?;
+        let mut bytes = Vec::new();
+        source.read_to_end(&mut bytes)?;
+        Ok((Self::detect(path, &bytes, face_index), bytes))
+    }
+
+    fn from_raster_source(raster: SfntRasterSource) -> Self {
+        match raster {
+            SfntRasterSource::MonochromeBitmap => {
+                Self::LegacyBitmap(LegacyBitmapFormat::OpenTypeMonochromeBitmap)
+            }
+            _ => Self::Sfnt,
+        }
+    }
+
     fn detect(path: &Path, bytes: &[u8], face_index: u32) -> Self {
         if bytes.starts_with(b"wOFF") || bytes.starts_with(b"wOF2") {
             return Self::WebFont;
@@ -153,20 +214,8 @@ impl FontContainer {
             }
         }
 
-        let sfnt = bytes.starts_with(&[0x00, 0x01, 0x00, 0x00])
-            || bytes.starts_with(b"OTTO")
-            || bytes.starts_with(b"ttcf")
-            || bytes.starts_with(b"true")
-            || bytes.starts_with(b"typ1");
-        if sfnt {
-            return match sfnt_raster_source(bytes, face_index) {
-                SfntRasterSource::MonochromeBitmap => {
-                    Self::LegacyBitmap(LegacyBitmapFormat::OpenTypeMonochromeBitmap)
-                }
-                SfntRasterSource::Outline
-                | SfntRasterSource::ColorBitmap
-                | SfntRasterSource::Unknown => Self::Sfnt,
-            };
+        if is_sfnt(bytes) {
+            return Self::from_raster_source(sfnt_raster_source(bytes, face_index));
         }
 
         match path.extension().and_then(|extension| extension.to_str()) {
@@ -182,6 +231,14 @@ impl FontContainer {
             _ => Self::Sfnt,
         }
     }
+}
+
+fn is_sfnt(bytes: &[u8]) -> bool {
+    bytes.starts_with(&[0x00, 0x01, 0x00, 0x00])
+        || bytes.starts_with(b"OTTO")
+        || bytes.starts_with(b"ttcf")
+        || bytes.starts_with(b"true")
+        || bytes.starts_with(b"typ1")
 }
 
 /// Inspect the selected SFNT face rather than trusting its suffix or
@@ -205,6 +262,10 @@ fn sfnt_raster_source_inner(bytes: &[u8], face_index: u32) -> Option<SfntRasterS
     } else {
         return Some(SfntRasterSource::Unknown);
     };
+    sfnt_raster_directory(bytes, directory)
+}
+
+fn sfnt_raster_directory(bytes: &[u8], directory: usize) -> Option<SfntRasterSource> {
     let count = read_be_u16(bytes, directory + 4)? as usize;
     let mut has_monochrome_bitmap_data = false;
     let mut has_monochrome_bitmap_location = false;
@@ -460,11 +521,15 @@ impl FontFileCache {
         file_path: &str,
         face_index: u32,
     ) -> Result<OpenedFontDbSource, FontDbSourceError> {
-        let bytes = std::fs::read(file_path).map_err(|error| FontDbSourceError::Read {
+        let read_error = |error: std::io::Error| FontDbSourceError::Read {
             path: file_path.to_owned(),
             reason: error.to_string(),
-        })?;
-        match FontContainer::detect(Path::new(file_path), &bytes, face_index) {
+        };
+        let mut file = std::fs::File::open(file_path).map_err(read_error)?;
+        let (container, bytes) =
+            FontContainer::read_source(&mut file, Path::new(file_path), face_index)
+                .map_err(read_error)?;
+        match container {
             FontContainer::LegacyBitmap(format) => Err(FontDbSourceError::Unsupported { format }),
             // Fontconfig may resolve to WOFF/WOFF2. fontdb/ttf-parser doesn't
             // parse those containers directly, so decode to SFNT first.

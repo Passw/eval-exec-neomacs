@@ -97,3 +97,86 @@ fn rebuilding_font_caches_reuses_process_lifetime_selectors() {
         previous = Some(family);
     }
 }
+
+#[test]
+fn collection_container_detection_reads_only_the_selected_directory() {
+    struct Counted {
+        data: std::io::Cursor<Vec<u8>>,
+        read: usize,
+    }
+    impl Read for Counted {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            let count = self.data.read(buf)?;
+            self.read += count;
+            Ok(count)
+        }
+    }
+    impl Seek for Counted {
+        fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+            self.data.seek(pos)
+        }
+    }
+    for tags in [
+        [*b"glyf", *b"head"],
+        [*b"EBDT", *b"EBLC"],
+        [*b"CBDT", *b"CBLC"],
+    ] {
+        let mut bytes = vec![0; 8 * 1024 * 1024];
+        bytes[..4].copy_from_slice(b"ttcf");
+        bytes[8..12].copy_from_slice(&2u32.to_be_bytes());
+        let directory = 4 * 1024 * 1024;
+        bytes[16..20].copy_from_slice(&(directory as u32).to_be_bytes());
+        bytes[directory..directory + 4].copy_from_slice(&TRUE_TYPE_TAG.to_be_bytes());
+        bytes[directory + 4..directory + 6].copy_from_slice(&2u16.to_be_bytes());
+        for (i, tag) in tags.iter().enumerate() {
+            let record = directory + 12 + i * 16;
+            bytes[record..record + 4].copy_from_slice(tag);
+            bytes[record + 12..record + 16].copy_from_slice(&100u32.to_be_bytes());
+        }
+        let path = Path::new("collection.ttc");
+        let expected = FontContainer::detect(path, &bytes, 1);
+        let mut source = Counted {
+            data: std::io::Cursor::new(bytes),
+            read: 0,
+        };
+        let (actual, _) = FontContainer::read_source(&mut source, path, 1).unwrap();
+        assert_eq!(actual, expected);
+        assert!(
+            source.read <= 64,
+            "classification read {} bytes",
+            source.read
+        );
+    }
+}
+
+#[test]
+fn streamed_container_detection_preserves_truncated_and_non_sfnt_results() {
+    let mut sfnt = vec![0; 28];
+    sfnt[..4].copy_from_slice(&TRUE_TYPE_TAG.to_be_bytes());
+    sfnt[4..6].copy_from_slice(&1u16.to_be_bytes());
+    sfnt[12..16].copy_from_slice(b"glyf");
+    sfnt[24..28].copy_from_slice(&100u32.to_be_bytes());
+    let mut collection = b"ttcf\0\x01\0\0\0\0\0\x01\0\0\0\x10".to_vec();
+    collection.extend_from_slice(&sfnt);
+    for bytes in [
+        sfnt,
+        collection,
+        b"STARTFONT 2.1".to_vec(),
+        b"wOFFpayload".to_vec(),
+        vec![],
+    ] {
+        for len in 0..=bytes.len() {
+            for index in [0, 1, u32::MAX] {
+                let path = Path::new("source.font");
+                let expected = FontContainer::detect(path, &bytes[..len], index);
+                let (actual, _) = FontContainer::read_source(
+                    &mut std::io::Cursor::new(&bytes[..len]),
+                    path,
+                    index,
+                )
+                .unwrap();
+                assert_eq!(actual, expected, "length={len} index={index}");
+            }
+        }
+    }
+}
