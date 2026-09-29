@@ -51,6 +51,8 @@ mod issue_170_centered_buffer;
 mod issue_254;
 #[path = "issue_383_dashboard_banner.rs"]
 mod issue_383_dashboard_banner;
+#[path = "issue_446_align_to_hscroll.rs"]
+mod issue_446_align_to_hscroll;
 #[path = "mark_region_fill.rs"]
 mod mark_region_fill;
 #[path = "menu_bar.rs"]
