@@ -1576,8 +1576,8 @@ fn page_viewports_measure_their_pixel_extent_in_one_walk() {
             > 1
     );
     assert!(
-        calls.get() <= 4,
-        "page plan restarted viewport walks: {}",
+        calls.get() <= 2,
+        "page plan remeasured covered pixels: {}",
         calls.get()
     );
 }
@@ -1648,5 +1648,70 @@ fn pixel_extent_queries_match_complete_rows_with_mixed_heights_and_overlays() {
                 .collect();
             assert_eq!(pixels.points, expected, "start={start:?}, height={height}");
         }
+    }
+}
+
+#[test]
+fn forward_page_uses_the_visible_wrap_context_with_tabs_and_overlays() {
+    use neovm_core::window::WindowLayoutQueryScope;
+    use std::num::NonZeroUsize;
+    for start in [17, 33, 74] {
+        let mut eval = Context::new();
+        let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+        eval.buffer_manager_mut().get_mut(buffer).unwrap().insert(
+            &"words\twith tabs and wrapping words repeated many times within a single physical line\n".repeat(100));
+        let frame = eval
+            .frame_manager_mut()
+            .create_frame("page-wrap-context", 190, 240, buffer);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        let window = eval.frame_manager().get(frame).unwrap().selected_window;
+        eval.eval_str(&format!("(setq mode-line-format nil header-line-format nil tab-line-format nil word-wrap t) (goto-char {start}) (set-window-start nil {start} t) (overlay-put (make-overlay 85 100) 'before-string (propertize \"prefix\" 'face '(:height 1.5)))")).unwrap();
+        let height = eval
+            .eval_str("(window-body-height nil t)")
+            .unwrap()
+            .as_fixnum()
+            .unwrap();
+        let mut query = WindowLayoutQueryEngine::new();
+        let snapshot = query
+            .query_window_layout(
+                &mut eval,
+                frame,
+                window,
+                WindowLayoutQueryScope::Pixels {
+                    start: LispCharPos1::from_one_based_usize(start),
+                    height: NonZeroUsize::new(height as usize).unwrap(),
+                },
+            )
+            .unwrap()
+            .into_geometry()
+            .unwrap();
+        let line_height = eval.frame_manager().get(frame).unwrap().char_height as i64;
+        let delta = (height / line_height - 2).max(1) * line_height;
+        let goal = snapshot.rows[0].y + delta;
+        let expected = snapshot
+            .rows
+            .iter()
+            .rev()
+            .find(|row| row.y <= goal && row.start_buffer_pos.is_some())
+            .unwrap()
+            .start_buffer_pos
+            .unwrap();
+        assert!(expected.as_i64() > start as i64);
+        eval.install_window_layout_query(move |eval, frame, window, scope| {
+            match query.query_window_layout(eval, frame, window, scope) {
+                Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+                Err(error) => WindowLayoutQueryOutcome::Failed(error),
+            }
+        });
+        eval.eval_str("(let ((noninteractive nil)) (scroll-up))")
+            .unwrap();
+        assert_eq!(
+            eval.eval_str("(window-start)").unwrap().as_fixnum(),
+            Some(expected.as_i64()),
+            "forward page must use the measured viewport at start {start}"
+        );
     }
 }

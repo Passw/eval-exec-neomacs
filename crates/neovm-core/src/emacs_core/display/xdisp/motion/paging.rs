@@ -375,7 +375,28 @@ fn plan_scroll(
         start = measurer.pixels(eval, point, -(height / 2), line_height)?;
     }
     let new_start = match amount {
-        ScrollAmount::Page(_) => measurer.pixels(eval, start, delta, line_height)?,
+        ScrollAmount::Page(_) => {
+            // A forward page normally fits inside the current measured body.
+            // Use that exact geometry, including a wrapped first row's actual
+            // context, instead of starting another walk at its physical line.
+            let covered = (delta > 0)
+                .then(|| rows.first())
+                .flatten()
+                .filter(|first| first.start_buffer_pos == Some(start))
+                .and_then(|first| {
+                    let goal = first.y.saturating_add(delta);
+                    rows.iter()
+                        .rev()
+                        .find(|row| row.y <= goal)
+                        .filter(|row| goal < row.y.saturating_add(row.height))
+                        .and_then(|row| row.start_buffer_pos)
+                        .filter(|target| *target > start)
+                });
+            match covered {
+                Some(target) => target,
+                None => measurer.pixels(eval, start, delta, line_height)?,
+            }
+        }
         ScrollAmount::Rows(rows) => {
             super::resolve(
                 eval,
