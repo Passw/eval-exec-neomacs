@@ -35,6 +35,9 @@
 (defvar command-line-processed nil
   "Non-nil once command line has been processed.")
 
+(defvar neomacs-compositor-scrolling t
+  "Whether Neomacs may project certified text during native scrolling.
+Customized scroll commands continue through the ordinary evaluator path.")
 (defvar neomacs--startup-gc-ceiling-active nil
   "Non-nil while Neomacs bounds startup GC allocation intervals.")
 

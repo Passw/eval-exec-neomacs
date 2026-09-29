@@ -26358,7 +26358,7 @@ The mode's hook is called both when the mode is enabled and when it is
 disabled.
 
 (fn &optional ARG)" t)
-(register-definition-prefixes "pixel-scroll" '("neomacs-compositor-scrolling" "pixel-"))
+(register-definition-prefixes "pixel-scroll" '("pixel-"))
 
 
 ;;; Generated autoloads from plstore.el

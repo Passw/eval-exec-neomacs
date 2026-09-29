@@ -872,9 +872,6 @@ precisely, according to the turning of the mouse wheel."
 ;; evaluator also checks active bindings, remaps and blocking scroll hooks.
 ;; Keeping the witness at the definition site makes later fset/advice changes
 ;; revoke prediction without changing ordinary command dispatch.
-(defvar neomacs-compositor-scrolling t
-  "Whether Neomacs may project certified text during native scrolling.
-Customized scroll commands continue through the ordinary evaluator path.")
 (dolist (function '(pixel-scroll-precision
                     pixel-scroll-precision-scroll-down
                     pixel-scroll-precision-scroll-down-page
