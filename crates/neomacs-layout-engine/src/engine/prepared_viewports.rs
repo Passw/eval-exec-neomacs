@@ -11,6 +11,7 @@ use super::*;
 use crate::frame_face_arena::PreparedFaceSnapshot;
 use crate::incremental_layout::WindowDelta;
 use neovm_core::tagged::collection_reads::CollectionReads;
+use neovm_core::buffer::CharPos0;
 use std::collections::VecDeque;
 
 const MAX_VIEWPORTS: usize = 8;
@@ -42,16 +43,21 @@ impl PreparedViewport {
     }
 }
 
+// The scheduling hint comes from the exact connected surface exported for
+// this content revision, rather than an arbitrary cached page's start.
+struct ExportedCoverage {
+    frame: neovm_core::window::FrameId,
+    window: DisplayWindowId,
+    key: RetainedWindowKey,
+    epoch: u64,
+    backward_start: Option<CharPos0>,
+}
+
 #[derive(Default)]
 pub(super) struct PreparedViewports {
     entries: VecDeque<PreparedViewport>,
     pub(super) invalidated: Vec<(neovm_core::window::FrameId, DisplayWindowId)>,
-    export_epochs: Vec<(
-        neovm_core::window::FrameId,
-        DisplayWindowId,
-        RetainedWindowKey,
-        u64,
-    )>,
+    exports: Vec<ExportedCoverage>,
 }
 
 impl PreparedViewports {
@@ -64,10 +70,27 @@ impl PreparedViewports {
             if !self.invalidated.contains(&owner) {
                 self.invalidated.push(owner);
             }
-            self.export_epochs
-                .retain(|(frame, window, _, _)| (*frame, *window) != owner);
+            self.exports
+                .retain(|export| (export.frame, export.window) != owner);
             false
         });
+    }
+
+    pub(super) fn backward_start(
+        &self,
+        frame: neovm_core::window::FrameId,
+        window: DisplayWindowId,
+        key: &RetainedWindowKey,
+    ) -> Option<CharPos0> {
+        self.exports
+            .iter()
+            .find(|export| {
+                export.frame == frame
+                    && export.window == window
+                    && RetainedWindowKey::row_content_eligible(&export.key, key)
+            })?
+            .backward_start
+            .filter(|start| start.get() < key.window_start.max(0) as usize)
     }
 
     pub(super) fn has_computed(

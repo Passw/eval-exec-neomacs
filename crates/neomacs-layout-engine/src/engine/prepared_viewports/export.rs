@@ -22,35 +22,47 @@ impl PreparedViewports {
         metrics: &mut Option<crate::font::metrics::FontMetricsService>,
     ) {
         self.retire_invalid_dependencies();
-        self.export_epochs.retain(|(old_frame, window, _, _)| {
-            *old_frame == frame && retained.contains_key(window)
-        });
+        self.exports
+            .retain(|export| export.frame == frame && retained.contains_key(&export.window));
         for (window, current) in retained {
-            let epoch = match self
-                .export_epochs
-                .iter_mut()
-                .find(|(f, w, _, _)| *f == frame && w == window)
+            let index = match self
+                .exports
+                .iter()
+                .position(|export| export.frame == frame && export.window == *window)
             {
-                Some((_, _, key, epoch))
-                    if RetainedWindowKey::row_content_eligible(key, &current.key) =>
-                {
-                    *epoch
-                }
-                Some((_, _, key, epoch)) => {
-                    *key = current.key.clone();
-                    *epoch = next_epoch();
-                    *epoch
+                Some(index) => {
+                    let export = &mut self.exports[index];
+                    if !RetainedWindowKey::row_content_eligible(&export.key, &current.key) {
+                        export.key = current.key.clone();
+                        export.epoch = next_epoch();
+                    }
+                    index
                 }
                 None => {
-                    let epoch = next_epoch();
-                    self.export_epochs
-                        .push((frame, *window, current.key.clone(), epoch));
-                    epoch
+                    self.exports.push(ExportedCoverage {
+                        frame,
+                        window: *window,
+                        key: current.key.clone(),
+                        epoch: next_epoch(),
+                        backward_start: None,
+                    });
+                    self.exports.len() - 1
                 }
             };
-            if let Some(coverage) =
-                self.export_window(frame, *window, current, state, arena, metrics, epoch)
-            {
+            let coverage = self.export_window(
+                frame,
+                *window,
+                current,
+                state,
+                arena,
+                metrics,
+                self.exports[index].epoch,
+            );
+            self.exports[index].backward_start = coverage
+                .as_ref()
+                .and_then(|coverage| coverage.content.matrix.rows.first())
+                .map(|row| CharPos0::new(row.start_charpos));
+            if let Some(coverage) = coverage {
                 state.scroll_coverage.push(Arc::new(coverage));
             }
         }

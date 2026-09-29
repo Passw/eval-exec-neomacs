@@ -2692,6 +2692,24 @@ fn idle_precomputation_prioritizes_the_current_scroll_direction() {
                 start < next_line * line.len(),
                 "backward scrolling prioritized a forward page at {start}"
             );
+            let frontier = engine
+                .last_frame_display_state
+                .as_ref()
+                .unwrap()
+                .scroll_coverage
+                .iter()
+                .find(|coverage| coverage.content.window_id.get() == window.0 as i64)
+                .unwrap()
+                .content
+                .matrix
+                .rows
+                .first()
+                .unwrap()
+                .start_charpos;
+            assert!(
+                start < frontier,
+                "backward preparation at {start} must extend coverage before {frontier}, not recapture already prepared rows"
+            );
         } else {
             assert!(
                 start > next_line * line.len(),

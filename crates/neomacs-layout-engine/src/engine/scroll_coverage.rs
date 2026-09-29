@@ -329,6 +329,12 @@ impl LayoutEngine {
             .windows
             .get(&window_id)
             .is_some_and(|observed| observed.key.window_start != retained.key.window_start);
+        let moving_backward = compatible
+            && self
+                .scroll_coverage
+                .windows
+                .get(&window_id)
+                .is_some_and(|observed| retained.key.window_start < observed.key.window_start);
         if !compatible {
             self.scroll_coverage.cancel_active();
         }
@@ -348,7 +354,19 @@ impl LayoutEngine {
             // Backward acquisition scans at most 8 KiB, regardless of buffer
             // length. It stops only on a complete physical-line boundary.
             let start = CharPos0::new(retained.key.window_start.max(0) as usize);
-            let start_byte = buffer.char_pos_to_emacs_byte_pos_clamped(start).get();
+            // During reversal, extend the connected coverage edge. Starting
+            // a whole page just behind the viewport can recapture only rows
+            // already available while a gap farther above goes unprepared.
+            let backward_start = if moving_backward {
+                self.prepared_viewports
+                    .backward_start(frame.id, window_id, &retained.key)
+                    .unwrap_or(start)
+            } else {
+                start
+            };
+            let start_byte = buffer
+                .char_pos_to_emacs_byte_pos_clamped(backward_start)
+                .get();
             let begin = buffer.point_min_emacs_byte_pos().get();
             let lower = start_byte.saturating_sub(8192).max(begin);
             let mut position = start_byte;
@@ -422,13 +440,7 @@ impl LayoutEngine {
             // Targets are consumed from the end. Follow the observed motion
             // so repeated backward redisplays cannot keep replacing the queue
             // with another forward page. An already active page still finishes.
-            if compatible
-                && self
-                    .scroll_coverage
-                    .windows
-                    .get(&window_id)
-                    .is_some_and(|observed| retained.key.window_start < observed.key.window_start)
-            {
+            if moving_backward {
                 if let Some(forward) = forward_target {
                     targets.retain(|target| *target != forward);
                     targets.insert(0, forward);
