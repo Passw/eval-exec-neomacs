@@ -9,6 +9,7 @@ mod export;
 mod measurement;
 
 use super::*;
+use neomacs_display_protocol::GlyphRowRole;
 use crate::frame_face_arena::PreparedFaceSnapshot;
 use crate::incremental_layout::WindowDelta;
 use neovm_core::tagged::collection_reads::CollectionReads;
@@ -53,6 +54,9 @@ struct ExportedCoverage {
     key: RetainedWindowKey,
     epoch: u64,
     backward_start: Option<CharPos0>,
+    // Placement hint for eviction, updated even when the content epoch is
+    // unchanged. It grants no authority to reuse source or geometry.
+    visible_source: std::ops::Range<usize>,
 }
 
 #[derive(Default)]
@@ -191,7 +195,7 @@ impl PreparedViewports {
             // Keep two recent history slots for exact page revisits, but do
             // not let each line scroll evict certified off-screen coverage.
             let history = self.entries.iter().filter(|entry| !entry.computed).count();
-            let victim = if history > 2 {
+            let mut victim = if history > 2 {
                 self.entries
                     .iter()
                     .position(|entry| !entry.computed)
@@ -199,6 +203,32 @@ impl PreparedViewports {
             } else {
                 0
             };
+            if self.entries[victim].computed {
+                let owner = (self.entries[victim].frame, self.entries[victim].window);
+                if let Some(export) = self.exports.iter()
+                    .find(|export| (export.frame, export.window) == owner)
+                {
+                    // FIFO can remove the only bridge beside the viewport
+                    // while retaining farther pages that depended on it.
+                    // Preserve owner fairness and the history allowance;
+                    // within that owner's worker pages, drop the farthest.
+                    let distance = |entry: &PreparedViewport| {
+                        let source = text_source_range(&entry.retained);
+                        export.visible_source.start.saturating_sub(source.end)
+                            .max(source.start.saturating_sub(export.visible_source.end))
+                    };
+                    let mut farthest = distance(&self.entries[victim]);
+                    for (index, entry) in self.entries.iter().enumerate() {
+                        if entry.computed && (entry.frame, entry.window) == owner {
+                            let gap = distance(entry);
+                            if gap > farthest {
+                                victim = index;
+                                farthest = gap;
+                            }
+                        }
+                    }
+                }
+            }
             self.entries.remove(victim);
         }
     }
@@ -521,4 +551,16 @@ impl PreparedViewports {
         }
         self.trim();
     }
+}
+
+fn text_source_range(retained: &RetainedWindowMatrix) -> std::ops::Range<usize> {
+    let start = retained.key.window_start.max(0) as usize;
+    retained
+        .matrix
+        .rows
+        .iter()
+        .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        .fold(start..start, |range, row| {
+            range.start.min(row.start_charpos)..range.end.max(row.end_charpos.saturating_add(1))
+        })
 }

@@ -3278,3 +3278,82 @@ fn backward_bridge_stops_acquisition_at_existing_coverage() {
     fresh.layout_frame_rust(&mut eval, frame);
     assert_eq!(actual, selected_window_layout_trace(&eval, &fresh, frame));
 }
+
+#[test]
+fn distant_worker_bridges_do_not_evict_the_connected_viewport_seam() {
+    let line = "nearby prepared row\n";
+    for backward in [true, false] {
+        let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 800, 600);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        let anchor = 120 * line.len();
+        scroll_window_to(&mut eval, frame, window, buffer, anchor as i64 + 1, anchor);
+        let mut engine = LayoutEngine::new();
+        engine.layout_frame_rust(&mut eval, frame);
+        let owner = DisplayWindowId::new(window.0 as i64);
+        let visible_end = engine.retained_window_matrices[&owner]
+            .matrix
+            .rows
+            .iter()
+            .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+            .last()
+            .unwrap()
+            .next_buffer_row_start()
+            .unwrap();
+        // Each real worker result contributes four adjacent physical rows,
+        // as the nearby backward scheduler does. Keep the live viewport
+        // fixed while enough pages arrive to exhaust the bounded cache.
+        for page in 0..12 {
+            let start = if backward {
+                anchor - (page + 1) * 4 * line.len()
+            } else {
+                visible_end + page * 4 * line.len()
+            };
+            engine
+                .request_scroll_bridge(
+                    &eval,
+                    frame,
+                    window,
+                    CharPos0::new(start),
+                    CharPos0::new(start + 4 * line.len()),
+                )
+                .unwrap();
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+            while !engine
+                .scroll_coverage
+                .drain(&mut engine.prepared_viewports)
+                .unwrap()
+            {
+                assert!(std::time::Instant::now() < deadline);
+                std::thread::yield_now();
+            }
+            engine.layout_frame_rust(&mut eval, frame);
+            let coverage = engine
+                .last_frame_display_state
+                .as_ref()
+                .unwrap()
+                .scroll_coverage
+                .iter()
+                .find(|coverage| coverage.content.window_id == owner)
+                .expect("retain usable offscreen coverage");
+            if backward {
+                assert!(
+                    coverage.anchor_row >= 4,
+                    "farther page {page} evicted the nearby backward seam"
+                );
+            } else {
+                assert!(
+                    coverage.content.matrix.rows.last().unwrap().end_charpos
+                        >= visible_end + 3 * line.len(),
+                    "farther page {page} evicted the nearby forward seam"
+                );
+            }
+        }
+        let actual = selected_window_layout_trace(&eval, &engine, frame);
+        let mut fresh = LayoutEngine::new();
+        fresh.layout_frame_rust(&mut eval, frame);
+        assert_eq!(actual, selected_window_layout_trace(&eval, &fresh, frame));
+    }
+}

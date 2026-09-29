@@ -45,10 +45,12 @@ impl PreparedViewports {
                         key: current.key.clone(),
                         epoch: next_epoch(),
                         backward_start: None,
+                        visible_source: text_source_range(current),
                     });
                     self.exports.len() - 1
                 }
             };
+            self.exports[index].visible_source = text_source_range(current);
             let coverage = self.export_window(
                 frame,
                 *window,

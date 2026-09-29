@@ -646,6 +646,21 @@ impl LayoutEngine {
         Ok(())
     }
 
+    #[cfg(test)]
+    pub(super) fn request_scroll_bridge(
+        &mut self,
+        evaluator: &neovm_core::emacs_core::Context,
+        frame: FrameId,
+        window: WindowId,
+        start: CharPos0,
+        end: CharPos0,
+    ) -> Result<(), RowProgramError> {
+        self.begin_scroll_coverage(evaluator, frame, window, start)?;
+        self.scroll_coverage.capture.as_mut().unwrap().stop_at_source = Some(end);
+        while self.capture_scroll_step(evaluator)? {}
+        Ok(())
+    }
+
     /// Consume at most one bounded physical line. All evaluator references
     /// are dropped before returning to the command-input wait loop.
     pub(super) fn capture_scroll_step(
