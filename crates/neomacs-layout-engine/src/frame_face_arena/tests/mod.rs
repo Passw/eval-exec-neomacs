@@ -539,3 +539,61 @@ fn worker_face_reservation_preserves_publication_and_serializes_identity_allocat
             .is_err()
     );
 }
+
+#[test]
+fn admitting_repeated_prepared_glyph_faces_preserves_existing_storage() {
+    let arena = FrameFaceArena::default();
+    let mut source = arena.begin_attempt();
+    let id = FaceId::new(1);
+    let mut face = Face::new(id);
+    face.font_family = "prepared face with owned family storage".to_owned();
+    source.import_face(face).unwrap();
+    let arena = source.commit();
+    let prepared = arena.prepared_snapshot();
+    let mut attempt = arena.begin_attempt();
+    attempt.admit_prepared([id], &prepared, &arena).unwrap();
+    let storage = attempt.state.borrow().faces[&id].font_family.as_ptr();
+    // A second row references the same face. It must be checked against its
+    // source namespace without replacing the identical, already owned face.
+    attempt.admit_prepared([id], &prepared, &arena).unwrap();
+    assert_eq!(
+        attempt.state.borrow().faces[&id].font_family.as_ptr(),
+        storage
+    );
+    attempt
+        .admit_prepared(std::iter::repeat_n(id, 4096), &prepared, &arena)
+        .unwrap();
+    assert_eq!(
+        attempt.state.borrow().faces[&id].font_family.as_ptr(),
+        storage
+    );
+    assert_eq!(attempt.faces(), *arena.faces);
+}
+
+#[test]
+fn repeated_prepared_faces_still_validate_each_source_namespace() {
+    let mut source = FrameFaceArena::default().begin_attempt();
+    let id = FaceId::new(1);
+    source.import_face(Face::new(id)).unwrap();
+    let arena = source.commit();
+    let prepared = arena.prepared_snapshot();
+    let mut attempt = arena.begin_attempt();
+    attempt.admit_prepared([id], &prepared, &arena).unwrap();
+    let before = attempt.faces();
+    let mut conflict = prepared.clone();
+    Arc::make_mut(&mut conflict.faces)
+        .get_mut(&id)
+        .unwrap()
+        .font_size += 1.0;
+    assert!(matches!(
+        attempt.admit_prepared([id, id], &conflict, &arena),
+        Err(FrameFaceReuseError::ConflictingFace(bad)) if bad == id
+    ));
+    assert_eq!(attempt.faces(), before);
+    let missing = FaceId::new(99);
+    assert!(matches!(
+        attempt.admit_prepared([id, id, missing], &prepared, &arena),
+        Err(FrameFaceReuseError::MissingFace(bad)) if bad == missing
+    ));
+    assert_eq!(attempt.faces(), before);
+}

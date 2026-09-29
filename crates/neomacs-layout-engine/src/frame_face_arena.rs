@@ -657,7 +657,10 @@ impl FrameFaceAttempt {
         if !Arc::ptr_eq(&state.base_snapshot, &current.snapshot) {
             return Err(FrameFaceReuseError::ForeignSnapshot);
         }
-        let ids: Vec<_> = face_ids.into_iter().collect();
+        // Rows repeat face IDs for every glyph. Validate each distinct ID
+        // once, retaining encounter order and the all-or-nothing admission.
+        let mut seen = rustc_hash::FxHashSet::default();
+        let ids: Vec<_> = face_ids.into_iter().filter(|id| seen.insert(*id)).collect();
         for id in &ids {
             let face = source
                 .faces
@@ -684,7 +687,10 @@ impl FrameFaceAttempt {
             }
         }
         for id in ids {
-            state.faces.insert(id, source.faces[&id].clone());
+            state
+                .faces
+                .entry(id)
+                .or_insert_with(|| source.faces[&id].clone());
         }
         Ok(())
     }
