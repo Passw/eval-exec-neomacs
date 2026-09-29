@@ -716,7 +716,7 @@ impl<'a> DisplaySourcePropertyResolver<'a> {
         }
     }
 
-    fn resolve_item_layout(&mut self, item: &mut DisplayItem) {
+    fn resolve_item_layout(&mut self, mut item: DisplayItem) -> DisplayItem {
         if let Some(overlay) = item.kind.semantic_face_overlay() {
             item.face = self.resolve_face_ref(item.face, Value::symbol(overlay.face_name()));
         }
@@ -731,6 +731,7 @@ impl<'a> DisplaySourcePropertyResolver<'a> {
             row_break.line_spacing =
                 self.resolve_line_spacing_policy(item.face, row_break.line_spacing);
         }
+        item
     }
 
     fn resolve_line_spacing_policy(
@@ -1040,11 +1041,9 @@ pub(crate) fn resolve_next_display_source_item(
             ),
         )
         .with_automatic_composition(params.automatic_composition);
-        let mut item = source.next_item(&mut context);
-        if let Some(item) = item.as_mut() {
-            resolver.resolve_item_layout(item);
-        }
-        item
+        source
+            .next_item(&mut context)
+            .map(|item| resolver.resolve_item_layout(item))
     };
     ResolvedDisplaySourceItem::with_non_text_area(item, pending_faces, pending_non_text_area)
 }
