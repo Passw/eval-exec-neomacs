@@ -3172,3 +3172,32 @@ fn connected_prepared_pages_export_a_bounded_surface_around_the_viewport() {
         assert!(anchor == 0 || coverage.anchor_row > 0);
     }
 }
+
+#[test]
+fn full_height_worker_preview_finishes_acquisition() {
+    let line = format!("{}\n", "wrapped offscreen text ".repeat(12));
+    let (mut eval, frame, _, window) = incr_editing_frame(&line.repeat(300), 240, 180);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let owner = neomacs_display_protocol::types::DisplayWindowId::new(window.0 as i64);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "worker preview never filled the viewport"
+        );
+        engine.maintain_scroll_coverage(&eval);
+        if engine.prepared_viewports.has_computed(frame, owner) {
+            assert!(
+                engine.scroll_coverage.active_capture_start_for_test().is_none(),
+                "a full-height preview must release acquisition for the next coverage target"
+            );
+            break;
+        }
+        std::thread::yield_now();
+    }
+}

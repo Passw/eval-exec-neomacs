@@ -169,7 +169,8 @@ impl ScrollCoverage {
                 take
             })
             .count();
-        let complete_viewport = height >= regions.text_body.height
+        let fills_viewport = height >= regions.text_body.height;
+        let complete_viewport = fills_viewport
             || rows.len() == admission.retained.matrix.rows.len() - admission.row_base;
         rows.truncate(visible);
         let body = position_buffer_rows(
@@ -210,6 +211,14 @@ impl ScrollCoverage {
         let query_freshness = snapshot.layout_freshness.take();
         snapshot.window_end_record = None;
         admission.retained.presented_cursor = None;
+        // A closed preview can already fill the bounded page, especially
+        // with wrapping or tall faces. Admission truncates every result at
+        // this height, so further acquisition cannot extend its coverage.
+        // Release the producer for the next target instead of capturing and
+        // replaying a suffix that will only be discarded.
+        if fills_viewport {
+            self.capture = None;
+        }
         self.publication_pending = true;
         destination.insert_computed(
             admission.frame,
