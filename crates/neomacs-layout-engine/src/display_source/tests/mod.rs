@@ -3460,3 +3460,55 @@ fn line_spacing_uses_gnu_numeric_and_cons_scaling_rules() {
         } if face.is_symbol_named("mode-line")
     ));
 }
+
+#[test]
+fn character_source_reuses_property_boundaries_and_recovers_after_rewinds() {
+    let mut eval = Context::new();
+    let buffer_id = eval.buffer_manager().current_buffer().unwrap().id();
+    let buffer = eval.buffer_manager_mut().get_mut(buffer_id).unwrap();
+    buffer.insert(&"é".repeat(32));
+    buffer.text_props_put_property_in_emacs_byte_range(
+        EmacsByteRange::new(EmacsBytePos::new(16), EmacsBytePos::new(32)),
+        Value::symbol("test-stop"),
+        Value::T,
+    );
+    let overlay = Value::make_overlay(neovm_core::heap_types::OverlayDataInit {
+        serial: 1,
+        plist: Value::NIL,
+        buffer: Some(buffer_id),
+        start: 24,
+        end: 48,
+        front_advance: false,
+        rear_advance: false,
+    });
+    buffer.overlays_mut().insert_overlay(overlay);
+    let snapshot = LayoutBufferSnapshot::from_buffer(buffer);
+    let end = CharPos0::new(32);
+    let mut source = BufferTextSourceCursor::new(
+        buffer_id,
+        &snapshot,
+        CharPos0::ZERO,
+        end,
+        RenderFaceRef::FaceId(FaceId::new(1)),
+    );
+    source.request_char_granularity_until(end);
+    assert_eq!(collect_items(&mut source).len(), 32);
+    // Stops at characters 8,12,16,24,32, despite one-character production.
+    assert_eq!(source.property_boundary_queries(), 5);
+    let mut context = DisplaySourceContext::empty();
+    source.rewind_for_word_wrap_to(CharPos0::new(2));
+    let replay = source.next_item(&mut context).unwrap();
+    assert_eq!(
+        replay.span.start,
+        DisplaySourcePosition::buffer(buffer_id, CharPos0::new(2), EmacsBytePos::new(4))
+    );
+    assert_eq!(source.property_boundary_queries(), 6);
+    source.next_item(&mut context).unwrap();
+    assert_eq!(source.property_boundary_queries(), 6);
+    source.reset_to(CharPos0::new(20));
+    source.next_item(&mut context).unwrap();
+    assert_eq!(source.property_boundary_queries(), 7);
+    source.reset_to(CharPos0::new(24));
+    source.next_item(&mut context).unwrap();
+    assert_eq!(source.property_boundary_queries(), 8);
+}

@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use crate::buffer_source::mouse_face::{MouseFaceRuns, MouseFaceStableRun, ResolvedMouseFace};
 use crate::buffer_source::producer::frame::{
     DisplayReplacementExtentLookup, ReplacementCoveredSpan,
@@ -172,6 +174,11 @@ pub(crate) struct BufferTextSourceCursor<'a, B: LayoutBufferView + ?Sized> {
     base_face: RenderFaceRef,
     replacement_strings: LispStringSourceStack,
     mouse_faces: MouseFaceRuns<'a, B>,
+    /// Stop position within this immutable view. Valid only for queries in
+    /// [start, end): wrap rewinds and replacement lookahead may query elsewhere.
+    property_boundary_run: Cell<Option<(CharPos0, CharPos0)>>,
+    #[cfg(test)]
+    property_boundary_queries: Cell<usize>,
     face_property: LayoutCharPropertyLookup,
     display_property: LayoutCharPropertyLookup,
     /// The walk's evaluated `(when FORM . SPEC)` results (from the view).
@@ -231,6 +238,9 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
                 ),
                 window_id,
             ),
+            property_boundary_run: Cell::new(None),
+            #[cfg(test)]
+            property_boundary_queries: Cell::new(0),
             face_property: LayoutCharPropertyLookup::new(buffer, Value::symbol("face")),
             display_property: LayoutCharPropertyLookup::new(buffer, Value::symbol("display")),
             line_height_property: LayoutCharPropertyLookup::new(
@@ -427,6 +437,11 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
         )
     }
 
+    #[cfg(test)]
+    pub(crate) fn property_boundary_queries(&self) -> usize {
+        self.property_boundary_queries.get()
+    }
+
     /// neomacs equivalent of GNU `compute_stop_pos`: the next position at which
     /// the face/display can change, i.e. where the current text run must end.
     /// GNU folds the next text-property change AND the next *overlay* change
@@ -437,6 +452,15 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
     /// the run would keep the face resolved at its start and the overlay would
     /// never paint (or would paint over the whole run).
     fn next_property_change(&self, char_pos: CharPos0) -> CharPos0 {
+        if let Some((start, end)) = self.property_boundary_run.get()
+            && start <= char_pos
+            && char_pos < end
+        {
+            return end;
+        }
+        #[cfg(test)]
+        self.property_boundary_queries
+            .set(self.property_boundary_queries.get() + 1);
         let byte = self.byte_pos(char_pos);
         let prop_change = self
             .buffer
@@ -449,7 +473,9 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
             .next_boundary_after_emacs_byte_pos(byte)
             .map(|byte_pos| self.buffer.layout_emacs_byte_pos_to_char_pos(byte_pos))
             .unwrap_or(self.end);
-        prop_change.min(overlay_change).min(self.end)
+        let end = prop_change.min(overlay_change).min(self.end);
+        self.property_boundary_run.set(Some((char_pos, end)));
+        end
     }
 
     fn display_prop_at(&self, char_pos: CharPos0) -> Option<Value> {
