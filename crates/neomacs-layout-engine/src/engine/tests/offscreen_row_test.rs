@@ -2795,3 +2795,79 @@ fn backward_precomputation_connects_fragmented_lines_to_the_viewport() {
     );
     assert_eq!(before, selected_window_layout_trace(&eval, &engine, frame));
 }
+
+#[test]
+fn repeated_idle_preview_preserves_a_longer_partial_prepared_page() {
+    let line = format!("{}\n", "W".repeat(180));
+    let (mut eval, frame, _, window) = incr_editing_frame(&line.repeat(300), 4000, 1000);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while engine.maintain_scroll_coverage(&eval).is_some() {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    engine.layout_frame_rust(&mut eval, frame);
+    let coverage_end = |engine: &LayoutEngine| {
+        engine
+            .last_frame_display_state
+            .as_ref()
+            .unwrap()
+            .scroll_coverage
+            .iter()
+            .find(|coverage| coverage.content.window_id.get() == window.0 as i64)
+            .expect("prepared coverage")
+            .content
+            .matrix
+            .rows
+            .last()
+            .unwrap()
+            .end_charpos
+    };
+    let before = coverage_end(&engine);
+    let prepare_far = |engine: &mut LayoutEngine, eval: &neovm_core::emacs_core::Context, start| {
+        engine
+            .request_scroll_coverage(eval, frame, window, CharPos0::new(start))
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        while !engine
+            .scroll_coverage
+            .drain(&mut engine.prepared_viewports)
+            .unwrap()
+        {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::yield_now();
+        }
+    };
+    // Fill the bounded cache, leaving the current useful prefix oldest.
+    for index in 0..7 {
+        prepare_far(&mut engine, &eval, (100 + index * 10) * line.len());
+    }
+    engine.take_scroll_coverage_publication();
+    engine.scroll_coverage.cancel();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !engine.take_scroll_coverage_publication() {
+        engine.maintain_scroll_coverage(&eval);
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    engine.layout_frame_rust(&mut eval, frame);
+    assert_eq!(
+        coverage_end(&engine),
+        before,
+        "a smaller preview must not withdraw still-valid partial coverage"
+    );
+    // Accepting the repeated prefix is still a visit to this page. A new
+    // unrelated page should evict an older target, not this useful coverage.
+    prepare_far(&mut engine, &eval, 250 * line.len());
+    engine.layout_frame_rust(&mut eval, frame);
+    assert_eq!(
+        coverage_end(&engine),
+        before,
+        "a retained larger prefix must inherit the new preview's cache recency"
+    );
+}

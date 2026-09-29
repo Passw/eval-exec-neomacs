@@ -96,11 +96,21 @@ impl PreparedViewports {
         // Retargeting can revisit a page that is already prepared. A preview
         // must never shorten its still-valid coverage while the rest is being
         // captured again. Freshness and geometry must match before retaining
-        // the old source roots and face namespace.
+        // the old source roots and face namespace. A job that stopped at its
+        // fragment budget may already own a longer partial prefix too.
+        let body_rows = |matrix: &RetainedWindowMatrix| {
+            matrix
+                .matrix
+                .rows
+                .iter()
+                .filter(|row| row.enabled && !RetainedWindowMatrix::is_chrome_role(row.role))
+                .count()
+        };
+        let incoming_rows = body_rows(&retained);
         if !complete_viewport
-            && self.entries.iter().any(|entry| {
+            && let Some(index) = self.entries.iter().position(|entry| {
                 entry.computed
-                    && entry.complete_viewport
+                    && (entry.complete_viewport || body_rows(&entry.retained) >= incoming_rows)
                     && entry.frame == frame
                     && entry.window == window
                     && entry.retained.key.window_start == retained.key.window_start
@@ -108,6 +118,10 @@ impl PreparedViewports {
                     && entry.dependencies_valid()
             })
         {
+            // Preserve insertion recency even when retaining the larger
+            // payload; otherwise cache pressure can immediately evict it.
+            let entry = self.entries.remove(index).expect("located prepared page");
+            self.entries.push_back(entry);
             return;
         }
         let rows = retained.matrix.rows.len();
