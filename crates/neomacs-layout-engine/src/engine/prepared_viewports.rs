@@ -160,7 +160,19 @@ impl PreparedViewports {
             || self.entries.iter().map(|entry| entry.rows).sum::<usize>() > MAX_ROWS
             || self.entries.iter().map(|entry| entry.glyphs).sum::<usize>() > MAX_GLYPHS
         {
-            self.entries.pop_front();
+            // Command-driven history arrives much faster than worker pages.
+            // Keep two recent history slots for exact page revisits, but do
+            // not let each line scroll evict certified off-screen coverage.
+            let history = self.entries.iter().filter(|entry| !entry.computed).count();
+            let victim = if history > 2 {
+                self.entries
+                    .iter()
+                    .position(|entry| !entry.computed)
+                    .unwrap()
+            } else {
+                0
+            };
+            self.entries.remove(victim);
         }
     }
 
@@ -445,8 +457,24 @@ impl PreparedViewports {
             if rows > MAX_ROWS || glyphs > MAX_GLYPHS {
                 continue;
             }
+            // A visited viewport must not replace certified worker coverage
+            // with history-only rows. Complete prepared pages already serve
+            // exact revisits; partial pages coexist with the full history.
+            if let Some(index) = self.entries.iter().position(|entry| {
+                entry.computed
+                    && entry.complete_viewport
+                    && entry.frame == frame
+                    && entry.window == window
+                    && entry.retained.key.window_start == retained.key.window_start
+                    && RetainedWindowKey::row_content_eligible(&entry.retained.key, &retained.key)
+            }) {
+                let entry = self.entries.remove(index).expect("located prepared page");
+                self.entries.push_back(entry);
+                continue;
+            }
             self.entries.retain(|entry| {
-                entry.frame != frame
+                entry.computed
+                    || entry.frame != frame
                     || entry.window != window
                     || entry.retained.key.window_start != retained.key.window_start
             });

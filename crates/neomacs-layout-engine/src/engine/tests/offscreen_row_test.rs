@@ -2871,3 +2871,212 @@ fn repeated_idle_preview_preserves_a_longer_partial_prepared_page() {
         "a retained larger prefix must inherit the new preview's cache recency"
     );
 }
+
+#[test]
+fn shared_rich_fixture_worker_prepares_the_overlay_line() {
+    let (mut eval, frame, buffer, window) = incr_editing_frame("", 1000, 800);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    // The context has no frontend font-list callback. Actual layout still uses
+    // these installed native families; content and face/overlay construction
+    // come from the same fixture as the GUI latency test.
+    let source = include_str!("../../../../neomacs-perf/fixtures/scrolling-content.el")
+        .replace("(display-graphic-p)", "t")
+        .replace(
+            "(font-family-list)",
+            "'(\"DejaVu Sans Mono\" \"DejaVu Serif\" \"DejaVu Sans\")",
+        );
+    for file in [
+        "emacs-lisp/byte-run.el",
+        "emacs-lisp/backquote.el",
+        "subr.el",
+        "emacs-lisp/macroexp.el",
+    ] {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../lisp")
+            .join(file);
+        eval.eval_str(&format!("(load {:?} nil nil t)", path.to_str().unwrap()))
+            .unwrap();
+    }
+    eval.eval_str(&source).unwrap();
+    eval.eval_str("(neomacs-scroll-content-insert 3000)")
+        .unwrap();
+    // Line 2000 has the same block/overlay phase as GUI line 50000.
+    let start = 2 * 110080;
+    let point = eval
+        .buffer_manager()
+        .get(buffer)
+        .unwrap()
+        .char_pos_to_emacs_byte_pos_clamped(CharPos0::new(start as usize))
+        .get();
+    scroll_window_to(&mut eval, frame, window, buffer, start + 1, point);
+    if let neovm_core::window::Window::Leaf { force_start, .. } = eval
+        .frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .find_window_mut(window)
+        .unwrap()
+    {
+        *force_start = true;
+    }
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    engine
+        .request_scroll_coverage(&eval, frame, window, CharPos0::new(start as usize + 1760))
+        .expect("capture the complex overlay line");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        match engine.scroll_coverage.drain(&mut engine.prepared_viewports) {
+            Ok(true) => break,
+            Ok(false) => {
+                assert!(std::time::Instant::now() < deadline);
+                std::thread::yield_now();
+            }
+            Err(error) => panic!("the overlay row was rejected: {error:?}"),
+        }
+    }
+    let point = eval
+        .buffer_manager()
+        .get(buffer)
+        .unwrap()
+        .char_pos_to_emacs_byte_pos_clamped(CharPos0::new(start as usize + 2020))
+        .get();
+    scroll_window_to(&mut eval, frame, window, buffer, start + 2021, point);
+    if let neovm_core::window::Window::Leaf { force_start, .. } = eval
+        .frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .find_window_mut(window)
+        .unwrap()
+    {
+        *force_start = true;
+    }
+    engine.layout_frame_rust(&mut eval, frame);
+    let coverage = engine
+        .last_frame_display_state
+        .as_ref()
+        .unwrap()
+        .scroll_coverage
+        .iter()
+        .find(|coverage| coverage.content.window_id.get() == window.0 as i64)
+        .expect("worker rows connect across the wrapped overlay line");
+    assert!(
+        coverage.anchor_row > 0,
+        "wrapped overlay rows remain connected above the viewport"
+    );
+}
+
+#[test]
+fn leaving_a_prepared_viewport_preserves_its_compositor_coverage() {
+    let line = "prepared row for backward scrolling\n";
+    let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    engine
+        .request_scroll_coverage(&eval, frame, window, CharPos0::new(0))
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !engine
+        .scroll_coverage
+        .drain(&mut engine.prepared_viewports)
+        .unwrap()
+    {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    scroll_window_to(
+        &mut eval,
+        frame,
+        window,
+        buffer,
+        line.len() as i64 + 1,
+        line.len(),
+    );
+    if let neovm_core::window::Window::Leaf { force_start, .. } = eval
+        .frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .find_window_mut(window)
+        .unwrap()
+    {
+        *force_start = true;
+    }
+    engine.layout_frame_rust(&mut eval, frame);
+    // Export again after the previous viewport has entered the history cache.
+    engine.layout_frame_rust(&mut eval, frame);
+    let coverage = engine
+        .last_frame_display_state
+        .as_ref()
+        .unwrap()
+        .scroll_coverage
+        .iter()
+        .find(|coverage| coverage.content.window_id.get() == window.0 as i64)
+        .expect("leaving a prepared viewport must retain its certified scroll surface");
+    assert!(
+        coverage.anchor_row > 0,
+        "previously prepared rows remain above the viewport"
+    );
+}
+
+#[test]
+fn scroll_history_does_not_evict_prepared_compositor_coverage() {
+    let line = "prepared row for backward scrolling\n";
+    let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    engine
+        .request_scroll_coverage(&eval, frame, window, CharPos0::new(0))
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !engine
+        .scroll_coverage
+        .drain(&mut engine.prepared_viewports)
+        .unwrap()
+    {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    for row in 1..=10 {
+        scroll_window_to(
+            &mut eval,
+            frame,
+            window,
+            buffer,
+            (row * line.len()) as i64 + 1,
+            row * line.len(),
+        );
+        if let neovm_core::window::Window::Leaf { force_start, .. } = eval
+            .frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .find_window_mut(window)
+            .unwrap()
+        {
+            *force_start = true;
+        }
+        engine.layout_frame_rust(&mut eval, frame);
+    }
+    engine.layout_frame_rust(&mut eval, frame);
+    let coverage = engine
+        .last_frame_display_state
+        .as_ref()
+        .unwrap()
+        .scroll_coverage
+        .iter()
+        .find(|coverage| coverage.content.window_id.get() == window.0 as i64)
+        .expect("leaving a prepared viewport must retain its certified scroll surface");
+    assert!(
+        coverage.anchor_row > 0,
+        "previously prepared rows remain above the viewport"
+    );
+}
