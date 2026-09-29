@@ -1760,3 +1760,108 @@ fn backward_page_grows_pixel_coverage_without_guessing_row_counts() {
         calls.get()
     );
 }
+
+#[test]
+fn pixel_coverage_reuses_a_larger_certified_observation() {
+    use crate::engine::viewport_retry_depth_probe as probe;
+    use neovm_core::window::WindowLayoutQueryScope;
+    use std::num::NonZeroUsize;
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert(&"mixed words\n".repeat(100));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("pixel-coverage-cache", 400, 160, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let window = eval.frame_manager().get(frame).unwrap().selected_window;
+    eval.eval_str("(goto-char 1) (setq mode-line-format nil) (put-text-property 20 60 'face '(:height 1.5)) (overlay-put (make-overlay 80 100) 'before-string \"prefix\")").unwrap();
+    let scope = |height| WindowLayoutQueryScope::Pixels {
+        start: LispCharPos1::ONE,
+        height: NonZeroUsize::new(height).unwrap(),
+    };
+    let mut engine = WindowLayoutQueryEngine::new();
+    let large = engine
+        .query_window_layout(&mut eval, frame, window, scope(400))
+        .unwrap();
+    probe::reset();
+    let covered = engine
+        .query_window_layout(&mut eval, frame, window, scope(160))
+        .unwrap();
+    assert_eq!(
+        probe::max_depth(),
+        0,
+        "smaller coverage rewalked its certified prefix"
+    );
+    assert_eq!(covered.end(), large.end());
+    assert_eq!(covered.geometry(), large.geometry());
+    eval.eval_str("(put-text-property 1 10 'face '(:height 2.0))")
+        .unwrap();
+    probe::reset();
+    let changed = engine
+        .query_window_layout(&mut eval, frame, window, scope(160))
+        .unwrap();
+    assert!(
+        probe::max_depth() > 0,
+        "source mutation must invalidate coverage"
+    );
+    let fresh = WindowLayoutQueryEngine::new()
+        .query_window_layout(&mut eval, frame, window, scope(160))
+        .unwrap();
+    assert_eq!(changed.geometry(), fresh.geometry());
+}
+
+#[test]
+fn backward_page_growth_handles_different_physical_line_lengths() {
+    use std::{cell::Cell, rc::Rc};
+    let mut eval = Context::new();
+    let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .insert(&format!(
+            "{}{}{}",
+            format!("{}\n", "x".repeat(200)).repeat(100),
+            format!("{}\n", "s".repeat(100)),
+            format!("{}\n", "x".repeat(200)).repeat(100)
+        ));
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("page-pixel-budget", 160, 600, buffer);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    eval.eval_str("(setq mode-line-format nil header-line-format nil tab-line-format nil) (goto-char 20202) (set-window-start nil 20202 t)").unwrap();
+    let calls = Rc::new(Cell::new(0));
+    let observed = calls.clone();
+    let mut query = WindowLayoutQueryEngine::new_without_font_metrics();
+    eval.install_window_layout_query(move |eval, frame, window, scope| {
+        observed.set(observed.get() + 1);
+        match query.query_window_layout(eval, frame, window, scope) {
+            Ok(query) => WindowLayoutQueryOutcome::Ready(query),
+            Err(error) => WindowLayoutQueryOutcome::Failed(error),
+        }
+    });
+    eval.eval_str("(let ((noninteractive nil)) (scroll-down))")
+        .unwrap();
+    let actual = eval
+        .eval_str("(window-start)")
+        .unwrap()
+        .as_fixnum()
+        .unwrap();
+    assert!(
+        (18000..20202).contains(&actual),
+        "page must move backward by a nearby viewport: {actual}"
+    );
+    assert!(
+        calls.get() <= 4,
+        "backward page restarted row-count guesses: {}",
+        calls.get()
+    );
+}

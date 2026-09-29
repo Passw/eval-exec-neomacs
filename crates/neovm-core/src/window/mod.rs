@@ -992,7 +992,9 @@ pub enum WindowLayoutQueryScope {
         start: LispCharPos1,
         count: std::num::NonZeroUsize,
     },
-    /// Complete rows intersecting a pixel extent at an explicit source start.
+    /// At least this pixel extent at an explicit source start (or through EOB).
+    /// A certified observation may supply a larger complete prefix. Its end
+    /// and geometry always describe that returned prefix, without cropping.
     Pixels {
         start: LispCharPos1,
         height: std::num::NonZeroUsize,

@@ -59,13 +59,29 @@ impl QueryCache {
                 collections_match = entry.collections.unchanged(),
                 freshness_matches = entry.query.geometry().and_then(|g| g.layout_freshness.as_ref()) == Some(&current),
                 "query cache lookup");
+            let covers_scope = entry.scope == scope || matches!(
+                (entry.scope, scope),
+                (WindowLayoutQueryScope::Pixels { start: cached_start, height: cached_height },
+                 WindowLayoutQueryScope::Pixels { start, height })
+                    if cached_start == start && cached_height >= height
+            );
             if !(entry.frame == frame
                 && entry.window == window
-                && entry.scope == scope
+                && covers_scope
                 && entry.source_point == source_point
                 && entry.collections.unchanged_and_observe())
             {
                 return None;
+            }
+            // A larger range does not certify arbitrary callbacks invoked
+            // with a different fontification extent.
+            if entry.scope != scope {
+                let source = evaluator.buffer_manager().get(buffer)?;
+                let fontification = source.buffer_local_value("fontification-functions")
+                    .or_else(|| evaluator.obarray().symbol_value("fontification-functions").copied());
+                if fontification.is_some_and(|value| !value.is_nil()) {
+                    return None;
+                }
             }
             if entry.query.geometry()?.layout_freshness.as_ref() == Some(&current) {
                 return Some(entry.query.clone());

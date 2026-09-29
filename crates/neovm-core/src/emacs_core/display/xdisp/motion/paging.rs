@@ -133,12 +133,13 @@ impl RowMeasurer {
                         .clamp(1, 64) as usize;
                     start = self.backtrack(eval, start, lines)?;
                     backtracked_lines = backtracked_lines.saturating_add(lines);
-                    height = i64::try_from(missing)
-                        .ok()
-                        .and_then(|extra| height.checked_add(extra))
-                        .ok_or_else(|| {
-                            failure("Scroll measurement exceeds the pixel address space")
-                        })?;
+                    // The newly included source lines can be taller than
+                    // the observed average. Grow geometrically, as when the
+                    // origin lies beyond coverage, to avoid a nearly-complete
+                    // intermediate walk followed by another full restart.
+                    height = height.checked_mul(2).ok_or_else(|| {
+                        failure("Scroll measurement exceeds the pixel address space")
+                    })?;
                     continue;
                 } else if goal >= rows.last().expect("origin row").y
                     && rows.last().and_then(|row| row.end_buffer_pos) != Some(accessible.end_lisp())
