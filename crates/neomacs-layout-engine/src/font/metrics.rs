@@ -1404,7 +1404,7 @@ impl FontMetricsService {
         };
         let attrs = self.build_attrs_unpinned(family, weight, slant);
         let metrics = safe_metrics(24.0, 24.0 * 1.3);
-        let mut buffer = Buffer::new(&mut self.font_system, metrics);
+        let mut buffer = Buffer::new_empty(metrics);
         buffer.set_size(&mut self.font_system, Some(96.0), Some(48.0));
         buffer.set_text(
             &mut self.font_system,
@@ -1434,9 +1434,9 @@ impl FontMetricsService {
         italic: bool,
         font_size: f32,
     ) -> (Option<fontdb::ID>, f32) {
-        // Cosmic's Buffer constructor shapes its default line and requires at
-        // least one catalog face. Preserve this selector's fallible contract
-        // when no native fonts are installed instead of panicking in shaping.
+        // Shaping the requested space requires at least one catalog face.
+        // Preserve this selector's fallible contract when no native fonts
+        // are installed instead of panicking in shaping.
         if self.font_system.db().faces().next().is_none() {
             return (None, 0.0);
         }
@@ -1451,7 +1451,7 @@ impl FontMetricsService {
             font_size,
         );
         let metrics = safe_metrics(font_size, font_size * 1.3);
-        let mut buffer = Buffer::new(&mut self.font_system, metrics);
+        let mut buffer = Buffer::new_empty(metrics);
         buffer.set_size(
             &mut self.font_system,
             Some(font_size * 4.0),
@@ -2201,7 +2201,7 @@ impl FontMetricsService {
         }
         let attrs = self.build_attrs_for_resolved_char(&resolved, selection.font_size)?;
         let metrics = safe_metrics(selection.font_size, selection.font_size * 1.3);
-        let mut buffer = Buffer::new(&mut self.font_system, metrics);
+        let mut buffer = Buffer::new_empty(metrics);
         buffer.set_size(
             &mut self.font_system,
             Some(selection.font_size * 4.0),
@@ -2656,7 +2656,7 @@ impl FontMetricsService {
         let line_height = font_size * 1.3;
         let metrics = safe_metrics(font_size, line_height);
 
-        let mut buffer = Buffer::new(&mut self.font_system, metrics);
+        let mut buffer = Buffer::new_empty(metrics);
         buffer.set_size(
             &mut self.font_system,
             Some(font_size * 4.0),
@@ -2946,7 +2946,7 @@ impl FontMetricsService {
             .map(|font| font.space_width as f32)
             .filter(|width| valid_advance(*width));
         let shaped_space_width = || {
-            let mut buffer = Buffer::new(&mut self.font_system, metrics);
+            let mut buffer = Buffer::new_empty(metrics);
             buffer.set_size(
                 &mut self.font_system,
                 Some(font_size * 4.0),
@@ -2985,7 +2985,7 @@ impl FontMetricsService {
                 widths[cp as usize] = glyph_advance.resolve(space_width);
                 continue;
             }
-            let mut buffer = Buffer::new(&mut self.font_system, metrics);
+            let mut buffer = Buffer::new_empty(metrics);
             buffer.set_size(
                 &mut self.font_system,
                 Some(font_size * 4.0),
@@ -3153,7 +3153,7 @@ impl FontMetricsService {
         // Fallback only: measure a representative glyph box when the selected
         // font's global tables are unavailable or obviously pathological.
         let sample = " Mg";
-        let mut buffer = Buffer::new(&mut self.font_system, metrics);
+        let mut buffer = Buffer::new_empty(metrics);
         buffer.set_size(
             &mut self.font_system,
             Some(font_size * 8.0),

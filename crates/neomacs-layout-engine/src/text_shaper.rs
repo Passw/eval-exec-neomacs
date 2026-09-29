@@ -37,7 +37,10 @@ impl TextShaper for CosmicTextShaper {
         line_height: f32,
     ) -> Vec<ShapedGlyph> {
         let metrics = cosmic_text::Metrics::new(font_size.max(1.0), line_height.max(1.0));
-        let mut buffer = Buffer::new(font_system, metrics);
+        // Install the requested text before shaping anything. `Buffer::new`
+        // first shapes an empty line with default font attributes, causing
+        // unrelated font matching and initialization after cache invalidation.
+        let mut buffer = Buffer::new_empty(metrics);
         // No width bound: lay the whole run out on a single line so shaping
         // spans the entire run instead of wrapping mid-word.
         buffer.set_size(font_system, None, None);
