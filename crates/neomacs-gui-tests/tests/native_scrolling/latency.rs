@@ -27,6 +27,7 @@ impl Report {
         let mut presented_ns = Vec::new();
         let mut latencies = Vec::new();
         let mut invalid_clocks = 0;
+        let mut last_first_response = 0;
         for sample in samples {
             let first = match (
                 sample["projected_presented_ns"].as_u64(),
@@ -39,12 +40,26 @@ impl Report {
                 .zip(sample["received_ns"].as_u64())
                 .and_then(|(presented, received)| presented.checked_sub(received));
             if let (Some(presented), Some(elapsed)) = (first, elapsed) {
-                presented_ns.push(presented);
+                last_first_response = last_first_response.max(presented);
+                // A later authoritative response can bridge the cadence
+                // while another input is still awaiting its first response.
+                // Keep per-input latency based on the first response only.
+                presented_ns.extend(
+                    [
+                        sample["projected_presented_ns"].as_u64(),
+                        sample["presented_ns"].as_u64(),
+                    ]
+                    .into_iter()
+                    .flatten(),
+                );
                 latencies.push(elapsed as f64 / 1e6);
             } else {
                 invalid_clocks += 1;
             }
         }
+        // Once every input has a first response, delayed acknowledgments
+        // cannot create a new gap in this input-response observation window.
+        presented_ns.retain(|timestamp| *timestamp <= last_first_response);
         presented_ns.sort_unstable();
         presented_ns.dedup();
         let gaps_ms: Vec<_> = presented_ns
@@ -56,7 +71,7 @@ impl Report {
             .get((latencies.len() * 95).div_ceil(100).saturating_sub(1))
             .copied();
         Self {
-            measurement: "first confirmed visual response per input; distinct native presentations",
+            measurement: "first confirmed response latency; all confirmed response presentations through the final first response",
             received_receipts: samples.len(),
             invalid_clocks,
             max_response_ms: latencies.last().copied(),
@@ -99,6 +114,27 @@ mod tests {
         assert_eq!(report.gaps_ms, [8.0]);
         assert_eq!(report.first_visible_latency_ms, [4.0, 8.0, 8.0]);
         assert!(report.meets_response_budget());
+    }
+
+    #[test]
+    fn native_latency_gap_includes_confirmed_catchup_while_inputs_await_response() {
+        let report = Report::from_samples(&[
+            json!({"received_ns": 0, "projected_presented_ns": 10_000_000, "presented_ns": 60_000_000}),
+            json!({"received_ns": 30_000_000, "projected_presented_ns": 40_000_000, "presented_ns": 80_000_000}),
+            json!({"received_ns": 35_000_000, "presented_ns": 100_000_000}),
+            // Confirmation after every first response is outside the measured
+            // response interval, as in the existing late-acknowledgment test.
+            json!({"received_ns": 30_000_000, "projected_presented_ns": 40_000_000, "presented_ns": 500_000_000}),
+        ]);
+        assert_eq!(report.first_visible_latency_ms, [10.0, 10.0, 10.0, 65.0]);
+        assert_eq!(
+            report.presented_ns,
+            [10_000_000, 40_000_000, 60_000_000, 80_000_000, 100_000_000]
+        );
+        assert_eq!(report.max_response_gap_ms, Some(30.0));
+        // Correcting cadence does not erase the slow input's latency.
+        assert_eq!(report.max_response_ms, Some(65.0));
+        assert!(!report.meets_response_budget());
     }
 
     #[test]
