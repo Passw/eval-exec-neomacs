@@ -57,6 +57,69 @@ fn dashboard_like_face_table() -> FaceTable {
 }
 
 #[test]
+fn repeated_source_resolution_reuses_unchanged_base_face_storage() {
+    use crate::buffer_source::text_source::BufferTextSourceCursor;
+
+    let snapshot = test_buffer_snapshot();
+    let table = dashboard_like_face_table();
+    let face_resolver = test_face_resolver(&table);
+    let mut base = face_resolver.default_face().clone();
+    base.font_family = "source face family".into();
+    let base = &base;
+    let mut state = DisplaySourceResolveState::default();
+    let mut face_ids = FrameFaceAttempt::for_test_with_next_id(20);
+    let params = DisplaySourceResolveParams::new(
+        DisplaySourceFaceBasis::new(
+            &face_resolver,
+            FaceId::new(0),
+            base,
+            DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
+        ),
+        None,
+        ImageScaleEnvironment::default(),
+    );
+    let end = snapshot.layout_point_max_char_pos();
+    let mut source = BufferTextSourceCursor::new(
+        neovm_core::buffer::BufferId(1),
+        &snapshot,
+        CharPos0::ZERO,
+        end,
+        RenderFaceRef::FaceId(FaceId::new(0)),
+    );
+    // A declined batched run is consumed character by character during wrap.
+    source.set_char_granularity_end(Some(end));
+    let mut storage = None;
+    for _ in 0..end.get() {
+        let resolved = resolve_next_display_source_item(
+            &mut source,
+            DisplaySourceFaceScope::FrameLocal,
+            params,
+            &mut state,
+            &mut face_ids,
+        );
+        assert!(resolved.item().is_some());
+        let retained = state.resolved_face(FaceId::new(0)).unwrap();
+        assert_eq!(retained, base);
+        let current = retained.font_family.as_ptr();
+        if let Some(previous) = storage {
+            assert_eq!(
+                current, previous,
+                "unchanged base face must not allocate a new family for each source item"
+            );
+        }
+        storage = Some(current);
+    }
+
+    // Reusing the ID does not justify keeping stale attributes.
+    let mut changed = base.clone();
+    changed.font_family = "changed family".into();
+    changed.font_size += 3.0;
+    changed.fg ^= 0x00ff00;
+    state.remember_face(FaceId::new(0), &changed);
+    assert_eq!(state.resolved_face(FaceId::new(0)), Some(&changed));
+}
+
+#[test]
 fn source_face_resolver_merges_overlay_face_over_current_base_face() {
     let table = dashboard_like_face_table();
     let face_resolver = test_face_resolver(&table);

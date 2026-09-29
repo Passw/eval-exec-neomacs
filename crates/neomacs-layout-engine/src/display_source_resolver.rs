@@ -152,7 +152,19 @@ pub(crate) struct DisplaySourceResolveState {
 
 impl DisplaySourceResolveState {
     pub(crate) fn remember_face(&mut self, face_id: FaceId, face: &ResolvedFace) {
-        self.resolved_faces.insert(face_id, face.clone());
+        // Source cursors recreate their resolver for every item, including
+        // each character of a run that wrapping declined to batch. Keep the
+        // existing payload when its complete attributes are unchanged.
+        match self.resolved_faces.entry(face_id) {
+            std::collections::hash_map::Entry::Occupied(mut entry) => {
+                if entry.get() != face {
+                    entry.insert(face.clone());
+                }
+            }
+            std::collections::hash_map::Entry::Vacant(entry) => {
+                entry.insert(face.clone());
+            }
+        }
     }
 
     pub(crate) fn resolved_face(&self, face_id: FaceId) -> Option<&ResolvedFace> {
