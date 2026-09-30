@@ -3164,6 +3164,231 @@ fn check_short_urgent_backward_bridge(rich: bool) {
 }
 
 #[test]
+fn urgent_bridge_resumes_forward_capture_progress_after_gc() {
+    check_paused_capture_resume(false, false, PausedCaptureMutation::None);
+}
+
+#[test]
+fn urgent_bridge_preempts_and_resumes_distant_backward_capture() {
+    check_paused_capture_resume(false, true, PausedCaptureMutation::None);
+}
+
+#[test]
+fn rich_urgent_bridge_resumes_captured_fragments_after_gc() {
+    check_paused_capture_resume(true, false, PausedCaptureMutation::None);
+}
+
+#[test]
+fn paused_capture_rejects_in_place_property_mutation_before_resume() {
+    check_paused_capture_resume(false, false, PausedCaptureMutation::InPlace);
+}
+
+#[test]
+fn paused_capture_is_retired_after_buffer_revision() {
+    check_paused_capture_resume(false, false, PausedCaptureMutation::BufferRevision);
+}
+
+enum PausedCaptureMutation {
+    None,
+    InPlace,
+    BufferRevision,
+}
+
+fn check_paused_capture_resume(rich: bool, backward: bool, mutation: PausedCaptureMutation) {
+    let line = "ordinary offscreen text\n";
+    let (mut eval, frame, buffer, window) = if rich {
+        shared_rich_scrolling_frame(664, 646)
+    } else {
+        let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 800, 600);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        (eval, frame, buffer, window)
+    };
+    let origin = if rich {
+        5565000 - 48 * 110080
+    } else {
+        120 * line.len()
+    };
+    let distance = if backward { -40 } else { 60 };
+    let producer = eval
+        .eval_str(&format!(
+            "(save-excursion (goto-char {}) (forward-line {distance}) (point))",
+            origin + 1
+        ))
+        .unwrap()
+        .as_fixnum()
+        .unwrap() as usize
+        - 1;
+    if matches!(mutation, PausedCaptureMutation::InPlace) {
+        eval.eval_str(&format!(
+            "(progn (setq paused-raise-spec (list 'raise 0.25)) (put-text-property {} {} 'display paused-raise-spec))",
+            producer + 1, producer + 10 * line.len()
+        )).unwrap();
+    }
+    let point = eval
+        .buffer_manager()
+        .get(buffer)
+        .unwrap()
+        .char_pos_to_emacs_byte_pos_clamped(CharPos0::new(origin + 100))
+        .get();
+    scroll_window_to(&mut eval, frame, window, buffer, origin as i64 + 1, point);
+    let set_hidden = |eval: &mut Context, hidden: i32| {
+        if let neovm_core::window::Window::Leaf {
+            force_start,
+            vscroll,
+            ..
+        } = eval
+            .frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .find_window_mut(window)
+            .unwrap()
+        {
+            *force_start = true;
+            *vscroll = -hidden;
+        }
+    };
+    set_hidden(&mut eval, 8);
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    engine.maintain_scroll_coverage(&eval);
+    engine
+        .begin_scroll_coverage(&eval, frame, window, CharPos0::new(producer))
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while engine
+        .scroll_coverage
+        .active_capture_progress_for_test()
+        .unwrap()
+        .2
+        < 3
+    {
+        assert!(std::time::Instant::now() < deadline);
+        assert_eq!(engine.capture_scroll_step(&eval), Ok(true));
+    }
+    let before = engine
+        .scroll_coverage
+        .active_capture_progress_for_test()
+        .unwrap();
+    assert!(
+        before.1 > producer,
+        "the producer has already acquired source"
+    );
+    set_hidden(&mut eval, 4);
+    engine.layout_frame_rust(&mut eval, frame);
+    let mut visible = selected_window_layout_trace(&eval, &engine, frame);
+    let nearest = eval
+        .eval_str(&format!(
+            "(save-excursion (goto-char {}) (forward-line -1) (point))",
+            origin + 1
+        ))
+        .unwrap()
+        .as_fixnum()
+        .unwrap() as usize
+        - 1;
+    engine.maintain_scroll_coverage(&eval);
+    assert_eq!(
+        engine.scroll_coverage.pending_source_start_for_test(),
+        Some(nearest),
+        "urgent connecting work must preempt both forward and distant backward producers"
+    );
+    eval.gc_collect_exact();
+    engine.take_scroll_coverage_publication();
+    loop {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "urgent bridge never published"
+        );
+        if engine
+            .scroll_coverage
+            .drain(&mut engine.prepared_viewports)
+            .unwrap()
+        {
+            break;
+        }
+        engine.maintain_scroll_coverage(&eval);
+        if engine.take_scroll_coverage_publication() {
+            break;
+        }
+        std::thread::yield_now();
+    }
+    engine.layout_frame_rust(&mut eval, frame);
+    if matches!(mutation, PausedCaptureMutation::InPlace) {
+        eval.eval_str("(setcar (cdr paused-raise-spec) 0.75)")
+            .unwrap();
+    }
+    if matches!(mutation, PausedCaptureMutation::BufferRevision) {
+        eval.eval_str("(save-excursion (goto-char (point-max)) (insert \"new revision\\n\"))")
+            .unwrap();
+        engine.layout_frame_rust(&mut eval, frame);
+        // Appending changes the window-end offsets from Z, even though the
+        // visible text is identical. Compare against this new revision.
+        visible = selected_window_layout_trace(&eval, &engine, frame);
+    }
+    eval.gc_collect_exact();
+    engine.maintain_scroll_coverage(&eval);
+    assert!(
+        !engine.scroll_coverage.has_deferred_capture_for_test(),
+        "saved acquisition must be resumed or retired after servicing the bridge"
+    );
+    if matches!(mutation, PausedCaptureMutation::BufferRevision) {
+        assert!(
+            engine
+                .scroll_coverage
+                .active_capture_progress_for_test()
+                .is_none_or(|progress| progress.2 < before.2),
+            "a new buffer revision must discard all paused old fragments"
+        );
+    } else if matches!(mutation, PausedCaptureMutation::InPlace) {
+        assert!(
+            engine
+                .scroll_coverage
+                .active_capture_progress_for_test()
+                .is_none(),
+            "a paused read certificate must reject in-place mutation before extending capture"
+        );
+        assert!(
+            engine
+                .scroll_coverage
+                .pending_source_start_for_test()
+                .is_none(),
+            "mutated saved programs must never be submitted"
+        );
+    } else {
+        let resumed = engine
+            .scroll_coverage
+            .active_capture_progress_for_test()
+            .expect("resume the bounded unfinished producer");
+        assert_eq!(
+            resumed.0, producer,
+            "resume saved work before distant fresh acquisition"
+        );
+        assert!(
+            resumed.1 >= before.1 && resumed.2 > before.2,
+            "resuming must preserve source progress and captured fragments: {before:?} -> {resumed:?}"
+        );
+    }
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while engine.maintain_scroll_coverage(&eval).is_some() {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    engine.layout_frame_rust(&mut eval, frame);
+    assert!(
+        visible == selected_window_layout_trace(&eval, &engine, frame),
+        "paused work must preserve visible geometry"
+    );
+    let mut fresh = LayoutEngine::new();
+    fresh.layout_frame_rust(&mut eval, frame);
+    assert!(
+        visible == selected_window_layout_trace(&eval, &fresh, frame),
+        "visible geometry must match fresh layout after resuming"
+    );
+}
+
+#[test]
 fn repeated_idle_preview_preserves_a_complete_prepared_page() {
     let line = "ordinary offscreen text\n";
     let (mut eval, frame, _, window) = incr_editing_frame(&line.repeat(300), 800, 600);

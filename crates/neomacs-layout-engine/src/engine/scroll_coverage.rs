@@ -112,6 +112,9 @@ pub(super) struct ScrollCoverage {
     worker: RowWorker,
     admission: Option<Admission>,
     capture: Option<Capture>,
+    // One paused acquisition, with the same per-page limits and root leases.
+    // Urgent bridges share the existing worker; no unbounded producer queue.
+    deferred: Option<Capture>,
     frame: Option<FrameId>,
     // At most three targets per retained live window. Glyph storage remains
     // subject to PreparedViewports' global byte/row limits.
@@ -137,6 +140,22 @@ impl ScrollCoverage {
         })
     }
 
+    #[cfg(test)]
+    pub(super) fn active_capture_progress_for_test(&self) -> Option<(usize, usize, usize)> {
+        self.capture.as_ref().map(|capture| {
+            (
+                capture.retained.key.window_start as usize,
+                capture.position.get(),
+                capture.programs.len(),
+            )
+        })
+    }
+
+    #[cfg(test)]
+    pub(super) fn has_deferred_capture_for_test(&self) -> bool {
+        self.deferred.is_some()
+    }
+
     pub(super) fn cancel(&mut self) {
         self.cancel_active();
         self.frame = None;
@@ -148,6 +167,7 @@ impl ScrollCoverage {
         self.worker.cancel();
         self.admission = None;
         self.capture = None;
+        self.deferred = None;
     }
 
     fn active_window(&self) -> Option<DisplayWindowId> {
@@ -155,6 +175,11 @@ impl ScrollCoverage {
             .as_ref()
             .map(|capture| DisplayWindowId::new(capture.window.0 as i64))
             .or_else(|| self.admission.as_ref().map(|admission| admission.window))
+            .or_else(|| {
+                self.deferred
+                    .as_ref()
+                    .map(|capture| DisplayWindowId::new(capture.window.0 as i64))
+            })
     }
 
     pub(super) fn drain(
@@ -614,54 +639,58 @@ impl LayoutEngine {
             }
             Ok(false) => {}
         }
-        // Finishing a forward producer can take many capture slices even
-        // after reversal. Yield only when a queued backward bridge is urgent
-        // and the active source cannot extend its connecting edge. Admitted
-        // prefixes remain cached; cancellation never revokes published rows.
-        let urgent_bridge = urgent_backward
+        let queued_urgent_bridge = urgent_backward
+            && self
+                .scroll_coverage
+                .windows
+                .get(&window_id)
+                .is_some_and(|observed| {
+                    observed
+                        .backward_bridge
+                        .is_some_and(|(bridge, _)| observed.targets.contains(&bridge))
+                });
+        // A distant producer in either direction can consume the available
+        // headroom. Pause its bounded acquisition, but let a connecting bridge
+        // finish even if a newer viewport supplies another target meanwhile.
+        if queued_urgent_bridge
+            && self.scroll_coverage.deferred.is_none()
             && self
                 .scroll_coverage
                 .capture
                 .as_ref()
-                .is_some_and(|capture| {
-                    self.scroll_coverage
-                        .windows
-                        .get(&window_id)
-                        .is_some_and(|observed| {
-                            observed.backward_bridge.is_some_and(|(bridge, end)| {
-                                observed.targets.contains(&bridge)
-                                    && capture.retained.key.window_start >= end.get() as i64
-                            })
-                        })
-                });
-        if urgent_bridge {
-            let start = CharPos0::new(
-                self.scroll_coverage
-                    .capture
-                    .as_ref()
-                    .unwrap()
-                    .retained
-                    .key
-                    .window_start
-                    .max(0) as usize,
-            );
+                .is_some_and(|capture| capture.stop_at_source.is_none())
+        {
+            let capture = self.scroll_coverage.capture.take().unwrap();
+            let start = CharPos0::new(capture.retained.key.window_start.max(0) as usize);
             let observed = self.scroll_coverage.windows.get_mut(&window_id).unwrap();
-            if !observed
-                .targets
-                .iter()
-                .any(|target| target.get() >= retained.key.window_start.max(0) as usize)
-            {
-                // Fractional reversal may not regenerate the source targets.
-                // Defer this forward origin behind the two backward targets.
-                observed.targets.insert(0, start);
-            }
+            // The deferred producer owns this origin; don't restart it later
+            // from a duplicate queued target. Other new targets remain bounded.
+            observed.targets.retain(|target| *target != start);
             tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
-                window = window.0, start = start.get(),
-                "yielding forward capture for urgent backward bridge");
-            self.scroll_coverage.cancel_active();
+                window = window.0, start = start.get(), position = capture.position.get(),
+                "pausing capture for urgent backward bridge");
+            self.scroll_coverage.worker.cancel();
+            self.scroll_coverage.admission = None;
+            self.scroll_coverage.deferred = Some(capture);
         }
         if self.scroll_coverage.admission.is_some() {
             return Some(ScrollCoverageProgress::WorkerPending);
+        }
+        if self.scroll_coverage.capture.is_none()
+            && !queued_urgent_bridge
+            && let Some(capture) = self.scroll_coverage.deferred.take()
+        {
+            // Placement changes don't invalidate source capture. Content,
+            // geometry and per-step read certificates retain their usual guards.
+            if capture.frame == frame.id
+                && capture.window == window
+                && RetainedWindowKey::row_content_eligible(&capture.retained.key, &retained.key)
+            {
+                tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
+                    window = window.0, start = capture.retained.key.window_start,
+                    position = capture.position.get(), "resuming deferred capture");
+                self.scroll_coverage.capture = Some(capture);
+            }
         }
         if self.scroll_coverage.capture.is_none() {
             let Some(start) = self
