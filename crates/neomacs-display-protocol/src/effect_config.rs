@@ -1972,6 +1972,13 @@ macro_rules! effect_schema_table {
                 "window_open" | "window_close" | "window_resize" | "window_movement" => {
                     Some(crate::window_animation::WindowAnimation::PROPERTIES)
                 }
+                "child_frame_animations" => {
+                    Some(crate::child_frame_animation::ChildFrameAnimationsConfig::PROPERTIES)
+                }
+                "child_frame_open" | "child_frame_close" | "child_frame_movement"
+                | "child_frame_resize" => {
+                    Some(crate::child_frame_animation::ChildFrameAnimation::PROPERTIES)
+                }
                 _ => None,
             }
         }

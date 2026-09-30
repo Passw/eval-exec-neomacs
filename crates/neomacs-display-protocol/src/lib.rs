@@ -6,6 +6,7 @@
 // `too_many_arguments` is allowed crate-wide rather than at each of the ~15 sites.
 #![allow(clippy::too_many_arguments)]
 
+pub mod child_frame_animation;
 pub mod clipboard;
 pub mod cursor;
 pub mod display_identity;
@@ -70,6 +71,7 @@ pub use popup_placement::*;
 pub use present_mapping::*;
 pub use window_chrome::*;
 
+pub use child_frame_animation::*;
 pub use presented_frame::*;
 pub use presented_pointer::*;
 pub use scene::*;
