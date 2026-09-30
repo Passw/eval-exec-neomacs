@@ -225,6 +225,10 @@ impl ScrollCoverage {
                         crate::display_item::DisplaySourcePosition::Buffer { char_pos, .. }
                         if *char_pos == end)
             }) else {
+                tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
+                    start = admission.retained.key.window_start, connecting_end = end.get(),
+                    last_source = ?rows.last().map(|row| &row.source.end), rows = rows.len(),
+                    "worker bridge has not reached its connecting seam");
                 return Ok(false);
             };
             rows.truncate(last + 1);
@@ -322,6 +326,13 @@ impl ScrollCoverage {
             self.capture = None;
         }
         self.publication_pending = true;
+        tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
+            start = admission.retained.key.window_start,
+            connecting_end = ?admission.bridge_end.map(|end| end.get()),
+            source_first = ?admission.retained.display_snapshot.rows.first().and_then(|row| row.start_buffer_pos),
+            source_last = ?admission.retained.display_snapshot.rows.last().and_then(|row| row.end_buffer_pos),
+            rows = admission.retained.display_snapshot.rows.len(), complete_viewport,
+            "admitted worker coverage");
         destination.insert_computed(
             admission.frame,
             admission.window,

@@ -3264,7 +3264,13 @@ impl LayoutEngine {
                 evaluator.compositor_scrolling_enabled(window);
             std::sync::Arc::make_mut(coverage).predict_pixels =
                 evaluator.permits_compositor_pixel_scroll(window);
-            tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", predict_pixels = coverage.predict_pixels, window = window.0, "exported compositor coverage");
+            tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
+                predict_pixels = coverage.predict_pixels, window = window.0,
+                epoch = coverage.epoch, anchor_row = coverage.anchor_row, origin = coverage.origin,
+                source_first = ?coverage.content.matrix.rows.first().map(|row| row.start_charpos),
+                source_last = ?coverage.content.matrix.rows.last().map(|row| row.end_charpos),
+                text_bounds = ?coverage.content.text_clip_bounds,
+                "exported compositor coverage");
         }
         let resolved = match crate::frame_presentation::ResolvedFrame::new(frame_display_state) {
             Ok(resolved) => resolved,

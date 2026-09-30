@@ -110,6 +110,8 @@ impl RowWorker {
         self.shared.revision.store(next, Ordering::Release);
         mailbox.pending = Some(Job { ticket, rows });
         mailbox.completed = None;
+        tracing::debug!(target: "neomacs_layout_engine::row_worker",
+            ticket = ticket.0, "row job submitted");
         self.shared.wake.notify_one();
         Ok(ticket)
     }
@@ -124,7 +126,12 @@ impl RowWorker {
     }
 
     pub(crate) fn take_completed(&mut self) -> Option<RowJobResult> {
-        self.shared.mailbox.lock().unwrap().completed.take()
+        let result = self.shared.mailbox.lock().unwrap().completed.take();
+        if let Some(result) = &result {
+            tracing::debug!(target: "neomacs_layout_engine::row_worker",
+                ticket = result.ticket.0, "row result taken");
+        }
+        result
     }
 }
 
@@ -142,13 +149,21 @@ fn run(shared: Arc<Shared>) {
             mailbox.pending.take().unwrap()
         };
         let cancelled = || shared.revision.load(Ordering::Acquire) != job.ticket.0;
+        tracing::debug!(target: "neomacs_layout_engine::row_worker",
+            ticket = job.ticket.0, programs = job.rows.len(), "row computation started");
         let rows = compute_rows(job.rows, &mut fonts, cancelled);
         let mut mailbox = shared.mailbox.lock().unwrap();
         if !mailbox.stopping && !cancelled() {
+            tracing::debug!(target: "neomacs_layout_engine::row_worker",
+                ticket = job.ticket.0, rows = rows.as_ref().map_or(0, Vec::len),
+                succeeded = rows.is_ok(), "row result ready");
             mailbox.completed = Some(RowJobResult {
                 ticket: job.ticket,
                 rows,
             });
+        } else {
+            tracing::debug!(target: "neomacs_layout_engine::row_worker",
+                ticket = job.ticket.0, "row result cancelled");
         }
     }
 }
