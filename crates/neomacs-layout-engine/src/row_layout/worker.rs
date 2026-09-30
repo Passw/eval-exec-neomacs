@@ -126,6 +126,11 @@ impl RowWorker {
     pub(crate) fn take_completed(&mut self) -> Option<RowJobResult> {
         self.shared.mailbox.lock().unwrap().completed.take()
     }
+
+    #[cfg(test)]
+    pub(crate) fn has_completed_for_test(&self) -> bool {
+        self.shared.mailbox.lock().unwrap().completed.is_some()
+    }
 }
 
 fn run(shared: Arc<Shared>) {
