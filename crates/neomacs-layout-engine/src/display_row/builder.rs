@@ -1944,8 +1944,8 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
                         .with_box_vertical_edges(box_vertical_edges)
                         .with_pointer_appearance(pointer_appearance.clone()),
                 );
-                let appended_is_stretch = self.writer.row.glyphs
-                    [self.writer.area_index()][before_len..]
+                let appended_is_stretch = self.writer.row.glyphs[self.writer.area_index()]
+                    [before_len..]
                     .iter()
                     .any(|glyph| matches!(glyph.glyph_type, GlyphType::Stretch { .. }));
                 let mut status = DisplayRowAppendStatus::Complete;

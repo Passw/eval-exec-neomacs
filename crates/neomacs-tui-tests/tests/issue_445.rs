@@ -38,8 +38,11 @@ fn render_fixture(span_from: usize, span_to: usize) -> TuiTempFile {
     )
 }
 
-fn assert_tail_visible(label: &str, gnu: &mut neomacs_tui_tests::TuiSession,
-                       neo: &mut neomacs_tui_tests::TuiSession) {
+fn assert_tail_visible(
+    label: &str,
+    gnu: &mut neomacs_tui_tests::TuiSession,
+    neo: &mut neomacs_tui_tests::TuiSession,
+) {
     read_both(gnu, neo, Duration::from_secs(1));
     let tail_visible = |grid: &[String]| grid.iter().any(|row| row.contains(TAIL));
     let gnu_ok = tail_visible(&gnu.text_grid());
@@ -58,11 +61,7 @@ fn assert_tail_visible(label: &str, gnu: &mut neomacs_tui_tests::TuiSession,
 fn face_boundary_on_zero_width_extender_keeps_line_visible() {
     let fixture = render_fixture(2, 3);
     let (mut gnu, mut neo) = boot_pair(&format!("-l {}", fixture.path().display()));
-    assert_tail_visible(
-        "issue #445/face-on-single-selector",
-        &mut gnu,
-        &mut neo,
-    );
+    assert_tail_visible("issue #445/face-on-single-selector", &mut gnu, &mut neo);
 }
 
 #[test]
@@ -83,9 +82,5 @@ fn face_boundary_on_second_extender_keeps_line_visible() {
         ),
     );
     let (mut gnu, mut neo) = boot_pair(&format!("-l {}", fixture.path().display()));
-    assert_tail_visible(
-        "issue #445/face-on-doubled-selector",
-        &mut gnu,
-        &mut neo,
-    );
+    assert_tail_visible("issue #445/face-on-doubled-selector", &mut gnu, &mut neo);
 }

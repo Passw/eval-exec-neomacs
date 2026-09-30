@@ -24392,9 +24392,12 @@ fn face_boundary_on_zero_width_extender_keeps_row_glyphs() {
     // 1-based chars [2, 3) = the U+FE0F.
     eval.eval_str("(put-text-property 2 3 'face '(:underline t))")
         .expect("face span on the extender");
-    let frame_id = eval
-        .frame_manager_mut()
-        .create_frame("face-boundary-zero-width-extender", 120, 160, buf_id);
+    let frame_id = eval.frame_manager_mut().create_frame(
+        "face-boundary-zero-width-extender",
+        120,
+        160,
+        buf_id,
+    );
     {
         let frame = eval.frame_manager_mut().get_mut(frame_id).expect("frame");
         frame.char_width = 1.0;
@@ -24460,15 +24463,16 @@ fn align_to_stretch_past_the_right_edge_truncates_like_gnu() {
     }
     eval.buffer_manager_mut().set_current(buf_id);
     // The recipe's `M-x toggle-truncate-lines`: the row must truncate, not wrap.
-    eval.eval_str("(setq truncate-lines t)").expect("truncate lines");
+    eval.eval_str("(setq truncate-lines t)")
+        .expect("truncate lines");
     // 1-based chars [5, 6) = the space; its display spec targets column 105 in
     // a 100-column window, so FFFF would start entirely PAST the edge — GNU
     // draws none of it.
     eval.eval_str("(put-text-property 5 6 'display '(space :align-to 105))")
         .expect("align-to space spec");
-    let frame_id = eval
-        .frame_manager_mut()
-        .create_frame("align-to-past-right-edge", 100, 160, buf_id);
+    let frame_id =
+        eval.frame_manager_mut()
+            .create_frame("align-to-past-right-edge", 100, 160, buf_id);
     {
         let frame = eval.frame_manager_mut().get_mut(frame_id).expect("frame");
         frame.char_width = 1.0;

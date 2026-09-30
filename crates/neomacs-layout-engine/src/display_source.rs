@@ -941,7 +941,6 @@ impl DisplaySourceItem {
         self.item.span.buffer_byte_len()
     }
 
-
     // The `Err` arm returns the unconsumed item to the caller (retry protocol),
     // so it is deliberately the same large type as `Ok`; boxing it is a perf
     // hint deferred out of the lint gate.
