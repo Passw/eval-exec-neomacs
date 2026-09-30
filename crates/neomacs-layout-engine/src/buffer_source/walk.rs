@@ -241,8 +241,14 @@ impl<'request, B: LayoutBufferView> BufferSourceWalk<'request, B> {
         tab_width: i32,
     ) -> DisplaySourcePositionConsumption<Option<BufferSourceHscrollSkipAction>> {
         let mut source_position = source_position;
-        let action =
-            consume_hscroll_skip_from_position(text, &mut source_position, hscroll_skip, tab_width);
+        let action = consume_hscroll_skip_from_position(
+            text,
+            &mut source_position,
+            hscroll_skip,
+            tab_width,
+            self.producer.layout_buffer(),
+            self.producer.text_start_byte(),
+        );
         DisplaySourcePositionConsumption::new(action, source_position)
     }
 

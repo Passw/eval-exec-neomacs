@@ -1176,6 +1176,14 @@ impl DisplayRowSourceStart {
         self.start_charpos = start_charpos;
     }
 
+    /// Whether `charpos` sits at or after the row's source start — used by
+    /// the hscroll skip to tell that a point hidden in the hscrolled-off
+    /// prefix belongs to THIS line, so its cursor clamps to the truncation
+    /// marker's cell.
+    pub(crate) fn covers(self, charpos: i64) -> bool {
+        charpos >= self.start_charpos
+    }
+
     pub(crate) fn should_finish_current_row(
         self,
         current_charpos: i64,

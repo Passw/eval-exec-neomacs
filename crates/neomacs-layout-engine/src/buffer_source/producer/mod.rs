@@ -119,6 +119,17 @@ impl<'request, B: LayoutBufferView> BufferElementProducer<'request, B> {
         }
     }
 
+    /// The buffer view the producer walks, for callers that must consult
+    /// buffer state directly (the hscroll skip resolving `display` specs).
+    pub(crate) fn layout_buffer(&self) -> &B {
+        self.source_cursor.layout_buffer()
+    }
+
+    /// The Emacs byte position of `text[0]` in the buffer.
+    pub(crate) fn text_start_byte(&self) -> usize {
+        self.source_consumption.text_start_byte()
+    }
+
     /// Save the producer's seating for a later [`restore`](Self::restore).
     #[cfg(test)]
     pub(crate) fn snapshot(&self) -> ProducerSnapshot {

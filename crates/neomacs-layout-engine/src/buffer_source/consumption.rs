@@ -43,6 +43,10 @@ impl BufferSourceConsumptionState {
         Self { text_start_byte }
     }
 
+    pub(crate) fn text_start_byte(&self) -> usize {
+        self.text_start_byte
+    }
+
     fn prepare_render_source_item(
         &mut self,
         source_item: DisplaySourceItem,

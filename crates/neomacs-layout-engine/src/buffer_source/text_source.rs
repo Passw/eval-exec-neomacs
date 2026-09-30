@@ -254,6 +254,13 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
         }
     }
 
+    /// The buffer view the cursor walks — for callers that must consult
+    /// buffer state (e.g. the hscroll skip resolving a `display` spec's
+    /// width) without routing through the producer.
+    pub(crate) fn layout_buffer(&self) -> &B {
+        self.buffer
+    }
+
     pub(crate) fn current_char_pos(&self) -> CharPos0 {
         self.char_pos
     }

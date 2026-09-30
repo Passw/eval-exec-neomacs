@@ -432,6 +432,16 @@ impl<'rows, 'request, 'emit, 'surface, 'face>
             // element-move arms at all.
             let move_to_next_row =
                 !moved_to_next_row && self.state.surface.append_surface.line_wrap().wraps();
+            // GNU's pen runs in the shared coordinate space that INCLUDES the
+            // hscrolled columns: `it->current_x` starts the row at
+            // `it->first_visible_x` (src/xdisp.c:3500). The row pen here is
+            // screen-relative, so a stretch resolved against it pinned
+            // `:align-to` fields to screen columns while the text around them
+            // scrolled (issue #446). The consumed hscroll columns are the
+            // difference between the two spaces.
+            let hscroll_offset_px = self.state.row_carryover.hscroll_skip.consumed_columns()
+                as f32
+                * self.params.char_width.max(1.0);
             let replacement_context = BufferDisplayPropertyTextReplacementRenderContext::new(
                 replacement.clone(),
                 self.loop_context.text_start_byte(),
@@ -441,7 +451,7 @@ impl<'rows, 'request, 'emit, 'surface, 'face>
                 0.0,
                 self.loop_context.char_height(),
                 self.active_face_state,
-                self.state.progress.row_progress().x(),
+                self.state.progress.row_progress().x() + hscroll_offset_px,
                 self.state.progress.row_position(),
             );
             let rendered_state = BufferDisplayPropertyTextReplacementRenderState::new(

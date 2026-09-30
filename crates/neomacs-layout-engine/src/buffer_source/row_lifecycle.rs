@@ -40,11 +40,12 @@ use crate::display_row::walk_state::{
     HscrollConsumedTextDisposition, InvisibleTextScanCheckpoint, LineNumberRenderState,
     TrailingWhitespaceRenderState, sync_position_after_row_transition,
 };
-use crate::display_source::DisplaySourceStepChar;
-use crate::display_source::DisplaySourceTextPosition;
+use crate::display_source::{
+    DisplaySpaceWidthPolicy, DisplaySourceStepChar, DisplaySourceTextPosition,
+};
 use crate::display_source_progress::{DisplaySourceProgressState, DisplaySourceRowProgressState};
 use crate::frame_face_arena::FrameFaceAttempt;
-use crate::neovm_bridge::{LayoutBufferView, RustTextPropAccess};
+use crate::neovm_bridge::{LayoutBufferView, LayoutCharPropertyLookup, RustTextPropAccess};
 use crate::types::LayoutCharPos0;
 use crate::unicode::is_wide_char;
 use crate::window_output::{
@@ -52,6 +53,7 @@ use crate::window_output::{
 };
 use neomacs_display_protocol::types::Color;
 use neovm_core::buffer::{EmacsBytePos, LispCharPos1};
+use neovm_core::emacs_core::value::{list_to_vec, Value};
 
 #[derive(Clone, Copy)]
 pub(crate) struct BufferSourceEndOfBufferTailRenderContext<'a> {
@@ -113,6 +115,17 @@ impl BufferSourceHscrollSkipAction {
         match self {
             Self::LineBreak { source_char } | Self::Text { source_char, .. } => {
                 source_char.start_charpos() + 1
+            }
+        }
+    }
+
+    /// The charpos of the first char AT or after the hscroll boundary: the
+    /// chars this action's skip consumed (and any before this one) are the
+    /// hscrolled-off prefix. Point below this charpos lies hidden.
+    pub(crate) fn hidden_prefix_end_charpos(self) -> i64 {
+        match self {
+            Self::LineBreak { source_char } | Self::Text { source_char, .. } => {
+                source_char.start_charpos()
             }
         }
     }
@@ -543,31 +556,82 @@ pub(crate) struct BufferSourceHscrollSkipRenderContext<'a> {
     row_limit: DisplayRowLimit,
 }
 
-pub(crate) fn consume_hscroll_skip_from_position(
+pub(crate) fn consume_hscroll_skip_from_position<B: LayoutBufferView + ?Sized>(
     text: &[u8],
     position: &mut DisplaySourceTextPosition,
     hscroll_skip: &mut HorizontalScrollSkipState,
     tab_width: i32,
+    buffer: &B,
+    text_start_byte: usize,
 ) -> Option<BufferSourceHscrollSkipAction> {
     let source_char = position.consume_step_char(text)?;
+    // A `(space :align-to N)` / `(space :width N)` spec on the skipped char
+    // occupies its RESOLVED width, not one column: GNU's hscroll move
+    // (`move_it_in_display_line_to_x` to `first_visible_x - 1`,
+    // src/xdisp.c) produces every element with glyph_row == NULL and
+    // accumulates the true advance, so a hscrolled line stops exactly at
+    // the spec's boundary and the field after it lands where GNU put it.
+    // Counting the spec's single source character as one column made the
+    // skip overshoot into the following field (issue #446).
+    let spec_columns = hscroll_display_spec_columns(
+        buffer,
+        text_start_byte + source_char.start_byte_idx(),
+        hscroll_skip.consumed_columns(),
+    );
     Some(consume_source_char_for_hscroll(
         source_char,
         hscroll_skip,
         tab_width,
+        spec_columns,
     ))
+}
+
+/// The column width a `(space …)` display spec occupies at the shared pen
+/// `consumed_columns`, when it can be resolved from bare numeric operands.
+/// `None` leaves the char to the ordinary per-char width (everything that is
+/// not a bare-number space spec — Lisp expressions, other spec kinds).
+fn hscroll_display_spec_columns<B: LayoutBufferView + ?Sized>(
+    buffer: &B,
+    byte_pos: usize,
+    consumed_columns: i32,
+) -> Option<i32> {
+    let spec = LayoutCharPropertyLookup::new(buffer, Value::symbol("display"))
+        .text_value_at(buffer, EmacsBytePos::new(byte_pos))?;
+    let items = list_to_vec(&spec)?;
+    let bare_columns = |prop: &Value| -> Option<i32> {
+        if let Some(n) = prop.as_fixnum() {
+            return Some(n as i32);
+        }
+        if prop.is_float() {
+            return Some(prop.xfloat() as i32);
+        }
+        None
+    };
+    match DisplaySpaceWidthPolicy::from_items(&items) {
+        DisplaySpaceWidthPolicy::AlignTo(prop) => {
+            // The stretch ends at column N in the shared coordinate space the
+            // skip is counting (`width = max(0, tem + align_to - x)`,
+            // xdisp.c:32876-32884, with the pen x at the columns consumed so
+            // far).
+            bare_columns(&prop).map(|n| (n - consumed_columns).max(0))
+        }
+        DisplaySpaceWidthPolicy::Explicit(prop) => bare_columns(&prop).map(|n| n.max(0)),
+        _ => None,
+    }
 }
 
 fn consume_source_char_for_hscroll(
     source_char: DisplaySourceStepChar,
     hscroll_skip: &mut HorizontalScrollSkipState,
     tab_width: i32,
+    spec_columns: Option<i32>,
 ) -> BufferSourceHscrollSkipAction {
     if source_char.ch() == '\n' {
         return BufferSourceHscrollSkipAction::LineBreak { source_char };
     }
 
-    let columns =
-        hscroll_skip_column_width(source_char, tab_width, hscroll_skip.consumed_columns());
+    let columns = spec_columns
+        .unwrap_or_else(|| hscroll_skip_column_width(source_char, tab_width, hscroll_skip.consumed_columns()));
     let display_item = if source_char.ch() == '\t' {
         HorizontalScrollDisplayItem::tab(columns)
     } else {
@@ -681,6 +745,9 @@ impl<'a> BufferSourceHscrollSkipRenderContext<'a> {
             );
         }
 
+        let marker_cell_position = progress.row_position();
+        let point_hidden_on_this_line = row_source_start.covers(context.point_charpos)
+            && context.point_charpos < hscroll_action.hidden_prefix_end_charpos();
         let cursor_position = hscroll_action
             .append_left_truncation_marker_to_text_row_and_apply(
                 BufferSyntheticTextRenderContext::with_face_attempt(
@@ -704,6 +771,30 @@ impl<'a> BufferSourceHscrollSkipRenderContext<'a> {
             cursor_position.x_px(),
             cursor_position.col(),
         );
+        // GNU keeps the cursor of a line whose point lies in the hscrolled-off
+        // prefix on the line's first visible cell -- the truncation marker's
+        // cell (the reporter's `C-x <`: GNU paints the cursor on the `$`,
+        // Neomacs left it hidden at the frame corner). The anchor capture
+        // above only answers point == the first visible char; a point deeper
+        // in the hidden prefix is clamped here, exactly once per walk (the
+        // capture marks the cursor found).
+        if point_hidden_on_this_line && cursor_info.is_missing() {
+            capture_cursor_approximation(
+                cursor_info,
+                CapturedCursorInfo::from_active_face_state(
+                    context.active_face_state,
+                    CapturedCursorPlacement::from_row_text_position(
+                        row_build.row_geometry.text_position(
+                            marker_cell_position.x_px(),
+                            0,
+                            marker_cell_position.col(),
+                        ),
+                        CapturedCursorSlotWidth::FaceChar,
+                        false,
+                    ),
+                ),
+            );
+        }
         DisplayRowTransitionContinuation::Continue
     }
 
