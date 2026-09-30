@@ -1,8 +1,9 @@
 //! What a banded decode promises its consumer.
 //!
 //! Three contracts, in the order a consumer meets them: the bands tile the
-//! source and the raster it becomes, the pixels they carry are the area average
-//! of the pixels the whole-image path would produce for the same file, and a
+//! source and the raster it becomes, the pixels they carry are the source's own
+//! pixels where the two paths meet — at the source's own size, which is what
+//! these tests realize — and a
 //! decode that cannot finish says so instead of stopping quietly.
 
 use super::*;
@@ -44,7 +45,7 @@ fn drain(mut source: BandedSource<'_>) -> (Vec<DecodedBand>, Option<RasterPixels
 
 /// The pixels the whole-image path produces for `data`, through `image`'s own
 /// decode and colour conversion — the reference a banded decode has to match
-/// when it realizes the source at its own size, where the area average is the
+/// when it realizes the source at its own size, where the filter is the
 /// identity.
 fn whole_image_pixels(data: &[u8]) -> (u32, u32, Vec<u8>) {
     let image = image::load_from_memory(data).expect("fixture decodes whole");
@@ -153,9 +154,18 @@ fn the_bands_of_a_source_tile_the_raster_from_row_zero() {
     );
 }
 
-/// Every band has somewhere to write. A source minified hard enough that one
-/// raster row spans many source rows still bands by raster row, because a band
-/// with no rows to fill is a state this type does not have.
+/// Every band has somewhere to write.
+///
+/// A source minified hard enough that one raster row spans many source rows
+/// still bands by raster row rather than by source row, because a band with no
+/// rows to fill is a state this type does not have: the reader runs past its
+/// row budget until the filter closes an output row, and then stops. That makes
+/// the first band long — it has to reach the end of the first output's support
+/// — and every band after it exactly one raster row, up to the last.
+///
+/// The last band is the exception, and it is the source that stops it rather
+/// than the filter: the raster's final output rows all end at the source's last
+/// row, so the band that reads it closes however many of them are still open.
 #[test]
 fn a_source_minified_hard_still_produces_a_band_for_every_raster_row() {
     let data = varying_png(80, 400);
@@ -165,11 +175,26 @@ fn a_source_minified_hard_still_produces_a_band_for_every_raster_row() {
     let (bands, raster) = drain(source);
 
     assert!(!bands.is_empty());
-    for band in &bands {
+    let mut start = 0;
+    for (at, band) in bands.iter().enumerate() {
+        let placement = band.placed().placement();
         assert_eq!(
-            band.placed().placement().rows().len().get(),
+            placement.rows().start(),
+            start,
+            "a band starts where the last one ended"
+        );
+        assert!(
+            placement.rows().len().get() >= 1,
+            "a band fills at least one raster row"
+        );
+        start = placement.rows().end();
+        if at + 1 == bands.len() {
+            continue;
+        }
+        assert_eq!(
+            placement.rows().len().get(),
             1,
-            "sixteen source rows to a raster row: each band is one raster row"
+            "sixteen source rows to a raster row: each band closes one raster row"
         );
         assert!(
             band.source().len().get() >= 16,
@@ -177,7 +202,12 @@ fn a_source_minified_hard_still_produces_a_band_for_every_raster_row() {
             band.source().len().get()
         );
     }
-    assert_eq!(bands.len(), 25, "one band per raster row");
+    assert_eq!(start, 25, "the bands reach the last row of the raster");
+    assert!(
+        bands.len() <= 25,
+        "the bands follow the raster's height, not the source's: {} of them",
+        bands.len()
+    );
     assert_eq!(
         raster
             .expect("a completed source yields the raster")
@@ -188,7 +218,7 @@ fn a_source_minified_hard_still_produces_a_band_for_every_raster_row() {
 }
 
 /// A source a caller asks to show larger than it is takes the whole-image path:
-/// an area average that had to invent samples would not be an average, and the
+/// a filter asked for samples that do not exist could only invent them, and the
 /// filter that does enlarge is the one that path already uses.
 #[test]
 fn a_source_shown_larger_than_itself_declines_the_target() {
@@ -213,7 +243,7 @@ fn a_source_shown_larger_than_itself_declines_the_target() {
 fn a_banded_decode_agrees_with_the_whole_image_path_for_every_row_format() {
     // One fixture per colour type that reaches the decoder as 8-bit output:
     // `Transformations::EXPAND` widens the sub-8-bit and paletted ones. Each is
-    // realized at its own size, so the area average is the identity and the
+    // realized at its own size, so the filter is the identity and the
     // raster must be `image`'s own decode of the same file, byte for byte.
     let width = 23;
     let height = 61;

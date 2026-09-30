@@ -357,8 +357,9 @@ impl<'a> BandedSource<'a> {
 /// in its coordinates — there is no native-size image anywhere in this
 /// structure, which is the point. Which mask the source has is not the raster's
 /// answer: that is classified from the source's own alphas as its rows are read
-/// (`classify_alpha`), because a box-filtered raster has intermediate alphas
-/// the source never had.
+/// (`classify_alpha`), because a filtered raster has alphas the source never
+/// had: intermediate ones, and — a kernel with negative lobes being what it
+/// is — ones the source's own range cannot hold.
 pub(crate) struct RasterPixels {
     native: ImageNativeExtent,
     raster: ImageRasterExtent,
@@ -619,7 +620,7 @@ impl<'a> PngRows<'a> {
     /// the header would not parse, the output is not one of the 8-bit colour
     /// types below, the source is interlaced, it is too small for banding to pay
     /// ([`BANDING_MIN_PIXELS`]), or the realization asks for it *larger* than it
-    /// is, which has no area average to decode through.
+    /// is, which is the one shape a filter that only ever reduces cannot take.
     fn open(data: &'a [u8], plan: BandPlan, min_pixels: u64) -> Option<Self> {
         let mut decoder = png::Decoder::new(Cursor::new(data));
         // The transform `image`'s own PNG decoder sets before reading
@@ -725,7 +726,7 @@ impl<'a> PngRows<'a> {
         };
         format.expand_row(source.data(), row).ok_or(())?;
         // The mask is a property of the source's own pixels, so it is read from
-        // them rather than from the raster they are averaged into: a box filter
+        // them rather than from the raster they are filtered into: the filter
         // gives a source with only opaque and clear pixels alphas in between,
         // and asking the raster which mask it has would be asking the filter.
         if format.may_be_transparent() {
