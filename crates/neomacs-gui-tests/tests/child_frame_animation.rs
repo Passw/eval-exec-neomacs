@@ -320,25 +320,26 @@ focus_follows_mouse yes
         arriving.push(region_mean(&pixels, ARRIVAL_STRIP));
     }
 
-    // The drift settles in ~6.6s (spring slowed 20x); wait past it and
-    // prove the popup arrived: the arrival area is covered red and the
-    // departure area is plain background.
-    thread::sleep(Duration::from_millis(5500));
-    let post_drift = capture(&display_env, &artifacts, "post-drift.png");
-    // The background reference for both strips comes from the pre-popup
-    // capture, over the same rectangles.
-    let arrival_covered = region_mean(&post_drift, ARRIVAL_STRIP);
+    // The drift settles in ~6.6s (spring slowed 20x) — on a loaded runner
+    // the ingest and presents lag that by seconds, so poll for the settled
+    // endpoints instead of sleeping a fixed time: the arrival area covered
+    // red and the departure area plain background.
     let pre_arrival = region_mean(&background_pixels, ARRIVAL_STRIP);
-    assert!(
-        arrival_covered < pre_arrival - 0.5,
-        "the popup must arrive at the new anchor: {arrival_covered:.3} vs {pre_arrival:.3}"
-    );
-    let departure_cleared = region_mean(&post_drift, DEPARTURE_STRIP);
     let pre_departure = region_mean(&background_pixels, DEPARTURE_STRIP);
-    assert!(
-        departure_cleared > pre_departure - 0.15,
-        "the departure area must be background once the popup left: {departure_cleared:.3} vs {pre_departure:.3}"
-    );
+    let deadline = Instant::now() + Duration::from_secs(45);
+    loop {
+        let pixels = capture(&display_env, &artifacts, "post-drift.png");
+        let arrival_covered = region_mean(&pixels, ARRIVAL_STRIP);
+        let departure_cleared = region_mean(&pixels, DEPARTURE_STRIP);
+        if arrival_covered < pre_arrival - 0.5 && departure_cleared > pre_departure - 0.15 {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the drift never settled: arrival {arrival_covered:.3} vs {pre_arrival:.3}, departure {departure_cleared:.3} vs {pre_departure:.3}"
+        );
+        thread::sleep(Duration::from_millis(600));
+    }
 
     // --- The resize content crossfade: the popup grows mid-life, and the
     // previous presentation's picture crossfades into the bigger one. The
