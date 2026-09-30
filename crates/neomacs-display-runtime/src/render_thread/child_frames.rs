@@ -17,7 +17,7 @@ use neomacs_display_protocol::motion_spec::MotionSpec;
 use neomacs_renderer_wgpu::SnapshotLease;
 
 use crate::core::frame_glyphs::FrameGlyphBuffer;
-use crate::render_thread::frame_compositor::motion::Motion;
+use crate::render_thread::frame_compositor::motion::{Motion, ProgressRate};
 use neomacs_display_protocol::{
     PlaceChildQuery, PresentedClip, PresentedFramePlacement, PresentedFrameScene,
 };
@@ -84,6 +84,9 @@ pub(crate) struct ChildFrameEntry {
     /// A content crossfade from the previous presentation's picture, when a
     /// size-changing update arrived with the resize slot enabled.
     pub crossfade: Option<EntryCrossfade>,
+    /// A placement drift toward the entry's settled position, when a
+    /// re-anchoring update moved the popup with the movement slot enabled.
+    pub drift: Option<EntryDrift>,
 }
 
 /// A content crossfade between the previous presentation's picture and the
@@ -97,6 +100,25 @@ pub(crate) struct EntryCrossfade {
     /// frame's.
     pub(in crate::render_thread) old_width: f32,
     pub(in crate::render_thread) old_height: f32,
+}
+
+/// A placement drift: the popup gliding from where it was drawn to where
+/// Emacs just anchored it.
+///
+/// `from_x`/`from_y` is the departure, in logical surface coordinates; the
+/// destination is always the entry's own placed position, so a payload that
+/// changes both placement and content needs no separate target. When a new
+/// re-anchor arrives mid-drift, the drift retargets from `last_drawn` --
+/// the position the previous pass actually painted -- so the popup carries
+/// on from where the user saw it instead of snapping back to a placement it
+/// never reached.
+pub(crate) struct EntryDrift {
+    pub(in crate::render_thread) motion: Motion,
+    pub(in crate::render_thread) from_x: f32,
+    pub(in crate::render_thread) from_y: f32,
+    /// The position and rate the last scene pass painted, written back for
+    /// the next retarget. `None` until the first pass after the drift began.
+    pub(in crate::render_thread) last_drawn: Option<(f32, f32, f32)>,
 }
 
 /// A child frame whose deletion is animating out.
@@ -268,6 +290,99 @@ impl ChildFrameManager {
         }
     }
 
+    /// Start a placement drift for `frame_id`, departing from
+    /// `from_x`/`from_y` toward the entry's placed position.
+    ///
+    /// Called when a re-anchoring update moved the popup and the movement
+    /// slot is enabled. An in-flight drift is replaced; the fresh start
+    /// departs from the last drawn position when the caller supplies one
+    /// (see `retarget_drift`).
+    pub fn begin_drift(
+        &mut self,
+        frame_id: u64,
+        from_x: f32,
+        from_y: f32,
+        spec: MotionSpec,
+        origin: EventTime,
+    ) -> bool {
+        let Some(motion) = Motion::start(spec, origin) else {
+            return false;
+        };
+        if let Some(entry) = self.frames.get_mut(&frame_id) {
+            entry.drift = Some(EntryDrift {
+                motion,
+                from_x,
+                from_y,
+                last_drawn: None,
+            });
+            tracing::info!(
+                frame_id,
+                from_x,
+                from_y,
+                "child_frame_lifecycle: drift_started"
+            );
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Retarget an in-flight drift from the position the previous pass
+    /// painted, at the speed it had.
+    ///
+    /// A re-anchor arriving mid-drift must carry the popup on from where
+    /// the user saw it, not restart it from a standstill at a place it
+    /// never reached -- the same step-11 rule the pane morphs follow.
+    pub fn retarget_drift(&mut self, frame_id: u64, spec: MotionSpec, origin: EventTime) -> bool {
+        let Some(last) = self
+            .frames
+            .get(&frame_id)
+            .and_then(|entry| entry.drift.as_ref())
+            .and_then(|drift| drift.last_drawn)
+        else {
+            return false;
+        };
+        let Some(motion) = Motion::resume(spec, origin, ProgressRate::new(last.2)) else {
+            return false;
+        };
+        if let Some(entry) = self.frames.get_mut(&frame_id) {
+            entry.drift = Some(EntryDrift {
+                motion,
+                from_x: last.0,
+                from_y: last.1,
+                last_drawn: None,
+            });
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Clear finished drifts, sampled at `sample`. Returns whether anything
+    /// was cleared, so the caller repaints once more.
+    pub fn clear_finished_drifts(&mut self, sample: FrameSample) -> bool {
+        let before = self
+            .frames
+            .values()
+            .filter(|entry| entry.drift.is_some())
+            .count();
+        for entry in self.frames.values_mut() {
+            if entry
+                .drift
+                .as_ref()
+                .is_some_and(|drift| drift.motion.sample(sample).finished)
+            {
+                entry.drift = None;
+            }
+        }
+        let after = self
+            .frames
+            .values()
+            .filter(|entry| entry.drift.is_some())
+            .count();
+        before != after
+    }
+
     /// Drop crossfades whose mix has finished at `sample`; the leases they
     /// held return to the pool. Returns whether anything was removed, so the
     /// caller repaints once more.
@@ -313,6 +428,16 @@ impl ChildFrameManager {
         })
     }
 
+    /// Record where a drifting frame was painted this pass, for the next
+    /// re-anchor's retarget.
+    pub fn record_drift_drawn(&mut self, frame_id: u64, x: f32, y: f32, rate: f32) {
+        if let Some(entry) = self.frames.get_mut(&frame_id)
+            && let Some(drift) = entry.drift.as_mut()
+        {
+            drift.last_drawn = Some((x, y, rate));
+        }
+    }
+
     /// Clear a finished lifecycle animation so `has_animation_activity`
     /// stops reporting it.
     pub fn clear_finished_animation(&mut self, frame_id: u64) {
@@ -330,9 +455,9 @@ impl ChildFrameManager {
     /// it while a lifecycle animation runs would show the corpse at whatever
     /// alpha it had when the texture was last built.
     pub fn has_animation_activity(&self) -> bool {
-        self.frames.values().any(|entry| entry.animation.is_some())
-            || self.has_dying()
-            || self.frames.values().any(|entry| entry.crossfade.is_some())
+        self.frames.values().any(|entry| {
+            entry.animation.is_some() || entry.crossfade.is_some() || entry.drift.is_some()
+        }) || self.has_dying()
     }
 
     /// Whether any child frame is mid-animation and needs another frame.
@@ -342,6 +467,14 @@ impl ChildFrameManager {
                 .animation
                 .as_ref()
                 .is_some_and(|animation| !animation.motion.sample(sample).finished)
+                || entry
+                    .drift
+                    .as_ref()
+                    .is_some_and(|drift| !drift.motion.sample(sample).finished)
+                || entry
+                    .crossfade
+                    .as_ref()
+                    .is_some_and(|crossfade| !crossfade.motion.sample(sample).finished)
         }) || self
             .dying
             .iter()
@@ -365,6 +498,13 @@ impl ChildFrameManager {
             .frames
             .get(&frame_id.get())
             .and_then(|entry| entry.animation);
+        // Same ownership as the appearance above: a drift belongs to the
+        // popup across payload replaces. Taken through a mutable borrow so
+        // the option moves out of the entry that is about to be replaced.
+        let previous_drift = self
+            .frames
+            .get_mut(&frame_id.get())
+            .and_then(|entry| entry.drift.take());
         let existing = self.frames.get_mut(&frame_id.get());
 
         // A re-delivery of a frame that is fading out cancels the fade: the
@@ -442,6 +582,10 @@ impl ChildFrameManager {
                 // in-flight one belongs to the replaced payload and drops
                 // with it.
                 crossfade: None,
+                // A placement drift belongs to the popup, not to one
+                // payload: the fresh entry settles at the same placed
+                // position the drift was gliding toward.
+                drift: previous_drift,
             },
         );
 

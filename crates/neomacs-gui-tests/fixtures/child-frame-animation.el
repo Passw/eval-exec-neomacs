@@ -22,18 +22,25 @@
 (defvar child-frame-animation-open-scale-from 0.6)
 (defvar child-frame-animation-close-scale-from 0.6)
 (defvar child-frame-animation-resize-enabled t)
+(defvar child-frame-animation-movement-enabled t)
 
 (defvar child-frame-animation-popup-size-before 0)
 (defvar child-frame-animation-popup-size-after 0)
 (defvar child-frame-animation-sample 0)
 (defvar child-frame-animation-popup nil)
+(defvar child-frame-animation-phases nil)
 
 (defun child-frame-animation-write (phase)
-  (setq child-frame-animation-sample (1+ child-frame-animation-sample))
+  (setq child-frame-animation-sample (1+ child-frame-animation-sample)
+        child-frame-animation-phases (cons phase child-frame-animation-phases))
   (with-temp-file (getenv "NEOMACS_GUI_ANIMATION_STATE_JSON")
     (insert (json-encode
              `((sample . ,child-frame-animation-sample)
                (phase . ,phase)
+               ;; Phases accumulate: the test's capture cadence can outrun
+               ;; the timers, and a phase overwritten before it is polled
+               ;; must still count as reached.
+               (phases . ,(reverse child-frame-animation-phases))
                (slowdown . ,(plist-get (neomacs-effect-get 'child-frame-animations)
                                        :slowdown))
                (popup-width-before . ,child-frame-animation-popup-size-before)
@@ -59,6 +66,10 @@
   ;; previous presentation's picture into the new one instead of snapping.
   (customize-set-variable
    'neomacs-child-frame-resize-enabled child-frame-animation-resize-enabled)
+  ;; The anchor-track drift: a re-anchored popup glides to its new
+  ;; placement instead of jumping.
+  (customize-set-variable
+   'neomacs-child-frame-movement-enabled child-frame-animation-movement-enabled)
   (switch-to-buffer (get-buffer-create "*child-frame-animation-parent*"))
   (insert "parent content line\n")
   ;; Publish before any popup exists: the test takes its background
@@ -98,8 +109,9 @@
                    (error (child-frame-animation-write
                            (format "snapshot-error %S" err))))))
   ;; Grow the popup mid-life: the size-changing update crossfades the old
-  ;; picture into the bigger one over the resize slot's 3s curve.
-  (run-at-time 5.0 nil
+  ;; picture into the bigger one over the resize slot's 3s curve. Placed
+  ;; after the drift settles so the two windows do not overlap.
+  (run-at-time 12.0 nil
                (lambda ()
                  ;; The phase goes out first: the crossfade begins when the
                  ;; render thread ingests the resized payload, which races
@@ -114,13 +126,25 @@
                  (redisplay t)
                  (setq child-frame-animation-popup-size-after
                        (frame-pixel-width child-frame-animation-popup))))
-  (run-at-time 9.5 nil
+  ;; Re-anchor mid-life: the movement slot's drift glides the popup from
+  ;; (240,180) to (400,300) over the spring's slowed settle (~6.6s, most of
+  ;; the travel in the first three).
+  (run-at-time 5.0 nil
+               (lambda ()
+                 (child-frame-animation-write "reanchored")
+                 (modify-frame-parameters
+                  child-frame-animation-popup
+                  '((left . (+ 400)) (top . (+ 300))))
+                 ;; The re-anchored payload reaches the render thread only
+                 ;; through a redisplay that re-publishes the child frame.
+                 (redisplay t)))
+  (run-at-time 16.0 nil
                (lambda ()
                  (delete-frame child-frame-animation-popup)
                  (child-frame-animation-write "deleted")))
-  ;; The close fade ends at 12.5s; the dying entry is pruned right after.
-  (run-at-time 13.0 nil (lambda () (child-frame-animation-write "pruned")))
-  (run-at-time 15.0 nil (lambda () (kill-emacs 0))))
+  ;; The close fade ends at 19.0s; the dying entry is pruned right after.
+  (run-at-time 19.5 nil (lambda () (child-frame-animation-write "pruned")))
+  (run-at-time 21.0 nil (lambda () (kill-emacs 0))))
 
 ;; Let the initial native configure establish the parent dimensions first.
 (run-at-time 1.5 nil #'child-frame-animation-setup)

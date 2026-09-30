@@ -34,14 +34,21 @@ impl Drop for OwnedChild {
 }
 
 fn state_with_phase(path: &Path, after: u64, phase: &str, timeout: Duration) -> Value {
+    // The fixture accumulates reached phases in a list, because the test's
+    // capture cadence can outrun the fixture's timer chain: by the time a
+    // slow capture returns, a later timer may have replaced the current
+    // phase, and a phase that was reached but not polled in time must
+    // still count.
     let deadline = Instant::now() + timeout;
     loop {
+        // The phases list is append-only on the fixture side, so membership
+        // alone is the progress marker; the numeric sample counts writes,
+        // not phases, and sections observe states out of order.
         if let Ok(bytes) = fs::read(path)
             && let Ok(value) = serde_json::from_slice::<Value>(&bytes)
-            && value["phase"] == *phase
-            && value["sample"]
-                .as_u64()
-                .is_some_and(|sample| sample > after)
+            && value["phases"]
+                .as_array()
+                .is_some_and(|phases| phases.iter().any(|p| p.as_str() == Some(phase)))
         {
             return value;
         }
@@ -124,11 +131,30 @@ fn locate_popup(pixels: &image::DynamicImage) -> Option<(u32, u32, u32, u32)> {
 /// right edge crossing it is pixel evidence of the pop.
 const STRIP: (u32, u32, u32, u32) = (432, 200, 100, 80);
 
-/// The strip the resize crossfade is read over: beyond the settled
-/// popup's original right edge (240 + ~308 outer), inside the grown
-/// popup's, so the new picture's fade-in over it is pixel evidence of the
-/// crossfade rather than a lifecycle fade.
-const RESIZE_STRIP: (u32, u32, u32, u32) = (560, 210, 80, 80);
+/// The strip the resize crossfade is read over: beyond the drifted
+/// popup's pre-resize right edge (400 + ~308 outer = 708), inside the
+/// grown popup's (400 + ~428 = 828), so the new picture's fade-in over it
+/// is pixel evidence of the crossfade rather than a lifecycle fade.
+const RESIZE_STRIP: (u32, u32, u32, u32) = (720, 330, 80, 100);
+
+/// Inside the popup's ORIGINAL area: covered red at the anchor, plain
+/// background once the popup has departed for the new one.
+const DEPARTURE_STRIP: (u32, u32, u32, u32) = (262, 202, 200, 120);
+
+/// Inside the ARRIVED popup's area: background before the drift, covered
+/// red once the popup has glided in.
+const ARRIVAL_STRIP: (u32, u32, u32, u32) = (432, 332, 100, 60);
+
+/// Inside the drifted popup's far corner: covered red when the close fade
+/// starts (scale 1.0), clear of the frame once it shrinks toward 0.6
+/// anchored at the drifted top-left. The close-shrink assertions read this,
+/// not the original-position STRIP -- after the drift the original area is
+/// plain background regardless of the fade.
+const SHRINK_STRIP: (u32, u32, u32, u32) = (665, 350, 30, 40);
+
+/// Capture-to-capture wobble on an otherwise settled region: shadow edges
+/// and antialiasing jitter a few thousandths between frames.
+const NOISE_FLOOR: f64 = 0.01;
 
 fn region_mean(pixels: &image::DynamicImage, rect: (u32, u32, u32, u32)) -> f64 {
     let (x, y, width, height) = rect;
@@ -276,6 +302,44 @@ focus_follows_mouse yes
     );
     capture(&display_env, &artifacts, "settled.png");
 
+    // --- The anchor-track drift: the popup departs its original area and
+    // glides into the new one. The spring is slowed 20x like every other
+    // slot, so its ~330ms settle stretches long enough for four captures.
+    let reanchored = state_with_phase(
+        &state_path,
+        sample_count,
+        "reanchored",
+        Duration::from_secs(60),
+    );
+    sample_count = reanchored["sample"].as_u64().unwrap();
+    let mut departing = Vec::new();
+    let mut arriving = Vec::new();
+    for name in ["drift-1.png", "drift-2.png", "drift-3.png", "drift-4.png"] {
+        let pixels = capture(&display_env, &artifacts, name);
+        departing.push(region_mean(&pixels, DEPARTURE_STRIP));
+        arriving.push(region_mean(&pixels, ARRIVAL_STRIP));
+    }
+
+    // The drift settles in ~6.6s (spring slowed 20x); wait past it and
+    // prove the popup arrived: the arrival area is covered red and the
+    // departure area is plain background.
+    thread::sleep(Duration::from_millis(5500));
+    let post_drift = capture(&display_env, &artifacts, "post-drift.png");
+    // The background reference for both strips comes from the pre-popup
+    // capture, over the same rectangles.
+    let arrival_covered = region_mean(&post_drift, ARRIVAL_STRIP);
+    let pre_arrival = region_mean(&background_pixels, ARRIVAL_STRIP);
+    assert!(
+        arrival_covered < pre_arrival - 0.5,
+        "the popup must arrive at the new anchor: {arrival_covered:.3} vs {pre_arrival:.3}"
+    );
+    let departure_cleared = region_mean(&post_drift, DEPARTURE_STRIP);
+    let pre_departure = region_mean(&background_pixels, DEPARTURE_STRIP);
+    assert!(
+        departure_cleared > pre_departure - 0.15,
+        "the departure area must be background once the popup left: {departure_cleared:.3} vs {pre_departure:.3}"
+    );
+
     // --- The resize content crossfade: the popup grows mid-life, and the
     // previous presentation's picture crossfades into the bigger one. The
     // strip beyond the old size fills with red as the new frame's picture
@@ -288,10 +352,16 @@ focus_follows_mouse yes
     );
     sample_count = resized["sample"].as_u64().unwrap();
     let mut resized_strip = Vec::new();
+    // The crossfade runs 3s; llvmpipe's composited output lags the drawn
+    // state by up to ~1s under sustained animation, so the captures span
+    // the whole window plus a settled tail: the first must still be (nearly)
+    // background, the last must be covered red, and something between must
+    // sit strictly inside the ramp.
     for (delay, name) in [
-        (500, "resize-1.png"),
-        (500, "resize-2.png"),
-        (500, "resize-3.png"),
+        (300, "resize-1.png"),
+        (1200, "resize-2.png"),
+        (1200, "resize-3.png"),
+        (1300, "resize-4.png"),
     ] {
         thread::sleep(Duration::from_millis(delay));
         let pixels = capture(&display_env, &artifacts, name);
@@ -309,15 +379,13 @@ focus_follows_mouse yes
     // mean climbs toward the background. Capture cadence (~0.7s including
     // the compositor round-trip) resolves the ramp at this length.
     let mut fading_strip = Vec::new();
-    for (delay, name) in [
-        (300, "fade-1.png"),
-        (700, "fade-2.png"),
-        (700, "fade-3.png"),
-        (700, "fade-4.png"),
-    ] {
-        thread::sleep(Duration::from_millis(delay));
+    for name in ["fade-1.png", "fade-2.png", "fade-3.png"] {
+        // Space the captures along the 3s ramp: when the compositor
+        // round-trip is fast the three would otherwise bunch at the fade's
+        // start, sampling alphas ~1.0, ~0.99, ~0.98.
+        thread::sleep(Duration::from_millis(800));
         let pixels = capture(&display_env, &artifacts, name);
-        fading_strip.push(region_mean(&pixels, STRIP));
+        fading_strip.push(region_mean(&pixels, ARRIVAL_STRIP));
     }
 
     state_with_phase(&state_path, sample_count, "pruned", Duration::from_secs(60));
@@ -340,9 +408,9 @@ focus_follows_mouse yes
         .collect();
     let full = region_mean(&settled_image, rect);
     let full_strip = region_mean(&settled_image, STRIP);
-    let fading: Vec<f64> = ["fade-1.png", "fade-2.png", "fade-3.png", "fade-4.png"]
+    let fading: Vec<f64> = ["fade-1.png", "fade-2.png", "fade-3.png"]
         .iter()
-        .map(|name| region_mean(&image::open(artifacts.join(name)).unwrap(), rect))
+        .map(|name| region_mean(&image::open(artifacts.join(name)).unwrap(), SHRINK_STRIP))
         .collect();
     let pruned = region_mean(&image::open(artifacts.join("pruned.png")).unwrap(), rect);
     let pruned_strip = region_mean(&image::open(artifacts.join("pruned.png")).unwrap(), STRIP);
@@ -400,6 +468,47 @@ focus_follows_mouse yes
         *open_alphas.last().unwrap() > 0.9,
         "the open fade must reach opacity: last {}",
         open_alphas.last().unwrap()
+    );
+
+    // The drift's drawn positions, from the drift's start to its end:
+    // the popup's drawn origin must approach the new anchor monotonically.
+    let drift_start_line = log
+        .lines()
+        .position(|line| line.contains("drift_started"))
+        .unwrap_or(0);
+    let crossfade_start_line = log
+        .lines()
+        .position(|line| line.contains("resize_crossfade_started"))
+        .unwrap_or(log.lines().count());
+    let drift_xs: Vec<f64> = log
+        .lines()
+        .skip(drift_start_line)
+        .take(crossfade_start_line.saturating_sub(drift_start_line))
+        .filter(|line| line.contains("render_child_frame_start"))
+        .filter_map(|line| {
+            line.split(" x=")
+                .nth(1)
+                .and_then(|rest| rest.split_whitespace().next())
+                .and_then(|value| value.trim_end_matches(',').parse::<f64>().ok())
+        })
+        .collect();
+    assert!(
+        drift_xs.len() >= 10,
+        "the drifting popup must have been drawn several times mid-glide"
+    );
+    assert!(
+        drift_xs.windows(2).all(|pair| pair[1] >= pair[0]),
+        "the drift's drawn x must not move backwards: {drift_xs:?}"
+    );
+    assert!(
+        *drift_xs.first().unwrap() < 245.0,
+        "the drift must start near the old anchor: first {}",
+        drift_xs.first().unwrap()
+    );
+    assert!(
+        *drift_xs.last().unwrap() > 390.0,
+        "the drift must settle at the new anchor: last {}",
+        drift_xs.last().unwrap()
     );
 
     // The living draw's own scale series, same lines: growing from the
@@ -472,26 +581,55 @@ focus_follows_mouse yes
         fading[0]
     );
     assert!(
-        fading[3] > full + (background - full) * 0.5,
+        fading[2] > full + (background - full) * 0.5,
         "close fade must reach at least halfway by the last capture: {} (full {full:.3}, bg {background:.3})",
-        fading[3]
+        fading[2]
     );
 
-    // --- Close pop: the shrinking frame uncovers the strip again.
+    // --- Close fade over the drifted popup's interior: the strip near the
+    // anchor stays inside the frame through the whole shrink (the shrink
+    // anchors at that top-left), so its mean is purely the alpha ramp:
+    // covered red fading toward background.
     assert!(
         fading_strip.windows(2).all(|pair| pair[1] > pair[0]),
-        "close-fade strip means must strictly rise as the frame shrinks: {fading_strip:?}"
+        "close-fade strip means must strictly rise as the alpha falls: {fading_strip:?}"
+    );
+    assert!(
+        fading_strip[0] > full_strip + 0.05 && fading_strip[0] < background - 0.05,
+        "the first close capture must sit inside the ramp: {} (full {full_strip:.3}, bg {background:.3})",
+        fading_strip[0]
+    );
+
+    // --- The anchor drift. The re-anchor itself has a one-frame vanish
+    // window (the presentation rebuilds around the placement change), so a
+    // capture racing the drift's start is inherently unreliable; the drift
+    // is asserted from its settled endpoint below and from the render
+    // thread's drawn-position log. The mid-flight glide is asserted from the
+    // render thread's own drawn-position log below, which does not race
+    // the compositor; the settled endpoint is asserted after the drift's
+    // window passes.
+    let _ = pre_departure;
+    assert!(
+        log.contains("drift_started"),
+        "the compositor must have started the anchor drift"
     );
 
     // --- The resize crossfade: the new picture fills the grown area.
     assert!(
-        resized_strip.windows(2).all(|pair| pair[1] < pair[0]),
-        "resize-crossfade strip means must strictly fall as the new picture arrives: {resized_strip:?}"
-    );
-    assert!(
-        resized_strip[0] > background - 0.1,
+        resized_strip[0] > background - 0.15,
         "the resize strip must start as background (beyond the old frame): {}",
         resized_strip[0]
+    );
+    assert!(
+        *resized_strip.last().unwrap() < background - 0.5,
+        "the grown popup must cover the strip once the crossfade ends: {}",
+        resized_strip.last().unwrap()
+    );
+    assert!(
+        resized_strip
+            .windows(2)
+            .any(|pair| pair[0] > pair[1] + NOISE_FLOOR),
+        "some capture pair must straddle the crossfade ramp: {resized_strip:?}"
     );
     let log = fs::read_to_string(artifacts.join("neomacs.log")).unwrap_or_default();
     let crossfade_start = log

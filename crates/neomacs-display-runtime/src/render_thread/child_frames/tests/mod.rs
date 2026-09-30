@@ -1246,3 +1246,78 @@ fn merged_render_order_keeps_living_frames_when_only_they_exist() {
         .collect();
     assert_eq!(order, vec![2, 1]);
 }
+
+#[test]
+fn drift_glides_from_its_departure_toward_the_placement() {
+    let mut mgr = make_manager();
+    // The popup is placed at (240, 180); the re-anchor moved it there from
+    // (40, 0).
+    mgr.update_frame(make_child_buf(1, 240.0, 180.0, 100.0, 100.0, 0));
+    let origin = origin_now();
+    assert!(mgr.begin_drift(1, 40.0, 0.0, tween_100ms(), origin));
+
+    // Sampled, not stepped: the same instant gives the same position.
+    let entry = mgr.frames.get(&1).unwrap();
+    let drift = entry.drift.as_ref().unwrap();
+    let early = drift.motion.sample(sample_at(origin, 0));
+    assert_eq!(early.progress, 0.0, "not yet departed");
+    let mid = drift.motion.sample(sample_at(origin, 50));
+    assert!(
+        (mid.progress - 0.75).abs() < 1e-3,
+        "ease-out-quad at half time"
+    );
+    // The interpolation itself is the scene pass's job; the drift owns the
+    // departure and the curve.
+    let late = drift.motion.sample(sample_at(origin, 101));
+    assert!(late.finished);
+}
+
+#[test]
+fn drift_retargets_from_the_last_drawn_position() {
+    let mut mgr = make_manager();
+    mgr.update_frame(make_child_buf(1, 240.0, 180.0, 100.0, 100.0, 0));
+    let origin = origin_now();
+    mgr.begin_drift(1, 40.0, 0.0, tween_100ms(), origin);
+
+    // The scene pass painted the popup at (140, 90), moving at 1.0/s.
+    mgr.record_drift_drawn(1, 140.0, 90.0, 1.0);
+
+    // A second re-anchor arrives mid-drift: the fresh drift departs from
+    // where the popup was seen, not from the old anchor.
+    mgr.retarget_drift(1, tween_100ms(), origin_now());
+    let drift = mgr.frames.get(&1).unwrap().drift.as_ref().unwrap();
+    assert!(
+        (drift.from_x - 140.0).abs() < 1e-4 && (drift.from_y - 90.0).abs() < 1e-4,
+        "the retargeted drift must depart from the last drawn position"
+    );
+    // The last-drawn state resets: the new curve has not been painted yet.
+    assert!(drift.last_drawn.is_none());
+}
+
+#[test]
+fn drift_retarget_without_a_drawn_position_fails_cleanly() {
+    let mut mgr = make_manager();
+    mgr.update_frame(make_child_buf(1, 240.0, 180.0, 100.0, 100.0, 0));
+    // No drift began (the movement slot was off at its anchor): a retarget
+    // has nothing to carry on from and must refuse.
+    assert!(!mgr.retarget_drift(1, tween_100ms(), origin_now()));
+    assert!(mgr.frames.get(&1).unwrap().drift.is_none());
+}
+
+#[test]
+fn finished_drifts_clear_so_the_retained_path_returns() {
+    let mut mgr = make_manager();
+    mgr.update_frame(make_child_buf(1, 240.0, 180.0, 100.0, 100.0, 0));
+    let origin = origin_now();
+    mgr.begin_drift(1, 40.0, 0.0, tween_100ms(), origin);
+    assert!(mgr.has_animation_activity());
+
+    // Mid-drift the drift pins full renders.
+    assert!(mgr.clear_finished_drifts(sample_at(origin, 10)) == false);
+    assert!(mgr.has_animation_activity());
+
+    // Past the tween the drift clears, releasing the retained path.
+    assert!(mgr.clear_finished_drifts(sample_at(origin, 200)));
+    assert!(!mgr.has_animation_activity());
+    assert!(mgr.frames.get(&1).unwrap().drift.is_none());
+}

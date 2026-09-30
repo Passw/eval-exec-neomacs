@@ -154,6 +154,12 @@ impl GuiFrameRenderState {
             .frames
             .get(&frame_id)
             .map(|entry| entry.frame.presentation_id);
+        let previous_placement = self
+            .compositor
+            .child_frames
+            .frames
+            .get(&frame_id)
+            .map(|entry| (entry.abs_x, entry.abs_y));
         let next_presentation = frame.presentation_id;
         let changed = self.compositor.child_frames.update_frame(frame);
         if changed {
@@ -181,6 +187,37 @@ impl GuiFrameRenderState {
                         motion.open_slide,
                         motion.open_scale_from,
                     );
+                    self.compositor.dirty = true;
+                }
+            }
+            // A re-anchor is the movement trigger: the payload's placed
+            // position moved on an entry that already exists. It fires on
+            // the placement delta, not on content refreshes at the same
+            // anchor. A drift already in flight retargets from the position
+            // the last pass painted, at the speed it had; a fresh one
+            // departs from the placement the popup held until now.
+            if !is_fresh_install
+                && let Some((previous_x, previous_y)) = previous_placement
+                && let Some(entry) = self.compositor.child_frames.frames.get(&frame_id)
+                && ((entry.abs_x - previous_x).abs() > f32::EPSILON
+                    || (entry.abs_y - previous_y).abs() > f32::EPSILON)
+            {
+                let motion = self.compositor.child_frame_motion;
+                if !motion.movement.is_instant() {
+                    let retargeted = self.compositor.child_frames.retarget_drift(
+                        frame_id,
+                        motion.movement,
+                        observe_platform_now(),
+                    );
+                    if !retargeted {
+                        self.compositor.child_frames.begin_drift(
+                            frame_id,
+                            previous_x,
+                            previous_y,
+                            motion.movement,
+                            observe_platform_now(),
+                        );
+                    }
                     self.compositor.dirty = true;
                 }
             }

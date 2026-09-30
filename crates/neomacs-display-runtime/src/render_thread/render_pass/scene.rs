@@ -107,6 +107,14 @@ pub(super) fn render_frame_content_overlays(
     // path's activity check does not pin the surface to full renders
     // forever after the first popup.
     let mut finished_animations = Vec::new();
+    // Positions each drifting frame was painted at, written back after the
+    // pass so a re-anchor arriving before the drift finishes can retarget
+    // from where the user actually saw the popup.
+    let mut drift_drawn: Vec<(u64, f32, f32, f32)> = Vec::new();
+    // Whether a drift finished this pass: the popup reached its placed
+    // position, and the retained texture -- frozen mid-drift at an
+    // interpolated origin -- must rebuild before it is blitted again.
+    let mut drift_finished = false;
     // Whether the corpse-clearing (or crossfade-closing) repaint was
     // requested this pass.
     let mut crossfade_finished = false;
@@ -259,6 +267,24 @@ pub(super) fn render_frame_content_overlays(
                         ));
                     }
                 }
+                // A placement drift glides the frame from where the last
+                // pass painted it to its placed position. While it runs,
+                // the drawn origin is the interpolation; the placed
+                // position is where it settles, reached with the speed the
+                // popup had when the re-anchor interrupted it.
+                let mut drawn_x = child_entry.abs_x;
+                let mut drawn_y = child_entry.abs_y;
+                if let Some(drift) = child_entry.drift.as_ref() {
+                    let progress = drift.motion.sample(sample);
+                    if progress.finished {
+                        drift_finished = true;
+                    } else {
+                        child_animation_active = true;
+                        drawn_x = drift.from_x + (drawn_x - drift.from_x) * progress.progress;
+                        drawn_y = drift.from_y + (drawn_y - drift.from_y) * progress.progress;
+                        drift_drawn.push((child_id, drawn_x, drawn_y, progress.rate));
+                    }
+                }
                 // The new frame's alpha rides the crossfade's mix when one
                 // is running, so the old picture genuinely shows through.
                 let effective_alpha =
@@ -273,8 +299,8 @@ pub(super) fn render_frame_content_overlays(
                 };
                 (
                     &child_entry.frame,
-                    child_entry.abs_x,
-                    child_entry.abs_y,
+                    drawn_x,
+                    drawn_y,
                     clip_in_root,
                     effective_alpha,
                     offset_y,
@@ -376,6 +402,21 @@ pub(super) fn render_frame_content_overlays(
     }
     if crossfade_finished && render.compositor.child_frames.prune_crossfades(sample) {
         // The mix ended: one more repaint draws the new payload alone.
+        render.mark_dirty();
+    }
+    for (frame_id, x, y, rate) in drift_drawn {
+        render
+            .compositor
+            .child_frames
+            .record_drift_drawn(frame_id, x, y, rate);
+    }
+    if drift_finished && render.compositor.child_frames.clear_finished_drifts(sample) {
+        // The popup reached its anchor. The retained texture was frozen
+        // mid-drift at an interpolated origin -- bump the generation so the
+        // next eligible frame rebuilds it with the popup settled, and one
+        // more repaint actually shows that.
+        render.compositor.current_scene_generation =
+            crate::render_thread::frame_state::next_scene_generation();
         render.mark_dirty();
     }
     if render.compositor.child_frames.has_dying()
