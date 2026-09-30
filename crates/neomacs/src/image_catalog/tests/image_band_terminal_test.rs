@@ -7,7 +7,7 @@
 //! moves it.
 
 use super::*;
-use neomacs_display_runtime::render_thread::{BandChunk, ImageDecodeTerminal};
+use neomacs_display_runtime::render_thread::{ImageDecodeTerminal, RowRange};
 use neovm_core::emacs_core::image_catalog::{
     ImageLayoutExtent, ImageLoadAttempt, ImageLookup, ImagePlacement, PendingImage,
     ResolvedImageMetadata,
@@ -21,15 +21,10 @@ fn load() -> ImageLoadToken {
 }
 
 fn band(rows: u32) -> ImageDecodeTerminal {
-    ImageDecodeTerminal::Band(
-        BandChunk::from_rows(
-            0,
-            std::num::NonZeroU32::new(rows).expect("non-zero rows"),
-            4,
-            vec![0u8; 4 * rows as usize * 4],
-        )
-        .expect("a band of the rows it claims"),
-    )
+    ImageDecodeTerminal::Band(RowRange::new(
+        0,
+        std::num::NonZeroU32::new(rows).expect("non-zero rows"),
+    ))
 }
 
 /// The invariant, from the catalog's side: bands leave a pending image pending,
