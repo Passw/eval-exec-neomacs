@@ -15110,6 +15110,25 @@ fn layout_frame_rust_wraps_a_mid_row_image_onto_the_next_row() {
         "a deferred image is re-produced whole on the next row, not cropped"
     );
 
+    // GNU marks that row continued (`row->continued_p = true`) rather than
+    // ending it, which is what makes the next row its continuation: the row
+    // keeps its `:extend` fill and draws the right-fringe continuation arrow.
+    let right_curly_index = eval
+        .eval_str("(get 'right-curly-arrow 'fringe)")
+        .expect("right-curly-arrow fringe prop")
+        .as_fixnum()
+        .expect("fringe index") as u16;
+    assert!(
+        text_rows[0].continued,
+        "the row the image did not fit in is a continued row"
+    );
+    assert!(
+        text_rows[0]
+            .right_fringe_bitmap
+            .is_some_and(|info| info.bitmap_index == right_curly_index),
+        "a continued row draws the right-fringe continuation arrow"
+    );
+
     let first_row_text = &text_rows[0].glyphs[GlyphArea::Text.index()];
     assert!(
         first_row_text

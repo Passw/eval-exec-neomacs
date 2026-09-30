@@ -12454,6 +12454,59 @@ fn display_replacement_row_render_reports_an_image_the_row_refuses() {
             );
         })
         .expect("current row");
+
+    // The same row places an image the leftover space can hold, and says so:
+    // "refused" is the row's answer, not this append's.
+    let fitting = DisplayPropertyReplacementRowRenderRequest::from_resolved_source_item(
+        replacement_source,
+        DisplayPropertyReplacementSourceItem::Media(
+            DisplayReplacementMediaSourceResolution::Media(DisplayReplacementMediaSourceItem::new(
+                DisplayMediaReplacement::image(DisplayImageItem {
+                    image_id: 43,
+                    source_rect: neomacs_display_protocol::ImageSourceRect::FULL,
+                    width: 15.0,
+                    height: 32.0,
+                    ascent: 32.0,
+                    horizontal_margin: 0.0,
+                    vertical_margin: 0.0,
+                    opaque_background: None,
+                }),
+                active_face.metrics().row_height(),
+                active_face.metrics().ascent(),
+                false,
+            )),
+        ),
+        0.0,
+        DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
+        DisplayRowPosition::new(150.0, 18),
+    );
+    let render = fitting.begin_render_to_text_rows(
+        &snapshot,
+        &mut text_row_source_render_state(
+            &mut builder,
+            &mut output_emitter,
+            &mut eval,
+            &mut font_metrics,
+            &face_resolver,
+        ),
+        &mut face_ids,
+        &surface,
+        &mut geometry,
+        &active_face,
+    );
+    let DisplayPropertyReplacementRowRender::Applied(outcome) = render else {
+        panic!("a media replacement is atomic");
+    };
+    assert_eq!(
+        outcome.placement(),
+        DisplayReplacementPlacement::Placed,
+        "the row keeps an image it has room for"
+    );
+    assert_eq!(
+        outcome.end_position(),
+        DisplayRowPosition::new(165.0, 20),
+        "a placed image advances the pen by its advance"
+    );
 }
 
 #[test]

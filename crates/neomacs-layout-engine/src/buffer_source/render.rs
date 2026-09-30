@@ -270,6 +270,14 @@ impl<'rows, 'request, 'emit, 'surface, 'face>
     /// `DisplayImageOverflowAction` -- takes the row's own answer instead of
     /// being deferred for ever.  A truncating row does not move the
     /// replacement down either: GNU draws that glyph past the edge.
+    ///
+    /// What this does not do, relative to `display_line`: when the row holds a
+    /// word-wrap candidate before the replacement, GNU breaks at that candidate
+    /// instead (`goto back_to_wrap`, src/xdisp.c:26394-26406) and moves the word
+    /// in front of the image down with it.  The replacement path has no word-wrap
+    /// candidate to rewind -- the text path owns that state -- so only the
+    /// replacement moves, and the word before it stays on the row above.  The
+    /// image still lands at the start of a continuation row.
     fn consume_replacement<B: LayoutBufferView>(
         mut self,
         source_walk: &mut BufferSourceWalk<'request, B>,
