@@ -235,9 +235,12 @@ impl RasterTarget {
                         pending.len() - 1
                     }
                 };
-                if let Some(accum) = pending.get_mut(slot) {
-                    accum.add(line, weight);
-                }
+                // Indexed rather than `get_mut`: the slot is one this loop just
+                // produced, so an invalid one is a bug in this function, and a
+                // contribution that vanished silently would be a wrong picture
+                // rather than a loud failure. A panic here is caught by the
+                // decoder thread and turns into a failed decode.
+                pending[slot].add(line, weight);
             });
         }
         // An output row is complete once every input that contributes to it

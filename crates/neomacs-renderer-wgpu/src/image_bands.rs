@@ -45,12 +45,14 @@ use crate::image_scale::RasterTarget;
 /// to be the point where the first band visibly beats the last one.
 pub(crate) const BANDING_MIN_PIXELS: u64 = 4_000_000;
 
-/// Largest RGBA payload one band carries.
+/// Largest run of source rows one band reads, in RGBA.
 ///
 /// This is what bounds the number of bands from below: with no width to worry
 /// about, a source arrives in at most `total_bytes / BAND_MAX_BYTES` bands, so
 /// even a hundred-megapixel image bands into about a hundred pieces instead of
-/// following its height into thousands.
+/// following its height into thousands. It bounds the *reading*, not what a
+/// band hands over — a band's payload is the raster rows those source rows
+/// filled, which is smaller by the reduction.
 pub(crate) const BAND_MAX_BYTES: usize = 4 * 1024 * 1024;
 
 /// Most bands one source is planned to produce.
@@ -522,7 +524,7 @@ impl BandPlan {
         Self { size, realization }
     }
 
-    /// Rows one band of a `width` x `height` source covers.
+    /// Rows one band of a `width` x `height` source aims to read.
     ///
     /// Three bounds meet, and the largest floor under the smallest ceiling
     /// wins:
@@ -537,7 +539,10 @@ impl BandPlan {
     ///
     /// The height floor and the byte ceiling govern in practice: a source
     /// large enough to band is usually shown at or below its own size, where
-    /// one display row is a single source row.
+    /// one display row is a single source row. This is a budget rather than a
+    /// rule — a band reads past it rather than fill no raster row at all
+    /// (`PngRows::next_band`) — and how many rows it hands over is whichever
+    /// raster rows those source rows completed.
     fn band_rows(self, width: u32, height: u32) -> NonZeroU32 {
         let display = self.rows_per_display_row(width, height).get();
         let counted = height.div_ceil(BAND_TARGET_COUNT).max(1);
