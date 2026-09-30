@@ -1865,6 +1865,134 @@ fn font_shape_gstring_rejects_invalid_shape_and_accepts_valid_opened_font() {
 }
 
 #[test]
+fn font_shape_gstring_fills_slots_through_the_installed_shaper() {
+    // Issue #447: the ligature flow is auto-compose-chars -> rule function
+    // (e.g. font-shape-gstring) -> shaped gstring whose slots carry the
+    // font's shaped glyphs. GNU's Ffont_shape_gstring runs the font driver's
+    // shape method, truncates the glyph vector at the produced count,
+    // validates the cluster coverage (first from == 0; monotone from/to with
+    // same-cluster sharing), and returns the gstring — nil only when the
+    // driver cannot shape. The stub returned nil unconditionally, which made
+    // every font-shaped ligature composition fail.
+    crate::test_utils::init_test_tracing();
+    let mut eval = Context::new();
+
+    let font = build_font_object(&RuntimeFace::new("default"));
+    let gstring = crate::emacs_core::composite::composition_get_gstring(
+        &mut eval,
+        vec![
+            Value::fixnum(0),
+            Value::fixnum(2),
+            font,
+            Value::string("fi"),
+        ],
+    )
+    .expect("composition-get-gstring should build a GNU-shaped gstring");
+
+    // A test shaper shaped as ONE ligature glyph covering both characters:
+    // slot[2] = [from=0 to=1 code=0xF1 width=13 …], slot[3] = nil.
+    eval.font_shape_fn = Some(Box::new(|_eval, gstring, _direction| {
+        let Some(slots) = gstring.as_vector_data() else {
+            return crate::emacs_core::font::GstringShapeOutcome::NotShapable;
+        };
+        if slots.len() < 4 {
+            return crate::emacs_core::font::GstringShapeOutcome::NeedLargerGlyphs;
+        }
+        gstring.set_vector_slot(
+            2,
+            Value::vector(vec![
+                Value::fixnum(0),
+                Value::fixnum(1),
+                Value::NIL,
+                Value::fixnum(0xF1),
+                Value::fixnum(13),
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+            ]),
+        );
+        gstring.set_vector_slot(3, Value::NIL);
+        crate::emacs_core::font::GstringShapeOutcome::Shaped(1)
+    }));
+
+    let shaped = font_shape_gstring(&mut eval, vec![gstring.clone(), Value::NIL])
+        .expect("shaping should not signal");
+    assert!(
+        shaped == gstring,
+        "GNU returns the gstring itself after shaping"
+    );
+    let slots = shaped.as_vector_data().expect("gstring vector");
+    // The shape id (slot 1) is the composition cache's bookkeeping — that
+    // cache is not yet implemented in this port, so it stays nil here.
+    assert!(slots[3].is_nil(), "the glyph vector is truncated at n=1");
+    let glyph = slots[2].as_vector_data().expect("first glyph slot");
+    assert_eq!(glyph[0], Value::fixnum(0), "from");
+    assert_eq!(glyph[1], Value::fixnum(1), "to");
+    assert_eq!(glyph[3], Value::fixnum(0xF1), "the shaper's glyph code");
+    assert_eq!(glyph[4], Value::fixnum(13), "the shaper's advance");
+}
+
+#[test]
+fn font_shape_gstring_grows_the_glyph_vector_when_the_shaper_needs_room() {
+    crate::test_utils::init_test_tracing();
+    let mut eval = Context::new();
+    let font = build_font_object(&RuntimeFace::new("default"));
+    let gstring = crate::emacs_core::composite::composition_get_gstring(
+        &mut eval,
+        vec![
+            Value::fixnum(0),
+            Value::fixnum(2),
+            font,
+            Value::string("fi"),
+        ],
+    )
+    .expect("gstring");
+
+    // A shaper that first asks for a larger vector, then produces one glyph
+    // covering the run — GNU grows the gstring and retries, up to three
+    // attempts (src/font.c Ffont_shape_gstring).
+    eval.font_shape_fn = Some(Box::new(|_eval, gstring, _direction| {
+        use std::cell::Cell;
+        use std::rc::Rc;
+        thread_local! {
+            static ATTEMPTS: Rc<Cell<u32>> = Rc::new(Cell::new(0));
+        }
+        let attempt = ATTEMPTS.with(|c| {
+            let v = c.get();
+            c.set(v + 1);
+            v
+        });
+        if attempt == 0 {
+            return crate::emacs_core::font::GstringShapeOutcome::NeedLargerGlyphs;
+        }
+        gstring.set_vector_slot(
+            2,
+            Value::vector(vec![
+                Value::fixnum(0),
+                Value::fixnum(1),
+                Value::NIL,
+                Value::fixnum(0xF1),
+                Value::fixnum(13),
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+            ]),
+        );
+        gstring.set_vector_slot(3, Value::NIL);
+        crate::emacs_core::font::GstringShapeOutcome::Shaped(1)
+    }));
+
+    let shaped = font_shape_gstring(&mut eval, vec![gstring, Value::NIL])
+        .expect("growing retry should not signal");
+    let slots = shaped.as_vector_data().expect("gstring vector");
+    assert!(!slots[2].is_nil(), "shaped after growing");
+}
+
+#[test]
 fn set_face_attribute_accepts_only_gnu_underline_style_symbols() {
     crate::test_utils::init_test_tracing();
     let rendered = bootstrap_eval_all(

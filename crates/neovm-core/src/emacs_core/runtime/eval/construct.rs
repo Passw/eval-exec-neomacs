@@ -2244,6 +2244,7 @@ impl Context {
             eval_task_rx: None,
             quit_requested: QuitRequest::new(),
             redisplay_fn: None,
+            font_shape_fn: None,
             display_idle_maintenance_fn: None,
             scroll_preview_fn: None,
             frame_snapshot_fn: None,

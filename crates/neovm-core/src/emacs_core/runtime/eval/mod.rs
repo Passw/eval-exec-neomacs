@@ -3316,6 +3316,13 @@ pub struct Context {
     #[allow(clippy::type_complexity)]
     // frontend callback seam avoids a core/layout dependency cycle
     pub redisplay_fn: Option<Box<dyn FnMut(&mut Self)>>,
+    /// Frontend-installed font-shaping driver (GNU `font->driver->shape`).
+    /// The gstring contract lives in src/font.c's `Ffont_shape_gstring`; the
+    /// shaping engine lives in the display layer, so the frontend installs
+    /// this typed seam. `None` means the driver cannot shape (the subr
+    /// answers nil — no composition).
+    #[allow(clippy::type_complexity)]
+    pub font_shape_fn: Option<crate::emacs_core::font::FontShapeFn>,
     /// Optional GUI observer of a complete marker-backed scroll transition.
     #[allow(clippy::type_complexity)]
     pub scroll_preview_fn: Option<

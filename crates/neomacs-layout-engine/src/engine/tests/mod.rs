@@ -36821,3 +36821,71 @@ fn wide_char_cut_at_truncation_edge_leaves_both_cells_to_the_marker() {
         "both cells of the cut wide glyph must carry the truncation glyph"
     );
 }
+
+#[test]
+fn probe_ligature_rule_on_gui_frame() {
+    // Issue #447: a ligature.el-style composition rule (font-shape-gstring
+    // over a matched run) on a GUI frame must compose the matched sequence
+    // into a composed glyph shaped through the font.
+    let mut eval = Context::new();
+    let buf_id = eval
+        .buffer_manager()
+        .current_buffer()
+        .expect("current buffer")
+        .id();
+    {
+        let buf = eval.buffer_manager_mut().get_mut(buf_id).expect("buffer");
+        buf.insert("a -> b\nc ->> d\n");
+    }
+    eval.buffer_manager_mut().set_current(buf_id);
+    let rule = "(progn \
+         (setq auto-composition-mode t auto-composition-function 'auto-compose-chars \
+         composition-function-table (make-char-table nil)) \
+         (aset composition-function-table ?- \
+           (list (vector \"\\\\(?:->\\\\)\" 0 font-shape-gstring))))";
+    let ok = eval.eval_str(rule);
+    eprintln!("i447dbg rule eval: {ok:?}");
+    let frame_id = eval
+        .frame_manager_mut()
+        .create_frame("ligature-probe", 200, 160, buf_id);
+    {
+        let frame = eval.frame_manager_mut().get_mut(frame_id).expect("frame");
+        frame.set_window_system(Some(Value::symbol("neo")));
+        frame.char_width = 8.0;
+        frame.char_height = 16.0;
+    }
+    let selected_window = eval
+        .frame_manager()
+        .get(frame_id)
+        .expect("frame")
+        .selected_window;
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame_id);
+    let state = engine
+        .last_frame_display_state
+        .as_ref()
+        .expect("display state");
+    let entry = state
+        .window_matrices
+        .iter()
+        .find(|entry| entry.window_id.get() == selected_window.0 as i64)
+        .expect("selected window matrix");
+    for (ri, row) in entry
+        .matrix
+        .rows
+        .iter()
+        .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        .enumerate()
+    {
+        let text_glyphs = &row.glyphs[GlyphArea::Text.index()];
+        eprintln!("i447dbg row {ri}: {:?}", glyphs_logical_text(text_glyphs));
+        for (i, g) in text_glyphs.iter().enumerate() {
+            eprintln!(
+                "i447dbg   glyph[{i}]: type={:?} width={} pos={:?}",
+                g.glyph_type,
+                g.pixel_width,
+                g.provenance
+            );
+        }
+    }
+}

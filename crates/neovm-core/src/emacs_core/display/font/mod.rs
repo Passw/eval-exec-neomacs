@@ -3887,6 +3887,28 @@ pub(crate) fn font_match_p(args: Vec<Value>) -> EvalResult {
 /// an already-cached ID, then dispatch to the opened font driver.  Neomacs's
 /// shaping driver is not yet exposed at this Lisp seam, so an uncached valid
 /// gstring currently reports no shaped result.
+/// The result of a font-shaper driver over one gstring — GNU's
+/// `font->driver->shape` return contract (src/font.c Ffont_shape_gstring).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GstringShapeOutcome {
+    /// Driver shaped the gstring in place; the value is the number of glyphs
+    /// produced (GNU's fixnum return).
+    Shaped(i64),
+    /// Driver needs a larger glyph vector (GNU grows the gstring and
+    /// retries, at most three times).
+    NeedLargerGlyphs,
+    /// This driver cannot shape this font (GNU: `font->driver->shape` is
+    /// NULL → the value is nil, no composition).
+    NotShapable,
+}
+
+/// The installed font-shaping driver seam. neovm-core owns the gstring
+/// contract (GNU src/font.c) but not the shaping engine — the display layer
+/// (layout engine, which owns the font system) installs the driver exactly
+/// the way it installs `redisplay_fn`.
+pub type FontShapeFn =
+    Box<dyn FnMut(&mut super::eval::Context, Value, Value) -> GstringShapeOutcome>;
+
 pub(crate) fn font_shape_gstring(eval: &mut super::eval::Context, args: Vec<Value>) -> EvalResult {
     expect_args("font-shape-gstring", &args, 2)?;
     if !super::composite::composition_gstring_p(eval, args[0]) {
@@ -3895,22 +3917,105 @@ pub(crate) fn font_shape_gstring(eval: &mut super::eval::Context, args: Vec<Valu
             vec![Value::string("Invalid glyph-string: "), args[0]],
         ));
     }
-    let slots = args[0]
+    if !args[0]
         .as_vector_data()
-        .expect("validated glyph-string must be a vector");
-    if !slots[1].is_nil() {
+        .expect("validated glyph-string must be a vector")[1]
+        .is_nil()
+    {
+        // GNU: LGSTRING_ID non-nil — already shaped (or cached).
         return Ok(args[0]);
     }
-    let header = slots[0]
+    let header = args[0]
         .as_vector_data()
-        .expect("validated glyph-string header must be a vector");
+        .expect("validated glyph-string must be a vector")[0]
+        .as_vector_data()
+        .expect("validated gstring header must be a vector")
+        .clone();
     if !is_font_object(&header[0]) {
         return Err(signal(
             LispCondition::WrongTypeArgument,
             vec![Value::symbol("font-object"), header[0]],
         ));
     }
-    Ok(Value::NIL)
+
+    let mut shape_driver = match eval.font_shape_fn.take() {
+        Some(driver) => driver,
+        // GNU: `font->driver->shape == NULL` → the value is nil.
+        None => return Ok(Value::NIL),
+    };
+
+    // Try at most three times with a larger gstring each time
+    // (src/font.c Ffont_shape_gstring).
+    let mut gstring = args[0];
+    let mut shaped_count = None;
+    for _ in 0..3 {
+        match shape_driver(eval, gstring.clone(), args[1]) {
+            GstringShapeOutcome::Shaped(n) => {
+                shaped_count = Some(n);
+                break;
+            }
+            GstringShapeOutcome::NeedLargerGlyphs => {
+                gstring = grow_gstring_glyphs(gstring);
+            }
+            GstringShapeOutcome::NotShapable => return Ok(Value::NIL),
+        }
+    }
+    let Some(n) = shaped_count else {
+        return Ok(Value::NIL);
+    };
+    if n == 0 {
+        return Ok(Value::NIL);
+    }
+
+    let glyph_slots = n.clamp(0, (gstring.as_vector_data().expect("g").len() - 2) as i64) as usize;
+    {
+        // GNU: LGSTRING_SET_GLYPH (gstring, n, nil) — truncate at the count.
+        if 2 + glyph_slots < gstring.as_vector_data().expect("g").len() {
+            gstring.set_vector_slot(2 + glyph_slots, Value::NIL);
+        }
+        // Cluster coverage validation: glyph[0].from == 0; every glyph's
+        // from <= to; same from shares the same to; otherwise from ==
+        // previous to + 1 (src/font.c Ffont_shape_gstring).
+        let mut covered_to: Option<i64> = None;
+        for index in 0..glyph_slots {
+            let glyph_slot = gstring.as_vector_data().expect("g")[2 + index].clone();
+            let Some(glyph) = glyph_slot.as_vector_data() else {
+                break;
+            };
+            let (from, to) = match (glyph[0].as_int(), glyph[1].as_int()) {
+                (Some(f), Some(t)) => (f, t),
+                _ => return Ok(Value::NIL),
+            };
+            let valid = match covered_to {
+                None => from == 0 && to >= from,
+                Some(prev_to) => {
+                    (from == covered_to.unwrap_or(i64::MIN) && to == prev_to)
+                        || (from == prev_to + 1 && to >= from)
+                }
+            };
+            if !valid {
+                return Ok(Value::NIL);
+            }
+            covered_to = Some(to);
+        }
+    }
+    // GNU also runs composition_gstring_adjust_zero_width and caches the
+    // shaped gstring here; the zero-width fold and the cache are not yet
+    // implemented in this port.
+    eval.font_shape_fn = Some(shape_driver);
+    Ok(gstring)
+}
+
+/// GNU's `larger_vector (gstring, LGSTRING_GLYPH_LEN (gstring), -1)`:
+/// double the glyph-slot capacity, filling with nil.
+fn grow_gstring_glyphs(gstring: Value) -> Value {
+    let Some(slots) = gstring.as_vector_data() else {
+        return gstring;
+    };
+    let glyph_len = slots.len().saturating_sub(2);
+    let mut grown = slots.as_slice().to_vec();
+    grown.extend(std::iter::repeat_n(Value::NIL, glyph_len));
+    Value::vector(grown)
 }
 
 pub(crate) fn font_variation_glyphs(args: Vec<Value>) -> EvalResult {
