@@ -12,8 +12,8 @@ pub use neomacs_display_protocol::ImageRealization as ResolvedImageRealization;
 pub use neomacs_display_protocol::{
     AxisSize, ImageColorContext, ImageEmbeddedMetadata, ImageFrameDelay, ImageFrameIndex,
     ImageHeuristicMask, ImageId, ImageLayoutExtent, ImageLoadAttempt, ImageLoadToken,
-    ImageMaskKind, ImageMaskPolicy, ImageReportedExtent, ImageRotation, ImageSizeSpec,
-    ImageStateEvent,
+    ImageMaskKind, ImageMaskPolicy, ImageNativeExtent, ImageReportedExtent, ImageRotation,
+    ImageSizeLimit, ImageSizeSpec, ImageStateEvent,
 };
 
 /// A finite, non-negative image scale stored by bits so image requests remain
@@ -65,12 +65,25 @@ pub enum ImageDefaultScale {
     Explicit(ImageScaleFactor),
 }
 
-/// Frame facts needed to resolve semantic GNU image scaling.
+/// Frame facts a GNU image lookup resolves against before it can load
+/// anything: the semantic scaling inputs, and the `max-image-size` bound that
+/// decides whether the image may be decoded at all.
+///
+/// Both come from the same two sources — the frame and the obarray — and are
+/// read at the same moment, because GNU resolves scaling in
+/// `compute_image_size` and the size limit in `check_image_size`
+/// (`src/image.c:1811`) while handling the very same image. Carrying them in
+/// one value is what lets a lookup that has a frame publish the scaling *and*
+/// the limit to the loader, instead of only the scaling.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ImageScaleEnvironment {
     frame_column_width: ImageScaleFactor,
     device_scale: ImageScaleFactor,
     default_scale: ImageDefaultScale,
+    /// GNU's `max-image-size`, measured against this frame. Starts at GNU's
+    /// own default value so an environment nobody resolved a limit for still
+    /// bounds what it loads.
+    size_limit: ImageSizeLimit,
 }
 
 impl ImageScaleEnvironment {
@@ -96,7 +109,21 @@ impl ImageScaleEnvironment {
             device_scale: ImageScaleFactor::try_from(device_scale)
                 .expect("sanitized device scale is valid"),
             default_scale,
+            size_limit: ImageSizeLimit::default(),
         }
+    }
+
+    /// Attach the frame's resolved `max-image-size` bound.
+    #[must_use]
+    pub const fn with_size_limit(mut self, size_limit: ImageSizeLimit) -> Self {
+        self.size_limit = size_limit;
+        self
+    }
+
+    /// The largest native extent this frame will load an image at.
+    #[must_use]
+    pub const fn size_limit(self) -> ImageSizeLimit {
+        self.size_limit
     }
 
     /// The validated logical-to-device scale carried by this frame snapshot.
@@ -167,6 +194,58 @@ pub fn image_scale_environment(frame: &Frame, obarray: &Obarray) -> ImageScaleEn
         frame.device_scale_factor as f32,
         default_scale,
     )
+    .with_size_limit(image_size_limit(frame, obarray))
+}
+
+/// GNU's `max-image-size` (`src/image.c:13037`), resolved against FRAME.
+///
+/// `Vmax_image_size` is an ordinary special variable, so what counts is the
+/// binding in force when the lookup runs — a `let` around the call that makes
+/// the image visible is honoured, and a binding that has already been unwound
+/// is not, which is exactly GNU's behaviour for a load that happens during
+/// redisplay. `DEFVAR_LISP` keeps it out of every buffer, so there is no
+/// buffer-local case to consider.
+#[must_use]
+pub fn image_size_limit(frame: &Frame, obarray: &Obarray) -> ImageSizeLimit {
+    // GNU tests `FIXNUMP` before `FLOATP`; `Value` splits the same way, and
+    // anything else (nil, a string, a symbol) is GNU's "no explicit limit".
+    match obarray.symbol_value("max-image-size").copied() {
+        Some(value) if value.as_int().is_some() => {
+            ImageSizeLimit::from_axis_pixels(value.as_int().expect("tested fixnum"))
+        }
+        Some(value) if value.as_float().is_some() => ImageSizeLimit::from_frame_ratio(
+            value.as_float().expect("tested float"),
+            Some(frame_pixel_extent(frame)),
+        ),
+        _ => ImageSizeLimit::UNLIMITED,
+    }
+}
+
+/// GNU's `FRAME_PIXEL_WIDTH` / `FRAME_PIXEL_HEIGHT` (`src/frame.h`).
+///
+/// Neomacs stores a frame's geometry in logical pixels and publishes the
+/// physical scale beside it, while GNU's macros are already in device pixels:
+/// recover the physical extent so a fractional `max-image-size` means the same
+/// fraction of the same frame on both sides.
+fn frame_pixel_extent(frame: &Frame) -> ImageNativeExtent {
+    let scale = if frame.device_scale_factor.is_finite() && frame.device_scale_factor > 0.0 {
+        frame.device_scale_factor
+    } else {
+        1.0
+    };
+    ImageNativeExtent::new(
+        physical_dimension(frame.width, scale),
+        physical_dimension(frame.height, scale),
+    )
+}
+
+fn physical_dimension(logical: u32, scale: f64) -> u32 {
+    let physical = f64::from(logical) * scale;
+    if physical >= f64::from(u32::MAX) {
+        u32::MAX
+    } else {
+        physical.round().max(0.0) as u32
+    }
 }
 
 #[must_use]
@@ -518,3 +597,7 @@ pub trait ImageCatalog {
 #[cfg(test)]
 #[path = "tests/image_catalog_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "tests/image_size_limit_test.rs"]
+mod size_limit_tests;
