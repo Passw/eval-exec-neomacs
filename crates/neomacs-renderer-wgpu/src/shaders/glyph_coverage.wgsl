@@ -20,6 +20,8 @@ struct VertexOutput {
 
 struct Uniforms {
     screen_size: vec2<f32>,
+    time: f32,
+    content_alpha: f32,
 }
 
 @group(0) @binding(0)
@@ -60,7 +62,10 @@ fn composite_coverage(in: VertexOutput, coverage: vec3<f32>) -> vec4<f32> {
     }
     let rgb = mix(linear_to_srgb(in.bg_color.rgb),
                   linear_to_srgb(in.fg_color.rgb), coverage * in.fg_color.a);
-    return vec4<f32>(srgb_to_linear(rgb), 1.0);
+    // The coverage pass paints an opaque glyph patch (text plus its
+    // background). A fading child frame scales the *whole patch* toward
+    // transparency so the parent's pixels show through proportionally.
+    return vec4<f32>(srgb_to_linear(rgb), uniforms.content_alpha);
 }
 
 @fragment

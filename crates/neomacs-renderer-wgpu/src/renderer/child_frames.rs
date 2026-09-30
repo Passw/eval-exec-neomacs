@@ -1,7 +1,7 @@
 //! Child frame rendering methods for WgpuRenderer.
 
 use super::super::glyph_atlas::WgpuGlyphAtlas;
-use super::super::vertex::{RectVertex, RoundedRectVertex, Uniforms};
+use super::super::vertex::{RectVertex, RoundedRectVertex};
 use super::WgpuRenderer;
 use neomacs_display_protocol::frame_glyphs::FrameGlyphBuffer;
 use neomacs_display_protocol::types::{AnimatedCursor, Color};
@@ -35,6 +35,12 @@ impl WgpuRenderer {
     /// rendering (text, cursors, images, etc.) to `render_frame_content()`,
     /// then draws the square outer border.
     /// Uses LoadOp::Load to composite on top of whatever was rendered before.
+    ///
+    /// `alpha` scales the frame's whole picture — background, border, shadow
+    /// and glyphs alike — toward transparent. The composition path passes the
+    /// interpolated value of a lifecycle animation, or 1.0 for a settled
+    /// frame; the multiply happens in the shared uniform, so no vertex
+    /// builder changes shape.
     #[allow(clippy::too_many_arguments)]
     pub fn render_child_frame(
         &mut self,
@@ -54,20 +60,23 @@ impl WgpuRenderer {
         shadow_offset: f32,
         shadow_opacity: f32,
         pointer_selection: Option<PointerAppearanceSelection>,
+        alpha: f32,
     ) {
+        let alpha = if alpha.is_finite() {
+            alpha.clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
         let logical_w = surface_width as f32 / self.scale_factor;
         let logical_h = surface_height as f32 / self.scale_factor;
-        let uniforms = Uniforms {
-            screen_size: [logical_w, logical_h],
-            time: 0.0,
-            _padding: 0.0,
-        };
-        let draw = self.parameters(uniforms.screen_size, uniforms.time);
+        // Same cache key as `parameters()` when alpha is 1.0, so a settled
+        // child frame reuses the identical immutable snapshot.
+        let draw = self.parameters_with_alpha([logical_w, logical_h], 0.0, alpha);
 
         let bw = child.border_width;
         let frame_w = child.width;
         let frame_h = child.height;
-        let bg_alpha = child.background_alpha;
+        let bg_alpha = child.background_alpha * alpha;
         let Some(scissor) = child_scissor(
             clip_in_root,
             self.scale_factor,
@@ -121,9 +130,10 @@ impl WgpuRenderer {
                     let sy = offset_y;
                     for layer in (1..=shadow_layers).rev() {
                         let off = layer as f32 * shadow_offset;
-                        let alpha =
-                            shadow_opacity * (1.0 - (layer - 1) as f32 / shadow_layers as f32);
-                        let c = Color::new(0.0, 0.0, 0.0, alpha);
+                        let layer_alpha = shadow_opacity
+                            * (1.0 - (layer - 1) as f32 / shadow_layers as f32)
+                            * alpha;
+                        let c = Color::new(0.0, 0.0, 0.0, layer_alpha);
                         self.add_rect(&mut shadow_verts, sx + off, sy + total_h, total_w, off, &c);
                         self.add_rect(&mut shadow_verts, sx + total_w, sy + off, off, total_h, &c);
                         self.add_rect(&mut shadow_verts, sx + total_w, sy + total_h, off, off, &c);
@@ -348,6 +358,7 @@ impl WgpuRenderer {
             corner_radius,
             pointer_selection,
             Some(scissor),
+            alpha,
         );
 
         let outer_bw = child

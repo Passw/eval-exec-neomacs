@@ -47,7 +47,7 @@ struct VertexOutput {
 struct Uniforms {
     screen_size: vec2<f32>,
     time: f32,
-    _padding: f32,
+    content_alpha: f32,
 }
 
 @group(0) @binding(0)
@@ -334,10 +334,16 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let d_outer = sd_rounded_box(pos - center, half_size, radius);
     let outer_alpha = 1.0 - smoothstep(-0.5, 0.5, d_outer);
 
+    // Every style's alpha is scaled by the draw's content multiplier last, so
+    // a fading child frame fades its border and fill together regardless of
+    // which style produced them.
+    var result: vec4<f32>;
+
     // Filled mode (no inner cutout)
     if (border_width <= 0.0) {
-        let a = in.color.a * outer_alpha;
-        return vec4<f32>(in.color.rgb * a, a);
+        let a = in.color.a * outer_alpha * uniforms.content_alpha;
+        result = vec4<f32>(in.color.rgb * a, a);
+        return result;
     }
 
     // Standard inner SDF for border mask
@@ -349,38 +355,39 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Dispatch to style
     switch style_id {
         case 1u: {
-            return style_rainbow(pos, center, border_alpha);
+            result = style_rainbow(pos, center, border_alpha);
         }
         case 2u: {
-            return style_animated_rainbow(pos, center, speed, border_alpha);
+            result = style_animated_rainbow(pos, center, speed, border_alpha);
         }
         case 3u: {
-            return style_gradient(pos, in.rect_min, in.rect_max, in.color, in.color2, border_alpha);
+            result = style_gradient(pos, in.rect_min, in.rect_max, in.color, in.color2, border_alpha);
         }
         case 4u: {
-            return style_pulsing_glow(d_outer, border_alpha, in.color, speed);
+            result = style_pulsing_glow(d_outer, border_alpha, in.color, speed);
         }
         case 5u: {
-            return style_neon(pos, center, half_size, border_width, radius, d_outer, in.color, in.color2);
+            result = style_neon(pos, center, half_size, border_width, radius, d_outer, in.color, in.color2);
         }
         case 6u: {
-            return style_dashed(pos, center, speed, border_alpha, in.color);
+            result = style_dashed(pos, center, speed, border_alpha, in.color);
         }
         case 7u: {
-            return style_comet(pos, center, speed, border_alpha, in.color);
+            result = style_comet(pos, center, speed, border_alpha, in.color);
         }
         case 8u: {
-            return style_iridescent(pos, in.rect_min, in.rect_max, speed, border_alpha, in.color);
+            result = style_iridescent(pos, in.rect_min, in.rect_max, speed, border_alpha, in.color);
         }
         case 9u: {
-            return style_fire(pos, speed, border_alpha, in.color);
+            result = style_fire(pos, speed, border_alpha, in.color);
         }
         case 10u: {
-            return style_heartbeat(pos, center, half_size, border_width, radius, outer_alpha, speed, in.color, in.color2);
+            result = style_heartbeat(pos, center, half_size, border_width, radius, outer_alpha, speed, in.color, in.color2);
         }
         default: {
             // Style 0: Solid
-            return style_solid(in.color, border_alpha);
+            result = style_solid(in.color, border_alpha);
         }
     }
+    return vec4<f32>(result.rgb, result.a * uniforms.content_alpha);
 }

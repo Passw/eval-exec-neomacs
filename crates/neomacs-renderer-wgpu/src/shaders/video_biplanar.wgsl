@@ -1,5 +1,7 @@
 struct Uniforms {
     screen_size: vec2<f32>,
+    time: f32,
+    content_alpha: f32,
 }
 
 @group(0) @binding(0)
@@ -142,5 +144,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     if transform.params.x >= 2u {
         display_linear /= 1.0 + max(max(display_linear.r, display_linear.g), display_linear.b);
     }
-    return vec4<f32>(max(display_linear, vec3<f32>(0.0)), 1.0) * in.color;
+    return vec4<f32>(max(display_linear, vec3<f32>(0.0)), 1.0) * in.color
+        * vec4<f32>(1.0, 1.0, 1.0, uniforms.content_alpha);
 }

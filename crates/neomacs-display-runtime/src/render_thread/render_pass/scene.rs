@@ -145,6 +145,7 @@ pub(super) fn render_frame_content_overlays(
                     child_frame_style.shadow_offset,
                     child_frame_style.shadow_opacity,
                     pointer_selection,
+                    1.0,
                 );
                 tracing::debug!(
                     parent_frame_id = render.emacs_frame_id,

@@ -12,6 +12,11 @@ struct VertexOutput {
 
 struct Uniforms {
     screen_size: vec2<f32>,
+    // Offsets 8..16 of the shared Uniforms snapshot; time is unused here but
+    // must be declared so content_alpha lands at byte 12, matching the CPU
+    // side (`vertex.rs`).
+    time: f32,
+    content_alpha: f32,
 }
 
 @group(0) @binding(0)
@@ -30,5 +35,5 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return in.color;
+    return vec4<f32>(in.color.rgb, in.color.a * uniforms.content_alpha);
 }

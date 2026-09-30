@@ -431,7 +431,7 @@ impl WgpuRenderer {
         let uniforms = Uniforms {
             screen_size: [logical_w, logical_h],
             time: 0.0,
-            _padding: 0.0,
+            content_alpha: 1.0,
         };
         let draw = self.parameters(uniforms.screen_size, uniforms.time);
 
@@ -715,7 +715,7 @@ impl WgpuRenderer {
         let uniforms = Uniforms {
             screen_size: [logical_w, logical_h],
             time: 0.0,
-            _padding: 0.0,
+            content_alpha: 1.0,
         };
         let draw = self.parameters(uniforms.screen_size, uniforms.time);
 
@@ -852,7 +852,7 @@ impl WgpuRenderer {
         let uniforms = Uniforms {
             screen_size: [logical_w, logical_h],
             time: 0.0,
-            _padding: 0.0,
+            content_alpha: 1.0,
         };
         let draw = self.parameters(uniforms.screen_size, uniforms.time);
 
@@ -971,7 +971,7 @@ impl WgpuRenderer {
         let uniforms = Uniforms {
             screen_size: [logical_w, logical_h],
             time: 0.0,
-            _padding: 0.0,
+            content_alpha: 1.0,
         };
         let draw = self.parameters(uniforms.screen_size, uniforms.time);
 
@@ -1495,7 +1495,7 @@ impl WgpuRenderer {
         let uniforms = Uniforms {
             screen_size: [logical_w, logical_h],
             time: 0.0,
-            _padding: 0.0,
+            content_alpha: 1.0,
         };
         let draw = self.parameters(uniforms.screen_size, uniforms.time);
 
@@ -1602,7 +1602,7 @@ impl WgpuRenderer {
         let uniforms = Uniforms {
             screen_size: [logical_w, logical_h],
             time: 0.0,
-            _padding: 0.0,
+            content_alpha: 1.0,
         };
         let draw = self.parameters(uniforms.screen_size, uniforms.time);
 
@@ -1676,7 +1676,7 @@ impl WgpuRenderer {
         let uniforms = Uniforms {
             screen_size: [logical_w, logical_h],
             time: 0.0,
-            _padding: 0.0,
+            content_alpha: 1.0,
         };
         let draw = self.parameters(uniforms.screen_size, uniforms.time);
 
@@ -1833,7 +1833,7 @@ impl WgpuRenderer {
         let uniforms = Uniforms {
             screen_size: [logical_w, logical_h],
             time: 0.0,
-            _padding: 0.0,
+            content_alpha: 1.0,
         };
         let draw = self.parameters(uniforms.screen_size, uniforms.time);
 
@@ -2134,7 +2134,7 @@ impl WgpuRenderer {
         let uniforms = Uniforms {
             screen_size: [logical_w, logical_h],
             time: 0.0,
-            _padding: 0.0,
+            content_alpha: 1.0,
         };
         let draw = self.parameters(uniforms.screen_size, uniforms.time);
 

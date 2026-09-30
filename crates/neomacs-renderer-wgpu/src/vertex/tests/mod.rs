@@ -31,7 +31,7 @@ fn rounded_rect_vertex_size() {
 
 #[test]
 fn uniforms_size() {
-    // screen_size: [f32; 2] = 8, _padding: [f32; 2] = 8 => 16 bytes
+    // screen_size: [f32; 2] = 8, time: f32 = 4, content_alpha: f32 = 4 => 16 bytes
     assert_eq!(size_of::<Uniforms>(), 16);
 }
 
@@ -472,7 +472,7 @@ fn uniforms_zeroed_is_valid() {
     let u: Uniforms = bytemuck::Zeroable::zeroed();
     assert_eq!(u.screen_size, [0.0, 0.0]);
     assert_eq!(u.time, 0.0);
-    assert_eq!(u._padding, 0.0);
+    assert_eq!(u.content_alpha, 0.0);
 }
 
 // ---- Bytemuck cast round-trip: struct <-> byte slice ----

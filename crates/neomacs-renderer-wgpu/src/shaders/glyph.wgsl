@@ -14,6 +14,8 @@ struct VertexOutput {
 
 struct Uniforms {
     screen_size: vec2<f32>,
+    time: f32,
+    content_alpha: f32,
 }
 
 @group(0) @binding(0)
@@ -37,7 +39,7 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let alpha = textureSample(glyph_texture, glyph_sampler, in.tex_coords).r;
+    let alpha = textureSample(glyph_texture, glyph_sampler, in.tex_coords).r * uniforms.content_alpha;
     // Gamma-correct compositing: swash rasterizes glyphs as linear coverage.
     // The GPU blends in sRGB space with pre-multiplied alpha, which darkens
     // mid-coverage anti-aliased edges.  Convert foreground to approximate

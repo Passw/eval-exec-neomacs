@@ -179,13 +179,15 @@ impl WgpuRenderer {
         clip_corner_radius: f32,
         pointer_selection: Option<neomacs_display_protocol::PointerAppearanceSelection>,
         scissor: Option<(u32, u32, u32, u32)>,
+        content_alpha: f32,
     ) {
-        let draw = self.parameters(
+        let draw = self.parameters_with_alpha(
             [
                 surface_width as f32 / self.scale_factor,
                 surface_height as f32 / self.scale_factor,
             ],
             0.0,
+            content_alpha,
         );
         self.arenas.glyph.begin_frame();
         self.arenas.coverage.begin_frame();

@@ -240,7 +240,14 @@ pub struct Uniforms {
     pub screen_size: [f32; 2],
     /// Elapsed time in seconds since renderer creation (for animated effects)
     pub time: f32,
-    pub _padding: f32,
+    /// Global multiplier on every color's alpha this draw produces.
+    ///
+    /// The child-frame composition path scales a fading or appearing frame's
+    /// entire picture with it; every other path passes 1.0 and the shaders'
+    /// multiply is free. Keeping this as a uniform rather than threading an
+    /// alpha through each vertex builder is what lets one scalar fade
+    /// background, border, shadow and glyphs together.
+    pub content_alpha: f32,
 }
 
 #[cfg(test)]

@@ -1942,7 +1942,18 @@ impl WgpuRenderer {
     }
 
     fn parameters(&self, size: [f32; 2], time: f32) -> draw::DrawParameters {
-        self.draw_parameters.get(&self.device, size, time)
+        self.parameters_with_alpha(size, time, 1.0)
+    }
+
+    /// Draw parameters carrying a global content-alpha multiplier.
+    ///
+    /// Only the child-frame composition path passes anything other than 1.0:
+    /// a child frame appearing or fading out scales every color it draws --
+    /// background, border, shadow and glyphs alike -- by one value, and
+    /// carrying that in the shared uniform snapshot is what keeps the
+    /// multiply out of every vertex builder.
+    fn parameters_with_alpha(&self, size: [f32; 2], time: f32, alpha: f32) -> draw::DrawParameters {
+        self.draw_parameters.get(&self.device, size, time, alpha)
     }
 
     fn frame_parameters(&self) -> draw::DrawParameters {

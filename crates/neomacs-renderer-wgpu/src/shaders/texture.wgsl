@@ -12,6 +12,8 @@ struct VertexOutput {
 
 struct Uniforms {
     screen_size: vec2<f32>,
+    time: f32,
+    content_alpha: f32,
 }
 
 @group(0) @binding(0)
@@ -34,5 +36,6 @@ fn vs_main(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(t_texture, t_sampler, in.tex_coords);
+    let sampled = textureSample(t_texture, t_sampler, in.tex_coords);
+    return vec4<f32>(sampled.rgb, sampled.a * uniforms.content_alpha);
 }

@@ -3,6 +3,8 @@
 
 struct Uniforms {
     screen_size: vec2<f32>,
+    time: f32,
+    content_alpha: f32,
 }
 
 @group(0) @binding(0)
@@ -41,7 +43,7 @@ var s_image: sampler;
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // Sample RGBA from image texture and multiply by vertex color (for tinting)
     let tex_color = textureSample(t_image, s_image, in.tex_coords);
-    return tex_color * in.color;
+    return vec4<f32>(tex_color.rgb * in.color.rgb, tex_color.a * in.color.a * uniforms.content_alpha);
 }
 
 @fragment
@@ -49,5 +51,5 @@ fn fs_main_opaque(in: VertexOutput) -> @location(0) vec4<f32> {
     // Sample from texture, force alpha=1.0 (for XRGB/BGRX DMA-BUF textures
     // where the alpha channel is unused and may be 0x00)
     let tex_color = textureSample(t_image, s_image, in.tex_coords);
-    return vec4<f32>(tex_color.rgb * in.color.rgb, in.color.a);
+    return vec4<f32>(tex_color.rgb * in.color.rgb, in.color.a * uniforms.content_alpha);
 }
