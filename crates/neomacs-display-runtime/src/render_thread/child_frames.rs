@@ -181,16 +181,22 @@ impl ChildFrameManager {
     }
 
     /// Drop dying frames whose close animation has finished at `sample`.
-    pub fn prune_dying(&mut self, sample: FrameSample) {
+    ///
+    /// Returns whether anything was removed: the caller must repaint once
+    /// more, because the corpse's last drawn pixels are on screen and
+    /// nothing else will ask for the frame that clears them.
+    pub fn prune_dying(&mut self, sample: FrameSample) -> bool {
         let before = self.dying.len();
         self.dying
             .retain(|dying| !dying.animation.motion.sample(sample).finished);
-        if self.dying.len() != before {
+        let pruned = self.dying.len() != before;
+        if pruned {
             tracing::debug!(
                 pruned = before - self.dying.len(),
                 "child_frame_lifecycle: render_thread_dying_pruned"
             );
         }
+        pruned
     }
 
     /// The dying entries that should still be drawn, in their own z-order.
@@ -208,6 +214,26 @@ impl ChildFrameManager {
 
     pub fn has_dying(&self) -> bool {
         !self.dying.is_empty()
+    }
+
+    /// Clear a finished lifecycle animation so `has_animation_activity`
+    /// stops reporting it.
+    pub fn clear_finished_animation(&mut self, frame_id: u64) {
+        if let Some(entry) = self.frames.get_mut(&frame_id) {
+            entry.animation = None;
+        }
+    }
+
+    /// Whether any child frame is mid-animation, or a corpse is retained.
+    ///
+    /// Conservative by design: it reads animation *state*, not sampled
+    /// progress, so it stays true until a scene pass clears a finished
+    /// animation. The retained-static path consults it to stay ineligible —
+    /// its texture is rebuilt only on a scene-generation change, so blitting
+    /// it while a lifecycle animation runs would show the corpse at whatever
+    /// alpha it had when the texture was last built.
+    pub fn has_animation_activity(&self) -> bool {
+        self.frames.values().any(|entry| entry.animation.is_some()) || self.has_dying()
     }
 
     /// Whether any child frame is mid-animation and needs another frame.

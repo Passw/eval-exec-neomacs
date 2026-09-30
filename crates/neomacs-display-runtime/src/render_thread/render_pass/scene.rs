@@ -97,7 +97,94 @@ pub(super) fn render_frame_content_overlays(
     scroll_indicators_enabled: bool,
 ) {
     let pointer_appearance = render.pointer_appearance;
+    // One sample drives every child-frame lifecycle animation on this
+    // surface. Sampling -- not stepping -- is what makes a frame redrawn at
+    // the same instant identical, so coalescing and dropped frames cannot
+    // change where a fade lands.
+    let sample = renderer.frame_sample();
+    let mut child_animation_active = false;
+    // Finished open animations are cleared after the pass, so the retained
+    // path's activity check does not pin the surface to full renders
+    // forever after the first popup.
+    let mut finished_animations = Vec::new();
     renderer.with_frame_effects(&mut render.compositor.renderer_effects, |renderer| {
+        // Dying frames draw first, beneath every living one: a dismissed
+        // popup is normally being replaced by the popup that took its
+        // place, and the old picture receding underneath reads as the new
+        // one arriving. Their z-order among themselves is the one they
+        // held when they died. The id/x/y triplets are collected first so
+        // the per-frame mutable atlas borrow below does not collide with
+        // the iterator's shared one.
+        if render.compositor.child_frames.has_dying() {
+            let dying_ids = render
+                .compositor
+                .child_frames
+                .dying_sorted_for_rendering()
+                .map(|dying| (dying.entry.frame_id, dying.entry.abs_x, dying.entry.abs_y))
+                .collect::<Vec<_>>();
+            for (dying_id, base_x, base_y) in dying_ids {
+                let Some(dying_entry) = render.compositor.child_frames.dying_entry(dying_id) else {
+                    continue;
+                };
+                // A corpse's payload is frozen by definition -- nothing will
+                // ever re-ingest it -- so the living-draw stale-catalog guard
+                // below does not apply to it. The atlas is content-addressed
+                // and retains its entries across face-table updates, and the
+                // corpse is transient and uninteractive; refusing its pixels
+                // here would make every dismissal instantly vanish instead
+                // of fading, which is what the guard's face-table bump on
+                // the removal itself otherwise guarantees.
+                let animation = dying_entry.animation;
+                let progress = animation.motion.sample(sample);
+                if progress.finished {
+                    continue;
+                }
+                child_animation_active = true;
+                let Some(atlas) = render.compositor.glyph_atlas.as_mut() else {
+                    continue;
+                };
+                atlas.set_current_frame_fonts(dying_entry.entry.frame.font_bindings());
+                // The close path runs progress toward "gone": opacity
+                // falls, and any slide distance carries the frame further
+                // down.
+                let alpha = 1.0 - progress.content_mix.get();
+                if alpha <= 0.0 {
+                    continue;
+                }
+                let offset_y = animation.slide_pixels * progress.progress;
+                let neomacs_display_protocol::PresentedClip::Rect(clip_in_root) =
+                    dying_entry.entry.clip_in_root
+                else {
+                    continue;
+                };
+                tracing::debug!(
+                    parent_frame_id = render.emacs_frame_id,
+                    frame_id = dying_id,
+                    alpha,
+                    "child_frame_lifecycle: render_dying_child_frame"
+                );
+                renderer.render_child_frame(
+                    surface_view,
+                    &dying_entry.entry.frame,
+                    base_x,
+                    base_y + offset_y,
+                    clip_in_root,
+                    atlas,
+                    native.content_size().0,
+                    native.content_size().1,
+                    cursor_visible,
+                    animated_cursor.filter(|ac| ac.frame_id == DisplayFrameId::new(dying_id)),
+                    child_frame_style.corner_radius,
+                    child_frame_style.shadow_enabled,
+                    child_frame_style.shadow_layers,
+                    child_frame_style.shadow_offset,
+                    child_frame_style.shadow_opacity,
+                    pointer_appearance.selection_for(&dying_entry.entry.frame),
+                    alpha,
+                );
+            }
+        }
+
         for &child_id in render.compositor.child_frames.sorted_for_rendering() {
             if let Some(child_entry) = render.compositor.child_frames.frames.get(&child_id) {
                 if child_entry.frame.font_catalog_generation != frame.font_catalog_generation {
@@ -107,6 +194,45 @@ pub(super) fn render_frame_content_overlays(
                         root_generation = frame.font_catalog_generation.get(),
                         "skipping retained child frame from a stale font catalog generation"
                     );
+                    continue;
+                }
+                // An entry without an animation draws settled, at full
+                // opacity, at its placed position -- byte-identical to the
+                // pre-animation path, which is what keeps this feature free
+                // when it is off.
+                let (alpha, offset_y, finished) =
+                    child_entry
+                        .animation
+                        .as_ref()
+                        .map_or((1.0, 0.0, true), |animation| {
+                            let progress = animation.motion.sample(sample);
+                            if progress.finished {
+                                (1.0, 0.0, true)
+                            } else {
+                                child_animation_active = true;
+                                if animation.closing {
+                                    (
+                                        1.0 - progress.content_mix.get(),
+                                        animation.slide_pixels * progress.progress,
+                                        false,
+                                    )
+                                } else {
+                                    // The open path rises: the frame starts
+                                    // `slide_pixels` below its placement and
+                                    // settles onto it, with the same curve as
+                                    // its opacity.
+                                    (
+                                        progress.content_mix.get(),
+                                        animation.slide_pixels * (1.0 - progress.progress),
+                                        false,
+                                    )
+                                }
+                            }
+                        });
+                if finished && child_entry.animation.is_some() {
+                    finished_animations.push(child_id);
+                }
+                if alpha <= 0.0 {
                     continue;
                 }
                 let neomacs_display_protocol::PresentedClip::Rect(clip_in_root) =
@@ -122,9 +248,10 @@ pub(super) fn render_frame_content_overlays(
                     parent_frame_id = render.emacs_frame_id,
                     frame_id = child_id,
                     x = child_entry.abs_x,
-                    y = child_entry.abs_y,
+                    y = child_entry.abs_y + offset_y,
                     width = child_entry.frame.width,
                     height = child_entry.frame.height,
+                    alpha,
                     glyphs = child_entry.frame.glyphs.len(),
                     "child_frame_lifecycle: render_child_frame_start"
                 );
@@ -132,7 +259,7 @@ pub(super) fn render_frame_content_overlays(
                     surface_view,
                     &child_entry.frame,
                     child_entry.abs_x,
-                    child_entry.abs_y,
+                    child_entry.abs_y + offset_y,
                     clip_in_root,
                     render.compositor.glyph_atlas.as_mut().unwrap(),
                     native.content_size().0,
@@ -145,7 +272,7 @@ pub(super) fn render_frame_content_overlays(
                     child_frame_style.shadow_offset,
                     child_frame_style.shadow_opacity,
                     pointer_selection,
-                    1.0,
+                    alpha,
                 );
                 tracing::debug!(
                     parent_frame_id = render.emacs_frame_id,
@@ -155,7 +282,25 @@ pub(super) fn render_frame_content_overlays(
             }
         }
     });
-    if render.compositor.renderer_effects.needs_redraw() {
+    // The pass reports continued animation the only way it may: by marking
+    // the frame dirty, so the scheduler asks for another one. Finished dying
+    // frames are pruned afterwards, on the same sample they were drawn with.
+    if child_animation_active || render.compositor.renderer_effects.needs_redraw() {
+        render.mark_dirty();
+    }
+    for frame_id in finished_animations {
+        render
+            .compositor
+            .child_frames
+            .clear_finished_animation(frame_id);
+    }
+    if render.compositor.child_frames.has_dying()
+        && render.compositor.child_frames.prune_dying(sample)
+    {
+        // The corpse just left the list, but its last drawn pixels are on
+        // screen and the standing demand retracts with it. One more repaint
+        // is what actually clears them; without it the dismissed popup's
+        // area freezes at whatever the final fade frame showed.
         render.mark_dirty();
     }
 
