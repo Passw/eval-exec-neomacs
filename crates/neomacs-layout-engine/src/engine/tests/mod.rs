@@ -36883,9 +36883,7 @@ fn probe_ligature_rule_on_gui_frame() {
         for (i, g) in text_glyphs.iter().enumerate() {
             eprintln!(
                 "i447dbg   glyph[{i}]: type={:?} width={} pos={:?}",
-                g.glyph_type,
-                g.pixel_width,
-                g.provenance
+                g.glyph_type, g.pixel_width, g.provenance
             );
         }
     }
