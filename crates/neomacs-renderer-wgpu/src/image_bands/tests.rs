@@ -8,7 +8,9 @@
 use super::*;
 use std::io::Cursor;
 
-use neomacs_display_protocol::{ImageRealization, ImageSizeSpec};
+use neomacs_display_protocol::{
+    ImageHeuristicMask, ImageMaskPolicy, ImageRealization, ImageSizeSpec,
+};
 
 /// A source banded regardless of size, so these tests can use small images.
 fn open_banded(data: &[u8]) -> BandSource<'_> {
@@ -303,6 +305,40 @@ fn a_truncated_png_fails_mid_stream_and_yields_no_image() {
         source.into_image().is_none(),
         "an unfinished decode must not hand back a prefix as the image"
     );
+}
+
+/// A band has a destination only where the texture can be built up from the
+/// top: an unrotated realization whose mask policy leaves the pixels alone.
+/// Both exceptions are about the realization rather than the band, and both
+/// leave the band what step 2 made it — progress, with nowhere to go.
+#[test]
+fn a_band_has_a_destination_only_where_the_texture_can_be_filled_from_the_top() {
+    assert_eq!(
+        BandFilling::of(ImageRotation::None, ImageMaskPolicy::Preserve),
+        BandFilling::TopDown,
+    );
+    for rotation in [
+        ImageRotation::Quarter,
+        ImageRotation::Half,
+        ImageRotation::ThreeQuarter,
+    ] {
+        assert_eq!(
+            BandFilling::of(rotation, ImageMaskPolicy::Preserve),
+            BandFilling::Deferred,
+            "a {rotation:?} turn moves a band's rows out of the raster's rows",
+        );
+    }
+    for mask in [
+        ImageMaskPolicy::Suppress,
+        ImageMaskPolicy::Heuristic(ImageHeuristicMask::FourCorners),
+        ImageMaskPolicy::Heuristic(ImageHeuristicMask::Rgb16([0x12, 0x34, 0x56])),
+    ] {
+        assert_eq!(
+            BandFilling::of(ImageRotation::None, mask),
+            BandFilling::Deferred,
+            "a {mask:?} mask rewrites pixels and needs all of them first",
+        );
+    }
 }
 
 /// A band of `rows` rows of `width` pixels, for the mapping tests: the pixels

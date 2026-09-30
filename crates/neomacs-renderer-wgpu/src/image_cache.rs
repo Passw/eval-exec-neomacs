@@ -2047,6 +2047,17 @@ impl ImageCache {
     /// band naming another raster belongs to other pixels entirely. Both are
     /// states this refuses to enter, and the whole-image upload at the end is
     /// what makes the refusal invisible.
+    ///
+    /// Writing in place, under a compositor that samples this texture, is a
+    /// deliberate choice over staging into a second texture and swapping: a
+    /// shadow would double the peak allocation for the largest texture this
+    /// cache holds (64 MiB at the 4096 limit) while the decode is already
+    /// holding the whole native image, and the swap would have to rebind a
+    /// texture the frames already presented are sampling. The state a partial
+    /// write describes is a prefix, which [`FilledRows`] expresses exactly; the
+    /// state a swap would need — two textures at two fill levels, and a rule for
+    /// when one may become the other — is the one that would have needed
+    /// policing.
     fn upload_band(
         &mut self,
         device: &wgpu::Device,

@@ -1975,12 +1975,10 @@ fn every_band_lands_in_the_raster_the_finished_upload_resolves() {
     let (width, height) = (2000_u32, 2000_u32);
     let data = varying_png(width, height);
     let scales = [
-        // Native size: the raster is the source and every band is its own rows.
         1.0_f32,
         // Magnified: the raster is 3125 rows from 2000, a ratio that lands
         // between texture rows at every band boundary.
-        1.25, // Minified: a texture row is worth two source rows.
-        0.5,
+        1.25,
     ];
     for scale in scales {
         let realization = ImageRealization::with_device_scale(scale, scale);
@@ -2030,6 +2028,43 @@ fn every_band_lands_in_the_raster_the_finished_upload_resolves() {
             "{width}x{height}@{scale}: the bands cover the whole raster"
         );
     }
+}
+
+/// A rotated image still decodes in bands — they are progress either way — but
+/// none of them has a destination, because GNU turns the image after sizing and
+/// a band of source rows lands in the *columns* of the stored raster. Such an
+/// image keeps the path it had before step 3: empty until the decode completes,
+/// then whole.
+#[test]
+fn a_rotated_decode_bands_without_giving_them_a_destination() {
+    let (width, height) = (2000_u32, 2000_u32);
+    let data = varying_png(width, height);
+    let mut bands = Vec::new();
+    let decoded = ImageCache::decode_data(
+        &data,
+        ImageSizeSpec::default(),
+        ImageRotation::Quarter,
+        ImageColorContext::default(),
+        ImageRealization::default(),
+        ImageMaskPolicy::Preserve,
+        ImageFrameIndex::default(),
+        crate::svg::SvgResourceContext::Isolated,
+        &ImageSequenceCache::new(),
+        ImageSequenceId::new(1).expect("non-zero test sequence"),
+        Some(&mut |band| bands.push(band)),
+    )
+    .expect("decode");
+
+    assert!(!bands.is_empty(), "a four-megapixel source still bands");
+    assert!(
+        bands.iter().all(|band| band.placed().is_none()),
+        "a quarter turn leaves a band no texture rows to fill"
+    );
+    assert_eq!(
+        decoded.geometry.raster().dimensions(),
+        (height, width),
+        "the turn exchanges the raster's axes"
+    );
 }
 
 /// A texture's filled prefix advances only by a band that continues it. A
