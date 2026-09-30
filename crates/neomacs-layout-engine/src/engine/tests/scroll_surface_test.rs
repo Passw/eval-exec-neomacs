@@ -13,6 +13,102 @@ fn await_coverage(engine: &mut LayoutEngine) {
 }
 
 #[test]
+fn overlapping_worker_wraps_cannot_disconnect_an_exported_surface() {
+    check_overlapping_worker_wraps(false);
+}
+
+#[test]
+fn overlapping_mixed_face_worker_wraps_preserve_exported_coverage() {
+    check_overlapping_worker_wraps(true);
+}
+
+fn check_overlapping_worker_wraps(rich: bool) {
+    let line = format!("{}\n", "ordinary wrapped text ".repeat(10));
+    let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(100), 320, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    if rich {
+        eval.eval_str(
+            "(progn
+            (put-text-property 20 100 'face '(:family \"DejaVu Serif\" :height 180 :weight bold))
+            (put-text-property 100 180 'face '(:family \"DejaVu Sans\" :height 85 :slant italic))
+            (let ((outer (make-overlay 10 190)) (inner (make-overlay 35 75)))
+              (overlay-put outer 'face '(:background \"#243040\"))
+              (overlay-put inner 'priority 30)
+              (overlay-put inner 'face '(:underline t))))",
+        )
+        .unwrap();
+    }
+    scroll_window_to(&mut eval, frame, window, buffer, 6, 5);
+    if let neovm_core::window::Window::Leaf { force_start, .. } = eval
+        .frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .find_window_mut(window)
+        .unwrap()
+    {
+        *force_start = true;
+    }
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let owner = DisplayWindowId::new(window.0 as i64);
+    let end = engine.retained_window_matrices[&owner]
+        .matrix
+        .rows
+        .iter()
+        .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        .last()
+        .unwrap()
+        .start_charpos;
+    let forward = end / line.len() * line.len();
+    engine
+        .request_scroll_coverage(&eval, frame, window, CharPos0::new(forward))
+        .unwrap();
+    await_coverage(&mut engine);
+    engine.layout_frame_rust(&mut eval, frame);
+    let coverage_end = |engine: &LayoutEngine| {
+        engine
+            .last_frame_display_state
+            .as_ref()
+            .unwrap()
+            .scroll_coverage
+            .iter()
+            .find(|coverage| coverage.content.window_id == owner)
+            .map(|coverage| coverage.content.matrix.rows.last().unwrap().end_charpos)
+    };
+    let before = coverage_end(&engine).expect("forward rows must extend the visible body");
+    let visible = selected_window_layout_trace(&eval, &engine, frame);
+    // This worker starts at the physical line's origin. The live viewport
+    // starts inside it, so their first paragraph has different wrap boundaries.
+    engine
+        .request_scroll_coverage(&eval, frame, window, CharPos0::new(0))
+        .unwrap();
+    await_coverage(&mut engine);
+    engine.layout_frame_rust(&mut eval, frame);
+    assert_eq!(
+        coverage_end(&engine),
+        Some(before),
+        "a conflicting worker paragraph must not interleave the accepted row chain"
+    );
+    assert_eq!(visible, selected_window_layout_trace(&eval, &engine, frame));
+    assert_eq!(
+        engine
+            .last_frame_display_state
+            .as_ref()
+            .unwrap()
+            .materialize()
+            .scroll_surfaces
+            .len(),
+        1
+    );
+    let mut fresh = LayoutEngine::new();
+    fresh.layout_frame_rust(&mut eval, frame);
+    assert_eq!(visible, selected_window_layout_trace(&eval, &fresh, frame));
+}
+
+#[test]
 fn exported_scroll_surface_moves_paint_and_source_hits_without_changing_viewport() {
     let line = "ordinary offscreen text\n";
     let (mut eval, frame_id, buffer, window) = incr_editing_frame(&line.repeat(300), 800, 600);

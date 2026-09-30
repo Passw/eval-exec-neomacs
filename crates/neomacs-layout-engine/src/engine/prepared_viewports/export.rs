@@ -153,13 +153,33 @@ impl PreparedViewports {
             // completed line boundary have independent layout context.
             for paragraph in prepared.split_inclusive(|(_, row)| !row.continued) {
                 let conflicts = paragraph.iter().any(|(_, row)| {
-                    rows.get(&row.start_charpos)
-                        .is_some_and(|(source, old_index)| {
+                    // Different wrap origins need not share any row start.
+                    // Reject interval overlaps too: otherwise inserting the
+                    // new starts between accepted rows breaks their adjacency.
+                    let previous_conflict = rows
+                        .range(..=row.start_charpos)
+                        .next_back()
+                        .is_some_and(|(_, (source, old_index))| {
                             let old = &source.matrix.rows[*old_index];
-                            old.height_px != row.height_px
-                                || old.end_charpos != row.end_charpos
-                                || old.continued != row.continued
-                        })
+                            if old.start_charpos == row.start_charpos {
+                                old.height_px != row.height_px
+                                    || old.end_charpos != row.end_charpos
+                                    || old.continued != row.continued
+                            } else {
+                                old.next_buffer_row_start()
+                                    .is_some_and(|end| end > row.start_charpos)
+                            }
+                        });
+                    previous_conflict
+                        || rows
+                            .range((
+                                std::ops::Bound::Excluded(row.start_charpos),
+                                std::ops::Bound::Unbounded,
+                            ))
+                            .next()
+                            .is_some_and(|(next, _)| {
+                                row.next_buffer_row_start().is_none_or(|end| *next < end)
+                            })
                 });
                 if conflicts {
                     continue;

@@ -2979,9 +2979,16 @@ fn repeated_idle_preview_preserves_a_longer_partial_prepared_page() {
     );
 }
 
-#[test]
-fn shared_rich_fixture_worker_prepares_the_overlay_line() {
-    let (mut eval, frame, buffer, window) = incr_editing_frame("", 1000, 800);
+fn shared_rich_scrolling_frame(
+    width: u32,
+    height: u32,
+) -> (
+    Context,
+    neovm_core::window::FrameId,
+    BufferId,
+    neovm_core::window::WindowId,
+) {
+    let (mut eval, frame, buffer, window) = incr_editing_frame("", width, height);
     eval.frame_manager_mut()
         .get_mut(frame)
         .unwrap()
@@ -3010,6 +3017,12 @@ fn shared_rich_fixture_worker_prepares_the_overlay_line() {
     eval.eval_str(&source).unwrap();
     eval.eval_str("(neomacs-scroll-content-insert 3000)")
         .unwrap();
+    (eval, frame, buffer, window)
+}
+
+#[test]
+fn shared_rich_fixture_worker_prepares_the_overlay_line() {
+    let (mut eval, frame, buffer, window) = shared_rich_scrolling_frame(1000, 800);
     // Line 2000 has the same block/overlay phase as GUI line 50000.
     let start = 2 * 110080;
     let point = eval
@@ -3073,6 +3086,131 @@ fn shared_rich_fixture_worker_prepares_the_overlay_line() {
         coverage.anchor_row > 0,
         "wrapped overlay rows remain connected above the viewport"
     );
+}
+
+#[test]
+fn captured_rich_worker_positions_preserve_connected_coverage() {
+    let (mut eval, frame, buffer, window) = shared_rich_scrolling_frame(664, 646);
+    // Remove 48 repeated 1000-line blocks from the 100000-line native fixture.
+    // This preserves the text, face, and 32-line overlay phases at these jobs.
+    let shift = 48 * 110080;
+    let jobs = [
+        5514560, 5515120, 5513060, 5512500, 5515020, 5514820, 5512600, 5514160, 5513760, 5511700,
+    ];
+    let owner = DisplayWindowId::new(window.0 as i64);
+    for origin in [5514560, 5513060, 5512500] {
+        let start = origin - shift + 5;
+        let point = eval
+            .buffer_manager()
+            .get(buffer)
+            .unwrap()
+            .char_pos_to_emacs_byte_pos_clamped(CharPos0::new(start))
+            .get();
+        scroll_window_to(&mut eval, frame, window, buffer, start as i64 + 1, point);
+        if let neovm_core::window::Window::Leaf {
+            force_start,
+            vscroll,
+            ..
+        } = eval
+            .frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .find_window_mut(window)
+            .unwrap()
+        {
+            *force_start = true;
+            *vscroll = 0;
+        }
+        let mut engine = LayoutEngine::new();
+        engine.layout_frame_rust(&mut eval, frame);
+        let end = engine.retained_window_matrices[&owner]
+            .matrix
+            .rows
+            .iter()
+            .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+            .last()
+            .unwrap()
+            .start_charpos;
+        let forward = eval
+            .eval_str(&format!(
+                "(save-excursion (goto-char {}) (line-beginning-position))",
+                end + 1
+            ))
+            .unwrap()
+            .as_fixnum()
+            .unwrap() as usize
+            - 1;
+        let prepare = |engine: &mut LayoutEngine, eval: &Context, source| {
+            engine
+                .request_scroll_coverage(eval, frame, window, CharPos0::new(source))
+                .unwrap();
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while !engine
+                .scroll_coverage
+                .drain(&mut engine.prepared_viewports)
+                .unwrap()
+            {
+                assert!(std::time::Instant::now() < deadline);
+                std::thread::yield_now();
+            }
+        };
+        prepare(&mut engine, &eval, forward);
+        engine.layout_frame_rust(&mut eval, frame);
+        let bounds = |engine: &LayoutEngine| {
+            engine
+                .last_frame_display_state
+                .as_ref()
+                .unwrap()
+                .scroll_coverage
+                .iter()
+                .find(|coverage| coverage.content.window_id == owner)
+                .map(|coverage| {
+                    let rows = &coverage.content.matrix.rows;
+                    (
+                        rows.first().unwrap().start_charpos,
+                        rows.last().unwrap().end_charpos,
+                    )
+                })
+        };
+        let original = bounds(&engine).expect("establish useful rich forward coverage");
+        let headroom = |engine: &LayoutEngine| {
+            let frame = engine
+                .last_frame_display_state
+                .as_ref()
+                .unwrap()
+                .materialize();
+            let surface = frame
+                .scroll_surfaces
+                .first()
+                .expect("materialized rich coverage");
+            (
+                surface.clamp_offset(-f32::MAX),
+                surface.clamp_offset(f32::MAX),
+            )
+        };
+        let original_headroom = headroom(&engine);
+        let visible = selected_window_layout_trace(&eval, &engine, frame);
+        for source in jobs {
+            prepare(&mut engine, &eval, source - shift);
+            engine.layout_frame_rust(&mut eval, frame);
+            let current = bounds(&engine)
+                .unwrap_or_else(|| panic!("worker {source} removed coverage at viewport {origin}"));
+            assert!(
+                current.0 <= original.0 && current.1 >= original.1,
+                "worker {source} shrank coverage at viewport {origin}: {original:?} -> {current:?}"
+            );
+            assert_eq!(visible, selected_window_layout_trace(&eval, &engine, frame));
+            let current_headroom = headroom(&engine);
+            assert!(
+                current_headroom.0 <= original_headroom.0 + 0.01
+                    && current_headroom.1 >= original_headroom.1 - 0.01,
+                "worker {source} reduced scroll headroom at {origin}: {original_headroom:?} -> {current_headroom:?}"
+            );
+        }
+        let mut fresh = LayoutEngine::new();
+        fresh.layout_frame_rust(&mut eval, frame);
+        assert_eq!(visible, selected_window_layout_trace(&eval, &fresh, frame));
+    }
 }
 
 #[test]
