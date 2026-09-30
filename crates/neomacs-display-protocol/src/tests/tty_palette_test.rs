@@ -28,23 +28,23 @@ struct Recorded {
 const RECORDED: [Recorded; 4] = [
     Recorded {
         term: "xterm",
-        alist: include_str!("tty_palette_data/xterm-alist.txt"),
-        sweep: include_str!("tty_palette_data/xterm-sweep.txt"),
+        alist: include_str!("../tty_palette_data/xterm-alist.txt"),
+        sweep: include_str!("../tty_palette_data/xterm-sweep.txt"),
     },
     Recorded {
         term: "rxvt-16color",
-        alist: include_str!("tty_palette_data/rxvt-16color-alist.txt"),
-        sweep: include_str!("tty_palette_data/rxvt-16color-sweep.txt"),
+        alist: include_str!("../tty_palette_data/rxvt-16color-alist.txt"),
+        sweep: include_str!("../tty_palette_data/rxvt-16color-sweep.txt"),
     },
     Recorded {
         term: "linux-16color",
-        alist: include_str!("tty_palette_data/linux-16color-alist.txt"),
-        sweep: include_str!("tty_palette_data/linux-16color-sweep.txt"),
+        alist: include_str!("../tty_palette_data/linux-16color-alist.txt"),
+        sweep: include_str!("../tty_palette_data/linux-16color-sweep.txt"),
     },
     Recorded {
         term: "xterm-256color",
-        alist: include_str!("tty_palette_data/xterm-256color-alist.txt"),
-        sweep: include_str!("tty_palette_data/xterm-256color-sweep.txt"),
+        alist: include_str!("../tty_palette_data/xterm-256color-alist.txt"),
+        sweep: include_str!("../tty_palette_data/xterm-256color-sweep.txt"),
     },
 ];
 
