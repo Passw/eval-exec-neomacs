@@ -22,6 +22,62 @@ fn settled_point(
 use super::*;
 
 #[test]
+fn discrete_scroll_preserves_horizontal_direction_and_multiple_steps() {
+    let mut eval = crate::emacs_core::Context::new();
+    let buffer = eval.buffer_manager_mut().create_buffer("wheel-steps");
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("wheel-steps", 800, 600, buffer);
+    let event = eval
+        .handle_read_char_input_event(
+            InputEvent::MouseScroll {
+                delta_x: -3.0,
+                delta_y: 0.0,
+                x: 30.0,
+                y: 40.0,
+                modifiers: Modifiers::default(),
+                target_frame_id: frame.0,
+            },
+            TtyInputDecoding::KeyboardCodingSystem,
+        )
+        .unwrap()
+        .unwrap();
+    let parts = crate::emacs_core::value::list_to_vec(&event).unwrap();
+    assert_eq!(parts[0].as_symbol_name(), Some("wheel-right"));
+    assert_eq!(parts[3].as_fixnum(), Some(3));
+    assert_eq!(
+        parts.len(),
+        4,
+        "discrete wheel event must not pretend to carry pixels"
+    );
+}
+
+#[test]
+fn invalid_or_empty_wheel_motion_does_not_dispatch_a_command() {
+    let mut eval = crate::emacs_core::Context::new();
+    let buffer = eval.buffer_manager_mut().create_buffer("wheel-invalid");
+    let frame = eval
+        .frame_manager_mut()
+        .create_frame("wheel-invalid", 800, 600, buffer);
+    for (x, y) in [(0.0, 0.0), (f32::NAN, 1.0), (0.0, f32::INFINITY)] {
+        let event = eval
+            .handle_read_char_input_event(
+                InputEvent::MouseScroll {
+                    delta_x: x,
+                    delta_y: y,
+                    x: 30.0,
+                    y: 40.0,
+                    modifiers: Modifiers::default(),
+                    target_frame_id: frame.0,
+                },
+                TtyInputDecoding::KeyboardCodingSystem,
+            )
+            .unwrap();
+        assert!(event.is_none());
+    }
+}
+
+#[test]
 fn precise_scroll_is_a_lisp_wheel_command_with_pixel_payload() {
     let mut eval = crate::emacs_core::Context::new();
     let buffer = eval.buffer_manager_mut().create_buffer("precise-wheel");

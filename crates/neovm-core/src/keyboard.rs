@@ -5384,14 +5384,26 @@ impl crate::emacs_core::eval::Context {
                 Ok(Some(event))
             }
             InputEvent::MouseScroll {
-                delta_x: _,
+                delta_x,
                 delta_y,
                 x,
                 y,
                 modifiers,
                 target_frame_id,
             } => {
-                let dir = if delta_y > 0.0 {
+                if !delta_x.is_finite()
+                    || !delta_y.is_finite()
+                    || (delta_x == 0.0 && delta_y == 0.0)
+                {
+                    return Ok(None);
+                }
+                let dir = if delta_x.abs() > delta_y.abs() {
+                    if delta_x > 0.0 {
+                        "wheel-left"
+                    } else {
+                        "wheel-right"
+                    }
+                } else if delta_y > 0.0 {
                     "wheel-up"
                 } else {
                     "wheel-down"
@@ -5400,7 +5412,16 @@ impl crate::emacs_core::eval::Context {
                 Self::append_modifier_prefix(&modifiers, &mut sym);
                 sym.push_str(dir);
                 let position = Self::make_mouse_position(x, y, target_frame_id, self);
-                let event = Value::list(vec![Value::symbol(&sym), position]);
+                // Frontends accumulate fractional wheel units before this
+                // integral command boundary. Preserve multiple steps in GNU's
+                // LINE-COUNT field, keeping custom wheel bindings in control.
+                let count = delta_x.abs().max(delta_y.abs()).round().max(1.0) as i64;
+                let event = Value::list(vec![
+                    Value::symbol(&sym),
+                    position,
+                    Value::fixnum(1),
+                    Value::fixnum(count),
+                ]);
                 self.command_loop.store_kbd_macro_event(event);
                 Ok(Some(event))
             }
