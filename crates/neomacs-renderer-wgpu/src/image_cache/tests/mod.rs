@@ -45,7 +45,7 @@ fn toolbar_png_keeps_intrinsic_colors_and_alpha() {
 
 fn decode_toolbar_pixels(data: &[u8]) -> Vec<u8> {
     let pixels = ImageCache::decode_data(
-        data,
+        EncodedBytes::copy_of(data),
         ImageSizeSpec::default(),
         ImageRotation::None,
         ImageColorContext::from_pixels(0xff0000, 0xabcdef)
@@ -173,7 +173,7 @@ fn decoder_worker_survives_a_panicking_request() {
         .send(DecodeRequest {
             load: following,
             source: ImageSource::Data {
-                data: png_bytes(vec![0x12, 0x34, 0x56, 0xff], 1, 1),
+                data: EncodedBytes::new(png_bytes(vec![0x12, 0x34, 0x56, 0xff], 1, 1)),
                 resources: crate::svg::SvgResourceContext::Isolated,
                 sequence: ImageSequenceId::new(62).expect("non-zero sequence"),
             },
@@ -1788,7 +1788,7 @@ fn varying_png(width: u32, height: u32) -> Vec<u8> {
 /// Every pixel of the whole-image path's answer for `data`, through the same
 /// call the banded path falls back to.
 fn whole_pixels(data: &[u8]) -> NativePixels {
-    ImageCache::decode_whole(data).expect("fixture decodes whole")
+    ImageCache::decode_whole(EncodedBytes::copy_of(data)).expect("fixture decodes whole")
 }
 
 fn decode_with_bands(
@@ -1797,7 +1797,7 @@ fn decode_with_bands(
     bands: &mut Vec<DecodedBand>,
 ) -> Option<DecodedPixels> {
     ImageCache::decode_data(
-        data,
+        EncodedBytes::copy_of(data),
         ImageSizeSpec::default(),
         ImageRotation::None,
         ImageColorContext::default(),
@@ -1991,7 +1991,7 @@ fn every_band_lands_in_the_raster_the_finished_upload_resolves() {
         let realization = ImageRealization::with_device_scale(scale, scale);
         let mut bands = Vec::new();
         let decoded = ImageCache::decode_data(
-            &data,
+            EncodedBytes::copy_of(&data),
             ImageSizeSpec::default(),
             ImageRotation::None,
             ImageColorContext::default(),
@@ -2072,7 +2072,7 @@ fn a_rotation_or_a_rewriting_mask_decodes_the_whole_image() {
     for (name, rotation, mask) in cases {
         let mut bands = Vec::new();
         let decoded = ImageCache::decode_data(
-            &data,
+            EncodedBytes::copy_of(&data),
             ImageSizeSpec::default(),
             rotation,
             ImageColorContext::default(),
@@ -2223,7 +2223,7 @@ fn a_source_below_the_threshold_keeps_the_whole_image_paths_filter() {
     let data = varying_png(width, height);
     let mut bands = Vec::new();
     let decoded = ImageCache::decode_data(
-        &data,
+        EncodedBytes::copy_of(&data),
         ImageSizeSpec::new(AxisSize::Exact(20), AxisSize::Exact(15)),
         ImageRotation::None,
         ImageColorContext::default(),
@@ -2267,7 +2267,7 @@ fn the_rows_a_band_hands_over_are_the_rows_the_finished_image_holds() {
     // A realization that really reduces: the raster is 500x500, so a band of
     // source rows has to be filtered rather than passed through.
     let decoded = ImageCache::decode_data(
-        &data,
+        EncodedBytes::copy_of(&data),
         ImageSizeSpec::new(AxisSize::Exact(500), AxisSize::Exact(500)),
         ImageRotation::None,
         ImageColorContext::default(),
@@ -2357,7 +2357,7 @@ fn the_texture_a_banded_decode_fills_ends_as_the_whole_image_paths() {
     // The finished upload, as `ImageCache::upload_texture` runs it when the
     // decode completes: the whole-image realization, written over the whole
     // texture in one call.
-    let whole = ImageCache::decode_whole(&data)
+    let whole = ImageCache::decode_whole(EncodedBytes::copy_of(&data))
         .expect("fixture decodes whole")
         .realize_bitmap(
             size,
@@ -2542,7 +2542,7 @@ fn a_clamped_baseline_jpeg_ends_as_the_whole_image_paths_texture() {
         "a band is a slice of the finished pixels, not an approximation of them"
     );
 
-    let whole = ImageCache::decode_whole(&data)
+    let whole = ImageCache::decode_whole(EncodedBytes::copy_of(&data))
         .expect("the fixture decodes whole")
         .realize_bitmap(
             ImageSizeSpec::default(),

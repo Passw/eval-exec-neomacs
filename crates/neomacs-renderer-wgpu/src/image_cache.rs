@@ -23,8 +23,8 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 
 use crate::image_bands::{
-    BandFilling, BandSink, BandSource, BandStep, DecodedBand, RasterBand, RowRange, TextureRows,
-    classify_alpha,
+    BandFilling, BandSource, BandStep, DecodedBand, EncodedBytes, RasterBand, RowRange,
+    TextureRows, classify_alpha,
 };
 use crate::image_sequence::{ImageSequenceCache, ImageSequenceResolution};
 
@@ -669,7 +669,7 @@ enum ImageSource {
         sequence: ImageSequenceId,
     },
     Data {
-        data: Vec<u8>,
+        data: EncodedBytes,
         resources: crate::svg::SvgResourceContext,
         sequence: ImageSequenceId,
     },
@@ -839,11 +839,16 @@ impl ImageCache {
                     // A banded decode reports each band as it lands, which is
                     // the whole point of decoding that way: the display side
                     // can act on a band long before the decode finishes, and
-                    // the render thread can write it into the texture.
+                    // the render thread can write it into the texture. The sink
+                    // is a borrow of this closure rather than a returned
+                    // collection — a band is worth having before the next one
+                    // exists — and it is optional, because a caller that only
+                    // wants the image decodes the same pixels without any of
+                    // this.
                     let mut publish_band = |decoded: DecodedBand| {
                         let _ = tx.send(WorkerDecodeOutcome::Band { load, decoded });
                     };
-                    let sink: BandSink<'_> = Some(&mut publish_band);
+                    let sink: Option<&mut dyn FnMut(DecodedBand)> = Some(&mut publish_band);
                     let result = catch_unwind(AssertUnwindSafe(|| match source {
                         #[cfg(test)]
                         ImageSource::Panic => panic!("injected decoder panic"),
@@ -864,7 +869,7 @@ impl ImageCache {
                             resources,
                             sequence,
                         } => Self::decode_data(
-                            &data,
+                            data,
                             size,
                             rotation,
                             colors,
@@ -934,12 +939,17 @@ impl ImageCache {
         frame: ImageFrameIndex,
         sequence_cache: &ImageSequenceCache,
         sequence: ImageSequenceId,
-        sink: BandSink<'_>,
+        sink: Option<&mut dyn FnMut(DecodedBand)>,
     ) -> Option<DecodedPixels> {
-        let encoded = std::fs::read(path).ok();
-        if let Some(pixels) = encoded.as_deref().and_then(|data| {
+        // The bytes the decode will read, owned here and handed to the decode
+        // chain by handle: `std::fs::read` gives the buffer, `EncodedBytes`
+        // moves it, and the fallbacks below still have the handle they need.
+        // The one clone is the atomic a decode job pays for the attempt to
+        // hold the bytes while this copy keeps them for the fallbacks.
+        let encoded = std::fs::read(path).ok().map(EncodedBytes::new);
+        if let Some(pixels) = encoded.as_ref().and_then(|data| {
             Self::decode_raster_data(
-                data,
+                data.clone(),
                 frame,
                 sequence_cache,
                 sequence,
@@ -990,7 +1000,7 @@ impl ImageCache {
 
     /// Decode image data with size constraints
     fn decode_data(
-        data: &[u8],
+        data: EncodedBytes,
         size: ImageSizeSpec,
         rotation: ImageRotation,
         colors: ImageColorContext,
@@ -1000,10 +1010,10 @@ impl ImageCache {
         resources: crate::svg::SvgResourceContext,
         sequence_cache: &ImageSequenceCache,
         sequence: ImageSequenceId,
-        sink: BandSink<'_>,
+        sink: Option<&mut dyn FnMut(DecodedBand)>,
     ) -> Option<DecodedPixels> {
         if let Some(pixels) = Self::decode_raster_data(
-            data,
+            data.clone(),
             frame,
             sequence_cache,
             sequence,
@@ -1019,7 +1029,7 @@ impl ImageCache {
             return None;
         }
         // Fallback: try XPM
-        if let Some(result) = crate::xpm::decode_xpm_data(data) {
+        if let Some(result) = crate::xpm::decode_xpm_data(&data) {
             return NativePixels::from_raster_tuple(result).realize_bitmap(
                 size,
                 rotation,
@@ -1030,7 +1040,7 @@ impl ImageCache {
         // Fallback: try XBM
         let fg = colors.foreground().rgba8();
         let bg = colors.background_rgba8();
-        if let Some(result) = crate::xbm::decode_xbm_data(data, fg, bg) {
+        if let Some(result) = crate::xbm::decode_xbm_data(&data, fg, bg) {
             return NativePixels::from_raster_tuple(result).realize_bitmap(
                 size,
                 rotation,
@@ -1039,7 +1049,7 @@ impl ImageCache {
             );
         }
         // Fallback: try SVG via the shared vector backend.
-        Self::decode_svg_data(data, size, rotation, realization, colors, mask, resources)
+        Self::decode_svg_data(&data, size, rotation, realization, colors, mask, resources)
     }
 
     /// Decode a raster source while preserving multi-frame semantics.
@@ -1049,7 +1059,7 @@ impl ImageCache {
     /// formats through `AnimationDecoder` first, then use the still-image path
     /// only for frame zero.
     fn decode_raster_data(
-        data: &[u8],
+        data: EncodedBytes,
         frame: ImageFrameIndex,
         sequence_cache: &ImageSequenceCache,
         sequence: ImageSequenceId,
@@ -1057,9 +1067,9 @@ impl ImageCache {
         rotation: ImageRotation,
         realization: ImageRealization,
         mask_policy: ImageMaskPolicy,
-        sink: BandSink<'_>,
+        sink: Option<&mut dyn FnMut(DecodedBand)>,
     ) -> Option<DecodedPixels> {
-        match sequence_cache.resolve(sequence, data, frame) {
+        match sequence_cache.resolve(sequence, &data, frame) {
             ImageSequenceResolution::Frame(frame) => {
                 let (width, height) = frame.dimensions();
                 let (rgba, embedded) = frame.into_parts();
@@ -1086,15 +1096,15 @@ impl ImageCache {
     /// that could not finish — is decoded whole and realized afterwards, which
     /// is what this code did for every source before banding existed.
     fn decode_still_image(
-        data: &[u8],
+        data: EncodedBytes,
         size: ImageSizeSpec,
         rotation: ImageRotation,
         realization: ImageRealization,
         mask_policy: ImageMaskPolicy,
-        sink: BandSink<'_>,
+        sink: Option<&mut dyn FnMut(DecodedBand)>,
     ) -> Option<DecodedPixels> {
         match Self::attempt_banded(
-            data,
+            data.clone(),
             size,
             realization,
             BandFilling::of(rotation, mask_policy),
@@ -1117,11 +1127,11 @@ impl ImageCache {
     /// pixels, the source's own row count would differ from the height the
     /// target was built for and the attempt is abandoned rather than published.
     fn attempt_banded(
-        data: &[u8],
+        data: EncodedBytes,
         size: ImageSizeSpec,
         realization: ImageRealization,
         filling: BandFilling,
-        mut sink: BandSink<'_>,
+        mut sink: Option<&mut dyn FnMut(DecodedBand)>,
     ) -> BandedAttempt {
         // A band has a destination only where the texture can be built up from
         // the top: an unrotated realization whose mask policy leaves the pixels
@@ -1183,8 +1193,8 @@ impl ImageCache {
 
     /// The whole image in one decode: the path every source took before
     /// banding, and the one a banded attempt falls back to.
-    fn decode_whole(data: &[u8]) -> Option<NativePixels> {
-        Self::process_image(image::load_from_memory(data).ok()?)
+    fn decode_whole(data: EncodedBytes) -> Option<NativePixels> {
+        Self::process_image(image::load_from_memory(&data).ok()?)
     }
 
     #[cfg(test)]
@@ -1203,7 +1213,7 @@ impl ImageCache {
         frame: ImageFrameIndex,
     ) -> Option<DecodedImage> {
         let pixels = Self::decode_data(
-            data,
+            EncodedBytes::copy_of(data),
             ImageSizeSpec::default(),
             ImageRotation::None,
             ImageColorContext::default(),
@@ -1270,7 +1280,7 @@ impl ImageCache {
         realization: ImageRealization,
     ) -> Option<DecodedImage> {
         let pixels = Self::decode_data(
-            data,
+            EncodedBytes::copy_of(data),
             size,
             rotation,
             ImageColorContext::from_pixels(fg_bg.0, fg_bg.1),
@@ -1598,7 +1608,7 @@ impl ImageCache {
         let _ = self.decode_tx.send(DecodeRequest {
             load,
             source: ImageSource::Data {
-                data: data.to_vec(),
+                data: EncodedBytes::new(data.to_vec()),
                 resources,
                 sequence,
             },
@@ -1695,7 +1705,7 @@ impl ImageCache {
         let _ = self.decode_tx.send(DecodeRequest {
             load,
             source: ImageSource::Data {
-                data: data.to_vec(),
+                data: EncodedBytes::new(data.to_vec()),
                 resources: crate::svg::SvgResourceContext::Isolated,
                 sequence: ImageSequenceId::new(u64::from(image.get()))
                     .expect("allocated image identity is non-zero"),
