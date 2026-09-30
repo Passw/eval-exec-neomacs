@@ -21,11 +21,7 @@ use neovm_core::emacs_core::Value;
 pub(crate) struct DisplayPointerSourceRange {
     // Captured on the evaluator thread. The row producer only copies opaque
     // protocol identities; it never dereferences an overlay or a Lisp string.
-    source: DisplaySourcePosition,
-    start_char_index: usize,
-    end_char_index: usize,
-    overlay_owner: Option<u64>,
-    occurrence: GlyphPointerOccurrenceIdentity,
+    identity: GlyphPointerSourceIdentity,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -54,17 +50,31 @@ impl DisplayPointerSourceRange {
         end_char_index: usize,
         overlay_owner: Option<Value>,
     ) -> Self {
+        let (kind, source_id) = match source {
+            DisplaySourcePosition::Buffer { buffer_id, .. } => {
+                (GlyphPointerSourceKind::Buffer, buffer_id.0)
+            }
+            DisplaySourcePosition::LispString { source_id, .. } => {
+                (GlyphPointerSourceKind::LispString, source_id.get())
+            }
+            DisplaySourcePosition::Synthetic { source_id, .. } => {
+                (GlyphPointerSourceKind::Synthetic, source_id.get())
+            }
+        };
         Self {
-            source,
-            start_char_index,
-            end_char_index,
-            overlay_owner: overlay_owner.map(|owner| owner.bits() as u64),
-            occurrence: GlyphPointerOccurrenceIdentity::Source,
+            identity: GlyphPointerSourceIdentity {
+                kind,
+                source_id,
+                range_start: start_char_index as u64,
+                range_end: end_char_index as u64,
+                property_owner: overlay_owner.map_or(0, |owner| owner.bits() as u64),
+                occurrence: GlyphPointerOccurrenceIdentity::Source,
+            },
         }
     }
 
     pub(crate) fn in_occurrence(mut self, occurrence: DisplayPointerOccurrence) -> Self {
-        self.occurrence = match occurrence {
+        self.identity.occurrence = match occurrence {
             DisplayPointerOccurrence::Source => GlyphPointerOccurrenceIdentity::Source,
             DisplayPointerOccurrence::OverlayString { overlay_id, kind } => {
                 GlyphPointerOccurrenceIdentity::OverlayString {
@@ -85,51 +95,28 @@ impl DisplayPointerSourceRange {
 
     #[cfg(test)]
     pub(crate) fn buffer_id(&self) -> Option<BufferId> {
-        match self.source {
-            DisplaySourcePosition::Buffer { buffer_id, .. } => Some(buffer_id),
-            _ => None,
-        }
+        (self.identity.kind == GlyphPointerSourceKind::Buffer)
+            .then_some(BufferId(self.identity.source_id))
     }
 
     #[cfg(test)]
     pub(crate) fn source_id(&self) -> Option<DisplaySourceId> {
-        match self.source {
-            DisplaySourcePosition::LispString { source_id, .. }
-            | DisplaySourcePosition::Synthetic { source_id, .. } => Some(source_id),
-            _ => None,
-        }
+        (self.identity.kind != GlyphPointerSourceKind::Buffer)
+            .then_some(DisplaySourceId::new(self.identity.source_id))
     }
 
     #[cfg(test)]
     pub(crate) const fn start_char_index(&self) -> usize {
-        self.start_char_index
+        self.identity.range_start as usize
     }
 
     #[cfg(test)]
     pub(crate) const fn end_char_index(&self) -> usize {
-        self.end_char_index
+        self.identity.range_end as usize
     }
 
     fn protocol_identity(&self) -> GlyphPointerSourceIdentity {
-        let (kind, source_id) = match self.source {
-            DisplaySourcePosition::Buffer { buffer_id, .. } => {
-                (GlyphPointerSourceKind::Buffer, buffer_id.0)
-            }
-            DisplaySourcePosition::LispString { source_id, .. } => {
-                (GlyphPointerSourceKind::LispString, source_id.get())
-            }
-            DisplaySourcePosition::Synthetic { source_id, .. } => {
-                (GlyphPointerSourceKind::Synthetic, source_id.get())
-            }
-        };
-        GlyphPointerSourceIdentity {
-            kind,
-            source_id,
-            range_start: self.start_char_index as u64,
-            range_end: self.end_char_index as u64,
-            property_owner: self.overlay_owner.unwrap_or(0),
-            occurrence: self.occurrence,
-        }
+        self.identity
     }
 }
 

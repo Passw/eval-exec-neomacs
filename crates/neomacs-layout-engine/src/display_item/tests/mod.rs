@@ -487,3 +487,16 @@ fn cropping_an_image_crops_its_advance_and_its_source_slice_together() {
         "only images carry GNU's image crop"
     );
 }
+
+#[test]
+fn captured_pointer_range_has_only_protocol_identity_storage() {
+    // Every text item carries this optional range through the row pipeline.
+    // Source positions belong to SourceSpan; pointer capture needs only the
+    // opaque identity that the glyph protocol publishes.
+    assert!(
+        std::mem::size_of::<DisplayPointerSourceRange>()
+            <= std::mem::size_of::<
+                neomacs_display_protocol::glyph_matrix::GlyphPointerSourceIdentity,
+            >()
+    );
+}
