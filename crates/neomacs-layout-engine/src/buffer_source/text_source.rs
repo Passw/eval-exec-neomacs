@@ -817,7 +817,21 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
 
         if let Some(composition) = self.buffer.layout_automatic_composition_starting_at(start) {
             let end = composition.end();
-            if end <= property_end && end <= self.end {
+            // A text-property boundary INSIDE the span does not split it: GNU
+            // composes the character sequence and stamps the composed glyph
+            // with the base character's face (`handle_stop` never re-seats a
+            // composition on a face change), and the pipeline writer's
+            // cross-segment merge rule keeps the base glyph's face. Gating on
+            // `property_end` here used to drop the span whenever a face seam
+            // cut it, and the plain-run scan below then clamped onto the
+            // span's start position and emitted an EMPTY run — the walk
+            // aborted and the row was committed blank (issue #445: ibuffer
+            // group headers like "🛠\u{FE0F}\u{FE0F} …" with an underline face
+            // starting on the selector blanked every row below). The
+            // `end <= self.end` bound still refuses spans crossing the
+            // accessible end (a bounded fragment's last cell is plain text,
+            // and the next fragment re-derives the composition).
+            if end <= self.end {
                 self.char_pos = end;
                 return Some(
                     self.bind_box_run_topology(
