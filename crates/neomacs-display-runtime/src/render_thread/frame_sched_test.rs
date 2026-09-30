@@ -905,6 +905,7 @@ fn demand_reason_names_are_an_explicit_golden_in_index_order() {
             "finite_effect",
             "transition",
             "pane_motion",
+            "child_frame_motion",
             "video",
             "webkit",
             "shader_surface",
@@ -922,7 +923,7 @@ fn demand_reason_names_are_an_explicit_golden_in_index_order() {
             "transient_effect",
         ]
     );
-    assert_eq!(DemandReason::COUNT, 21);
+    assert_eq!(DemandReason::COUNT, 22);
 }
 
 #[test]

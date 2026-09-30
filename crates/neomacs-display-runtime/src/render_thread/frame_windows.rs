@@ -2571,6 +2571,20 @@ impl GuiFrameWindowManager {
         });
     }
 
+    /// Publish how child frames should live and die under the current policy.
+    ///
+    /// Like the pane-motion publication above, this only affects lifecycle
+    /// events measured after this point: a fade already in flight finishes on
+    /// the spec it started with.
+    pub(super) fn apply_top_level_child_frame_motion(
+        &mut self,
+        specs: crate::render_thread::render_quality::ChildFrameMotionSpecs,
+    ) {
+        self.for_each_top_level_window_mut(|window_state| {
+            window_state.render.compositor.child_frame_motion = specs;
+        });
+    }
+
     /// Discard renderer-owned animation timelines for every top-level window.
     ///
     /// A quality-policy downgrade must remove the state that advertises frame

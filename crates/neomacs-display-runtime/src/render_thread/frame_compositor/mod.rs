@@ -118,6 +118,8 @@ pub(crate) struct FrameCompositor {
     pub(super) interaction: Option<neomacs_display_protocol::InteractionProjection>,
     /// How panes should travel, from the current quality policy.
     pub(super) pane_motion: crate::render_thread::render_quality::WindowAnimationSpecs,
+    /// How child frames live and die, from the current quality policy.
+    pub(super) child_frame_motion: crate::render_thread::render_quality::ChildFrameMotionSpecs,
     /// What the compositor is doing about the layout: settled, or carrying the
     /// panes between two of them. A state machine rather than an `Option`,
     /// because every question about it is then a `match` the compiler requires
@@ -214,6 +216,8 @@ impl FrameCompositor {
             baseline: None,
             interaction: None,
             pane_motion: crate::render_thread::render_quality::WindowAnimationSpecs::INSTANT,
+            child_frame_motion:
+                crate::render_thread::render_quality::ChildFrameMotionSpecs::INSTANT,
             layout: layout_driver::LayoutDriver::default(),
             pending: PendingContinuity::default(),
         }

@@ -1063,6 +1063,8 @@ impl RenderApp {
             .apply_top_level_transition_policy(self.transition_policy);
         self.frame_windows
             .apply_top_level_pane_motion(next_policy.pane_motion());
+        self.frame_windows
+            .apply_top_level_child_frame_motion(next_policy.child_frame_motion());
         self.effects = effective.effects.clone();
         if let Some(renderer) = self.renderer.as_mut() {
             renderer.effects = self.effects.clone();

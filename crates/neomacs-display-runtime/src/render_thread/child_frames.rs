@@ -2,13 +2,61 @@
 //!
 //! Manages child frames (posframe, which-key-posframe, etc.) as floating
 //! overlays composited on top of the parent frame within a single winit window.
+//!
+//! Lifecycle animations live beside the presentation, not inside it: an
+//! entry carries an optional [`EntryAnimation`] (a sampler bound to the
+//! moment the frame appeared), and a frame deleted while a close slot is
+//! enabled moves into [`ChildFrameManager::dying`] instead of vanishing --
+//! pixels retained for the fade, but absent from every interaction path,
+//! which consult only [`ChildFrameManager::frames`].
 
 use std::collections::HashMap;
 
+use neomacs_display_protocol::frame_time::{EventTime, FrameSample};
+use neomacs_display_protocol::motion_spec::MotionSpec;
+
 use crate::core::frame_glyphs::FrameGlyphBuffer;
+use crate::render_thread::frame_compositor::motion::Motion;
 use neomacs_display_protocol::{
     PlaceChildQuery, PresentedClip, PresentedFramePlacement, PresentedFrameScene,
 };
+
+/// An animation bound to one child frame's lifecycle.
+///
+/// The sampler is a [`Motion`]: same spec, same instant, same answer, so a
+/// frame redrawn at the same timestamp draws the same picture regardless of
+/// how many frames came between.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct EntryAnimation {
+    pub(in crate::render_thread) motion: Motion,
+    /// How far the frame displaces vertically while it animates, in logical
+    /// pixels. Zero is a pure fade.
+    pub slide_pixels: f32,
+    /// Whether the frame is leaving (`true`) or arriving (`false`).
+    ///
+    /// One direction flag instead of two animation fields: the close path
+    /// shows `1 - progress`, the open path shows `progress`, and everything
+    /// else about the curves is identical.
+    pub closing: bool,
+}
+
+impl EntryAnimation {
+    /// Bind a spec to the instant it started, or keep nothing for an
+    /// `Instant` spec -- the type-level statement that disabled animation
+    /// builds no state at all.
+    pub(crate) fn start(
+        spec: MotionSpec,
+        origin: EventTime,
+        slide_pixels: f32,
+        closing: bool,
+    ) -> Option<Self> {
+        Motion::start(spec, origin).map(|motion| Self {
+            motion,
+            slide_pixels,
+            closing,
+        })
+    }
+}
 
 /// State for one child frame.
 pub(crate) struct ChildFrameEntry {
@@ -25,6 +73,14 @@ pub(crate) struct ChildFrameEntry {
     /// Unique per-install stamp; the face aggregation signature uses it to
     /// detect that this entry's frame payload was replaced.
     pub ingest_seq: u64,
+    /// The lifecycle animation in progress, if one was started.
+    pub animation: Option<EntryAnimation>,
+}
+
+/// A child frame whose deletion is animating out.
+pub(crate) struct DyingChildFrame {
+    pub entry: ChildFrameEntry,
+    pub animation: EntryAnimation,
 }
 
 /// Manages all child frames for the render thread.
@@ -35,6 +91,12 @@ pub(crate) struct ChildFrameManager {
     /// Monotonic counter incremented each poll_frame cycle
     frame_counter: u64,
     root: Option<PresentedFramePlacement>,
+    /// Frames removed while a close slot is enabled, kept for their fade.
+    ///
+    /// A `Vec` because the set is tiny (at most one per popup dismissal) and
+    /// order is z-order at the moment of death; interaction paths never read
+    /// it, so insertion cost is irrelevant.
+    dying: Vec<DyingChildFrame>,
 }
 
 impl ChildFrameManager {
@@ -44,6 +106,7 @@ impl ChildFrameManager {
             render_order: Vec::new(),
             frame_counter: 0,
             root: None,
+            dying: Vec::new(),
         }
     }
 
@@ -57,6 +120,109 @@ impl ChildFrameManager {
         self.frame_counter += 1;
     }
 
+    /// Record that `frame_id` was installed fresh, binding its open slot.
+    ///
+    /// The caller decides "fresh" (it sees the map before the install);
+    /// re-delivering an existing frame must not retrigger an appearance.
+    pub fn begin_open_animation(
+        &mut self,
+        frame_id: u64,
+        spec: MotionSpec,
+        origin: EventTime,
+        slide_pixels: f32,
+    ) {
+        if let Some(entry) = self.frames.get_mut(&frame_id)
+            && let Some(animation) = EntryAnimation::start(spec, origin, slide_pixels, false)
+        {
+            entry.animation = Some(animation);
+        }
+    }
+
+    /// Remove `frame_id`'s subtree, retaining each removed entry in `dying`
+    /// with a bound close animation.
+    ///
+    /// Frames whose close slot resolves to `Instant` are dropped outright --
+    /// that is the "no animation" case behaving exactly as removal always
+    /// did. A dying entry keeps its placement, clip and z-path snapshots; it
+    /// is unconsultable for interaction, which is the whole point of keeping
+    /// it out of `frames`.
+    pub fn retire_frame(
+        &mut self,
+        frame_id: u64,
+        spec: MotionSpec,
+        origin: EventTime,
+        slide_pixels: f32,
+    ) -> bool {
+        if !self.frames.contains_key(&frame_id) {
+            tracing::debug!(
+                frame_id,
+                "child_frame_lifecycle: render_thread_child_remove_missing"
+            );
+            return false;
+        }
+        let removed = self.subtree_frame_ids(frame_id);
+        let mut retired = Vec::new();
+        for id in removed {
+            let Some(entry) = self.frames.remove(&id) else {
+                continue;
+            };
+            if let Some(animation) = EntryAnimation::start(spec, origin, slide_pixels, true) {
+                retired.push(DyingChildFrame { entry, animation });
+            }
+        }
+        self.rebuild_presented_scene();
+        tracing::info!(
+            frame_id,
+            dying = retired.len(),
+            "child_frame_lifecycle: render_thread_child_retired"
+        );
+        self.dying.extend(retired);
+        true
+    }
+
+    /// Drop dying frames whose close animation has finished at `sample`.
+    pub fn prune_dying(&mut self, sample: FrameSample) {
+        let before = self.dying.len();
+        self.dying
+            .retain(|dying| !dying.animation.motion.sample(sample).finished);
+        if self.dying.len() != before {
+            tracing::debug!(
+                pruned = before - self.dying.len(),
+                "child_frame_lifecycle: render_thread_dying_pruned"
+            );
+        }
+    }
+
+    /// The dying entries that should still be drawn, in their own z-order.
+    pub fn dying_sorted_for_rendering(&self) -> impl Iterator<Item = &DyingChildFrame> {
+        let mut dying = self.dying.iter().collect::<Vec<_>>();
+        dying.sort_by(|a, b| a.entry.z_path.cmp(&b.entry.z_path));
+        dying.into_iter()
+    }
+
+    pub fn dying_entry(&self, frame_id: u64) -> Option<&DyingChildFrame> {
+        self.dying
+            .iter()
+            .find(|dying| dying.entry.frame_id == frame_id)
+    }
+
+    pub fn has_dying(&self) -> bool {
+        !self.dying.is_empty()
+    }
+
+    /// Whether any child frame is mid-animation and needs another frame.
+    pub fn has_active_animation(&self, sample: FrameSample) -> bool {
+        self.frames.values().any(|entry| {
+            entry
+                .animation
+                .as_ref()
+                .is_some_and(|animation| !animation.motion.sample(sample).finished)
+        }) || self
+            .dying
+            .iter()
+            .any(|dying| !dying.animation.motion.sample(sample).finished)
+    }
+
     /// Insert or update a child frame, recompute absolute position, rebuild render order.
     ///
     /// Returns true only when the rendered payload changed. Repeated delivery of
@@ -68,7 +234,19 @@ impl ChildFrameManager {
         let abs_x = outer.x();
         let abs_y = outer.y();
         let z_order = buf.frame_placement.z_order();
+        // Taken before the payload below replaces the entry wholesale: an
+        // in-flight appearance belongs to the popup, not to one payload.
+        let previous_animation = self
+            .frames
+            .get(&frame_id.get())
+            .and_then(|entry| entry.animation);
         let existing = self.frames.get_mut(&frame_id.get());
+
+        // A re-delivery of a frame that is fading out cancels the fade: the
+        // frame is alive again, and a close animation running underneath the
+        // fresh entry would draw it toward gone.
+        self.dying
+            .retain(|dying| dying.entry.frame_id != frame_id.get());
 
         let glyph_count = buf.glyphs.len();
         if let Some(entry) = existing
@@ -130,6 +308,11 @@ impl ChildFrameManager {
                 z_path: placed.z_path().to_vec(),
                 last_updated: self.frame_counter,
                 ingest_seq: super::frame_state::next_scene_generation(),
+                // A payload refresh mid-appearance continues the animation
+                // the previous payload started: the popup is still arriving,
+                // and restarting its fade on every keystroke would read as
+                // flicker.
+                animation: previous_animation,
             },
         );
 
