@@ -720,35 +720,9 @@ impl LayoutEngine {
                 capture.stop_at_source = bridge_end;
             }
         }
-        // A rich physical line can span several bounded source fragments.
-        // Avoid another evaluator wake for each cheap fragment when backward
-        // headroom is low. Keep ordinary page acquisition at one step, stop at
-        // an admission, and bound this urgent burst by four steps and 1 ms.
-        let steps = if urgent_backward
-            && self
-                .scroll_coverage
-                .capture
-                .as_ref()
-                .is_some_and(|capture| capture.stop_at_source.is_some())
-        {
-            4
-        } else {
-            1
-        };
-        let started = (steps > 1).then(std::time::Instant::now);
-        for _ in 0..steps {
-            if let Err(error) = self.capture_scroll_step(evaluator) {
-                tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", ?error, "row capture rejected");
-                self.scroll_coverage.last_window = Some(window_id);
-                break;
-            }
-            if self.scroll_coverage.admission.is_some()
-                || self.scroll_coverage.capture.is_none()
-                || started
-                    .is_some_and(|start| start.elapsed() >= std::time::Duration::from_millis(1))
-            {
-                break;
-            }
+        if let Err(error) = self.capture_scroll_step(evaluator) {
+            tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", ?error, "row capture rejected");
+            self.scroll_coverage.last_window = Some(window_id);
         }
         Some(ScrollCoverageProgress::Continue)
     }
