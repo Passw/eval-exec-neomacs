@@ -1879,6 +1879,8 @@ pub struct ScrollBarItem {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct FrameDisplayState {
+    #[serde(default)]
+    pub scroll_input_policy: crate::ScrollInputPolicy,
     /// Bounded body coverage, separate from authoritative query geometry.
     #[serde(default)]
     pub scroll_coverage: Vec<std::sync::Arc<crate::scroll_coverage::ScrollCoverage>>,
@@ -2421,6 +2423,7 @@ impl FrameDisplayState {
 
     pub fn new(frame_cols: usize, frame_rows: usize, char_width: f32, char_height: f32) -> Self {
         Self {
+            scroll_input_policy: crate::ScrollInputPolicy::default(),
             scroll_coverage: Vec::new(),
             input_checkpoint: Vec::new(),
             presentation_id: PresentationId::default(),
@@ -2524,6 +2527,7 @@ impl FrameDisplayState {
         let frame_rows = (buf.height / buf.char_height.max(1.0)) as usize;
         let mut state = Self::new(frame_cols, frame_rows, buf.char_width, buf.char_height);
         state.presentation_id = buf.presentation_id;
+        state.scroll_input_policy = buf.scroll_input_policy;
         state.frame_placement = buf.frame_placement;
         state.presented_hit_index = buf.presented_hit_index().clone();
         state.frame_pixel_width = buf.width;
@@ -2670,6 +2674,7 @@ impl FrameDisplayState {
         MATERIALIZE_CALL_COUNT.with(|count| count.set(count.get() + 1));
         let mut buf = FrameGlyphBuffer::with_size(self.frame_pixel_width, self.frame_pixel_height);
         buf.presentation_id = self.presentation_id;
+        buf.scroll_input_policy = self.scroll_input_policy;
         buf.input_checkpoint = self.input_checkpoint.clone();
         buf.scroll_surfaces = self
             .scroll_coverage

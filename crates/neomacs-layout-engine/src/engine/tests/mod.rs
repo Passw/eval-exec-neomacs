@@ -44,6 +44,7 @@ mod mini_window_still_test;
 mod mode_line_gate_engine_test;
 mod replay_cursor_on_tab_test;
 mod scroll_back_engine_test;
+mod scroll_input_policy_test;
 mod scroll_surface_test;
 mod text_snapshot_cow_test;
 

@@ -22,7 +22,7 @@ use neomacs_webview::{
     WebViewModifiers, WebViewScrollDelta,
 };
 use winit::dpi::PhysicalPosition;
-use winit::event::{ElementState, MouseButton, MouseScrollDelta};
+use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, TouchPhase};
 use winit::window::WindowId;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -320,6 +320,19 @@ impl RenderApp {
         position: PointerPosition,
         action: PointerAction,
     ) -> Result<InputEvent, neomacs_display_protocol::PresentedHitError> {
+        let target = Self::positioned_pointer_target(render, owner, position)?;
+        Ok(InputEvent::PositionedPointer(PositionedPointerInput {
+            position,
+            target,
+            action,
+        }))
+    }
+
+    fn positioned_pointer_target(
+        render: &super::frame_windows::GuiFrameRenderState,
+        owner: PointerOwner,
+        position: PointerPosition,
+    ) -> Result<PointerTarget, neomacs_display_protocol::PresentedHitError> {
         let target = if owner.target().is_some() {
             match render.presented_region_observation(
                 position.target_frame_id,
@@ -335,11 +348,7 @@ impl RenderApp {
         } else {
             PointerTarget::Unpresented
         };
-        Ok(InputEvent::PositionedPointer(PositionedPointerInput {
-            position,
-            target,
-            action,
-        }))
+        Ok(target)
     }
 
     #[cfg(feature = "webview")]
@@ -1661,20 +1670,19 @@ impl RenderApp {
     pub(super) fn handle_cursor_left(&mut self, window_id: WindowId) {
         if let Some(window_state) = self.frame_windows.get_by_winit_mut(window_id) {
             window_state.render.clear_pointer_hover();
+            window_state.render.scroll_input.reset();
         }
     }
 
-    pub(super) fn handle_mouse_wheel(&mut self, window_id: WindowId, delta: MouseScrollDelta) {
-        if let Some(window_state) = self.frame_windows.get_by_winit(window_id) {
+    pub(super) fn handle_mouse_wheel(
+        &mut self,
+        window_id: WindowId,
+        device: Option<DeviceId>,
+        delta: MouseScrollDelta,
+        phase: TouchPhase,
+    ) {
+        if let Some(window_state) = self.frame_windows.get_by_winit_mut(window_id) {
             let scale = window_state.scale_factor();
-            let delta = match delta {
-                MouseScrollDelta::LineDelta(x, y) => ScrollDelta::Lines { x, y },
-                MouseScrollDelta::PixelDelta(pos) => ScrollDelta::Pixels {
-                    x: (pos.x / scale) as f32,
-                    y: (pos.y / scale) as f32,
-                },
-                _ => return,
-            };
             let pointer_owner = Self::pointer_owner(
                 window_state,
                 window_state.render.mouse_pos.0,
@@ -1687,6 +1695,62 @@ impl RenderApp {
                     window_state.render.mouse_pos.1,
                 )
             });
+            let position = PointerPosition {
+                x: ev_x,
+                y: ev_y,
+                target_frame_id: target_fid,
+            };
+            let target = match Self::positioned_pointer_target(
+                &window_state.render,
+                pointer_owner,
+                position,
+            ) {
+                Ok(target) => target,
+                Err(error) => {
+                    window_state.render.scroll_input.reset();
+                    tracing::error!(
+                        ?error,
+                        target_fid,
+                        ev_x,
+                        ev_y,
+                        "dropping incoherent mouse-wheel input"
+                    );
+                    return;
+                }
+            };
+            let target_window = match target {
+                PointerTarget::Presented { hit: Some(hit), .. } => hit.region().window(),
+                _ => None,
+            };
+            let frame = window_state.render.frame_for_target(target_fid);
+            let info = frame.and_then(|frame| {
+                frame
+                    .window_infos
+                    .iter()
+                    .find(|info| Some(info.window_id) == target_window)
+            });
+            let scroll_target = super::scroll_input::ScrollTarget {
+                frame: target_fid,
+                window: target_window,
+                buffer: info.map(|info| info.buffer_id),
+                height: info
+                    .map(|info| info.bounds.height)
+                    .or_else(|| frame.map(|frame| frame.height))
+                    .unwrap_or(1.0),
+                scale,
+                x11_factor: frame
+                    .map(|frame| frame.scroll_input_policy.x11_delta_factor)
+                    .unwrap_or(1.0),
+                modifiers: self.modifiers,
+                device,
+            };
+            let Some(delta) = window_state
+                .render
+                .scroll_input
+                .convert(delta, scroll_target, phase)
+            else {
+                return;
+            };
             #[cfg(feature = "webview")]
             let webview_delivery =
                 Self::webview_target_for_frame_window(&window_state.render, target_fid, ev_x, ev_y)
@@ -1704,78 +1768,60 @@ impl RenderApp {
                             },
                         )
                     });
-            let position = PointerPosition {
-                x: ev_x,
-                y: ev_y,
-                target_frame_id: target_fid,
-            };
             let action = PointerAction::Scroll {
                 delta,
                 modifiers: self.modifiers,
             };
-            match Self::positioned_pointer_input_event(
-                &window_state.render,
-                pointer_owner,
+            let input = InputEvent::PositionedPointer(PositionedPointerInput {
                 position,
+                target,
                 action,
-            ) {
-                Ok(input) => {
-                    let (receipt, token) = self.comms.send_input_with_receipt(input);
-                    if let Some(receipt) = &receipt
-                        && let Some(state) = self.frame_windows.get_by_winit_mut(window_id)
-                    {
-                        state
-                            .render
-                            .compositor
-                            .input_scroll
-                            .observe_input(receipt.clone(), token);
-                    }
-                    if let (
-                        ScrollDelta::Pixels {
-                            x: horizontal,
-                            y: vertical,
-                        },
-                        Some(receipt),
-                    ) = (delta, receipt)
-                        && self.modifiers == 0
-                        && horizontal.abs() <= vertical.abs()
-                        && let Some(state) = self.frame_windows.get_by_winit_mut(window_id)
-                        && state.render.emacs_frame_id == target_fid
-                        && matches!(
-                            state.render.compositor.layout,
-                            super::frame_compositor::layout_driver::LayoutDriver::Settled
-                        )
-                        && !state.render.compositor.transitions.has_active()
-                        && !state
-                            .render
-                            .compositor
-                            .renderer_effects
-                            .scroll_effects_active()
-                        && let Some(frame) = state.render.compositor.current_frame.as_ref()
-                        && state.render.compositor.input_scroll.push(
-                            frame,
-                            ev_x,
-                            ev_y,
-                            -vertical.round(),
-                            receipt,
-                            token,
-                        )
-                    {
-                        state.render.compositor.current_scene_generation =
-                            super::frame_state::next_scene_generation();
-                        state.render.compositor.current_row_damage = None;
-                        state.render.mark_dirty();
-                    }
-                }
-                Err(error) => {
-                    tracing::error!(
-                        ?error,
-                        target_fid,
-                        ev_x,
-                        ev_y,
-                        "dropping incoherent mouse-wheel input"
-                    );
-                }
+            });
+            let (receipt, token) = self.comms.send_input_with_receipt(input);
+            if let Some(receipt) = &receipt
+                && let Some(state) = self.frame_windows.get_by_winit_mut(window_id)
+            {
+                state
+                    .render
+                    .compositor
+                    .input_scroll
+                    .observe_input(receipt.clone(), token);
+            }
+            if let (
+                ScrollDelta::Pixels {
+                    x: horizontal,
+                    y: vertical,
+                },
+                Some(receipt),
+            ) = (delta, receipt)
+                && self.modifiers == 0
+                && horizontal.abs() <= vertical.abs()
+                && let Some(state) = self.frame_windows.get_by_winit_mut(window_id)
+                && state.render.emacs_frame_id == target_fid
+                && matches!(
+                    state.render.compositor.layout,
+                    super::frame_compositor::layout_driver::LayoutDriver::Settled
+                )
+                && !state.render.compositor.transitions.has_active()
+                && !state
+                    .render
+                    .compositor
+                    .renderer_effects
+                    .scroll_effects_active()
+                && let Some(frame) = state.render.compositor.current_frame.as_ref()
+                && state.render.compositor.input_scroll.push(
+                    frame,
+                    ev_x,
+                    ev_y,
+                    -vertical.round(),
+                    receipt,
+                    token,
+                )
+            {
+                state.render.compositor.current_scene_generation =
+                    super::frame_state::next_scene_generation();
+                state.render.compositor.current_row_damage = None;
+                state.render.mark_dirty();
             }
             #[cfg(feature = "webview")]
             if let Some((delivery, input)) = webview_delivery

@@ -328,6 +328,7 @@ pub(crate) struct GuiFrameRenderState {
     pub(super) cursor: CursorState,
     /// Last known pointer position in native root-surface logical coordinates.
     pub mouse_pos: (f32, f32),
+    pub(super) scroll_input: super::scroll_input::ScrollInput,
     /// Whether the native window currently owns the pointer. The last position
     /// remains useful for input coordinates after leave, but must not reactivate
     /// a visual range on a captured release.
@@ -525,6 +526,7 @@ impl GuiFrameRenderState {
             input_method: InputMethodState::default(),
             cursor: CursorState::new(at),
             mouse_pos: (0.0, 0.0),
+            scroll_input: super::scroll_input::ScrollInput::default(),
             pointer_inside: false,
         }
     }
@@ -680,7 +682,7 @@ impl GuiFrameRenderState {
     /// every hit test needs both the buffer and the projection that belongs to
     /// it; resolving the pair in one place is what keeps them from being
     /// fetched from two different frames.
-    fn frame_for_target(&self, target_frame_id: u64) -> Option<&FrameGlyphBuffer> {
+    pub(super) fn frame_for_target(&self, target_frame_id: u64) -> Option<&FrameGlyphBuffer> {
         if target_frame_id == self.emacs_frame_id {
             self.compositor.current_frame.as_ref()
         } else {

@@ -28,6 +28,7 @@ mod modifier_sides;
 mod pointer_events;
 pub(in crate::render_thread) mod render_pass;
 mod render_quality;
+mod scroll_input;
 mod startup;
 mod state;
 mod surface_readback;

@@ -2975,6 +2975,12 @@ impl LayoutEngine {
                 return None;
             }
         };
+        frame_display_state.scroll_input_policy.x11_delta_factor = evaluator
+            .obarray()
+            .symbol_value("x-scroll-event-delta-factor")
+            .and_then(|value| value.as_number_f64())
+            .filter(|factor| factor.is_finite())
+            .unwrap_or(1.0);
         let sealed_face_arena = match accepted_face_attempt.seal(frame_display_state.faces.clone())
         {
             Ok(arena) => arena,

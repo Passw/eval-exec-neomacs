@@ -3236,3 +3236,20 @@ fn unused_matrix_rows_share_storage_but_writes_are_isolated() {
     ));
     assert!(GlyphMatrix::new(0, 80).rows.is_empty());
 }
+#[test]
+fn scroll_input_policy_survives_matrix_materialization_and_legacy_json() {
+    let mut buf = crate::FrameGlyphBuffer::with_size(200.0, 64.0);
+    buf.scroll_input_policy.x11_delta_factor = 0.25;
+    let state = super::FrameDisplayState::from_frame_glyph_buffer(&buf);
+    assert_eq!(
+        state.materialize().scroll_input_policy,
+        buf.scroll_input_policy
+    );
+    let mut json = serde_json::to_value(&state).unwrap();
+    json.as_object_mut().unwrap().remove("scroll_input_policy");
+    let restored: super::FrameDisplayState = serde_json::from_value(json).unwrap();
+    assert_eq!(
+        restored.scroll_input_policy,
+        crate::ScrollInputPolicy::default()
+    );
+}

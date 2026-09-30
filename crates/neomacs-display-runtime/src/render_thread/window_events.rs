@@ -522,8 +522,12 @@ impl RenderApp {
                 self.handle_cursor_left(window_id);
             }
 
-            WindowEvent::MouseWheel { delta, .. } => {
-                self.handle_mouse_wheel(window_id, delta);
+            WindowEvent::MouseWheel {
+                device_id,
+                delta,
+                phase,
+            } => {
+                self.handle_mouse_wheel(window_id, device_id, delta, phase);
             }
 
             WindowEvent::RedrawRequested => {
