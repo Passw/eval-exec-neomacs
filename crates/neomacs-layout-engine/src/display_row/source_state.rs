@@ -1,4 +1,5 @@
 use crate::display_item::DisplayItem;
+use crate::display_row::render_item::DisplayRowClippedRemainder;
 use crate::display_source::DisplayItemSource;
 use crate::display_source_resolver::{
     DisplaySourceFaceScope, DisplaySourceResolveParams, DisplaySourceResolveState,
@@ -79,8 +80,19 @@ impl DisplayRowSourceState {
         self.pending_item.take()
     }
 
-    pub(crate) fn remember_pending_item(&mut self, item: Option<DisplayItem>) {
-        self.pending_item = item;
+    /// Carry the part of the clipped item the next row still owes.
+    ///
+    /// Both resumable cases become the head of the next row: GNU resumes the
+    /// element's unrendered tail there, and re-produces an element it removed
+    /// whole (`display_line`, src/xdisp.c:26448-26475).  `Nothing` is the only
+    /// way to remember no item, so a clipped item cannot disappear for want of
+    /// a representation.
+    pub(crate) fn remember_pending_item(&mut self, remainder: DisplayRowClippedRemainder) {
+        self.pending_item = match remainder {
+            DisplayRowClippedRemainder::Resume(item)
+            | DisplayRowClippedRemainder::DeferWhole(item) => Some(item),
+            DisplayRowClippedRemainder::Nothing => None,
+        };
     }
 
     pub(crate) fn discard_pending_item(&mut self) {

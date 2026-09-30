@@ -1279,6 +1279,19 @@ impl DisplayRowAppendProgress {
         &self.slots
     }
 
+    /// How many glyphs of the appended item reached the row.
+    ///
+    /// The writer pushes one slot per emitted glyph (the text path pushes one
+    /// per character, media and replacements push one for their single glyph)
+    /// and pushes none when it refuses the item -- either because the item
+    /// draws past the right edge of a text row, or because a structural lane
+    /// has no room for it.  GNU reads the same count off
+    /// `row->used[TEXT_AREA] - n_glyphs_before` (`display_line`,
+    /// src/xdisp.c:26304) to decide whether an element was produced at all.
+    pub(crate) fn emitted_glyphs(&self) -> usize {
+        self.slots.len()
+    }
+
     pub(crate) fn is_complete_with_positive_width(&self) -> bool {
         self.status == DisplayRowAppendStatus::Complete && self.metrics.has_positive_width()
     }

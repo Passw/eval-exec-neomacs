@@ -670,11 +670,21 @@ impl RowProgram {
             let item = if operation_offset == 0 {
                 original.clone()
             } else {
-                crate::display_row::render_item::clipped_display_item_remainder_after_chars(
+                // A program resumes an operation it already placed part of, so
+                // only a resumable tail can express the cut; an operation the
+                // line refused whole (or exhausted) has no program form.
+                match crate::display_row::render_item::clipped_display_item_remainder_after_chars(
                     original.clone(),
                     operation_offset,
-                )
-                .ok_or(RowProgramError::Unsupported)?
+                ) {
+                    crate::display_row::render_item::DisplayRowClippedRemainder::Resume(item) => {
+                        item
+                    }
+                    crate::display_row::render_item::DisplayRowClippedRemainder::DeferWhole(_)
+                    | crate::display_row::render_item::DisplayRowClippedRemainder::Nothing => {
+                        return Err(RowProgramError::Unsupported);
+                    }
+                }
             };
             let scalar_plan;
             let original_plan = if scalar_operations.contains(&operation_index) {

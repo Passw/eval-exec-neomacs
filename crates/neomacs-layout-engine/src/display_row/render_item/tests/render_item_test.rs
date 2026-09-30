@@ -74,8 +74,11 @@ fn clipped_string_mapped_text_preserves_and_advances_its_string_origin() {
         box_run_membership: Default::default(),
     };
 
-    let remainder = clipped_display_item_remainder_after_chars(source, 1)
-        .expect("two string characters remain");
+    let DisplayRowClippedRemainder::Resume(remainder) =
+        clipped_display_item_remainder_after_chars(source, 1)
+    else {
+        panic!("two string characters remain, so the tail resumes");
+    };
 
     assert_eq!(
         remainder.kind,
@@ -85,4 +88,108 @@ fn clipped_string_mapped_text_preserves_and_advances_its_string_origin() {
         )),
         "the next row must continue in the same string coordinate space"
     );
+}
+
+fn media_source_item(image_id: i32, width: f32, height: f32) -> DisplayItem {
+    DisplayItem {
+        span: SourceSpan::synthetic(9, 0, 1),
+        face: RenderFaceRef::FaceId(neomacs_display_protocol::types::FaceId::new(3)),
+        kind: DisplayItemKind::MediaReplacement(DisplayMediaReplacement::image(DisplayImageItem {
+            image_id,
+            source_rect: neomacs_display_protocol::ImageSourceRect::FULL,
+            width,
+            height,
+            ascent: height,
+            horizontal_margin: 0.0,
+            vertical_margin: 0.0,
+            opaque_background: None,
+        })),
+        layout: Default::default(),
+        pointer_appearance: None,
+        box_vertical_edges: Default::default(),
+        box_run_membership: Default::default(),
+    }
+}
+
+/// GNU `display_line` unproduces a display element that draws past the right
+/// edge of a continued row and re-produces it at the start of the next row
+/// (src/xdisp.c:26448-26475).  A refused image therefore carries over WHOLE --
+/// the old `Option` remainder answered "nothing to remember" for it, which is
+/// how the image silently disappeared instead of moving down.
+#[test]
+fn refused_media_item_is_deferred_whole() {
+    let source = media_source_item(42, 200.0, 80.0);
+    let remainder = clipped_display_item_remainder_after_chars(source.clone(), 0);
+    let DisplayRowClippedRemainder::DeferWhole(deferred) = remainder else {
+        panic!("a media glyph that reached no part of the row is deferred whole");
+    };
+    assert_eq!(
+        deferred, source,
+        "the deferred item keeps its own face, layout and media identity"
+    );
+}
+
+/// An atomic item the row did place -- a structural lane clipped it in place
+/// -- has no resumable tail; re-producing it would draw the glyph twice.
+#[test]
+fn media_item_already_on_the_row_has_no_remainder() {
+    let remainder =
+        clipped_display_item_remainder_after_chars(media_source_item(42, 200.0, 80.0), 1);
+    assert_eq!(remainder, DisplayRowClippedRemainder::Nothing);
+}
+
+/// A text run the row kept part of resumes from its unrendered tail, and one
+/// it kept whole has nothing left.
+#[test]
+fn text_run_remainder_resumes_and_then_exhausts() {
+    let source = DisplayItem {
+        span: SourceSpan::synthetic(5, 0, 3),
+        face: RenderFaceRef::FaceId(neomacs_display_protocol::types::FaceId::new(1)),
+        kind: DisplayItemKind::TextRun(DisplayTextRun::new("abc")),
+        layout: Default::default(),
+        pointer_appearance: None,
+        box_vertical_edges: Default::default(),
+        box_run_membership: Default::default(),
+    };
+    let DisplayRowClippedRemainder::Resume(remainder) =
+        clipped_display_item_remainder_after_chars(source.clone(), 1)
+    else {
+        panic!("one character of three is left");
+    };
+    assert_eq!(
+        remainder.kind,
+        DisplayItemKind::TextRun(DisplayTextRun::new("bc"))
+    );
+    assert_eq!(
+        clipped_display_item_remainder_after_chars(source, 3),
+        DisplayRowClippedRemainder::Nothing
+    );
+}
+
+/// A run the row refused outright is the same item produced against the next
+/// row, not a rebuilt text tail: it keeps its span, layout and box topology.
+#[test]
+fn refused_text_run_is_deferred_whole_with_its_box_topology() {
+    let mut source = DisplayItem {
+        span: SourceSpan::synthetic(5, 0, 3),
+        face: RenderFaceRef::FaceId(neomacs_display_protocol::types::FaceId::new(1)),
+        kind: DisplayItemKind::TextRun(DisplayTextRun::new("abc")),
+        layout: Default::default(),
+        pointer_appearance: None,
+        box_vertical_edges: neomacs_display_protocol::face::BoxVerticalEdges::from_ownership(
+            true, true,
+        ),
+        box_run_membership: Default::default(),
+    };
+    source.layout.raise = Some(0.25);
+    let DisplayRowClippedRemainder::DeferWhole(deferred) =
+        clipped_display_item_remainder_after_chars(source.clone(), 0)
+    else {
+        panic!("a refused text run is deferred whole");
+    };
+    assert_eq!(deferred, source);
+    assert!(matches!(
+        deferred.box_vertical_edges,
+        neomacs_display_protocol::face::BoxVerticalEdges::Both
+    ));
 }
