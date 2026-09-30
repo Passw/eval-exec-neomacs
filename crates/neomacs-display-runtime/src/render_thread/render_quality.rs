@@ -222,13 +222,15 @@ impl RenderQualityPolicy {
 
     /// How child frames travel under this policy, one spec per lifecycle role.
     ///
-    /// Like [`Self::pane_motion`], a reduced-quality plan declines the whole
-    /// family: an appearing popup redraws its parent's surface every tick, and
-    /// a software rasterizer has no spare per-frame budget for that.
+    /// Unlike [`Self::pane_motion`], a reduced-quality plan does **not**
+    /// decline this family. A pane morph animates the whole tiling and needs
+    /// the previous picture composed offscreen; a child-frame fade draws the
+    /// popup's own pixels onto the retained root scene, the same work the
+    /// popup itself already costs every frame, and the software-mode smoke
+    /// and close-confirmation suites already sustain display-rate demand for
+    /// exactly that kind of redraw. A user on a software adapter gets the
+    /// fade they asked for; turning it off remains their `enabled` setting.
     pub(super) fn child_frame_motion(&self) -> ChildFrameMotionSpecs {
-        if self.mode != QualityMode::Full {
-            return ChildFrameMotionSpecs::INSTANT;
-        }
         let config = &self.effective_visual_config;
         let globals = config.child_frame_animations;
         ChildFrameMotionSpecs {
@@ -379,10 +381,6 @@ fn software_compat_visual_config(requested: &VisualConfig) -> VisualConfig {
     // Disabling it there is the honest setting, and it also costs nothing: the
     // compositor builds no motion at all for a disabled spec.
     effective.window_animations.off = true;
-    // Same reasoning for child frames: a fading popup redraws its parent's
-    // surface every tick of its animation, and a software adapter has no
-    // spare budget for a redraw a popup is the only reason to want.
-    effective.child_frame_animations.off = true;
 
     let disable_effects = effective
         .effects

@@ -36,6 +36,12 @@ impl GuiFrameRenderState {
             MotionSpec::Instant => (MotionSpec::Instant, 0.0, false),
             close => (close, motion.close_slide, true),
         };
+        tracing::debug!(
+            frame_id,
+            spec = ?motion.close,
+            slide_pixels = motion.close_slide,
+            "child_frame_lifecycle: close_animation_resolved"
+        );
         let origin = observe_platform_now();
         let removed = if animates {
             self.compositor
@@ -45,6 +51,13 @@ impl GuiFrameRenderState {
             self.compositor.child_frames.remove_frame(frame_id)
         };
         if removed {
+            // The scene changed without an ingest: the retained-static
+            // texture still holds the departed frame's pixels at whatever
+            // alpha the last build saw, and it must rebuild once the corpse
+            // is gone. Bump the generation here so the first eligible frame
+            // after the fade rewrites it.
+            self.compositor.current_scene_generation =
+                crate::render_thread::frame_state::next_scene_generation();
             self.compositor
                 .pending_child_frame_removals_to_present
                 .push(frame_id);
@@ -151,6 +164,12 @@ impl GuiFrameRenderState {
             if is_fresh_install {
                 let motion = self.compositor.child_frame_motion;
                 if !motion.open.is_instant() {
+                    tracing::debug!(
+                        frame_id,
+                        spec = ?motion.open,
+                        slide_pixels = motion.open_slide,
+                        "child_frame_lifecycle: open_animation_started"
+                    );
                     self.compositor.child_frames.begin_open_animation(
                         frame_id,
                         motion.open,

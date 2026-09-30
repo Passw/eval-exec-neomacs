@@ -688,28 +688,28 @@ impl RenderApp {
                 ),
                 // Child-frame lifecycle animation is the same shape: its state
                 // lives in the child-frame manager, invisible to every demand
-                // above. An idle frame whose popup is fading would otherwise
-                // freeze mid-fade the moment the cursor finished its own
-                // animation, since nothing else schedules frames at all.
-                // Sampled at the observed now rather than a presentation tick:
-                // a demand check only answers "is it still running", and
-                // sampling is monotonic in `now`, so an early sample can at
-                // worst retract one poll early -- never report a dead
-                // animation alive or extend one that finished.
+                // above. Unlike the ambient families it is not gated on
+                // dynamic quality -- a fade is a finite burst the user asked
+                // for, not standing ambient demand, and it draws the popup's
+                // own pixels onto the retained root scene. Sampled at the
+                // observed now rather than a presentation tick: a demand check
+                // only answers "is it still running", and sampling is
+                // monotonic in `now`, so an early sample can at worst retract
+                // one poll early -- never report a dead animation alive or
+                // extend one that finished.
                 (
-                    dynamic_effects_allowed
-                        && window_state
-                            .render
-                            .compositor
-                            .child_frames
-                            .has_active_animation(
-                                neomacs_display_protocol::frame_time::FrameSample::new(
-                                    now,
-                                    std::time::Duration::ZERO,
-                                ),
+                    window_state
+                        .render
+                        .compositor
+                        .child_frames
+                        .has_active_animation(
+                            neomacs_display_protocol::frame_time::FrameSample::new(
+                                now,
+                                std::time::Duration::ZERO,
                             ),
+                        ),
                     DemandReason::ChildFrameMotion,
-                    dynamic_animation_rate,
+                    max_rate,
                 ),
             ];
             let mut action = PacingAction::Sleep;
