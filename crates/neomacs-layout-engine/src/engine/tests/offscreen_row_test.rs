@@ -3199,7 +3199,7 @@ fn check_fractional_reversal_prepared_edge(idle: bool, extend_again: bool) {
         let (bridge, end) = engine
             .scroll_coverage
             .pending_backward_bridge_for_test(owner)
-            .expect("publication must schedule another useful bridge without viewport motion");
+            .expect("publication must queue another useful bridge without viewport motion");
         assert!(bridge.get() < edge);
         assert_eq!(
             end,
@@ -3351,32 +3351,27 @@ fn check_short_urgent_backward_bridge(rich: bool) {
 
 #[test]
 fn urgent_bridge_resumes_forward_capture_progress_after_gc() {
-    check_paused_capture_resume(false, false, PausedCaptureMutation::None, false);
+    check_paused_capture_resume(false, false, PausedCaptureMutation::None);
 }
 
 #[test]
 fn urgent_bridge_preempts_and_resumes_distant_backward_capture() {
-    check_paused_capture_resume(false, true, PausedCaptureMutation::None, false);
+    check_paused_capture_resume(false, true, PausedCaptureMutation::None);
 }
 
 #[test]
 fn rich_urgent_bridge_resumes_captured_fragments_after_gc() {
-    check_paused_capture_resume(true, false, PausedCaptureMutation::None, false);
+    check_paused_capture_resume(true, false, PausedCaptureMutation::None);
 }
 
 #[test]
 fn paused_capture_rejects_in_place_property_mutation_before_resume() {
-    check_paused_capture_resume(false, false, PausedCaptureMutation::InPlace, false);
+    check_paused_capture_resume(false, false, PausedCaptureMutation::InPlace);
 }
 
 #[test]
 fn paused_capture_is_retired_after_buffer_revision() {
-    check_paused_capture_resume(false, false, PausedCaptureMutation::BufferRevision, false);
-}
-
-#[test]
-fn backward_preparation_yields_a_far_producer_before_headroom_becomes_urgent() {
-    check_paused_capture_resume(false, false, PausedCaptureMutation::None, true);
+    check_paused_capture_resume(false, false, PausedCaptureMutation::BufferRevision);
 }
 
 enum PausedCaptureMutation {
@@ -3385,12 +3380,7 @@ enum PausedCaptureMutation {
     BufferRevision,
 }
 
-fn check_paused_capture_resume(
-    rich: bool,
-    backward: bool,
-    mutation: PausedCaptureMutation,
-    prepared: bool,
-) {
+fn check_paused_capture_resume(rich: bool, backward: bool, mutation: PausedCaptureMutation) {
     let line = "ordinary offscreen text\n";
     let (mut eval, frame, buffer, window) = if rich {
         shared_rich_scrolling_frame(664, 646)
@@ -3450,27 +3440,6 @@ fn check_paused_capture_resume(
     let mut engine = LayoutEngine::new();
     engine.layout_frame_rust(&mut eval, frame);
     engine.maintain_scroll_coverage(&eval);
-    if prepared {
-        engine
-            .request_scroll_bridge(
-                &eval,
-                frame,
-                window,
-                CharPos0::new(origin - 4 * line.len()),
-                CharPos0::new(origin),
-            )
-            .unwrap();
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-        while !engine
-            .scroll_coverage
-            .drain(&mut engine.prepared_viewports)
-            .unwrap()
-        {
-            assert!(std::time::Instant::now() < deadline);
-            std::thread::yield_now();
-        }
-        engine.layout_frame_rust(&mut eval, frame);
-    }
     engine
         .begin_scroll_coverage(&eval, frame, window, CharPos0::new(producer))
         .unwrap();
@@ -3505,39 +3474,12 @@ fn check_paused_capture_resume(
         .as_fixnum()
         .unwrap() as usize
         - 1;
-    if prepared {
-        let owner = DisplayWindowId::new(window.0 as i64);
-        let coverage = engine
-            .last_frame_display_state
-            .as_ref()
-            .unwrap()
-            .scroll_coverage
-            .iter()
-            .find(|coverage| coverage.content.window_id == owner)
-            .unwrap();
-        let headroom =
-            coverage.viewport.y + coverage.origin - coverage.content.text_clip_bounds.unwrap().y;
-        assert!(headroom > engine.retained_window_matrices[&owner].key.char_height * 2.0);
-        assert!(headroom < coverage.viewport.height * 0.25);
-        let edge = engine
-            .prepared_viewports
-            .backward_start(frame, owner, &engine.retained_window_matrices[&owner].key)
-            .unwrap()
-            .get();
-        engine.maintain_scroll_coverage(&eval);
-        assert_eq!(
-            engine.scroll_coverage.pending_source_start_for_test(),
-            Some(edge - 4 * line.len()),
-            "prepare a full nearby bridge before limited headroom becomes urgent"
-        );
-    } else {
-        engine.maintain_scroll_coverage(&eval);
-        assert_eq!(
-            engine.scroll_coverage.pending_source_start_for_test(),
-            Some(nearest),
-            "urgent connecting work must preempt both forward and distant backward producers"
-        );
-    }
+    engine.maintain_scroll_coverage(&eval);
+    assert_eq!(
+        engine.scroll_coverage.pending_source_start_for_test(),
+        Some(nearest),
+        "urgent connecting work must preempt both forward and distant backward producers"
+    );
     eval.gc_collect_exact();
     engine.take_scroll_coverage_publication();
     loop {
@@ -3573,7 +3515,7 @@ fn check_paused_capture_resume(
     }
     eval.gc_collect_exact();
     engine.maintain_scroll_coverage(&eval);
-    // Newly published coverage can still leave too little preparation
+    // Newly published coverage can still leave less than two rows of
     // headroom. Allow another connecting bridge before resuming the saved
     // producer, while preserving the mutation and GC checks below.
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);

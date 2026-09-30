@@ -115,7 +115,7 @@ pub(super) struct ScrollCoverage {
     admission: Option<Admission>,
     capture: Option<Capture>,
     // One paused acquisition, with the same per-page limits and root leases.
-    // Nearby bridges share the existing worker; no unbounded producer queue.
+    // Urgent bridges share the existing worker; no unbounded producer queue.
     deferred: Option<Capture>,
     frame: Option<FrameId>,
     // At most three targets per retained live window. Glyph storage remains
@@ -164,17 +164,9 @@ impl ScrollCoverage {
         window: DisplayWindowId,
     ) -> Option<(CharPos0, CharPos0)> {
         let observed = self.windows.get(&window)?;
-        observed.backward_bridge.filter(|(start, end)| {
-            observed.targets.contains(start)
-                || self.capture.as_ref().is_some_and(|capture| {
-                    capture.retained.key.window_start == start.get() as i64
-                        && capture.stop_at_source == Some(*end)
-                })
-                || self.admission.as_ref().is_some_and(|admission| {
-                    admission.retained.key.window_start == start.get() as i64
-                        && admission.bridge_end == Some(*end)
-                })
-        })
+        observed
+            .backward_bridge
+            .filter(|(start, _)| observed.targets.contains(start))
     }
 
     pub(super) fn cancel(&mut self) {
@@ -489,29 +481,21 @@ impl LayoutEngine {
                 .windows
                 .get(&window_id)
                 .is_some_and(|observed| backward_start < observed.backward_edge);
-        let backward_headroom = self.last_frame_display_state.as_ref().and_then(|state| {
-            state
-                .scroll_coverage
-                .iter()
-                .find(|coverage| coverage.content.window_id == window_id)
-                .and_then(|coverage| {
-                    coverage.content.text_clip_bounds.map(|bounds| {
-                        // The same lower offset as ScrollSurface::clamp_offset;
-                        // no glyph materialization is needed to schedule work.
-                        let headroom = coverage.viewport.y + coverage.origin - bounds.y;
-                        (headroom, coverage.viewport.height)
-                    })
-                })
-        });
         let urgent_backward = moving_backward
-            && backward_headroom
-                .is_none_or(|(headroom, _)| headroom <= retained.key.char_height * 2.0);
-        // Completed rows still need evaluator admission and publication.
-        // Start a normal nearby bridge with a quarter viewport of lead time;
-        // shorten it to one physical line only at the existing urgent edge.
-        let prepare_backward = moving_backward
-            && backward_headroom.is_none_or(|(headroom, height)| {
-                headroom <= (height * 0.25).max(retained.key.char_height * 2.0)
+            && self.last_frame_display_state.as_ref().is_none_or(|state| {
+                state
+                    .scroll_coverage
+                    .iter()
+                    .find(|coverage| coverage.content.window_id == window_id)
+                    .and_then(|coverage| {
+                        coverage.content.text_clip_bounds.map(|bounds| {
+                            // The same lower offset as ScrollSurface::clamp_offset;
+                            // no glyph materialization is needed to schedule work.
+                            let headroom = coverage.viewport.y + coverage.origin - bounds.y;
+                            headroom <= retained.key.char_height * 2.0
+                        })
+                    })
+                    .unwrap_or(true)
             });
         if !compatible {
             self.scroll_coverage.cancel_active();
@@ -692,7 +676,7 @@ impl LayoutEngine {
             }
             Ok(false) => {}
         }
-        let queued_backward_bridge = prepare_backward
+        let queued_urgent_bridge = urgent_backward
             && self
                 .scroll_coverage
                 .windows
@@ -705,7 +689,7 @@ impl LayoutEngine {
         // A distant producer in either direction can consume the available
         // headroom. Pause its bounded acquisition, but let a connecting bridge
         // finish even if a newer viewport supplies another target meanwhile.
-        if queued_backward_bridge
+        if queued_urgent_bridge
             && self.scroll_coverage.deferred.is_none()
             && self
                 .scroll_coverage
@@ -721,7 +705,7 @@ impl LayoutEngine {
             observed.targets.retain(|target| *target != start);
             tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
                 window = window.0, start = start.get(), position = capture.position.get(),
-                "pausing capture for backward bridge");
+                "pausing capture for urgent backward bridge");
             self.scroll_coverage.worker.cancel();
             self.scroll_coverage.admission = None;
             self.scroll_coverage.deferred = Some(capture);
@@ -730,7 +714,7 @@ impl LayoutEngine {
             return Some(ScrollCoverageProgress::WorkerPending);
         }
         if self.scroll_coverage.capture.is_none()
-            && !queued_backward_bridge
+            && !queued_urgent_bridge
             && let Some(capture) = self.scroll_coverage.deferred.take()
         {
             // Placement changes don't invalidate source capture. Content,
