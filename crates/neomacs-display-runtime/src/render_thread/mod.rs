@@ -22,6 +22,7 @@ mod input;
 mod lifecycle;
 mod media;
 #[cfg(test)]
+#[path = "tests/modifier_policy_cooking_test.rs"]
 mod modifier_policy_cooking_test;
 mod modifier_sides;
 mod pointer_events;
@@ -36,14 +37,14 @@ mod terminal_expansion;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-#[path = "texture_discipline_test.rs"]
+#[path = "tests/texture_discipline_test.rs"]
 mod texture_discipline_test;
 
 mod geometry_hints;
 mod surface_resize;
 mod thread_handle;
 #[cfg(test)]
-#[path = "time_discipline_test.rs"]
+#[path = "tests/time_discipline_test.rs"]
 mod time_discipline_test;
 mod toolbar;
 mod transitions;

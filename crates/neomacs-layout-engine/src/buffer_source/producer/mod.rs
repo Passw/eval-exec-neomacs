@@ -333,5 +333,5 @@ impl<'request, B: LayoutBufferView> BufferElementProducer<'request, B> {
 mod tests;
 
 #[cfg(test)]
-#[path = "stream_harness_test.rs"]
+#[path = "tests/stream_harness_test.rs"]
 mod stream_harness_tests;

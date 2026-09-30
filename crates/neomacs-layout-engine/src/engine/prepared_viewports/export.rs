@@ -381,5 +381,5 @@ fn scroll_row_faces(
 }
 
 #[cfg(test)]
-#[path = "export_test.rs"]
+#[path = "tests/export_test.rs"]
 mod tests;

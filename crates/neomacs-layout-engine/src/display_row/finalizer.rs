@@ -503,5 +503,5 @@ impl<'cursor> GlyphRowFinalizer<'cursor> {
 mod tests;
 
 #[cfg(test)]
-#[path = "extend_fill_test.rs"]
+#[path = "tests/extend_fill_test.rs"]
 mod extend_fill_tests;

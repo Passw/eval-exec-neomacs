@@ -1257,5 +1257,5 @@ impl RenderComms {
 mod tests;
 
 #[cfg(test)]
-#[path = "positioned_input_test.rs"]
+#[path = "tests/positioned_input_test.rs"]
 mod positioned_input_test;

@@ -948,9 +948,9 @@ pub(crate) fn display_space_positive_number(value: Value) -> Option<f32> {
 mod tests;
 
 #[cfg(test)]
-#[path = "display_spec_surface_test.rs"]
+#[path = "tests/display_spec_surface_test.rs"]
 mod surface_tests;
 
 #[cfg(test)]
-#[path = "display_spec_image_test.rs"]
+#[path = "tests/display_spec_image_test.rs"]
 mod image_tests;

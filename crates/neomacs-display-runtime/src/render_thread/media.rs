@@ -1135,5 +1135,5 @@ mod image_cache_event_tests;
 mod tests;
 
 #[cfg(test)]
-#[path = "media_test.rs"]
+#[path = "tests/media_test.rs"]
 mod followup_tests;

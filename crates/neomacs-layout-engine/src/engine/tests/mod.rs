@@ -22,23 +22,23 @@ fn settled_point(
 use super::*;
 use crate::display_row::append_context::DisplayRowLineWrap;
 
-#[path = "../../engine_face_identity_test.rs"]
+#[path = "../../tests/engine_face_identity_test.rs"]
 mod face_identity;
 
-#[path = "../../engine_font_selection_test.rs"]
+#[path = "../../tests/engine_font_selection_test.rs"]
 mod font_selection;
 
 #[path = "../../tests/engine_line_spacing_test.rs"]
 mod line_spacing;
 
-#[path = "../../engine_display_motion_test.rs"]
+#[path = "../../tests/engine_display_motion_test.rs"]
 mod display_motion;
 
 mod chrome_memo_engine_test;
 mod edit_replay_point_visibility_test;
 mod edit_replay_row_extent_test;
 mod edit_sync_engine_test;
-#[path = "../../engine_layout_validity_test.rs"]
+#[path = "../../tests/engine_layout_validity_test.rs"]
 mod layout_validity;
 mod mini_window_still_test;
 mod mode_line_gate_engine_test;

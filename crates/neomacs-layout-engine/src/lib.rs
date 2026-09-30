@@ -70,4 +70,5 @@ pub use engine::*;
 pub use types::*;
 
 #[cfg(test)]
+#[path = "tests/test_composition.rs"]
 mod test_composition;

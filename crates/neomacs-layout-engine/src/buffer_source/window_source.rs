@@ -9,7 +9,7 @@ use crate::types::{PartialBodyWalkStart, WindowKind, WindowParams};
 use neovm_core::buffer::{CharPos0, EmacsBytePos, TextPositionAnchor};
 
 #[cfg(test)]
-#[path = "window_source_tests.rs"]
+#[path = "tests/window_source_tests.rs"]
 mod bounded_read_tests;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

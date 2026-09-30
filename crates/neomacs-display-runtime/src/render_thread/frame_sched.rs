@@ -1129,5 +1129,5 @@ impl FrameCoordinator {
 }
 
 #[cfg(test)]
-#[path = "frame_sched_test.rs"]
+#[path = "tests/frame_sched_test.rs"]
 mod frame_sched_test;

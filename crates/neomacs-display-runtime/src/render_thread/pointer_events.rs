@@ -172,7 +172,7 @@ mod webview_tests {
 mod shader_surface_tests;
 
 #[cfg(test)]
-#[path = "pointer_events_test.rs"]
+#[path = "tests/pointer_events_test.rs"]
 mod native_chrome_tests;
 
 impl PointerOwner {
