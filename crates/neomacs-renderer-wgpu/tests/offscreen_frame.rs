@@ -2146,15 +2146,133 @@ fn drive_banded_load(
     partial
 }
 
-/// The area average of `rgba` into `raster`, one axis at a time, written out
-/// the obvious way: every output sample walks the inputs it covers and weights
-/// each by the overlap.
+/// `sin(pi * t) / (pi * t)`, with the removable singularity at zero taken.
+fn sinc(t: f64) -> f64 {
+    if t == 0.0 {
+        1.0
+    } else {
+        let a = t * std::f64::consts::PI;
+        a.sin() / a
+    }
+}
+
+/// Lanczos's windowed sinc with a window of three, from the definition.
+///
+/// The kernel the banded path filters with, stated here rather than reached
+/// into the crate for, so the acceptance test's expectation does not depend on
+/// the implementation it checks.
+fn lanczos3(distance: f64) -> f64 {
+    let x = distance.abs();
+    if x < 3.0 {
+        sinc(x) * sinc(x / 3.0)
+    } else {
+        0.0
+    }
+}
+
+/// One unit of weight, the divisor a weight is stored in.
+const WEIGHT_ONE: f64 = 65536.0;
+
+/// The resample of `rgba` into `raster`, one axis at a time, written out the
+/// obvious way: every output sample walks the inputs its support covers and
+/// weights each by the kernel.
 ///
 /// This is the definition the banded path implements with a streaming target,
 /// stated here so the acceptance test's expectation is independent of that
-/// implementation. An output covers the input interval `[o * n / m, (o + 1) *
-/// n / m)` and an input covers `[i, i + 1)`; their overlap, in units of `1/m`,
-/// is the weight, and one output's weights sum to `n`.
+/// implementation. Output `o` is centred at `(o + 0.5) * n / m` in input
+/// coordinates, where input texel `i` spans `[i, i + 1)`; the kernel's support
+/// is three output texels — widened by the reduction, so it is `3n/m` input
+/// texels either side — and a tap is any texel whose centre lies inside that.
+/// Weights are the kernel's value at each tap, scaled by [`WEIGHT_ONE`] and
+/// normalized by the sum of the taps that fell inside the source, and the
+/// sample is that weighted sum divided by the sum of the *quantized* weights
+/// and rounded.
+///
+/// Two rules belong to the path rather than to the kernel. The first axis hands
+/// the second a *mean* rather than an 8-bit level: the clamp that turns a mean
+/// into a sample happens once, at the end, because clamping per axis discards
+/// an excursion the second axis was going to cancel. And an axis with as many
+/// outputs as inputs is **copied**: Lanczos3's taps at scale one land on
+/// whole-texel offsets where two of its three sinc factors are zero, so
+/// filtering would come out the same today, but only while the zeros survive
+/// quantization — and an image shown at its own size is the case this path has
+/// to keep exact by construction.
+fn lanczos_resample(
+    rgba: &[u8],
+    (width, height): (u32, u32),
+    (out_width, out_height): (u32, u32),
+) -> Vec<u8> {
+    /// The taps of one output, as `(input index, weight)`.
+    fn taps(centre: f64, scale: f64, input: u32) -> (Vec<(usize, f64)>, f64) {
+        let half = 3.0 * scale;
+        let first = ((centre - half - 0.5).floor().max(0.0)) as u32;
+        let last = ((centre + half - 0.5).ceil().min(f64::from(input - 1))) as u32;
+        let weighted: Vec<(usize, f64)> = (first..=last)
+            .map(|i| (i as usize, ((f64::from(i) + 0.5) - centre).abs() / scale))
+            .map(|(i, distance)| (i, lanczos3(distance)))
+            .collect();
+        let sum = weighted.iter().map(|(_, weight)| *weight).sum();
+        (weighted, sum)
+    }
+    let mean = |sum: i64, total: i64| (sum + total / 2).div_euclid(total) as i32;
+    let level = |mean: i32| u8::try_from(mean.clamp(0, 255)).expect("a clamped level is a level");
+
+    let mut lines: Vec<i32> = Vec::with_capacity(height as usize * out_width as usize * 4);
+    let x_scale = f64::from(width) / f64::from(out_width);
+    for row in rgba.chunks_exact(width as usize * 4) {
+        if width == out_width {
+            lines.extend(row.iter().map(|sample| i32::from(*sample)));
+            continue;
+        }
+        for o in 0..out_width {
+            let (taps, sum) = taps((f64::from(o) + 0.5) * x_scale, x_scale, width);
+            let mut sums = [0_i64; 4];
+            let mut total = 0_i64;
+            for (i, weight) in taps {
+                let weight = (weight * WEIGHT_ONE / sum).round() as i64;
+                total += weight;
+                for (c, sum) in sums.iter_mut().enumerate() {
+                    *sum += weight * i64::from(row[i * 4 + c]);
+                }
+            }
+            for sum in sums {
+                lines.push(mean(sum, total));
+            }
+        }
+    }
+
+    let mut out = vec![0_u8; out_width as usize * out_height as usize * 4];
+    let y_scale = f64::from(height) / f64::from(out_height);
+    for column in 0..out_width as usize {
+        for o in 0..out_height {
+            let at = (o as usize * out_width as usize + column) * 4;
+            if height == out_height {
+                for c in 0..4 {
+                    out[at + c] = level(lines[at + c]);
+                }
+                continue;
+            }
+            let (taps, sum) = taps((f64::from(o) + 0.5) * y_scale, y_scale, height);
+            let mut sums = [0_i64; 4];
+            let mut total = 0_i64;
+            for (i, weight) in taps {
+                let weight = (weight * WEIGHT_ONE / sum).round() as i64;
+                total += weight;
+                for (c, sum) in sums.iter_mut().enumerate() {
+                    *sum += weight * i64::from(lines[(i * out_width as usize + column) * 4 + c]);
+                }
+            }
+            for (channel, sum) in out[at..at + 4].iter_mut().zip(sums) {
+                *channel = level(mean(sum, total));
+            }
+        }
+    }
+    out
+}
+
+/// The area average of `rgba` into `raster`, one axis at a time — the filter
+/// the banded path resampled with between step 4 and step 6, and the control
+/// the acceptance test below holds the new one against.
 fn area_average(
     rgba: &[u8],
     (width, height): (u32, u32),
@@ -2217,16 +2335,24 @@ fn area_average(
 ///
 /// The expected bytes are stated here without reference to the cache: `image`'s
 /// own decode of the fixture, reduced to the raster the texture limit clamps it
-/// to by the area average above.
+/// to by the Lanczos3 resample above.
 ///
-/// This replaces an equality against `image::imageops::resize(…, Lanczos3)`.
-/// That contract said a banded decode ends as the *whole-image path's* bytes,
-/// which was true while both paths resampled with Lanczos3 and is exactly what
-/// step 4 changes: the banded path now decodes straight into its target with a
-/// box filter, so there is no whole-image buffer for it to agree with. The
-/// contract that survives — and that this test is — is that the finished
-/// texture is the bytes the decode's own filter defines, and that the bands
-/// along the way fill it from row zero.
+/// This was an equality against `image::imageops::resize(…, Lanczos3)` until
+/// the banded path stopped resampling with Lanczos3. It resamples with it
+/// again, but the equality is not restored, and deliberately: that contract
+/// said a banded decode ends as the *whole-image path's* bytes, which cannot be
+/// true of a path that has no whole-image buffer to agree with. The contract
+/// that survives — and that this test is — is that the finished texture is the
+/// bytes the decode's own filter defines, and that the bands along the way fill
+/// it from row zero.
+///
+/// Two controls keep that from being a statement about any resample at all. The
+/// crate's own Lanczos3 is a *different implementation* of the same filter —
+/// weight quantization and accumulation order are not the same — so it is held
+/// to within a couple of levels of the texture rather than to equality, which
+/// is a bound the area average does not come close to. And the area average,
+/// the filter this replaced, is measured to be a different picture by a margin
+/// the same bound would call a failure.
 #[test]
 fn a_banded_image_ends_in_the_texture_its_own_filter_defines() {
     let Some(mut h) = try_harness() else {
@@ -2272,19 +2398,50 @@ fn a_banded_image_ends_in_the_texture_its_own_filter_defines() {
     let whole = image::load_from_memory(&data)
         .expect("the fixture decodes")
         .to_rgba8();
-    let expected = area_average(whole.as_raw(), (width, height), (4096, 819));
+    let expected = lanczos_resample(whole.as_raw(), (width, height), (4096, 819));
     assert_eq!(
         read_back, expected,
-        "the finished texture must be the area average of the source"
+        "the finished texture must be the Lanczos3 resample of the source"
     );
-    // The control: the filter this replaced — the whole-image path's Lanczos3
-    // resize to the same raster — is a different picture, so the equality above
-    // is a statement about the banded path's filter and not about any resample.
-    let lanczos = image::imageops::resize(&whole, 4096, 819, image::imageops::FilterType::Lanczos3)
-        .into_raw();
+
+    // The independent control, and the one that says the equality above is a
+    // statement about *which* filter rather than about this implementation of
+    // it: `image`'s own Lanczos3, resampled whole, is the same picture to
+    // within the level a quantized weight table and two accumulation orders
+    // are worth. Nothing about the banded path is an input to it.
+    let crate_lanczos =
+        image::imageops::resize(&whole, 4096, 819, image::imageops::FilterType::Lanczos3)
+            .into_raw();
+    let worst = read_back
+        .iter()
+        .zip(&crate_lanczos)
+        .map(|(got, want)| got.abs_diff(*want))
+        .max()
+        .expect("a raster has pixels");
+    assert!(
+        worst <= 2,
+        "the banded path must be the same filter the whole-image path resamples \
+         with, to within a level or two: worst texel differs by {worst}"
+    );
+
+    // And the filter this replaced: the area average of the same source is a
+    // different picture by a wide margin, so the equality above cannot be
+    // passing for want of a filter in it.
+    let averaged = area_average(whole.as_raw(), (width, height), (4096, 819));
     assert_ne!(
-        read_back, lanczos,
-        "the banded path no longer resamples with the whole-image path's filter"
+        read_back, averaged,
+        "the banded path does not resample with the area average any more"
+    );
+    assert!(
+        read_back
+            .iter()
+            .zip(&averaged)
+            .map(|(got, want)| got.abs_diff(*want))
+            .max()
+            .expect("a raster has pixels")
+            > 8,
+        "the two filters are not near neighbours; a bound this loose would be a \
+         bound about nothing"
     );
 }
 

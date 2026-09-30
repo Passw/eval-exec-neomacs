@@ -1814,7 +1814,7 @@ fn decode_with_bands(
 /// The whole point of the seam: a large source decodes in bands, they arrive in
 /// order as disjoint row ranges that fill the raster from the top, and the
 /// image they add up to — at this realization the source's own size, where the
-/// area average is the identity — is the image the whole-image path would have
+/// filter is the identity — is the image the whole-image path would have
 /// produced, through the same call the renderer makes.
 #[test]
 fn a_large_png_decodes_in_bands_that_add_up_to_the_whole_image() {
@@ -2265,7 +2265,7 @@ fn the_rows_a_band_hands_over_are_the_rows_the_finished_image_holds() {
     let data = varying_png(width, height);
     let mut bands = Vec::new();
     // A realization that really reduces: the raster is 500x500, so a band of
-    // source rows has to be averaged rather than passed through.
+    // source rows has to be filtered rather than passed through.
     let decoded = ImageCache::decode_data(
         &data,
         ImageSizeSpec::new(AxisSize::Exact(500), AxisSize::Exact(500)),
