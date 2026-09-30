@@ -17980,6 +17980,43 @@ fn issue_204_align_to_image_operand_falls_back_without_a_catalog() {
     assert_eq!(geometry.width, 8.0, "GNU falls back to one char width");
 }
 
+/// The \`:align-to\` coordinate contract for buffer replacements: GNU resolves
+/// a raw number against the TEXT AREA's left edge
+/// (\`align_to < 0 -> 0\`, xdisp.c:32878-32884), while this port's pen
+/// (\`progress.row_progress().x()\`) runs in FRAME-ABSOLUTE pixels starting at
+/// \`content_x = body.x + line-number field\`. The resolver therefore re-bases
+/// the bare-number target by \`text_area_left\`. This test pins that re-basing:
+/// dropping it (resolving against the pen directly) would under-width every
+/// align-to replacement in a window whose text area does not start at frame
+/// x 0 (GUI fringes, margins, scroll bars).
+#[test]
+fn align_to_raw_number_rebases_to_the_frame_absolute_pen() {
+    let _eval = Context::new();
+    let mut params = test_window_params();
+    // The window sits at frame x 10; margins/fringes put the text area's left
+    // edge at frame x 40. Char cell 8px.
+    params.bounds = Rect::new(10.0, 0.0, 810.0, 600.0);
+    params.text_bounds = Rect::new(40.0, 0.0, 760.0, 560.0);
+    let spec = Value::list(vec![
+        Value::symbol("space"),
+        Value::keyword("align-to"),
+        Value::fixnum(21),
+    ]);
+
+    // A pen 60 frame pixels in -- GNU's text-area-relative pen is
+    // 60 - 40 = 20px, so the stretch reaches column 21: width
+    // = (40 + 21*8) - 60 = 148.
+    let geometry = DisplaySpaceGeometry::from_display_space_spec(
+        &spec, 60.0, 40.0, 8.0, 8.0, 10.0, 7.0, &params,
+    );
+
+    assert_eq!(
+        geometry.width, 148.0,
+        "a raw :align-to target is measured from the text area's left edge, \
+         re-based into the frame-absolute pen"
+    );
+}
+
 /// An image that finishes decoding must invalidate the window's retained
 /// matrix, not just request a redisplay.
 ///
@@ -36635,3 +36672,75 @@ fn hscroll_cursor_publication_preserves_clipping_visible_text_and_eol() {
 mod prepared_viewport_test;
 
 mod offscreen_row_test;
+
+#[test]
+fn borrowed_and_snapshot_views_agree_on_composition_span_queries() {
+    // The two LayoutBufferView implementations derive their composition spans
+    // independently (BorrowedLayoutBuffer::for_window vs
+    // LayoutBufferSnapshot::from_buffer_for_window) and answer the span
+    // queries with different loop shapes (linear find vs partition_point).
+    // A divergence between them silently changes which rows take which
+    // layout path — issue #445/#446's machinery sits on both sides. Pin the
+    // contract: identical answers on every position, both queries, INCLUDING
+    // a position that sits ON a span start (the historical divergence).
+    let mut eval = Context::new();
+    let buf_id = eval
+        .buffer_manager()
+        .current_buffer()
+        .expect("current buffer")
+        .id();
+    {
+        let buf = eval.buffer_manager_mut().get_mut(buf_id).expect("buffer");
+        buf.insert("abxycdé x\n");
+    }
+    eval.eval_str(
+        "(progn (setq auto-composition-mode t auto-composition-function 'auto-compose-chars composition-function-table (make-char-table nil)) (aset composition-function-table ?x (list (vector \"xy\" 0 'font-shape-gstring))))",
+    )
+    .expect("composition rule on x");
+
+    let buffer = eval.buffer_manager().get(buf_id).expect("buffer");
+    let obarray = eval.obarray();
+    let target = crate::display_property::DisplayPropertyTarget::Graphical;
+    let snapshot = LayoutBufferSnapshot::from_buffer_for_window(buffer, obarray, None, target);
+    let borrowed = crate::neovm_bridge::BorrowedLayoutBuffer::for_window(
+        buffer,
+        obarray,
+        CharPos0::new(0),
+        usize::MAX,
+        target,
+    );
+
+    use crate::neovm_bridge::LayoutBufferView as _;
+
+    // Engagement: the "xy" rule produced a span, or the sweep is vacuous.
+    let text_len = CharPos0::new(10);
+    assert!(
+        snapshot
+            .layout_next_automatic_composition_start(CharPos0::new(0), text_len)
+            .is_some(),
+        "snapshot view must see the composition span"
+    );
+    assert!(
+        borrowed
+            .layout_next_automatic_composition_start(CharPos0::new(0), text_len)
+            .is_some(),
+        "borrowed view must see the composition span"
+    );
+
+    for pos in 0..=10usize {
+        let p = CharPos0::new(pos);
+        for limit in [text_len, CharPos0::new((pos + 3).min(10))] {
+            assert_eq!(
+                snapshot.layout_next_automatic_composition_start(p, limit),
+                borrowed.layout_next_automatic_composition_start(p, limit),
+                "next-composition-start parity at pos={pos} limit={:?}",
+                limit.get()
+            );
+        }
+        assert_eq!(
+            snapshot.layout_automatic_composition_starting_at(p),
+            borrowed.layout_automatic_composition_starting_at(p),
+            "composition-starting-at parity at pos={pos}"
+        );
+    }
+}

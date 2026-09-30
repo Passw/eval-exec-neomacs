@@ -164,9 +164,17 @@ impl LayoutBufferView for BorrowedLayoutBuffer<'_> {
         pos: CharPos0,
         limit: CharPos0,
     ) -> Option<CharPos0> {
+        // A span starting AT `pos` is reported, matching the snapshot view's
+        // partition (`start() < pos`) — GNU's `composition_compute_stop_pos`
+        // likewise reports a stop AT the position. The row router's
+        // conservative `ScanCompose` refusal depends on the at-pos report
+        // (a row may not route when a composition opens on its first char);
+        // the pipeline's run scan never observes it, because the producer's
+        // item arm emits an at-pos span first
+        // (`layout_automatic_composition_starting_at`).
         self.spans
             .iter()
             .map(|span| span.start())
-            .find(|start| *start > pos && *start < limit)
+            .find(|start| *start >= pos && *start < limit)
     }
 }

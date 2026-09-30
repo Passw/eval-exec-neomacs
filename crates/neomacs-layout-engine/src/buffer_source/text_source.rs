@@ -130,6 +130,29 @@ impl BufferOverlayStringsItem {
 /// bridge, which preserves typed display items while splitting text runs only
 /// where the remaining buffer walk still needs per-character wrap/cursor
 /// decisions.
+/// The exclusive end of a plain text run: STRICTLY past the run's start. An
+/// empty run is unrepresentable — issue #445: a composition-start limit
+/// clamped ONTO the run's start once produced an empty `TextRun`, whose
+/// missing source character made consumption refuse the item and the walk
+/// abandon the row, committing it blank.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct NonEmptyRunEnd(CharPos0);
+
+impl NonEmptyRunEnd {
+    /// `scanned_end`, floored at `start + 1` (progress is structural) and
+    /// never clamped below that floor by `limit`: a limit at or before the
+    /// run's start cannot yield a run, and honouring it would re-create the
+    /// empty run.
+    pub(crate) fn past(start: CharPos0, scanned_end: CharPos0, limit: CharPos0) -> Self {
+        let floor = start.add_len(CharLen::new(1));
+        Self(scanned_end.max(floor).min(limit.max(floor)))
+    }
+
+    pub(crate) fn get(self) -> CharPos0 {
+        self.0
+    }
+}
+
 pub(crate) struct BufferTextSourceCursor<'a, B: LayoutBufferView + ?Sized> {
     buffer_id: BufferId,
     buffer: &'a B,
@@ -712,7 +735,7 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
         Some(DisplayPointerAppearance::new(source, pointer_face))
     }
 
-    fn next_text_run_end(&self, start: CharPos0, limit: CharPos0) -> CharPos0 {
+    fn next_text_run_end(&self, start: CharPos0, limit: CharPos0) -> NonEmptyRunEnd {
         let limit = self
             .buffer
             .layout_next_automatic_composition_start(start, limit)
@@ -739,7 +762,7 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
             }
             end = end.add_len(CharLen::new(1));
         }
-        end.max(start.add_len(CharLen::new(1))).min(limit)
+        NonEmptyRunEnd::past(start, end, limit)
     }
 
     /// Resolve the active display table's glyph vector for `ch`, returning the
@@ -960,7 +983,7 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
         let end = if self.produces_single_chars_at(start) {
             start.add_len(CharLen::new(1)).min(property_end)
         } else {
-            self.next_text_run_end(start, property_end)
+            self.next_text_run_end(start, property_end).get()
         };
         self.debug_assert_no_overlay_string_anchor_inside(start, end);
         self.char_pos = end;
