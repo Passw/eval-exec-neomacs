@@ -267,8 +267,9 @@ pub(crate) fn text_window_right_edge_marker_decorations(
         let Some(marker) = marker else {
             continue;
         };
-        let marker_fill_padding =
-            request.row_flags.is_set(row_idx, DisplayRowFlagKind::WideCut);
+        let marker_fill_padding = request
+            .row_flags
+            .is_set(row_idx, DisplayRowFlagKind::WideCut);
         decorations.push(TextWindowRightEdgeMarkerDecoration {
             display_row_index,
             target_col,

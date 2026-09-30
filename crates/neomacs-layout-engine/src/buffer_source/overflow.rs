@@ -216,13 +216,11 @@ impl<'a> BufferSourceOverflowRenderRequest<'a> {
                 // produce_special_glyphs per cell to the row's end).
                 let cut_start_inside = progress.row_position().x_px() < context.right_edge_px;
                 if crate::unicode::is_wide_char(context.ch) && cut_start_inside {
-                    row_build
-                        .row_geometry
-                        .mark_current_row_flag_kind(
-                            row_build.row_flags,
-                            crate::display_row::geometry::DisplayRowFlagKind::WideCut,
-                            context.row_limit,
-                        );
+                    row_build.row_geometry.mark_current_row_flag_kind(
+                        row_build.row_flags,
+                        crate::display_row::geometry::DisplayRowFlagKind::WideCut,
+                        context.row_limit,
+                    );
                 }
                 self.publish_right_edge_marker_slot(
                     &mut source_render,

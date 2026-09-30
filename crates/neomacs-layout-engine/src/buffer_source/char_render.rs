@@ -205,12 +205,7 @@ pub(crate) fn render_source_char_and_apply<B: LayoutBufferView>(
             loop_context.frame_background(),
         ),
     )
-    .render_if_needed_and_apply(
-        append_context,
-        source_walk,
-        text,
-        state.reborrow(),
-    );
+    .render_if_needed_and_apply(append_context, source_walk, text, state.reborrow());
     if overflow_outcome.should_break() {
         return BufferSourceItemRenderOutcome::Stop;
     }
