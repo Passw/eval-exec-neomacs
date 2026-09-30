@@ -112,6 +112,7 @@ fn display_row_request_for_face<'a>(
         base_face_id,
         base_face,
         role,
+        DisplayRowLineWrap::chrome_row(),
     )
 }
 
@@ -1348,6 +1349,7 @@ fn display_row_geometry_builds_row_layout() {
             std::collections::HashMap::new(),
         ),
         None,
+        DisplayRowLineWrap::chrome_row(),
     );
 
     assert_eq!(layout.role, GlyphRowRole::Text);

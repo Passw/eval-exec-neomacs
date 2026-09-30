@@ -1,5 +1,6 @@
 use crate::display_item::RenderFaceRef;
 use crate::display_pixel_calc::PixelCalcContext;
+use crate::display_row::append_context::DisplayRowLineWrap;
 use crate::display_row::builder::{DisplayRowLayout, DisplayTabPolicy};
 use crate::display_row::face_state::DisplayRowMeasurementMode;
 use crate::display_row::spacing::ResolvedLineSpacing;
@@ -134,6 +135,7 @@ impl DisplayRowGeometry {
         self
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn to_layout(
         &self,
         role: GlyphRowRole,
@@ -142,6 +144,7 @@ impl DisplayRowGeometry {
         base_face: RenderFaceRef,
         pixel_calc: PixelCalcContext,
         space_image_params: Option<crate::display_pixel_calc::PixelCalcImageInputs>,
+        line_wrap: DisplayRowLineWrap,
     ) -> DisplayRowLayout {
         DisplayRowLayout {
             role,
@@ -154,6 +157,7 @@ impl DisplayRowGeometry {
             base_face,
             pixel_calc,
             space_image_params,
+            line_wrap,
         }
     }
 }

@@ -44,6 +44,7 @@ fn layout() -> DisplayRowLayout {
             std::collections::HashMap::new(),
         ),
         space_image_params: None,
+        line_wrap: crate::display_row::append_context::DisplayRowLineWrap::chrome_row(),
     }
 }
 

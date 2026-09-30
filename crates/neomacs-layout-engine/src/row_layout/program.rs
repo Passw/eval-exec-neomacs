@@ -7,12 +7,14 @@ use super::{ResolvedMappedTextInput, ResolvedSpacingInput, ResolvedTextInput};
 use crate::display_face_ref::render_face_ref_id;
 use crate::display_item::*;
 use crate::display_pixel_calc::PixelCalcContext;
+use crate::display_row::append_context::DisplayRowLineWrap;
 use crate::display_row::builder::*;
 use crate::display_row::face_state::{DisplayRowFace, DisplayRowMeasurementMode};
 use crate::display_row::finalizer::DisplayRowLineEndFinalizer;
 use crate::display_row::geometry::DisplayRowTextAreaOrigin;
 use crate::display_row::metrics::DisplayRowFallbackMetrics;
 use crate::display_text_run_measurement::DisplayTextRunMeasurement;
+use crate::types::LineWrapMode;
 use neomacs_display_protocol::frame_glyphs::GlyphRowRole;
 use neomacs_display_protocol::glyph_matrix::{GlyphArea, GlyphRow};
 use neomacs_display_protocol::types::{Color, FaceId};
@@ -52,6 +54,21 @@ pub(crate) struct RowProgramGeometry {
 }
 
 impl RowProgramGeometry {
+    /// GNU `it->line_wrap` for the row this program produces.
+    /// `character_wrap` is the window's non-truncating mode and `word_wrap`
+    /// its `word-wrap`, which is exactly the pair `init_iterator` folds into
+    /// WORD_WRAP vs WINDOW_WRAP (src/xdisp.c:3416-3426).
+    fn line_wrap(&self) -> DisplayRowLineWrap {
+        DisplayRowLineWrap::for_window(
+            if self.character_wrap {
+                LineWrapMode::Wrap
+            } else {
+                LineWrapMode::Truncate
+            },
+            self.word_wrap,
+        )
+    }
+
     fn layout(&self) -> DisplayRowLayout {
         DisplayRowLayout {
             role: GlyphRowRole::Text,
@@ -69,6 +86,7 @@ impl RowProgramGeometry {
                 Default::default(),
             ),
             space_image_params: None,
+            line_wrap: self.line_wrap(),
         }
     }
 }

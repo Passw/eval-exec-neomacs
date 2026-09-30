@@ -1,3 +1,4 @@
+use crate::display_row::append_context::DisplayRowLineWrap;
 use crate::display_row::geometry::DisplayRowTextAreaOrigin;
 use crate::display_row::transition::{DisplayRowOverflowTransitionPlan, VisualWrapBreak};
 use crate::display_row::walk_state::{
@@ -250,16 +251,13 @@ impl DisplayXwidgetOverflowAction {
 ///
 /// What this port decides differently from the function above:
 ///
-/// - **The word-wrap clause is a precondition here, not a disjunct.** GNU
-///   crops a mid-row image under word wrap only when the image is wider than
-///   the row it would get to itself (`pixel_width > last_visible_x -
-///   lnum_pixel_width - FRAME_COLUMN_WIDTH`); otherwise it leaves the glyph
-///   whole so `display_line` can move it to the next row.  The row writer has
-///   no word-wrap mode to test, so this port applies that disjunct *always*.
-///   It therefore never crops an image GNU would leave whole, and the one case
-///   it does not crop -- a *truncating* row's mid-row image narrower than the
-///   row but wider than a quarter of it, which GNU crops and this port still
-///   rejects -- keeps the row's pre-existing overflow behaviour.
+/// - **Which rows word-wrap.** The word-wrap disjunct is tested through the
+///   row's resolved [`DisplayRowLineWrap`], which separates GNU's `WORD_WRAP`
+///   from `WINDOW_WRAP`; `LineWrapMode` alone collapses the two and would
+///   apply the clause to every wrapping row.  GNU measured, 720 px text area,
+///   a 400 px image starting at 396: WORD_WRAP leaves the glyph whole and
+///   `display_line` moves it to the next row (row 0 ends at 369), WINDOW_WRAP
+///   crops it to 720 and keeps it on row 0.
 /// - **No room at all.** With `hpos == 0` GNU still crops when nothing of the
 ///   row is left, producing a zero- or negative-width glyph
 ///   (`clip_to_bounds (-1, …)`, :32529); here a non-positive advance is
@@ -285,22 +283,44 @@ pub(crate) enum DisplayImageOverflowAction {
 
 impl DisplayImageOverflowAction {
     /// `layout_advance_px` is GNU's `it->pixel_width` for the image: the
-    /// image's own width plus its horizontal margins.
+    /// image's own width plus its horizontal margins.  `line_wrap` is the
+    /// row's resolved `it->line_wrap` (see
+    /// [`crate::display_row::append_context::DisplayRowLineWrap`]); without it
+    /// the word-wrap disjunct below cannot be evaluated and the rule silently
+    /// becomes a strict subset of GNU's.
     pub(crate) fn for_image(
         layout_advance_px: f32,
         extent: WindowLocalRowExtent,
         at_row_start: bool,
         char_width_px: f32,
         line_number_width_px: f32,
+        line_wrap: DisplayRowLineWrap,
     ) -> Self {
         let crop = layout_advance_px - extent.remaining_px();
         if crop <= 0.0 {
             return Self::Fits;
         }
         // "Always crop images larger than the window-width, minus 1 space."
+        //
+        // The whole clause is the FIRST DISJUNCT of GNU's condition:
+        //
+        //   if ((it->line_wrap != WORD_WRAP
+        //        || it->hpos == (0 + (it->lnum_width ? it->lnum_width + 2 : 0))
+        //        || it->pixel_width > (it->last_visible_x - it->lnum_pixel_width
+        //                              - FRAME_COLUMN_WIDTH (it->f)))
+        //       && ...)
+        //
+        // so a row that does not word-wrap skips it entirely.  That is what
+        // makes a TRUNCATING row crop a mid-row image --
+        // GNU Emacs 31.1, Xvfb, 720 px text area, 9 px column, 64 columns of
+        // text (current_x 576) and a 181 px image: the glyph ends at 720
+        // (row->pixel_width 720), while the same image at 180 px is left whole
+        // (row->pixel_width 756).  A WINDOW_WRAP row crops too (a 400 px image
+        // at 396 ends at 720), and only WORD_WRAP holds the glyph's real width
+        // back so `display_line` can move it.
         let wider_than_a_row_of_its_own = layout_advance_px
             > extent.last_visible_x_px() - line_number_width_px.max(0.0) - char_width_px.max(0.0);
-        if !at_row_start && !wider_than_a_row_of_its_own {
+        if line_wrap.is_word_wrap() && !at_row_start && !wider_than_a_row_of_its_own {
             return Self::LeaveWhole;
         }
         // "`it->pixel_width > it->last_visible_x / 4`".

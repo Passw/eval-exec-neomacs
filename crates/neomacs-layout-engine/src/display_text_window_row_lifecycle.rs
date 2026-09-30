@@ -5,7 +5,7 @@
 //! rendered rows, cursor effects, retry metadata, and final window snapshots.
 
 use crate::display_row::append_context::{
-    DisplayRowAppendArea, DisplayRowAppendSurface, RightEdgeMarkerColumn,
+    DisplayRowAppendArea, DisplayRowAppendSurface, DisplayRowLineWrap, RightEdgeMarkerColumn,
 };
 use crate::display_row::builder::DisplayTabPolicy;
 use crate::display_row::geometry::{
@@ -111,6 +111,10 @@ pub(crate) struct TextWindowAppendSurfaceRequest<'a> {
     char_width: f32,
     tab_width: i32,
     tab_stop_list: &'a [i32],
+    /// GNU `it->line_wrap` for every row this window appends into the surface;
+    /// see `DisplayRowLineWrap`.  Required, never defaulted: the glyph writer
+    /// decides GNU's image-crop rule with it.
+    line_wrap: DisplayRowLineWrap,
 }
 
 impl<'a> TextWindowAppendSurfaceRequest<'a> {
@@ -124,6 +128,7 @@ impl<'a> TextWindowAppendSurfaceRequest<'a> {
         char_width: f32,
         tab_width: i32,
         tab_stop_list: &'a [i32],
+        line_wrap: DisplayRowLineWrap,
     ) -> Self {
         Self {
             content_x,
@@ -136,6 +141,7 @@ impl<'a> TextWindowAppendSurfaceRequest<'a> {
             char_width,
             tab_width,
             tab_stop_list,
+            line_wrap,
         }
     }
 
@@ -178,6 +184,7 @@ impl<'a> TextWindowAppendSurfaceRequest<'a> {
                 self.tab_width,
                 self.tab_stop_list,
             ),
+            self.line_wrap,
         )
         .with_right_edge_marker_column(right_edge_marker_column)
     }

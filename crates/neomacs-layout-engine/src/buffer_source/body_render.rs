@@ -17,7 +17,7 @@ use crate::buffer_source::walk::BufferSourceWalk;
 use crate::buffer_source::window_geometry::{BufferWindowGeometry, BufferWindowLocalDisplayPolicy};
 use crate::buffer_source::window_source::BufferWindowSource;
 use crate::display_cursor::CursorCaptureState;
-use crate::display_row::append_context::DisplayRowAppendSurface;
+use crate::display_row::append_context::{DisplayRowAppendSurface, DisplayRowLineWrap};
 use crate::display_row::builder::DisplayPhysicalLineTabState;
 use crate::display_row::face_environment::FrameFaces;
 use crate::display_row::face_state::{DisplayRowActiveFaceState, DisplayRowMeasurementMode};
@@ -292,6 +292,12 @@ impl<'a> BufferSourceWalkSetupRequest<'a> {
                 self.metrics.char_width(),
                 self.tab_width,
                 self.tab_stop_list,
+                // The single point where GNU's `it->line_wrap` is resolved
+                // for a window's rows: `window__wrap_mode` is the effective
+                // truncate/wrap decision and `word-wrap` picks between GNU's
+                // word-wrap and window-wrap (`init_iterator`,
+                // src/xdisp.c:3414-3426).
+                DisplayRowLineWrap::for_window(self.wrap_mode, self.word_wrap),
             )
             .into_surface()
             .with_margin_areas(

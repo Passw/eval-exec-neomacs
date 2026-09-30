@@ -20,6 +20,7 @@ fn settled_point(
 }
 
 use super::*;
+use crate::display_row::append_context::DisplayRowLineWrap;
 
 #[path = "../../engine_face_identity_test.rs"]
 mod face_identity;
@@ -2066,6 +2067,7 @@ fn render_buffer_text_source_shadow_row(
         GlyphRowRole::Text,
         FaceId::new(0),
         resolver.default_face(),
+        DisplayRowLineWrap::chrome_row(),
     )
     .render_request(DisplayRowRenderBounds::new(
         DisplayRowPosition::new(0.0, 0),
@@ -15003,7 +15005,7 @@ impl ImageCatalog for MidRowImageHost {
     }
 }
 
-/// A mid-row image on a WRAPPING row moves down whole.
+/// A mid-row image on a WORD-WRAPPING row moves down whole.
 ///
 /// GNU `display_line` never drops a display element that draws past the right
 /// edge of a continued row: it unproduces it, restores the iterator to before
@@ -15013,6 +15015,15 @@ impl ImageCatalog for MidRowImageHost {
 /// starts at column zero (:32492-32509).  Before this port the row writer
 /// rejected the glyph and the clipped-item remainder answered "nothing to
 /// remember", so the image was never produced again on any row.
+///
+/// `word-wrap` must be on.  The crop is skipped only for WORD_WRAP
+/// (`it->line_wrap != WORD_WRAP` is the first disjunct of
+/// `produce_image_glyph`'s condition, :32493-32508), so a WINDOW_WRAP row
+/// crops this same image instead of moving it -- measured on GNU Emacs 31.1,
+/// Xvfb, 720 px text area, 9 px column, 75 columns then a 200x80 image:
+/// `word-wrap` nil gives `window-lines-pixel-dimensions` rows (720 54 9)
+/// (cropped, on row 0) and `word-wrap` t gives (675 209 54) (moved whole);
+/// `tmp/midrow-image/wrapfix-*.txt`.
 ///
 /// The filler length is measured from the frame's own text metrics so the image
 /// lands mid-row whatever the default font measures, and the numbers are the
@@ -15070,6 +15081,9 @@ fn layout_frame_rust_wraps_a_mid_row_image_onto_the_next_row() {
             ]),
         );
         buf.set_buffer_local("truncate-lines", Value::NIL);
+        // WORD_WRAP: the only wrap method under which GNU leaves the glyph
+        // whole for `display_line` to move.  Without it the row crops.
+        buf.set_buffer_local("word-wrap", Value::T);
     }
 
     let mut engine = LayoutEngine::new();
@@ -15143,6 +15157,218 @@ fn layout_frame_rust_wraps_a_mid_row_image_onto_the_next_row() {
             .count(),
         filler,
         "the text row is unchanged by the deferral"
+    );
+}
+
+/// A mid-row image on a WINDOW-WRAPPING row is cropped to the row edge.
+///
+/// Same content and geometry as the WORD_WRAP test above, with `word-wrap`
+/// nil.  GNU crops here: `it->line_wrap != WORD_WRAP` is the first disjunct of
+/// `produce_image_glyph`'s condition, so a WINDOW_WRAP row never reaches the
+/// "keep the real width for wrapping" clause
+/// (src/xdisp.c:32493-32508), and the glyph ends exactly at
+/// `it->last_visible_x` -- which is why `display_line` can end a truncating
+/// row on `IT_IMAGE` at equality and why the crop is what lets the row keep
+/// the glyph at all.
+///
+/// Measured, GNU Emacs 31.1 under Xvfb, 720 px text area, 9 px column, 75
+/// columns of text and a 200x80 image: `window-lines-pixel-dimensions` reports
+/// rows (720 54 9) with `word-wrap` nil against (675 209 54) with it
+/// (`tmp/midrow-image/wrapfix-nil.txt`, `wrapfix-t.txt`).
+#[test]
+fn layout_frame_rust_crops_a_mid_row_image_on_a_window_wrapping_row() {
+    let mut eval = Context::new();
+    eval.set_display_host(Box::new(MidRowImageHost));
+    let buf_id = eval
+        .buffer_manager()
+        .current_buffer()
+        .expect("current buffer")
+        .id();
+    let frame_id =
+        eval.frame_manager_mut()
+            .create_frame("layout-window-wrap-crop", 640, 400, buf_id);
+    eval.frame_manager_mut()
+        .get_mut(frame_id)
+        .expect("frame")
+        .set_window_system(Some(Value::symbol("neo")));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame_id);
+    let probe = engine
+        .last_frame_display_state
+        .as_ref()
+        .expect("probe display state");
+    let entry = widest_text_body_window_matrix(probe);
+    let text_width = entry.text_pixel_bounds.width;
+    let char_width = probe.char_width;
+    let filler = (text_width / char_width).floor() as usize - 5;
+    assert!(filler > 8, "the probe row holds enough columns: {filler}");
+    assert!(
+        200.0 > text_width / 4.0,
+        "the image is past the quarter-width floor: {text_width}px"
+    );
+
+    {
+        let buf = eval.buffer_manager_mut().get_mut(buf_id).expect("buffer");
+        buf.insert(&format!("{}i\n", "x".repeat(filler)));
+        buf.put_text_property(
+            filler + 1,
+            filler + 2,
+            Value::symbol("display"),
+            Value::list(vec![
+                Value::symbol("image"),
+                Value::keyword("type"),
+                Value::symbol("png"),
+                Value::keyword("file"),
+                Value::string("./tmp/midrow-image/mid-row.png"),
+            ]),
+        );
+        buf.set_buffer_local("truncate-lines", Value::NIL);
+        buf.set_buffer_local("word-wrap", Value::NIL);
+    }
+
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame_id);
+
+    let state = engine
+        .last_frame_display_state
+        .as_ref()
+        .expect("display state");
+    let entry = widest_text_body_window_matrix(state);
+    let text_rows: Vec<&neomacs_display_protocol::glyph_matrix::MatrixRow> = entry
+        .matrix
+        .rows
+        .iter()
+        .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        .collect();
+
+    let row0 = text_rows[0].glyphs[GlyphArea::Text.index()].as_slice();
+    let image_glyphs: Vec<&neomacs_display_protocol::glyph_matrix::Glyph> = text_rows
+        .iter()
+        .flat_map(|row| row.glyphs[GlyphArea::Text.index()].iter())
+        .filter(|glyph| matches!(glyph.glyph_type, GlyphType::Image { .. }))
+        .collect();
+    assert_eq!(
+        image_glyphs.len(),
+        1,
+        "a WINDOW_WRAP row keeps the image it crops"
+    );
+    let image_glyph = image_glyphs[0];
+    assert!(
+        image_glyph.pixel_width < 200.0,
+        "the image is cropped, not deferred whole: {} px",
+        image_glyph.pixel_width
+    );
+    // GNU's invariant for the cropped glyph: it ends exactly at the row's
+    // right edge, so nothing of the row overhangs the text area.
+    let row_width: f32 = row0.iter().map(|glyph| glyph.pixel_width).sum();
+    let prefix_width = row_width - image_glyph.pixel_width;
+    assert!(
+        prefix_width + 200.0 > text_width,
+        "the uncropped image would overhang the text area: \
+         {prefix_width} + 200 vs {text_width}"
+    );
+    assert!(
+        row_width <= text_width + 0.5 && row_width > text_width - char_width,
+        "the cropped row ends at the text area's right edge: {row_width} vs {text_width} \
+         (char width {char_width})"
+    );
+}
+
+/// A mid-row image on a TRUNCATING row is cropped to the row edge too.
+///
+/// Same content and geometry as the WINDOW_WRAP test above, with
+/// `truncate-lines` at its default.  This is the case the first port of
+/// `produce_image_glyph`'s crop left out: it took the word-wrap clause as a
+/// precondition instead of a disjunct, so a row that does not word-wrap fell
+/// through to the row writer's overflow policy and the glyph was rejected.
+///
+/// Measured, GNU Emacs 31.1 under Xvfb, 720 px text area, 9 px column, 64
+/// columns of text (current_x 576): a 180 px image leaves the row 756 px wide
+/// (no crop) and a 181 px image leaves it 720 px (crop), so the crop fires
+/// exactly above `last_visible_x / 4` -- `tmp/midrow-image/crop-truncate.txt`.
+#[test]
+fn layout_frame_rust_crops_a_mid_row_image_on_a_truncating_row() {
+    let mut eval = Context::new();
+    eval.set_display_host(Box::new(MidRowImageHost));
+    let buf_id = eval
+        .buffer_manager()
+        .current_buffer()
+        .expect("current buffer")
+        .id();
+    let frame_id = eval
+        .frame_manager_mut()
+        .create_frame("layout-truncate-crop", 640, 400, buf_id);
+    eval.frame_manager_mut()
+        .get_mut(frame_id)
+        .expect("frame")
+        .set_window_system(Some(Value::symbol("neo")));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame_id);
+    let probe = engine
+        .last_frame_display_state
+        .as_ref()
+        .expect("probe display state");
+    let entry = widest_text_body_window_matrix(probe);
+    let text_width = entry.text_pixel_bounds.width;
+    let char_width = probe.char_width;
+    let filler = (text_width / char_width).floor() as usize - 5;
+    assert!(filler > 8, "the probe row holds enough columns: {filler}");
+    assert!(
+        200.0 > text_width / 4.0,
+        "the image is past the quarter-width floor: {text_width}px"
+    );
+
+    {
+        let buf = eval.buffer_manager_mut().get_mut(buf_id).expect("buffer");
+        buf.insert(&format!("{}i\n", "x".repeat(filler)));
+        buf.put_text_property(
+            filler + 1,
+            filler + 2,
+            Value::symbol("display"),
+            Value::list(vec![
+                Value::symbol("image"),
+                Value::keyword("type"),
+                Value::symbol("png"),
+                Value::keyword("file"),
+                Value::string("./tmp/midrow-image/mid-row.png"),
+            ]),
+        );
+        buf.set_buffer_local("truncate-lines", Value::T);
+    }
+
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame_id);
+
+    let state = engine
+        .last_frame_display_state
+        .as_ref()
+        .expect("display state");
+    let entry = widest_text_body_window_matrix(state);
+    let text_rows: Vec<&neomacs_display_protocol::glyph_matrix::MatrixRow> = entry
+        .matrix
+        .rows
+        .iter()
+        .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        .collect();
+    let row0 = text_rows[0].glyphs[GlyphArea::Text.index()].as_slice();
+    let image_glyph = row0
+        .iter()
+        .find(|glyph| matches!(glyph.glyph_type, GlyphType::Image { .. }))
+        .expect("the truncating row keeps the image it crops");
+    assert!(
+        image_glyph.pixel_width < 200.0,
+        "the image is cropped: {} px",
+        image_glyph.pixel_width
+    );
+    let row_width: f32 = row0.iter().map(|glyph| glyph.pixel_width).sum();
+    let prefix_width = row_width - image_glyph.pixel_width;
+    assert!(
+        prefix_width + 200.0 > text_width,
+        "the uncropped image would overhang the text area: {prefix_width} + 200 vs {text_width}"
+    );
+    assert!(
+        row_width <= text_width + 0.5 && row_width > text_width - char_width,
+        "the cropped row ends at the text area's right edge: {row_width} vs {text_width}"
     );
 }
 
@@ -21564,6 +21790,7 @@ fn render_buffer_plain_item_source_shadow_row(
         GlyphRowRole::Text,
         base_face_id,
         resolver.default_face(),
+        DisplayRowLineWrap::chrome_row(),
     )
     .render_request(DisplayRowRenderBounds::new(
         DisplayRowPosition::new(0.0, 0),
@@ -21643,6 +21870,7 @@ fn render_buffer_plain_item_prefix_shadow_row_at(
         GlyphRowRole::Text,
         base_face_id,
         resolver.default_face(),
+        DisplayRowLineWrap::chrome_row(),
     )
     .render_request(DisplayRowRenderBounds::new(
         start_position,
@@ -23219,6 +23447,7 @@ fn assert_segmented_plain_shadow_row(
         GlyphRowRole::Text,
         base_face_id,
         resolver.default_face(),
+        DisplayRowLineWrap::chrome_row(),
     )
     .render_request(DisplayRowRenderBounds::new(
         DisplayRowPosition::new(0.0, 0),

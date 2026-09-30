@@ -1372,6 +1372,9 @@ impl<'a> TextRowSourceRenderState<'a> {
             neomacs_display_protocol::frame_glyphs::GlyphRowRole::Text,
             margin_face_id,
             &margin_face,
+            // A margin lane is a structural lane of its own: it never
+            // continues onto another row.
+            crate::display_row::append_context::DisplayRowLineWrap::chrome_row(),
         )
         .render_request_from_column_for_area(0, columns, area);
 

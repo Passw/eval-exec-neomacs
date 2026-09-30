@@ -45,6 +45,7 @@ use crate::display_property::{
     DisplayMediaReplacementProperty, DisplayPropertyClassification, DisplayReplacementProperty,
     classify_display_property,
 };
+use crate::display_row::append_context::DisplayRowLineWrap;
 use crate::display_row::append_context::*;
 use crate::display_row::builder::{
     DisplayRowAppendProgress, DisplayRowAppendStatus, DisplayRowGlyphCheckpoint,
@@ -1236,6 +1237,7 @@ fn buffer_hscroll_skip_render_request_appends_left_truncation_marker() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let mut byte_idx = 0;
     let mut charpos = 0;
@@ -1527,6 +1529,7 @@ fn buffer_hscroll_skip_action_appends_left_truncation_marker_and_marks_row() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
     let mut x = 0.0;
@@ -1910,6 +1913,7 @@ fn buffer_invisible_text_render_request_appends_ellipsis_and_captures_cursor() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let overlay_context = BufferOverlayStringTextRowRenderContext::new(
         false,
@@ -2935,6 +2939,7 @@ fn buffer_text_line_break_render_request_emits_row_transition_and_syncs_position
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let overlay_context = BufferOverlayStringTextRowRenderContext::new(
         true,
@@ -3085,6 +3090,7 @@ fn buffer_selective_display_tail_render_request_appends_marker_and_transitions_r
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let text = b"a\rb\nc";
     let mut byte_idx = 2;
@@ -4201,7 +4207,7 @@ fn test_append_frame_at(
     metrics: DisplayRowAppendMetrics,
     tab_policy: DisplayTabPolicy,
 ) -> DisplayRowAppendFrame {
-    let surface = DisplayRowAppendSurface::new(area, tab_policy);
+    let surface = DisplayRowAppendSurface::new(area, tab_policy, DisplayRowLineWrap::Truncate);
     let geometry = DisplayRowGeometryState::new(row, y, 0.0, metrics.height(), metrics.ascent());
     surface.frame_from_geometry_state(&geometry, glyph_y - y, metrics)
 }
@@ -4210,6 +4216,7 @@ fn test_advance_resolution_surface() -> DisplayRowAppendSurface {
     DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     )
 }
 
@@ -4590,6 +4597,7 @@ fn display_row_append_frame_builds_from_geometry_state() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(10.0, 90.0, 120.0, 6.0, 0.0),
         DisplayTabPolicy::every(4),
+        DisplayRowLineWrap::Truncate,
     );
 
     let frame = surface.frame_from_geometry_state(
@@ -4649,6 +4657,7 @@ fn synthetic_text_append_context_renders_fragment_and_emits_slots() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
     let append_context = SyntheticTextRowAppendContext::with_face_attempt(
@@ -4740,6 +4749,7 @@ fn buffer_synthetic_text_render_context_renders_active_marker() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
 
@@ -4807,6 +4817,7 @@ fn buffer_synthetic_text_render_context_renders_hscroll_marker() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
 
@@ -4896,6 +4907,7 @@ fn buffer_line_prefix_render_context_renders_default_prefix_and_clears_request()
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
     let values = DisplayRowPrefixValues::default_values(Some(Value::string("=>")), None);
@@ -4978,6 +4990,7 @@ fn buffer_line_prefix_render_context_appends_gnu_space_align_to_prefix() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 248.0, 248.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 1.0, 1.0);
     let prefix = Value::list(vec![
@@ -5076,6 +5089,7 @@ fn buffer_line_prefix_render_request_applies_rendered_position() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
     let values = DisplayRowPrefixValues::default_values(Some(Value::string("=>")), None);
@@ -5210,6 +5224,7 @@ fn buffer_overlay_string_render_context_disabled_keeps_render_state() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let render_context = BufferOverlayStringTextRowRenderContext::new(
         false,
@@ -5270,6 +5285,7 @@ fn overlay_string_row_break_context_finishes_current_row() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let row_context = OverlayStringRenderRowContext::new(
         &surface,
@@ -5576,6 +5592,7 @@ fn append_rendered_display_row_fragment_to_text_row_and_emit_appends_glyphs_and_
             GlyphRowRole::Text,
             FaceId::new(7),
             &base_face,
+            DisplayRowLineWrap::chrome_row(),
         )
         .render_request(DisplayRowRenderBounds::new(
             DisplayRowPosition::new(16.0, 2),
@@ -5643,6 +5660,7 @@ fn display_row_append_surface_builds_positioned_source_requests() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(8.0, 120.0, 150.0, 10.0, 0.0),
         tab_policy.clone(),
+        DisplayRowLineWrap::Truncate,
     );
 
     let geometry = DisplayRowGeometryState::new(3, 20.0, 0.0, 16.0, 11.0);
@@ -6083,6 +6101,7 @@ fn display_row_append_surface_builds_frames_with_shared_area() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(8.0, 120.0, 150.0, 10.0, 0.0),
         tab_policy.clone(),
+        DisplayRowLineWrap::Truncate,
     );
 
     assert_eq!(surface.content_x(), 8.0);
@@ -6123,6 +6142,7 @@ fn display_row_text_append_context_builds_text_frame_from_shared_surface() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(8.0, 120.0, 150.0, 10.0, 0.0),
         DisplayTabPolicy::every(4),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(3, 20.0, 0.0, 16.0, 11.0);
 
@@ -6169,6 +6189,7 @@ fn display_row_append_surface_builds_frame_from_active_face_state() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(8.0, 120.0, 150.0, 10.0, 0.0),
         DisplayTabPolicy::every(4),
+        DisplayRowLineWrap::Truncate,
     );
 
     let geometry = DisplayRowGeometryState::new(3, 20.0, 0.0, 16.0, 12.0);
@@ -6655,6 +6676,7 @@ fn lisp_string_append_context_appends_fragment_items() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
     let append_context = LispStringRowAppendContext::new(
@@ -6736,6 +6758,7 @@ fn buffer_text_source_append_context_appends_source_char() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
 
@@ -6940,6 +6963,7 @@ fn buffer_text_source_render_request_appends_plain_text_run_with_cursor_inside()
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let overlay_context = BufferOverlayStringTextRowRenderContext::new(
         false,
@@ -7090,6 +7114,7 @@ fn buffer_text_source_render_request_keeps_space_run_whole_when_trailing_enabled
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let overlay_context = BufferOverlayStringTextRowRenderContext::new(
         false,
@@ -7251,6 +7276,7 @@ fn buffer_text_source_render_request_keeps_space_run_whole_when_word_wrap_enable
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let overlay_context = BufferOverlayStringTextRowRenderContext::new(
         false,
@@ -7412,6 +7438,7 @@ fn buffer_text_source_render_request_renders_fit_prefix_before_overflow() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 32.0, 32.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let overlay_context = BufferOverlayStringTextRowRenderContext::new(
         false,
@@ -7575,6 +7602,7 @@ fn buffer_text_source_append_context_prepares_current_text_row_source_char() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
     let append_context = BufferSourceRowAppendContext::new_with_face_attempt(
@@ -7678,6 +7706,7 @@ fn buffer_overlay_string_context_reports_render_gate() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(2, 32.0, 0.0, 16.0, 12.0);
     let past_limit = DisplayRowGeometryState::new(4, 64.0, 0.0, 16.0, 12.0);
@@ -7746,6 +7775,7 @@ fn buffer_end_of_buffer_tail_render_request_captures_cursor_and_renders_overlay(
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let overlay_context = BufferOverlayStringTextRowRenderContext::new(
         true,
@@ -9605,6 +9635,7 @@ fn buffer_text_item_append_context_builds_mapped_item() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
     let append_context = BufferSourceRowAppendContext::new_with_face_attempt(
@@ -9828,6 +9859,7 @@ fn buffer_text_item_append_context_builds_glyphless_item() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
     let append_context = BufferSourceRowAppendContext::new_with_face_attempt(
@@ -10025,6 +10057,7 @@ fn lisp_string_source_append_context_preserves_source_after_row_break() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let first_geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
     let second_geometry = DisplayRowGeometryState::new(1, 16.0, 0.0, 16.0, 12.0);
@@ -10773,6 +10806,7 @@ fn display_property_replacement_resolve_request_appends_and_reports_outcome() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let mut geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
     let active_face = test_active_face_state(FaceId::new(7), 8.0);
@@ -10889,6 +10923,7 @@ fn buffer_display_property_replacement_render_outcome_updates_progress() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let mut geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
     let active_face = test_active_face_state(FaceId::new(7), 8.0);
@@ -11635,6 +11670,7 @@ fn display_replacement_append_context_advances_stretch_output() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
     let replacement_source = crate::display_item::BufferDisplayReplacementSource::new(
@@ -11719,6 +11755,7 @@ fn display_replacement_append_context_advances_source_mapped_text_output() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 16.0, 12.0);
     let replacement_source = crate::display_item::BufferDisplayReplacementSource::new(
@@ -11806,6 +11843,7 @@ fn synthetic_text_append_context_uses_source_append_render_request() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 80.0, 80.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let active_face = test_active_face_state(FaceId::new(3), 8.0);
     let geometry = DisplayRowGeometryState::new(0, 0.0, 0.0, 18.0, 13.0);
@@ -11888,6 +11926,7 @@ fn display_replacement_append_context_installs_xwidget_replacements() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(text_bounds.x, 160.0, 160.0, 0.0, 0.0),
         DisplayTabPolicy::from_tab_width_and_stops(text_bounds.x, 8, &[]),
+        DisplayRowLineWrap::Truncate,
     );
     let geometry = DisplayRowGeometryState::new(0, 4.0, 0.0, 16.0, 12.0);
     let replacement_source = crate::display_item::BufferDisplayReplacementSource::new(
@@ -12367,6 +12406,7 @@ fn display_replacement_row_render_reports_an_image_the_row_refuses() {
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(text_bounds.x, 160.0, 160.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let mut geometry =
         DisplayRowGeometryDefaults::new(0.0, 16.0, 12.0, DisplayRowMeasurementMode::ConcreteFont)
@@ -12890,6 +12930,7 @@ fn display_property_live_render_outcome(
     let surface = DisplayRowAppendSurface::new(
         DisplayRowAppendArea::new(0.0, 800.0, 800.0, 0.0, 0.0),
         DisplayTabPolicy::every(8),
+        DisplayRowLineWrap::Truncate,
     );
     let params = test_display_space_window_params();
     let text_bytes = text.as_bytes();

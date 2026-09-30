@@ -11,8 +11,8 @@ use crate::display_item::{
 };
 use crate::display_pixel_calc::{PixelCalcContext, calc_pixel_width_or_height};
 use crate::display_row::append_context::{
-    DisplayRowTextCharState, DisplayRowTextNaturalAdvanceKind, DisplayRowTextNaturalAdvancePolicy,
-    DisplayRowTextNaturalAdvanceRequest,
+    DisplayRowLineWrap, DisplayRowTextCharState, DisplayRowTextNaturalAdvanceKind,
+    DisplayRowTextNaturalAdvancePolicy, DisplayRowTextNaturalAdvanceRequest,
 };
 use crate::display_row::geometry::DisplayRowTextAreaOrigin;
 #[cfg(test)]
@@ -110,6 +110,11 @@ pub(crate) struct DisplayRowLayout {
     /// GNU's `FRAME_WINDOW_P` guard: the operand fails and `:align-to` is not
     /// applied.
     pub(crate) space_image_params: Option<crate::display_pixel_calc::PixelCalcImageInputs>,
+    /// GNU `it->line_wrap` for the row this layout produces.  The writer reads
+    /// it where GNU's `produce_image_glyph` reads it -- to decide whether an
+    /// overflowing image glyph is cropped or left whole; see
+    /// [`DisplayRowLineWrap`].
+    pub(crate) line_wrap: DisplayRowLineWrap,
 }
 
 impl DisplayRowLayout {
@@ -1892,6 +1897,7 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
                                                 before_len == 0,
                                                 self.writer.layout.char_width_px,
                                                 self.writer.layout.line_number_width_px,
+                                                self.writer.layout.line_wrap,
                                             )
                                         },
                                     );
