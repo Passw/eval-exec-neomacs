@@ -2335,6 +2335,7 @@ impl FontMetricsService {
     /// composed path uses), so replaying these glyphs reproduces current
     /// visual behavior with the re-selection risk removed.
     /// Shape one gstring through the font named by its header (issue #447):
+<<<<<<< HEAD
     /// fills the gstring's glyph slots from the font's shaped output — the same
     /// contract as GNU's `font->driver->shape` (src/font.c Ffont_shape_gstring
     /// calls into the driver, then validates coverage and truncates).
@@ -2360,6 +2361,37 @@ impl FontMetricsService {
             return GstringShapeOutcome::NotShapable;
         };
         let Some((family, pixel_size)) = header.first().and_then(font_object_family_and_pixel_size)
+||||||| parent of 7be02f8ef8 (feat(layout-engine): shape gstrings through the installed font (issue #447 driver core))
+=======
+    /// fills the gstring's glyph slots from the font's shaped output — the
+    /// same contract as GNU's `font->driver->shape` (src/font.c
+    /// Ffont_shape_gstring calls into the driver, then validates coverage
+    /// and truncates).
+    ///
+    /// The gstring header carries the font object (family + pixel size) and
+    /// the run's characters; each shaped glyph lands in a slot as
+    /// `[from to char code width …]` with INCLUSIVE to, the code the font's
+    /// shaped glyph id, and the pixel advance. Returns the shaped glyph
+    /// count.
+    pub fn shape_gstring_through_font(
+        &mut self,
+        gstring: &mut neovm_core::Value,
+        _direction: neovm_core::Value,
+    ) -> neovm_core::emacs_core::font::GstringShapeOutcome {
+        use neovm_core::emacs_core::font::{
+            GstringShapeOutcome, font_object_family_and_pixel_size,
+        };
+
+        let slots: Vec<neovm_core::Value> = match gstring.as_vector_data() {
+            Some(slots) => slots.to_vec(),
+            None => return GstringShapeOutcome::NotShapable,
+        };
+        let Some(header) = slots.first().and_then(|header| header.as_vector_data()) else {
+            return GstringShapeOutcome::NotShapable;
+        };
+        let Some((family, pixel_size)) =
+            header.first().and_then(font_object_family_and_pixel_size)
+>>>>>>> 7be02f8ef8 (feat(layout-engine): shape gstrings through the installed font (issue #447 driver core))
         else {
             return GstringShapeOutcome::NotShapable;
         };

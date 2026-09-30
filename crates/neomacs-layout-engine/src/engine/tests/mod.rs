@@ -36849,6 +36849,7 @@ fn ligature_rule_composes_through_the_font_shape_driver() {
            '([\"\\\\(?:->\\\\)\" 0 font-shape-gstring])) \
          (aset composition-function-table ?> \
            '([\"\\\\(?:->>\\\\|->\\\\)\" 0 font-shape-gstring])))";
+<<<<<<< HEAD
     let ok = eval.eval_str(rule);
 <<<<<<< HEAD
     eprintln!("i447dbg rule eval: {ok:?}");
@@ -36875,6 +36876,28 @@ fn ligature_rule_composes_through_the_font_shape_driver() {
         "the ligature rule setup must evaluate: {ok:?}"
     );
 >>>>>>> a591c2a358 (feat(gui-tests,layout-engine): ligature composition end-to-end + the shaping driver install (issue #447))
+||||||| parent of 7be02f8ef8 (feat(layout-engine): shape gstrings through the installed font (issue #447 driver core))
+           (list (vector \"\\\\(?:->\\\\)\" 0 font-shape-gstring))))";
+    let ok = eval.eval_str(rule);
+    assert!(
+        ok.is_ok(),
+        "the ligature rule setup must evaluate: {ok:?}"
+    );
+=======
+    eval.eval_str(rule).expect("the ligature rule setup must evaluate");
+
+    // The installed font-shaping driver: a disjoint FontMetricsService the
+    // runtime owns (RedisplayRuntime::shape_gstring's exact pattern).
+    let metrics = std::sync::Arc::new(std::sync::Mutex::new(
+        crate::font::metrics::FontMetricsService::new(),
+    ));
+    let driver_metrics = metrics.clone();
+    eval.font_shape_fn = Some(Box::new(move |_eval, mut gstring, direction| {
+        let mut metrics = driver_metrics.lock().expect("driver metrics");
+        metrics.shape_gstring_through_font(&mut gstring, direction)
+    }));
+
+>>>>>>> 7be02f8ef8 (feat(layout-engine): shape gstrings through the installed font (issue #447 driver core))
     let frame_id = eval
         .frame_manager_mut()
         .create_frame("ligature-probe", 200, 160, buf_id);
@@ -36900,43 +36923,26 @@ fn ligature_rule_composes_through_the_font_shape_driver() {
         .iter()
         .find(|entry| entry.window_id.get() == selected_window.0 as i64)
         .expect("selected window matrix");
-    for (ri, row) in entry
+    let text_rows: Vec<_> = entry
         .matrix
         .rows
         .iter()
         .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
-        .enumerate()
-    {
-        let text_glyphs = &row.glyphs[GlyphArea::Text.index()];
-<<<<<<< HEAD
-        eprintln!("i447dbg row {ri}: {:?}", glyphs_logical_text(text_glyphs));
-        for (i, g) in text_glyphs.iter().enumerate() {
-            eprintln!(
-                "i447dbg   glyph[{i}]: type={:?} width={} pos={:?}",
-                g.glyph_type, g.pixel_width, g.provenance
-||||||| parent of 260bcf9e7d (feat(gui-tests,layout-engine): ligature composition end-to-end + the shaping driver install (issue #447))
-        eprintln!("i447dbg row {ri}: {:?}", glyphs_logical_text(text_glyphs));
-        for (i, g) in text_glyphs.iter().enumerate() {
-            eprintln!(
-                "i447dbg   glyph[{i}]: type={:?} width={} pos={:?}",
-                g.glyph_type,
-                g.pixel_width,
-                g.provenance
-=======
-            let has_ligature_composition = text_glyphs.iter().any(|glyph| {
-            matches!(
-                &glyph.glyph_type,
-                GlyphType::AutomaticComposite { text, .. } if text.as_ref() == "->"
-            )
-        });
-        if ri == 0 {
-            assert!(
-                has_ligature_composition,
-                "the '->' sequence must compose into one glyph through the \
-                 font-shape driver, got {:?}",
-                glyphs_logical_text(text_glyphs)
->>>>>>> 260bcf9e7d (feat(gui-tests,layout-engine): ligature composition end-to-end + the shaping driver install (issue #447))
-            );
-        }
-    }
+        .collect();
+    // The '->' sequence must compose into ONE glyph through the driver: an
+    // AutomaticComposite carrying the cluster text.
+    let first_text_glyphs = &text_rows[0].glyphs[GlyphArea::Text.index()];
+    let composed = first_text_glyphs.iter().any(|glyph| {
+        matches!(
+            &glyph.glyph_type,
+            GlyphType::Composite { text } | GlyphType::AutomaticComposite { text, .. }
+                if text.as_ref() == "->"
+        )
+    });
+    assert!(
+        composed,
+        "the '->' sequence must compose into one glyph through the \
+         font-shape driver, got {:?}",
+        glyphs_logical_text(first_text_glyphs)
+    );
 }
