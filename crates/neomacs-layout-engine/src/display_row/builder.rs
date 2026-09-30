@@ -918,18 +918,28 @@ impl DisplayRowColumnCount {
     }
 }
 
+/// Pop glyphs until the row fits `target` columns. Returns whether any
+/// popped glyph was a wide glyph or a wide-glyph padding cell: GNU's TTY
+/// truncation overwrites the padding cells of a cut wide character with the
+/// truncation glyph (the back-scan to the last non-padding glyph at
+/// xdisp.c:26611-26615, then one `produce_special_glyphs` per cell from
+/// there to the row's end, :26636-26641) — issue #446's
+/// `ibuffer_truncated_wide_name_at_the_window_edge`: both cells the cut
+/// `日` leaves carry `$`, not blank+`$`.
 pub(crate) fn trim_display_row_text_to_total_columns(
     row: &mut GlyphRow,
     target: usize,
     char_width_px: f32,
-) {
+) -> bool {
+    let mut popped_wide = false;
     while DisplayRowColumnCount::from_row(row, char_width_px).get() > target {
         let text_area = &mut row.glyphs[GlyphArea::Text.index()];
-        if text_area.is_empty() {
+        let Some(glyph) = text_area.pop() else {
             break;
-        }
-        text_area.pop();
+        };
+        popped_wide |= glyph.wide || glyph.padding;
     }
+    popped_wide
 }
 
 pub(crate) fn pop_display_row_trailing_text_char(row: &mut GlyphRow, ch: char) -> Option<Glyph> {

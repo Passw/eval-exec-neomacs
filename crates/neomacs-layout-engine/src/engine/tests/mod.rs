@@ -36744,3 +36744,84 @@ fn borrowed_and_snapshot_views_agree_on_composition_span_queries() {
         );
     }
 }
+
+#[test]
+fn wide_char_cut_at_truncation_edge_leaves_both_cells_to_the_marker() {
+    // RED pin for the last issue #446 follow-up (the upstream
+    // ibuffer_truncated_wide_name TUI test): a wide character at columns
+    // 38..40 in a forty-column truncating window is cut at the edge. GNU's
+    // truncation pass overwrites BOTH its cells with the truncation glyph
+    // (xdisp.c:26611-26641). This port refuses the glyph at the fit check
+    // and paints blank + `$`. The marker-fill support is in place
+    // (RightEdgeMarkerItemSource's marker-filled padding); the missing
+    // piece is the admission routing through the overflow arm — see the
+    // NOTE in DisplayRowTextOverflowDecision::for_char. {
+    let mut eval = Context::new();
+    let buf_id = eval
+        .buffer_manager()
+        .current_buffer()
+        .expect("current buffer")
+        .id();
+    {
+        let buf = eval.buffer_manager_mut().get_mut(buf_id).expect("buffer");
+        // 38 ASCII columns, then a wide char spanning 38..40, then text after:
+        // the wide char exactly fills to the window edge and gets cut.
+        buf.insert(&format!(
+            "{}{}tail\n",
+            "x".repeat(38),
+            char::from_u32(0x65e5).unwrap()
+        ));
+    }
+    eval.buffer_manager_mut().set_current(buf_id);
+    eval.eval_str("(setq truncate-lines t)")
+        .expect("truncate lines");
+    let frame_id = eval
+        .frame_manager_mut()
+        .create_frame("wide-cut-at-edge", 40, 160, buf_id);
+    {
+        let frame = eval.frame_manager_mut().get_mut(frame_id).expect("frame");
+        frame.char_width = 1.0;
+        frame.char_height = 1.0;
+    }
+    let selected_window = eval
+        .frame_manager()
+        .get(frame_id)
+        .expect("frame")
+        .selected_window;
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame_id);
+    let state = engine
+        .last_frame_display_state
+        .as_ref()
+        .expect("display state");
+    let entry = state
+        .window_matrices
+        .iter()
+        .find(|entry| entry.window_id.get() == selected_window.0 as i64)
+        .expect("selected window matrix");
+    let rows: Vec<_> = entry
+        .matrix
+        .rows
+        .iter()
+        .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        .cloned()
+        .collect();
+    assert!(rows.len() >= 2, "both lines must lay out");
+    let text_glyphs = &rows[0].glyphs[GlyphArea::Text.index()];
+    for (i, g) in text_glyphs.iter().enumerate() {
+        eprintln!(
+            "i446dbg wide-cut glyph[{i}]: type={:?} wide={} width={} pos={:?}",
+            g.glyph_type,
+            g.wide,
+            g.pixel_width,
+            g.provenance
+        );
+    }
+    // GNU's contract: the text, then the truncation glyph in BOTH the cut
+    // glyph's cells.
+    assert_eq!(
+        glyphs_logical_text(text_glyphs),
+        format!("x{}$$", "x".repeat(37)),
+        "both cells of the cut wide glyph must carry the truncation glyph"
+    );
+}

@@ -592,6 +592,18 @@ impl DisplayRowTextOverflowDecision {
         if ch == '\t' || x_px + advance_px <= right_edge_px {
             Self::Fits
         } else if wrap_mode == LineWrapMode::Truncate {
+            // NOTE on the wide-glyph cut case (issue #446 wide-name): GNU
+            // admits a wide character whose first cell fits and OVERWRITES
+            // both its cells with the truncation glyph
+            // (xdisp.c:26611-26641). This port refuses it here and writes
+            // blank + marker — a tracked one-cell divergence (the upstream
+            // ibuffer_truncated_wide_name test). Admitting the glyph from
+            // this fit check alone regresses worse: the append ends through
+            // the writer's Clipped status path, which never raises the
+            // Truncated row flag, and the marker disappears entirely. The
+            // admission must route through the overflow arm (or the Clipped
+            // path must raise the flag) — see the marker-fill support in
+            // RightEdgeMarkerItemSource, already in place.
             Self::Truncate
         } else if word_wrap.has_candidate() {
             Self::WordWrap {
