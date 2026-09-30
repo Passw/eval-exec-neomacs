@@ -2813,6 +2813,227 @@ fn idle_precomputation_prioritizes_the_current_scroll_direction() {
 }
 
 #[test]
+fn backward_reversal_retargets_an_active_forward_capture() {
+    check_active_capture_reversal(false, false, false, false);
+}
+
+#[test]
+fn fractional_backward_reversal_retargets_an_active_forward_capture() {
+    check_active_capture_reversal(false, true, false, false);
+}
+
+#[test]
+fn rich_backward_reversal_retargets_an_active_forward_capture() {
+    check_active_capture_reversal(true, false, false, false);
+}
+
+#[test]
+fn backward_reversal_keeps_forward_capture_with_sufficient_headroom() {
+    check_active_capture_reversal(false, false, true, false);
+}
+
+#[test]
+fn backward_reversal_preserves_admitted_forward_prefix() {
+    check_active_capture_reversal(false, false, false, true);
+}
+
+fn check_active_capture_reversal(rich: bool, fractional: bool, prepared: bool, preview: bool) {
+    let line = "ordinary offscreen text\n";
+    let (mut eval, frame, buffer, window) = if rich {
+        shared_rich_scrolling_frame(664, 646)
+    } else {
+        let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 800, 600);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        (eval, frame, buffer, window)
+    };
+    let origin = if rich {
+        5574160 - 48 * 110080
+    } else {
+        120 * line.len()
+    };
+    let place = |eval: &mut Context, start: usize, hidden: i32| {
+        let point = eval
+            .buffer_manager()
+            .get(buffer)
+            .unwrap()
+            .char_pos_to_emacs_byte_pos_clamped(CharPos0::new(start + 100))
+            .get();
+        scroll_window_to(eval, frame, window, buffer, start as i64 + 1, point);
+        if let neovm_core::window::Window::Leaf {
+            force_start,
+            vscroll,
+            ..
+        } = eval
+            .frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .find_window_mut(window)
+            .unwrap()
+        {
+            *force_start = true;
+            *vscroll = -hidden;
+        }
+    };
+    place(&mut eval, origin, 8);
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    assert!(engine.maintain_scroll_coverage(&eval).is_some());
+    let owner = DisplayWindowId::new(window.0 as i64);
+    if preview {
+        for _ in 0..3 {
+            engine.maintain_scroll_coverage(&eval);
+        }
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !engine
+            .scroll_coverage
+            .drain(&mut engine.prepared_viewports)
+            .unwrap()
+        {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::yield_now();
+        }
+        assert!(engine.prepared_viewports.has_computed(frame, owner));
+        eval.gc_collect_exact();
+        engine.layout_frame_rust(&mut eval, frame);
+    }
+    if prepared {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while engine.maintain_scroll_coverage(&eval).is_some() {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::yield_now();
+        }
+        engine.layout_frame_rust(&mut eval, frame);
+        let start = engine.retained_window_matrices[&owner]
+            .matrix
+            .rows
+            .iter()
+            .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+            .last()
+            .unwrap()
+            .start_charpos;
+        let forward = eval
+            .eval_str(&format!(
+                "(save-excursion (goto-char {}) (line-beginning-position))",
+                start + 1
+            ))
+            .unwrap()
+            .as_fixnum()
+            .unwrap() as usize
+            - 1;
+        engine
+            .begin_scroll_coverage(&eval, frame, window, CharPos0::new(forward))
+            .unwrap();
+    }
+    let forward = engine
+        .scroll_coverage
+        .active_capture_start_for_test()
+        .unwrap();
+    assert!(forward > origin, "establish an active forward capture");
+    let start = if fractional {
+        origin
+    } else if rich {
+        eval.eval_str(&format!(
+            "(save-excursion (goto-char {}) (forward-line -1) (point))",
+            origin + 1
+        ))
+        .unwrap()
+        .as_fixnum()
+        .unwrap() as usize
+            - 1
+    } else {
+        origin - line.len()
+    };
+    place(&mut eval, start, 4);
+    engine.layout_frame_rust(&mut eval, frame);
+    let visible = selected_window_layout_trace(&eval, &engine, frame);
+    let headroom = |engine: &LayoutEngine| {
+        engine
+            .last_frame_display_state
+            .as_ref()
+            .unwrap()
+            .materialize()
+            .scroll_surfaces
+            .iter()
+            .find(|surface| surface.coverage().content.window_id == owner)
+            .map_or(0.0, |surface| -surface.clamp_offset(-f32::MAX))
+    };
+    if prepared {
+        assert!(
+            headroom(&engine) > 100.0,
+            "prepared backward rows leave time for forward acquisition"
+        );
+    } else {
+        assert!(headroom(&engine) < 34.0, "backward preparation is urgent");
+    }
+    let coverage_end = |engine: &LayoutEngine| {
+        engine
+            .last_frame_display_state
+            .as_ref()
+            .unwrap()
+            .scroll_coverage
+            .iter()
+            .find(|coverage| coverage.content.window_id == owner)
+            .map(|coverage| coverage.content.matrix.rows.last().unwrap().end_charpos)
+    };
+    let original_end = coverage_end(&engine);
+    if preview {
+        assert!(
+            original_end.is_some(),
+            "published forward prefix connects to the viewport"
+        );
+    }
+    engine.maintain_scroll_coverage(&eval);
+    let active = engine
+        .scroll_coverage
+        .active_capture_start_for_test()
+        .unwrap();
+    if prepared {
+        assert_eq!(
+            active, forward,
+            "adequate backward headroom must preserve the active forward capture"
+        );
+    } else {
+        assert!(
+            active < start,
+            "reversal with little headroom must start a backward bridge instead of continuing forward capture at {active}"
+        );
+    }
+    if preview {
+        eval.gc_collect_exact();
+        engine.layout_frame_rust(&mut eval, frame);
+        assert_eq!(
+            coverage_end(&engine),
+            original_end,
+            "yielding a producer must retain its already admitted prefix across GC"
+        );
+    }
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while engine.maintain_scroll_coverage(&eval).is_some() {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    engine.layout_frame_rust(&mut eval, frame);
+    assert!(
+        headroom(&engine) > 34.0,
+        "the worker must provide usable backward pixel coverage, got {}",
+        headroom(&engine)
+    );
+    assert!(
+        visible == selected_window_layout_trace(&eval, &engine, frame),
+        "idle preparation must preserve the visible layout"
+    );
+    let mut fresh = LayoutEngine::new();
+    fresh.layout_frame_rust(&mut eval, frame);
+    assert!(
+        visible == selected_window_layout_trace(&eval, &fresh, frame),
+        "visible layout must match fresh layout"
+    );
+}
+
+#[test]
 fn repeated_idle_preview_preserves_a_complete_prepared_page() {
     let line = "ordinary offscreen text\n";
     let (mut eval, frame, _, window) = incr_editing_frame(&line.repeat(300), 800, 600);

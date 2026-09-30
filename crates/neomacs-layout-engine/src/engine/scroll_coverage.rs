@@ -100,6 +100,8 @@ struct Capture {
 struct WindowCoverage {
     key: RetainedWindowKey,
     targets: Vec<CharPos0>,
+    // Remember pixel motion between source-row transitions and worker wakes.
+    moving_backward: bool,
     // Only the nearby bridge stops at this seam. The farther backward job
     // still prepares a complete viewport for page-up measurement and reuse.
     backward_bridge: Option<(CharPos0, CharPos0)>,
@@ -397,7 +399,15 @@ impl LayoutEngine {
                 .scroll_coverage
                 .windows
                 .get(&window_id)
-                .is_some_and(|observed| retained.key.window_start < observed.key.window_start);
+                .is_some_and(|observed| {
+                    if retained.key.window_start != observed.key.window_start {
+                        retained.key.window_start < observed.key.window_start
+                    } else if retained.key.vscroll != observed.key.vscroll {
+                        retained.key.vscroll > observed.key.vscroll
+                    } else {
+                        observed.moving_backward
+                    }
+                });
         if !compatible {
             self.scroll_coverage.cancel_active();
         }
@@ -504,7 +514,8 @@ impl LayoutEngine {
             }
             // Targets are consumed from the end. Follow the observed motion
             // so repeated backward redisplays cannot keep replacing the queue
-            // with another forward page. An already active page still finishes.
+            // with another forward page. Usually an active page still finishes;
+            // low backward headroom below can yield a forward producer.
             if moving_backward {
                 if let Some(forward) = forward_target {
                     targets.retain(|target| *target != forward);
@@ -516,9 +527,13 @@ impl LayoutEngine {
                 WindowCoverage {
                     key: retained.key.clone(),
                     targets,
+                    moving_backward,
                     backward_bridge,
                 },
             );
+        } else if let Some(observed) = self.scroll_coverage.windows.get_mut(&window_id) {
+            observed.key.vscroll = retained.key.vscroll;
+            observed.moving_backward = moving_backward;
         }
         match self.scroll_coverage.drain(&mut self.prepared_viewports) {
             Ok(true) => {
@@ -532,6 +547,67 @@ impl LayoutEngine {
                 return Some(ScrollCoverageProgress::Continue);
             }
             Ok(false) => {}
+        }
+        // Finishing a forward producer can take many capture slices even
+        // after reversal. Yield only when a queued backward bridge is urgent
+        // and the active source cannot extend its connecting edge. Admitted
+        // prefixes remain cached; cancellation never revokes published rows.
+        let urgent_bridge = moving_backward
+            && self
+                .scroll_coverage
+                .capture
+                .as_ref()
+                .is_some_and(|capture| {
+                    self.scroll_coverage
+                        .windows
+                        .get(&window_id)
+                        .is_some_and(|observed| {
+                            observed.backward_bridge.is_some_and(|(bridge, end)| {
+                                observed.targets.contains(&bridge)
+                                    && capture.retained.key.window_start >= end.get() as i64
+                            })
+                        })
+                })
+            && self.last_frame_display_state.as_ref().is_none_or(|state| {
+                state
+                    .scroll_coverage
+                    .iter()
+                    .find(|coverage| coverage.content.window_id == window_id)
+                    .and_then(|coverage| {
+                        coverage.content.text_clip_bounds.map(|bounds| {
+                            // The same lower offset as ScrollSurface::clamp_offset;
+                            // no glyph materialization is needed to schedule work.
+                            let headroom = coverage.viewport.y + coverage.origin - bounds.y;
+                            headroom <= retained.key.char_height * 2.0
+                        })
+                    })
+                    .unwrap_or(true)
+            });
+        if urgent_bridge {
+            let start = CharPos0::new(
+                self.scroll_coverage
+                    .capture
+                    .as_ref()
+                    .unwrap()
+                    .retained
+                    .key
+                    .window_start
+                    .max(0) as usize,
+            );
+            let observed = self.scroll_coverage.windows.get_mut(&window_id).unwrap();
+            if !observed
+                .targets
+                .iter()
+                .any(|target| target.get() >= retained.key.window_start.max(0) as usize)
+            {
+                // Fractional reversal may not regenerate the source targets.
+                // Defer this forward origin behind the two backward targets.
+                observed.targets.insert(0, start);
+            }
+            tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
+                window = window.0, start = start.get(),
+                "yielding forward capture for urgent backward bridge");
+            self.scroll_coverage.cancel_active();
         }
         if self.scroll_coverage.admission.is_some() {
             return Some(ScrollCoverageProgress::WorkerPending);
