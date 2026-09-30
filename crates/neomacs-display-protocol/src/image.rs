@@ -137,6 +137,57 @@ impl ImageSourceRect {
     pub fn map_uv(self, u: f32, v: f32) -> (f32, f32) {
         (self.x() + u * self.width(), self.y() + v * self.height())
     }
+
+    /// The sub-rect left when the right `1 - fraction` of this rect's x extent
+    /// is cropped away.
+    ///
+    /// GNU crops an inline image glyph that would run past the row's right
+    /// edge by removing the same pixels from its layout advance and from its
+    /// source slice (`it->pixel_width -= crop; slice.width -= crop;`,
+    /// `produce_image_glyph`, src/xdisp.c:32506-32507), so the glyph shows the
+    /// left part of the image instead of squeezing all of it into the narrower
+    /// box.  This is that crop in the slice's own normalized coordinates.
+    ///
+    /// `None` when `fraction` leaves nothing to sample — including the case
+    /// where the remaining extent rounds to zero width in the `u16` encoding,
+    /// which is also how GNU reaches `slice.width == 0`.
+    #[must_use]
+    pub fn crop_right_to_fraction(self, fraction: f32) -> Option<Self> {
+        if !fraction.is_finite() || fraction <= 0.0 {
+            return None;
+        }
+        if fraction >= 1.0 {
+            return Some(self);
+        }
+        Self::new(self.x(), self.y(), self.width() * fraction, self.height())
+    }
+}
+
+/// The horizontal row advance an inline image glyph keeps after GNU's
+/// right-edge crop.
+///
+/// The cropped advance is deliberately not an `ImageSourceRect` or a raw
+/// pixel count: it is the one number `produce_image_glyph` subtracts the crop
+/// from, and pairing it with the *uncropped* source slice would stretch the
+/// whole image into the narrower box.  [`ImageSourceRect::crop_right_to_fraction`]
+/// is the other half of the same edit.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ImageLayoutAdvance(crate::types::Px);
+
+impl ImageLayoutAdvance {
+    /// A finite, strictly positive glyph advance.  A crop that leaves nothing
+    /// produces no glyph in this port, matching the row writer's rule for
+    /// ordinary glyphs.
+    #[must_use]
+    pub fn new(px: crate::types::Px) -> Option<Self> {
+        (px.get().is_finite() && px.get() > 0.0).then_some(Self(px))
+    }
+
+    #[must_use]
+    pub const fn px(self) -> crate::types::Px {
+        self.0
+    }
 }
 
 /// GNU image margins are non-negative integer pixels. Store them in that

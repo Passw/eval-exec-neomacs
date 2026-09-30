@@ -1,9 +1,13 @@
-use super::{DisplayXwidgetOverflowAction, WindowLocalRowExtent};
+use super::{DisplayImageOverflowAction, DisplayXwidgetOverflowAction, WindowLocalRowExtent};
 use crate::display_row::geometry::DisplayRowTextAreaOrigin;
 use neomacs_display_protocol::{Px, XwidgetLayoutAdvance};
 
 fn advance(px: f32) -> XwidgetLayoutAdvance {
     XwidgetLayoutAdvance::new(Px(px)).expect("positive finite layout advance")
+}
+
+fn image_advance(px: f32) -> neomacs_display_protocol::ImageLayoutAdvance {
+    neomacs_display_protocol::ImageLayoutAdvance::new(Px(px)).expect("positive finite advance")
 }
 
 /// A window at the frame's left edge: window-local and frame-absolute
@@ -141,4 +145,87 @@ fn row_extent_rejects_non_finite_and_inverted_frame_geometry() {
     assert!(WindowLocalRowExtent::from_frame_coordinates(origin, f32::INFINITY, 180.0).is_err());
     assert!(WindowLocalRowExtent::from_frame_coordinates(origin, 181.0, 180.0).is_err());
     assert!(WindowLocalRowExtent::from_frame_coordinates(origin, 99.0, 180.0).is_err());
+}
+
+/// `produce_image_glyph`, src/xdisp.c:32492-32509 (emacs-31.1), with GNU's
+/// numbers: a 320 px frame with one reserved column has `last_visible_x` 312
+/// and an 8 px column, and the image after a one-cell "a" sits at 8.
+#[test]
+fn an_image_wider_than_the_remaining_row_is_cropped_by_gnus_rule() {
+    assert_eq!(
+        DisplayImageOverflowAction::for_image(100.0, leftmost_window(8.0, 312.0), false, 8.0, 0.0),
+        DisplayImageOverflowAction::Fits
+    );
+    assert_eq!(
+        DisplayImageOverflowAction::for_image(304.0, leftmost_window(8.0, 312.0), false, 8.0, 0.0),
+        DisplayImageOverflowAction::Fits,
+        "crop == 0 is not a crop"
+    );
+    // Wider than a row of its own (600 > 312 - 0 - 8): crop = 600 - 304.
+    assert_eq!(
+        DisplayImageOverflowAction::for_image(600.0, leftmost_window(8.0, 312.0), false, 8.0, 0.0),
+        DisplayImageOverflowAction::CropToVisibleWidth {
+            advance: image_advance(304.0)
+        }
+    );
+    // At hpos 0 the width does not matter.
+    assert_eq!(
+        DisplayImageOverflowAction::for_image(40.0, leftmost_window(300.0, 312.0), true, 8.0, 0.0),
+        DisplayImageOverflowAction::CropToVisibleWidth {
+            advance: image_advance(12.0)
+        }
+    );
+    // Mid-row and narrower than a row of its own: GNU leaves it whole so
+    // `display_line` can wrap it to the next row.
+    assert_eq!(
+        DisplayImageOverflowAction::for_image(
+            200.0,
+            leftmost_window(300.0, 312.0),
+            false,
+            8.0,
+            0.0
+        ),
+        DisplayImageOverflowAction::LeaveWhole
+    );
+    // Narrow mid-row image, past the quarter-width floor as well.
+    assert_eq!(
+        DisplayImageOverflowAction::for_image(40.0, leftmost_window(300.0, 312.0), false, 8.0, 0.0),
+        DisplayImageOverflowAction::LeaveWhole
+    );
+    // Nothing of the row is left; a zero-width crop would produce no glyph.
+    assert_eq!(
+        DisplayImageOverflowAction::for_image(600.0, leftmost_window(312.0, 312.0), true, 8.0, 0.0),
+        DisplayImageOverflowAction::LeaveWhole
+    );
+}
+
+/// "Always crop images larger than the window-width, minus 1 space" subtracts
+/// the line-number field too, so an image that fits the bare row but not the
+/// row left after the numbers is still cropped.
+#[test]
+fn the_row_minus_one_space_threshold_subtracts_the_line_number_field() {
+    assert_eq!(
+        DisplayImageOverflowAction::for_image(
+            300.0,
+            leftmost_window(200.0, 312.0),
+            false,
+            8.0,
+            0.0
+        ),
+        DisplayImageOverflowAction::LeaveWhole,
+        "300 <= 312 - 0 - 8"
+    );
+    assert_eq!(
+        DisplayImageOverflowAction::for_image(
+            300.0,
+            leftmost_window(200.0, 312.0),
+            false,
+            8.0,
+            32.0
+        ),
+        DisplayImageOverflowAction::CropToVisibleWidth {
+            advance: image_advance(112.0)
+        },
+        "300 > 312 - 32 - 8"
+    );
 }

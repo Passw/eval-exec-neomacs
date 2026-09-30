@@ -4,7 +4,9 @@ use crate::display_row::walk_state::{
     DisplayRowTextOverflowDecision, SpecialTextRowOverflowDecision, TextRowTransitionStatePolicy,
     WordWrapBreakCandidate,
 };
-use neomacs_display_protocol::{GeometryError, LogicalPixels, Px, XwidgetLayoutAdvance};
+use neomacs_display_protocol::{
+    GeometryError, ImageLayoutAdvance, LogicalPixels, Px, XwidgetLayoutAdvance,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum DisplaySourceTextCharOverflowAction {
@@ -142,9 +144,10 @@ impl WindowLocalRowExtent {
 /// and `x_draw_xwidget_glyph_string` clips the widget, whose own size is
 /// untouched (src/xwidget.c:2841-2849).
 ///
-/// This is the xwidget rule only.  `produce_image_glyph` has its own
-/// (src/xdisp.c:32457-32473), which also weighs word wrap, the line-number
-/// prefix and the frame's column width, and it is not ported here.
+/// This is the xwidget rule only.  `produce_image_glyph` has its own, ported
+/// separately as [`DisplayImageOverflowAction`]: it also weighs word wrap, the
+/// line-number prefix and the frame's column width, and it crops the glyph's
+/// source slice along with its advance.
 ///
 /// What this port does NOT do, relative to the GNU function:
 ///
@@ -205,6 +208,108 @@ impl DisplayXwidgetOverflowAction {
             Self::CropAdvanceToVisibleWidth { advance }
         } else {
             Self::LeaveWhole
+        }
+    }
+}
+
+/// What GNU does with an inline *image* glyph that would extend past the right
+/// edge of the text area.
+///
+/// `produce_image_glyph` (src/xdisp.c:32492-32509, emacs-31.1) decides this at
+/// production time, before `display_line` measures the row:
+///
+/// ```c
+///   /* Automatically crop wide image glyphs at right edge so we can draw
+///      the cursor on same display row.  But don't do that under
+///      word-wrap, unless the image starts at column zero, because
+///      wrapping correctly needs the real pixel width of the image.  */
+///   if ((it->line_wrap != WORD_WRAP
+///        || it->hpos == (0 + (it->lnum_width ? it->lnum_width + 2 : 0))
+///        /* Always crop images larger than the window-width, minus 1 space.  */
+///        || it->pixel_width > (it->last_visible_x - it->lnum_pixel_width
+///                              - FRAME_COLUMN_WIDTH (it->f)))
+///       && (crop = it->pixel_width - (it->last_visible_x - it->current_x),
+///           crop > 0)
+///       && (it->hpos == (0 + (it->lnum_width ? it->lnum_width + 2 : 0))
+///           || it->pixel_width > it->last_visible_x / 4))
+///     {
+///       it->pixel_width -= crop;
+///       slice.width -= crop;
+///     }
+/// ```
+///
+/// A glyph that starts the row, or is wider than a quarter of the window's
+/// visible width, has its layout advance -- and with it the visible part of its
+/// source slice -- cropped so the image ends exactly at the right edge instead
+/// of disappearing.  `display_line` then keeps the glyph, which is why
+/// `it->what == IT_IMAGE` is one of the conditions that end a truncating row
+/// (:26585-26598).
+///
+/// This is the image rule only.  `produce_xwidget_glyph` has its own
+/// ([`DisplayXwidgetOverflowAction`]).
+///
+/// What this port decides differently from the function above:
+///
+/// - **The word-wrap clause is a precondition here, not a disjunct.** GNU
+///   crops a mid-row image under word wrap only when the image is wider than
+///   the row it would get to itself (`pixel_width > last_visible_x -
+///   lnum_pixel_width - FRAME_COLUMN_WIDTH`); otherwise it leaves the glyph
+///   whole so `display_line` can move it to the next row.  The row writer has
+///   no word-wrap mode to test, so this port applies that disjunct *always*.
+///   It therefore never crops an image GNU would leave whole, and the one case
+///   it does not crop -- a *truncating* row's mid-row image narrower than the
+///   row but wider than a quarter of it, which GNU crops and this port still
+///   rejects -- keeps the row's pre-existing overflow behaviour.
+/// - **No room at all.** With `hpos == 0` GNU still crops when nothing of the
+///   row is left, producing a zero- or negative-width glyph
+///   (`clip_to_bounds (-1, …)`, :32529); here a non-positive advance is
+///   [`Self::LeaveWhole`] and the row's overflow policy drops the glyph, the
+///   same guard [`DisplayXwidgetOverflowAction`] documents.
+/// - **Box line widths.** GNU adds `box_vertical_line_width` to
+///   `it->pixel_width` before computing `crop` (:32473-32490); the width this
+///   rule sees is the media replacement's own.
+/// - **Horizontal scrolling.** As for the xwidget rule, `current_x` and
+///   `last_visible_x` carry no `first_visible_x`; the remaining width agrees.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum DisplayImageOverflowAction {
+    Fits,
+    /// Crop both halves of GNU's edit: the layout advance
+    /// ([`neomacs_display_protocol::ImageLayoutAdvance`]) and, by the same
+    /// number of pixels, the glyph's source slice.
+    CropToVisibleWidth {
+        advance: ImageLayoutAdvance,
+    },
+    /// GNU leaves the glyph whole; the row's overflow policy decides.
+    LeaveWhole,
+}
+
+impl DisplayImageOverflowAction {
+    /// `layout_advance_px` is GNU's `it->pixel_width` for the image: the
+    /// image's own width plus its horizontal margins.
+    pub(crate) fn for_image(
+        layout_advance_px: f32,
+        extent: WindowLocalRowExtent,
+        at_row_start: bool,
+        char_width_px: f32,
+        line_number_width_px: f32,
+    ) -> Self {
+        let crop = layout_advance_px - extent.remaining_px();
+        if crop <= 0.0 {
+            return Self::Fits;
+        }
+        // "Always crop images larger than the window-width, minus 1 space."
+        let wider_than_a_row_of_its_own = layout_advance_px
+            > extent.last_visible_x_px() - line_number_width_px.max(0.0) - char_width_px.max(0.0);
+        if !at_row_start && !wider_than_a_row_of_its_own {
+            return Self::LeaveWhole;
+        }
+        // "`it->pixel_width > it->last_visible_x / 4`".
+        if !at_row_start && !(layout_advance_px > extent.last_visible_x_px() / 4.0) {
+            return Self::LeaveWhole;
+        }
+        match ImageLayoutAdvance::new(Px(extent.remaining_px())) {
+            Some(advance) => Self::CropToVisibleWidth { advance },
+            None => Self::LeaveWhole,
         }
     }
 }

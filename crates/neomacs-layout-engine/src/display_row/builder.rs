@@ -17,7 +17,9 @@ use crate::display_row::append_context::{
 use crate::display_row::geometry::DisplayRowTextAreaOrigin;
 #[cfg(test)]
 use crate::display_source::{DisplayItemSource, DisplaySourceContext};
-use crate::display_source_overflow::{DisplayXwidgetOverflowAction, WindowLocalRowExtent};
+use crate::display_source_overflow::{
+    DisplayImageOverflowAction, DisplayXwidgetOverflowAction, WindowLocalRowExtent,
+};
 use crate::glyph_row_writer;
 #[cfg(test)]
 use crate::output::builder::DisplayOutputBuilder;
@@ -1395,6 +1397,14 @@ enum DisplayRowOverflowPolicy {
 enum DisplayItemRightEdgeAdmission {
     EnforceRowBoundary,
     PreserveWholeXwidget,
+    /// An image the row already cropped to its right edge
+    /// (`DisplayImageOverflowAction::CropToVisibleWidth`).
+    ///
+    /// The crop is the boundary handling, so re-deriving the edge from the
+    /// rounded frame coordinates below can only disagree with it by an
+    /// ulp -- and the disagreement would drop the glyph this path exists to
+    /// keep.
+    CroppedImageAtRowEdge,
 }
 
 pub(crate) struct DisplayRowProgressWriter<'layout, 'row, 'measurer> {
@@ -1797,11 +1807,12 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
                 let slot_start = self.position;
                 let slot_source = span.start.clone();
                 let before_len = self.area_len();
-                // GNU crops a wide xwidget's advance when it produces the
-                // glyph, before `display_line` measures the row; see
-                // `DisplayXwidgetOverflowAction`.  Xwidgets in body text only:
-                // images have their own GNU rule (not ported), and margin
-                // lanes keep their own structural clip below.
+                // GNU crops a wide xwidget's advance, and a wide image's
+                // advance *and* source slice, when it produces the glyph --
+                // before `display_line` measures the row; see
+                // `DisplayXwidgetOverflowAction` and
+                // `DisplayImageOverflowAction`.  Media in body text only:
+                // margin lanes keep their own structural clip below.
                 let (kind, right_edge_admission) = match kind {
                     DisplayItemKind::MediaReplacement(media)
                         if self.writer.overflow_policy()
@@ -1844,10 +1855,65 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
                                     admission,
                                 )
                             }
-                            Err(media) => (
-                                DisplayItemKind::MediaReplacement(media),
-                                DisplayItemRightEdgeAdmission::EnforceRowBoundary,
-                            ),
+                            Err(media) => match media.into_image() {
+                                Ok(image) => {
+                                    let extent = WindowLocalRowExtent::from_frame_coordinates(
+                                        self.text_area_origin,
+                                        self.position.x_px(),
+                                        self.max_x_px,
+                                    );
+                                    // A window-local extent this row cannot
+                                    // form (a pen outside the text area) is not
+                                    // a crop: leave the glyph whole and let the
+                                    // boundary check below decide, exactly as
+                                    // an uncroppable image does.  The xwidget
+                                    // arm rejects instead because GNU crops a
+                                    // widget on a width alone, with no floor to
+                                    // fall back on.
+                                    let action = extent.map_or(
+                                        DisplayImageOverflowAction::LeaveWhole,
+                                        |extent| {
+                                            DisplayImageOverflowAction::for_image(
+                                                image.layout_advance_px(),
+                                                extent,
+                                                before_len == 0,
+                                                self.writer.layout.char_width_px,
+                                                self.writer.layout.line_number_width_px,
+                                            )
+                                        },
+                                    );
+                                    match action {
+                                        DisplayImageOverflowAction::CropToVisibleWidth {
+                                            advance,
+                                        } => match image.crop_to_visible_width(advance) {
+                                            Some(cropped) => (
+                                                DisplayItemKind::MediaReplacement(cropped),
+                                                DisplayItemRightEdgeAdmission::CroppedImageAtRowEdge,
+                                            ),
+                                            // Nothing of the slice would
+                                            // survive the crop; GNU emits a
+                                            // zero-width glyph here, this port
+                                            // lets the row's own boundary
+                                            // policy decide.
+                                            None => (
+                                                DisplayItemKind::MediaReplacement(
+                                                    image.into_media(),
+                                                ),
+                                                DisplayItemRightEdgeAdmission::EnforceRowBoundary,
+                                            ),
+                                        },
+                                        DisplayImageOverflowAction::Fits
+                                        | DisplayImageOverflowAction::LeaveWhole => (
+                                            DisplayItemKind::MediaReplacement(image.into_media()),
+                                            DisplayItemRightEdgeAdmission::EnforceRowBoundary,
+                                        ),
+                                    }
+                                }
+                                Err(media) => (
+                                    DisplayItemKind::MediaReplacement(media),
+                                    DisplayItemRightEdgeAdmission::EnforceRowBoundary,
+                                ),
+                            },
                         }
                     }
                     kind => (kind, DisplayItemRightEdgeAdmission::EnforceRowBoundary),

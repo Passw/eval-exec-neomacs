@@ -12158,6 +12158,163 @@ fn display_replacement_append_context_installs_image_replacements() {
     );
 }
 
+/// GNU crops an image glyph that runs past the row's right edge instead of
+/// dropping it (`produce_image_glyph`, src/xdisp.c:32506-32507).  This test
+/// drives one over-wide image through the real body-text replacement append
+/// path; before the crop was ported the glyph was rejected wholesale, so the
+/// row stayed and the image vanished.
+#[test]
+fn display_replacement_append_context_crops_an_image_wider_than_the_text_area() {
+    let mut eval = Context::new();
+    let buf_id = eval
+        .buffer_manager()
+        .current_buffer()
+        .expect("current buffer")
+        .id();
+    let frame_id =
+        eval.frame_manager_mut()
+            .create_frame("append-wide-image-item", 320, 120, buf_id);
+    let window_id = eval
+        .frame_manager()
+        .get(frame_id)
+        .expect("frame")
+        .selected_window;
+    let mut output_emitter =
+        crate::window_output::WindowOutputEmitter::new(frame_id, window_id, 0, 0.0, 0.0);
+    output_emitter.begin_update(&mut eval);
+    output_emitter.begin_text_row(&mut eval, 0, 0, 0.0, 0.0);
+    let table = neovm_core::face::FaceTable::new();
+    let face_resolver =
+        crate::neovm_bridge::FaceResolver::new(&table, 0x00ffffff, 0x000000, 14.0, None);
+    let base_face = face_resolver.default_face();
+    let mut font_metrics = None;
+
+    let mut builder = crate::output::builder::DisplayOutputBuilder::new();
+    let text_bounds = Rect::new(10.0, 20.0, 160.0, 64.0);
+    builder.begin_window_with_text_bounds(
+        77,
+        1,
+        24,
+        Rect::new(0.0, 0.0, 200.0, 80.0),
+        text_bounds,
+        true,
+    );
+    builder.begin_row(0, GlyphRowRole::Text);
+    let frame = test_append_frame_at(
+        0,
+        4.0,
+        6.0,
+        DisplayRowAppendArea::new(text_bounds.x, 160.0, 160.0, 0.0, 0.0),
+        DisplayRowAppendMetrics::new(
+            16.0,
+            12.0,
+            8.0,
+            8.0,
+            DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
+        ),
+        DisplayTabPolicy::from_tab_width_and_stops(text_bounds.x, 8, &[]),
+    );
+    let replacement_source = crate::display_item::BufferDisplayReplacementSource::new(
+        buf_id,
+        CharPos0::new(0),
+        EmacsBytePos::new(0),
+    );
+
+    // The text area's right edge is 170 and the image starts at 16, so 154 px
+    // of the image's 300 are inside the row.
+    let active_face = test_active_face_state(FaceId::new(3), 8.0);
+    let media_item = DisplayReplacementMediaSourceItem::new(
+        DisplayMediaReplacement::image(DisplayImageItem {
+            image_id: 42,
+            source_rect: neomacs_display_protocol::ImageSourceRect::FULL,
+            width: 300.0,
+            height: 32.0,
+            ascent: 32.0,
+            horizontal_margin: 0.0,
+            vertical_margin: 0.0,
+            opaque_background: None,
+        }),
+        active_face.metrics().row_height(),
+        active_face.metrics().ascent(),
+        false,
+    );
+    let append_context = DisplayReplacementAppendContext::new(FaceId::new(3), base_face, frame);
+    let mut face_ids = FrameFaceAttempt::for_test_with_next_id(4);
+    builder.set_face_attempt(face_ids.clone());
+    let progress = append_context
+        .append_replacement_item_kind_to_text_row_and_emit(
+            &mut text_row_source_render_state(
+                &mut builder,
+                &mut output_emitter,
+                &mut eval,
+                &mut font_metrics,
+                &face_resolver,
+            ),
+            &mut face_ids,
+            replacement_source,
+            DisplayItemKind::MediaReplacement(media_item.media()),
+            DisplayRowPosition::new(16.0, 2),
+        )
+        .expect("append progress");
+
+    assert_eq!(
+        progress.status(),
+        DisplayRowAppendStatus::Complete,
+        "a cropped image glyph completes its row"
+    );
+    builder
+        .edit_current_row_for_test(|row| {
+            let glyph = row.glyphs[1]
+                .first()
+                .expect("the image glyph survives the right-edge overflow");
+            assert_eq!(glyph.pixel_width, 154.0);
+            assert_eq!(glyph.pixel_height, 32.0);
+            let neomacs_display_protocol::glyph_matrix::GlyphType::Image {
+                image_id,
+                width_cols,
+                source_rect,
+                ..
+            } = glyph.glyph_type
+            else {
+                panic!("expected an image glyph");
+            };
+            assert_eq!(image_id, 42);
+            assert_eq!(width_cols, 20);
+            // GNU removes the same pixels from the slice (`slice.width -= crop`)
+            // so the glyph draws the left 154/300 of the image.
+            assert_eq!(source_rect.x(), 0.0);
+            assert!(
+                (source_rect.width() - 154.0 / 300.0).abs() < 1e-3,
+                "source slice keeps only the visible part: {}",
+                source_rect.width()
+            );
+        })
+        .expect("current row");
+
+    builder.end_row();
+    builder.end_window();
+    let state = builder.finish(24, 1, 8.0, 16.0);
+    let frame = state.materialize();
+    let image = frame
+        .glyphs
+        .iter()
+        .find_map(|glyph| match glyph {
+            neomacs_display_protocol::frame_glyphs::FrameGlyph::Image {
+                image_id,
+                x,
+                width,
+                source_rect,
+                ..
+            } => Some((*image_id, *x, *width, *source_rect)),
+            _ => None,
+        })
+        .expect("image materialized from its cropped row glyph");
+    assert_eq!(image.0.get(), 42);
+    assert_eq!((image.1, image.2), (16.0, 154.0));
+    assert!((image.3.x() - 0.0).abs() < 1e-3);
+    assert!((image.3.width() - 154.0 / 300.0).abs() < 1e-3);
+}
+
 #[test]
 fn display_replacement_append_context_installs_video_replacements() {
     let mut eval = Context::new();
