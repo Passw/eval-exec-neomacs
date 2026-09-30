@@ -2245,6 +2245,7 @@ impl Context {
             quit_requested: QuitRequest::new(),
             redisplay_fn: None,
             font_shape_fn: None,
+            gstring_shape_cache: HashMap::new(),
             display_idle_maintenance_fn: None,
             scroll_preview_fn: None,
             frame_snapshot_fn: None,

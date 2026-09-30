@@ -18,7 +18,10 @@
          (setq composition-function-table (make-char-table nil))))
    (insert (propertize "a -> b" 'face '(:foreground "black" :background "white")))
    (goto-char (point-min))
-   (local-set-key
+   ;; Global binding: the verification target is the rendered surface, not
+   ;; which buffer owns the local map at keypress time. GNU's
+   ;; composition_gstring_adjust_zero_width analog lands in the shaping core.
+   (global-set-key
     (kbd "C-c t")
     (lambda ()
       (interactive)

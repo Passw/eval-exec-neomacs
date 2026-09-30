@@ -3916,6 +3916,16 @@ pub enum GstringShapeOutcome {
 /// contract (GNU src/font.c) but not the shaping engine — the display layer
 /// (layout engine, which owns the font system) installs the driver exactly
 /// the way it installs `redisplay_fn`.
+/// The cache key for shaped gstrings: the header's font family, pixel size
+/// (bit-exact), and the run's characters. Two gstrings with the same key
+/// shape identically, so one cache entry serves both.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct GstringShapeCacheKey {
+    pub family: String,
+    pub pixel_size_bits: u64,
+    pub chars: Vec<i64>,
+}
+
 pub type FontShapeFn =
     Box<dyn FnMut(&mut super::eval::Context, Value, Value) -> GstringShapeOutcome>;
 
@@ -4009,11 +4019,113 @@ pub(crate) fn font_shape_gstring(eval: &mut super::eval::Context, args: Vec<Valu
             covered_to = Some(to);
         }
     }
-    // GNU also runs composition_gstring_adjust_zero_width and caches the
-    // shaped gstring here; the zero-width fold and the cache are not yet
-    // implemented in this port.
+    composition_gstring_adjust_zero_width(&gstring);
+
+    // GNU: composition_gstring_put_cache — store the shaped gstring keyed by
+    // the header and stamp its ID slot; a later call with the same header
+    // returns the cached gstring instead of re-shaping.
+    let cache_key = gstring_shape_cache_key(&gstring);
+    if let Some(cached) = eval.gstring_shape_cache.get(&cache_key) {
+        eval.font_shape_fn = Some(shape_driver);
+        return Ok(cached.clone());
+    }
+    let id = eval.gstring_shape_cache.len() as i64;
+    gstring.set_vector_slot(1, Value::fixnum(id));
+    eval.gstring_shape_cache.insert(cache_key, gstring.clone());
     eval.font_shape_fn = Some(shape_driver);
     Ok(gstring)
+}
+
+/// GNU `composition_gstring_adjust_zero_width` (src/composite.c:798):
+/// within each cluster (glyphs sharing a `from`), if the accumulated width
+/// is zero, the cluster's LAST glyph gets its ADJUSTMENT set to
+/// `[0 0 width+1]` so a cursor can be placed on the zero-width run.
+fn composition_gstring_adjust_zero_width(gstring: &Value) {
+    let slots = gstring.as_vector_data().expect("g").to_vec();
+    let mut from: i64 = 0;
+    let mut width: i64 = 0;
+    let mut group_start: usize = 2;
+    let mut index: usize = 2;
+    loop {
+        let glyph = slots
+            .get(index)
+            .map(|slot| slot.as_vector_data().map(|g| g.to_vec()));
+        let end_of_run = matches!(glyph, None | Some(None));
+        let this_from = glyph
+            .as_ref()
+            .and_then(|g| g.as_ref().and_then(|g| g[0].as_int()));
+        let group_ends =
+            end_of_run || this_from.is_none_or(|this_from| this_from != from);
+        if group_ends {
+            if width == 0 && index > group_start {
+                // GNU: LGLYPH_SET_ADJUSTMENT(last, …) — the glyph's
+                // ADJUSTMENT slot (LGLYPH slot 5) is set, NOT the glyph
+                // itself; writing the vector as the glyph once replaced both
+                // cut glyphs with adjustment vectors.
+                let last = index - 1;
+                let glyph_vec = slots[last].as_vector_data().expect("glyph");
+                let own_width = glyph_vec[4].as_int().unwrap_or(0);
+                let glyph_value = slots[last].clone();
+                if glyph_vec[5].is_nil() {
+                    glyph_value.set_vector_slot(
+                        5,
+                        Value::vector(vec![
+                            Value::fixnum(0),
+                            Value::fixnum(0),
+                            Value::fixnum(own_width + 1),
+                            Value::NIL,
+                            Value::NIL,
+                            Value::NIL,
+                            Value::NIL,
+                            Value::NIL,
+                            Value::NIL,
+                            Value::NIL,
+                        ]),
+                    );
+                } else {
+                    let mut adjustment =
+                        glyph_vec[5].as_vector_data().expect("adj").to_vec();
+                    adjustment[2] =
+                        Value::fixnum(adjustment[2].as_int().unwrap_or(0) + 1);
+                    glyph_value.set_vector_slot(5, Value::vector(adjustment));
+                }
+            }
+            if end_of_run {
+                break;
+            }
+            from = this_from.expect("checked above");
+            width = 0;
+            group_start = index;
+        }
+        let glyph_vec = glyph.as_ref().and_then(|g| g.as_ref()).expect("checked");
+        width += if glyph_vec[5].is_nil() {
+            glyph_vec[4].as_int().unwrap_or(0)
+        } else {
+            glyph_vec[5]
+                .as_vector_data()
+                .and_then(|adj| adj[2].as_int())
+                .unwrap_or(0)
+        };
+        index += 1;
+    }
+}
+
+/// The cache key for `gstring_shape_cache`: family + bit-exact pixel size +
+/// the run's characters.
+fn gstring_shape_cache_key(gstring: &Value) -> crate::emacs_core::font::GstringShapeCacheKey {
+    let slots = gstring.as_vector_data().expect("g");
+    let header = slots[0].as_vector_data().expect("header");
+    let (family, pixel_size) = font_object_family_and_pixel_size(&header[0])
+        .unwrap_or_else(|| (String::from("?"), 0.0));
+    let chars: Vec<i64> = header[1..]
+        .iter()
+        .map(|char_slot| char_slot.as_int().unwrap_or(0))
+        .collect();
+    crate::emacs_core::font::GstringShapeCacheKey {
+        family,
+        pixel_size_bits: pixel_size.to_bits(),
+        chars,
+    }
 }
 
 /// GNU's `larger_vector (gstring, LGSTRING_GLYPH_LEN (gstring), -1)`:

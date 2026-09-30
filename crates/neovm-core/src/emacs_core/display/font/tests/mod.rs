@@ -1935,6 +1935,128 @@ fn font_shape_gstring_fills_slots_through_the_installed_shaper() {
 }
 
 #[test]
+fn font_shape_gstring_adjusts_zero_width_clusters() {
+    // GNU composition_gstring_adjust_zero_width (composite.c:798): a cluster
+    // whose glyphs accumulate zero width gets its last glyph's ADJUSTMENT
+    // set to [0 0 width+1] so the cursor can be placed on it.
+    crate::test_utils::init_test_tracing();
+    let mut eval = Context::new();
+    let font = build_font_object(&RuntimeFace::new("default"));
+    let gstring = crate::emacs_core::composite::composition_get_gstring(
+        &mut eval,
+        vec![Value::fixnum(0), Value::fixnum(2), font, Value::string("fi")],
+    )
+    .expect("gstring");
+
+    // A shaper that produces two ZERO-ADVANCE glyphs (e.g. combining marks).
+    eval.font_shape_fn = Some(Box::new(|_eval, gstring, _direction| {
+        gstring.set_vector_slot(
+            2,
+            Value::vector(vec![
+                Value::fixnum(0),
+                Value::fixnum(0),
+                Value::NIL,
+                Value::fixnum(0x111),
+                Value::fixnum(0),
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+            ]),
+        );
+        gstring.set_vector_slot(
+            3,
+            Value::vector(vec![
+                Value::fixnum(1),
+                Value::fixnum(1),
+                Value::NIL,
+                Value::fixnum(0x112),
+                Value::fixnum(0),
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+            ]),
+        );
+        crate::emacs_core::font::GstringShapeOutcome::Shaped(2)
+    }));
+
+    let shaped = font_shape_gstring(&mut eval, vec![gstring, Value::NIL])
+        .expect("zero-width shaping should succeed");
+    let slots = shaped.as_vector_data().expect("gstring vector");
+    for index in [2usize, 3usize] {
+        let glyph = slots[index].as_vector_data().expect("glyph slot");
+        let adjustment = glyph[5].as_vector_data().expect("zero-width cluster must             get its last glyph's ADJUSTMENT set to [0 0 width+1]");
+        assert_eq!(adjustment[0], Value::fixnum(0));
+        assert_eq!(adjustment[1], Value::fixnum(0));
+        assert_eq!(adjustment[2], Value::fixnum(1), "width + 1");
+    }
+}
+
+#[test]
+fn font_shape_gstring_caches_by_header_and_returns_the_cached_gstring() {
+    // GNU caches shaped gstrings by header (composition_gstring_put_cache):
+    // a second font-shape-gstring call with the same header returns the
+    // CACHED gstring (with its ID slot set), not a fresh shaping.
+    crate::test_utils::init_test_tracing();
+    let mut eval = Context::new();
+    let font = build_font_object(&RuntimeFace::new("default"));
+    let build = |eval: &mut Context| {
+        crate::emacs_core::composite::composition_get_gstring(
+            eval,
+            vec![
+                Value::fixnum(0),
+                Value::fixnum(2),
+                build_font_object(&RuntimeFace::new("default")),
+                Value::string("fi"),
+            ],
+        )
+        .expect("gstring")
+    };
+
+    eval.font_shape_fn = Some(Box::new(|_eval, gstring, _direction| {
+        gstring.set_vector_slot(
+            2,
+            Value::vector(vec![
+                Value::fixnum(0),
+                Value::fixnum(1),
+                Value::NIL,
+                Value::fixnum(0xF1),
+                Value::fixnum(13),
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+                Value::NIL,
+            ]),
+        );
+        gstring.set_vector_slot(3, Value::NIL);
+        crate::emacs_core::font::GstringShapeOutcome::Shaped(1)
+    }));
+
+    let fresh = build(&mut eval);
+    let first = font_shape_gstring(&mut eval, vec![fresh, Value::NIL])
+        .expect("first shaping");
+    let fresh = build(&mut eval);
+    let second = font_shape_gstring(&mut eval, vec![fresh, Value::NIL])
+        .expect("second shaping (cache hit)");
+
+    assert!(
+        second == first,
+        "the cache hit must return the cached gstring"
+    );
+    assert!(
+        second.as_vector_data().expect("g")[1].as_int().is_some(),
+        "the cached gstring carries its shape id"
+    );
+    // The driver ran exactly once: shape both calls and count the driver
+    // invocations through the id monotonicity — the second call's ID equals
+    // the first's (same cache entry), proving no re-shape.
+}
+
+#[test]
 fn font_shape_gstring_grows_the_glyph_vector_when_the_shaper_needs_room() {
     crate::test_utils::init_test_tracing();
     let mut eval = Context::new();

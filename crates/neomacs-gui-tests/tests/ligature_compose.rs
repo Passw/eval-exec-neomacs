@@ -45,6 +45,11 @@ fn run_case(tag: &str, ligature_enabled: bool) -> (PathBuf, PathBuf) {
     for (key, value) in session.env() {
         plan = plan.with_env(key.clone(), value.clone());
     }
+    // Materialize the env BEFORE moving into the input thread: capturing
+    // `session` in the closure would move (and drop, killing sway) the
+    // session when the thread finishes — the surface loss that aborted
+    // every ligature run at the C-l keypress.
+    let env = session.env().to_vec();
     let input = std::thread::spawn(move || {
         let deadline = std::time::Instant::now() + Duration::from_secs(15);
         while !ready.exists() {
@@ -57,7 +62,7 @@ fn run_case(tag: &str, ligature_enabled: bool) -> (PathBuf, PathBuf) {
         let output = std::process::Command::new(
             std::env::var_os("NEOMACS_GUI_WTYPE").unwrap_or_else(|| "wtype".into()),
         )
-        .envs(session.env().to_vec())
+        .envs(env)
         .args([
             "-d", "300", "-M", "ctrl", "-k", "l", "-k", "c", "-m", "ctrl", "-k", "t",
         ])
@@ -87,6 +92,10 @@ fn run_case(tag: &str, ligature_enabled: bool) -> (PathBuf, PathBuf) {
 
 #[test]
 fn ligature_rule_composes_on_the_rendered_surface() {
+    // Control: the run with the rule stripped must boot and render cleanly
+    // (it did before #447's driver). If the ENABLED run crashes where this
+    // passes, the crash is in the composition render path.
+    let (_disabled_snapshot, disabled_png) = run_case("off", false);
     let (enabled_snapshot, enabled_png) = run_case("on", true);
     // The composed glyph must be recorded in the row's matrix.
     let snapshot: serde_json::Value =
@@ -110,7 +119,6 @@ fn ligature_rule_composes_on_the_rendered_surface() {
 
     // The rendered surface with the ligature rule must differ from the run
     // without it (the composed glyph changes at least one cell).
-    let (_disabled_snapshot, disabled_png) = run_case("off", false);
     let enabled = image::open(format!("{}.png", enabled_png.display()))
         .unwrap()
         .to_rgba8();
