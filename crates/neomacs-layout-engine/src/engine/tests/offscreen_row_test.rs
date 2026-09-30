@@ -2988,7 +2988,7 @@ fn check_active_capture_reversal(rich: bool, fractional: bool, prepared: bool, p
     engine.maintain_scroll_coverage(&eval);
     let active = engine
         .scroll_coverage
-        .active_capture_start_for_test()
+        .pending_source_start_for_test()
         .unwrap();
     if prepared {
         assert_eq!(
@@ -3030,6 +3030,136 @@ fn check_active_capture_reversal(rich: bool, fractional: bool, prepared: bool, p
     assert!(
         visible == selected_window_layout_trace(&eval, &fresh, frame),
         "visible layout must match fresh layout"
+    );
+}
+
+#[test]
+fn urgent_backward_bridge_publishes_after_one_physical_line() {
+    check_short_urgent_backward_bridge(false);
+}
+
+#[test]
+fn rich_fractional_reversal_starts_the_nearest_physical_bridge() {
+    check_short_urgent_backward_bridge(true);
+}
+
+fn check_short_urgent_backward_bridge(rich: bool) {
+    let line = "ordinary offscreen text\n";
+    let (mut eval, frame, buffer, window) = if rich {
+        shared_rich_scrolling_frame(664, 646)
+    } else {
+        let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 800, 600);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        (eval, frame, buffer, window)
+    };
+    let origin = if rich {
+        5565000 - 48 * 110080
+    } else {
+        120 * line.len()
+    };
+    let point = eval
+        .buffer_manager()
+        .get(buffer)
+        .unwrap()
+        .char_pos_to_emacs_byte_pos_clamped(CharPos0::new(origin + 100))
+        .get();
+    scroll_window_to(&mut eval, frame, window, buffer, origin as i64 + 1, point);
+    let set_hidden = |eval: &mut Context, hidden: i32| {
+        if let neovm_core::window::Window::Leaf {
+            force_start,
+            vscroll,
+            ..
+        } = eval
+            .frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .find_window_mut(window)
+            .unwrap()
+        {
+            *force_start = true;
+            *vscroll = -hidden;
+        }
+    };
+    set_hidden(&mut eval, 8);
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    engine.maintain_scroll_coverage(&eval);
+    set_hidden(&mut eval, 4);
+    engine.layout_frame_rust(&mut eval, frame);
+    let visible = selected_window_layout_trace(&eval, &engine, frame);
+    let nearest = eval
+        .eval_str(&format!(
+            "(save-excursion (goto-char {}) (forward-line -1) (point))",
+            origin + 1
+        ))
+        .unwrap()
+        .as_fixnum()
+        .unwrap() as usize
+        - 1;
+    engine.maintain_scroll_coverage(&eval);
+    assert_eq!(
+        engine.scroll_coverage.pending_source_start_for_test(),
+        Some(nearest),
+        "low backward headroom must acquire the nearest physical line first"
+    );
+    if !rich {
+        assert!(
+            engine
+                .scroll_coverage
+                .active_capture_start_for_test()
+                .is_none(),
+            "one plain physical line must reach the worker in a single capture slice"
+        );
+    }
+    engine.take_scroll_coverage_publication();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "urgent bridge never published"
+        );
+        if engine
+            .scroll_coverage
+            .drain(&mut engine.prepared_viewports)
+            .unwrap()
+        {
+            break;
+        }
+        if rich {
+            engine.maintain_scroll_coverage(&eval);
+            if engine.take_scroll_coverage_publication() {
+                break;
+            }
+        }
+        std::thread::yield_now();
+    }
+    eval.gc_collect_exact();
+    engine.layout_frame_rust(&mut eval, frame);
+    let owner = DisplayWindowId::new(window.0 as i64);
+    let coverage = engine
+        .last_frame_display_state
+        .as_ref()
+        .unwrap()
+        .scroll_coverage
+        .iter()
+        .find(|coverage| coverage.content.window_id == owner)
+        .expect("connected bridge");
+    assert_eq!(
+        coverage.content.matrix.rows[0].start_charpos, nearest,
+        "published coverage must extend to the nearest acquired physical line"
+    );
+    assert!(
+        visible == selected_window_layout_trace(&eval, &engine, frame),
+        "bridge publication must preserve visible geometry"
+    );
+    let mut fresh = LayoutEngine::new();
+    fresh.layout_frame_rust(&mut eval, frame);
+    assert!(
+        visible == selected_window_layout_trace(&eval, &fresh, frame),
+        "visible geometry must match a fresh layout"
     );
 }
 

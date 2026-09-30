@@ -128,6 +128,15 @@ impl ScrollCoverage {
             .map(|capture| capture.retained.key.window_start as usize)
     }
 
+    #[cfg(test)]
+    pub(super) fn pending_source_start_for_test(&self) -> Option<usize> {
+        self.active_capture_start_for_test().or_else(|| {
+            self.admission
+                .as_ref()
+                .map(|admission| admission.retained.key.window_start as usize)
+        })
+    }
+
     pub(super) fn cancel(&mut self) {
         self.cancel_active();
         self.frame = None;
@@ -408,6 +417,22 @@ impl LayoutEngine {
                         observed.moving_backward
                     }
                 });
+        let urgent_backward = moving_backward
+            && self.last_frame_display_state.as_ref().is_none_or(|state| {
+                state
+                    .scroll_coverage
+                    .iter()
+                    .find(|coverage| coverage.content.window_id == window_id)
+                    .and_then(|coverage| {
+                        coverage.content.text_clip_bounds.map(|bounds| {
+                            // The same lower offset as ScrollSurface::clamp_offset;
+                            // no glyph materialization is needed to schedule work.
+                            let headroom = coverage.viewport.y + coverage.origin - bounds.y;
+                            headroom <= retained.key.char_height * 2.0
+                        })
+                    })
+                    .unwrap_or(true)
+            });
         if !compatible {
             self.scroll_coverage.cancel_active();
         }
@@ -535,6 +560,47 @@ impl LayoutEngine {
             observed.key.vscroll = retained.key.vscroll;
             observed.moving_backward = moving_backward;
         }
+        if urgent_backward {
+            // A four-line bridge can take longer to capture than the remaining
+            // pixel headroom permits. Acquire the nearest physical line first.
+            // This also handles fractional reversal, which keeps the old queue.
+            if let Some(observed) = self.scroll_coverage.windows.get_mut(&window_id)
+                && let Some((bridge, end)) = observed.backward_bridge
+                && let Some(index) = observed.targets.iter().position(|target| *target == bridge)
+                && let Some(buffer) = evaluator
+                    .buffer_manager()
+                    .get(neovm_core::buffer::BufferId(retained.key.buffer_id))
+            {
+                let end_byte = buffer.char_pos_to_emacs_byte_pos_clamped(end).get();
+                let begin = buffer.point_min_emacs_byte_pos().get();
+                let lower = end_byte.saturating_sub(8192).max(begin);
+                let mut byte = end_byte;
+                while byte > lower {
+                    byte -= 1;
+                    if buffer.emacs_byte_at_pos(neovm_core::buffer::EmacsBytePos::new(byte))
+                        == Some(b'\n')
+                        && byte + 1 < end_byte
+                    {
+                        byte += 1;
+                        break;
+                    }
+                }
+                if byte == begin
+                    || (byte < end_byte
+                        && buffer
+                            .emacs_byte_at_pos(neovm_core::buffer::EmacsBytePos::new(byte - 1))
+                            == Some(b'\n'))
+                {
+                    let near = buffer.emacs_byte_pos_to_char_pos_clamped(
+                        neovm_core::buffer::EmacsBytePos::new(byte),
+                    );
+                    if near > bridge && near < end {
+                        observed.targets[index] = near;
+                        observed.backward_bridge = Some((near, end));
+                    }
+                }
+            }
+        }
         match self.scroll_coverage.drain(&mut self.prepared_viewports) {
             Ok(true) => {
                 tracing::debug!(target: "neomacs_layout_engine::scroll_coverage", "worker page ready");
@@ -552,7 +618,7 @@ impl LayoutEngine {
         // after reversal. Yield only when a queued backward bridge is urgent
         // and the active source cannot extend its connecting edge. Admitted
         // prefixes remain cached; cancellation never revokes published rows.
-        let urgent_bridge = moving_backward
+        let urgent_bridge = urgent_backward
             && self
                 .scroll_coverage
                 .capture
@@ -567,22 +633,7 @@ impl LayoutEngine {
                                     && capture.retained.key.window_start >= end.get() as i64
                             })
                         })
-                })
-            && self.last_frame_display_state.as_ref().is_none_or(|state| {
-                state
-                    .scroll_coverage
-                    .iter()
-                    .find(|coverage| coverage.content.window_id == window_id)
-                    .and_then(|coverage| {
-                        coverage.content.text_clip_bounds.map(|bounds| {
-                            // The same lower offset as ScrollSurface::clamp_offset;
-                            // no glyph materialization is needed to schedule work.
-                            let headroom = coverage.viewport.y + coverage.origin - bounds.y;
-                            headroom <= retained.key.char_height * 2.0
-                        })
-                    })
-                    .unwrap_or(true)
-            });
+                });
         if urgent_bridge {
             let start = CharPos0::new(
                 self.scroll_coverage
