@@ -617,8 +617,9 @@ impl<'a> PngRows<'a> {
     ///
     /// `None` hands the source back to the whole-image path, and means one of:
     /// the header would not parse, the output is not one of the 8-bit colour
-    /// types below, the source is interlaced, or it is too small for banding to
-    /// pay ([`BANDING_MIN_PIXELS`]).
+    /// types below, the source is interlaced, it is too small for banding to pay
+    /// ([`BANDING_MIN_PIXELS`]), or the realization asks for it *larger* than it
+    /// is, which has no area average to decode through.
     fn open(data: &'a [u8], plan: BandPlan, min_pixels: u64) -> Option<Self> {
         let mut decoder = png::Decoder::new(Cursor::new(data));
         // The transform `image`'s own PNG decoder sets before reading

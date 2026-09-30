@@ -2208,6 +2208,47 @@ fn test_band() -> DecodedBand {
     DecodedBand::new(rows, RasterBand::new(placement, vec![0u8; 4].into()))
 }
 
+/// Below the banding threshold nothing about the decode changes. The source
+/// goes through the whole-image path, which resamples with the filter it has
+/// always resampled with — so the cheaper filter the banded path now uses
+/// reaches no image small enough not to band, and the wording "nothing below
+/// the threshold changes" is a test rather than a hope.
+#[test]
+fn a_source_below_the_threshold_keeps_the_whole_image_paths_filter() {
+    let (width, height) = (40_u32, 30_u32);
+    assert!(
+        u64::from(width) * u64::from(height) < crate::image_bands::BANDING_MIN_PIXELS,
+        "the fixture is below the threshold"
+    );
+    let data = varying_png(width, height);
+    let mut bands = Vec::new();
+    let decoded = ImageCache::decode_data(
+        &data,
+        ImageSizeSpec::new(AxisSize::Exact(20), AxisSize::Exact(15)),
+        ImageRotation::None,
+        ImageColorContext::default(),
+        ImageRealization::default(),
+        ImageMaskPolicy::Preserve,
+        ImageFrameIndex::default(),
+        crate::svg::SvgResourceContext::Isolated,
+        &ImageSequenceCache::new(),
+        ImageSequenceId::new(1).expect("non-zero test sequence"),
+        Some(&mut |band| bands.push(band)),
+    )
+    .expect("decode");
+    assert!(bands.is_empty(), "a source this small does not band");
+
+    let whole = image::load_from_memory(&data)
+        .expect("the fixture decodes")
+        .to_rgba8();
+    let expected =
+        image::imageops::resize(&whole, 20, 15, image::imageops::FilterType::Lanczos3).into_raw();
+    assert_eq!(
+        decoded.rgba, expected,
+        "a source below the threshold is still resampled the old way"
+    );
+}
+
 /// The rows a band hands over are the rows the finished image holds.
 ///
 /// A preview is not an approximation of the picture that the finished upload
