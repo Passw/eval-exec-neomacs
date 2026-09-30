@@ -1187,23 +1187,62 @@ fn prune_dying_drops_only_finished_entries() {
 }
 
 #[test]
-fn dying_frames_render_in_their_own_z_order() {
+fn merged_render_order_interleaves_living_and_dying_by_z() {
     let mut mgr = make_manager();
+    // z 5 (living), z 3 (will die), z 1 (living), z 1 (will die)
     mgr.update_frame(make_child_buf(1, 0.0, 0.0, 100.0, 100.0, 5));
-    mgr.update_frame(make_child_buf(2, 0.0, 0.0, 100.0, 100.0, 1));
+    mgr.update_frame(make_child_buf(2, 0.0, 0.0, 100.0, 100.0, 3));
+    mgr.update_frame(make_child_buf(3, 0.0, 0.0, 100.0, 100.0, 1));
+    mgr.update_frame(make_child_buf(4, 0.0, 0.0, 100.0, 100.0, 1));
+    let origin = origin_now();
+    mgr.retire_frame(2, tween_100ms(), origin, 0.0);
+    mgr.retire_frame(4, tween_100ms(), origin, 0.0);
+
+    let order: Vec<u64> = mgr
+        .merged_render_order()
+        .iter()
+        .map(|(id, _)| *id)
+        .collect();
+    assert_eq!(
+        order,
+        vec![4, 3, 2, 1],
+        "z ascending, with the z-3 corpse between the z-1 and z-5 living frames"
+    );
+}
+
+#[test]
+fn merged_render_order_puts_a_corpse_beneath_a_living_frame_at_equal_z() {
+    // The dismissal case: the dying popup is being replaced by the popup
+    // that took its place at the same z. The old picture must recede
+    // *beneath* the new one.
+    let mut mgr = make_manager();
+    mgr.update_frame(make_child_buf(1, 0.0, 0.0, 100.0, 100.0, 7));
+    mgr.update_frame(make_child_buf(2, 0.0, 0.0, 100.0, 100.0, 7));
     let origin = origin_now();
     mgr.retire_frame(1, tween_100ms(), origin, 0.0);
 
-    let order: Vec<u64> = mgr
-        .dying_sorted_for_rendering()
-        .map(|dying| dying.entry.frame_id)
-        .collect();
-    assert_eq!(order, vec![1], "a single dying frame survives the sort");
+    let order = mgr.merged_render_order();
+    assert_eq!(order, vec![(1, true), (2, false)]);
+}
 
-    mgr.retire_frame(2, tween_100ms(), origin, 0.0);
+#[test]
+fn merged_render_order_is_empty_with_no_frames() {
+    let mgr = make_manager();
+    assert!(mgr.merged_render_order().is_empty());
+}
+
+#[test]
+fn merged_render_order_keeps_living_frames_when_only_they_exist() {
+    let mut mgr = make_manager();
+    mgr.update_frame(make_child_buf(1, 0.0, 0.0, 100.0, 100.0, 2));
+    mgr.update_frame(make_child_buf(2, 0.0, 0.0, 100.0, 100.0, 1));
     let order: Vec<u64> = mgr
-        .dying_sorted_for_rendering()
-        .map(|dying| dying.entry.frame_id)
+        .merged_render_order()
+        .iter()
+        .map(|(id, dying)| {
+            assert!(!dying);
+            *id
+        })
         .collect();
-    assert_eq!(order, vec![2, 1], "lower z draws first");
+    assert_eq!(order, vec![2, 1]);
 }

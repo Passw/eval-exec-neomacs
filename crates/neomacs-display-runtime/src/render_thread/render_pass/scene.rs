@@ -108,42 +108,31 @@ pub(super) fn render_frame_content_overlays(
     // forever after the first popup.
     let mut finished_animations = Vec::new();
     renderer.with_frame_effects(&mut render.compositor.renderer_effects, |renderer| {
-        // Dying frames draw first, beneath every living one: a dismissed
-        // popup is normally being replaced by the popup that took its
-        // place, and the old picture receding underneath reads as the new
-        // one arriving. Their z-order among themselves is the one they
-        // held when they died. The id/x/y triplets are collected first so
-        // the per-frame mutable atlas borrow below does not collide with
-        // the iterator's shared one.
-        if render.compositor.child_frames.has_dying() {
-            let dying_ids = render
-                .compositor
-                .child_frames
-                .dying_sorted_for_rendering()
-                .map(|dying| (dying.entry.frame_id, dying.entry.abs_x, dying.entry.abs_y))
-                .collect::<Vec<_>>();
-            for (dying_id, base_x, base_y) in dying_ids {
-                let Some(dying_entry) = render.compositor.child_frames.dying_entry(dying_id) else {
+        // One merged draw order: living frames and dying corpses
+        // interleaved in z-path order, a corpse drawing before a living
+        // frame at equal z -- a dismissed popup is normally being replaced
+        // by the popup that took its place at the same z, and the old
+        // picture receding *beneath* the new one reads as the new one
+        // arriving.
+        let merged = render.compositor.child_frames.merged_render_order();
+        for (child_id, dying) in merged {
+            let (child_frame, base_x, base_y, clip_in_root, alpha, offset_y) = if dying {
+                let Some(dying_entry) = render.compositor.child_frames.dying_entry(child_id) else {
                     continue;
                 };
                 // A corpse's payload is frozen by definition -- nothing will
-                // ever re-ingest it -- so the living-draw stale-catalog guard
-                // below does not apply to it. The atlas is content-addressed
-                // and retains its entries across face-table updates, and the
-                // corpse is transient and uninteractive; refusing its pixels
-                // here would make every dismissal instantly vanish instead
-                // of fading, which is what the guard's face-table bump on
-                // the removal itself otherwise guarantees.
+                // ever re-ingest it -- so the living-draw stale-catalog
+                // guard below does not apply to it. The atlas is
+                // content-addressed and retains its entries across
+                // face-table updates, and the corpse is transient and
+                // uninteractive; refusing its pixels here would make every
+                // dismissal instantly vanish instead of fading.
                 let animation = dying_entry.animation;
                 let progress = animation.motion.sample(sample);
                 if progress.finished {
                     continue;
                 }
                 child_animation_active = true;
-                let Some(atlas) = render.compositor.glyph_atlas.as_mut() else {
-                    continue;
-                };
-                atlas.set_current_frame_fonts(dying_entry.entry.frame.font_bindings());
                 // The close path runs progress toward "gone": opacity
                 // falls, and any slide distance carries the frame further
                 // down.
@@ -157,36 +146,18 @@ pub(super) fn render_frame_content_overlays(
                 else {
                     continue;
                 };
-                tracing::debug!(
-                    parent_frame_id = render.emacs_frame_id,
-                    frame_id = dying_id,
-                    alpha,
-                    "child_frame_lifecycle: render_dying_child_frame"
-                );
-                renderer.render_child_frame(
-                    surface_view,
+                (
                     &dying_entry.entry.frame,
-                    base_x,
-                    base_y + offset_y,
+                    dying_entry.entry.abs_x,
+                    dying_entry.entry.abs_y,
                     clip_in_root,
-                    atlas,
-                    native.content_size().0,
-                    native.content_size().1,
-                    cursor_visible,
-                    animated_cursor.filter(|ac| ac.frame_id == DisplayFrameId::new(dying_id)),
-                    child_frame_style.corner_radius,
-                    child_frame_style.shadow_enabled,
-                    child_frame_style.shadow_layers,
-                    child_frame_style.shadow_offset,
-                    child_frame_style.shadow_opacity,
-                    pointer_appearance.selection_for(&dying_entry.entry.frame),
                     alpha,
-                );
-            }
-        }
-
-        for &child_id in render.compositor.child_frames.sorted_for_rendering() {
-            if let Some(child_entry) = render.compositor.child_frames.frames.get(&child_id) {
+                    offset_y,
+                )
+            } else {
+                let Some(child_entry) = render.compositor.child_frames.frames.get(&child_id) else {
+                    continue;
+                };
                 if child_entry.frame.font_catalog_generation != frame.font_catalog_generation {
                     tracing::debug!(
                         frame_id = child_id,
@@ -240,40 +211,59 @@ pub(super) fn render_frame_content_overlays(
                 else {
                     continue;
                 };
-                let pointer_selection = pointer_appearance.selection_for(&child_entry.frame);
-                if let Some(atlas) = render.compositor.glyph_atlas.as_mut() {
-                    atlas.set_current_frame_fonts(child_entry.frame.font_bindings());
-                }
+                (
+                    &child_entry.frame,
+                    child_entry.abs_x,
+                    child_entry.abs_y,
+                    clip_in_root,
+                    alpha,
+                    offset_y,
+                )
+            };
+            let pointer_selection = pointer_appearance.selection_for(child_frame);
+            if let Some(atlas) = render.compositor.glyph_atlas.as_mut() {
+                atlas.set_current_frame_fonts(child_frame.font_bindings());
+            }
+            if dying {
                 tracing::debug!(
                     parent_frame_id = render.emacs_frame_id,
                     frame_id = child_id,
-                    x = child_entry.abs_x,
-                    y = child_entry.abs_y + offset_y,
-                    width = child_entry.frame.width,
-                    height = child_entry.frame.height,
                     alpha,
-                    glyphs = child_entry.frame.glyphs.len(),
+                    "child_frame_lifecycle: render_dying_child_frame"
+                );
+            } else {
+                tracing::debug!(
+                    parent_frame_id = render.emacs_frame_id,
+                    frame_id = child_id,
+                    x = base_x,
+                    y = base_y + offset_y,
+                    width = child_frame.width,
+                    height = child_frame.height,
+                    alpha,
+                    glyphs = child_frame.glyphs.len(),
                     "child_frame_lifecycle: render_child_frame_start"
                 );
-                renderer.render_child_frame(
-                    surface_view,
-                    &child_entry.frame,
-                    child_entry.abs_x,
-                    child_entry.abs_y + offset_y,
-                    clip_in_root,
-                    render.compositor.glyph_atlas.as_mut().unwrap(),
-                    native.content_size().0,
-                    native.content_size().1,
-                    cursor_visible,
-                    animated_cursor.filter(|ac| ac.frame_id == DisplayFrameId::new(child_id)),
-                    child_frame_style.corner_radius,
-                    child_frame_style.shadow_enabled,
-                    child_frame_style.shadow_layers,
-                    child_frame_style.shadow_offset,
-                    child_frame_style.shadow_opacity,
-                    pointer_selection,
-                    alpha,
-                );
+            }
+            renderer.render_child_frame(
+                surface_view,
+                child_frame,
+                base_x,
+                base_y + offset_y,
+                clip_in_root,
+                render.compositor.glyph_atlas.as_mut().unwrap(),
+                native.content_size().0,
+                native.content_size().1,
+                cursor_visible,
+                animated_cursor.filter(|ac| ac.frame_id == DisplayFrameId::new(child_id)),
+                child_frame_style.corner_radius,
+                child_frame_style.shadow_enabled,
+                child_frame_style.shadow_layers,
+                child_frame_style.shadow_offset,
+                child_frame_style.shadow_opacity,
+                pointer_selection,
+                alpha,
+            );
+            if !dying {
                 tracing::debug!(
                     parent_frame_id = render.emacs_frame_id,
                     frame_id = child_id,
@@ -282,6 +272,7 @@ pub(super) fn render_frame_content_overlays(
             }
         }
     });
+    // The pass reports continued animation    });
     // The pass reports continued animation the only way it may: by marking
     // the frame dirty, so the scheduler asks for another one. Finished dying
     // frames are pruned afterwards, on the same sample they were drawn with.

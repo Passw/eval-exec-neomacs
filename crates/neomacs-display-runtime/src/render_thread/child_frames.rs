@@ -416,6 +416,39 @@ impl ChildFrameManager {
         &self.render_order
     }
 
+    /// The merged draw order: every child frame — living and dying — in
+    /// z-path order, a corpse drawing before a living frame at equal z.
+    ///
+    /// The corpse-first tie-break is the dismissal case: the dying popup is
+    /// normally being replaced by the popup that took its place at the same
+    /// z, and the old picture receding *beneath* the new one reads as the
+    /// new one arriving. Interleaving matters for the rest: a dying child
+    /// deep in the stack must not jump above an unrelated living sibling
+    /// that happens to sit higher.
+    pub fn merged_render_order(&self) -> Vec<(u64, bool)> {
+        let mut order: Vec<(&[i32], u64, bool)> =
+            Vec::with_capacity(self.frames.len() + self.dying.len());
+        for (&id, entry) in &self.frames {
+            order.push((entry.z_path.as_slice(), id, false));
+        }
+        for dying in &self.dying {
+            order.push((dying.entry.z_path.as_slice(), dying.entry.frame_id, true));
+        }
+        order.sort_by(|a, b| {
+            a.0.cmp(b.0).then(if a.2 == b.2 {
+                a.1.cmp(&b.1)
+            } else if a.2 {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Greater
+            })
+        });
+        order
+            .into_iter()
+            .map(|(_, id, dying)| (id, dying))
+            .collect()
+    }
+
     /// Hit test: find the topmost child frame at the given point.
     /// Returns (frame_id: frame_id.get(), local_x, local_y) if hit, None otherwise.
     /// Iterates in reverse render order (topmost first).
