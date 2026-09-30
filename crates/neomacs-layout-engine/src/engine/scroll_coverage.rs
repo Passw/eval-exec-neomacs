@@ -102,6 +102,8 @@ struct WindowCoverage {
     targets: Vec<CharPos0>,
     // Remember pixel motion between source-row transitions and worker wakes.
     moving_backward: bool,
+    // Source edge used to plan this queue, including after its bridge is popped.
+    backward_edge: CharPos0,
     // Only the nearby bridge stops at this seam. The farther backward job
     // still prepares a complete viewport for page-up measurement and reuse.
     backward_bridge: Option<(CharPos0, CharPos0)>,
@@ -154,6 +156,17 @@ impl ScrollCoverage {
     #[cfg(test)]
     pub(super) fn has_deferred_capture_for_test(&self) -> bool {
         self.deferred.is_some()
+    }
+
+    #[cfg(test)]
+    pub(super) fn pending_backward_bridge_for_test(
+        &self,
+        window: DisplayWindowId,
+    ) -> Option<(CharPos0, CharPos0)> {
+        let observed = self.windows.get(&window)?;
+        observed
+            .backward_bridge
+            .filter(|(start, _)| observed.targets.contains(start))
     }
 
     pub(super) fn cancel(&mut self) {
@@ -412,6 +425,11 @@ impl LayoutEngine {
                             )
                             || observed.key.window_start != retained.key.window_start
                             || observed.key.vscroll != retained.key.vscroll
+                            || (observed.moving_backward
+                                && self
+                                    .prepared_viewports
+                                    .backward_start(frame.id, *owner, &retained.key)
+                                    .is_some_and(|edge| edge < observed.backward_edge))
                     })
             })
         })?;
@@ -449,6 +467,20 @@ impl LayoutEngine {
                 .windows
                 .get(&window_id)
                 .is_some_and(|observed| !observed.moving_backward);
+        let start = CharPos0::new(retained.key.window_start.max(0) as usize);
+        let backward_start = if moving_backward {
+            self.prepared_viewports
+                .backward_start(frame.id, window_id, &retained.key)
+                .unwrap_or(start)
+        } else {
+            start
+        };
+        let extended_backward = moving_backward
+            && self
+                .scroll_coverage
+                .windows
+                .get(&window_id)
+                .is_some_and(|observed| backward_start < observed.backward_edge);
         let urgent_backward = moving_backward
             && self.last_frame_display_state.as_ref().is_none_or(|state| {
                 state
@@ -468,11 +500,14 @@ impl LayoutEngine {
         if !compatible {
             self.scroll_coverage.cancel_active();
         }
-        if !compatible || moved || reversing_backward {
+        if !compatible || moved || reversing_backward || extended_backward {
             // Placement-only changes retarget future work without starving
             // the page already being captured during continuous scrolling.
             // A fractional reversal also needs the current exported edge:
             // the old bridge may now lie entirely inside prepared coverage.
+            // Published bridges can extend that edge without viewport motion.
+            // Follow only extensions; cache eviction must not create a retry
+            // cycle between old and new edges while the viewport stays still.
             let mut targets = Vec::with_capacity(3);
             let buffer = evaluator
                 .buffer_manager()
@@ -485,17 +520,9 @@ impl LayoutEngine {
                 .collect();
             // Backward acquisition scans at most 8 KiB, regardless of buffer
             // length. It stops only on a complete physical-line boundary.
-            let start = CharPos0::new(retained.key.window_start.max(0) as usize);
             // During reversal, extend the connected coverage edge. Starting
             // a whole page just behind the viewport can recapture only rows
             // already available while a gap farther above goes unprepared.
-            let backward_start = if moving_backward {
-                self.prepared_viewports
-                    .backward_start(frame.id, window_id, &retained.key)
-                    .unwrap_or(start)
-            } else {
-                start
-            };
             let start_byte = buffer
                 .char_pos_to_emacs_byte_pos_clamped(backward_start)
                 .get();
@@ -587,6 +614,7 @@ impl LayoutEngine {
                     key: retained.key.clone(),
                     targets,
                     moving_backward,
+                    backward_edge: backward_start,
                     backward_bridge,
                 },
             );
@@ -597,7 +625,7 @@ impl LayoutEngine {
         if urgent_backward {
             // A four-line bridge can take longer to capture than the remaining
             // pixel headroom permits. Acquire the nearest physical line first.
-            // This also handles fractional reversal, which keeps the old queue.
+            // Fractional reversal uses the same prepared source seam.
             if let Some(observed) = self.scroll_coverage.windows.get_mut(&window_id)
                 && let Some((bridge, end)) = observed.backward_bridge
                 && let Some(index) = observed.targets.iter().position(|target| *target == bridge)

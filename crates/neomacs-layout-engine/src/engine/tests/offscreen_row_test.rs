@@ -3045,21 +3045,30 @@ fn rich_fractional_reversal_starts_the_nearest_physical_bridge() {
 
 #[test]
 fn fractional_reversal_extends_the_prepared_edge_instead_of_recapturing_it() {
-    check_fractional_reversal_prepared_edge(false);
+    check_fractional_reversal_prepared_edge(false, false);
 }
 
 #[test]
 fn fractional_reversal_restarts_preparation_after_the_queue_is_idle() {
-    check_fractional_reversal_prepared_edge(true);
+    check_fractional_reversal_prepared_edge(true, false);
 }
 
-fn check_fractional_reversal_prepared_edge(idle: bool) {
+#[test]
+fn backward_preparation_follows_a_published_bridge_without_viewport_motion() {
+    check_fractional_reversal_prepared_edge(false, true);
+}
+
+fn check_fractional_reversal_prepared_edge(idle: bool, extend_again: bool) {
     let line = "ordinary offscreen text\n";
     let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 800, 600);
     eval.frame_manager_mut()
         .get_mut(frame)
         .unwrap()
         .window_system = Some(Value::symbol("neomacs"));
+    if extend_again {
+        eval.eval_str("(put-text-property (point-min) (point-max) 'face '(:height 80))")
+            .unwrap();
+    }
     let origin = 120 * line.len();
     let point = eval
         .buffer_manager()
@@ -3159,13 +3168,61 @@ fn check_fractional_reversal_prepared_edge(idle: bool) {
             "urgent preparation takes the nearest line"
         );
     }
+    if extend_again {
+        let start = engine.retained_window_matrices[&owner].key.window_start;
+        let vscroll = engine.retained_window_matrices[&owner].key.vscroll;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !engine
+            .scroll_coverage
+            .drain(&mut engine.prepared_viewports)
+            .unwrap()
+        {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::yield_now();
+        }
+        engine.layout_frame_rust(&mut eval, frame);
+        assert_eq!(
+            engine.retained_window_matrices[&owner].key.window_start,
+            start
+        );
+        assert_eq!(engine.retained_window_matrices[&owner].key.vscroll, vscroll);
+        let edge = engine
+            .prepared_viewports
+            .backward_start(frame, owner, &engine.retained_window_matrices[&owner].key)
+            .unwrap()
+            .get();
+        assert_eq!(
+            edge, next,
+            "the completed bridge must extend exported coverage"
+        );
+        engine.maintain_scroll_coverage(&eval);
+        let (bridge, end) = engine
+            .scroll_coverage
+            .pending_backward_bridge_for_test(owner)
+            .expect("publication must queue another useful bridge without viewport motion");
+        assert!(bridge.get() < edge);
+        assert_eq!(
+            end,
+            CharPos0::new(edge),
+            "the next bridge must end at the newly exported edge"
+        );
+    }
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     while engine.maintain_scroll_coverage(&eval).is_some() {
         assert!(std::time::Instant::now() < deadline);
+        if extend_again && engine.take_scroll_coverage_publication() {
+            engine.layout_frame_rust(&mut eval, frame);
+        }
         std::thread::yield_now();
     }
     eval.gc_collect_exact();
     engine.layout_frame_rust(&mut eval, frame);
+    if extend_again {
+        assert!(
+            engine.maintain_scroll_coverage(&eval).is_none(),
+            "bounded prepared coverage must eventually stop extending at a stationary viewport"
+        );
+    }
     assert_eq!(visible, selected_window_layout_trace(&eval, &engine, frame));
     let mut fresh = LayoutEngine::new();
     fresh.layout_frame_rust(&mut eval, frame);
@@ -3458,6 +3515,18 @@ fn check_paused_capture_resume(rich: bool, backward: bool, mutation: PausedCaptu
     }
     eval.gc_collect_exact();
     engine.maintain_scroll_coverage(&eval);
+    // Newly published coverage can still leave less than two rows of
+    // headroom. Allow another connecting bridge before resuming the saved
+    // producer, while preserving the mutation and GC checks below.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while engine.scroll_coverage.has_deferred_capture_for_test() {
+        assert!(std::time::Instant::now() < deadline);
+        engine.maintain_scroll_coverage(&eval);
+        if engine.take_scroll_coverage_publication() {
+            engine.layout_frame_rust(&mut eval, frame);
+        }
+        std::thread::yield_now();
+    }
     assert!(
         !engine.scroll_coverage.has_deferred_capture_for_test(),
         "saved acquisition must be resumed or retired after servicing the bridge"
