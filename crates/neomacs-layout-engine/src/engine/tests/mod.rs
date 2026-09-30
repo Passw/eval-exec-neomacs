@@ -24364,6 +24364,80 @@ fn plain_item_source_shadow_matches_mark_cluster_beside_face_span() {
     assert_ne!(segments[0].face_id, segments[1].face_id);
 }
 
+#[test]
+fn face_boundary_on_zero_width_extender_keeps_row_glyphs() {
+    // neovm issue #445 (ibuffer group headers like "🛠\u{FE0F}" with the
+    // underline face starting at the selector blanked the whole row): a face
+    // change landing exactly ON a zero-width cluster extender must keep the
+    // row's glyphs — every buffer character of the line stays represented in
+    // the row (the extender in the base's cluster, the remainder under the
+    // new face) — never an empty row. The composition-span shape this fix
+    // targets needs a live composition-function-table, so the end-to-end
+    // regression lives in neomacs-tui-tests `issue_445`; this harness pins
+    // the char-coverage invariant at cell metrics.
+    let text = "a\u{FE0F}bc\nnext\n";
+    // char-cell metrics, matching the -nw TTY frontend where the blank row
+    // was observed (1x1 cells).
+    let mut eval = Context::new();
+    let buf_id = eval
+        .buffer_manager()
+        .current_buffer()
+        .expect("current buffer")
+        .id();
+    {
+        let buf = eval.buffer_manager_mut().get_mut(buf_id).expect("buffer");
+        buf.insert(text);
+    }
+    eval.buffer_manager_mut().set_current(buf_id);
+    // 1-based chars [2, 3) = the U+FE0F.
+    eval.eval_str("(put-text-property 2 3 'face '(:underline t))")
+        .expect("face span on the extender");
+    let frame_id = eval
+        .frame_manager_mut()
+        .create_frame("face-boundary-zero-width-extender", 120, 160, buf_id);
+    {
+        let frame = eval.frame_manager_mut().get_mut(frame_id).expect("frame");
+        frame.char_width = 1.0;
+        frame.char_height = 1.0;
+    }
+    let selected_window = eval
+        .frame_manager()
+        .get(frame_id)
+        .expect("frame")
+        .selected_window;
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame_id);
+    let state = engine
+        .last_frame_display_state
+        .as_ref()
+        .expect("display state");
+    let entry = state
+        .window_matrices
+        .iter()
+        .find(|entry| entry.window_id.get() == selected_window.0 as i64)
+        .expect("selected window matrix");
+    let rows: Vec<_> = entry
+        .matrix
+        .rows
+        .iter()
+        .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        .cloned()
+        .collect();
+    assert!(rows.len() >= 2, "both lines must lay out");
+    let text_glyphs = &rows[0].glyphs[GlyphArea::Text.index()];
+    assert!(
+        !text_glyphs.is_empty(),
+        "a face boundary on a zero-width extender must not blank the row"
+    );
+    // Every visible character of the line is represented (the appended
+    // newline space included), and nothing but those.
+    assert_eq!(
+        glyphs_logical_text(text_glyphs),
+        "a\u{FE0F}bc ",
+        "the row must account for the whole line despite the face seam"
+    );
+}
+
 /// Engagement proof for the composed-cluster extension (flag-on suite gate):
 /// a combining-mark row must actually take the routed acquisition.
 /// Trivially passes when the flag is off.
