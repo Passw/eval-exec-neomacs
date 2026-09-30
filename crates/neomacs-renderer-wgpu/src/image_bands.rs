@@ -6,7 +6,7 @@
 //! row-wise decoder, or the all-or-nothing decode this renderer did before —
 //! and [`BandedSource::next_band`] is the progress itself.
 //!
-//! Three properties this module is built to keep:
+//! Four properties this module is built to keep:
 //!
 //! - **Bands tile the source.** A source derives every band from the cursor it
 //!   advances itself, and nothing can ask a source for a named range, so its
@@ -20,13 +20,19 @@
 //!   stops at [`BandStep::Failed`]; its bands are abandoned and the caller
 //!   decodes the whole image again. Only [`BandedSource::into_image`] on a
 //!   completed source yields pixels.
+//! - **A band knows where it goes.** [`BandMap`] scales source rows onto the
+//!   texture rows the finished image will occupy — the same realization, over
+//!   the same clamp, that the whole-image upload resolves — so a band can be
+//!   written into the texture the moment it exists, and the bands of one decode
+//!   fill it from the top with no gap and no overlap.
 
 use std::io::Cursor;
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use neomacs_display_protocol::{
-    ImageIntrinsicExtent, ImageNativeExtent, ImageRealization, ImageRotation, ImageSizeSpec,
+    ImageIntrinsicExtent, ImageMaskPolicy, ImageNativeExtent, ImageRasterExtent, ImageRealization,
+    ImageRotation, ImageSizeSpec,
 };
 
 /// Smallest source, in pixels, that banding engages for.
@@ -58,7 +64,39 @@ pub(crate) const BAND_TARGET_COUNT: u32 = 32;
 /// next one exists, which is the whole point of decoding this way. `None`
 /// decodes the same pixels without reporting progress, for the callers that
 /// only want the image.
-pub(crate) type BandSink<'sink> = Option<&'sink mut dyn FnMut(BandChunk)>;
+pub(crate) type BandSink<'sink> = Option<&'sink mut dyn FnMut(DecodedBand)>;
+
+/// Whether one decode's bands have somewhere to go.
+///
+/// Two things about a realization stop a band from having a destination, and
+/// neither is about the band:
+///
+/// - A quarter turn is applied to the *scaled* image (GNU turns after sizing),
+///   so a band of source rows becomes a column range of the stored raster, and
+///   "how far down has it filled" stops being one number.
+/// - A mask policy that rewrites pixels needs the whole image before it can say
+///   what any pixel is — `ImageHeuristicMask::FourCorners` is literally the
+///   four corners.
+///
+/// Both keep the band, which is still progress, and decline the placement,
+/// which is why this is named after the side that is missing.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum BandFilling {
+    /// A band's rows go straight into the texture, below the last one written.
+    TopDown,
+    /// The texture is filled once, when the decode completes.
+    Deferred,
+}
+
+impl BandFilling {
+    pub(crate) const fn of(rotation: ImageRotation, mask: ImageMaskPolicy) -> Self {
+        if matches!(rotation, ImageRotation::None) && matches!(mask, ImageMaskPolicy::Preserve) {
+            Self::TopDown
+        } else {
+            Self::Deferred
+        }
+    }
+}
 
 /// A run of whole source rows, in decode order.
 ///
@@ -161,6 +199,213 @@ impl std::fmt::Debug for BandChunk {
             .field("width", &self.width)
             .field("pixels", &format_args!("{} bytes", self.pixels.len()))
             .finish()
+    }
+}
+
+/// A run of rows of the texture that will hold an image.
+///
+/// Built by [`BandMap`] and nowhere else, so a destination cannot name rows
+/// outside the raster it was mapped for.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TextureRows {
+    start: u32,
+    len: NonZeroU32,
+}
+
+impl TextureRows {
+    /// First texture row this range covers.
+    #[must_use]
+    pub const fn start(self) -> u32 {
+        self.start
+    }
+
+    /// How many texture rows it covers; never zero.
+    #[must_use]
+    pub const fn len(self) -> NonZeroU32 {
+        self.len
+    }
+
+    /// One past the last texture row it covers.
+    #[must_use]
+    pub const fn end(self) -> u32 {
+        self.start + self.len.get()
+    }
+}
+
+/// Where a source's rows land in the texture that will hold it.
+///
+/// The finished upload scales the whole native image onto the raster in one
+/// pass — `image::imageops::resize` with Lanczos3, over the raster the texture
+/// limit has already clamped — so which raster row a source row lands on is the
+/// *realization's* answer, not the band's. A band is a range of source rows, and
+/// its destination is that same mapping restricted to the band: the raster rows
+/// whose source interval `[r * H / R, (r + 1) * H / R)` — the rows the resize's
+/// sample positions come from — are inside it.
+///
+/// Those boundaries generally fall between two texture rows. Rounding each to
+/// the nearest row is what keeps the bands tiling: `round` is monotone, maps
+/// `0` to `0` and `H` to `R`, so consecutive bands' destinations are contiguous
+/// from row 0 to the last row of the raster — no gap, no overlap, and a
+/// boundary that lands between rows belongs to the band that starts there. One
+/// number therefore says how far the texture has been filled, which is what the
+/// display side draws against.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BandMap {
+    native_height: NonZeroU32,
+    raster: ImageRasterExtent,
+}
+
+impl BandMap {
+    /// The map for a `native_height`-row source realized to `raster`.
+    ///
+    /// `None` when either extent is empty, which is a source with no rows to
+    /// place rather than a map with none.
+    #[must_use]
+    pub fn new(native_height: u32, raster: ImageRasterExtent) -> Option<Self> {
+        Some(Self {
+            native_height: NonZeroU32::new(native_height)?,
+            raster: ImageRasterExtent::new(raster.width().max(1), raster.height().max(1)),
+        })
+    }
+
+    /// The texture extent these rows are in.
+    #[must_use]
+    pub const fn raster(self) -> ImageRasterExtent {
+        self.raster
+    }
+
+    /// The texture row nearest to source row `source`.
+    fn row_at(self, source: u32) -> u32 {
+        let native = u64::from(self.native_height.get());
+        let scaled = u64::from(source) * u64::from(self.raster.height());
+        // round(x / native) for a non-negative numerator, in integers: `source`
+        // comes from a row range, so it never exceeds `native` and the result
+        // never exceeds the raster's height.
+        let row = (scaled + native / 2) / native;
+        u32::try_from(row).unwrap_or(self.raster.height())
+    }
+
+    /// `band`'s pixels, resized into the texture rows it fills.
+    ///
+    /// `None` when the band lands on no texture row at all, which a source
+    /// minified hard enough can do: there is then nothing to write, and the
+    /// next band's destination still starts where this one's would have.
+    #[must_use]
+    pub fn place(self, band: &BandChunk) -> Option<RasterBand> {
+        let start = self.row_at(band.rows().start());
+        let end = self.row_at(band.rows().end());
+        // `row_at` is monotone, so this cannot underflow; it is zero only when
+        // both ends rounded to the same row.
+        let rows = NonZeroU32::new(end.saturating_sub(start))?;
+        let source = image::RgbaImage::from_raw(
+            band.width(),
+            band.rows().len().get(),
+            band.pixels().to_vec(),
+        )?;
+        let resized = image::imageops::resize(
+            &source,
+            self.raster.width(),
+            rows.get(),
+            image::imageops::FilterType::Lanczos3,
+        );
+        Some(RasterBand {
+            placement: BandPlacement {
+                raster: self.raster,
+                rows: TextureRows { start, len: rows },
+            },
+            pixels: resized.into_raw().into(),
+        })
+    }
+}
+
+/// One band's destination: the raster it belongs to and the rows it fills.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BandPlacement {
+    raster: ImageRasterExtent,
+    rows: TextureRows,
+}
+
+impl BandPlacement {
+    /// The raster of the texture this band belongs in.
+    #[must_use]
+    pub const fn raster(self) -> ImageRasterExtent {
+        self.raster
+    }
+
+    /// The texture rows it fills.
+    #[must_use]
+    pub const fn rows(self) -> TextureRows {
+        self.rows
+    }
+}
+
+/// A band's pixels in the texture's own coordinates, ready to be written.
+///
+/// `pixels` covers exactly [`BandPlacement::rows`] of a
+/// [`BandPlacement::raster`]-sized texture, so the write that carries them
+/// writes the rows it claims and no others.
+///
+/// The resize happens here, on the thread that just decoded the rows, rather
+/// than on the render thread: it is the same work the whole-image path does at
+/// completion, and a frame that is about to be drawn must not spend itself on
+/// it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RasterBand {
+    placement: BandPlacement,
+    pixels: Arc<[u8]>,
+}
+
+impl RasterBand {
+    /// Where these pixels go.
+    #[must_use]
+    pub const fn placement(&self) -> BandPlacement {
+        self.placement
+    }
+
+    /// RGBA pixels, `raster.width() * rows.len() * 4` bytes, row-major from
+    /// `rows.start()`.
+    #[must_use]
+    pub fn pixels(&self) -> &[u8] {
+        &self.pixels
+    }
+}
+
+/// One band of a decode: what the source produced, and what the texture takes.
+///
+/// Two views of the same rows, because two consumers want different things.
+/// [`Self::band`] is the decode's own progress — source rows and their pixels,
+/// which is the fact the display side reads — and [`Self::placed`] is those rows
+/// already resized into the texture's coordinates, which is the fact the
+/// renderer writes.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DecodedBand {
+    band: BandChunk,
+    placed: Option<RasterBand>,
+}
+
+impl DecodedBand {
+    #[must_use]
+    pub fn new(band: BandChunk, placed: Option<RasterBand>) -> Self {
+        Self { band, placed }
+    }
+
+    /// The rows the decode produced, in source coordinates.
+    #[must_use]
+    pub fn band(&self) -> &BandChunk {
+        &self.band
+    }
+
+    /// The same rows for the texture, if this decode has a destination for
+    /// them ([`BandFilling`]).
+    #[must_use]
+    pub fn placed(&self) -> Option<&RasterBand> {
+        self.placed.as_ref()
+    }
+
+    /// Both halves, for a consumer that keeps one and writes the other.
+    #[must_use]
+    pub fn into_parts(self) -> (BandChunk, Option<RasterBand>) {
+        (self.band, self.placed)
     }
 }
 

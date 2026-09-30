@@ -1790,7 +1790,11 @@ fn whole_pixels(data: &[u8]) -> NativePixels {
     ImageCache::decode_whole(data).expect("fixture decodes whole")
 }
 
-fn decode_with_bands(data: &[u8], scale: f32, bands: &mut Vec<BandChunk>) -> Option<DecodedPixels> {
+fn decode_with_bands(
+    data: &[u8],
+    scale: f32,
+    bands: &mut Vec<DecodedBand>,
+) -> Option<DecodedPixels> {
     ImageCache::decode_data(
         data,
         ImageSizeSpec::default(),
@@ -1825,9 +1829,9 @@ fn a_large_png_decodes_in_bands_that_add_up_to_the_whole_image() {
     );
     let mut expected_start = 0;
     for band in &bands {
-        assert_eq!(band.rows().start(), expected_start);
-        assert_eq!(band.width(), width);
-        expected_start = band.rows().end();
+        assert_eq!(band.band().rows().start(), expected_start);
+        assert_eq!(band.band().width(), width);
+        expected_start = band.band().rows().end();
     }
     assert_eq!(expected_start, height, "the bands cover the whole source");
     assert_eq!(
@@ -1924,7 +1928,7 @@ fn a_truncated_source_fails_instead_of_publishing_a_prefix() {
         !bands.is_empty(),
         "the failure happened after the banded path had reported progress"
     );
-    let covered = bands.last().map_or(0, |band| band.rows().end());
+    let covered = bands.last().map_or(0, |band| band.band().rows().end());
     assert!(
         covered > 0 && covered < height,
         "the failure is mid-stream: {covered} of {height} rows"
@@ -1941,8 +1945,11 @@ fn bands_do_not_consume_the_load_attempt() {
 
     let band = || WorkerDecodeOutcome::Band {
         load,
-        band: BandChunk::from_rows(0, std::num::NonZeroU32::new(1).unwrap(), 1, vec![0u8; 4])
-            .expect("a band of one pixel row"),
+        decoded: DecodedBand::new(
+            BandChunk::from_rows(0, std::num::NonZeroU32::new(1).unwrap(), 1, vec![0u8; 4])
+                .expect("a band of one pixel row"),
+            None,
+        ),
     };
     assert!(matches!(loads.take_current(band()), Some(_)));
     assert!(matches!(loads.take_current(band()), Some(_)));
@@ -1956,4 +1963,262 @@ fn bands_do_not_consume_the_load_attempt() {
         "a superseded decode's bands are dropped"
     );
     assert!(loads.is_current(replacement));
+}
+
+/// Every band of a decode is placed in the raster the *finished* upload
+/// resolves, and the placements tile that raster from row zero. The two sides
+/// agree because both resolve their raster through one function; this is the
+/// test that says so, and it is what makes a texture holding rows from two
+/// different scalings unreachable.
+#[test]
+fn every_band_lands_in_the_raster_the_finished_upload_resolves() {
+    let (width, height) = (2000_u32, 2000_u32);
+    let data = varying_png(width, height);
+    let scales = [
+        // Native size: the raster is the source and every band is its own rows.
+        1.0_f32,
+        // Magnified: the raster is 3125 rows from 2000, a ratio that lands
+        // between texture rows at every band boundary.
+        1.25, // Minified: a texture row is worth two source rows.
+        0.5,
+    ];
+    for scale in scales {
+        let realization = ImageRealization::with_device_scale(scale, scale);
+        let mut bands = Vec::new();
+        let decoded = ImageCache::decode_data(
+            &data,
+            ImageSizeSpec::default(),
+            ImageRotation::None,
+            ImageColorContext::default(),
+            realization,
+            ImageMaskPolicy::Preserve,
+            ImageFrameIndex::default(),
+            crate::svg::SvgResourceContext::Isolated,
+            &ImageSequenceCache::new(),
+            ImageSequenceId::new(1).expect("non-zero test sequence"),
+            Some(&mut |band| bands.push(band)),
+        )
+        .expect("decode");
+        assert!(!bands.is_empty(), "{width}x{height}@{scale} bands");
+
+        let raster = decoded.geometry.raster();
+        let mut expected_start = 0;
+        for band in &bands {
+            let placed = band
+                .placed()
+                .unwrap_or_else(|| panic!("{width}x{height}@{scale}: every band has a place"));
+            assert_eq!(
+                placed.placement().raster(),
+                raster,
+                "a band is mapped into the raster the image is realized to"
+            );
+            assert_eq!(
+                placed.placement().rows().start(),
+                expected_start,
+                "bands tile the raster from row zero"
+            );
+            assert_eq!(
+                placed.pixels().len(),
+                raster.width() as usize * placed.placement().rows().len().get() as usize * 4,
+                "a placed band carries exactly the rows it fills"
+            );
+            expected_start = placed.placement().rows().end();
+        }
+        assert_eq!(
+            expected_start,
+            raster.height(),
+            "{width}x{height}@{scale}: the bands cover the whole raster"
+        );
+    }
+}
+
+/// A texture's filled prefix advances only by a band that continues it. A
+/// hole, a band applied twice, or one that names rows the texture does not
+/// have are all refused, so the value the draw side trusts cannot be made to
+/// claim rows nobody wrote.
+#[test]
+fn a_textures_filled_prefix_advances_only_by_bands_that_continue_it() {
+    let raster = ImageRasterExtent::new(4, 8);
+    let map = BandMap::new(8, raster).expect("an eight-row source has a map");
+    let rows_of = |start: u32, len: u32| {
+        let band = BandChunk::from_rows(
+            start,
+            std::num::NonZeroU32::new(len).expect("non-zero test rows"),
+            4,
+            vec![0u8; 4 * len as usize * 4],
+        )
+        .expect("a band of exactly the rows it claims");
+        map.place(&band)
+            .expect("a native-size band covers texture rows")
+            .placement()
+            .rows()
+    };
+
+    let empty = FilledRows::empty(raster);
+    assert_eq!(empty.filled(), 0);
+    assert_eq!(empty.filled_fraction(), 0.0);
+    assert!(!empty.is_complete());
+
+    let first = rows_of(0, 3);
+    let filled = empty
+        .extend(first)
+        .expect("the first band continues row zero");
+    assert_eq!(filled.filled(), first.end());
+    assert!(!filled.is_complete());
+
+    assert!(
+        filled.extend(first).is_none(),
+        "rows already written are not written twice"
+    );
+    assert!(
+        filled.extend(rows_of(4, 2)).is_none(),
+        "a band that would leave a hole is refused"
+    );
+    assert!(
+        filled.extend(rows_of(0, 2)).is_none(),
+        "a band from before the prefix is refused"
+    );
+
+    let filled = filled
+        .extend(rows_of(3, 5))
+        .expect("the last band continues the prefix");
+    assert!(filled.is_complete());
+    assert_eq!(filled.filled(), raster.height());
+    assert_eq!(filled.filled_fraction(), 1.0);
+
+    // A texture shorter than the rows a band names cannot take them, however
+    // contiguous they are: the prefix may not outgrow the texture.
+    let shorter = FilledRows::empty(ImageRasterExtent::new(4, 2));
+    assert!(shorter.extend(rows_of(0, 3)).is_none());
+}
+
+/// A quad is trimmed to the rows that hold pixels: the part of it above the
+/// filled rows is drawn, the rest is not, and a quad wholly below them is not
+/// drawn at all.
+#[test]
+fn a_quad_is_drawn_only_over_the_rows_that_hold_pixels() {
+    /// The trimmed span, as `(v1, height)`, to within a pixel.
+    fn trimmed(span: Option<(f32, f32)>) -> Option<(f32, f32)> {
+        span.map(|(v1, height)| (v1, (height * 1000.0).round() / 1000.0))
+    }
+
+    let complete = FilledRows::complete(ImageRasterExtent::new(4, 8));
+    assert_eq!(
+        trimmed(complete.clip_span(0.0, 1.0, 80.0)),
+        Some((1.0, 80.0)),
+        "a whole texture draws the whole quad"
+    );
+
+    let map = BandMap::new(8, ImageRasterExtent::new(4, 8)).expect("map");
+    let band = BandChunk::from_rows(
+        0,
+        std::num::NonZeroU32::new(4).expect("non-zero"),
+        4,
+        vec![0u8; 4 * 4 * 4],
+    )
+    .expect("a band of four rows");
+    let half = FilledRows::empty(ImageRasterExtent::new(4, 8))
+        .extend(map.place(&band).expect("placed").placement().rows())
+        .expect("the first band continues row zero");
+    assert_eq!(half.filled_fraction(), 0.5);
+
+    // The quad is drawn over the top half of the texture and no further.
+    assert_eq!(trimmed(half.clip_span(0.0, 1.0, 80.0)), Some((0.5, 40.0)));
+    // A span already inside the filled part is untouched.
+    assert_eq!(trimmed(half.clip_span(0.0, 0.25, 20.0)), Some((0.25, 20.0)));
+    // A span that crosses the boundary keeps its start and loses the rest.
+    assert_eq!(trimmed(half.clip_span(0.25, 1.0, 60.0)), Some((0.5, 20.0)));
+    // A span wholly below the boundary has nothing to draw.
+    assert_eq!(half.clip_span(0.5, 1.0, 40.0), None);
+    assert_eq!(half.clip_span(0.75, 1.0, 20.0), None);
+}
+
+/// The acceptance criterion, without a GPU: whatever the bands did on the way,
+/// the image the decode ends with is the whole-image path's pixels, and the
+/// finished upload writes every texel of the texture they were accumulating in.
+///
+/// The identity is structural rather than a coincidence of the band previews:
+/// the terminal upload is the same buffer the whole-image path produces, and
+/// this test pins the two halves of that — the bands fill the texture
+/// completely (so the preview is an honest preview of the finished image), and
+/// the finished upload's buffer is exactly the texture's shape (so its one
+/// write covers everything the bands wrote, however far they got).
+#[test]
+fn the_texture_a_banded_decode_fills_ends_as_the_whole_image_paths() {
+    let (width, height) = (2000, 2000);
+    let data = varying_png(width, height);
+    let (size, realization) = (ImageSizeSpec::default(), ImageRealization::default());
+
+    let mut bands = Vec::new();
+    let decoded = decode_with_bands(&data, 1.0, &mut bands).expect("decode");
+    let raster = decoded.geometry.raster();
+    let (raster_width, raster_height) = raster.dimensions();
+
+    // Stand in for the texture `ImageCache` fills band by band: the same buffer
+    // shape, filled with a placeholder the fixture's own pixels cannot be —
+    // transparent, where every pixel of `varying_png` is opaque — so a row
+    // nobody wrote is visible.
+    let mut texture = vec![0u8; raster_width as usize * raster_height as usize * 4];
+    let stride = raster_width as usize * 4;
+    let mut filled = FilledRows::empty(raster);
+    for band in &bands {
+        let placed = band.placed().expect("a top-down decode places every band");
+        let rows = placed.placement().rows();
+        let advanced = filled
+            .extend(rows)
+            .expect("each band continues the rows already written");
+        texture[rows.start() as usize * stride..rows.end() as usize * stride]
+            .copy_from_slice(placed.pixels());
+        filled = advanced;
+    }
+    assert!(
+        filled.is_complete(),
+        "the bands wrote every row of the texture"
+    );
+    for row in 0..raster_height as usize {
+        let written = &texture[row * stride..(row + 1) * stride];
+        assert!(
+            written.chunks_exact(4).all(|texel| texel[3] != 0),
+            "row {row} of the texture was never written"
+        );
+    }
+
+    // The finished upload, as `ImageCache::upload_texture` runs it when the
+    // decode completes: the whole-image realization, written over the whole
+    // texture in one call.
+    let whole = ImageCache::decode_whole(&data)
+        .expect("fixture decodes whole")
+        .realize_bitmap(
+            size,
+            ImageRotation::None,
+            realization,
+            ImageMaskPolicy::Preserve,
+        )
+        .expect("realize");
+    assert_eq!(
+        whole.geometry.raster(),
+        raster,
+        "the finished upload writes the same raster the bands were mapped into"
+    );
+    assert_eq!(
+        whole.rgba.len(),
+        texture.len(),
+        "the finished upload's buffer is the whole texture"
+    );
+    assert_eq!(
+        decoded.rgba, whole.rgba,
+        "the banded decode ends as the whole-image path's pixels"
+    );
+    texture.copy_from_slice(&whole.rgba);
+    // The oracle, stated without reference to any of the above: this fixture
+    // realizes at its native size, so the whole-image path is `image`'s own
+    // decode of the same file with no resample at all.
+    let expected = image::load_from_memory(&data)
+        .expect("fixture decodes")
+        .to_rgba8()
+        .into_raw();
+    assert_eq!(
+        texture, expected,
+        "the finished texture holds the whole-image path's bytes"
+    );
 }

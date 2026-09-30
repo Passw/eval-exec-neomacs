@@ -1924,6 +1924,13 @@ impl WgpuRenderer {
         self.surface_format
     }
 
+    /// The image cache, for a caller that needs a texture's own state rather
+    /// than the draw path's view of it — how much of it holds pixels, say, or
+    /// the texture itself.
+    pub fn image_cache(&self) -> &ImageCache {
+        &self.caches.image
+    }
+
     /// Get the image bind group layout (for creating bind groups for offscreen textures)
     pub fn image_bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         self.caches.image.bind_group_layout()

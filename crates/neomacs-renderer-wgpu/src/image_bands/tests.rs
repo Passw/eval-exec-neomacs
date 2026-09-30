@@ -305,6 +305,113 @@ fn a_truncated_png_fails_mid_stream_and_yields_no_image() {
     );
 }
 
+/// A band of `rows` rows of `width` pixels, for the mapping tests: the pixels
+/// are all zero, because where they land is the question and what they contain
+/// is not.
+fn band_of_rows(start: u32, rows: u32, width: u32) -> BandChunk {
+    BandChunk::from_rows(
+        start,
+        NonZeroU32::new(rows).expect("a test band has rows"),
+        width,
+        vec![0u8; width as usize * rows as usize * 4],
+    )
+    .expect("a band of exactly the rows it claims")
+}
+
+/// The bands of one decode have to fill its texture from the top: contiguous,
+/// in order, and reaching the raster's last row. A source row boundary rarely
+/// lands on a texture row, so the boundaries are the case that decides the
+/// rule — and covering the raster with no hole is what lets the display side
+/// describe how far the image has come with one number.
+#[test]
+fn the_bands_of_a_source_tile_the_raster_from_row_zero() {
+    // 700 source rows onto 238 raster rows (a 12000x700 image clamped to the
+    // texture limit): 0.34 raster rows per source row, so nearly every band
+    // boundary falls between two of them.
+    let raster = ImageRasterExtent::new(4096, 238);
+    let map = BandMap::new(700, raster).expect("a source with rows has a map");
+    assert_eq!(map.raster(), raster);
+
+    let mut expected_start = 0;
+    for start in (0..700).step_by(22) {
+        let rows = (700 - start).min(22);
+        let placed = map
+            .place(&band_of_rows(start, rows, 8))
+            .expect("a 22-row band covers several texture rows");
+        let placement = placed.placement();
+        assert_eq!(
+            placement.rows().start(),
+            expected_start,
+            "a band starts where the last one ended"
+        );
+        assert_eq!(placement.raster(), raster);
+        assert_eq!(
+            placed.pixels().len(),
+            raster.width() as usize * placement.rows().len().get() as usize * 4,
+            "a placed band carries exactly the rows it fills"
+        );
+        expected_start = placement.rows().end();
+    }
+    assert_eq!(
+        expected_start,
+        raster.height(),
+        "the bands reach the last row of the raster"
+    );
+}
+
+/// A boundary between two texture rows belongs to the band that starts there:
+/// rounding it to the nearest row is what keeps consecutive bands adjacent
+/// instead of leaving the boundary row to neither of them.
+#[test]
+fn a_band_boundary_between_two_texture_rows_belongs_to_the_band_that_starts_there() {
+    let map = BandMap::new(700, ImageRasterExtent::new(4096, 238)).expect("map");
+    // 33 * 238 / 700 = 11.22: nearer row 11 than row 12.
+    let second = map
+        .place(&band_of_rows(33, 11, 1))
+        .expect("the second band has rows");
+    assert_eq!(second.placement().rows().start(), 11);
+
+    let first = map
+        .place(&band_of_rows(0, 33, 1))
+        .expect("the first band has rows");
+    assert_eq!(
+        first.placement().rows().end(),
+        11,
+        "the band before the boundary ends exactly where the next begins"
+    );
+}
+
+/// A source whose rows map one to one onto the raster — the case of an image
+/// shown at its own size — places every band on exactly its own rows.
+#[test]
+fn a_band_of_a_native_size_image_fills_the_rows_it_covered() {
+    let map = BandMap::new(600, ImageRasterExtent::new(600, 600)).expect("map");
+    let placed = map
+        .place(&band_of_rows(120, 30, 4))
+        .expect("a 30-row band of 600");
+    assert_eq!(placed.placement().rows().start(), 120);
+    assert_eq!(placed.placement().rows().len().get(), 30);
+}
+
+/// A source minified so far that a band covers less than one texture row has
+/// nowhere to write, which is a band that places nowhere rather than a band
+/// written at the wrong place.
+#[test]
+fn a_band_that_covers_no_texture_row_places_nothing() {
+    // 40000 source rows onto 10 raster rows: one raster row per 4000 source
+    // rows, so a 100-row band can round to a single row... and a 1-row band to
+    // the row it rounds to, which is the floor below.
+    let map = BandMap::new(40000, ImageRasterExtent::new(10, 10)).expect("map");
+    let placed = map.place(&band_of_rows(0, 100, 1));
+    // Rounding sends rows 0..100 to 0..0, so there is nothing to write.
+    assert!(
+        placed.is_none(),
+        "a band worth less than a texture row places nothing"
+    );
+    // The control: the same source with wider bands does place rows.
+    assert!(map.place(&band_of_rows(0, 4000, 1)).is_some());
+}
+
 /// Whatever the source, a band says which rows it is: the constructor refuses
 /// pixels that are not that rectangle.
 #[test]

@@ -15,14 +15,17 @@ use neomacs_display_protocol::{
 };
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
-use std::num::NonZeroUsize;
+use std::num::{NonZeroU32, NonZeroUsize};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 
-use crate::image_bands::{BandChunk, BandSink, BandSource, BandStep};
+use crate::image_bands::{
+    BandChunk, BandFilling, BandMap, BandSink, BandSource, BandStep, DecodedBand, RasterBand,
+    TextureRows,
+};
 use crate::image_sequence::{ImageSequenceCache, ImageSequenceResolution};
 
 #[cfg(target_os = "linux")]
@@ -69,6 +72,23 @@ pub(crate) fn constrain_dimensions(width: u32, height: u32) -> (u32, u32) {
 pub(crate) fn constrain_raster_extent(extent: ImageRasterExtent) -> ImageRasterExtent {
     let (width, height) = constrain_dimensions(extent.width(), extent.height());
     ImageRasterExtent::new(width, height)
+}
+
+/// The geometry a decode realizes to, raster clamped by the texture limit.
+///
+/// One function rather than a line in each caller, because two callers must
+/// agree about it: `NativePixels::realize_bitmap` scales the image onto this
+/// raster, and a band's rows are expressed in it (`image_bands::BandMap`). Bands
+/// mapped under a different raster than the texture they are written into would
+/// leave that texture holding rows from two scales, which nothing downstream
+/// could detect.
+fn realized_geometry(
+    extent: ImageNativeExtent,
+    size: ImageSizeSpec,
+    realization: ImageRealization,
+) -> ResolvedImageGeometry {
+    let geometry = realization.resolve_geometry(size, extent, ImageRotation::None);
+    geometry.with_raster(constrain_raster_extent(geometry.raster()))
 }
 
 /// Maximum total cache memory in bytes (64MB)
@@ -120,6 +140,102 @@ pub enum ImageState {
     Failed(String),
 }
 
+/// How much of a texture holds pixels, as a prefix of its rows.
+///
+/// A banded decode fills from the top: its bands are disjoint, in order, and
+/// the first starts at row 0, so the rows that exist are always a *prefix* of
+/// the texture — never a set, never a hole. That is what lets the draw side ask
+/// one number how far down it may draw, and it is why `filled <= total` is an
+/// invariant of this type rather than a check at each use: a value claiming more
+/// rows than the texture has cannot be built, so "draw a row that was never
+/// uploaded" cannot be said.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FilledRows {
+    filled: u32,
+    total: NonZeroU32,
+}
+
+impl FilledRows {
+    /// Every row of a texture that was written whole.
+    #[must_use]
+    pub fn complete(raster: ImageRasterExtent) -> Self {
+        Self::partial(raster.height(), raster.height())
+    }
+
+    /// A texture whose rows are all still to be written.
+    #[must_use]
+    pub fn empty(raster: ImageRasterExtent) -> Self {
+        Self::partial(0, raster.height())
+    }
+
+    fn partial(filled: u32, total: u32) -> Self {
+        Self {
+            filled,
+            total: NonZeroU32::new(total).unwrap_or(NonZeroU32::MIN),
+        }
+    }
+
+    /// The part of a `total`-row texture that holds pixels.
+    #[must_use]
+    pub const fn filled(&self) -> u32 {
+        self.filled
+    }
+
+    /// How many rows the texture has.
+    #[must_use]
+    pub const fn total(&self) -> NonZeroU32 {
+        self.total
+    }
+
+    /// Whether every row of the texture has been written.
+    #[must_use]
+    pub const fn is_complete(&self) -> bool {
+        self.filled == self.total.get()
+    }
+
+    /// How far down the texture a quad may be drawn, as a texture coordinate.
+    #[must_use]
+    pub fn filled_fraction(&self) -> f32 {
+        self.filled as f32 / self.total.get() as f32
+    }
+
+    /// This prefix extended by `rows`, which must start exactly where it ends.
+    ///
+    /// `None` for a band that would leave a hole or rewrite rows that are
+    /// already there — a band from a superseded decode, or one that was applied
+    /// twice. Holding the extended value is what the write of those rows is
+    /// paired with, so a texture cannot come to claim rows nobody wrote.
+    #[must_use]
+    pub fn extend(self, rows: TextureRows) -> Option<Self> {
+        (rows.start() == self.filled && rows.end() <= self.total.get()).then(|| Self {
+            filled: rows.end(),
+            ..self
+        })
+    }
+
+    /// Trim a drawn span to the rows that hold pixels.
+    ///
+    /// `height` is how many pixels of the glyph are drawn and `v0..v1` the same
+    /// span as texture rows, so the finish is affine and shortening one by a
+    /// fraction shortens the other by the same fraction. `None` when nothing of
+    /// the span is uploaded: the quad must be skipped rather than drawn against
+    /// rows that were never written.
+    #[must_use]
+    pub fn clip_span(self, v0: f32, v1: f32, height: f32) -> Option<(f32, f32)> {
+        if v1 <= v0 {
+            return None;
+        }
+        let limit = self.filled_fraction();
+        if v0 >= limit {
+            return None;
+        }
+        if v1 <= limit {
+            return Some((v1, height));
+        }
+        Some((limit, height * (limit - v0) / (v1 - v0)))
+    }
+}
+
 /// Cached image with GPU texture
 pub struct CachedImage {
     pub texture: wgpu::Texture,
@@ -127,6 +243,13 @@ pub struct CachedImage {
     pub bind_group: wgpu::BindGroup,
     /// Uploaded texture dimensions in physical device pixels.
     pub raster: ImageRasterExtent,
+    /// How much of `raster` has been written.
+    ///
+    /// Everything, for an image that was decoded whole. A banded decode leaves
+    /// this short of `raster` while its rows are still arriving, and every
+    /// consumer that draws the image reads it from here — there is no second
+    /// copy of "how far has it got" to fall out of step with the texture.
+    pub filled: FilledRows,
     pub metadata: Option<ImageMetadata>,
     /// Memory size in bytes
     pub memory_size: usize,
@@ -204,12 +327,10 @@ impl NativePixels {
         mask_policy: ImageMaskPolicy,
     ) -> Option<DecodedPixels> {
         let mask = apply_mask_policy(&mut self.rgba, self.extent.dimensions(), mask_policy);
-        let geometry = realization.resolve_geometry(size, self.extent, ImageRotation::None);
-        let raster = constrain_raster_extent(geometry.raster());
-        let geometry = geometry.with_raster(raster);
-        let (raster_width, raster_height) = raster.dimensions();
+        let geometry = realized_geometry(self.extent, size, realization);
+        let (raster_width, raster_height) = geometry.raster().dimensions();
         let (native_width, native_height) = self.extent.dimensions();
-        let rgba = if raster == ImageRasterExtent::new(native_width, native_height) {
+        let rgba = if geometry.raster() == ImageRasterExtent::new(native_width, native_height) {
             self.rgba
         } else {
             let source = image::RgbaImage::from_raw(native_width, native_height, self.rgba)?;
@@ -337,7 +458,7 @@ enum WorkerDecodeOutcome {
     /// supersedes it.
     Band {
         load: ImageLoadToken,
-        band: BandChunk,
+        decoded: DecodedBand,
     },
     Ready(DecodedImage),
     Failed(ImageLoadToken),
@@ -731,9 +852,10 @@ impl ImageCache {
                     } = request;
                     // A banded decode reports each band as it lands, which is
                     // the whole point of decoding that way: the display side
-                    // can act on a band long before the decode finishes.
-                    let mut publish_band = |band: BandChunk| {
-                        let _ = tx.send(WorkerDecodeOutcome::Band { load, band });
+                    // can act on a band long before the decode finishes, and
+                    // the render thread can write it into the texture.
+                    let mut publish_band = |decoded: DecodedBand| {
+                        let _ = tx.send(WorkerDecodeOutcome::Band { load, decoded });
                     };
                     let sink: BandSink<'_> = Some(&mut publish_band);
                     let result = catch_unwind(AssertUnwindSafe(|| match source {
@@ -837,6 +959,7 @@ impl ImageCache {
                 sequence,
                 size,
                 realization,
+                BandFilling::of(rotation, mask),
                 sink,
             )
         }) {
@@ -899,6 +1022,10 @@ impl ImageCache {
             sequence,
             size,
             realization,
+            // The realization decides both how the image is drawn and whether a
+            // band has a destination: a turn lands bands in columns, and a mask
+            // policy that rewrites pixels cannot speak for a row it has not seen.
+            BandFilling::of(rotation, mask),
             sink,
         ) {
             return pixels.realize_bitmap(size, rotation, realization, mask);
@@ -943,6 +1070,7 @@ impl ImageCache {
         sequence: ImageSequenceId,
         size: ImageSizeSpec,
         realization: ImageRealization,
+        filling: BandFilling,
         sink: BandSink<'_>,
     ) -> Option<NativePixels> {
         match sequence_cache.resolve(sequence, data, frame) {
@@ -957,7 +1085,7 @@ impl ImageCache {
             }
             ImageSequenceResolution::MissingFrame => None,
             ImageSequenceResolution::NotAnimated => {
-                Self::decode_still_image(data, size, realization, sink)
+                Self::decode_still_image(data, size, realization, filling, sink)
             }
         }
     }
@@ -973,9 +1101,10 @@ impl ImageCache {
         data: &[u8],
         size: ImageSizeSpec,
         realization: ImageRealization,
+        filling: BandFilling,
         sink: BandSink<'_>,
     ) -> Option<NativePixels> {
-        match Self::attempt_banded(data, size, realization, sink) {
+        match Self::attempt_banded(data, size, realization, filling, sink) {
             BandedAttempt::Complete(pixels) => Some(pixels),
             BandedAttempt::NotBandable | BandedAttempt::Abandoned => Self::decode_whole(data),
         }
@@ -986,11 +1115,31 @@ impl ImageCache {
         data: &[u8],
         size: ImageSizeSpec,
         realization: ImageRealization,
+        filling: BandFilling,
         mut sink: BandSink<'_>,
     ) -> BandedAttempt {
         let mut source = match BandSource::open(data, size, realization) {
             BandSource::Banded(source) => source,
             BandSource::Whole => return BandedAttempt::NotBandable,
+        };
+        // Where these bands land, resolved from the *header's* extent through
+        // the same `realized_geometry` the finished upload resolves from the
+        // decoded one. Step 1 pins those two extents equal; if a header ever
+        // disagrees with its own pixels, the finished upload notices and
+        // replaces the texture rather than writing into it (see
+        // `ImageCache::upload_texture`).
+        let (native_width, native_height) = source.dimensions();
+        let map = match filling {
+            BandFilling::TopDown => BandMap::new(
+                native_height,
+                realized_geometry(
+                    ImageNativeExtent::new(native_width, native_height),
+                    size,
+                    realization,
+                )
+                .raster(),
+            ),
+            BandFilling::Deferred => None,
         };
         #[cfg(test)]
         let mut published = 0_u32;
@@ -998,7 +1147,8 @@ impl ImageCache {
             match source.next_band() {
                 BandStep::Band(band) => {
                     if let Some(sink) = sink.as_deref_mut() {
-                        sink(band);
+                        let placed = map.and_then(|map| map.place(&band));
+                        sink(DecodedBand::new(band, placed));
                     }
                     #[cfg(test)]
                     {
@@ -1757,6 +1907,8 @@ impl ImageCache {
                     view,
                     bind_group,
                     raster: ImageRasterExtent::new(width, height),
+                    // The imported buffer is the whole image already.
+                    filled: FilledRows::complete(ImageRasterExtent::new(width, height)),
                     metadata: None,
                     memory_size,
                     last_access: Cell::new(self.next_access_stamp()),
@@ -1792,9 +1944,8 @@ impl ImageCache {
                 continue;
             };
             match outcome {
-                // Nothing is uploaded for a band yet: it is carried to the
-                // display side, which is where the per-band upload lands.
-                WorkerDecodeOutcome::Band { load, band } => {
+                WorkerDecodeOutcome::Band { load, decoded } => {
+                    let (band, placed) = decoded.into_parts();
                     tracing::debug!(
                         "Image {} decoded rows {}..{} of {} wide",
                         load.image(),
@@ -1802,6 +1953,9 @@ impl ImageCache {
                         band.rows().end(),
                         band.width()
                     );
+                    if let Some(placed) = placed {
+                        self.upload_band(device, queue, load, &placed);
+                    }
                     events.push(ImageCacheEvent::Band { load, band });
                 }
                 WorkerDecodeOutcome::Ready(decoded) => {
@@ -1813,6 +1967,10 @@ impl ImageCache {
                 }
                 WorkerDecodeOutcome::Failed(load) => {
                     let error = "image decode failed".to_owned();
+                    // A failed decode keeps no texture: a band may already have
+                    // created one, and it holds rows of an image that will never
+                    // arrive. Leaving it would draw them forever.
+                    self.release(load.image());
                     self.states
                         .insert(load.image(), ImageState::Failed(error.clone()));
                     self.pending_dimensions.remove(&load.image());
@@ -1826,6 +1984,164 @@ impl ImageCache {
         events
     }
 
+    /// The texture, view and bind group every image in this cache is drawn
+    /// through.
+    ///
+    /// One constructor for the whole cache: a banded decode creates its texture
+    /// here and the finished upload gets the same allocation, so the two cannot
+    /// disagree about format, usage or size.
+    fn create_image_texture(
+        &self,
+        device: &wgpu::Device,
+        raster: ImageRasterExtent,
+    ) -> (wgpu::Texture, wgpu::TextureView, wgpu::BindGroup) {
+        let (width, height) = raster.dimensions();
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Image Texture"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            // `COPY_SRC` costs nothing to carry and is what makes these
+            // textures' contents observable: a band-filled texture ending
+            // byte-for-byte as the whole-image path's is a claim only a readback
+            // can settle.
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Image Bind Group"),
+            layout: &self.bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+            ],
+        });
+        (texture, view, bind_group)
+    }
+
+    /// Write one band's pixels into the image's texture.
+    ///
+    /// The first band creates the texture, and the image is drawable from that
+    /// moment on: the quad is step 1's and does not move, the texture only grows
+    /// downward, and what has not arrived yet is simply not drawn
+    /// (`FilledRows::clip_span`). Every later band appends to it.
+    ///
+    /// A band that does not continue the prefix is dropped rather than written.
+    /// Rows written out of order, or twice, would leave the texture holding
+    /// pixels from two different scalings and nothing downstream could tell; a
+    /// band naming another raster belongs to other pixels entirely. Both are
+    /// states this refuses to enter, and the whole-image upload at the end is
+    /// what makes the refusal invisible.
+    fn upload_band(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        load: ImageLoadToken,
+        placed: &RasterBand,
+    ) {
+        let image = load.image();
+        let placement = placed.placement();
+        let raster = placement.raster();
+        if !self.textures.contains_key(&image) {
+            let (texture, view, bind_group) = self.create_image_texture(device, raster);
+            let memory_size = (raster.width() * raster.height() * 4) as usize;
+            self.total_memory += memory_size;
+            self.accounting
+                .push(crate::media_budget::MediaAccounting::Registered {
+                    media_type: crate::media_budget::MediaType::Image,
+                    id: image.get(),
+                    size_bytes: memory_size,
+                });
+            self.textures.insert(
+                image,
+                CachedImage {
+                    texture,
+                    view,
+                    bind_group,
+                    raster,
+                    filled: FilledRows::empty(raster),
+                    metadata: None,
+                    memory_size,
+                    last_access: Cell::new(self.next_access_stamp()),
+                },
+            );
+        }
+        let Some(cached) = self.textures.get_mut(&image) else {
+            return;
+        };
+        if cached.raster != raster {
+            tracing::warn!(
+                "Image {} band for a {}x{} raster into a {}x{} texture",
+                image,
+                raster.width(),
+                raster.height(),
+                cached.raster.width(),
+                cached.raster.height()
+            );
+            return;
+        }
+        let rows = placement.rows();
+        let Some(filled) = cached.filled.extend(rows) else {
+            tracing::debug!(
+                "Image {} band for rows {}..{} does not continue {} written",
+                image,
+                rows.start(),
+                rows.end(),
+                cached.filled.filled()
+            );
+            return;
+        };
+        let (raster_width, raster_height) = raster.dimensions();
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &cached.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d {
+                    x: 0,
+                    y: rows.start(),
+                    z: 0,
+                },
+                aspect: wgpu::TextureAspect::All,
+            },
+            placed.pixels(),
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(raster_width * 4),
+                rows_per_image: Some(rows.len().get()),
+            },
+            wgpu::Extent3d {
+                width: raster_width,
+                height: rows.len().get(),
+                depth_or_array_layers: 1,
+            },
+        );
+        cached.filled = filled;
+        tracing::debug!(
+            "Image {} filled rows {}..{} of {} (raster {}x{})",
+            image,
+            rows.start(),
+            rows.end(),
+            raster_height,
+            raster_width,
+            raster_height
+        );
+    }
+
     /// Upload decoded image to GPU texture
     fn upload_texture(
         &mut self,
@@ -1833,22 +2149,46 @@ impl ImageCache {
         queue: &wgpu::Queue,
         decoded: DecodedImage,
     ) {
+        let image = decoded.load.image();
         let raster = decoded.geometry.raster();
         let (raster_width, raster_height) = raster.dimensions();
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Image Texture"),
-            size: wgpu::Extent3d {
-                width: raster_width,
-                height: raster_height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
+        // A banded decode may have already built this image's texture, at
+        // exactly this raster (`realized_geometry` is the one place either side
+        // resolves it). Keep it: the write below covers every texel of it, so
+        // the finished image is the whole-image path's bytes — written by the
+        // same call, to the same shape of texture — and the bind group the
+        // presented frames already sample never changes under them. A texture of
+        // any other raster is not this image's and is released rather than
+        // written into.
+        let existing = self.textures.remove(&image);
+        let (texture, view, bind_group, memory_size) = match existing {
+            Some(cached) if cached.raster == raster => (
+                cached.texture,
+                cached.view,
+                cached.bind_group,
+                cached.memory_size,
+            ),
+            other => {
+                if let Some(cached) = other {
+                    self.total_memory -= cached.memory_size;
+                    self.accounting
+                        .push(crate::media_budget::MediaAccounting::Freed {
+                            media_type: crate::media_budget::MediaType::Image,
+                            id: image.get(),
+                        });
+                }
+                let (texture, view, bind_group) = self.create_image_texture(device, raster);
+                let memory_size = (raster_width * raster_height * 4) as usize;
+                self.total_memory += memory_size;
+                self.accounting
+                    .push(crate::media_budget::MediaAccounting::Registered {
+                        media_type: crate::media_budget::MediaType::Image,
+                        id: image.get(),
+                        size_bytes: memory_size,
+                    });
+                (texture, view, bind_group, memory_size)
+            }
+        };
 
         queue.write_texture(
             wgpu::TexelCopyTextureInfo {
@@ -1870,53 +2210,30 @@ impl ImageCache {
             },
         );
 
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Image Bind Group"),
-            layout: &self.bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
-                },
-            ],
-        });
-
-        let memory_size = (raster_width * raster_height * 4) as usize;
-        self.total_memory += memory_size;
-        self.accounting
-            .push(crate::media_budget::MediaAccounting::Registered {
-                media_type: crate::media_budget::MediaType::Image,
-                id: decoded.load.image().get(),
-                size_bytes: memory_size,
-            });
-
         let layout = decoded.metadata.layout;
 
         self.textures.insert(
-            decoded.load.image(),
+            image,
             CachedImage {
                 texture,
                 view,
                 bind_group,
                 raster,
+                // The write above covered the whole texture, whether or not a
+                // banded decode had got part of the way through it.
+                filled: FilledRows::complete(raster),
                 metadata: Some(decoded.metadata),
                 memory_size,
                 last_access: Cell::new(self.next_access_stamp()),
             },
         );
 
-        self.states.insert(decoded.load.image(), ImageState::Ready);
-        self.pending_dimensions.remove(&decoded.load.image());
+        self.states.insert(image, ImageState::Ready);
+        self.pending_dimensions.remove(&image);
 
         tracing::debug!(
             "Uploaded image {} (layout {}x{}, raster {}x{}, {}KB)",
-            decoded.load.image(),
+            image,
             layout.width(),
             layout.height(),
             raster_width,
@@ -1931,6 +2248,12 @@ impl ImageCache {
             let victim = lru_unpresented_victim(
                 self.textures
                     .iter()
+                    // A half-filled texture belongs to a decode that is still
+                    // running: the load owns it, and taking it away would leave
+                    // the rows that follow with nowhere to go — the next band
+                    // continues a prefix that no longer exists. It becomes
+                    // evictable the moment the decode ends, one way or another.
+                    .filter(|(_, cached)| cached.filled.is_complete())
                     .map(|(&id, cached)| (id, cached.last_access.get())),
                 &self.retained_images,
             );
@@ -1967,20 +2290,24 @@ impl ImageCache {
 
     /// Get image dimensions (pending or loaded)
     pub fn get_dimensions(&self, image: ImageId) -> Option<ImageLayoutExtent> {
-        // Check loaded textures first
-        if let Some(cached) = self.textures.get(&image) {
-            return Some(
-                cached
-                    .metadata
-                    .as_ref()
-                    .map(|metadata| metadata.layout)
-                    .unwrap_or_else(|| {
-                        ImageLayoutExtent::new(cached.raster.width(), cached.raster.height())
-                    }),
-            );
+        // A texture with metadata is a finished decode, and its layout is the
+        // answer. A texture without one is the prefix a banded decode has
+        // uploaded — its rows say nothing about how big the image is — so the
+        // layout step 1 resolved from the header is the answer until then.
+        if let Some(layout) = self
+            .textures
+            .get(&image)
+            .and_then(|cached| cached.metadata.as_ref())
+            .map(|metadata| metadata.layout)
+        {
+            return Some(layout);
         }
-        // Check pending dimensions
-        self.pending_dimensions.get(&image).copied()
+        if let Some(layout) = self.pending_dimensions.get(&image) {
+            return Some(*layout);
+        }
+        self.textures
+            .get(&image)
+            .map(|cached| ImageLayoutExtent::new(cached.raster.width(), cached.raster.height()))
     }
 
     /// Get image state

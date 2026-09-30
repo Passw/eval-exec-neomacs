@@ -26,7 +26,9 @@ mod svg;
 #[path = "texture_discipline_test.rs"]
 mod texture_discipline_test;
 pub mod tooltip_layout;
-pub use image_bands::{BandChunk, RowRange};
+pub use image_bands::{
+    BandChunk, BandMap, BandPlacement, DecodedBand, RasterBand, RowRange, TextureRows,
+};
 pub use svg::SvgResourceContext;
 pub mod vertex;
 pub mod xbm;
@@ -55,7 +57,9 @@ pub use glyph_atlas::{
     ComposedGlyphKey, GlyphAtlasHandle, GlyphKey, GlyphPixelKind, RasterizeResult, WgpuGlyphAtlas,
     allocator, pages, types,
 };
-pub use image_cache::{CachedImage, ImageCache, ImageCacheEvent, ImageMetadata, ImageState};
+pub use image_cache::{
+    CachedImage, FilledRows, ImageCache, ImageCacheEvent, ImageMetadata, ImageState,
+};
 pub use image_probe::{ImageProbeSource, admit, probe_image_layout};
 pub use renderer::{
     BudgetExceeded, CompositionRing, FrameRowDamage, FullFrameTexture, GpuBudget, GpuBudgetOwner,

@@ -22,15 +22,16 @@ use neomacs_display_protocol::types::{
     AnimatedCursor, Color, DisplayFrameId, DisplayWindowId, FaceId,
 };
 use neomacs_display_protocol::{
-    BoxType, DeviceScale, Face, FaceAttributes, FrameRect, GeometrySize, ImageId, ImageLoadAttempt,
-    ImageLoadToken, ImageSourceRect, LogicalPixels, PointerAppearanceId, PointerAppearancePhase,
-    PointerAppearanceSelection, PointerDrawMode, PointerImageRelief, PointerReliefCornerErase,
-    PointerReliefEdges, PointerReliefMargins, PresentMapping, PresentationExtent,
-    PresentedPaintSpan, PresentedPointerAppearance, PresentedPointerRegion, PresentedPrimitiveKind,
-    SurfaceState,
+    BoxType, DeviceScale, Face, FaceAttributes, FrameRect, GeometrySize, ImageColorContext,
+    ImageFrameIndex, ImageId, ImageLoadAttempt, ImageLoadToken, ImageMaskPolicy, ImageRealization,
+    ImageRotation, ImageSequenceId, ImageSizeSpec, ImageSourceRect, LogicalPixels,
+    PointerAppearanceId, PointerAppearancePhase, PointerAppearanceSelection, PointerDrawMode,
+    PointerImageRelief, PointerReliefCornerErase, PointerReliefEdges, PointerReliefMargins,
+    PresentMapping, PresentationExtent, PresentedPaintSpan, PresentedPointerAppearance,
+    PresentedPointerRegion, PresentedPrimitiveKind, SurfaceState,
 };
 use neomacs_renderer_wgpu::types::SubpixelRequest;
-use neomacs_renderer_wgpu::{WgpuGlyphAtlas, WgpuRenderer};
+use neomacs_renderer_wgpu::{FilledRows, WgpuGlyphAtlas, WgpuRenderer};
 
 const W: u32 = 96;
 const H: u32 = 64;
@@ -1994,5 +1995,286 @@ fn filled_box_cell_redraw_ignores_stale_cell_below_resized_surface() {
         true,
         None,
         (20, 16, 10, 18),
+    );
+}
+
+/// A PNG wide and tall enough to band — over `BANDING_MIN_PIXELS` — whose every
+/// pixel is bright and distinct, so a row drawn from the wrong place (or not
+/// drawn at all) is visible against the black background these tests paint.
+fn banding_png(width: u32, height: u32) -> Vec<u8> {
+    let pixels: Vec<u8> = (0..height)
+        .flat_map(|y| {
+            (0..width).flat_map(move |x| {
+                [
+                    64 + (x % 180) as u8,
+                    64 + (y % 160) as u8,
+                    64 + ((x + y) % 180) as u8,
+                    0xff,
+                ]
+            })
+        })
+        .collect();
+    let image = image::RgbaImage::from_raw(width, height, pixels).expect("pixel buffer");
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgba8(image)
+        .write_to(&mut bytes, image::ImageFormat::Png)
+        .expect("PNG is encodable");
+    bytes.into_inner()
+}
+
+/// Every pixel of `texture`, un-padded, as RGBA.
+fn read_image_texture(
+    renderer: &WgpuRenderer,
+    texture: &wgpu::Texture,
+    width: u32,
+    height: u32,
+) -> Vec<u8> {
+    let unpadded = width * 4;
+    let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+    let padded = unpadded.div_ceil(align) * align;
+    let buf = renderer.device().create_buffer(&wgpu::BufferDescriptor {
+        label: Some("image readback"),
+        size: u64::from(padded) * u64::from(height),
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    let mut enc = renderer
+        .device()
+        .create_command_encoder(&Default::default());
+    enc.copy_texture_to_buffer(
+        wgpu::TexelCopyTextureInfo {
+            texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::TexelCopyBufferInfo {
+            buffer: &buf,
+            layout: wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(padded),
+                rows_per_image: Some(height),
+            },
+        },
+        wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
+    );
+    renderer.queue().submit(std::iter::once(enc.finish()));
+    let slice = buf.slice(..);
+    slice.map_async(wgpu::MapMode::Read, |_| {});
+    renderer
+        .device()
+        .poll(wgpu::PollType::Wait {
+            submission_index: None,
+            timeout: Some(std::time::Duration::from_secs(10)),
+        })
+        .expect("poll");
+    let data = slice.get_mapped_range().expect("readback is mapped");
+    let mut out = vec![0u8; (unpadded * height) as usize];
+    for row in 0..height {
+        let src = (row * padded) as usize;
+        let dst = (row * unpadded) as usize;
+        out[dst..dst + unpadded as usize].copy_from_slice(&data[src..src + unpadded as usize]);
+    }
+    out
+}
+
+/// Load `data` through the renderer and drain image events the way the frame
+/// loop does. Stops, leaving the decode running, the first time `watch` is
+/// satisfied — which is how a test asks for a frame drawn at one particular
+/// point of the fill rather than after it — and otherwise runs to the end.
+///
+/// Returns every fill observed while rows were still arriving, in order; an
+/// empty list says the decode was never caught mid-flight.
+fn drive_banded_load(
+    h: &mut Harness,
+    image: u32,
+    data: &[u8],
+    realization: ImageRealization,
+    watch: impl Fn(FilledRows) -> bool,
+) -> Vec<FilledRows> {
+    h.renderer.load_image_data_with_id(
+        test_image_load(image),
+        data,
+        ImageSizeSpec::default(),
+        ImageRotation::None,
+        realization,
+        ImageColorContext::default(),
+        ImageMaskPolicy::Preserve,
+        ImageFrameIndex::default(),
+        ImageSequenceId::new(u64::from(image)).expect("non-zero test sequence"),
+        neomacs_renderer_wgpu::SvgResourceContext::Isolated,
+    );
+    let image_id = ImageId::new(image);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    let mut partial = Vec::new();
+    while std::time::Instant::now() < deadline {
+        h.renderer.process_pending_images();
+        if let Some(cached) = h.renderer.image_cache().get(image_id)
+            && !cached.filled.is_complete()
+            && partial.last() != Some(&cached.filled)
+        {
+            partial.push(cached.filled);
+            if watch(cached.filled) {
+                return partial;
+            }
+        }
+        if h.renderer.is_image_ready(image_id) {
+            break;
+        }
+        std::thread::yield_now();
+    }
+    assert!(h.renderer.is_image_ready(image_id), "the image must decode");
+    partial
+}
+
+/// The acceptance criterion, on the real GPU path: an image decoded in bands
+/// ends in exactly the texture one whole decode and resize would have produced
+/// — the same bytes, not merely the same picture.
+///
+/// The expected bytes are stated here without reference to the cache: `image`'s
+/// own decode of the fixture, resized the way the whole-image path resizes, to
+/// the raster the texture limit clamps it to.
+#[test]
+fn a_banded_image_ends_in_the_texture_the_whole_image_path_produces() {
+    let Some(mut h) = try_harness() else {
+        eprintln!("SKIP: no GPU adapter");
+        return;
+    };
+
+    // Five source pixels per raster pixel across: the raster is the clamped
+    // 4096x819, so a band is mapped through a real scaling rather than one to
+    // one, and the clamping is part of what this pins.
+    let (width, height) = (5000u32, 1000u32);
+    let data = banding_png(width, height);
+    let fills = drive_banded_load(
+        &mut h,
+        907,
+        &data,
+        ImageRealization::with_device_scale(1.0, 1.0),
+        |_| false,
+    );
+    assert!(
+        !fills.is_empty(),
+        "a five-megapixel PNG is still arriving when the first frame is drained"
+    );
+
+    let cached = h
+        .renderer
+        .image_cache()
+        .get(ImageId::new(907))
+        .expect("a decoded image has a texture");
+    assert_eq!(
+        (cached.raster.width(), cached.raster.height()),
+        (4096, 819),
+        "the texture limit clamps the raster"
+    );
+    assert!(cached.filled.is_complete());
+    let read_back = read_image_texture(
+        &h.renderer,
+        &cached.texture,
+        cached.raster.width(),
+        cached.raster.height(),
+    );
+
+    let whole = image::load_from_memory(&data)
+        .expect("the fixture decodes")
+        .to_rgba8();
+    let expected =
+        image::imageops::resize(&whole, 4096, 819, image::imageops::FilterType::Lanczos3)
+            .into_raw();
+    assert_eq!(
+        read_back, expected,
+        "the finished texture must be the whole-image path's bytes"
+    );
+}
+
+/// A band's rows are drawn as soon as they are uploaded, and nothing below them
+/// is: the frame that catches a decode mid-flight shows the image down to where
+/// its pixels have arrived and the background underneath.
+#[test]
+fn a_frame_drawn_mid_decode_shows_only_the_rows_that_have_arrived() {
+    let Some(mut h) = try_harness() else {
+        eprintln!("SKIP: no GPU adapter");
+        return;
+    };
+
+    let (width, height) = (5000u32, 1000u32);
+    let data = banding_png(width, height);
+    // Stopped somewhere in the middle of the decode, so the boundary between
+    // drawn and undrawn rows lands inside the target: one row of it drawn, or
+    // all but one, would not exercise the boundary at all.
+    let fills = drive_banded_load(
+        &mut h,
+        908,
+        &data,
+        ImageRealization::with_device_scale(1.0, 1.0),
+        |filled| (0.2..0.8).contains(&filled.filled_fraction()),
+    );
+    let filled = *fills
+        .last()
+        .expect("the decode must be caught part-way through");
+    let image_id = ImageId::new(908);
+
+    let mut frame = FrameGlyphBuffer::with_size(W as f32, H as f32);
+    frame.background = Color::BLACK;
+    let image_face_id = FaceId::new(42);
+    let mut image_face = Face::new(image_face_id);
+    image_face.background = Color::BLACK;
+    frame.faces.insert(image_face_id, image_face);
+    frame.glyphs.push(FrameGlyph::Image {
+        window_id: DisplayWindowId::new(1),
+        row_role: GlyphRowRole::Text,
+        clip_rect: None,
+        slot_id: None,
+        image_id,
+        source_rect: ImageSourceRect::new(0.0, 0.0, 1.0, 1.0).expect("the whole image"),
+        slot_rect: neomacs_display_protocol::Rect::new(0.0, 0.0, W as f32, H as f32),
+        box_rect: neomacs_display_protocol::Rect::new(0.0, 0.0, W as f32, H as f32),
+        x: 0.0,
+        y: 0.0,
+        width: W as f32,
+        height: H as f32,
+        face_id: image_face_id,
+        box_vertical_edges: BoxVerticalEdges::Unboxed,
+    });
+
+    h.renderer.render_frame_glyphs(
+        &h.view,
+        &frame,
+        &mut h.atlas,
+        mapping_for(&frame, W, H),
+        false,
+        None,
+        None,
+        None,
+        None,
+        None,
+    );
+    let rendered = read_back(&h);
+
+    // Where the boundary between drawn and undrawn rows falls on screen: the
+    // glyph is the whole target, so its texture rows are the target's rows.
+    let boundary =
+        (f64::from(filled.filled()) / f64::from(filled.total().get()) * f64::from(H)) as u32;
+    assert!(
+        (2..H - 2).contains(&boundary),
+        "the boundary must be inside the frame, got {boundary}"
+    );
+    let above = px(&rendered, W / 2, boundary - 2);
+    let below = px(&rendered, W / 2, boundary + 2);
+    assert!(
+        above[0] > 40 && above[1] > 40,
+        "rows that arrived must be drawn, got {above:?} at row {}",
+        boundary - 2
+    );
+    assert_eq!(
+        below,
+        [0, 0, 0, 255],
+        "rows that have not arrived must not be drawn, got {below:?} at row {}",
+        boundary + 2
     );
 }
