@@ -79,8 +79,8 @@ fn publish_image_cache_event(
     event: neomacs_renderer_wgpu::ImageCacheEvent,
 ) -> Option<crate::thread_comm::ImageStateEvent> {
     let (event, terminal) = match event {
-        neomacs_renderer_wgpu::ImageCacheEvent::Band { load, band } => {
-            shared.publish_band(load, band);
+        neomacs_renderer_wgpu::ImageCacheEvent::Band { load, rows } => {
+            shared.publish_band(load, rows);
             return None;
         }
         neomacs_renderer_wgpu::ImageCacheEvent::Ready { load, metadata } => {

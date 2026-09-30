@@ -57,15 +57,7 @@ fn bands_do_not_answer_a_terminal_query() {
         Arc::new(super::super::ImageRenderState::default());
     let image = ImageId::new(11);
     let load = ImageLoadToken::new(image, ImageLoadAttempt::new(1).unwrap());
-    let band = |start| {
-        super::super::BandChunk::from_rows(
-            start,
-            std::num::NonZeroU32::new(4).unwrap(),
-            2,
-            vec![0u8; 2 * 4 * 4],
-        )
-        .expect("a band of four rows")
-    };
+    let band = |start| super::super::RowRange::new(start, std::num::NonZeroU32::new(4).unwrap());
 
     shared.publish_band(load, band(0));
     assert!(
@@ -73,7 +65,7 @@ fn bands_do_not_answer_a_terminal_query() {
         "bands are not an answer to how the load ended"
     );
     assert_eq!(
-        shared.band(load).map(|band| band.rows().start()),
+        shared.band(load).map(|rows| rows.start()),
         Some(0),
         "the band is published where the display side can read it"
     );
@@ -84,7 +76,7 @@ fn bands_do_not_answer_a_terminal_query() {
 
     shared.publish_band(load, band(4));
     assert_eq!(
-        shared.band(load).map(|band| band.rows().start()),
+        shared.band(load).map(|rows| rows.start()),
         Some(4),
         "a band supersedes the one before it"
     );

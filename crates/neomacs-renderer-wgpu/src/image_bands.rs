@@ -100,8 +100,11 @@ impl BandFilling {
 
 /// A run of whole source rows, in decode order.
 ///
-/// Built only by the source that hands it out, from the cursor that source
-/// advances; `len` is non-zero so an empty band cannot be published.
+/// `len` is non-zero, so an empty run cannot be built. The invariant that one
+/// decode's runs tile its source — contiguous, in order, no overlap — belongs
+/// to the source that hands them out, which derives every one from the cursor
+/// it advances; the constructor is open so a run can also be published,
+/// carried or asserted on without a source in hand.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct RowRange {
     start: u32,
@@ -109,7 +112,9 @@ pub struct RowRange {
 }
 
 impl RowRange {
-    fn new(start: u32, len: NonZeroU32) -> Self {
+    /// A run of `len` rows from `start`.
+    #[must_use]
+    pub const fn new(start: u32, len: NonZeroU32) -> Self {
         Self { start, len }
     }
 

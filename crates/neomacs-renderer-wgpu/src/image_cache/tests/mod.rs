@@ -1,4 +1,5 @@
 use super::*;
+use crate::image_bands::BandChunk;
 use crate::image_probe::{ImageProbeSource, probe_image_layout};
 use neomacs_display_protocol::{
     AxisSize, ImageFrameDelay, ImageFrameIndex, ImageRotation, ImageSizeSpec,

@@ -53,20 +53,14 @@ fn a_band_publishes_without_ending_the_load() {
         Arc::new(super::super::ImageRenderState::default());
     let image = ImageId::new(92);
     let load = ImageLoadToken::new(image, ImageLoadAttempt::new(1).unwrap());
-    let band = neomacs_renderer_wgpu::BandChunk::from_rows(
+    let rows = neomacs_renderer_wgpu::RowRange::new(
         3,
         std::num::NonZeroU32::new(2).expect("non-zero rows"),
-        2,
-        vec![0u8; 2 * 2 * 4],
-    )
-    .expect("a band of two rows");
+    );
 
     let event = publish_image_cache_event(
         &shared,
-        neomacs_renderer_wgpu::ImageCacheEvent::Band {
-            load,
-            band: band.clone(),
-        },
+        neomacs_renderer_wgpu::ImageCacheEvent::Band { load, rows },
     );
     assert!(
         event.is_none(),
@@ -76,8 +70,5 @@ fn a_band_publishes_without_ending_the_load() {
         shared.terminal(load).is_none(),
         "a band must not answer a terminal query"
     );
-    assert_eq!(
-        shared.band(load).map(|published| published.rows().start()),
-        Some(3),
-    );
+    assert_eq!(shared.band(load).map(|rows| rows.start()), Some(3),);
 }

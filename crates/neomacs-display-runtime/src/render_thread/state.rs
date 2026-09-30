@@ -16,7 +16,7 @@ use neomacs_display_protocol::{
     InteractionId, PointerAppearanceId, PointerAppearanceSelection, PresentationId,
     PresentedResizeAxis, TransitionPolicy, VisualConfig,
 };
-use neomacs_renderer_wgpu::{BandChunk, WgpuRenderer};
+use neomacs_renderer_wgpu::{RowRange, WgpuRenderer};
 use neovm_core::emacs_core::image_catalog::ResolvedImageMetadata;
 
 use super::cursor::CursorState;
@@ -38,7 +38,7 @@ pub(super) use super::toolbar::ToolbarResources;
 pub enum ImageDecodeTerminal {
     /// One band of a decode still running: rows that exist, in source-row
     /// coordinates.
-    Band(BandChunk),
+    Band(RowRange),
     Ready(ResolvedImageMetadata),
     Failed(String),
 }
@@ -86,8 +86,8 @@ impl ImageTerminalPublication<'_> {
     /// A band replaces the load's previous band and is in turn replaced by the
     /// terminal state, so a reader that never looks at bands costs one shared
     /// buffer per in-flight load and nothing else.
-    pub fn publish_band(&mut self, load: ImageLoadToken, band: BandChunk) {
-        self.publish(load, ImageDecodeTerminal::Band(band));
+    pub fn publish_band(&mut self, load: ImageLoadToken, rows: RowRange) {
+        self.publish(load, ImageDecodeTerminal::Band(rows));
     }
 
     pub fn remove(&mut self, load: ImageLoadToken) {
@@ -176,8 +176,8 @@ impl ImageRenderState {
     }
 
     /// Publish one band of a load whose decode is still running.
-    pub fn publish_band(&self, load: ImageLoadToken, band: BandChunk) {
-        self.begin_terminal_publication().publish_band(load, band);
+    pub fn publish_band(&self, load: ImageLoadToken, rows: RowRange) {
+        self.begin_terminal_publication().publish_band(load, rows);
     }
 
     /// The newest band published for `load`, if one is.
@@ -186,9 +186,9 @@ impl ImageRenderState {
     /// observable is how far the decode has come, not its history. The
     /// terminal state supersedes the bands in turn, so a load that has ended
     /// reports `None` here even though it published bands on the way.
-    pub fn band(&self, load: ImageLoadToken) -> Option<BandChunk> {
+    pub fn band(&self, load: ImageLoadToken) -> Option<RowRange> {
         match self.lock_terminals().get(&load) {
-            Some(ImageDecodeTerminal::Band(band)) => Some(band.clone()),
+            Some(ImageDecodeTerminal::Band(rows)) => Some(*rows),
             Some(ImageDecodeTerminal::Ready(_) | ImageDecodeTerminal::Failed(_)) | None => None,
         }
     }

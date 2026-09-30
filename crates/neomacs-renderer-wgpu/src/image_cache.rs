@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 
 use crate::image_bands::{
-    BandChunk, BandFilling, BandMap, BandSink, BandSource, BandStep, DecodedBand, RasterBand,
+    BandFilling, BandMap, BandSink, BandSource, BandStep, DecodedBand, RasterBand, RowRange,
     TextureRows,
 };
 use crate::image_sequence::{ImageSequenceCache, ImageSequenceResolution};
@@ -482,10 +482,12 @@ pub enum ImageCacheEvent {
     /// One band of an image whose decode is still running.
     ///
     /// Intermediate by construction: the `Ready` for the same load carries the
-    /// whole image, so a consumer that drew this band ends up correct.
+    /// whole image, so a consumer that drew this band ends up correct. Only the
+    /// rows are published — they are what says how far the decode has come, and
+    /// the pixels have already gone into the texture.
     Band {
         load: ImageLoadToken,
-        band: BandChunk,
+        rows: RowRange,
     },
     Ready {
         load: ImageLoadToken,
@@ -1956,7 +1958,10 @@ impl ImageCache {
                     if let Some(placed) = placed {
                         self.upload_band(device, queue, load, &placed);
                     }
-                    events.push(ImageCacheEvent::Band { load, band });
+                    events.push(ImageCacheEvent::Band {
+                        load,
+                        rows: band.rows(),
+                    });
                 }
                 WorkerDecodeOutcome::Ready(decoded) => {
                     events.push(ImageCacheEvent::Ready {

@@ -72,7 +72,7 @@ pub use neomacs_renderer_wgpu::image_probe::{ImageProbeSource, probe_image_layou
 
 /// Rows of an image whose decode is still running, as published by
 /// `ImageDecodeTerminal::Band`.
-pub use neomacs_renderer_wgpu::BandChunk;
+pub use neomacs_renderer_wgpu::RowRange;
 
 use winit::event_loop::EventLoopProxy;
 
