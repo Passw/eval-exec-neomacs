@@ -89,14 +89,14 @@ pub(crate) struct ChildFrameEntry {
 /// A content crossfade between the previous presentation's picture and the
 /// freshly installed one.
 pub(crate) struct EntryCrossfade {
-    pub motion: Motion,
+    pub(in crate::render_thread) motion: Motion,
     /// The old content's picture, leased from the snapshot pool. Dropping
     /// the entry returns the lease.
-    pub old: SnapshotLease,
+    pub(in crate::render_thread) old: SnapshotLease,
     /// The old content's logical size, which may differ from the new
     /// frame's.
-    pub old_width: f32,
-    pub old_height: f32,
+    pub(in crate::render_thread) old_width: f32,
+    pub(in crate::render_thread) old_height: f32,
 }
 
 /// A child frame whose deletion is animating out.
