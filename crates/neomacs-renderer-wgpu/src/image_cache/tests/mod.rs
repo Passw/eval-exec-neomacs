@@ -2208,6 +2208,61 @@ fn test_band() -> DecodedBand {
     DecodedBand::new(rows, RasterBand::new(placement, vec![0u8; 4].into()))
 }
 
+/// The rows a band hands over are the rows the finished image holds.
+///
+/// A preview is not an approximation of the picture that the finished upload
+/// later replaces: the decode resamples each source row once, into the raster
+/// the texture holds, so a band is a *slice of the finished pixels* and where
+/// the decode happens to cut its bands cannot reach them. This is what a
+/// reduced image gets out of decoding into its target — under the per-band
+/// resize this replaced, each band was resampled on its own from its own rows,
+/// at its own scale, and the preview was a different picture from the one it
+/// was previewing.
+#[test]
+fn the_rows_a_band_hands_over_are_the_rows_the_finished_image_holds() {
+    let (width, height) = (2000_u32, 2000_u32);
+    let data = varying_png(width, height);
+    let mut bands = Vec::new();
+    // A realization that really reduces: the raster is 500x500, so a band of
+    // source rows has to be averaged rather than passed through.
+    let decoded = ImageCache::decode_data(
+        &data,
+        ImageSizeSpec::new(AxisSize::Exact(500), AxisSize::Exact(500)),
+        ImageRotation::None,
+        ImageColorContext::default(),
+        ImageRealization::default(),
+        ImageMaskPolicy::Preserve,
+        ImageFrameIndex::default(),
+        crate::svg::SvgResourceContext::Isolated,
+        &ImageSequenceCache::new(),
+        ImageSequenceId::new(1).expect("non-zero test sequence"),
+        Some(&mut |band| bands.push(band)),
+    )
+    .expect("decode");
+    assert!(!bands.is_empty(), "a four-megapixel source bands");
+
+    let raster = decoded.geometry.raster();
+    assert_eq!(raster.dimensions(), (500, 500));
+    let stride = raster.width() as usize * 4;
+    let mut assembled = vec![0_u8; stride * raster.height() as usize];
+    let mut expected_start = 0;
+    for band in &bands {
+        let rows = band.placed().placement().rows();
+        assert_eq!(rows.start(), expected_start, "bands tile the raster");
+        assembled[rows.start() as usize * stride..rows.end() as usize * stride]
+            .copy_from_slice(band.placed().pixels());
+        expected_start = rows.end();
+    }
+    assert!(
+        expected_start == raster.height(),
+        "the bands cover the raster"
+    );
+    assert_eq!(
+        assembled, decoded.rgba,
+        "a band is a slice of the finished pixels, not an approximation of them"
+    );
+}
+
 /// The acceptance criterion, without a GPU: whatever the bands did on the way,
 /// the image the decode ends with is the whole-image path's pixels, and the
 /// finished upload writes every texel of the texture they were accumulating in.
