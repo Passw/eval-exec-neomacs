@@ -151,6 +151,11 @@ impl PreparedViewports {
             // Preserve insertion recency even when retaining the larger
             // payload; otherwise cache pressure can immediately evict it.
             let entry = self.entries.remove(index).expect("located prepared page");
+            tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
+                window = window.get(), start = retained.key.window_start,
+                incoming_rows, retained_rows = body_rows(&entry.retained),
+                complete_viewport = entry.complete_viewport,
+                "retaining larger prepared prefix");
             self.entries.push_back(entry);
             return;
         }
@@ -240,6 +245,11 @@ impl PreparedViewports {
                     }
                 }
             }
+            tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
+                window = self.entries[victim].window.get(),
+                start = self.entries[victim].retained.key.window_start,
+                computed = self.entries[victim].computed,
+                "evicting prepared viewport");
             self.entries.remove(victim);
         }
     }

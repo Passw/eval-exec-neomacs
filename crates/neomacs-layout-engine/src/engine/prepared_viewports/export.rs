@@ -152,7 +152,7 @@ impl PreparedViewports {
             // Reject the whole conflicting continuation chain; rows after its
             // completed line boundary have independent layout context.
             for paragraph in prepared.split_inclusive(|(_, row)| !row.continued) {
-                let conflicts = paragraph.iter().any(|(_, row)| {
+                let conflict = paragraph.iter().find(|(_, row)| {
                     // Different wrap origins need not share any row start.
                     // Reject interval overlaps too: otherwise inserting the
                     // new starts between accepted rows breaks their adjacency.
@@ -181,7 +181,20 @@ impl PreparedViewports {
                                 row.next_buffer_row_start().is_none_or(|end| *next < end)
                             })
                 });
-                if conflicts {
+                if let Some((_, row)) = conflict {
+                    tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
+                        window = window.get(), epoch,
+                        body_start = anchor.start_charpos,
+                        prepared_start = entry.retained.key.window_start,
+                        paragraph_start = ?paragraph.first().map(|(_, row)| row.start_charpos),
+                        row_start = row.start_charpos, row_end = row.end_charpos,
+                        row_next = ?row.next_buffer_row_start(), row_continued = row.continued,
+                        previous = ?rows.range(..=row.start_charpos).next_back().map(|(_, (source, index))| {
+                            let row = &source.matrix.rows[*index];
+                            (row.start_charpos, row.end_charpos, row.continued, row.height_px)
+                        }),
+                        next = ?rows.range((std::ops::Bound::Excluded(row.start_charpos), std::ops::Bound::Unbounded)).next().map(|(start, _)| *start),
+                        "prepared paragraph conflicts with selected coverage");
                     continue;
                 }
                 for (index, row) in paragraph {
@@ -202,6 +215,20 @@ impl PreparedViewports {
         let mut begin = anchor_index;
         while begin > 0 && adjacent(begin - 1, begin) {
             begin -= 1;
+        }
+        if begin > 0 {
+            let (left, li) = all[begin - 1];
+            let (right, ri) = all[begin];
+            tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
+                window = window.get(), epoch, body_start = anchor.start_charpos,
+                left_origin = left.key.window_start,
+                left_start = left.matrix.rows[li].start_charpos,
+                left_end = left.matrix.rows[li].end_charpos,
+                left_continued = left.matrix.rows[li].continued,
+                left_next = ?left.matrix.rows[li].next_buffer_row_start(),
+                right_origin = right.key.window_start,
+                right_start = right.matrix.rows[ri].start_charpos,
+                "prepared backward coverage is disconnected");
         }
         let mut end = anchor_index + 1;
         while end < all.len() && adjacent(end - 1, end) {

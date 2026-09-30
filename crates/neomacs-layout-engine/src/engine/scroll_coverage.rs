@@ -331,6 +331,9 @@ impl ScrollCoverage {
             connecting_end = ?admission.bridge_end.map(|end| end.get()),
             source_first = ?admission.retained.display_snapshot.rows.first().and_then(|row| row.start_buffer_pos),
             source_last = ?admission.retained.display_snapshot.rows.last().and_then(|row| row.end_buffer_pos),
+            matrix_seam = ?admission.retained.matrix.rows.iter().rev()
+                .find(|row| row.enabled && row.role == neomacs_display_protocol::frame_glyphs::GlyphRowRole::Text)
+                .map(|row| (row.start_charpos, row.end_charpos, row.continued, row.next_buffer_row_start())),
             rows = admission.retained.display_snapshot.rows.len(), complete_viewport,
             "admitted worker coverage");
         destination.insert_computed(
