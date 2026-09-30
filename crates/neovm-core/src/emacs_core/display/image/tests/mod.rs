@@ -4,8 +4,8 @@ use crate::emacs_core::image_catalog::{
     AxisSize, ImageAnimationInvalidation, ImageCatalog, ImageEmbeddedMetadata, ImageFrameDelay,
     ImageFrameIndex, ImageHeuristicMask, ImageId, ImageInvalidation, ImageInvalidationResult,
     ImageLayoutExtent, ImageLoadAttempt, ImageLoadToken, ImageLookup, ImageMaskKind,
-    ImageMaskPolicy, ImageResolveRequest, ImageResolveSource, ImageSizeSpec, PendingImage,
-    ReadyImage, ResolvedImageMetadata,
+    ImageMaskPolicy, ImageResolveRequest, ImageResolveSource, ImageSizeLimit, ImageSizeSpec,
+    PendingImage, ReadyImage, ResolvedImageMetadata,
 };
 use crate::emacs_core::value::list_to_vec;
 use crate::face::{Color, FaceTable};
@@ -44,6 +44,7 @@ impl DisplayHost for RecordingImageDisplayHost {
     fn resolve_image_sync(
         &self,
         request: ImageResolveRequest,
+        _limit: ImageSizeLimit,
     ) -> Result<Option<ReadyImage>, String> {
         let (width, height) = self.fixed_size.unwrap_or((40, 30));
         let metadata = ResolvedImageMetadata::from_layout(
@@ -70,7 +71,7 @@ impl DisplayHost for RecordingImageDisplayHost {
 }
 
 impl ImageCatalog for RecordingImageDisplayHost {
-    fn lookup(&self, request: ImageResolveRequest) -> ImageLookup {
+    fn lookup(&self, request: ImageResolveRequest, _limit: ImageSizeLimit) -> ImageLookup {
         self.requests
             .lock()
             .expect("image requests lock")

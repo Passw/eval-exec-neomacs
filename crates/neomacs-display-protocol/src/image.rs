@@ -736,6 +736,16 @@ impl ImageIntrinsicExtent {
     pub const fn dimensions(self) -> (f64, f64) {
         (self.width, self.height)
     }
+
+    /// The integer extent this source occupies once it is rasterized.
+    ///
+    /// GNU compares integer decoded dimensions, so a fractional extent is
+    /// compared with its ceiling: a vector document that is over a limit after
+    /// rounding is over the limit.
+    #[must_use]
+    pub fn native_ceiling(self) -> ImageNativeExtent {
+        ImageNativeExtent::new(intrinsic_bound(self.width), intrinsic_bound(self.height))
+    }
 }
 
 impl From<ImageNativeExtent> for ImageIntrinsicExtent {
@@ -834,18 +844,10 @@ impl ImageSizeLimit {
     }
 
     /// [`Self::permits`] for a source extent that has not been rounded to
-    /// pixels yet.
-    ///
-    /// GNU compares integer decoded dimensions, so a fractional extent is
-    /// compared with its ceiling: a vector document that is over the limit
-    /// after rounding is over the limit.
+    /// pixels yet; see [`ImageIntrinsicExtent::native_ceiling`].
     #[must_use]
     pub fn permits_intrinsic(self, intrinsic: ImageIntrinsicExtent) -> bool {
-        let (width, height) = intrinsic.dimensions();
-        self.permits(ImageNativeExtent::new(
-            intrinsic_bound(width),
-            intrinsic_bound(height),
-        ))
+        self.permits(intrinsic.native_ceiling())
     }
 }
 

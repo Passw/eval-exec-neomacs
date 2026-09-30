@@ -906,7 +906,7 @@ pub(crate) fn builtin_image_size_in_context(eval: &mut Context, args: Vec<Value>
     };
 
     let resolved = display_host
-        .resolve_image_sync(request)
+        .resolve_image_sync(request, environment.size_limit())
         .map_err(|message| signal("error", vec![Value::string(message)]))?;
     let Some(image) = resolved else {
         return Err(signal(
@@ -1057,7 +1057,7 @@ pub(crate) fn builtin_image_mask_p_in_context(eval: &mut Context, args: Vec<Valu
     // Prefer a sync resolve so mask/transparency reflects decoded state, not a
     // pending catalog probe. GNU inspects `img->mask` after `lookup_image`.
     let resolved = display_host
-        .resolve_image_sync(request)
+        .resolve_image_sync(request, environment.size_limit())
         .map_err(|message| signal("error", vec![Value::string(message)]))?;
     let Some(image) = resolved else {
         return Ok(Value::NIL);
@@ -1501,7 +1501,7 @@ pub(crate) fn builtin_image_metadata_in_context(
         )
     })?;
     let resolved = display_host
-        .resolve_image_sync(request)
+        .resolve_image_sync(request, environment.size_limit())
         .map_err(|message| signal("error", vec![Value::string(message)]))?;
     Ok(resolved
         .map(|image| image_embedded_metadata_to_lisp(&image.metadata.embedded))
@@ -1543,7 +1543,7 @@ pub(crate) fn builtin_neomacs_image_extent_in_context(
     };
     let display_host = eval.display_host.as_ref().expect("checked host");
     let resolved = display_host
-        .resolve_image_sync(request)
+        .resolve_image_sync(request, environment.size_limit())
         .map_err(|message| signal("error", vec![Value::string(message)]))?;
     let Some(image) = resolved else {
         return Ok(Value::NIL);

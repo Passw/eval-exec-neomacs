@@ -25,7 +25,7 @@ impl DisplayHost for ReloadingImageHost {
 }
 
 impl ImageCatalog for ReloadingImageHost {
-    fn lookup(&self, _: ImageResolveRequest) -> ImageLookup {
+    fn lookup(&self, _: ImageResolveRequest, _limit: ImageSizeLimit) -> ImageLookup {
         ImageLookup::Ready(ReadyImage {
             load: test_image_load(if self.0.get() { 78 } else { 77 }),
             metadata:
@@ -75,7 +75,7 @@ impl DisplayHost for ExplicitExtentImageHost {
 }
 
 impl ImageCatalog for ExplicitExtentImageHost {
-    fn lookup(&self, request: ImageResolveRequest) -> ImageLookup {
+    fn lookup(&self, request: ImageResolveRequest, _limit: ImageSizeLimit) -> ImageLookup {
         let (width, height) = request.size.placeholder_extent().expect("explicit extent");
         ImageLookup::Pending(PendingImage::new(
             test_image_load(77),

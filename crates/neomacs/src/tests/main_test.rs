@@ -59,7 +59,7 @@ use neovm_core::emacs_core::image_catalog::{AxisSize, ImageRotation, ImageSizeSp
 use neovm_core::emacs_core::image_catalog::{
     ImageAnimationInvalidation, ImageCatalog, ImageColorContext, ImageDataSource, ImageFrameIndex,
     ImageId, ImageLoadAttempt, ImageLoadToken, ImageLookup, ImageResolveRequest,
-    ImageResolveSource, ImageSpecIdentity, ResolvedImageMetadata,
+    ImageResolveSource, ImageSizeLimit, ImageSpecIdentity, ResolvedImageMetadata,
 };
 use neovm_core::emacs_core::intern::intern;
 use neovm_core::emacs_core::load::{
@@ -2548,6 +2548,14 @@ fn primary_display_host_popup_menu_routes_primary_and_secondary_frames() {
     ));
 }
 
+/// The catalog's own scheduling tests are not about the size bound: every
+/// lookup here states GNU's "no explicit limit" arm. The bound itself travels
+/// through `the_load_command_carries_the_looking_frames_max_image_size` in the
+/// catalog's own suite.
+fn unbounded_lookup(catalog: &AsyncImageCatalog, request: ImageResolveRequest) -> ImageLookup {
+    catalog.lookup(request, ImageSizeLimit::UNLIMITED)
+}
+
 #[test]
 fn primary_image_catalog_lookup_returns_pending_without_waiting_for_render_thread() {
     let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
@@ -2590,7 +2598,7 @@ fn primary_image_catalog_lookup_returns_pending_without_waiting_for_render_threa
     };
 
     let started = Instant::now();
-    let lookup = host.image_catalog.lookup(request.clone());
+    let lookup = unbounded_lookup(&host.image_catalog, request.clone());
 
     assert!(
         started.elapsed() < Duration::from_millis(100),
@@ -2612,7 +2620,7 @@ fn primary_image_catalog_lookup_returns_pending_without_waiting_for_render_threa
         other => panic!("expected ImageLoadFile, got {other:?}"),
     }
     assert_eq!(
-        host.image_catalog.lookup(request.clone()),
+        unbounded_lookup(&host.image_catalog, request.clone()),
         ImageLookup::Pending(image.clone()),
         "duplicate lookup should reuse the same pending image"
     );
@@ -2632,7 +2640,7 @@ fn primary_image_catalog_lookup_returns_pending_without_waiting_for_render_threa
         )),
     );
 
-    let ImageLookup::Ready(image) = host.image_catalog.lookup(request) else {
+    let ImageLookup::Ready(image) = unbounded_lookup(&host.image_catalog, request) else {
         panic!("decoded image lookup should be ready");
     };
     assert_eq!(image.metadata.layout.dimensions(), (25, 50));
@@ -2664,9 +2672,9 @@ fn animation_frames_share_sequence_identity_and_retirement_advances_generation()
         realization: Default::default(),
     };
 
-    catalog.lookup(request.clone());
+    unbounded_lookup(&catalog, request.clone());
     request.frame = ImageFrameIndex::new(1);
-    catalog.lookup(request.clone());
+    unbounded_lookup(&catalog, request.clone());
     let sequence_for = |command| match command {
         RenderCommand::Asset(AssetCommand::ImageLoadData { sequence, .. }) => sequence,
         other => panic!("expected image data load, got {other:?}"),
@@ -2687,7 +2695,7 @@ fn animation_frames_share_sequence_identity_and_retirement_advances_generation()
     ));
 
     request.frame = ImageFrameIndex::new(2);
-    catalog.lookup(request);
+    unbounded_lookup(&catalog, request);
     let replacement = sequence_for(cmd_rx.try_recv().expect("replacement frame load"));
     assert_ne!(replacement, first);
 }
@@ -2738,8 +2746,8 @@ fn primary_image_catalog_does_not_block_on_render_command_backpressure() {
             #[cfg(feature = "neo-term")]
             terminal_state: super::super::TerminalHostState::new(new_shared_terminals()),
         };
-        let lookup = host.image_catalog.lookup(request.clone());
-        let duplicate_lookup = host.image_catalog.lookup(request);
+        let lookup = unbounded_lookup(&host.image_catalog, request.clone());
+        let duplicate_lookup = unbounded_lookup(&host.image_catalog, request);
         done_tx
             .send((lookup, duplicate_lookup))
             .expect("publish lookup results");
@@ -2807,7 +2815,8 @@ fn primary_image_catalog_does_not_wait_for_renderer_metadata_lock() {
         frame: Default::default(),
         realization: Default::default(),
     };
-    let ImageLookup::Pending(expected) = host.image_catalog.lookup(request.clone()) else {
+    let ImageLookup::Pending(expected) = unbounded_lookup(&host.image_catalog, request.clone())
+    else {
         panic!("new image should be pending");
     };
     cmd_rx.try_recv().expect("queued image command");
@@ -2823,7 +2832,7 @@ fn primary_image_catalog_does_not_wait_for_renderer_metadata_lock() {
     locked_rx.recv().expect("renderer metadata lock acquired");
 
     let started = Instant::now();
-    let lookup = host.image_catalog.lookup(request);
+    let lookup = unbounded_lookup(&host.image_catalog, request);
     let elapsed = started.elapsed();
     drop(release_tx);
     locker.join().expect("metadata locker");
@@ -2871,7 +2880,7 @@ fn primary_display_host_expands_tilde_in_image_file_before_render_command() {
     };
 
     assert!(matches!(
-        host.image_catalog.lookup(request),
+        unbounded_lookup(&host.image_catalog, request),
         ImageLookup::Pending(_)
     ));
 
@@ -2955,7 +2964,7 @@ fn primary_display_host_resolve_image_sync_returns_cached_decode_failure_promptl
         frame: Default::default(),
         realization: Default::default(),
     };
-    let ImageLookup::Pending(image) = host.image_catalog.lookup(request.clone()) else {
+    let ImageLookup::Pending(image) = unbounded_lookup(&host.image_catalog, request.clone()) else {
         panic!("new image should be pending");
     };
     image_metadata.publish_terminal(
@@ -2965,7 +2974,8 @@ fn primary_display_host_resolve_image_sync_returns_cached_decode_failure_promptl
 
     for _ in 0..2 {
         let started = Instant::now();
-        let ImageLookup::Failed(failed) = host.image_catalog.lookup(request.clone()) else {
+        let ImageLookup::Failed(failed) = unbounded_lookup(&host.image_catalog, request.clone())
+        else {
             panic!("failed decode should be negative-cached");
         };
         assert_eq!(failed.placement(), image.placement());
@@ -2979,7 +2989,11 @@ fn primary_display_host_resolve_image_sync_returns_cached_decode_failure_promptl
     for _ in 0..2 {
         let started = Instant::now();
         assert_eq!(
-            neovm_core::emacs_core::DisplayHost::resolve_image_sync(&host, request.clone()),
+            neovm_core::emacs_core::DisplayHost::resolve_image_sync(
+                &host,
+                request.clone(),
+                ImageSizeLimit::UNLIMITED,
+            ),
             Err("image decode failed".to_owned())
         );
         assert!(

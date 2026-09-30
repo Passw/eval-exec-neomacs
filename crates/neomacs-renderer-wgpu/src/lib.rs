@@ -54,7 +54,7 @@ pub use glyph_atlas::{
     allocator, pages, types,
 };
 pub use image_cache::{CachedImage, ImageCache, ImageCacheEvent, ImageMetadata, ImageState};
-pub use image_probe::{ImageProbeSource, probe_image_layout};
+pub use image_probe::{ImageProbeSource, admit, probe_image_layout};
 pub use renderer::{
     BudgetExceeded, CompositionRing, FrameRowDamage, FullFrameTexture, GpuBudget, GpuBudgetOwner,
     PaneBlit, PaneSource, RendererFrameEffects, RowDamageInfo, RowReuseStats, SnapshotId,

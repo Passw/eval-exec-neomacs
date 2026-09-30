@@ -496,9 +496,15 @@ pub trait DisplayHost {
     /// GNU-compatible synchronous image query used by explicit Lisp
     /// primitives such as `image-size`. This may wait for metadata and must
     /// never be called from redisplay.
+    ///
+    /// `limit` is the querying frame's resolved `max-image-size`, for the same
+    /// reason [`super::image_catalog::ImageCatalog::lookup`] takes it: GNU
+    /// checks the bound in the loader, so a synchronous query must refuse the
+    /// same images redisplay refuses.
     fn resolve_image_sync(
         &self,
         _request: super::image_catalog::ImageResolveRequest,
+        _limit: super::image_catalog::ImageSizeLimit,
     ) -> Result<Option<super::image_catalog::ReadyImage>, String> {
         Ok(None)
     }

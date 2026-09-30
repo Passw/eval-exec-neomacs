@@ -790,6 +790,7 @@ fn render_command_image_load_file() {
         frame: neomacs_display_protocol::ImageFrameIndex::new(3),
         sequence: neomacs_display_protocol::ImageSequenceId::new(11)
             .expect("non-zero test sequence"),
+        limit: neomacs_display_protocol::ImageSizeLimit::from_axis_pixels(4096),
     });
     match cmd {
         RenderCommand::Asset(AssetCommand::ImageLoadFile {
@@ -802,6 +803,7 @@ fn render_command_image_load_file() {
             mask,
             frame,
             sequence,
+            limit,
         }) => {
             assert_eq!(actual_load, load);
             assert_eq!(path, "/home/user/photo.png");
@@ -825,6 +827,10 @@ fn render_command_image_load_file() {
             assert_eq!(
                 sequence,
                 neomacs_display_protocol::ImageSequenceId::new(11).expect("non-zero test sequence")
+            );
+            assert_eq!(
+                limit,
+                neomacs_display_protocol::ImageSizeLimit::from_axis_pixels(4096)
             );
         }
         other => panic!("Expected ImageLoadFile, got {:?}", other),

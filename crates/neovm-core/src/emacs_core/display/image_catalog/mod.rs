@@ -13,7 +13,7 @@ pub use neomacs_display_protocol::{
     AxisSize, ImageColorContext, ImageEmbeddedMetadata, ImageFrameDelay, ImageFrameIndex,
     ImageHeuristicMask, ImageId, ImageLayoutExtent, ImageLoadAttempt, ImageLoadToken,
     ImageMaskKind, ImageMaskPolicy, ImageNativeExtent, ImageReportedExtent, ImageRotation,
-    ImageSizeLimit, ImageSizeSpec, ImageStateEvent,
+    ImageSizeLimit, ImageSizeSpec, ImageStateEvent, OversizedImage,
 };
 
 /// A finite, non-negative image scale stored by bits so image requests remain
@@ -460,6 +460,12 @@ impl ImagePlacement {
     pub const fn height(self) -> u32 {
         self.layout.height()
     }
+
+    /// The slot's logical layout extent as a pair.
+    #[must_use]
+    pub const fn dimensions(self) -> (u32, u32) {
+        (self.width(), self.height())
+    }
 }
 
 /// Geometry for an image that is still being decoded.
@@ -565,7 +571,16 @@ pub trait ImageCatalog {
     /// renderer queue capacity, metadata locks, file I/O, decode, or upload —
     /// including while resolving the pending layout, which is why header
     /// geometry arrives from a producer thread rather than from this call.
-    fn lookup(&self, request: ImageResolveRequest) -> ImageLookup;
+    ///
+    /// `limit` is the frame's resolved `max-image-size`
+    /// ([`ImageScaleEnvironment::size_limit`]). It is a parameter rather than a
+    /// property of the request because it is *not* part of an image's identity:
+    /// GNU leaves an already-loaded image alone when the frame is resized, so
+    /// folding the bound into the key would re-decode every image on every
+    /// resize step. It is a parameter rather than a defaulted property of the
+    /// implementation so that a lookup cannot be written without stating the
+    /// bound it loads under.
+    fn lookup(&self, request: ImageResolveRequest, limit: ImageSizeLimit) -> ImageLookup;
 
     /// Apply one explicitly typed cache operation. The next matching lookup
     /// must allocate a fresh renderer identity and decode again. Hosts without

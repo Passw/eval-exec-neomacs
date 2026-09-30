@@ -25,8 +25,8 @@ use neomacs_display_runtime::thread_comm::{AssetCommand, RenderCommand};
 use neovm_core::emacs_core::image_catalog::{
     FailedImage, ImageAnimationInvalidation, ImageCatalog, ImageId, ImageInvalidation,
     ImageInvalidationResult, ImageLayoutExtent, ImageLoadAttempt, ImageLoadToken, ImageLookup,
-    ImagePlacement, ImageResolveRequest, ImageResolveSource, ImageStateEvent, PendingImage,
-    ReadyImage,
+    ImagePlacement, ImageResolveRequest, ImageResolveSource, ImageSizeLimit, ImageStateEvent,
+    PendingImage, ReadyImage,
 };
 use neovm_core::emacs_core::image_path::ImageFileRequest;
 use neovm_core::emacs_core::load::image_data_directory;
@@ -147,6 +147,15 @@ pub(super) struct AsyncImageCatalog {
     sequence_ids: RefCell<HashMap<ImageResolveSource, ImageSequenceId>>,
     next_load_attempt: Cell<u64>,
     next_sequence_id: Cell<u64>,
+    /// The `max-image-size` bound the most recent lookup resolved.
+    ///
+    /// Only the device-loss re-queue needs it: that path rebuilds every
+    /// entry's load command without a frame in hand, and it runs while the
+    /// same frames are being redisplayed, so the bound those entries were
+    /// built under is the one to re-check them against. It starts at GNU's
+    /// registered initializer rather than at "no limit", so a re-queue can
+    /// never be the one path that loads without a bound.
+    size_limit: Cell<ImageSizeLimit>,
     home_directory: Option<String>,
     /// GNU `image_find_image_fd` search path (`data-directory/images`, then
     /// `x-bitmap-file-path`), used to resolve relative image `:file`s.
@@ -170,6 +179,7 @@ impl AsyncImageCatalog {
             sequence_ids: RefCell::new(HashMap::new()),
             next_load_attempt: Cell::new(0),
             next_sequence_id: Cell::new(0),
+            size_limit: Cell::new(ImageSizeLimit::default()),
             home_directory: home_directory_from_environment(),
             search_path: vec![image_data_directory().to_string_lossy().into_owned()],
         }
@@ -254,12 +264,16 @@ impl AsyncImageCatalog {
     /// to `Pending` while its renderer residency is rebuilt.
     pub(super) fn invalidate_all(&self) {
         let mut entries = self.entries.borrow_mut();
+        // No frame is in hand on this path; re-check every entry against the
+        // bound the redisplay that built it resolved (see `size_limit`).
+        let limit = self.size_limit.get();
         for (request, state) in entries.iter_mut() {
             let placement = state.placement();
             let image_id = placement.image_id();
             let load = self.next_load(image_id);
             let (request, resolution) = self.classify_request(request.clone());
-            let command = image_load_command(&request, load, self.sequence_id(&request.source));
+            let command =
+                image_load_command(&request, load, self.sequence_id(&request.source), limit);
             let pending = PendingImage::new(load, self.renew_header_layout(&request, load));
             *state = match schedule_image_command(
                 &self.cmd_tx,
@@ -283,9 +297,10 @@ impl AsyncImageCatalog {
     pub(super) fn resolve_sync(
         &self,
         request: ImageResolveRequest,
+        limit: ImageSizeLimit,
     ) -> Result<Option<ReadyImage>, String> {
         let normalized_request = self.classify_request(request.clone()).0;
-        let pending = match self.lookup(request.clone()) {
+        let pending = match self.lookup(request.clone(), limit) {
             ImageLookup::Ready(image) => return Ok(Some(image)),
             ImageLookup::Pending(image) => image,
             ImageLookup::Failed(failed) => return Err(failed.error),
@@ -316,7 +331,8 @@ impl AsyncImageCatalog {
 }
 
 impl ImageCatalog for AsyncImageCatalog {
-    fn lookup(&self, request: ImageResolveRequest) -> ImageLookup {
+    fn lookup(&self, request: ImageResolveRequest, limit: ImageSizeLimit) -> ImageLookup {
+        self.size_limit.set(limit);
         let (request, resolution) = self.classify_request(request);
         let mut entries = self.entries.borrow_mut();
         if !entries.contains_key(&request) {
@@ -324,7 +340,8 @@ impl ImageCatalog for AsyncImageCatalog {
             let load = self.next_load(image_id);
             let layout = placeholder_image_extent(&request);
             let pending = PendingImage::new(load, layout);
-            let command = image_load_command(&request, load, self.sequence_id(&request.source));
+            let command =
+                image_load_command(&request, load, self.sequence_id(&request.source), limit);
             let state = match schedule_image_command(
                 &self.cmd_tx,
                 self.render_waker.as_ref(),
@@ -344,7 +361,8 @@ impl ImageCatalog for AsyncImageCatalog {
         if let CatalogEntry::Evicted(placement) = state {
             let load = self.next_load(placement.image_id());
             let pending = PendingImage::new(load, placement.layout());
-            let command = image_load_command(&request, load, self.sequence_id(&request.source));
+            let command =
+                image_load_command(&request, load, self.sequence_id(&request.source), limit);
             *state = match schedule_image_command(
                 &self.cmd_tx,
                 self.render_waker.as_ref(),
@@ -805,10 +823,18 @@ fn resolve_deferred_image_path(
     command
 }
 
+/// Build one load command.
+///
+/// `limit` travels with the command rather than staying behind in the catalog
+/// because only the decoder side can apply it: GNU checks the bound in the
+/// loader, against the header it has just read, before it allocates a pixel
+/// buffer (`check_image_size`, `src/image.c:1811`), and the renderer's header
+/// read is the port's equivalent of that moment.
 fn image_load_command(
     request: &ImageResolveRequest,
     load: ImageLoadToken,
     sequence: ImageSequenceId,
+    limit: ImageSizeLimit,
 ) -> RenderCommand {
     match &request.source {
         ImageResolveSource::File(path) => RenderCommand::Asset(AssetCommand::ImageLoadFile {
@@ -821,6 +847,7 @@ fn image_load_command(
             mask: request.mask,
             frame: request.frame,
             sequence,
+            limit,
         }),
         ImageResolveSource::Data(data) => RenderCommand::Asset(AssetCommand::ImageLoadData {
             load,
@@ -832,6 +859,7 @@ fn image_load_command(
             mask: request.mask,
             frame: request.frame,
             sequence,
+            limit,
         }),
     }
 }

@@ -22,7 +22,8 @@ use neovm_core::emacs_core::eval::{
     WebKitResolveRequest,
 };
 use neovm_core::emacs_core::image_catalog::{
-    ImageCatalog, ImageLookup, ImageResolveRequest, PendingImage, ReadyImage, ResolvedImageMetadata,
+    ImageCatalog, ImageLookup, ImageResolveRequest, ImageSizeLimit, PendingImage, ReadyImage,
+    ResolvedImageMetadata,
 };
 use neovm_core::emacs_core::value::StringTextPropertyRun;
 use neovm_core::emacs_core::{Context, Value};
@@ -196,6 +197,7 @@ impl DisplayHost for RecordingDisplayRowMediaHost {
     fn resolve_image_sync(
         &self,
         _request: ImageResolveRequest,
+        _limit: neovm_core::emacs_core::image_catalog::ImageSizeLimit,
     ) -> Result<Option<ReadyImage>, String> {
         panic!("display row rendering must not use synchronous image resolution");
     }
@@ -229,7 +231,7 @@ impl DisplayHost for RecordingDisplayRowMediaHost {
 }
 
 impl ImageCatalog for RecordingDisplayRowMediaHost {
-    fn lookup(&self, request: ImageResolveRequest) -> ImageLookup {
+    fn lookup(&self, request: ImageResolveRequest, _limit: ImageSizeLimit) -> ImageLookup {
         self.image_requests
             .lock()
             .expect("image requests lock")

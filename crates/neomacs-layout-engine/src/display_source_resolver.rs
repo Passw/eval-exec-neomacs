@@ -1116,7 +1116,10 @@ fn resolve_image_display_property(
         params.image_scale_environment,
         params.image_dimension_environment,
     );
-    let lookup = params.display_host.image_catalog()?.lookup(request);
+    let lookup = params
+        .display_host
+        .image_catalog()?
+        .lookup(request, params.image_scale_environment.size_limit());
     let placement = lookup.placement();
     let opaque_background = lookup
         .ready_metadata()
@@ -1255,7 +1258,10 @@ fn resolve_surface_channel(
             params.image_scale_environment,
             params.image_dimension_environment,
         );
-        let lookup = params.display_host.image_catalog()?.lookup(request);
+        let lookup = params
+            .display_host
+            .image_catalog()?
+            .lookup(request, params.image_scale_environment.size_limit());
         return Some((
             SurfaceChannelKind::Image,
             lookup.placement().image_id().get(),

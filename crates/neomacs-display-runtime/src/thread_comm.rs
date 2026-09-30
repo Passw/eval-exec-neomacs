@@ -472,6 +472,11 @@ pub enum AssetCommand {
         mask: ImageMaskPolicy,
         frame: neomacs_display_protocol::ImageFrameIndex,
         sequence: neomacs_display_protocol::ImageSequenceId,
+        /// The looking frame's resolved GNU `max-image-size`
+        /// (`check_image_size`, `src/image.c:1811`). The loader refuses a
+        /// source whose encoded header exceeds it before anything is decoded,
+        /// so an image GNU would not load is never allocated here either.
+        limit: neomacs_display_protocol::ImageSizeLimit,
     },
     /// Load image from encoded data bytes (PNG, JPEG, SVG, etc.)
     ImageLoadData {
@@ -486,6 +491,8 @@ pub enum AssetCommand {
         mask: ImageMaskPolicy,
         frame: neomacs_display_protocol::ImageFrameIndex,
         sequence: neomacs_display_protocol::ImageSequenceId,
+        /// See [`AssetCommand::ImageLoadFile::limit`].
+        limit: neomacs_display_protocol::ImageSizeLimit,
     },
     /// Load image from raw ARGB32 pixel data
     ImageLoadArgb32 {

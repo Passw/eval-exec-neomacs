@@ -132,7 +132,7 @@ use neomacs_display_protocol::types::{Color, Rect};
 use neovm_core::buffer::{Buffer, BufferId, CharPos0, EmacsBytePos, EmacsByteRange, LispCharPos1};
 use neovm_core::emacs_core::eval::{DisplayHost, GuiFrameHostRequest};
 use neovm_core::emacs_core::image_catalog::{
-    ImageCatalog, ImageLookup, ImageResolveRequest, PendingImage, ReadyImage,
+    ImageCatalog, ImageLookup, ImageResolveRequest, ImageSizeLimit, PendingImage, ReadyImage,
 };
 use neovm_core::emacs_core::value::StringTextPropertyRun;
 use neovm_core::emacs_core::{Context, Value};
@@ -473,6 +473,7 @@ impl DisplayHost for RecordingAppendImageHost {
     fn resolve_image_sync(
         &self,
         _request: ImageResolveRequest,
+        _limit: neovm_core::emacs_core::image_catalog::ImageSizeLimit,
     ) -> Result<Option<ReadyImage>, String> {
         panic!("append display source rendering must not use synchronous image resolution");
     }
@@ -483,7 +484,7 @@ impl DisplayHost for RecordingAppendImageHost {
 }
 
 impl ImageCatalog for RecordingAppendImageHost {
-    fn lookup(&self, request: ImageResolveRequest) -> ImageLookup {
+    fn lookup(&self, request: ImageResolveRequest, _limit: ImageSizeLimit) -> ImageLookup {
         self.requests
             .lock()
             .expect("image requests lock")

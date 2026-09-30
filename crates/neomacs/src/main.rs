@@ -198,7 +198,9 @@ use neovm_core::emacs_core::eval::{
     SurfaceChannelKind, SurfaceResolveRequest, VideoResolveRequest, WebKitResolveRequest,
     WebKitResolveSource,
 };
-use neovm_core::emacs_core::image_catalog::{ImageCatalog, ImageResolveRequest, ReadyImage};
+use neovm_core::emacs_core::image_catalog::{
+    ImageCatalog, ImageResolveRequest, ImageSizeLimit, ReadyImage,
+};
 use neovm_core::emacs_core::intern::intern;
 use neovm_core::emacs_core::load::{
     LoadupDumpInvocation, LoadupDumpMode, LoadupInvocation, RuntimeImageRole,
@@ -2177,8 +2179,9 @@ impl DisplayHost for PrimaryWindowDisplayHost {
     fn resolve_image_sync(
         &self,
         request: ImageResolveRequest,
+        limit: ImageSizeLimit,
     ) -> Result<Option<ReadyImage>, String> {
-        self.image_catalog.resolve_sync(request)
+        self.image_catalog.resolve_sync(request, limit)
     }
 
     fn image_catalog(&self) -> Option<&dyn ImageCatalog> {

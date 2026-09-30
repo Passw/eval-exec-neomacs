@@ -106,8 +106,8 @@ use neovm_core::emacs_core::eval::{
     SurfaceChannelKind, SurfaceResolveRequest, VideoResolveRequest, WebKitResolveRequest,
 };
 use neovm_core::emacs_core::image_catalog::{
-    AxisSize, ImageCatalog, ImageLookup, ImageResolveRequest, ImageSizeSpec, PendingImage,
-    ReadyImage,
+    AxisSize, ImageCatalog, ImageLookup, ImageResolveRequest, ImageSizeLimit, ImageSizeSpec,
+    PendingImage, ReadyImage,
 };
 use neovm_core::emacs_core::load::{
     apply_runtime_startup_state, create_bootstrap_evaluator_cached_with_features,
@@ -1878,6 +1878,7 @@ impl DisplayHost for RecordingImageDisplayHost {
     fn resolve_image_sync(
         &self,
         _request: ImageResolveRequest,
+        _limit: neovm_core::emacs_core::image_catalog::ImageSizeLimit,
     ) -> Result<Option<ReadyImage>, String> {
         panic!("layout must not use synchronous image resolution");
     }
@@ -1922,7 +1923,7 @@ impl DisplayHost for RecordingImageDisplayHost {
 }
 
 impl ImageCatalog for RecordingImageDisplayHost {
-    fn lookup(&self, request: ImageResolveRequest) -> ImageLookup {
+    fn lookup(&self, request: ImageResolveRequest, _limit: ImageSizeLimit) -> ImageLookup {
         self.requests
             .lock()
             .expect("requests lock")
@@ -17464,7 +17465,7 @@ struct FixedSizeImageCatalog {
 }
 
 impl ImageCatalog for FixedSizeImageCatalog {
-    fn lookup(&self, _request: ImageResolveRequest) -> ImageLookup {
+    fn lookup(&self, _request: ImageResolveRequest, _limit: ImageSizeLimit) -> ImageLookup {
         ImageLookup::Ready(ReadyImage {
             load: test_image_load(9),
             metadata:

@@ -2,6 +2,7 @@ use super::*;
 use neomacs_display_runtime::render_thread::ImageRenderState;
 use neovm_core::emacs_core::Context;
 use neovm_core::emacs_core::Value;
+use neovm_core::emacs_core::image_catalog::ImageSizeLimit;
 use neovm_core::emacs_core::image_catalog::{
     AxisSize, ImageColorContext, ImageDefaultScale, ImageScaleEnvironment, ImageScalePolicy,
     ImageSizeSpec, ImageSpecIdentity,
@@ -33,6 +34,13 @@ fn file_request(path: &str) -> ImageResolveRequest {
         frame: Default::default(),
         realization: Default::default(),
     }
+}
+
+/// These tests exercise scheduling, not the size bound: every lookup here
+/// states GNU's "no explicit limit" arm, and the bound itself is asserted by
+/// `the_load_command_carries_the_looking_frames_max_image_size`.
+fn lookup(catalog: &AsyncImageCatalog, request: ImageResolveRequest) -> ImageLookup {
+    catalog.lookup(request, ImageSizeLimit::UNLIMITED)
 }
 
 fn classify(file: &str) -> (ImageResolveRequest, Option<ImageFileRequest>) {
@@ -92,7 +100,7 @@ fn pending_slot_and_decode_command_share_one_resolved_realization() {
     request.realization = ImageScaleEnvironment::new(7.2, 1.75, ImageDefaultScale::Auto)
         .resolve(ImageScalePolicy::Default);
 
-    let placement = catalog.lookup(request).placement();
+    let placement = lookup(&catalog, request).placement();
 
     assert_eq!(placement.width(), 18);
     assert_eq!(placement.height(), 18);
@@ -112,12 +120,10 @@ fn invalidate_all_requeues_every_entry_under_its_existing_id() {
     let metadata = Arc::new(ImageRenderState::default());
     let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata, None);
 
-    let first = catalog
-        .lookup(file_request("/tmp/one.png"))
+    let first = lookup(&catalog, file_request("/tmp/one.png"))
         .placement()
         .image_id();
-    let second = catalog
-        .lookup(file_request("/tmp/two.png"))
+    let second = lookup(&catalog, file_request("/tmp/two.png"))
         .placement()
         .image_id();
     // Drain the two initial load commands.
@@ -141,8 +147,7 @@ fn invalidate_all_requeues_every_entry_under_its_existing_id() {
     assert_eq!(requeued_ids, expected, "same ids, one command per entry");
 
     // The entries survive: a later lookup reuses the id, no new load.
-    let again = catalog
-        .lookup(file_request("/tmp/one.png"))
+    let again = lookup(&catalog, file_request("/tmp/one.png"))
         .placement()
         .image_id();
     assert_eq!(again, first);
@@ -156,7 +161,7 @@ fn invalidating_dependency_retires_old_identity_and_next_lookup_reloads() {
     let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata, None);
     let request = file_request("/tmp/watched.svg");
 
-    let first = catalog.lookup(request.clone()).placement().image_id();
+    let first = lookup(&catalog, request.clone()).placement().image_id();
     assert!(matches!(
         cmd_rx.try_recv().expect("initial image load"),
         RenderCommand::Asset(AssetCommand::ImageLoadFile { load, .. })
@@ -169,7 +174,7 @@ fn invalidating_dependency_retires_old_identity_and_next_lookup_reloads() {
         RenderCommand::Asset(AssetCommand::ImageRetire { image }) if image == first
     ));
 
-    let second = catalog.lookup(request).placement().image_id();
+    let second = lookup(&catalog, request).placement().image_id();
     assert_ne!(first, second);
     assert!(matches!(
         cmd_rx.try_recv().expect("replacement image load"),
@@ -196,8 +201,8 @@ fn invalidating_spec_preserves_other_spec_that_uses_same_dependency() {
     ]);
     second.spec = ImageSpecIdentity::from_lisp_spec(&second_spec).expect("second test image spec");
 
-    let first_id = catalog.lookup(first.clone()).placement().image_id();
-    let second_id = catalog.lookup(second.clone()).placement().image_id();
+    let first_id = lookup(&catalog, first.clone()).placement().image_id();
+    let second_id = lookup(&catalog, second.clone()).placement().image_id();
     assert_ne!(first_id, second_id);
     assert!(cmd_rx.try_recv().is_ok());
     assert!(cmd_rx.try_recv().is_ok());
@@ -212,13 +217,13 @@ fn invalidating_spec_preserves_other_spec_that_uses_same_dependency() {
     assert!(cmd_rx.try_recv().is_err());
 
     assert_eq!(
-        catalog.lookup(second).placement().image_id(),
+        lookup(&catalog, second).placement().image_id(),
         second_id,
         "the other spec keeps its renderer identity"
     );
     assert!(cmd_rx.try_recv().is_err());
 
-    let replacement_id = catalog.lookup(first).placement().image_id();
+    let replacement_id = lookup(&catalog, first).placement().image_id();
     assert_ne!(replacement_id, first_id);
     assert!(matches!(
         cmd_rx.try_recv().expect("exact spec is decoded again"),
@@ -237,7 +242,7 @@ fn renderer_reconciliation_upgrades_pending_to_ready_geometry() {
     let catalog = AsyncImageCatalog::new(cmd_tx, None, Arc::clone(&metadata), None);
     let request = file_request("/tmp/promote.png");
 
-    let ImageLookup::Pending(pending) = catalog.lookup(request.clone()) else {
+    let ImageLookup::Pending(pending) = lookup(&catalog, request.clone()) else {
         panic!("expected pending");
     };
     let id = pending.placement().image_id();
@@ -257,7 +262,7 @@ fn renderer_reconciliation_upgrades_pending_to_ready_geometry() {
     );
 
     catalog.reconcile_renderer_state(ImageStateEvent::DecodeCompleted(load));
-    let ImageLookup::Ready(ready) = catalog.lookup(request) else {
+    let ImageLookup::Ready(ready) = lookup(&catalog, request) else {
         panic!("promote must leave Ready geometry for rebuild");
     };
     assert_eq!(ready.metadata.layout.dimensions(), (120, 80));
@@ -274,7 +279,7 @@ fn renderer_eviction_requeues_ready_image_under_its_stable_id() {
     let catalog = AsyncImageCatalog::new(cmd_tx, None, Arc::clone(&metadata), None);
     let request = file_request("/tmp/room-avatar.png");
 
-    let ImageLookup::Pending(pending) = catalog.lookup(request.clone()) else {
+    let ImageLookup::Pending(pending) = lookup(&catalog, request.clone()) else {
         panic!("new avatar should begin pending");
     };
     let id = pending.placement().image_id();
@@ -297,7 +302,7 @@ fn renderer_eviction_requeues_ready_image_under_its_stable_id() {
     );
     catalog.reconcile_renderer_state(ImageStateEvent::DecodeCompleted(first_load));
     assert!(matches!(
-        catalog.lookup(request.clone()),
+        lookup(&catalog, request.clone()),
         ImageLookup::Ready(_)
     ));
 
@@ -306,7 +311,7 @@ fn renderer_eviction_requeues_ready_image_under_its_stable_id() {
     metadata.remove_terminal(first_load);
     catalog.reconcile_renderer_state(ImageStateEvent::Evicted(id));
 
-    let ImageLookup::Pending(reloading) = catalog.lookup(request) else {
+    let ImageLookup::Pending(reloading) = lookup(&catalog, request) else {
         panic!("evicted avatar should remain pending until its reload completes");
     };
     assert!(matches!(
@@ -326,7 +331,7 @@ fn eviction_after_decode_but_before_evaluator_service_does_not_strand_pending_im
     let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata, None);
     let request = file_request("/tmp/large-chat-photo.png");
 
-    let ImageLookup::Pending(first_load) = catalog.lookup(request.clone()) else {
+    let ImageLookup::Pending(first_load) = lookup(&catalog, request.clone()) else {
         panic!("new image should begin pending");
     };
     let id = first_load.placement().image_id();
@@ -340,7 +345,7 @@ fn eviction_after_decode_but_before_evaluator_service_does_not_strand_pending_im
     catalog.reconcile_renderer_state(ImageStateEvent::DecodeCompleted(first_token));
     catalog.reconcile_renderer_state(ImageStateEvent::Evicted(id));
 
-    let ImageLookup::Pending(reload) = catalog.lookup(request) else {
+    let ImageLookup::Pending(reload) = lookup(&catalog, request) else {
         panic!("visible evicted image should schedule another load");
     };
     assert_eq!(reload.placement().image_id(), id);
@@ -361,14 +366,14 @@ fn stale_decode_completion_cannot_promote_a_replacement_load() {
     let catalog = AsyncImageCatalog::new(cmd_tx, None, Arc::clone(&metadata), None);
     let request = file_request("/tmp/replaced-avatar.png");
 
-    let ImageLookup::Pending(first) = catalog.lookup(request.clone()) else {
+    let ImageLookup::Pending(first) = lookup(&catalog, request.clone()) else {
         panic!("initial image should be pending");
     };
     let first_load = first.load();
     cmd_rx.try_recv().expect("initial load command");
 
     catalog.reconcile_renderer_state(ImageStateEvent::Evicted(first_load.image()));
-    let ImageLookup::Pending(replacement) = catalog.lookup(request.clone()) else {
+    let ImageLookup::Pending(replacement) = lookup(&catalog, request.clone()) else {
         panic!("eviction should schedule a replacement load");
     };
     let replacement_load = replacement.load();
@@ -388,7 +393,7 @@ fn stale_decode_completion_cannot_promote_a_replacement_load() {
     );
     catalog.reconcile_renderer_state(ImageStateEvent::DecodeCompleted(first_load));
 
-    let ImageLookup::Pending(still_replacement) = catalog.lookup(request) else {
+    let ImageLookup::Pending(still_replacement) = lookup(&catalog, request) else {
         panic!("a stale completion must not promote the replacement attempt");
     };
     assert_eq!(still_replacement.load(), replacement_load);
@@ -420,7 +425,7 @@ fn pending_geometry_resolves_from_the_header_before_any_pixel_exists() {
     // pre-header placeholder reserves the clamp square 50x50 instead.
     request.size = ImageSizeSpec::new(AxisSize::AtMost(50), AxisSize::Native);
 
-    let ImageLookup::Pending(placeholder) = catalog.lookup(request.clone()) else {
+    let ImageLookup::Pending(placeholder) = lookup(&catalog, request.clone()) else {
         panic!("a new image lookup begins pending");
     };
     assert_eq!(
@@ -445,7 +450,7 @@ fn pending_geometry_resolves_from_the_header_before_any_pixel_exists() {
     // renderer, which is what makes the resolution independent of the decode.
     let deadline = Instant::now() + Duration::from_secs(10);
     let pending = loop {
-        let lookup = catalog.lookup(request.clone());
+        let lookup = lookup(&catalog, request.clone());
         if lookup.placement().height() == 100 {
             break lookup;
         }
@@ -491,7 +496,7 @@ fn pending_geometry_without_a_header_keeps_the_request_placeholder() {
     let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata, None);
     let request = file_request("/nonexistent/neomacs/not-an-image.png");
 
-    let ImageLookup::Pending(pending) = catalog.lookup(request.clone()) else {
+    let ImageLookup::Pending(pending) = lookup(&catalog, request.clone()) else {
         panic!("a new image lookup begins pending");
     };
     assert_eq!(
@@ -501,7 +506,7 @@ fn pending_geometry_without_a_header_keeps_the_request_placeholder() {
 
     // Let any probe for the unreadable path land before re-checking.
     std::thread::sleep(Duration::from_millis(200));
-    let ImageLookup::Pending(unchanged) = catalog.lookup(request) else {
+    let ImageLookup::Pending(unchanged) = lookup(&catalog, request) else {
         panic!("an unreadable image stays pending until it fails");
     };
     assert_eq!(
@@ -511,5 +516,119 @@ fn pending_geometry_without_a_header_keeps_the_request_placeholder() {
         ),
         (24, 24),
         "no header means no refinement"
+    );
+}
+
+/// The bound a lookup is made under travels with the load command.
+///
+/// The catalog cannot apply `max-image-size` itself — it never sees the
+/// encoded header — and the renderer refuses at the header read it already
+/// performs, which is GNU's own point in the load (`check_image_size`,
+/// `src/image.c:1811`). What the catalog owes is the value.
+#[test]
+fn the_load_command_carries_the_looking_frames_max_image_size() {
+    let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
+    let metadata = Arc::new(ImageRenderState::default());
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata, None);
+    let limit = ImageSizeLimit::from_axis_pixels(64);
+
+    catalog.lookup(file_request("/tmp/huge.png"), limit);
+
+    assert!(matches!(
+        cmd_rx.try_recv().expect("image load command"),
+        RenderCommand::Asset(AssetCommand::ImageLoadFile { limit: carried, .. }) if carried == limit
+    ));
+}
+
+/// A later lookup under a different bound must carry *that* bound, not the one
+/// it was first scheduled with: the frame that is asking is the frame whose
+/// `max-image-size` applies.
+#[test]
+fn each_lookup_carries_the_bound_it_was_made_under() {
+    let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
+    let metadata = Arc::new(ImageRenderState::default());
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata, None);
+    let request = file_request("/tmp/reloaded.png");
+
+    catalog.lookup(request.clone(), ImageSizeLimit::from_axis_pixels(64));
+    catalog.invalidate(ImageInvalidation::Spec {
+        spec: request.spec.clone(),
+    });
+    catalog.lookup(request, ImageSizeLimit::from_axis_pixels(4096));
+
+    // The first load, the retirement of its identity, then the reload.
+    assert!(matches!(
+        cmd_rx.try_recv().expect("first load"),
+        RenderCommand::Asset(AssetCommand::ImageLoadFile { limit, .. })
+            if limit == ImageSizeLimit::from_axis_pixels(64)
+    ));
+    assert!(matches!(
+        cmd_rx.try_recv().expect("retirement"),
+        RenderCommand::Asset(AssetCommand::ImageRetire { .. })
+    ));
+    assert!(matches!(
+        cmd_rx.try_recv().expect("reload"),
+        RenderCommand::Asset(AssetCommand::ImageLoadFile { limit, .. })
+            if limit == ImageSizeLimit::from_axis_pixels(4096)
+    ));
+}
+
+/// The device-loss re-queue has no frame in hand, so it re-checks against the
+/// bound the redisplay that built the entries resolved — never against "no
+/// limit", which is the one bound a re-queue must not load under.
+#[test]
+fn a_device_loss_requeue_carries_the_limit_it_last_saw() {
+    let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
+    let metadata = Arc::new(ImageRenderState::default());
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, metadata, None);
+    let limit = ImageSizeLimit::from_axis_pixels(7);
+
+    catalog.lookup(file_request("/tmp/before-loss.png"), limit);
+    cmd_rx.try_recv().expect("initial load");
+    catalog.invalidate_all();
+
+    assert!(matches!(
+        cmd_rx.try_recv().expect("re-queued load"),
+        RenderCommand::Asset(AssetCommand::ImageLoadFile { limit: carried, .. }) if carried == limit
+    ));
+}
+
+/// What the evaluator sees when the renderer refuses a load: the same failed
+/// state a decoder failure produces, carrying GNU's diagnostic.
+///
+/// The refusal travels as `ImageCacheEvent::Failed` (asserted where the command
+/// is dispatched, in `neomacs-display-runtime`), which publishes this terminal.
+/// Redisplay keeps the placeholder slot; a synchronous query surfaces the
+/// message.
+#[test]
+fn a_refused_load_is_a_failed_lookup_carrying_gnus_diagnostic() {
+    use neovm_core::emacs_core::image_catalog::OversizedImage;
+
+    let (cmd_tx, _cmd_rx) = crossbeam_channel::unbounded();
+    let metadata = Arc::new(ImageRenderState::default());
+    let catalog = AsyncImageCatalog::new(cmd_tx, None, Arc::clone(&metadata), None);
+    let request = file_request("/tmp/too-large.png");
+
+    let ImageLookup::Pending(pending) = catalog.lookup(request.clone(), ImageSizeLimit::UNLIMITED)
+    else {
+        panic!("a new image lookup begins pending");
+    };
+    let load = pending.load();
+    let slot = pending.placement();
+
+    metadata.publish_terminal(
+        load,
+        ImageDecodeTerminal::Failed(OversizedImage::MESSAGE.to_owned()),
+    );
+
+    let ImageLookup::Failed(failed) = catalog.lookup(request, ImageSizeLimit::UNLIMITED) else {
+        panic!("a refused load must not stay pending");
+    };
+    assert_eq!(failed.load(), load);
+    assert_eq!(failed.error, OversizedImage::MESSAGE);
+    assert_eq!(
+        failed.placement().dimensions(),
+        slot.dimensions(),
+        "the reserved slot survives the refusal, so the frame does not move"
     );
 }

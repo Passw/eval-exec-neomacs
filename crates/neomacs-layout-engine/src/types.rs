@@ -7,7 +7,7 @@
 use neomacs_display_protocol::cursor::CursorBarWidth;
 use neomacs_display_protocol::types::Rect;
 use neovm_core::emacs_core::image_catalog::{
-    ImageCatalog, ImageLookup, ImageResolveRequest, ImageScaleEnvironment,
+    ImageCatalog, ImageLookup, ImageResolveRequest, ImageScaleEnvironment, ImageSizeLimit,
 };
 
 /// Parameters for a window that the layout engine needs.
@@ -185,9 +185,12 @@ impl WindowParams {
 }
 
 impl SharedImageCatalog {
+    /// `limit` is the looking frame's resolved `max-image-size`; it travels
+    /// with the request rather than being read here, because the layout engine
+    /// holds no obarray.
     #[must_use]
-    pub fn lookup(&self, request: ImageResolveRequest) -> ImageLookup {
-        self.0.lookup(request)
+    pub fn lookup(&self, request: ImageResolveRequest, limit: ImageSizeLimit) -> ImageLookup {
+        self.0.lookup(request, limit)
     }
 }
 

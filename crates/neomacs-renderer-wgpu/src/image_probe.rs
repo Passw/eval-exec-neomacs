@@ -24,7 +24,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use neomacs_display_protocol::{
     ImageIntrinsicExtent, ImageLayoutExtent, ImageNativeExtent, ImageRealization, ImageRotation,
-    ImageSizeSpec,
+    ImageSizeLimit, ImageSizeSpec, OversizedImage,
 };
 
 /// Encoded image to measure without decoding it.
@@ -34,6 +34,37 @@ pub enum ImageProbeSource<'a> {
     File(&'a str),
     /// Encoded bytes, as held by an image `:data` spec.
     Data(&'a [u8]),
+}
+
+/// GNU `check_image_size` (`src/image.c:1811-1836`) at the point this port can
+/// ask it having allocated nothing.
+///
+/// The header read that resolves geometry carries the dimensions the bound is
+/// compared against, so a source over `limit` is refused here — before the
+/// decoder is asked for a pixel, and before it could allocate one. That is what
+/// makes this the seam for the rule: GNU refuses inside each loader, against the
+/// size it has just read from the file and before it creates an image, and this
+/// is the same moment in this port's lifecycle.
+///
+/// `Ok(())` also covers a source this crate cannot measure — an SVG, whose
+/// extent comes from a document parse whose result depends on resolved
+/// resources. The only honest answer for an unknown extent is "not known to be
+/// over the limit", so such a source is admitted here and left to the decoder.
+/// GNU checks those after parsing them; this port has no post-parse check of its
+/// own to make.
+///
+/// # Errors
+///
+/// Returns the measurement that exceeded the limit, as [`OversizedImage`].
+pub fn admit(source: ImageProbeSource<'_>, limit: ImageSizeLimit) -> Result<(), OversizedImage> {
+    let Some(intrinsic) = probe_intrinsic_extent(source) else {
+        return Ok(());
+    };
+    let native = intrinsic.native_ceiling();
+    if limit.permits(native) {
+        return Ok(());
+    }
+    Err(OversizedImage::new(native, limit))
 }
 
 /// Intrinsic (pre-realization) extent read from the encoded header alone.
