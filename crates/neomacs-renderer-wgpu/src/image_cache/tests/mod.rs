@@ -55,6 +55,7 @@ fn decode_toolbar_pixels(data: &[u8]) -> Vec<u8> {
         crate::svg::SvgResourceContext::Isolated,
         &ImageSequenceCache::new(),
         ImageSequenceId::new(1).unwrap(),
+        None,
     )
     .expect("decode toolbar SVG");
     // Return the public decoder result's unpremultiplied RGBA payload.
@@ -1763,4 +1764,196 @@ fn probe_declines_sources_it_cannot_measure_without_decoding() {
         )
         .is_none()
     );
+}
+
+/// A PNG of `width` x `height` whose every pixel differs, so a band placed at
+/// the wrong offset is visible rather than hidden by identical rows.
+fn varying_png(width: u32, height: u32) -> Vec<u8> {
+    let pixels = (0..height)
+        .flat_map(|y| {
+            (0..width).flat_map(move |x| {
+                [
+                    (x % 251) as u8,
+                    (y % 253) as u8,
+                    ((x + y) % 241) as u8,
+                    0xff,
+                ]
+            })
+        })
+        .collect();
+    png_bytes(pixels, width, height)
+}
+
+/// Every pixel of the whole-image path's answer for `data`, through the same
+/// call the banded path falls back to.
+fn whole_pixels(data: &[u8]) -> NativePixels {
+    ImageCache::decode_whole(data).expect("fixture decodes whole")
+}
+
+fn decode_with_bands(data: &[u8], scale: f32, bands: &mut Vec<BandChunk>) -> Option<DecodedPixels> {
+    ImageCache::decode_data(
+        data,
+        ImageSizeSpec::default(),
+        ImageRotation::None,
+        ImageColorContext::default(),
+        ImageRealization::with_device_scale(scale, scale),
+        ImageMaskPolicy::Preserve,
+        ImageFrameIndex::default(),
+        crate::svg::SvgResourceContext::Isolated,
+        &ImageSequenceCache::new(),
+        ImageSequenceId::new(1).expect("non-zero test sequence"),
+        Some(&mut |band| bands.push(band)),
+    )
+}
+
+/// The whole point of the seam: a large source decodes in bands, they arrive in
+/// order as disjoint row ranges, and the image they add up to is the image the
+/// whole-image path would have produced — through the same call the renderer
+/// makes.
+#[test]
+fn a_large_png_decodes_in_bands_that_add_up_to_the_whole_image() {
+    let (width, height) = (2000, 2000);
+    let data = varying_png(width, height);
+    let mut bands = Vec::new();
+
+    let decoded = decode_with_bands(&data, 1.0, &mut bands).expect("decode");
+
+    assert!(
+        bands.len() > 1,
+        "a four-megapixel source must band, got {} band(s)",
+        bands.len()
+    );
+    let mut expected_start = 0;
+    for band in &bands {
+        assert_eq!(band.rows().start(), expected_start);
+        assert_eq!(band.width(), width);
+        expected_start = band.rows().end();
+    }
+    assert_eq!(expected_start, height, "the bands cover the whole source");
+    assert_eq!(
+        decoded.rgba,
+        whole_pixels(&data).rgba,
+        "a banded decode must publish the whole decode's pixels"
+    );
+}
+
+/// Below the threshold the source takes the whole-image path, bands and all:
+/// one decode is not visibly slow there, and the simpler path is not slower.
+#[test]
+fn a_source_below_the_size_threshold_publishes_no_bands() {
+    let data = varying_png(40, 30);
+    let mut bands = Vec::new();
+
+    let decoded = decode_with_bands(&data, 1.0, &mut bands).expect("decode");
+
+    assert!(bands.is_empty(), "a small source has nothing to report");
+    assert_eq!(decoded.rgba.len(), 40 * 30 * 4);
+}
+
+/// What separates the two paths is the source's size and nothing else, so the
+/// threshold is a boundary: the same kind of source bands on one side of it and
+/// does not on the other.
+#[test]
+fn the_threshold_is_the_boundary_between_the_two_paths() {
+    let threshold = crate::image_bands::BANDING_MIN_PIXELS;
+    let (below_width, below_height) = (1999, 2000);
+    let (above_width, above_height) = (2000, 2000);
+    assert!(u64::from(below_width) * u64::from(below_height) < threshold);
+    assert!(u64::from(above_width) * u64::from(above_height) >= threshold);
+
+    let mut below = Vec::new();
+    decode_with_bands(&varying_png(below_width, below_height), 1.0, &mut below).expect("decode");
+    let mut above = Vec::new();
+    decode_with_bands(&varying_png(above_width, above_height), 1.0, &mut above).expect("decode");
+
+    assert!(
+        below.is_empty(),
+        "a source under the threshold decodes whole"
+    );
+    assert!(
+        !above.is_empty(),
+        "a source at the threshold decodes in bands"
+    );
+}
+
+/// A banded decode that cannot finish is abandoned, and the image is decoded
+/// again whole: the caller gets a whole image, never a prefix.
+///
+/// Both decoders read the same bytes, so no real fixture can express "the
+/// row-wise decode fails where the whole one succeeds" — a source truncated
+/// enough to break one breaks both. The abandonment is therefore injected: the
+/// attempt is cut short after a band, and what the test pins is the consequence
+/// the requirement is about.
+#[test]
+fn an_abandoned_banded_decode_still_yields_the_whole_image() {
+    let (width, height) = (2000, 2000);
+    let data = varying_png(width, height);
+    let mut bands = Vec::new();
+
+    let remaining = ABANDON_AFTER_BANDS.load(Ordering::Relaxed);
+    ABANDON_AFTER_BANDS.store(1, Ordering::Relaxed);
+    let decoded = decode_with_bands(&data, 1.0, &mut bands);
+    ABANDON_AFTER_BANDS.store(remaining, Ordering::Relaxed);
+
+    let decoded = decoded.expect("an abandoned attempt must still produce the image");
+    assert_eq!(bands.len(), 1, "the attempt was abandoned mid-stream");
+    assert_eq!(
+        decoded.rgba,
+        whole_pixels(&data).rgba,
+        "the image must be whole, not the prefix the abandoned attempt reached"
+    );
+}
+
+/// A decoder that fails mid-stream does not leave a half-decoded picture: the
+/// bands it published are abandoned and the decode fails as a whole rather than
+/// succeeding with part of an image.
+#[test]
+fn a_truncated_source_fails_instead_of_publishing_a_prefix() {
+    let (width, height) = (2000, 2000);
+    let data = varying_png(width, height);
+    let truncated = &data[..data.len() / 2];
+    let mut bands = Vec::new();
+
+    let decoded = decode_with_bands(truncated, 1.0, &mut bands);
+
+    assert!(
+        decoded.is_none(),
+        "a decode that could not finish must not publish an image"
+    );
+    assert!(
+        !bands.is_empty(),
+        "the failure happened after the banded path had reported progress"
+    );
+    let covered = bands.last().map_or(0, |band| band.rows().end());
+    assert!(
+        covered > 0 && covered < height,
+        "the failure is mid-stream: {covered} of {height} rows"
+    );
+}
+
+/// Bands are progress, not endings: they do not consume the load attempt, so
+/// the terminal outcome that follows them still publishes, and a superseded
+/// decode's bands are dropped with its terminal outcome.
+#[test]
+fn bands_do_not_consume_the_load_attempt() {
+    let mut loads = ImageLoadLifecycle::default();
+    let load = loads.begin_generated(ImageId::new(71));
+
+    let band = || WorkerDecodeOutcome::Band {
+        load,
+        band: BandChunk::from_rows(0, std::num::NonZeroU32::new(1).unwrap(), 1, vec![0u8; 4])
+            .expect("a band of one pixel row"),
+    };
+    assert!(matches!(loads.take_current(band()), Some(_)));
+    assert!(matches!(loads.take_current(band()), Some(_)));
+    assert!(loads.is_current(load), "bands leave the attempt alone");
+
+    // The attempt is superseded while its bands are still arriving.
+    let replacement = loads.begin_generated(ImageId::new(71));
+    assert_ne!(replacement, load);
+    assert!(
+        loads.take_current(band()).is_none(),
+        "a superseded decode's bands are dropped"
+    );
+    assert!(loads.is_current(replacement));
 }

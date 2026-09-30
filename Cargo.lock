@@ -3981,6 +3981,7 @@ dependencies = [
  "neomacs-layout-engine",
  "neomacs-test-fonts",
  "neomacs-video",
+ "png",
  "pollster",
  "resvg",
  "rustc-hash 2.1.3",

@@ -64,11 +64,22 @@ impl TerminalPaintTarget {
 #[cfg(all(feature = "webview", target_os = "linux"))]
 use neomacs_renderer_wgpu::WgpuRenderer;
 
+/// Publish one renderer image event, and say whether the evaluator needs to
+/// hear about it.
+///
+/// A band is published to the shared state and goes no further: nothing the
+/// evaluator holds — layout, readiness, cache size — changed when a decode
+/// advanced, so waking it per band would buy a redisplay per band and nothing
+/// else. The terminal events are the ones it reconciles against.
 fn publish_image_cache_event(
     shared: &super::SharedImageRenderState,
     event: neomacs_renderer_wgpu::ImageCacheEvent,
-) -> crate::thread_comm::ImageStateEvent {
+) -> Option<crate::thread_comm::ImageStateEvent> {
     let (event, terminal) = match event {
+        neomacs_renderer_wgpu::ImageCacheEvent::Band { load, band } => {
+            shared.publish_band(load, band);
+            return None;
+        }
         neomacs_renderer_wgpu::ImageCacheEvent::Ready { load, metadata } => {
             let metadata = neovm_core::emacs_core::image_catalog::ResolvedImageMetadata {
                 layout: metadata.layout,
@@ -100,7 +111,7 @@ fn publish_image_cache_event(
     } else {
         shared.clear_image_terminals(event.image());
     }
-    event
+    Some(event)
 }
 
 impl RenderApp {
@@ -572,7 +583,9 @@ impl RenderApp {
     }
 
     pub(super) fn handle_image_event(&mut self, event: neomacs_renderer_wgpu::ImageCacheEvent) {
-        let event = publish_image_cache_event(&self.image_metadata, event);
+        let Some(event) = publish_image_cache_event(&self.image_metadata, event) else {
+            return;
+        };
         if self
             .toolbar
             .textures()

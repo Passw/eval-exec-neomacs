@@ -70,6 +70,10 @@ pub use thread_handle::RenderThread;
 /// decoded yet (see `neomacs_renderer_wgpu::image_probe`).
 pub use neomacs_renderer_wgpu::image_probe::{ImageProbeSource, probe_image_layout};
 
+/// Rows of an image whose decode is still running, as published by
+/// `ImageDecodeTerminal::Band`.
+pub use neomacs_renderer_wgpu::BandChunk;
+
 use winit::event_loop::EventLoopProxy;
 
 pub type RenderEventLoopProxy = EventLoopProxy;

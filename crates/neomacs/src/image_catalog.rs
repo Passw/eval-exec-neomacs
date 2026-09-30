@@ -628,6 +628,9 @@ impl AsyncImageCatalog {
 fn image_lookup_from_terminal(pending: PendingImage, terminal: ImageDecodeTerminal) -> ImageLookup {
     let load = pending.load();
     match terminal {
+        // Intermediate: the decode is still running, so the slot keeps the
+        // geometry the header gave it and stays pending until `Ready` lands.
+        ImageDecodeTerminal::Band(_) => ImageLookup::Pending(pending),
         ImageDecodeTerminal::Ready(metadata) => ImageLookup::Ready(ReadyImage { load, metadata }),
         ImageDecodeTerminal::Failed(error) => ImageLookup::Failed(pending.failed(error)),
     }
@@ -890,3 +893,12 @@ fn home_directory_from_environment() -> Option<String> {
 #[cfg(test)]
 #[path = "image_catalog/tests/image_catalog_test.rs"]
 mod tests;
+
+/// What the catalog does with an image load's intermediate publications.
+///
+/// Separate from `tests` because it pokes the terminal-to-lookup step directly:
+/// what a band must not do is a property of that step, and it holds whatever
+/// else the catalog is in the middle of.
+#[cfg(test)]
+#[path = "image_catalog/tests/image_band_terminal_test.rs"]
+mod band_terminal_tests;

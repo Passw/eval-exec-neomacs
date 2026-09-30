@@ -22,6 +22,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 
+use crate::image_bands::{BandChunk, BandSink, BandSource, BandStep};
 use crate::image_sequence::{ImageSequenceCache, ImageSequenceResolution};
 
 #[cfg(target_os = "linux")]
@@ -29,6 +30,18 @@ use crate::external_buffer::DmaBufBuffer;
 
 /// Maximum texture dimension (width or height)
 const MAX_TEXTURE_SIZE: u32 = 4096;
+
+/// Test-only: abandon a banded attempt after this many bands have been
+/// published. Zero disables it.
+///
+/// The property this serves — a banded decode that stops part-way leaves the
+/// caller with a whole image rather than a truncated one — cannot be expressed
+/// with a fixture: both paths read the same bytes, so a source the row-wise
+/// reader rejects is one the whole-image decoder rejects too. Injecting the cut
+/// leaves the consequence under test exactly as it would be, and `nextest`
+/// gives each test its own process, so the hook cannot leak into another.
+#[cfg(test)]
+static ABANDON_AFTER_BANDS: AtomicU32 = AtomicU32::new(0);
 
 /// Clamp to the renderer's texture limit, preserving aspect ratio.
 ///
@@ -128,6 +141,24 @@ struct DecodedImage {
     geometry: ResolvedImageGeometry,
     data: Vec<u8>, // RGBA
     metadata: ImageMetadata,
+}
+
+/// What one attempt at a banded decode produced.
+///
+/// The two ways of not completing are separate arms because they mean
+/// different things to a reader — one is a source that never had a row-wise
+/// decoder, the other a decoder that stopped part-way — even though the caller
+/// does the same thing with both.
+enum BandedAttempt {
+    /// Every row was decoded.
+    Complete(NativePixels),
+    /// The source has no row-wise decoder at this size, or none for its
+    /// format: decode the whole image.
+    NotBandable,
+    /// A row-wise decode that could not finish. The bands it published are
+    /// abandoned; decoding the whole image is the only way to end up with a
+    /// whole one.
+    Abandoned,
 }
 
 /// Pixels directly emitted by a decoder before an image spec is realized.
@@ -301,6 +332,13 @@ fn apply_mask_policy(
 }
 
 enum WorkerDecodeOutcome {
+    /// One band of a decode that is still running. Intermediate, not terminal:
+    /// it consumes no load generation, and the `Ready` that ends the decode
+    /// supersedes it.
+    Band {
+        load: ImageLoadToken,
+        band: BandChunk,
+    },
     Ready(DecodedImage),
     Failed(ImageLoadToken),
 }
@@ -308,6 +346,7 @@ enum WorkerDecodeOutcome {
 impl WorkerDecodeOutcome {
     fn load(&self) -> ImageLoadToken {
         match self {
+            Self::Band { load, .. } => *load,
             Self::Ready(decoded) => decoded.load,
             Self::Failed(load) => *load,
         }
@@ -319,6 +358,14 @@ impl WorkerDecodeOutcome {
 /// residency state.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ImageCacheEvent {
+    /// One band of an image whose decode is still running.
+    ///
+    /// Intermediate by construction: the `Ready` for the same load carries the
+    /// whole image, so a consumer that drew this band ends up correct.
+    Band {
+        load: ImageLoadToken,
+        band: BandChunk,
+    },
     Ready {
         load: ImageLoadToken,
         metadata: ImageMetadata,
@@ -362,14 +409,32 @@ impl ImageLoadLifecycle {
     }
 
     fn accept(&mut self, load: ImageLoadToken) -> bool {
-        if self.active.get(&load.image()) != Some(&load.attempt()) {
+        if !self.is_current(load) {
             return false;
         }
         self.active.remove(&load.image());
         true
     }
 
+    /// Whether `load` is still the attempt allowed to publish for its image,
+    /// without consuming it.
+    ///
+    /// Intermediate publications — bands — check this and leave the attempt
+    /// alone; only the terminal outcome consumes it.
+    fn is_current(&self, load: ImageLoadToken) -> bool {
+        self.active.get(&load.image()) == Some(&load.attempt())
+    }
+
+    /// Accept `outcome` if its attempt is still the current one.
+    ///
+    /// A band and a terminal outcome differ here: a band is progress from a
+    /// decode that is still running, so it is checked and left alone, while
+    /// only the terminal outcome consumes the attempt — once, so a superseded
+    /// decode can never publish Ready after its replacement has begun.
     fn take_current(&mut self, outcome: WorkerDecodeOutcome) -> Option<WorkerDecodeOutcome> {
+        if matches!(outcome, WorkerDecodeOutcome::Band { .. }) {
+            return self.is_current(outcome.load()).then_some(outcome);
+        }
         self.accept(outcome.load()).then_some(outcome)
     }
 
@@ -664,6 +729,13 @@ impl ImageCache {
                         mask,
                         frame,
                     } = request;
+                    // A banded decode reports each band as it lands, which is
+                    // the whole point of decoding that way: the display side
+                    // can act on a band long before the decode finishes.
+                    let mut publish_band = |band: BandChunk| {
+                        let _ = tx.send(WorkerDecodeOutcome::Band { load, band });
+                    };
+                    let sink: BandSink<'_> = Some(&mut publish_band);
                     let result = catch_unwind(AssertUnwindSafe(|| match source {
                         #[cfg(test)]
                         ImageSource::Panic => panic!("injected decoder panic"),
@@ -677,6 +749,7 @@ impl ImageCache {
                             frame,
                             &sequence_cache,
                             sequence,
+                            sink,
                         ),
                         ImageSource::Data {
                             data,
@@ -693,6 +766,7 @@ impl ImageCache {
                             resources,
                             &sequence_cache,
                             sequence,
+                            sink,
                         ),
                         ImageSource::RawArgb32 {
                             data,
@@ -752,12 +826,20 @@ impl ImageCache {
         frame: ImageFrameIndex,
         sequence_cache: &ImageSequenceCache,
         sequence: ImageSequenceId,
+        sink: BandSink<'_>,
     ) -> Option<DecodedPixels> {
         let encoded = std::fs::read(path).ok();
-        if let Some(pixels) = encoded
-            .as_deref()
-            .and_then(|data| Self::decode_raster_data(data, frame, sequence_cache, sequence))
-        {
+        if let Some(pixels) = encoded.as_deref().and_then(|data| {
+            Self::decode_raster_data(
+                data,
+                frame,
+                sequence_cache,
+                sequence,
+                size,
+                realization,
+                sink,
+            )
+        }) {
             return pixels.realize_bitmap(size, rotation, realization, mask);
         }
         if !frame.is_first() {
@@ -808,8 +890,17 @@ impl ImageCache {
         resources: crate::svg::SvgResourceContext,
         sequence_cache: &ImageSequenceCache,
         sequence: ImageSequenceId,
+        sink: BandSink<'_>,
     ) -> Option<DecodedPixels> {
-        if let Some(pixels) = Self::decode_raster_data(data, frame, sequence_cache, sequence) {
+        if let Some(pixels) = Self::decode_raster_data(
+            data,
+            frame,
+            sequence_cache,
+            sequence,
+            size,
+            realization,
+            sink,
+        ) {
             return pixels.realize_bitmap(size, rotation, realization, mask);
         }
         if !frame.is_first() {
@@ -850,6 +941,9 @@ impl ImageCache {
         frame: ImageFrameIndex,
         sequence_cache: &ImageSequenceCache,
         sequence: ImageSequenceId,
+        size: ImageSizeSpec,
+        realization: ImageRealization,
+        sink: BandSink<'_>,
     ) -> Option<NativePixels> {
         match sequence_cache.resolve(sequence, data, frame) {
             ImageSequenceResolution::Frame(frame) => {
@@ -863,9 +957,83 @@ impl ImageCache {
             }
             ImageSequenceResolution::MissingFrame => None,
             ImageSequenceResolution::NotAnimated => {
-                Self::process_image(image::load_from_memory(data).ok()?)
+                Self::decode_still_image(data, size, realization, sink)
             }
         }
+    }
+
+    /// Decode a still raster source, row-wise where the source allows it.
+    ///
+    /// The two arms of [`BandSource`] are the whole decision: a source with a
+    /// row-wise decoder above the size threshold is decoded band by band, and
+    /// everything else — every other format, every source below the threshold,
+    /// and any row-wise decode that could not finish — is decoded whole, which
+    /// is what this code did for every source before banding existed.
+    fn decode_still_image(
+        data: &[u8],
+        size: ImageSizeSpec,
+        realization: ImageRealization,
+        sink: BandSink<'_>,
+    ) -> Option<NativePixels> {
+        match Self::attempt_banded(data, size, realization, sink) {
+            BandedAttempt::Complete(pixels) => Some(pixels),
+            BandedAttempt::NotBandable | BandedAttempt::Abandoned => Self::decode_whole(data),
+        }
+    }
+
+    /// One attempt at a banded decode.
+    fn attempt_banded(
+        data: &[u8],
+        size: ImageSizeSpec,
+        realization: ImageRealization,
+        mut sink: BandSink<'_>,
+    ) -> BandedAttempt {
+        let mut source = match BandSource::open(data, size, realization) {
+            BandSource::Banded(source) => source,
+            BandSource::Whole => return BandedAttempt::NotBandable,
+        };
+        #[cfg(test)]
+        let mut published = 0_u32;
+        loop {
+            match source.next_band() {
+                BandStep::Band(band) => {
+                    if let Some(sink) = sink.as_deref_mut() {
+                        sink(band);
+                    }
+                    #[cfg(test)]
+                    {
+                        published += 1;
+                        let abandon_after = ABANDON_AFTER_BANDS.load(Ordering::Relaxed);
+                        if abandon_after != 0 && published >= abandon_after {
+                            return BandedAttempt::Abandoned;
+                        }
+                    }
+                }
+                // A completed source is the only one that yields pixels, so a
+                // prefix cannot escape as an image.
+                BandStep::Done => {
+                    let extent = source.dimensions();
+                    return source.into_image().map_or(
+                        BandedAttempt::Abandoned,
+                        |(width, height, rgba)| {
+                            debug_assert_eq!(
+                                (width, height),
+                                extent,
+                                "the rows a banded decode filled must cover the extent its header named"
+                            );
+                            BandedAttempt::Complete(NativePixels::raster(width, height, rgba))
+                        },
+                    );
+                }
+                BandStep::Failed => return BandedAttempt::Abandoned,
+            }
+        }
+    }
+
+    /// The whole image in one decode: the path every source took before
+    /// banding, and the one a banded attempt falls back to.
+    fn decode_whole(data: &[u8]) -> Option<NativePixels> {
+        Self::process_image(image::load_from_memory(data).ok()?)
     }
 
     #[cfg(test)]
@@ -894,6 +1062,7 @@ impl ImageCache {
             crate::svg::SvgResourceContext::Isolated,
             &ImageSequenceCache::new(),
             ImageSequenceId::new(1).expect("non-zero test sequence"),
+            None,
         )?;
         Some(Self::decoded_image(
             ImageLoadToken::new(
@@ -960,6 +1129,7 @@ impl ImageCache {
             crate::svg::SvgResourceContext::Isolated,
             &ImageSequenceCache::new(),
             ImageSequenceId::new(1).expect("non-zero test sequence"),
+            None,
         )?;
         Some(Self::decoded_image(
             ImageLoadToken::new(
@@ -1622,6 +1792,18 @@ impl ImageCache {
                 continue;
             };
             match outcome {
+                // Nothing is uploaded for a band yet: it is carried to the
+                // display side, which is where the per-band upload lands.
+                WorkerDecodeOutcome::Band { load, band } => {
+                    tracing::debug!(
+                        "Image {} decoded rows {}..{} of {} wide",
+                        load.image(),
+                        band.rows().start(),
+                        band.rows().end(),
+                        band.width()
+                    );
+                    events.push(ImageCacheEvent::Band { load, band });
+                }
                 WorkerDecodeOutcome::Ready(decoded) => {
                     events.push(ImageCacheEvent::Ready {
                         load: decoded.load,

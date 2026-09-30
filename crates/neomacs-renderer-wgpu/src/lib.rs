@@ -11,6 +11,7 @@ pub mod frame_post;
 pub mod glyph_atlas;
 #[cfg(feature = "video")]
 mod gpu_frame_timing;
+mod image_bands;
 pub mod image_cache;
 pub mod image_probe;
 mod image_sequence;
@@ -25,6 +26,7 @@ mod svg;
 #[path = "texture_discipline_test.rs"]
 mod texture_discipline_test;
 pub mod tooltip_layout;
+pub use image_bands::{BandChunk, RowRange};
 pub use svg::SvgResourceContext;
 pub mod vertex;
 pub mod xbm;
