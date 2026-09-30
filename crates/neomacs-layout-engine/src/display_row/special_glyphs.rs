@@ -212,8 +212,7 @@ fn install_right_edge_marker_from_source_request(
     let Some(clamped_col) = prepare_special_glyph_row(row, matrix_cols, target_col) else {
         return;
     };
-    let trimmed_wide =
-        trim_display_row_text_to_total_columns(row, clamped_col, char_width);
+    let trimmed_wide = trim_display_row_text_to_total_columns(row, clamped_col, char_width);
 
     let padding_cols =
         clamped_col.saturating_sub(DisplayRowColumnCount::from_row(row, char_width).get());

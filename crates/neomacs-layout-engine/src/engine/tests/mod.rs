@@ -36811,10 +36811,7 @@ fn wide_char_cut_at_truncation_edge_leaves_both_cells_to_the_marker() {
     for (i, g) in text_glyphs.iter().enumerate() {
         eprintln!(
             "i446dbg wide-cut glyph[{i}]: type={:?} wide={} width={} pos={:?}",
-            g.glyph_type,
-            g.wide,
-            g.pixel_width,
-            g.provenance
+            g.glyph_type, g.wide, g.pixel_width, g.provenance
         );
     }
     // GNU's contract: the text, then the truncation glyph in BOTH the cut
