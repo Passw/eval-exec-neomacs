@@ -439,8 +439,7 @@ impl<'rows, 'request, 'emit, 'surface, 'face>
             // `:align-to` fields to screen columns while the text around them
             // scrolled (issue #446). The consumed hscroll columns are the
             // difference between the two spaces.
-            let hscroll_offset_px = self.state.row_carryover.hscroll_skip.consumed_columns()
-                as f32
+            let hscroll_offset_px = self.state.row_carryover.hscroll_skip.consumed_columns() as f32
                 * self.params.char_width.max(1.0);
             let replacement_context = BufferDisplayPropertyTextReplacementRenderContext::new(
                 replacement.clone(),

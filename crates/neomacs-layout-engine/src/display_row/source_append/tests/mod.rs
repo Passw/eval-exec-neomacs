@@ -1116,7 +1116,6 @@ fn display_row_transition_render_state_applies_row_start_line_break_policy() {
     );
 }
 
-
 /// An empty snapshot-backed buffer view for the hscroll-skip fallback tests:
 /// every property lookup misses, so chars count with the ordinary widths.
 fn hscroll_skip_fixture() -> (Context, LayoutBufferSnapshot) {
@@ -1145,8 +1144,15 @@ fn buffer_hscroll_skip_preserves_line_break_action() {
         HorizontalScrollTruncationTarget::FirstVisibleSourceGlyph,
     );
 
-    let action = consume_hscroll_skip_from_position(b"\nnext", &mut position, &mut hscroll_skip, 8, &snapshot, 0)
-        .expect("hscroll skip action");
+    let action = consume_hscroll_skip_from_position(
+        b"\nnext",
+        &mut position,
+        &mut hscroll_skip,
+        8,
+        &snapshot,
+        0,
+    )
+    .expect("hscroll skip action");
 
     assert_eq!(
         action,
@@ -1168,8 +1174,15 @@ fn buffer_hscroll_skip_consumes_tab_to_next_stop() {
         HorizontalScrollTruncationTarget::FirstVisibleSourceGlyph,
     );
 
-    let action = consume_hscroll_skip_from_position(b"\tabc", &mut position, &mut hscroll_skip, 8, &snapshot, 0)
-        .expect("hscroll skip action");
+    let action = consume_hscroll_skip_from_position(
+        b"\tabc",
+        &mut position,
+        &mut hscroll_skip,
+        8,
+        &snapshot,
+        0,
+    )
+    .expect("hscroll skip action");
 
     assert_eq!(
         action,
@@ -1195,9 +1208,15 @@ fn buffer_hscroll_skip_consumes_wide_char_columns() {
         HorizontalScrollTruncationTarget::FirstVisibleSourceGlyph,
     );
 
-    let action =
-        consume_hscroll_skip_from_position("界x".as_bytes(), &mut position, &mut hscroll_skip, 8, &snapshot, 0)
-            .expect("hscroll skip action");
+    let action = consume_hscroll_skip_from_position(
+        "界x".as_bytes(),
+        &mut position,
+        &mut hscroll_skip,
+        8,
+        &snapshot,
+        0,
+    )
+    .expect("hscroll skip action");
 
     assert_eq!(
         action,
@@ -1209,9 +1228,15 @@ fn buffer_hscroll_skip_consumes_wide_char_columns() {
     assert_eq!(position, DisplaySourceTextPosition::new("界".len(), 4));
     assert!(hscroll_skip.should_skip());
 
-    let action =
-        consume_hscroll_skip_from_position("界x".as_bytes(), &mut position, &mut hscroll_skip, 8, &snapshot, 0)
-            .expect("left truncation replacement action");
+    let action = consume_hscroll_skip_from_position(
+        "界x".as_bytes(),
+        &mut position,
+        &mut hscroll_skip,
+        8,
+        &snapshot,
+        0,
+    )
+    .expect("left truncation replacement action");
 
     assert_eq!(
         action,
@@ -1237,8 +1262,15 @@ fn buffer_hscroll_skip_keeps_marker_pending_while_still_skipping() {
         HorizontalScrollTruncationTarget::FirstVisibleSourceGlyph,
     );
 
-    let action = consume_hscroll_skip_from_position(b"abc", &mut position, &mut hscroll_skip, 8, &snapshot, 0)
-        .expect("hscroll skip action");
+    let action = consume_hscroll_skip_from_position(
+        b"abc",
+        &mut position,
+        &mut hscroll_skip,
+        8,
+        &snapshot,
+        0,
+    )
+    .expect("hscroll skip action");
 
     assert_eq!(
         action,

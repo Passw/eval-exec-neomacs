@@ -41,7 +41,7 @@ use crate::display_row::walk_state::{
     TrailingWhitespaceRenderState, sync_position_after_row_transition,
 };
 use crate::display_source::{
-    DisplaySpaceWidthPolicy, DisplaySourceStepChar, DisplaySourceTextPosition,
+    DisplaySourceStepChar, DisplaySourceTextPosition, DisplaySpaceWidthPolicy,
 };
 use crate::display_source_progress::{DisplaySourceProgressState, DisplaySourceRowProgressState};
 use crate::frame_face_arena::FrameFaceAttempt;
@@ -53,7 +53,7 @@ use crate::window_output::{
 };
 use neomacs_display_protocol::types::Color;
 use neovm_core::buffer::{EmacsBytePos, LispCharPos1};
-use neovm_core::emacs_core::value::{list_to_vec, Value};
+use neovm_core::emacs_core::value::{Value, list_to_vec};
 
 #[derive(Clone, Copy)]
 pub(crate) struct BufferSourceEndOfBufferTailRenderContext<'a> {
@@ -630,8 +630,9 @@ fn consume_source_char_for_hscroll(
         return BufferSourceHscrollSkipAction::LineBreak { source_char };
     }
 
-    let columns = spec_columns
-        .unwrap_or_else(|| hscroll_skip_column_width(source_char, tab_width, hscroll_skip.consumed_columns()));
+    let columns = spec_columns.unwrap_or_else(|| {
+        hscroll_skip_column_width(source_char, tab_width, hscroll_skip.consumed_columns())
+    });
     let display_item = if source_char.ch() == '\t' {
         HorizontalScrollDisplayItem::tab(columns)
     } else {
