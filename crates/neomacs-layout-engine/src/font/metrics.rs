@@ -731,6 +731,89 @@ impl Default for FontMetricsService {
 }
 
 impl FontMetricsService {
+
+    /// Shape one gstring through the font named by its header (issue #447):
+    /// fills the gstring's glyph slots from the font's shaped output — the
+    /// same contract as GNU's `font->driver->shape` (src/font.c
+    /// Ffont_shape_gstring calls into the driver, then validates coverage
+    /// and truncates).
+    ///
+    /// The gstring header carries the font object (family + pixel size) and
+    /// the run's characters; each shaped glyph lands in a slot as
+    /// `[from to char code width …]` with INCLUSIVE to, the code the font's
+    /// shaped glyph id, and the pixel advance. Returns the shaped glyph
+    /// count.
+    pub fn shape_gstring_through_font(
+        &mut self,
+        gstring: &mut neovm_core::Value,
+        _direction: neovm_core::Value,
+    ) -> neovm_core::emacs_core::font::GstringShapeOutcome {
+        use neovm_core::emacs_core::font::{
+            GstringShapeOutcome, font_object_family_and_pixel_size,
+        };
+
+        let slots: Vec<neovm_core::Value> = match gstring.as_vector_data() {
+            Some(slots) => slots.to_vec(),
+            None => return GstringShapeOutcome::NotShapable,
+        };
+        let Some(header) = slots.first().and_then(|header| header.as_vector_data()) else {
+            return GstringShapeOutcome::NotShapable;
+        };
+        let Some((family, pixel_size)) =
+            header.first().and_then(font_object_family_and_pixel_size)
+        else {
+            return GstringShapeOutcome::NotShapable;
+        };
+        let chars: Vec<char> = header[1..]
+            .iter()
+            .filter_map(|char_slot| {
+                char_slot
+                    .as_int()
+                    .and_then(|code| u32::try_from(code).ok())
+                    .and_then(char::from_u32)
+            })
+            .collect();
+        if chars.is_empty() {
+            return GstringShapeOutcome::NotShapable;
+        }
+        let text: String = chars.iter().collect();
+
+        let shaped = self.shape_run(&text, &family, 400, false, pixel_size as f32);
+        if shaped.is_empty() {
+            return GstringShapeOutcome::Shaped(0);
+        }
+        let glyph_slot_capacity = slots.len().saturating_sub(2);
+        if shaped.len() > glyph_slot_capacity {
+            return GstringShapeOutcome::NeedLargerGlyphs;
+        }
+
+        for (index, glyph) in shaped.iter().enumerate() {
+            // Cluster byte offsets -> inclusive character from/to.
+            let from_char = text[..glyph.cluster_start.min(text.len())].chars().count();
+            let to_end = glyph.cluster_end.min(text.len());
+            let to_char_exclusive = text[..to_end].chars().count();
+            let cluster_char = text[glyph.cluster_start.min(text.len())..to_end]
+                .chars()
+                .next();
+            let slot_values = vec![
+                neovm_core::Value::fixnum(from_char as i64),
+                neovm_core::Value::fixnum(to_char_exclusive.saturating_sub(1) as i64),
+                cluster_char.map_or(neovm_core::Value::NIL, |ch| {
+                    neovm_core::Value::fixnum(ch as i64)
+                }),
+                neovm_core::Value::fixnum(i64::from(glyph.glyph_id)),
+                neovm_core::Value::fixnum(glyph.x_advance.round() as i64),
+                neovm_core::Value::NIL,
+                neovm_core::Value::NIL,
+                neovm_core::Value::NIL,
+                neovm_core::Value::NIL,
+                neovm_core::Value::NIL,
+            ];
+            gstring.set_vector_slot(2 + index, neovm_core::Value::vector(slot_values));
+        }
+        GstringShapeOutcome::Shaped(shaped.len() as i64)
+    }
+
     /// Create a new FontMetricsService.
     ///
     /// This scans the system font database, which can take tens of
@@ -2334,117 +2417,6 @@ impl FontMetricsService {
     /// Shapes the cluster text standalone (the same input the renderer's
     /// composed path uses), so replaying these glyphs reproduces current
     /// visual behavior with the re-selection risk removed.
-    /// Shape one gstring through the font named by its header (issue #447):
-<<<<<<< HEAD
-    /// fills the gstring's glyph slots from the font's shaped output — the same
-    /// contract as GNU's `font->driver->shape` (src/font.c Ffont_shape_gstring
-    /// calls into the driver, then validates coverage and truncates).
-    ///
-    /// The gstring header carries the font object (family + pixel size) and the
-    /// run's characters; each shaped glyph lands in a slot as
-    /// `[from to char code width …]` with INCLUSIVE to, the code the font's
-    /// shaped glyph id, and the pixel advance. Returns the shaped glyph count.
-    pub fn shape_gstring_through_font(
-        &mut self,
-        gstring: &mut neovm_core::Value,
-        _direction: neovm_core::Value,
-    ) -> neovm_core::emacs_core::font::GstringShapeOutcome {
-        use neovm_core::emacs_core::font::{
-            GstringShapeOutcome, font_object_family_and_pixel_size,
-        };
-
-        let slots: Vec<neovm_core::Value> = match gstring.as_vector_data() {
-            Some(slots) => slots.to_vec(),
-            None => return GstringShapeOutcome::NotShapable,
-        };
-        let Some(header) = slots.first().and_then(|header| header.as_vector_data()) else {
-            return GstringShapeOutcome::NotShapable;
-        };
-        let Some((family, pixel_size)) = header.first().and_then(font_object_family_and_pixel_size)
-||||||| parent of 7be02f8ef8 (feat(layout-engine): shape gstrings through the installed font (issue #447 driver core))
-=======
-    /// fills the gstring's glyph slots from the font's shaped output — the
-    /// same contract as GNU's `font->driver->shape` (src/font.c
-    /// Ffont_shape_gstring calls into the driver, then validates coverage
-    /// and truncates).
-    ///
-    /// The gstring header carries the font object (family + pixel size) and
-    /// the run's characters; each shaped glyph lands in a slot as
-    /// `[from to char code width …]` with INCLUSIVE to, the code the font's
-    /// shaped glyph id, and the pixel advance. Returns the shaped glyph
-    /// count.
-    pub fn shape_gstring_through_font(
-        &mut self,
-        gstring: &mut neovm_core::Value,
-        _direction: neovm_core::Value,
-    ) -> neovm_core::emacs_core::font::GstringShapeOutcome {
-        use neovm_core::emacs_core::font::{
-            GstringShapeOutcome, font_object_family_and_pixel_size,
-        };
-
-        let slots: Vec<neovm_core::Value> = match gstring.as_vector_data() {
-            Some(slots) => slots.to_vec(),
-            None => return GstringShapeOutcome::NotShapable,
-        };
-        let Some(header) = slots.first().and_then(|header| header.as_vector_data()) else {
-            return GstringShapeOutcome::NotShapable;
-        };
-        let Some((family, pixel_size)) =
-            header.first().and_then(font_object_family_and_pixel_size)
->>>>>>> 7be02f8ef8 (feat(layout-engine): shape gstrings through the installed font (issue #447 driver core))
-        else {
-            return GstringShapeOutcome::NotShapable;
-        };
-        let chars: Vec<char> = header[1..]
-            .iter()
-            .filter_map(|char_slot| {
-                char_slot
-                    .as_int()
-                    .and_then(|code| u32::try_from(code).ok())
-                    .and_then(char::from_u32)
-            })
-            .collect();
-        if chars.is_empty() {
-            return GstringShapeOutcome::NotShapable;
-        }
-        let text: String = chars.iter().collect();
-
-        let shaped = self.shape_run(&text, &family, 400, false, pixel_size as f32);
-        if shaped.is_empty() {
-            return GstringShapeOutcome::Shaped(0);
-        }
-        let glyph_slot_capacity = slots.len().saturating_sub(2);
-        if shaped.len() > glyph_slot_capacity {
-            return GstringShapeOutcome::NeedLargerGlyphs;
-        }
-
-        for (index, glyph) in shaped.iter().enumerate() {
-            // Cluster byte offsets -> inclusive character from/to.
-            let from_char = text[..glyph.cluster_start.min(text.len())].chars().count();
-            let to_end = glyph.cluster_end.min(text.len());
-            let to_char_exclusive = text[..to_end].chars().count();
-            let cluster_char = text[glyph.cluster_start.min(text.len())..to_end]
-                .chars()
-                .next();
-            let slot_values = vec![
-                neovm_core::Value::fixnum(from_char as i64),
-                neovm_core::Value::fixnum(to_char_exclusive.saturating_sub(1) as i64),
-                cluster_char.map_or(neovm_core::Value::NIL, |ch| {
-                    neovm_core::Value::fixnum(ch as i64)
-                }),
-                neovm_core::Value::fixnum(i64::from(glyph.glyph_id)),
-                neovm_core::Value::fixnum(glyph.x_advance.round() as i64),
-                neovm_core::Value::NIL,
-                neovm_core::Value::NIL,
-                neovm_core::Value::NIL,
-                neovm_core::Value::NIL,
-                neovm_core::Value::NIL,
-            ];
-            gstring.set_vector_slot(2 + index, neovm_core::Value::vector(slot_values));
-        }
-        GstringShapeOutcome::Shaped(shaped.len() as i64)
-    }
-
     pub fn resolved_glyphs_for_cluster(
         &mut self,
         text: &str,

@@ -36841,50 +36841,24 @@ fn ligature_rule_composes_through_the_font_shape_driver() {
     eval.buffer_manager_mut().set_current(buf_id);
     // QUOTED rules (the wiki pattern): the rule vector is data — the
     // function symbol reaches auto-compose-chars' funcall through the
-    // function cell, no variable binding involved.
-    let rule = "(progn \
-         (setq auto-composition-mode t auto-composition-function 'auto-compose-chars \
-         composition-function-table (make-char-table nil)) \
-         (aset composition-function-table ?- \
-           '([\"\\\\(?:->\\\\)\" 0 font-shape-gstring])) \
-         (aset composition-function-table ?> \
-           '([\"\\\\(?:->>\\\\|->\\\\)\" 0 font-shape-gstring])))";
-<<<<<<< HEAD
-    let ok = eval.eval_str(rule);
-<<<<<<< HEAD
-    eprintln!("i447dbg rule eval: {ok:?}");
-
-    // The installed font-shaping driver: the layout engine's own font
-    // system, exactly what RedisplayRuntime::shape_gstring exposes.
-    let metrics = std::sync::Arc::new(std::sync::Mutex::new(
-        crate::font::metrics::FontMetricsService::new(),
-    ));
-    let driver_metrics = metrics.clone();
-    eval.font_shape_fn = Some(Box::new(move |_eval, mut gstring, direction| {
-        let mut metrics = driver_metrics.lock().expect("driver metrics");
-        crate::font::metrics::FontMetricsService::shape_gstring_through_font(
-            &mut metrics,
-            &mut gstring,
-            direction,
-        )
-    }));
-||||||| parent of a591c2a358 (feat(gui-tests,layout-engine): ligature composition end-to-end + the shaping driver install (issue #447))
-    eprintln!("i447dbg rule eval: {ok:?}");
-=======
-    assert!(
-        ok.is_ok(),
-        "the ligature rule setup must evaluate: {ok:?}"
+    // function cell. Built via format! so no escape-sequence ambiguity.
+    // The Lisp string must read back as the regex `\(?:->\)` (shy group):
+    // the Lisp SOURCE needs doubled backslashes, so the pattern string
+    // carries two literal backslashes around the group.
+    let regex_pattern = String::from_utf8(vec![
+        0x5C, 0x5C, 0x28, 0x3F, 0x3A, 0x2D, 0x3E, 0x5C, 0x5C, 0x29,
+    ])
+    .expect("ASCII");
+    // regex_pattern is the 8-byte string `\(?:->\)`.
+    let rule = format!(
+        "(progn (setq auto-composition-mode t auto-composition-function \
+          'auto-compose-chars composition-function-table (make-char-table nil)) \
+          (aset composition-function-table ?- \
+          '([\"{}\" 0 font-shape-gstring])))",
+        regex_pattern
     );
->>>>>>> a591c2a358 (feat(gui-tests,layout-engine): ligature composition end-to-end + the shaping driver install (issue #447))
-||||||| parent of 7be02f8ef8 (feat(layout-engine): shape gstrings through the installed font (issue #447 driver core))
-           (list (vector \"\\\\(?:->\\\\)\" 0 font-shape-gstring))))";
-    let ok = eval.eval_str(rule);
-    assert!(
-        ok.is_ok(),
-        "the ligature rule setup must evaluate: {ok:?}"
-    );
-=======
-    eval.eval_str(rule).expect("the ligature rule setup must evaluate");
+    eval.eval_str(&rule)
+        .expect("the ligature rule setup must evaluate");
 
     // The installed font-shaping driver: a disjoint FontMetricsService the
     // runtime owns (RedisplayRuntime::shape_gstring's exact pattern).
@@ -36897,7 +36871,6 @@ fn ligature_rule_composes_through_the_font_shape_driver() {
         metrics.shape_gstring_through_font(&mut gstring, direction)
     }));
 
->>>>>>> 7be02f8ef8 (feat(layout-engine): shape gstrings through the installed font (issue #447 driver core))
     let frame_id = eval
         .frame_manager_mut()
         .create_frame("ligature-probe", 200, 160, buf_id);
@@ -36935,8 +36908,7 @@ fn ligature_rule_composes_through_the_font_shape_driver() {
     let composed = first_text_glyphs.iter().any(|glyph| {
         matches!(
             &glyph.glyph_type,
-            GlyphType::Composite { text } | GlyphType::AutomaticComposite { text, .. }
-                if text.as_ref() == "->"
+            GlyphType::AutomaticComposite { text, .. } if text.as_ref() == "->"
         )
     });
     assert!(
@@ -36944,5 +36916,5 @@ fn ligature_rule_composes_through_the_font_shape_driver() {
         "the '->' sequence must compose into one glyph through the \
          font-shape driver, got {:?}",
         glyphs_logical_text(first_text_glyphs)
-    );
+    )
 }
