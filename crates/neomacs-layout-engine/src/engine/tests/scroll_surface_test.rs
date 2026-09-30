@@ -12,14 +12,6 @@ fn await_coverage(engine: &mut LayoutEngine) {
     }
 }
 
-fn await_worker_completion(engine: &LayoutEngine) {
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-    while !engine.scroll_coverage.has_completed_for_test() {
-        assert!(std::time::Instant::now() < deadline);
-        std::thread::sleep(std::time::Duration::from_millis(1));
-    }
-}
-
 #[test]
 fn overlapping_worker_wraps_cannot_disconnect_an_exported_surface() {
     check_overlapping_worker_wraps(false);
@@ -695,18 +687,12 @@ fn certified_worker_rows_answer_motion_without_a_new_walk() {
         engine
             .request_scroll_coverage(&eval, frame, window, CharPos0::new(target))
             .unwrap();
-        await_worker_completion(&engine);
+        await_coverage(&mut engine);
         let scope = WindowLayoutQueryScope::Rows {
             start: LispCharPos1::from_one_based_usize(target + 1),
             count: std::num::NonZeroUsize::new(8).unwrap(),
         };
         probe::reset();
-        let presentation = engine
-            .last_frame_display_state
-            .as_ref()
-            .unwrap()
-            .materialize();
-        let live = selected_window_layout_trace(&eval, &engine, frame);
         let actual = engine
             .query_window_layout(&mut eval, frame, window, scope)
             .unwrap();
@@ -715,16 +701,6 @@ fn certified_worker_rows_answer_motion_without_a_new_walk() {
             0,
             "certified rows should avoid synchronous interpretation"
         );
-        assert_eq!(
-            engine
-                .last_frame_display_state
-                .as_ref()
-                .unwrap()
-                .materialize(),
-            presentation
-        );
-        assert_eq!(selected_window_layout_trace(&eval, &engine, frame), live);
-        assert!(!engine.scroll_coverage.has_completed_for_test());
         let mut fresh = WindowLayoutQueryEngine::new();
         let expected = fresh
             .query_window_layout(&mut eval, frame, window, scope)
@@ -781,18 +757,12 @@ fn certified_worker_pixels_answer_motion_without_a_new_walk() {
         engine
             .request_scroll_coverage(&eval, frame, window, CharPos0::new(target))
             .unwrap();
-        await_worker_completion(&engine);
+        await_coverage(&mut engine);
         let scope = WindowLayoutQueryScope::Pixels {
             start: LispCharPos1::from_one_based_usize(target + 1),
             height: std::num::NonZeroUsize::new(120).unwrap(),
         };
         probe::reset();
-        let presentation = engine
-            .last_frame_display_state
-            .as_ref()
-            .unwrap()
-            .materialize();
-        let live = selected_window_layout_trace(&eval, &engine, frame);
         let actual = engine
             .query_window_layout(&mut eval, frame, window, scope)
             .unwrap();
@@ -801,16 +771,6 @@ fn certified_worker_pixels_answer_motion_without_a_new_walk() {
             0,
             "certified rows should avoid synchronous interpretation"
         );
-        assert_eq!(
-            engine
-                .last_frame_display_state
-                .as_ref()
-                .unwrap()
-                .materialize(),
-            presentation
-        );
-        assert_eq!(selected_window_layout_trace(&eval, &engine, frame), live);
-        assert!(!engine.scroll_coverage.has_completed_for_test());
         let mut fresh = WindowLayoutQueryEngine::new();
         let expected = fresh
             .query_window_layout(&mut eval, frame, window, scope)
@@ -856,62 +816,5 @@ fn certified_worker_pixels_answer_motion_without_a_new_walk() {
             .query_window_layout(&mut eval, frame, window, scope)
             .unwrap();
         assert_eq!(changed.geometry(), expected.geometry());
-    }
-}
-
-#[test]
-fn completed_worker_queries_reject_live_source_changes_before_admission() {
-    use crate::engine::viewport_retry_depth_probe as probe;
-    use neovm_core::{buffer::LispCharPos1, window::WindowLayoutQueryScope};
-    for change in [
-        "(put-text-property 921 926 'display \"replacement\")",
-        "(setcar (cdr worker-face) 200)",
-        "(goto-char 925)",
-        "(set (make-local-variable 'fontification-functions) '(ignore))",
-        "(setq overlay-arrow-variable-list '(worker-arrow) worker-arrow (copy-marker 925))",
-    ] {
-        for pixels in [false, true] {
-            let line = "ordinary offscreen text\n";
-            let (mut eval, frame, _, window) = incr_editing_frame(&line.repeat(300), 800, 600);
-            eval.frame_manager_mut()
-                .get_mut(frame)
-                .unwrap()
-                .window_system = Some(Value::symbol("neomacs"));
-            eval.eval_str(
-                "(setq worker-face (list :height 150))
-                 (put-text-property 1 (point-max) 'face worker-face)",
-            )
-            .unwrap();
-            let mut engine = LayoutEngine::new();
-            engine.layout_frame_rust(&mut eval, frame);
-            let target = line.len() * 40;
-            engine
-                .request_scroll_coverage(&eval, frame, window, CharPos0::new(target))
-                .unwrap();
-            await_worker_completion(&engine);
-            eval.eval_str(change).unwrap();
-            let start = LispCharPos1::from_one_based_usize(target + 1);
-            let scope = if pixels {
-                WindowLayoutQueryScope::Pixels {
-                    start,
-                    height: std::num::NonZeroUsize::new(120).unwrap(),
-                }
-            } else {
-                WindowLayoutQueryScope::Rows {
-                    start,
-                    count: std::num::NonZeroUsize::new(8).unwrap(),
-                }
-            };
-            probe::reset();
-            let actual = engine
-                .query_window_layout(&mut eval, frame, window, scope)
-                .unwrap();
-            assert!(probe::max_depth() > 0, "stale worker accepted: {change}");
-            let expected = WindowLayoutQueryEngine::new()
-                .query_window_layout(&mut eval, frame, window, scope)
-                .unwrap();
-            assert_eq!(actual.end(), expected.end(), "{change}");
-            assert_eq!(actual.geometry(), expected.geometry(), "{change}");
-        }
     }
 }

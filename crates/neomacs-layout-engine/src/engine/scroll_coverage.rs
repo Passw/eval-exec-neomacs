@@ -127,11 +127,6 @@ pub(super) struct ScrollCoverage {
 
 impl ScrollCoverage {
     #[cfg(test)]
-    pub(super) fn has_completed_for_test(&self) -> bool {
-        self.worker.has_completed_for_test()
-    }
-
-    #[cfg(test)]
     pub(super) fn active_capture_start_for_test(&self) -> Option<usize> {
         self.capture
             .as_ref()

@@ -3448,14 +3448,6 @@ impl LayoutEngine {
         if let Some(query) = self.query_cache.get(evaluator, frame_id, window_id, scope) {
             return Ok(query);
         }
-        // A command can reach measurement before the next maintenance/frame
-        // boundary. Admit already completed work without waiting or publishing;
-        // the bounded query below still validates its live source and extent.
-        if !matches!(scope, neovm_core::window::WindowLayoutQueryScope::Viewport)
-            && scroll_coverage::inactive_overlay_arrows(evaluator)
-        {
-            let _ = self.scroll_coverage.drain(&mut self.prepared_viewports);
-        }
         if let Some(query) = self
             .prepared_viewports
             .measure_rows(evaluator, frame_id, window_id, scope)
