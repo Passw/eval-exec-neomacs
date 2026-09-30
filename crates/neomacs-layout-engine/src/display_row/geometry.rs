@@ -284,6 +284,13 @@ pub(crate) enum DisplayRowFlagKind {
     /// 26399-26403, 26421-26432). A row broken at a recorded word-wrap point
     /// (`back_to_wrap`, src/xdisp.c:26360-26388) is `Continued` but not this.
     ContinuedMidElement,
+    /// A double-width character was cut at this row's right edge: its first
+    /// cell started inside the window and its trailing cell crossed the edge.
+    /// GNU's TTY truncation pass overwrites EVERY cell the cut glyph leaves
+    /// with the truncation glyph (the back-scan to the last non-padding glyph
+    /// at src/xdisp.c:26611-26615, then one produce_special_glyphs per cell
+    /// to the row's end, :26636-26641) — issue #446's wide-name case.
+    WideCut,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -292,6 +299,7 @@ pub(crate) struct DisplayRowFlags {
     truncated: Vec<bool>,
     continuation: Vec<bool>,
     continued_mid_element: Vec<bool>,
+    wide_cut: Vec<bool>,
 }
 
 impl DisplayRowFlags {
@@ -301,6 +309,7 @@ impl DisplayRowFlags {
             truncated: vec![false; row_count],
             continuation: vec![false; row_count],
             continued_mid_element: vec![false; row_count],
+            wide_cut: vec![false; row_count],
         }
     }
 
@@ -324,6 +333,7 @@ impl DisplayRowFlags {
             DisplayRowFlagKind::Truncated => &self.truncated,
             DisplayRowFlagKind::Continuation => &self.continuation,
             DisplayRowFlagKind::ContinuedMidElement => &self.continued_mid_element,
+            DisplayRowFlagKind::WideCut => &self.wide_cut,
         }
     }
 
@@ -333,6 +343,7 @@ impl DisplayRowFlags {
             DisplayRowFlagKind::Truncated => &mut self.truncated,
             DisplayRowFlagKind::Continuation => &mut self.continuation,
             DisplayRowFlagKind::ContinuedMidElement => &mut self.continued_mid_element,
+            DisplayRowFlagKind::WideCut => &mut self.wide_cut,
         }
     }
 }

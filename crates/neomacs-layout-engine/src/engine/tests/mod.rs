@@ -36749,15 +36749,12 @@ fn borrowed_and_snapshot_views_agree_on_composition_span_queries() {
 
 #[test]
 fn wide_char_cut_at_truncation_edge_leaves_both_cells_to_the_marker() {
-    // RED pin for the last issue #446 follow-up (the upstream
-    // ibuffer_truncated_wide_name TUI test): a wide character at columns
-    // 38..40 in a forty-column truncating window is cut at the edge. GNU's
-    // truncation pass overwrites BOTH its cells with the truncation glyph
-    // (xdisp.c:26611-26641). This port refuses the glyph at the fit check
-    // and paints blank + `$`. The marker-fill support is in place
-    // (RightEdgeMarkerItemSource's marker-filled padding); the missing
-    // piece is the admission routing through the overflow arm — see the
-    // NOTE in DisplayRowTextOverflowDecision::for_char. {
+    // Issue #446 follow-up (the upstream ibuffer_truncated_wide_name TUI
+    // test): a wide character at columns 38..40 in a forty-column truncating
+    // window is cut at the edge. GNU's truncation pass overwrites BOTH its
+    // cells with the truncation glyph (xdisp.c:26611-26641): the cut is
+    // recorded as the row's WideCut flag and the marker installer fills the
+    // padding cells with the marker. {
     let mut eval = Context::new();
     let buf_id = eval
         .buffer_manager()

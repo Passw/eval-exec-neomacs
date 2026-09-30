@@ -592,24 +592,14 @@ impl DisplayRowTextOverflowDecision {
         if ch == '\t' || x_px + advance_px <= right_edge_px {
             Self::Fits
         } else if wrap_mode == LineWrapMode::Truncate {
-            // NOTE on the wide-glyph cut case (issue #446 wide-name): GNU
-            // admits a wide character whose first cell fits and OVERWRITES
-            // both its cells with the truncation glyph
-            // (xdisp.c:26611-26641). This port refuses it here and writes
-            // blank + marker — a tracked one-cell divergence (the upstream
-            // ibuffer_truncated_wide_name test, pinned at the engine level
-            // by wide_char_cut_at_truncation_edge_leaves_both_cells_to_the_marker).
-            //
-            // Admitting it is NOT a local change: an attempted routing
-            // (WideCutTruncate through the overflow arm, appending via the
-            // prepared append before the truncation skip) corrupted the
-            // FOLLOWING line's point/face bookkeeping — the appended glyph
-            // bypasses the walk's face-checkpoint lifecycle, so the next
-            // line's face runs resolved one character off (missing point for
-            // the line's first char, fallback-width 好 glyphs). The
-            // marker-fill support (RightEdgeMarkerItemSource's marker-filled
-            // padding) is in place; the admission must integrate with the
-            // face-scan/checkpoint lifecycle first.
+            // Wide-glyph cut case (issue #446 wide-name): a wide character
+            // whose first cell fits is still refused here, but the truncation
+            // arm records the cut as the row's WideCut flag (overflow.rs),
+            // and the marker installer then overwrites the padding cells —
+            // the cut glyph's cells — with the truncation glyph, matching
+            // GNU's visible result (append + overwrite,
+            // xdisp.c:26611-26641) without touching the walk/append
+            // lifecycle.
             Self::Truncate
         } else if word_wrap.has_candidate() {
             Self::WordWrap {
