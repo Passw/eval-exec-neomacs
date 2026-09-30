@@ -325,7 +325,6 @@ impl ScrollCoverage {
         if fills_viewport || bridge {
             self.capture = None;
         }
-        self.publication_pending = true;
         tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
             start = admission.retained.key.window_start,
             connecting_end = ?admission.bridge_end.map(|end| end.get()),
@@ -336,7 +335,7 @@ impl ScrollCoverage {
                 .map(|row| (row.start_charpos, row.end_charpos, row.continued, row.next_buffer_row_start())),
             rows = admission.retained.display_snapshot.rows.len(), complete_viewport,
             "admitted worker coverage");
-        destination.insert_computed(
+        let changed = destination.insert_computed(
             admission.frame,
             admission.window,
             admission.retained,
@@ -346,6 +345,10 @@ impl ScrollCoverage {
             complete_viewport,
             query_freshness,
         );
+        self.publication_pending |= changed;
+        tracing::debug!(target: "neomacs_layout_engine::scroll_coverage",
+            window = admission.window.get(), changed,
+            "worker coverage retention decision");
         Ok(true)
     }
 }

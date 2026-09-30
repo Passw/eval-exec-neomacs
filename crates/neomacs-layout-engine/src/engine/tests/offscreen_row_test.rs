@@ -4562,3 +4562,90 @@ fn check_backward_bridge_admission_under_overlapping_page_pressure(rich: bool) {
         "bridge changed accepted visible geometry"
     );
 }
+
+#[test]
+fn discarded_distant_bridge_does_not_request_a_coverage_publication() {
+    check_discarded_bridge_publication(false);
+}
+
+#[test]
+fn discarded_bridge_preserves_an_earlier_unconsumed_publication() {
+    check_discarded_bridge_publication(true);
+}
+
+fn check_discarded_bridge_publication(pending: bool) {
+    let line = "nearby prepared row\n";
+    let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let anchor = 120 * line.len();
+    scroll_window_to(&mut eval, frame, window, buffer, anchor as i64 + 1, anchor);
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    let owner = DisplayWindowId::new(window.0 as i64);
+    // Unique four-line pages exhaust the bounded cache. A farther page
+    // cannot replace the already connected seam without breaking coverage.
+    for page in 0..9 {
+        let start = anchor - (page + 1) * 4 * line.len();
+        if !pending {
+            engine.take_scroll_coverage_publication();
+        }
+        let visible_before = selected_window_layout_trace(&eval, &engine, frame);
+        let edge_before = engine.prepared_viewports.backward_start(
+            frame,
+            owner,
+            &engine.retained_window_matrices[&owner].key,
+        );
+        engine
+            .request_scroll_bridge(
+                &eval,
+                frame,
+                window,
+                CharPos0::new(start),
+                CharPos0::new(start + 4 * line.len()),
+            )
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !engine
+            .scroll_coverage
+            .drain(&mut engine.prepared_viewports)
+            .unwrap()
+        {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::yield_now();
+        }
+        if page == 8 {
+            assert_eq!(
+                engine.take_scroll_coverage_publication(),
+                pending,
+                "discarded work must preserve the previous publication decision"
+            );
+        }
+        engine.layout_frame_rust(&mut eval, frame);
+        if page == 8 {
+            assert!(
+                selected_window_layout_trace(&eval, &engine, frame) == visible_before,
+                "discarded work changed accepted geometry"
+            );
+            assert_eq!(
+                engine.prepared_viewports.backward_start(
+                    frame,
+                    owner,
+                    &engine.retained_window_matrices[&owner].key
+                ),
+                edge_before,
+                "discarded work changed the exported edge"
+            );
+        }
+    }
+    assert!(
+        engine
+            .prepared_viewports
+            .backward_start(frame, owner, &engine.retained_window_matrices[&owner].key)
+            .unwrap()
+            .get()
+            < anchor
+    );
+}

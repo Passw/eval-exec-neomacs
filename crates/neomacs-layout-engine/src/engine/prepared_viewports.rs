@@ -112,6 +112,7 @@ impl PreparedViewports {
         })
     }
 
+    /// Whether retention may have changed the exported content or selection.
     pub(super) fn insert_computed(
         &mut self,
         frame: neovm_core::window::FrameId,
@@ -122,7 +123,7 @@ impl PreparedViewports {
         source_roots: Vec<neovm_core::emacs_core::owned_roots::OwnedRoots>,
         complete_viewport: bool,
         query_freshness: Option<neovm_core::window::WindowDisplaySnapshotFreshness>,
-    ) {
+    ) -> bool {
         // Retargeting can revisit a page that is already prepared. A preview
         // must never shorten its still-valid coverage while the rest is being
         // captured again. Freshness and geometry must match before retaining
@@ -157,7 +158,7 @@ impl PreparedViewports {
                 complete_viewport = entry.complete_viewport,
                 "retaining larger prepared prefix");
             self.entries.push_back(entry);
-            return;
+            return true;
         }
         let rows = retained.matrix.rows.len();
         let glyphs = retained
@@ -168,13 +169,16 @@ impl PreparedViewports {
             .map(Vec::len)
             .sum();
         if rows > MAX_ROWS || glyphs > MAX_GLYPHS {
-            return;
+            return false;
         }
+        let before = self.entries.len();
+        let origin = retained.key.window_start;
         self.entries.retain(|entry| {
             entry.frame != frame
                 || entry.window != window
                 || entry.retained.key.window_start != retained.key.window_start
         });
+        let replaced = self.entries.len() != before;
         self.entries.push_back(PreparedViewport {
             frame,
             window,
@@ -189,6 +193,15 @@ impl PreparedViewports {
             _source_roots: source_roots,
         });
         self.trim();
+        // Removing only the newly appended entry leaves both payloads and
+        // precedence unchanged. Do not make the evaluator redraw that no-op.
+        replaced
+            || self.entries.len() != before
+            || self.entries.iter().any(|entry| {
+                entry.frame == frame
+                    && entry.window == window
+                    && entry.retained.key.window_start == origin
+            })
     }
 
     fn trim(&mut self) {
