@@ -731,16 +731,22 @@ fn sync_live_frame_font_state_in_state(
     let new_font_pixel_size = metrics.pixel_size.max(1) as f32;
     let new_char_width = metrics.average_width.max(1) as f32;
     let new_char_height = metrics.height.max(1) as f32;
+    // GNU's `FONT_BASE`: the new font's baseline within the cell.  A row's
+    // height is `max (ascent) + max (descent)` over the elements on it, so a
+    // font change that moves only the baseline is still a layout input.
+    let new_font_ascent = metrics.ascent.clamp(0, metrics.height) as f32;
     let line_height_changed = frame.char_height != new_char_height;
     let geometry_changed = line_height_changed
         || frame.font_pixel_size != new_font_pixel_size
-        || frame.char_width != new_char_width;
+        || frame.char_width != new_char_width
+        || frame.font_ascent != new_font_ascent;
 
     frame.set_known_parameter(FrameParam::Font, public_font_name);
     frame.set_parameter(Value::symbol("font-parameter"), resolution.font_value);
     frame.font_pixel_size = new_font_pixel_size;
     frame.char_width = new_char_width;
     frame.char_height = new_char_height;
+    frame.font_ascent = new_font_ascent;
 
     // GNU's `set_new_font_hook` ends in `adjust_frame_size (f, FRAME_COLS (f)
     // * FRAME_COLUMN_WIDTH (f), FRAME_LINES (f) * FRAME_LINE_HEIGHT (f), 3,

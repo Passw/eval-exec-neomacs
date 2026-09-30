@@ -1717,6 +1717,12 @@ impl LayoutEngine {
                     frame.char_width = geometry.metrics.char_width;
                     frame.char_height = geometry.metrics.line_height;
                     frame.font_pixel_size = geometry.font_size.get();
+                    // The same metrics object already decides the ascent every
+                    // image row is laid out against (`default_metrics.ascent`
+                    // below); publishing it on the frame keeps a non-rendering
+                    // measurement (`window-text-pixel-size`) from having to
+                    // guess the baseline split of the cell it reports.
+                    frame.font_ascent = geometry.metrics.ascent;
                 }
             }
             Some(FrameCellGeometry::TerminalCell) => {
@@ -1732,6 +1738,11 @@ impl LayoutEngine {
                     if frame.char_height < 1.0 {
                         frame.char_height = 1.0;
                     }
+                    // No font object on a terminal frame: the whole cell sits
+                    // above the baseline, which is the same choice
+                    // `neovm_bridge::window_params_from_neovm` makes for
+                    // terminal `WindowParams`.
+                    frame.font_ascent = frame.char_height;
                 }
             }
             // A graphic layout engine without font services retains the last

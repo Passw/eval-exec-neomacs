@@ -580,7 +580,7 @@ pub struct WindowRedisplayState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FrameLayoutInputState {
     pub(crate) id: FrameId,
-    pub(crate) geometry: (u32, u32, u32, u32, u32),
+    pub(crate) geometry: (u32, u32, u32, u32, u32, u32),
     pub(crate) device_scale_bits: u64,
     pub(crate) visible: bool,
     pub(crate) displays_chrome: bool,
@@ -3880,6 +3880,22 @@ pub struct Frame {
     pub char_width: f32,
     /// Default character height.
     pub char_height: f32,
+    /// The default font's ascent in pixels: how far the text baseline sits
+    /// below the top of a character cell.
+    ///
+    /// GNU's `FONT_BASE` for the frame's default face font (`FRAME_BASELINE` is
+    /// `char_height`-relative, not a pixel count).  A row's height is
+    /// `max (ascent) + max (descent)` over the elements on it
+    /// (`move_it_in_display_line_to`, src/xdisp.c:11203-11207; the image branch
+    /// is `produce_image_glyph`, src/xdisp.c:32447-32463), so a display element
+    /// that rises above the baseline -- an image with `:ascent 100` -- needs
+    /// this number to be measurable at all.  Without it the frame carried only
+    /// the cell's *total* height and every consumer had to guess the split.
+    ///
+    /// Terminal frames keep the cell convention `descent = 0` that
+    /// `neovm_bridge` uses for them (`font_ascent = char_height`); they display
+    /// no images, so the split is unobservable there.
+    pub font_ascent: f32,
     /// One-shot guard used when a live default-font change updates the frame's
     /// character metrics before GNU would commit the follow-up width/height
     /// window-system resize.
@@ -4044,6 +4060,10 @@ impl Frame {
             font_pixel_size: 16.0,
             char_width: 8.0,
             char_height: 16.0,
+            // The cell convention for a frame whose font has not been probed:
+            // the whole cell is above the baseline, so `ascent + descent` stays
+            // equal to `char_height` for every consumer (see `font_ascent`).
+            font_ascent: 16.0,
             device_scale_factor: 1.0,
             defer_next_gui_parameter_resize: false,
             pending_gui_resize: None,
@@ -4189,6 +4209,16 @@ impl Frame {
             })
     }
 
+    /// The default font's ascent, clamped into the frame's character cell.
+    ///
+    /// The clamp makes `ascent + descent == char_height` for every frame,
+    /// including one whose metrics came from different sources (a test or a
+    /// stub host can set `char_height` without a matching `font_ascent`), so a
+    /// text-only row keeps measuring exactly one cell tall.
+    pub fn font_cell_ascent(&self) -> f32 {
+        self.font_ascent.clamp(0.0, self.char_height.max(0.0))
+    }
+
     pub fn layout_inputs(&self) -> FrameLayoutInputState {
         let window_system = self.effective_window_system();
         FrameLayoutInputState {
@@ -4199,6 +4229,7 @@ impl Frame {
                 redisplay_f32_bits(self.char_width),
                 redisplay_f32_bits(self.char_height),
                 redisplay_f32_bits(self.font_pixel_size),
+                redisplay_f32_bits(self.font_ascent),
             ),
             device_scale_bits: self.device_scale_factor.to_bits(),
             visible: self.visibility.is_visible(),

@@ -476,6 +476,76 @@ impl ImageSpecMargins {
     }
 }
 
+/// GNU `img->hmargin` / `img->vmargin` for an image SPEC: the margin ONE SIDE
+/// of the bitmap occupies (`:margin` / `:relief`, the latter by its magnitude).
+///
+/// Redisplay's glyph arithmetic adds one of these on each side it reaches
+/// (`produce_image_glyph`, src/xdisp.c:32463-32470), so a consumer that wants
+/// the whole glyph adds twice the value; `Fimage_size` does the same.
+pub(crate) fn image_spec_margins(spec: &Value) -> (f32, f32) {
+    let margins = ImageSpecMargins::from_image_spec(spec);
+    (margins.hmargin as f32, margins.vmargin as f32)
+}
+
+/// GNU's `img->ascent` policy for an image SPEC
+/// (`src/image.c:3592-3596`, `image_ascent` at `src/image.c:1887-1924`).
+///
+/// `:ascent N` is a percentage of the image's height, `:ascent center` centres
+/// the image on the text baseline with `image_ascent`'s font-metric bias, and
+/// anything else keeps `DEFAULT_IMAGE_ASCENT` (50, src/dispextern.h:3311).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum ImageAscentPolicy {
+    Percent(f32),
+    Center,
+}
+
+impl ImageAscentPolicy {
+    /// The ascent in pixels of an image whose ascent box is `height` pixels,
+    /// against a face font whose cell splits into `text_ascent` / `text_descent`.
+    ///
+    /// `height` is what GNU's `image_ascent` calls `height`: the glyph height
+    /// plus its vertical margin where the image touches the cell edge.
+    pub(crate) fn resolve(self, height: f32, text_ascent: f32, text_descent: f32) -> f32 {
+        match self {
+            Self::Percent(percent) => height * (percent / 100.0),
+            // GNU errs upward when the image cannot be centred exactly: a
+            // typical font is top-heavy, so the placement should be too.
+            Self::Center => ((height + text_ascent - text_descent + 1.0) / 2.0).floor(),
+        }
+    }
+}
+
+/// Read `:ascent` off an image SPEC.
+///
+/// The accepted range deliberately matches the renderer's parser
+/// (`neomacs-layout-engine/src/display_spec.rs::parse_image_ascent`): a
+/// measurement that accepted a percentage the renderer rejects would report a
+/// row height no redisplay ever produces.  GNU accepts any fixnum there and
+/// multiplies by it, so an out-of-range `:ascent` is the one case where a
+/// measurement of an out-of-range spec differs from GNU's.
+pub(crate) fn image_spec_ascent(spec: &Value) -> ImageAscentPolicy {
+    let Some(items) = list_to_vec(spec) else {
+        return ImageAscentPolicy::Percent(50.0);
+    };
+    let mut index = 1;
+    while index + 1 < items.len() {
+        if ImageSpecKey::from_lisp_value(items[index]) == Some(ImageSpecKey::Ascent) {
+            let value = items[index + 1];
+            if value.is_symbol_named("center") {
+                return ImageAscentPolicy::Center;
+            }
+            if let Some(percent) = value.as_int().map(|percent| percent as f32)
+                && percent.is_finite()
+                && (0.0..=100.0).contains(&percent)
+            {
+                return ImageAscentPolicy::Percent(percent);
+            }
+        }
+        index += 2;
+    }
+    ImageAscentPolicy::Percent(50.0)
+}
+
 pub(crate) fn image_resolve_request_from_spec(
     spec: &Value,
     environment: ImageScaleEnvironment,

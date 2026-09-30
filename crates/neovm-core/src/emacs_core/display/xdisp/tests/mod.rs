@@ -2211,7 +2211,7 @@ fn pixel_size_tty_context() -> (Context, i64) {
 
 /// A window-system frame for the image tests: a 10x20 cell whose font splits
 /// into (ascent, descent) = (15, 5), exactly the split GNU 31.1 reported for
-/// its default font in the reference run.
+/// its default font in the reference run (`tmp/textsize/gnu5.txt`).
 fn pixel_size_image_context() -> (Context, i64) {
     let mut eval = interactive_context();
     let buf_id = eval.buffers.current_buffer().expect("current buffer").id;
@@ -2223,6 +2223,7 @@ fn pixel_size_image_context() -> (Context, i64) {
         frame.char_width = 10.0;
         frame.char_height = 20.0;
         frame.font_pixel_size = 16.0;
+        frame.font_ascent = 15.0;
         frame.set_window_system(Some(Value::symbol("x")));
     }
     eval.set_display_host(Box::new(DecodedImageHost));
@@ -2447,8 +2448,8 @@ fn window_text_pixel_size_uses_the_tallest_row_element_for_height() {
             .image(image_display_spec(40, 300, &[]))
             .text("cd\n")
             .measure(Value::NIL, Value::NIL),
-        (240, 300),
-        "a 300px-tall image grows the text row to 300"
+        (80, 300),
+        "2 cells + 40px image + 2 cells; a 300px-tall image grows the text row to 300"
     );
 }
 
@@ -2505,6 +2506,122 @@ fn window_text_pixel_size_measures_an_image_row_under_the_y_limit() {
             .measure(Value::NIL, Value::fixnum(100)),
         (200, 100),
         "a 100 px y-limit covers both rows (20 + 80)"
+    );
+}
+
+/// An image's `:ascent` decides how much of it rises above the text baseline.
+///
+/// A row is `max (ascent) + max (descent)` over the elements on it
+/// (`move_it_in_display_line_to`, src/xdisp.c:11203-11207) -- NOT the tallest
+/// element's height -- so an image that hangs below the baseline grows the row
+/// even when it is shorter than the cell, and an image that sits on the
+/// baseline never grows it past the text ascent.  The expected heights are
+/// GNU 31.1's, from the height/ascent sweep in `tmp/textsize/gnu5.txt` against
+/// a font cell that splits 15/5.
+#[test]
+fn window_text_pixel_size_honours_image_ascent() {
+    crate::test_utils::init_test_tracing();
+    let height = |spec: Value| {
+        ImageProbe::new()
+            .text("ab")
+            .image(spec)
+            .text("cd\n")
+            .measure(Value::NIL, Value::NIL)
+            .1
+    };
+
+    // 30px images at each ascent policy.  GNU: 30 / 45 / 35 / 30.
+    assert_eq!(height(image_display_spec(40, 30, &[])), 30, "default 50%");
+    assert_eq!(
+        height(image_display_spec(40, 30, &[(":ascent", Value::fixnum(0))])),
+        45,
+        ":ascent 0 puts the whole image below the baseline: 15 + 30"
+    );
+    assert_eq!(
+        height(image_display_spec(
+            40,
+            30,
+            &[(":ascent", Value::fixnum(100))]
+        )),
+        35,
+        ":ascent 100 lifts it clear of the baseline: 30 + 5"
+    );
+    assert_eq!(
+        height(image_display_spec(
+            40,
+            30,
+            &[(":ascent", Value::symbol("center"))]
+        )),
+        30,
+        ":ascent center is biased upward by the font metrics: 20 + 10"
+    );
+
+    // Shorter than the cell: the row stays as tall as the image reaches.
+    // GNU: 20 (default) / 23 (:ascent 0) / 20 (:ascent 100).
+    assert_eq!(
+        height(image_display_spec(40, 8, &[])),
+        20,
+        "a short centered image does not change the row"
+    );
+    assert_eq!(
+        height(image_display_spec(40, 8, &[(":ascent", Value::fixnum(0))])),
+        23,
+        ":ascent 0 keeps the image's 8px below the baseline: 15 + 8"
+    );
+    assert_eq!(
+        height(image_display_spec(
+            40,
+            8,
+            &[(":ascent", Value::fixnum(100))]
+        )),
+        20,
+        ":ascent 100 keeps it inside the cell: max (15, 8) + 5"
+    );
+
+    // Tied with, or under, the cell height.  GNU: 25 (:ascent 100 at 20px).
+    assert_eq!(
+        height(image_display_spec(
+            40,
+            20,
+            &[(":ascent", Value::fixnum(100))]
+        )),
+        25,
+        "an image exactly one cell tall, raised: 20 + 5"
+    );
+}
+
+/// `:margin` / `:relief` pad the image's glyph on every side, in the glyph's
+/// own arithmetic (`produce_image_glyph`, src/xdisp.c:32447-32470):
+/// `:margin 10` on a 200x80 image is a 220x100 glyph, `:relief 5` a 210x90 one.
+/// GNU 31.1 measured `(256 . 100)` and `(246 . 90)` on its 9px cell.
+#[test]
+fn window_text_pixel_size_pads_an_image_by_its_margin() {
+    crate::test_utils::init_test_tracing();
+    assert_eq!(
+        ImageProbe::new()
+            .text("ab")
+            .image(image_display_spec(
+                200,
+                80,
+                &[(":margin", Value::fixnum(10))]
+            ))
+            .text("cd\n")
+            .measure(Value::NIL, Value::NIL),
+        (260, 100),
+        "200 + 2*10 px wide, 80 + 2*10 px tall"
+    );
+    assert_eq!(
+        ImageProbe::new()
+            .text("ab")
+            .image(image_display_spec(
+                200,
+                80,
+                &[(":relief", Value::fixnum(5))]
+            ))
+            .text("cd\n")
+            .measure(Value::NIL, Value::NIL),
+        (250, 90),
+        "relief pads like a margin of its magnitude"
     );
 }
 
