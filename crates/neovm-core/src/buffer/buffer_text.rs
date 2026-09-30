@@ -2406,6 +2406,10 @@ impl BufferText {
         self.storage.borrow().text_props.trace_roots(roots);
     }
 
+    pub(crate) fn trace_text_prop_roots_with(&self, visit: &mut dyn FnMut(Value)) {
+        self.storage.borrow().text_props.for_each_root(visit);
+    }
+
     /// Register a marker in this buffer. Updates `LispMarker` fields
     /// authoritatively (buffer/bytepos/charpos/marker_id/insertion_type)
     /// and splices the marker into this buffer's intrusive chain at head.

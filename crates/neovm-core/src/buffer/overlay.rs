@@ -2023,11 +2023,15 @@ impl Default for OverlayList {
 
 impl GcTrace for OverlayList {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
+        self.trace_roots_with(&mut |value| roots.push(value));
+    }
+
+    fn trace_roots_with(&self, visit: &mut dyn FnMut(Value)) {
         for overlay in self.index.values() {
-            roots.push(overlay);
+            visit(overlay);
         }
         if let Some(snapshot) = self.snapshot.borrow().as_ref() {
-            snapshot.trace_roots(roots);
+            snapshot.trace_roots_with(visit);
         }
     }
 }
