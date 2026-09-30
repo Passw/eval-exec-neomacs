@@ -163,6 +163,12 @@ pub(crate) struct BufferTextSourceCursor<'a, B: LayoutBufferView + ?Sized> {
     window_id: Option<u64>,
     char_pos: CharPos0,
     end: CharPos0,
+    // Absolute mappings within this immutable view. Decoding establishes the
+    // current and next byte positions; a separate lookup slot keeps distant
+    // property boundaries from displacing that sequential pair. Rewinds may
+    // miss, but all cached mappings remain valid until the view is dropped.
+    decoded_byte_positions: Cell<[(CharPos0, EmacsBytePos); 2]>,
+    looked_up_byte_position: Cell<(CharPos0, EmacsBytePos)>,
     /// While the cursor sits before this position, plain text runs are produced
     /// ONE CHARACTER AT A TIME.
     ///
@@ -204,6 +210,8 @@ pub(crate) struct BufferTextSourceCursor<'a, B: LayoutBufferView + ?Sized> {
     property_boundary_queries: Cell<usize>,
     #[cfg(test)]
     text_slice_queries: Cell<usize>,
+    #[cfg(test)]
+    byte_position_queries: Cell<usize>,
     face_property: LayoutCharPropertyLookup,
     display_property: LayoutCharPropertyLookup,
     /// The walk's evaluated `(when FORM . SPEC)` results (from the view).
@@ -240,12 +248,16 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
         let accessible_end = buffer.layout_point_max_char_pos();
         let start = start.min(accessible_end);
         let end = end.min(accessible_end).max(start);
+        let start_byte = buffer.layout_char_pos_to_emacs_byte_pos(start);
+        let end_byte = buffer.layout_char_pos_to_emacs_byte_pos(end);
         Self {
             buffer_id,
             buffer,
             window_id,
             char_pos: start,
             end,
+            decoded_byte_positions: Cell::new([(start, start_byte); 2]),
+            looked_up_byte_position: Cell::new((end, end_byte)),
             char_granularity_end: None,
             overlay_strings_produced_at: None,
             base_face,
@@ -257,10 +269,7 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
             display_when: buffer.layout_display_when_conditions(),
             mouse_faces: MouseFaceRuns::new(
                 buffer,
-                EmacsByteRange::new(
-                    buffer.layout_char_pos_to_emacs_byte_pos(start),
-                    buffer.layout_char_pos_to_emacs_byte_pos(end),
-                ),
+                EmacsByteRange::new(start_byte, end_byte),
                 window_id,
             ),
             property_boundary_run: Cell::new(None),
@@ -268,6 +277,8 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
             property_boundary_queries: Cell::new(0),
             #[cfg(test)]
             text_slice_queries: Cell::new(0),
+            #[cfg(test)]
+            byte_position_queries: Cell::new(0),
             face_property: LayoutCharPropertyLookup::new(buffer, Value::symbol("face")),
             display_property: LayoutCharPropertyLookup::new(buffer, Value::symbol("display")),
             line_height_property: LayoutCharPropertyLookup::new(
@@ -394,8 +405,27 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn byte_position_queries(&self) -> usize {
+        self.byte_position_queries.get()
+    }
+
     fn byte_pos(&self, char_pos: CharPos0) -> EmacsBytePos {
-        self.buffer.layout_char_pos_to_emacs_byte_pos(char_pos)
+        for (position, byte) in self.decoded_byte_positions.get() {
+            if position == char_pos {
+                return byte;
+            }
+        }
+        let (position, byte) = self.looked_up_byte_position.get();
+        if position == char_pos {
+            return byte;
+        }
+        #[cfg(test)]
+        self.byte_position_queries
+            .set(self.byte_position_queries.get() + 1);
+        let byte = self.buffer.layout_char_pos_to_emacs_byte_pos(char_pos);
+        self.looked_up_byte_position.set((char_pos, byte));
+        byte
     }
 
     pub(crate) fn char_at(&self, char_pos: CharPos0) -> Option<EmacsChar> {
@@ -409,29 +439,39 @@ impl<'a, B: LayoutBufferView + ?Sized> BufferTextSourceCursor<'a, B> {
         } else {
             EmacsTextStorage::Unibyte
         };
-        if first.is_ascii() || storage == EmacsTextStorage::Unibyte {
-            return decode_emacs_char(&[first], storage).map(|(character, _)| character);
-        }
-
-        // Decode a bounded prefix directly from the immutable view. A single
-        // Emacs character needs at most five bytes; neither a heap allocation
-        // nor a second character-to-byte lookup is needed to find its end.
-        let mut bytes = [0; neovm_core::emacs_core::emacs_char::MAX_MULTIBYTE_LENGTH];
-        let end = EmacsBytePos::new(
-            start
-                .get()
-                .saturating_add(bytes.len())
-                .min(self.buffer.layout_point_max_emacs_byte_pos().get()),
-        );
-        let mut len = 0;
-        let _: Result<(), std::convert::Infallible> = self
-            .buffer
-            .layout_try_for_each_emacs_byte_range_chunk(EmacsByteRange::new(start, end), |chunk| {
-                bytes[len..len + chunk.len()].copy_from_slice(chunk);
-                len += chunk.len();
-                Ok(())
-            });
-        decode_emacs_char(&bytes[..len], storage).map(|(character, _)| character)
+        let (character, decoded_len) = if first.is_ascii() || storage == EmacsTextStorage::Unibyte {
+            decode_emacs_char(&[first], storage)?
+        } else {
+            // A single Emacs character needs at most five bytes. Its decoded
+            // length supplies the next absolute byte anchor, including raw
+            // byte and non-Unicode characters that have no Rust UTF-8 length.
+            let mut bytes = [0; neovm_core::emacs_core::emacs_char::MAX_MULTIBYTE_LENGTH];
+            let end = EmacsBytePos::new(
+                start
+                    .get()
+                    .saturating_add(bytes.len())
+                    .min(self.buffer.layout_point_max_emacs_byte_pos().get()),
+            );
+            let mut len = 0;
+            let _: Result<(), std::convert::Infallible> =
+                self.buffer.layout_try_for_each_emacs_byte_range_chunk(
+                    EmacsByteRange::new(start, end),
+                    |chunk| {
+                        bytes[len..len + chunk.len()].copy_from_slice(chunk);
+                        len += chunk.len();
+                        Ok(())
+                    },
+                );
+            decode_emacs_char(&bytes[..len], storage)?
+        };
+        self.decoded_byte_positions.set([
+            (char_pos, start),
+            (
+                char_pos.add_len(CharLen::new(1)),
+                EmacsBytePos::new(start.get() + decoded_len),
+            ),
+        ]);
+        Some(character)
     }
 
     #[cfg(test)]

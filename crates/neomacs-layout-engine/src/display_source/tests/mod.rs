@@ -213,6 +213,33 @@ fn buffer_character_lookahead_preserves_encoding_and_cursor_end() {
             assert_eq!(source.char_at(CharPos0::new(index)), Some(character));
             assert_eq!(source.char_at(end), None);
         }
+        let end = CharPos0::new(expected.len());
+        let mut source = BufferTextSourceCursor::new(
+            id,
+            view,
+            CharPos0::ZERO,
+            end,
+            RenderFaceRef::FaceId(FaceId::new(0)),
+        );
+        // One view and cursor, with forward lookahead followed by rewinds.
+        // Reference offsets come directly from the buffer encoding index.
+        for index in (0..expected.len()).chain((0..expected.len()).rev()) {
+            let position = CharPos0::new(index);
+            assert_eq!(source.char_at(position), Some(expected[index]));
+            let next = CharPos0::new(index + 1);
+            assert_eq!(source.char_at(next), expected.get(index + 1).copied());
+            for position in [position, next] {
+                source.reset_to(position);
+                assert_eq!(
+                    source.source_position(),
+                    DisplaySourcePosition::buffer(
+                        id,
+                        position,
+                        view.layout_char_pos_to_emacs_byte_pos(position)
+                    )
+                );
+            }
+        }
     }
 
     for multibyte in [false, true] {
@@ -3634,13 +3661,70 @@ fn character_source_reuses_decoded_text_without_extracting_ranges() {
     let items = collect_items(&mut source);
     assert_eq!(items.len(), text.chars().count());
     let mut actual = String::new();
-    for item in items {
+    let mut byte = 0;
+    for (index, item) in items.into_iter().enumerate() {
         let DisplayItemKind::TextRun(run) = item.kind else {
             panic!("ordinary character must remain a text run");
         };
         assert_eq!(run.text.chars().count(), 1);
+        assert_eq!(
+            item.span.start,
+            DisplaySourcePosition::buffer(buffer_id, CharPos0::new(index), EmacsBytePos::new(byte))
+        );
+        byte += run.text.len();
+        assert_eq!(
+            item.span.end,
+            DisplaySourcePosition::buffer(
+                buffer_id,
+                CharPos0::new(index + 1),
+                EmacsBytePos::new(byte)
+            )
+        );
         actual.push_str(&run.text);
     }
     assert_eq!(actual, text);
     assert_eq!(source.text_slice_queries(), 0);
+    assert!(
+        source.byte_position_queries() <= 2,
+        "sequential character production repeated {} coordinate translations",
+        source.byte_position_queries()
+    );
+}
+
+#[test]
+fn character_source_keeps_narrowed_byte_coordinates_after_lookahead_and_rewinds() {
+    let mut eval = Context::new();
+    let id = eval.buffer_manager().current_buffer().unwrap().id();
+    let buffer = eval.buffer_manager_mut().get_mut(id).unwrap();
+    buffer.insert("é中🦀alphaé中🦀omega");
+    let start = CharPos0::new(2);
+    let end = CharPos0::new(11);
+    let start_byte = buffer.char_pos_to_emacs_byte_pos_clamped(start);
+    let end_byte = buffer.char_pos_to_emacs_byte_pos_clamped(end);
+    buffer.narrow_to_emacs_byte_range(EmacsByteRange::new(start_byte, end_byte));
+    let snapshot = LayoutBufferSnapshot::from_buffer(buffer);
+    let mut source = BufferTextSourceCursor::new(id, &snapshot, start, end, RenderFaceRef::Inherit);
+    for index in [2, 3, 10, 5, 2, 8, 9, 4] {
+        let position = CharPos0::new(index);
+        assert!(source.char_at(position).is_some());
+        source.reset_to(position);
+        assert_eq!(
+            source.source_position(),
+            DisplaySourcePosition::buffer(
+                id,
+                position,
+                buffer.char_pos_to_emacs_byte_pos_clamped(position)
+            )
+        );
+        source.reset_to(CharPos0::new(index + 1));
+        assert_eq!(
+            source.source_position(),
+            DisplaySourcePosition::buffer(
+                id,
+                CharPos0::new(index + 1),
+                buffer.char_pos_to_emacs_byte_pos_clamped(CharPos0::new(index + 1))
+            )
+        );
+    }
+    assert_eq!(source.char_at(end), None);
 }
