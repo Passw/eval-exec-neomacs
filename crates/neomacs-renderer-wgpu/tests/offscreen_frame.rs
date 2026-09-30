@@ -2131,15 +2131,89 @@ fn drive_banded_load(
     partial
 }
 
+/// The area average of `rgba` into `raster`, one axis at a time, written out
+/// the obvious way: every output sample walks the inputs it covers and weights
+/// each by the overlap.
+///
+/// This is the definition the banded path implements with a streaming target,
+/// stated here so the acceptance test's expectation is independent of that
+/// implementation. An output covers the input interval `[o * n / m, (o + 1) *
+/// n / m)` and an input covers `[i, i + 1)`; their overlap, in units of `1/m`,
+/// is the weight, and one output's weights sum to `n`.
+fn area_average(
+    rgba: &[u8],
+    (width, height): (u32, u32),
+    (out_width, out_height): (u32, u32),
+) -> Vec<u8> {
+    fn weights(lo: u64, hi: u64, step: u64) -> impl Iterator<Item = (usize, u64)> {
+        (lo / step..hi.div_ceil(step)).filter_map(move |i| {
+            let overlap = hi.min((i + 1) * step) - lo.max(i * step);
+            (overlap > 0).then_some((i as usize, overlap))
+        })
+    }
+    let round = |sum: u64, total: u64| ((sum + total / 2) / total) as u8;
+
+    let mut lines = Vec::with_capacity(height as usize * out_width as usize * 4);
+    for row in rgba.chunks_exact(width as usize * 4) {
+        let mut line = vec![0_u8; out_width as usize * 4];
+        for (o, texel) in line.chunks_exact_mut(4).enumerate() {
+            let (lo, hi) = (
+                o as u64 * u64::from(width),
+                (o as u64 + 1) * u64::from(width),
+            );
+            let mut sums = [0_u64; 4];
+            for (i, weight) in weights(lo, hi, u64::from(out_width)) {
+                for (c, sum) in sums.iter_mut().enumerate() {
+                    *sum += weight * u64::from(row[i * 4 + c]);
+                }
+            }
+            for (channel, sum) in texel.iter_mut().zip(sums) {
+                *channel = round(sum, u64::from(width));
+            }
+        }
+        lines.extend_from_slice(&line);
+    }
+
+    let mut out = vec![0_u8; out_width as usize * out_height as usize * 4];
+    for column in 0..out_width as usize {
+        for o in 0..out_height {
+            let (lo, hi) = (
+                u64::from(o) * u64::from(height),
+                (u64::from(o) + 1) * u64::from(height),
+            );
+            let mut sums = [0_u64; 4];
+            for (i, weight) in weights(lo, hi, u64::from(out_height)) {
+                for (c, sum) in sums.iter_mut().enumerate() {
+                    *sum += weight * u64::from(lines[i * out_width as usize * 4 + column * 4 + c]);
+                }
+            }
+            let at = (o as usize * out_width as usize + column) * 4;
+            for (channel, sum) in out[at..at + 4].iter_mut().zip(sums) {
+                *channel = round(sum, u64::from(height));
+            }
+        }
+    }
+    out
+}
+
 /// The acceptance criterion, on the real GPU path: an image decoded in bands
-/// ends in exactly the texture one whole decode and resize would have produced
-/// — the same bytes, not merely the same picture.
+/// ends in exactly the texture the same decode realized through the same filter
+/// would have produced — the same bytes, not merely the same picture.
 ///
 /// The expected bytes are stated here without reference to the cache: `image`'s
-/// own decode of the fixture, resized the way the whole-image path resizes, to
-/// the raster the texture limit clamps it to.
+/// own decode of the fixture, reduced to the raster the texture limit clamps it
+/// to by the area average above.
+///
+/// This replaces an equality against `image::imageops::resize(…, Lanczos3)`.
+/// That contract said a banded decode ends as the *whole-image path's* bytes,
+/// which was true while both paths resampled with Lanczos3 and is exactly what
+/// step 4 changes: the banded path now decodes straight into its target with a
+/// box filter, so there is no whole-image buffer for it to agree with. The
+/// contract that survives — and that this test is — is that the finished
+/// texture is the bytes the decode's own filter defines, and that the bands
+/// along the way fill it from row zero.
 #[test]
-fn a_banded_image_ends_in_the_texture_the_whole_image_path_produces() {
+fn a_banded_image_ends_in_the_texture_its_own_filter_defines() {
     let Some(mut h) = try_harness() else {
         eprintln!("SKIP: no GPU adapter");
         return;
@@ -2183,12 +2257,19 @@ fn a_banded_image_ends_in_the_texture_the_whole_image_path_produces() {
     let whole = image::load_from_memory(&data)
         .expect("the fixture decodes")
         .to_rgba8();
-    let expected =
-        image::imageops::resize(&whole, 4096, 819, image::imageops::FilterType::Lanczos3)
-            .into_raw();
+    let expected = area_average(whole.as_raw(), (width, height), (4096, 819));
     assert_eq!(
         read_back, expected,
-        "the finished texture must be the whole-image path's bytes"
+        "the finished texture must be the area average of the source"
+    );
+    // The control: the filter this replaced — the whole-image path's Lanczos3
+    // resize to the same raster — is a different picture, so the equality above
+    // is a statement about the banded path's filter and not about any resample.
+    let lanczos = image::imageops::resize(&whole, 4096, 819, image::imageops::FilterType::Lanczos3)
+        .into_raw();
+    assert_ne!(
+        read_back, lanczos,
+        "the banded path no longer resamples with the whole-image path's filter"
     );
 }
 

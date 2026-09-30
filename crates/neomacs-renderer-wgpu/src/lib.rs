@@ -14,6 +14,7 @@ mod gpu_frame_timing;
 mod image_bands;
 pub mod image_cache;
 pub mod image_probe;
+mod image_scale;
 mod image_sequence;
 pub mod media_budget;
 #[cfg(target_os = "linux")]
@@ -26,9 +27,7 @@ mod svg;
 #[path = "texture_discipline_test.rs"]
 mod texture_discipline_test;
 pub mod tooltip_layout;
-pub use image_bands::{
-    BandChunk, BandMap, BandPlacement, DecodedBand, RasterBand, RowRange, TextureRows,
-};
+pub use image_bands::{BandPlacement, DecodedBand, RasterBand, RowRange, TextureRows};
 pub use svg::SvgResourceContext;
 pub mod vertex;
 pub mod xbm;

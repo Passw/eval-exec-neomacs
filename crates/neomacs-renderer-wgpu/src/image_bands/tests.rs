@@ -1,15 +1,15 @@
 //! What a banded decode promises its consumer.
 //!
 //! Three contracts, in the order a consumer meets them: the bands tile the
-//! source, the pixels they carry are the pixels the whole-image path would
-//! produce for the same file, and a decode that cannot finish says so instead
-//! of stopping quietly.
+//! source and the raster it becomes, the pixels they carry are the area average
+//! of the pixels the whole-image path would produce for the same file, and a
+//! decode that cannot finish says so instead of stopping quietly.
 
 use super::*;
 use std::io::Cursor;
 
 use neomacs_display_protocol::{
-    ImageHeuristicMask, ImageMaskPolicy, ImageRealization, ImageSizeSpec,
+    AxisSize, ImageHeuristicMask, ImageMaskKind, ImageMaskPolicy, ImageRealization, ImageSizeSpec,
 };
 
 /// A source banded regardless of size, so these tests can use small images.
@@ -17,23 +17,35 @@ fn open_banded(data: &[u8]) -> BandSource<'_> {
     BandSource::open_forced(data, ImageSizeSpec::default(), ImageRealization::default())
 }
 
+/// The same, realized at an exact size, which is how a source is asked for a
+/// raster smaller than itself.
+fn open_banded_at(data: &[u8], width: u32, height: u32) -> BandSource<'_> {
+    BandSource::open_forced(
+        data,
+        ImageSizeSpec::new(AxisSize::Exact(width), AxisSize::Exact(height)),
+        ImageRealization::default(),
+    )
+}
+
 /// Drive a banded source to completion, collecting what it published.
 ///
-/// Returns the bands and the image, and panics on a failure — the tests that
+/// Returns the bands and the raster, and panics on a failure — the tests that
 /// expect one drive the source themselves.
-fn drain(mut source: BandedSource<'_>) -> (Vec<BandChunk>, Option<(u32, u32, Vec<u8>)>) {
+fn drain(mut source: BandedSource<'_>) -> (Vec<DecodedBand>, Option<RasterPixels>) {
     let mut bands = Vec::new();
     loop {
         match source.next_band() {
             BandStep::Band(band) => bands.push(band),
-            BandStep::Done => return (bands, source.into_image()),
+            BandStep::Done => return (bands, source.into_raster()),
             BandStep::Failed => panic!("a valid source must not fail"),
         }
     }
 }
 
 /// The pixels the whole-image path produces for `data`, through `image`'s own
-/// decode and colour conversion — the reference a banded decode has to match.
+/// decode and colour conversion — the reference a banded decode has to match
+/// when it realizes the source at its own size, where the area average is the
+/// identity.
 fn whole_image_pixels(data: &[u8]) -> (u32, u32, Vec<u8>) {
     let image = image::load_from_memory(data).expect("fixture decodes whole");
     let rgba = image.to_rgba8();
@@ -78,9 +90,8 @@ fn bands_tile_the_source_in_order_and_cover_every_row_once() {
     let BandSource::Banded(source) = open_banded(&data) else {
         panic!("a PNG has a row-wise decoder");
     };
-    assert_eq!(source.dimensions(), (width, height));
 
-    let (bands, image) = drain(source);
+    let (bands, raster) = drain(source);
 
     assert!(
         bands.len() > 1,
@@ -90,57 +101,120 @@ fn bands_tile_the_source_in_order_and_cover_every_row_once() {
     let mut expected_start = 0;
     for band in &bands {
         assert_eq!(
-            band.rows().start(),
+            band.source().start(),
             expected_start,
             "bands arrive in order, each where the last one ended"
         );
-        assert_eq!(band.width(), width);
-        assert_eq!(
-            band.pixels().len(),
-            width as usize * band.rows().len().get() as usize * 4,
-            "a band carries exactly the rows it claims"
-        );
-        expected_start = band.rows().end();
+        expected_start = band.source().end();
     }
     assert_eq!(expected_start, height, "the bands cover every row once");
 
-    let Some((image_width, image_height, rgba)) = image else {
-        panic!("a source that reached Done yields the image");
+    let Some(raster) = raster else {
+        panic!("a source that reached Done yields the raster");
     };
-    assert_eq!((image_width, image_height), (width, height));
+    assert_eq!(raster.native().dimensions(), (width, height));
+    assert_eq!(raster.raster().dimensions(), (width, height));
     assert_eq!(
-        rgba,
+        raster.into_rgba(),
         varying_pixels(width, height),
-        "the assembled image is the source's pixels"
+        "the realized image is the source's pixels"
     );
 }
 
+/// The bands of one decode fill the raster from the top: contiguous, in order,
+/// and reaching its last row. One number therefore says how far the image has
+/// come, which is what the display side draws against.
 #[test]
-fn the_pixels_a_band_carries_are_where_it_says_they_are() {
-    let (width, height) = (32, 200);
+fn the_bands_of_a_source_tile_the_raster_from_row_zero() {
+    // A 12000x700-like shape without the megapixels: 700 source rows onto 238
+    // raster rows, so most source rows land inside an output row rather than on
+    // one.
+    let (width, height) = (600, 700);
     let data = varying_png(width, height);
-    let BandSource::Banded(source) = open_banded(&data) else {
+    let BandSource::Banded(source) = open_banded_at(&data, 205, 238) else {
         panic!("a PNG has a row-wise decoder");
     };
     let (bands, _) = drain(source);
 
-    let stride = width as usize * 4;
+    let mut expected_start = 0;
     for band in &bands {
-        let expected = &varying_pixels(width, height)
-            [band.rows().start() as usize * stride..band.rows().end() as usize * stride];
+        let placement = band.placed().placement();
         assert_eq!(
-            band.pixels(),
-            expected,
-            "band at row {} carries those rows, not others",
-            band.rows().start()
+            placement.rows().start(),
+            expected_start,
+            "a band starts where the last one ended"
+        );
+        assert!(placement.rows().len().get() > 0);
+        expected_start = placement.rows().end();
+    }
+    assert_eq!(
+        expected_start, 238,
+        "the bands reach the last row of the raster"
+    );
+}
+
+/// Every band has somewhere to write. A source minified hard enough that one
+/// raster row spans many source rows still bands by raster row, because a band
+/// with no rows to fill is a state this type does not have.
+#[test]
+fn a_source_minified_hard_still_produces_a_band_for_every_raster_row() {
+    let data = varying_png(80, 400);
+    let BandSource::Banded(source) = open_banded_at(&data, 80, 25) else {
+        panic!("a PNG has a row-wise decoder");
+    };
+    let (bands, raster) = drain(source);
+
+    assert!(!bands.is_empty());
+    for band in &bands {
+        assert_eq!(
+            band.placed().placement().rows().len().get(),
+            1,
+            "sixteen source rows to a raster row: each band is one raster row"
+        );
+        assert!(
+            band.source().len().get() >= 16,
+            "the band reads the rows that row is made of, got {}",
+            band.source().len().get()
+        );
+    }
+    assert_eq!(bands.len(), 25, "one band per raster row");
+    assert_eq!(
+        raster
+            .expect("a completed source yields the raster")
+            .raster()
+            .height(),
+        25
+    );
+}
+
+/// A source a caller asks to show larger than it is takes the whole-image path:
+/// an area average that had to invent samples would not be an average, and the
+/// filter that does enlarge is the one that path already uses.
+#[test]
+fn a_source_shown_larger_than_itself_declines_the_target() {
+    let data = varying_png(40, 30);
+    assert!(matches!(open_banded(&data), BandSource::Banded(_)));
+    for (width, height) in [(41, 30), (40, 31), (80, 15)] {
+        assert!(
+            matches!(open_banded_at(&data, width, height), BandSource::Whole),
+            "{width}x{height} is larger than the source on an axis"
+        );
+    }
+    // The control: the same source shown at or below its own size bands.
+    for (width, height) in [(40, 30), (20, 30), (40, 15), (1, 1)] {
+        assert!(
+            matches!(open_banded_at(&data, width, height), BandSource::Banded(_)),
+            "{width}x{height} is a reduction"
         );
     }
 }
 
 #[test]
-fn a_banded_decode_produces_the_whole_image_paths_pixels_for_every_row_format() {
+fn a_banded_decode_agrees_with_the_whole_image_path_for_every_row_format() {
     // One fixture per colour type that reaches the decoder as 8-bit output:
-    // `Transformations::EXPAND` widens the sub-8-bit and paletted ones.
+    // `Transformations::EXPAND` widens the sub-8-bit and paletted ones. Each is
+    // realized at its own size, so the area average is the identity and the
+    // raster must be `image`'s own decode of the same file, byte for byte.
     let width = 23;
     let height = 61;
     let cases: Vec<(&str, Vec<u8>)> = vec![
@@ -216,19 +290,70 @@ fn a_banded_decode_produces_the_whole_image_paths_pixels_for_every_row_format() 
         let BandSource::Banded(source) = open_banded(&data) else {
             panic!("{name}: an 8-bit PNG has a row-wise decoder");
         };
-        let (bands, image) = drain(source);
+        let (bands, raster) = drain(source);
         assert!(!bands.is_empty(), "{name}: bands were produced");
-        let Some(banded) = image else {
-            panic!("{name}: a completed source yields the image");
+        let Some(raster) = raster else {
+            panic!("{name}: a completed source yields the raster");
         };
-        assert_eq!(banded.0, width, "{name}: the decoded width");
-        assert_eq!(banded.1, height, "{name}: the decoded height");
+        let (image_width, image_height, rgba) = whole_image_pixels(&data);
         assert_eq!(
-            banded,
-            whole_image_pixels(&data),
+            raster.raster().dimensions(),
+            (image_width, image_height),
+            "{name}: the raster is the source's size"
+        );
+        assert_eq!(
+            raster.into_rgba(),
+            rgba,
             "{name}: a banded decode must produce the whole decode's pixels"
         );
     }
+}
+
+/// The mask identity GNU's `:mask` reads is a property of the *source* pixels,
+/// so a banded decode classifies them as they arrive rather than reading the
+/// raster it built: a source whose alphas are only ever clear or opaque has
+/// pixels in between once they have been averaged, and asking the raster would
+/// be asking the filter.
+#[test]
+fn the_mask_comes_from_the_source_pixels_not_from_the_raster() {
+    let (width, height) = (40, 20);
+    let mut pixels = vec![0_u8; width as usize * height as usize * 4];
+    for (index, texel) in pixels.chunks_exact_mut(4).enumerate() {
+        texel.copy_from_slice(&[0x40, 0x80, 0xc0, if index % 3 == 0 { 0 } else { 255 }]);
+    }
+    let data = png_of(width, height, pixels);
+    let BandSource::Banded(source) = open_banded_at(&data, 20, 10) else {
+        panic!("a PNG has a row-wise decoder");
+    };
+    let (_, raster) = drain(source);
+    let raster = raster.expect("a completed source yields the raster");
+    assert_eq!(
+        raster.mask(),
+        ImageMaskKind::Clipping,
+        "the source's own alphas are clear or opaque"
+    );
+    assert!(
+        raster
+            .into_rgba()
+            .chunks_exact(4)
+            .any(|texel| texel[3] != 0 && texel[3] != 255),
+        "the raster the filter built has alphas the source never had"
+    );
+
+    // The control: a source with partial alpha of its own is neither.
+    let mut pixels = vec![0_u8; width as usize * height as usize * 4];
+    for texel in pixels.chunks_exact_mut(4) {
+        texel.copy_from_slice(&[0x40, 0x80, 0xc0, 0x80]);
+    }
+    let data = png_of(width, height, pixels);
+    let BandSource::Banded(source) = open_banded_at(&data, 20, 10) else {
+        panic!("a PNG has a row-wise decoder");
+    };
+    let (_, raster) = drain(source);
+    assert_eq!(
+        raster.expect("a completed source").mask(),
+        ImageMaskKind::AlphaChannel
+    );
 }
 
 #[test]
@@ -296,21 +421,21 @@ fn a_truncated_png_fails_mid_stream_and_yields_no_image() {
         }
     }
 
-    let covered = bands.last().map_or(0, |band| band.rows().end());
+    let covered = bands.last().map_or(0, |band| band.source().end());
     assert!(
         covered > 0 && covered < height,
         "the failure is mid-stream: {covered} of {height} rows"
     );
     assert!(
-        source.into_image().is_none(),
+        source.into_raster().is_none(),
         "an unfinished decode must not hand back a prefix as the image"
     );
 }
 
 /// A band has a destination only where the texture can be built up from the
 /// top: an unrotated realization whose mask policy leaves the pixels alone.
-/// Both exceptions are about the realization rather than the band, and both
-/// leave the band what step 2 made it — progress, with nowhere to go.
+/// Both exceptions are about the realization rather than the band, and a source
+/// with either takes the whole-image path instead of holding a native image.
 #[test]
 fn a_band_has_a_destination_only_where_the_texture_can_be_filled_from_the_top() {
     assert_eq!(
@@ -341,121 +466,14 @@ fn a_band_has_a_destination_only_where_the_texture_can_be_filled_from_the_top() 
     }
 }
 
-/// A band of `rows` rows of `width` pixels, for the mapping tests: the pixels
-/// are all zero, because where they land is the question and what they contain
-/// is not.
-fn band_of_rows(start: u32, rows: u32, width: u32) -> BandChunk {
-    BandChunk::from_rows(
-        start,
-        NonZeroU32::new(rows).expect("a test band has rows"),
-        width,
-        vec![0u8; width as usize * rows as usize * 4],
-    )
-    .expect("a band of exactly the rows it claims")
-}
-
-/// The bands of one decode have to fill its texture from the top: contiguous,
-/// in order, and reaching the raster's last row. A source row boundary rarely
-/// lands on a texture row, so the boundaries are the case that decides the
-/// rule — and covering the raster with no hole is what lets the display side
-/// describe how far the image has come with one number.
-#[test]
-fn the_bands_of_a_source_tile_the_raster_from_row_zero() {
-    // 700 source rows onto 238 raster rows (a 12000x700 image clamped to the
-    // texture limit): 0.34 raster rows per source row, so nearly every band
-    // boundary falls between two of them.
-    let raster = ImageRasterExtent::new(4096, 238);
-    let map = BandMap::new(700, raster).expect("a source with rows has a map");
-    assert_eq!(map.raster(), raster);
-
-    let mut expected_start = 0;
-    for start in (0..700).step_by(22) {
-        let rows = (700 - start).min(22);
-        let placed = map
-            .place(&band_of_rows(start, rows, 8))
-            .expect("a 22-row band covers several texture rows");
-        let placement = placed.placement();
-        assert_eq!(
-            placement.rows().start(),
-            expected_start,
-            "a band starts where the last one ended"
-        );
-        assert_eq!(placement.raster(), raster);
-        assert_eq!(
-            placed.pixels().len(),
-            raster.width() as usize * placement.rows().len().get() as usize * 4,
-            "a placed band carries exactly the rows it fills"
-        );
-        expected_start = placement.rows().end();
-    }
-    assert_eq!(
-        expected_start,
-        raster.height(),
-        "the bands reach the last row of the raster"
-    );
-}
-
-/// A boundary between two texture rows belongs to the band that starts there:
-/// rounding it to the nearest row is what keeps consecutive bands adjacent
-/// instead of leaving the boundary row to neither of them.
-#[test]
-fn a_band_boundary_between_two_texture_rows_belongs_to_the_band_that_starts_there() {
-    let map = BandMap::new(700, ImageRasterExtent::new(4096, 238)).expect("map");
-    // 33 * 238 / 700 = 11.22: nearer row 11 than row 12.
-    let second = map
-        .place(&band_of_rows(33, 11, 1))
-        .expect("the second band has rows");
-    assert_eq!(second.placement().rows().start(), 11);
-
-    let first = map
-        .place(&band_of_rows(0, 33, 1))
-        .expect("the first band has rows");
-    assert_eq!(
-        first.placement().rows().end(),
-        11,
-        "the band before the boundary ends exactly where the next begins"
-    );
-}
-
-/// A source whose rows map one to one onto the raster — the case of an image
-/// shown at its own size — places every band on exactly its own rows.
-#[test]
-fn a_band_of_a_native_size_image_fills_the_rows_it_covered() {
-    let map = BandMap::new(600, ImageRasterExtent::new(600, 600)).expect("map");
-    let placed = map
-        .place(&band_of_rows(120, 30, 4))
-        .expect("a 30-row band of 600");
-    assert_eq!(placed.placement().rows().start(), 120);
-    assert_eq!(placed.placement().rows().len().get(), 30);
-}
-
-/// A source minified so far that a band covers less than one texture row has
-/// nowhere to write, which is a band that places nowhere rather than a band
-/// written at the wrong place.
-#[test]
-fn a_band_that_covers_no_texture_row_places_nothing() {
-    // 40000 source rows onto 10 raster rows: one raster row per 4000 source
-    // rows, so a 100-row band can round to a single row... and a 1-row band to
-    // the row it rounds to, which is the floor below.
-    let map = BandMap::new(40000, ImageRasterExtent::new(10, 10)).expect("map");
-    let placed = map.place(&band_of_rows(0, 100, 1));
-    // Rounding sends rows 0..100 to 0..0, so there is nothing to write.
-    assert!(
-        placed.is_none(),
-        "a band worth less than a texture row places nothing"
-    );
-    // The control: the same source with wider bands does place rows.
-    assert!(map.place(&band_of_rows(0, 4000, 1)).is_some());
-}
-
 /// Whatever the source, a band says which rows it is: the constructor refuses
 /// pixels that are not that rectangle.
 #[test]
+#[should_panic(expected = "a band carries exactly the rows it fills")]
 fn a_band_refuses_pixels_that_are_not_the_rows_it_claims() {
     let rows = NonZeroU32::new(2).expect("non-zero");
-    assert!(BandChunk::from_rows(0, rows, 4, vec![0u8; 4 * 2 * 4]).is_some());
-    assert!(BandChunk::from_rows(0, rows, 4, vec![0u8; 4 * 2 * 4 - 1]).is_none());
-    assert!(BandChunk::from_rows(0, rows, 4, vec![0u8; 4 * 2 * 4 + 1]).is_none());
+    let placement = BandPlacement::new(ImageRasterExtent::new(4, 8), TextureRows::new(0, rows));
+    let _ = RasterBand::new(placement, vec![0_u8; 4 * 2 * 4 - 1].into());
 }
 
 /// The size a band covers follows the source and the byte cap, not the
@@ -488,17 +506,14 @@ fn band_rows_are_bounded_by_the_display_row_the_count_and_the_bytes() {
 }
 
 /// The source rows behind a display row: more when the source is shown
-/// smaller than it is, one when it is shown at its own size or larger.
+/// smaller than it is, one when it is shown at its own size.
 #[test]
 fn the_band_plan_scales_source_rows_to_display_rows() {
     let at_native = BandPlan::new(ImageSizeSpec::default(), ImageRealization::default());
     assert_eq!(at_native.rows_per_display_row(1000, 1000).get(), 1);
 
     let minified = BandPlan::new(
-        ImageSizeSpec::new(
-            neomacs_display_protocol::AxisSize::Exact(100),
-            neomacs_display_protocol::AxisSize::Exact(100),
-        ),
+        ImageSizeSpec::new(AxisSize::Exact(100), AxisSize::Exact(100)),
         ImageRealization::default(),
     );
     assert_eq!(

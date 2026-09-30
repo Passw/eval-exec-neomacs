@@ -1,5 +1,5 @@
 use super::*;
-use crate::image_bands::BandChunk;
+use crate::image_bands::{BandPlacement, DecodedBand, RasterBand, RowRange};
 use crate::image_probe::{ImageProbeSource, probe_image_layout};
 use neomacs_display_protocol::{
     AxisSize, ImageFrameDelay, ImageFrameIndex, ImageRotation, ImageSizeSpec,
@@ -1812,9 +1812,10 @@ fn decode_with_bands(
 }
 
 /// The whole point of the seam: a large source decodes in bands, they arrive in
-/// order as disjoint row ranges, and the image they add up to is the image the
-/// whole-image path would have produced — through the same call the renderer
-/// makes.
+/// order as disjoint row ranges that fill the raster from the top, and the
+/// image they add up to — at this realization the source's own size, where the
+/// area average is the identity — is the image the whole-image path would have
+/// produced, through the same call the renderer makes.
 #[test]
 fn a_large_png_decodes_in_bands_that_add_up_to_the_whole_image() {
     let (width, height) = (2000, 2000);
@@ -1822,6 +1823,7 @@ fn a_large_png_decodes_in_bands_that_add_up_to_the_whole_image() {
     let mut bands = Vec::new();
 
     let decoded = decode_with_bands(&data, 1.0, &mut bands).expect("decode");
+    let raster = decoded.geometry.raster();
 
     assert!(
         bands.len() > 1,
@@ -1830,11 +1832,17 @@ fn a_large_png_decodes_in_bands_that_add_up_to_the_whole_image() {
     );
     let mut expected_start = 0;
     for band in &bands {
-        assert_eq!(band.band().rows().start(), expected_start);
-        assert_eq!(band.band().width(), width);
-        expected_start = band.band().rows().end();
+        assert_eq!(band.source().start(), expected_start);
+        assert_eq!(band.placed().placement().raster(), raster);
+        assert_eq!(band.placed().placement().rows().start(), expected_start);
+        expected_start = band.placed().placement().rows().end();
     }
-    assert_eq!(expected_start, height, "the bands cover the whole source");
+    assert_eq!(expected_start, height, "the bands cover the whole raster");
+    assert_eq!(
+        decoded.rgba.len(),
+        raster.width() as usize * raster.height() as usize * 4,
+        "the decode ends as the raster, not as a native-size image"
+    );
     assert_eq!(
         decoded.rgba,
         whole_pixels(&data).rgba,
@@ -1929,7 +1937,7 @@ fn a_truncated_source_fails_instead_of_publishing_a_prefix() {
         !bands.is_empty(),
         "the failure happened after the banded path had reported progress"
     );
-    let covered = bands.last().map_or(0, |band| band.band().rows().end());
+    let covered = bands.last().map_or(0, |band| band.source().end());
     assert!(
         covered > 0 && covered < height,
         "the failure is mid-stream: {covered} of {height} rows"
@@ -1946,11 +1954,7 @@ fn bands_do_not_consume_the_load_attempt() {
 
     let band = || WorkerDecodeOutcome::Band {
         load,
-        decoded: DecodedBand::new(
-            BandChunk::from_rows(0, std::num::NonZeroU32::new(1).unwrap(), 1, vec![0u8; 4])
-                .expect("a band of one pixel row"),
-            None,
-        ),
+        decoded: test_band(),
     };
     assert!(matches!(loads.take_current(band()), Some(_)));
     assert!(matches!(loads.take_current(band()), Some(_)));
@@ -1977,12 +1981,13 @@ fn every_band_lands_in_the_raster_the_finished_upload_resolves() {
     let data = varying_png(width, height);
     let scales = [
         // Native size: the raster is the source, and every band is its own rows.
-        1.0_f32,
-        // Magnified: the raster is 3125 rows from 2000, a ratio whose band
-        // boundaries all land between texture rows.
-        1.25,
+        // (layout scale and device scale both apply: 2000 stays 2000.)
+        (1.0_f32, (2000_u32, 2000_u32)),
+        // Halved twice over, and the raster is an eighth of the source: a ratio
+        // whose output rows are made of several source rows rather than one.
+        (0.5, (500, 500)),
     ];
-    for scale in scales {
+    for (scale, expected) in scales {
         let realization = ImageRealization::with_device_scale(scale, scale);
         let mut bands = Vec::new();
         let decoded = ImageCache::decode_data(
@@ -2002,11 +2007,15 @@ fn every_band_lands_in_the_raster_the_finished_upload_resolves() {
         assert!(!bands.is_empty(), "{width}x{height}@{scale} bands");
 
         let raster = decoded.geometry.raster();
+        assert_eq!(raster.dimensions(), expected, "{width}x{height}@{scale}");
+        assert_eq!(
+            decoded.rgba.len(),
+            raster.width() as usize * raster.height() as usize * 4,
+            "the decode ends as the raster"
+        );
         let mut expected_start = 0;
         for band in &bands {
-            let placed = band
-                .placed()
-                .unwrap_or_else(|| panic!("{width}x{height}@{scale}: every band has a place"));
+            let placed = band.placed();
             assert_eq!(
                 placed.placement().raster(),
                 raster,
@@ -2032,41 +2041,72 @@ fn every_band_lands_in_the_raster_the_finished_upload_resolves() {
     }
 }
 
-/// A rotated image still decodes in bands — they are progress either way — but
-/// none of them has a destination, because GNU turns the image after sizing and
-/// a band of source rows lands in the *columns* of the stored raster. Such an
-/// image keeps the path it had before step 3: empty until the decode completes,
-/// then whole.
+/// A rotation or a mask that rewrites pixels leaves a band nowhere to go: GNU
+/// turns the image after sizing, so a band of source rows lands in the
+/// *columns* of the stored raster, and a heuristic mask needs every pixel
+/// before it can say what one of them is. Such a source therefore takes the
+/// whole-image path — which is what it looked like before banding anyway,
+/// empty until the decode completes and then whole — rather than holding the
+/// native-size image a band would have had to wait in.
 #[test]
-fn a_rotated_decode_bands_without_giving_them_a_destination() {
+fn a_rotation_or_a_rewriting_mask_decodes_the_whole_image() {
     let (width, height) = (2000_u32, 2000_u32);
     let data = varying_png(width, height);
-    let mut bands = Vec::new();
-    let decoded = ImageCache::decode_data(
-        &data,
-        ImageSizeSpec::default(),
-        ImageRotation::Quarter,
-        ImageColorContext::default(),
-        ImageRealization::default(),
-        ImageMaskPolicy::Preserve,
-        ImageFrameIndex::default(),
-        crate::svg::SvgResourceContext::Isolated,
-        &ImageSequenceCache::new(),
-        ImageSequenceId::new(1).expect("non-zero test sequence"),
-        Some(&mut |band| bands.push(band)),
-    )
-    .expect("decode");
+    let cases = [
+        (
+            "a quarter turn",
+            ImageRotation::Quarter,
+            ImageMaskPolicy::Preserve,
+        ),
+        (
+            "no turn, a mask",
+            ImageRotation::None,
+            ImageMaskPolicy::Suppress,
+        ),
+        (
+            "no turn, a heuristic mask",
+            ImageRotation::None,
+            ImageMaskPolicy::Heuristic(ImageHeuristicMask::FourCorners),
+        ),
+    ];
+    for (name, rotation, mask) in cases {
+        let mut bands = Vec::new();
+        let decoded = ImageCache::decode_data(
+            &data,
+            ImageSizeSpec::default(),
+            rotation,
+            ImageColorContext::default(),
+            ImageRealization::default(),
+            mask,
+            ImageFrameIndex::default(),
+            crate::svg::SvgResourceContext::Isolated,
+            &ImageSequenceCache::new(),
+            ImageSequenceId::new(1).expect("non-zero test sequence"),
+            Some(&mut |band| bands.push(band)),
+        )
+        .expect("decode");
 
-    assert!(!bands.is_empty(), "a four-megapixel source still bands");
-    assert!(
-        bands.iter().all(|band| band.placed().is_none()),
-        "a quarter turn leaves a band no texture rows to fill"
-    );
-    assert_eq!(
-        decoded.geometry.raster().dimensions(),
-        (height, width),
-        "the turn exchanges the raster's axes"
-    );
+        assert!(bands.is_empty(), "{name}: no band has a destination");
+        let raster = decoded.geometry.raster();
+        let turned = matches!(
+            rotation,
+            ImageRotation::Quarter | ImageRotation::ThreeQuarter
+        );
+        assert_eq!(
+            raster.dimensions(),
+            if turned {
+                (height, width)
+            } else {
+                (width, height)
+            },
+            "{name}: the geometry is still resolved as it was"
+        );
+        assert_eq!(
+            decoded.rgba.len(),
+            raster.width() as usize * raster.height() as usize * 4,
+            "{name}: the whole-image path still realizes the image"
+        );
+    }
 }
 
 /// A texture's filled prefix advances only by a band that continues it. A
@@ -2076,19 +2116,11 @@ fn a_rotated_decode_bands_without_giving_them_a_destination() {
 #[test]
 fn a_textures_filled_prefix_advances_only_by_bands_that_continue_it() {
     let raster = ImageRasterExtent::new(4, 8);
-    let map = BandMap::new(8, raster).expect("an eight-row source has a map");
     let rows_of = |start: u32, len: u32| {
-        let band = BandChunk::from_rows(
+        TextureRows::new(
             start,
             std::num::NonZeroU32::new(len).expect("non-zero test rows"),
-            4,
-            vec![0u8; 4 * len as usize * 4],
         )
-        .expect("a band of exactly the rows it claims");
-        map.place(&band)
-            .expect("a native-size band covers texture rows")
-            .placement()
-            .rows()
     };
 
     let empty = FilledRows::empty(raster);
@@ -2146,16 +2178,11 @@ fn a_quad_is_drawn_only_over_the_rows_that_hold_pixels() {
         "a whole texture draws the whole quad"
     );
 
-    let map = BandMap::new(8, ImageRasterExtent::new(4, 8)).expect("map");
-    let band = BandChunk::from_rows(
-        0,
-        std::num::NonZeroU32::new(4).expect("non-zero"),
-        4,
-        vec![0u8; 4 * 4 * 4],
-    )
-    .expect("a band of four rows");
     let half = FilledRows::empty(ImageRasterExtent::new(4, 8))
-        .extend(map.place(&band).expect("placed").placement().rows())
+        .extend(TextureRows::new(
+            0,
+            std::num::NonZeroU32::new(4).expect("non-zero"),
+        ))
         .expect("the first band continues row zero");
     assert_eq!(half.filled_fraction(), 0.5);
 
@@ -2168,6 +2195,17 @@ fn a_quad_is_drawn_only_over_the_rows_that_hold_pixels() {
     // A span wholly below the boundary has nothing to draw.
     assert_eq!(half.clip_span(0.5, 1.0, 40.0), None);
     assert_eq!(half.clip_span(0.75, 1.0, 20.0), None);
+}
+
+/// One band, for the tests that are about how a band is carried rather than
+/// where its pixels came from.
+fn test_band() -> DecodedBand {
+    let rows = RowRange::new(0, std::num::NonZeroU32::new(1).expect("one row"));
+    let placement = BandPlacement::new(
+        ImageRasterExtent::new(1, 1),
+        TextureRows::new(0, std::num::NonZeroU32::new(1).expect("one row")),
+    );
+    DecodedBand::new(rows, RasterBand::new(placement, vec![0u8; 4].into()))
 }
 
 /// The acceptance criterion, without a GPU: whatever the bands did on the way,
@@ -2199,7 +2237,7 @@ fn the_texture_a_banded_decode_fills_ends_as_the_whole_image_paths() {
     let stride = raster_width as usize * 4;
     let mut filled = FilledRows::empty(raster);
     for band in &bands {
-        let placed = band.placed().expect("a top-down decode places every band");
+        let placed = band.placed();
         let rows = placed.placement().rows();
         let advanced = filled
             .extend(rows)

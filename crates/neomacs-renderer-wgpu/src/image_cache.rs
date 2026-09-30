@@ -23,8 +23,8 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 
 use crate::image_bands::{
-    BandFilling, BandMap, BandSink, BandSource, BandStep, DecodedBand, RasterBand, RowRange,
-    TextureRows,
+    BandFilling, BandSink, BandSource, BandStep, DecodedBand, RasterBand, RowRange, TextureRows,
+    classify_alpha,
 };
 use crate::image_sequence::{ImageSequenceCache, ImageSequenceResolution};
 
@@ -77,12 +77,12 @@ pub(crate) fn constrain_raster_extent(extent: ImageRasterExtent) -> ImageRasterE
 /// The geometry a decode realizes to, raster clamped by the texture limit.
 ///
 /// One function rather than a line in each caller, because two callers must
-/// agree about it: `NativePixels::realize_bitmap` scales the image onto this
-/// raster, and a band's rows are expressed in it (`image_bands::BandMap`). Bands
-/// mapped under a different raster than the texture they are written into would
-/// leave that texture holding rows from two scales, which nothing downstream
-/// could detect.
-fn realized_geometry(
+/// agree about it: `NativePixels::realize_bitmap` scales the whole image onto
+/// this raster, and a banded decode builds the raster it writes into from it
+/// (`image_bands::BandPlan::target`). A decode writing under a different raster
+/// than the upload that finishes it would leave the texture holding rows from
+/// two scales, which nothing downstream could detect.
+pub(crate) fn realized_geometry(
     extent: ImageNativeExtent,
     size: ImageSizeSpec,
     realization: ImageRealization,
@@ -273,10 +273,10 @@ struct DecodedImage {
 /// decoder, the other a decoder that stopped part-way — even though the caller
 /// does the same thing with both.
 enum BandedAttempt {
-    /// Every row was decoded.
-    Complete(NativePixels),
-    /// The source has no row-wise decoder at this size, or none for its
-    /// format: decode the whole image.
+    /// Every row was decoded, into the raster the image is realized to.
+    Complete(DecodedPixels),
+    /// The source has no row-wise decoder at this size, or none for its format,
+    /// or no band of it has anywhere to go: decode the whole image.
     NotBandable,
     /// A row-wise decode that could not finish. The bands it published are
     /// abandoned; decoding the whole image is the only way to end up with a
@@ -364,22 +364,6 @@ impl NativePixels {
             mask,
             embedded: self.embedded,
         })
-    }
-}
-
-fn classify_alpha(rgba: &[u8]) -> ImageMaskKind {
-    let mut has_transparent = false;
-    for alpha in rgba.iter().skip(3).step_by(4).copied() {
-        match alpha {
-            255 => {}
-            0 => has_transparent = true,
-            _ => return ImageMaskKind::AlphaChannel,
-        }
-    }
-    if has_transparent {
-        ImageMaskKind::Clipping
-    } else {
-        ImageMaskKind::None
     }
 }
 
@@ -960,12 +944,13 @@ impl ImageCache {
                 sequence_cache,
                 sequence,
                 size,
+                rotation,
                 realization,
-                BandFilling::of(rotation, mask),
+                mask,
                 sink,
             )
         }) {
-            return pixels.realize_bitmap(size, rotation, realization, mask);
+            return Some(pixels);
         }
         if !frame.is_first() {
             return None;
@@ -1023,14 +1008,12 @@ impl ImageCache {
             sequence_cache,
             sequence,
             size,
+            rotation,
             realization,
-            // The realization decides both how the image is drawn and whether a
-            // band has a destination: a turn lands bands in columns, and a mask
-            // policy that rewrites pixels cannot speak for a row it has not seen.
-            BandFilling::of(rotation, mask),
+            mask,
             sink,
         ) {
-            return pixels.realize_bitmap(size, rotation, realization, mask);
+            return Some(pixels);
         }
         if !frame.is_first() {
             return None;
@@ -1071,23 +1054,25 @@ impl ImageCache {
         sequence_cache: &ImageSequenceCache,
         sequence: ImageSequenceId,
         size: ImageSizeSpec,
+        rotation: ImageRotation,
         realization: ImageRealization,
-        filling: BandFilling,
+        mask_policy: ImageMaskPolicy,
         sink: BandSink<'_>,
-    ) -> Option<NativePixels> {
+    ) -> Option<DecodedPixels> {
         match sequence_cache.resolve(sequence, data, frame) {
             ImageSequenceResolution::Frame(frame) => {
                 let (width, height) = frame.dimensions();
                 let (rgba, embedded) = frame.into_parts();
-                Some(NativePixels {
+                NativePixels {
                     extent: ImageNativeExtent::new(width, height),
                     rgba,
                     embedded,
-                })
+                }
+                .realize_bitmap(size, rotation, realization, mask_policy)
             }
             ImageSequenceResolution::MissingFrame => None,
             ImageSequenceResolution::NotAnimated => {
-                Self::decode_still_image(data, size, realization, filling, sink)
+                Self::decode_still_image(data, size, rotation, realization, mask_policy, sink)
             }
         }
     }
@@ -1095,24 +1080,42 @@ impl ImageCache {
     /// Decode a still raster source, row-wise where the source allows it.
     ///
     /// The two arms of [`BandSource`] are the whole decision: a source with a
-    /// row-wise decoder above the size threshold is decoded band by band, and
-    /// everything else — every other format, every source below the threshold,
-    /// and any row-wise decode that could not finish — is decoded whole, which
+    /// row-wise decoder above the size threshold is decoded band by band,
+    /// straight into the raster its texture holds, and everything else — every
+    /// other format, every source below the threshold, and any row-wise decode
+    /// that could not finish — is decoded whole and realized afterwards, which
     /// is what this code did for every source before banding existed.
     fn decode_still_image(
         data: &[u8],
         size: ImageSizeSpec,
+        rotation: ImageRotation,
         realization: ImageRealization,
-        filling: BandFilling,
+        mask_policy: ImageMaskPolicy,
         sink: BandSink<'_>,
-    ) -> Option<NativePixels> {
-        match Self::attempt_banded(data, size, realization, filling, sink) {
+    ) -> Option<DecodedPixels> {
+        match Self::attempt_banded(
+            data,
+            size,
+            realization,
+            BandFilling::of(rotation, mask_policy),
+            sink,
+        ) {
             BandedAttempt::Complete(pixels) => Some(pixels),
-            BandedAttempt::NotBandable | BandedAttempt::Abandoned => Self::decode_whole(data),
+            BandedAttempt::NotBandable | BandedAttempt::Abandoned => {
+                Self::decode_whole(data)?.realize_bitmap(size, rotation, realization, mask_policy)
+            }
         }
     }
 
     /// One attempt at a banded decode.
+    ///
+    /// The whole attempt resolves to one raster, from the *header's* extent
+    /// through the same `realized_geometry` the finished upload resolves from
+    /// the decoded one, and the source writes its rows into it as it reads
+    /// them. Step 1 pins those two extents equal, so the raster is the raster
+    /// the finished upload would write; if a header ever disagreed with its own
+    /// pixels, the source's own row count would differ from the height the
+    /// target was built for and the attempt is abandoned rather than published.
     fn attempt_banded(
         data: &[u8],
         size: ImageSizeSpec,
@@ -1120,28 +1123,21 @@ impl ImageCache {
         filling: BandFilling,
         mut sink: BandSink<'_>,
     ) -> BandedAttempt {
+        // A band has a destination only where the texture can be built up from
+        // the top: an unrotated realization whose mask policy leaves the pixels
+        // alone. Where it has none — a turn lands a band's rows in the raster's
+        // columns, and a mask that rewrites pixels needs all of them first —
+        // there is nothing to write a band into as it arrives, and the only way
+        // to hold the rows until the end is the native-size buffer this step
+        // exists to remove. Such a source takes the whole-image path, which is
+        // what it took before banding and what it still looks like on screen:
+        // empty until the decode completes, then whole.
+        if filling == BandFilling::Deferred {
+            return BandedAttempt::NotBandable;
+        }
         let mut source = match BandSource::open(data, size, realization) {
             BandSource::Banded(source) => source,
             BandSource::Whole => return BandedAttempt::NotBandable,
-        };
-        // Where these bands land, resolved from the *header's* extent through
-        // the same `realized_geometry` the finished upload resolves from the
-        // decoded one. Step 1 pins those two extents equal; if a header ever
-        // disagrees with its own pixels, the finished upload notices and
-        // replaces the texture rather than writing into it (see
-        // `ImageCache::upload_texture`).
-        let (native_width, native_height) = source.dimensions();
-        let map = match filling {
-            BandFilling::TopDown => BandMap::new(
-                native_height,
-                realized_geometry(
-                    ImageNativeExtent::new(native_width, native_height),
-                    size,
-                    realization,
-                )
-                .raster(),
-            ),
-            BandFilling::Deferred => None,
         };
         #[cfg(test)]
         let mut published = 0_u32;
@@ -1149,8 +1145,7 @@ impl ImageCache {
             match source.next_band() {
                 BandStep::Band(band) => {
                     if let Some(sink) = sink.as_deref_mut() {
-                        let placed = map.and_then(|map| map.place(&band));
-                        sink(DecodedBand::new(band, placed));
+                        sink(band);
                     }
                     #[cfg(test)]
                     {
@@ -1164,18 +1159,22 @@ impl ImageCache {
                 // A completed source is the only one that yields pixels, so a
                 // prefix cannot escape as an image.
                 BandStep::Done => {
-                    let extent = source.dimensions();
-                    return source.into_image().map_or(
-                        BandedAttempt::Abandoned,
-                        |(width, height, rgba)| {
-                            debug_assert_eq!(
-                                (width, height),
-                                extent,
-                                "the rows a banded decode filled must cover the extent its header named"
-                            );
-                            BandedAttempt::Complete(NativePixels::raster(width, height, rgba))
-                        },
+                    let Some(pixels) = source.into_raster() else {
+                        return BandedAttempt::Abandoned;
+                    };
+                    let geometry = realized_geometry(pixels.native(), size, realization);
+                    debug_assert_eq!(
+                        geometry.raster(),
+                        pixels.raster(),
+                        "a decode fills the raster its realization resolves"
                     );
+                    let mask = pixels.mask();
+                    return BandedAttempt::Complete(DecodedPixels {
+                        geometry,
+                        rgba: pixels.into_rgba(),
+                        mask,
+                        embedded: ImageEmbeddedMetadata::default(),
+                    });
                 }
                 BandStep::Failed => return BandedAttempt::Abandoned,
             }
@@ -1947,21 +1946,17 @@ impl ImageCache {
             };
             match outcome {
                 WorkerDecodeOutcome::Band { load, decoded } => {
-                    let (band, placed) = decoded.into_parts();
+                    let (source, placed) = decoded.into_parts();
                     tracing::debug!(
-                        "Image {} decoded rows {}..{} of {} wide",
+                        "Image {} decoded rows {}..{} into texture rows {}..{}",
                         load.image(),
-                        band.rows().start(),
-                        band.rows().end(),
-                        band.width()
+                        source.start(),
+                        source.end(),
+                        placed.placement().rows().start(),
+                        placed.placement().rows().end(),
                     );
-                    if let Some(placed) = placed {
-                        self.upload_band(device, queue, load, &placed);
-                    }
-                    events.push(ImageCacheEvent::Band {
-                        load,
-                        rows: band.rows(),
-                    });
+                    self.upload_band(device, queue, load, &placed);
+                    events.push(ImageCacheEvent::Band { load, rows: source });
                 }
                 WorkerDecodeOutcome::Ready(decoded) => {
                     events.push(ImageCacheEvent::Ready {
