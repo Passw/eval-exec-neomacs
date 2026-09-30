@@ -36850,6 +36850,7 @@ fn ligature_rule_composes_through_the_font_shape_driver() {
          (aset composition-function-table ?> \
            '([\"\\\\(?:->>\\\\|->\\\\)\" 0 font-shape-gstring])))";
     let ok = eval.eval_str(rule);
+<<<<<<< HEAD
     eprintln!("i447dbg rule eval: {ok:?}");
 
     // The installed font-shaping driver: the layout engine's own font
@@ -36866,6 +36867,14 @@ fn ligature_rule_composes_through_the_font_shape_driver() {
             direction,
         )
     }));
+||||||| parent of a591c2a358 (feat(gui-tests,layout-engine): ligature composition end-to-end + the shaping driver install (issue #447))
+    eprintln!("i447dbg rule eval: {ok:?}");
+=======
+    assert!(
+        ok.is_ok(),
+        "the ligature rule setup must evaluate: {ok:?}"
+    );
+>>>>>>> a591c2a358 (feat(gui-tests,layout-engine): ligature composition end-to-end + the shaping driver install (issue #447))
     let frame_id = eval
         .frame_manager_mut()
         .create_frame("ligature-probe", 200, 160, buf_id);
@@ -36899,11 +36908,34 @@ fn ligature_rule_composes_through_the_font_shape_driver() {
         .enumerate()
     {
         let text_glyphs = &row.glyphs[GlyphArea::Text.index()];
+<<<<<<< HEAD
         eprintln!("i447dbg row {ri}: {:?}", glyphs_logical_text(text_glyphs));
         for (i, g) in text_glyphs.iter().enumerate() {
             eprintln!(
                 "i447dbg   glyph[{i}]: type={:?} width={} pos={:?}",
                 g.glyph_type, g.pixel_width, g.provenance
+||||||| parent of 260bcf9e7d (feat(gui-tests,layout-engine): ligature composition end-to-end + the shaping driver install (issue #447))
+        eprintln!("i447dbg row {ri}: {:?}", glyphs_logical_text(text_glyphs));
+        for (i, g) in text_glyphs.iter().enumerate() {
+            eprintln!(
+                "i447dbg   glyph[{i}]: type={:?} width={} pos={:?}",
+                g.glyph_type,
+                g.pixel_width,
+                g.provenance
+=======
+            let has_ligature_composition = text_glyphs.iter().any(|glyph| {
+            matches!(
+                &glyph.glyph_type,
+                GlyphType::AutomaticComposite { text, .. } if text.as_ref() == "->"
+            )
+        });
+        if ri == 0 {
+            assert!(
+                has_ligature_composition,
+                "the '->' sequence must compose into one glyph through the \
+                 font-shape driver, got {:?}",
+                glyphs_logical_text(text_glyphs)
+>>>>>>> 260bcf9e7d (feat(gui-tests,layout-engine): ligature composition end-to-end + the shaping driver install (issue #447))
             );
         }
     }

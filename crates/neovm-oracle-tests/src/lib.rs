@@ -15,6 +15,7 @@ mod aot_battery;
 mod append_nconc_semantics;
 mod apply;
 mod aref_aset;
+mod composition_font_shape;
 mod arithmetic;
 mod ash_logand_logior_patterns;
 mod assoc;
