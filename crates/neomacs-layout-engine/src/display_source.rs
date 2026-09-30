@@ -677,6 +677,29 @@ impl DisplaySourceStepChar {
     }
 }
 
+/// Why [`DisplaySourceItem::consume_for_render`] refused an item. The variants
+/// name the only two invariants consumption relies on, so a refusal can be
+/// ACTED on (skip, reseat, or abort with an attributable log) instead of being
+/// flattened into an anonymous `None` — the anonymous flatten is what once
+/// turned an empty text run into a silently abandoned, blank row (issue
+/// #445).
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum SourceItemConsumeFailure {
+    /// The item's span start does not match the walk position: the producer
+    /// and the walk disagree about where the next element is.
+    PositionMismatch {
+        item_byte_idx: usize,
+        item_charpos: i64,
+        walk_byte_idx: usize,
+        walk_charpos: i64,
+    },
+    /// The item carries no direct source character, so the walk cannot derive
+    /// its advance from the source text. A producer that emits such an item
+    /// has broken the run contract (every run covers at least one character);
+    /// consumption refuses it rather than advancing by a guessed length.
+    NoDirectSourceChar,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct DisplaySourceItem {
     item: DisplayItem,
@@ -918,6 +941,7 @@ impl DisplaySourceItem {
         self.item.span.buffer_byte_len()
     }
 
+
     // The `Err` arm returns the unconsumed item to the caller (retry protocol),
     // so it is deliberately the same large type as `Ok`; boxing it is a perf
     // hint deferred out of the lint gate.
@@ -925,7 +949,7 @@ impl DisplaySourceItem {
     pub(crate) fn consume_for_render(
         self,
         position: &mut DisplaySourceTextPosition,
-    ) -> Result<Self, Self> {
+    ) -> Result<Self, (SourceItemConsumeFailure, Self)> {
         if !position.matches(self.start_byte_idx(), self.start_charpos()) {
             tracing::error!(
                 "DisplaySourceItem: validated source item at byte {} charpos {} \
@@ -935,10 +959,24 @@ impl DisplaySourceItem {
                 position.byte_idx(),
                 position.charpos()
             );
-            return Err(self);
+            let failure = SourceItemConsumeFailure::PositionMismatch {
+                item_byte_idx: self.start_byte_idx(),
+                item_charpos: self.start_charpos(),
+                walk_byte_idx: position.byte_idx(),
+                walk_charpos: position.charpos(),
+            };
+            return Err((failure, self));
         }
         let Some(ch) = self.direct_source_char() else {
-            return Err(self);
+            let failure = SourceItemConsumeFailure::NoDirectSourceChar;
+            tracing::error!(
+                "DisplaySourceItem: item at byte {} charpos {} carries no direct \
+                 source character; the producer emitted a run the walk cannot \
+                 advance by",
+                self.start_byte_idx(),
+                self.start_charpos()
+            );
+            return Err((failure, self));
         };
         let byte_len = self.buffer_byte_len().unwrap_or_else(|| ch.len_utf8());
         position.advance_byte_idx_to(self.start_byte_idx().saturating_add(byte_len));
