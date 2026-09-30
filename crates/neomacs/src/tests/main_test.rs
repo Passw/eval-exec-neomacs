@@ -57,8 +57,8 @@ use neovm_core::emacs_core::eval::{
 };
 use neovm_core::emacs_core::image_catalog::{AxisSize, ImageRotation, ImageSizeSpec};
 use neovm_core::emacs_core::image_catalog::{
-    ImageAnimationInvalidation, ImageCatalog, ImageColorContext, ImageDataSource, ImageFrameIndex,
-    ImageId, ImageLoadAttempt, ImageLoadToken, ImageLookup, ImageResolveRequest,
+    EncodedBytes, ImageAnimationInvalidation, ImageCatalog, ImageColorContext, ImageDataSource,
+    ImageFrameIndex, ImageId, ImageLoadAttempt, ImageLoadToken, ImageLookup, ImageResolveRequest,
     ImageResolveSource, ImageSizeLimit, ImageSpecIdentity, ResolvedImageMetadata,
 };
 use neovm_core::emacs_core::intern::intern;
@@ -2660,7 +2660,9 @@ fn primary_image_catalog_lookup_returns_pending_without_waiting_for_render_threa
 fn animation_frames_share_sequence_identity_and_retirement_advances_generation() {
     let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded();
     let catalog = AsyncImageCatalog::new(cmd_tx, None, Arc::new(ImageRenderState::default()), None);
-    let source = ImageResolveSource::Data(ImageDataSource::Isolated(vec![b'G', b'I', b'F']));
+    let source = ImageResolveSource::Data(ImageDataSource::Isolated(EncodedBytes::new(vec![
+        b'G', b'I', b'F',
+    ])));
     let mut request = ImageResolveRequest {
         spec: test_image_spec_identity("animated.gif"),
         source: source.clone(),
@@ -2710,7 +2712,9 @@ fn primary_image_catalog_does_not_block_on_render_command_backpressure() {
         .expect("fill command queue");
     let request = ImageResolveRequest {
         spec: test_image_spec_identity("backpressure.png"),
-        source: ImageResolveSource::Data(ImageDataSource::Isolated(vec![0x89, b'P', b'N', b'G'])),
+        source: ImageResolveSource::Data(ImageDataSource::Isolated(EncodedBytes::new(vec![
+            0x89, b'P', b'N', b'G',
+        ]))),
         size: ImageSizeSpec::new(AxisSize::AtMost(24), AxisSize::AtMost(24)),
         rotation: ImageRotation::None,
         colors: ImageColorContext::default(),
@@ -2807,7 +2811,9 @@ fn primary_image_catalog_does_not_wait_for_renderer_metadata_lock() {
     };
     let request = ImageResolveRequest {
         spec: test_image_spec_identity("metadata-lock.png"),
-        source: ImageResolveSource::Data(ImageDataSource::Isolated(vec![0x89, b'P', b'N', b'G'])),
+        source: ImageResolveSource::Data(ImageDataSource::Isolated(EncodedBytes::new(vec![
+            0x89, b'P', b'N', b'G',
+        ]))),
         size: ImageSizeSpec::new(AxisSize::AtMost(18), AxisSize::AtMost(18)),
         rotation: ImageRotation::None,
         colors: ImageColorContext::default(),
@@ -2956,7 +2962,9 @@ fn primary_display_host_resolve_image_sync_returns_cached_decode_failure_promptl
     };
     let request = ImageResolveRequest {
         spec: test_image_spec_identity("failed-decode.png"),
-        source: ImageResolveSource::Data(ImageDataSource::Isolated(vec![0xde, 0xad])),
+        source: ImageResolveSource::Data(ImageDataSource::Isolated(EncodedBytes::new(vec![
+            0xde, 0xad,
+        ]))),
         size: ImageSizeSpec::new(AxisSize::AtMost(0), AxisSize::AtMost(0)),
         rotation: ImageRotation::None,
         colors: ImageColorContext::default(),

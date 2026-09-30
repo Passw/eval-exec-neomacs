@@ -3,6 +3,7 @@
 use crate::types::{ImageId, ImageLoadToken};
 use std::collections::HashSet;
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 /// One renderer-side image lifecycle fact.
 ///
@@ -57,6 +58,75 @@ impl RetainedImageSet {
 impl FromIterator<ImageId> for RetainedImageSet {
     fn from_iter<T: IntoIterator<Item = ImageId>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
+    }
+}
+
+/// The encoded bytes of one image source, handed around by handle.
+///
+/// One buffer, named by the Lisp side and read by the renderer, so the two are
+/// the same bytes rather than two copies of them: a request's identity holds a
+/// handle to what the decode job reads, and every hop between them — the load
+/// command, the decode queue, the row-wise decoders, the whole-image fallback
+/// an abandoned banded attempt takes — clones the handle instead of the image.
+///
+/// A handle to the [`Vec`] rather than an `Arc<[u8]>`, which is the tidier type
+/// and is not reachable from an owned buffer without the copy this exists to
+/// avoid: a slice's refcount header has to sit in front of its data, so
+/// `Arc::from(vec)` reallocates and copies the whole buffer, while moving a
+/// `Vec` into an `Arc` moves three words and leaves the bytes where they are.
+///
+/// Equality and hashing are the bytes': two handles to the same contents are
+/// one source, which is what a request keyed by them means.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct EncodedBytes(Arc<Vec<u8>>);
+
+impl EncodedBytes {
+    /// Take ownership of the bytes, without copying them.
+    #[must_use]
+    pub fn new(bytes: Vec<u8>) -> Self {
+        Self(Arc::new(bytes))
+    }
+
+    /// A handle to a copy of `bytes`.
+    ///
+    /// For a caller that has a slice and no buffer to hand over: it is a full
+    /// copy of the source, so a path that owns its bytes uses [`Self::new`].
+    #[must_use]
+    pub fn copy_of(bytes: &[u8]) -> Self {
+        Self::new(bytes.to_vec())
+    }
+
+    /// How many bytes the source is.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Whether the source is empty.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The bytes.
+    #[must_use]
+    pub fn as_slice(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
+impl AsRef<[u8]> for EncodedBytes {
+    /// The bytes, for a reader that is given a buffer to read from.
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_slice()
+    }
+}
+
+impl std::ops::Deref for EncodedBytes {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        self.0.as_slice()
     }
 }
 

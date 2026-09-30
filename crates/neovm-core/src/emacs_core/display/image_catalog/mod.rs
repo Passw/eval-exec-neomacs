@@ -9,6 +9,7 @@ use crate::emacs_core::symbol::Obarray;
 use crate::heap_types::LispString;
 use crate::window::Frame;
 pub use neomacs_display_protocol::ImageRealization as ResolvedImageRealization;
+pub use neomacs_display_protocol::image::EncodedBytes;
 pub use neomacs_display_protocol::{
     AxisSize, ImageColorContext, ImageEmbeddedMetadata, ImageFrameDelay, ImageFrameIndex,
     ImageHeuristicMask, ImageId, ImageLayoutExtent, ImageLoadAttempt, ImageLoadToken,
@@ -261,10 +262,13 @@ pub fn numeric_image_scale(value: Value) -> Option<ImageScaleFactor> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ImageDataSource {
     /// Encoded bytes with no authority to resolve external resources.
-    Isolated(Vec<u8>),
+    Isolated(EncodedBytes),
     /// Encoded bytes whose relative resources may be resolved against the
     /// explicitly supplied GNU image `:base-uri`.
-    WithBaseUri { data: Vec<u8>, base_uri: LispString },
+    WithBaseUri {
+        data: EncodedBytes,
+        base_uri: LispString,
+    },
 }
 
 impl ImageDataSource {

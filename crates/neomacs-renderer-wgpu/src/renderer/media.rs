@@ -135,7 +135,7 @@ impl WgpuRenderer {
     pub fn load_image_data_with_id(
         &mut self,
         load: ImageLoadToken,
-        data: &[u8],
+        data: neomacs_display_protocol::image::EncodedBytes,
         size: ImageSizeSpec,
         rotation: ImageRotation,
         realization: ImageRealization,

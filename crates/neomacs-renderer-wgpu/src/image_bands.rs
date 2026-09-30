@@ -30,6 +30,7 @@ use std::io::Cursor;
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
+use neomacs_display_protocol::image::EncodedBytes;
 use neomacs_display_protocol::{
     ImageIntrinsicExtent, ImageMaskKind, ImageMaskPolicy, ImageNativeExtent, ImageRasterExtent,
     ImageRealization, ImageRotation, ImageSizeSpec,
@@ -300,62 +301,6 @@ pub(crate) enum BandStep {
     /// caller that wants a whole image must abandon it and decode the source
     /// again on the whole-image path.
     Failed,
-}
-
-/// The encoded bytes of one source, handed around by handle.
-///
-/// The row-wise decoders below read these bytes through a reader they own,
-/// which is why this chain used to carry `&'a [u8]`: a lifetime threaded
-/// through every signature between the two decoders and the caller that
-/// publishes their bands. Nothing about a row-wise decode needs the borrow.
-/// The bytes are owned before the chain is entered — a file read on the
-/// decoder thread, or the load command's own copy — and the whole-image path
-/// a failed attempt falls back to needs them *after* the source that holds
-/// them is gone, so the chain carries a handle to that one buffer instead.
-/// A decode job pays two atomic increments and decrements for it — one for the
-/// attempt to hold the bytes while the fallback keeps its own, one for a
-/// fallback to hold them while the attempt does — which is nothing beside a
-/// decode that takes hundreds of milliseconds.
-///
-/// A handle to the [`Vec`] rather than an `Arc<[u8]>`, which would be the
-/// tidier type and cannot be built without the copy this exists to avoid: a
-/// refcount header has to sit in front of a slice's data, so `Arc::from(vec)`
-/// reallocates and copies the whole buffer. Moving a `Vec` into an `Arc`
-/// instead moves three words and leaves the bytes where they are — which is
-/// what lets the file path, which today copies nothing at all, keep copying
-/// nothing.
-#[derive(Clone)]
-pub(crate) struct EncodedBytes(Arc<Vec<u8>>);
-
-impl EncodedBytes {
-    /// Take ownership of the bytes, without copying them.
-    pub(crate) fn new(bytes: Vec<u8>) -> Self {
-        Self(Arc::new(bytes))
-    }
-
-    /// A handle to a copy of `bytes`.
-    ///
-    /// For the callers that hold a slice rather than a buffer: it is a full
-    /// copy of the source, so a path that owns its bytes uses [`Self::new`].
-    #[cfg(test)]
-    pub(crate) fn copy_of(bytes: &[u8]) -> Self {
-        Self::new(bytes.to_vec())
-    }
-}
-
-impl AsRef<[u8]> for EncodedBytes {
-    /// The bytes, for a reader that is given a buffer to read from.
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_slice()
-    }
-}
-
-impl std::ops::Deref for EncodedBytes {
-    type Target = [u8];
-
-    fn deref(&self) -> &[u8] {
-        self.0.as_slice()
-    }
 }
 
 /// Where an encoded source's rows come from.

@@ -171,7 +171,7 @@ impl RenderApp {
                 if let Some(ref mut renderer) = self.renderer {
                     renderer.load_image_data_with_id(
                         load,
-                        &data,
+                        data,
                         size,
                         rotation,
                         realization,

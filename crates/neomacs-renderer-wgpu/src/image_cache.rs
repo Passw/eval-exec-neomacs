@@ -6,6 +6,7 @@
 //! - GPU texture upload when ready
 //! - LRU cache with memory limits
 
+use neomacs_display_protocol::image::EncodedBytes;
 use neomacs_display_protocol::{
     ImageCacheUsage, ImageColorContext, ImageEmbeddedMetadata, ImageFrameIndex, ImageHeuristicMask,
     ImageId, ImageIntrinsicExtent, ImageLayoutExtent, ImageLoadAttempt, ImageLoadToken,
@@ -23,8 +24,8 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 
 use crate::image_bands::{
-    BandFilling, BandSource, BandStep, DecodedBand, EncodedBytes, RasterBand, RowRange,
-    TextureRows, classify_alpha,
+    BandFilling, BandSource, BandStep, DecodedBand, RasterBand, RowRange, TextureRows,
+    classify_alpha,
 };
 use crate::image_sequence::{ImageSequenceCache, ImageSequenceResolution};
 
@@ -1580,10 +1581,14 @@ impl ImageCache {
     }
 
     /// Load image from data with a pre-allocated ID (for threaded mode)
+    ///
+    /// The bytes arrive as the handle the request already holds, and are moved
+    /// into the decode queue: the caller's buffer is the decode's buffer, which
+    /// is what the catalog's own key to the same request points at too.
     pub fn load_data_with_id(
         &mut self,
         load: ImageLoadToken,
-        data: &[u8],
+        data: EncodedBytes,
         size: ImageSizeSpec,
         rotation: ImageRotation,
         realization: ImageRealization,
@@ -1596,7 +1601,7 @@ impl ImageCache {
         let load = self.begin_load(load);
         let image = load.image();
         // Query dimensions for the pending-image placeholder.
-        if let Some(dims) = Self::query_data_intrinsic_extent(data) {
+        if let Some(dims) = Self::query_data_intrinsic_extent(&data) {
             self.pending_dimensions.insert(
                 image,
                 realization.resolve_geometry(size, dims, rotation).layout(),
@@ -1608,7 +1613,7 @@ impl ImageCache {
         let _ = self.decode_tx.send(DecodeRequest {
             load,
             source: ImageSource::Data {
-                data: EncodedBytes::new(data.to_vec()),
+                data,
                 resources,
                 sequence,
             },
@@ -1680,6 +1685,9 @@ impl ImageCache {
     }
 
     /// Load image from data (async)
+    ///
+    /// A caller here has a slice and no buffer of its own to hand over, so the
+    /// bytes are materialized into the handle the decode will read.
     pub fn load_data(
         &mut self,
         data: &[u8],
@@ -1705,7 +1713,7 @@ impl ImageCache {
         let _ = self.decode_tx.send(DecodeRequest {
             load,
             source: ImageSource::Data {
-                data: EncodedBytes::new(data.to_vec()),
+                data: EncodedBytes::copy_of(data),
                 resources: crate::svg::SvgResourceContext::Isolated,
                 sequence: ImageSequenceId::new(u64::from(image.get()))
                     .expect("allocated image identity is non-zero"),

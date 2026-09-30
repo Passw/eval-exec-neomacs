@@ -18,6 +18,7 @@ use neomacs_display_protocol::frame_chrome::PresentationId;
 use neomacs_display_protocol::frame_glyphs::{
     CursorStyle, DisplaySlotId, FrameGlyph, FrameGlyphBuffer, GlyphRowRole, PhysCursor,
 };
+use neomacs_display_protocol::image::EncodedBytes;
 use neomacs_display_protocol::types::{
     AnimatedCursor, Color, DisplayFrameId, DisplayWindowId, FaceId,
 };
@@ -2113,7 +2114,7 @@ fn drive_banded_load(
 ) -> Vec<FilledRows> {
     h.renderer.load_image_data_with_id(
         test_image_load(image),
-        data,
+        EncodedBytes::copy_of(data),
         ImageSizeSpec::default(),
         ImageRotation::None,
         realization,
@@ -2551,7 +2552,7 @@ fn a_failed_banded_decode_leaves_no_partial_texture() {
     let data = &full[..full.len() * 2 / 5];
     h.renderer.load_image_data_with_id(
         test_image_load(909),
-        data,
+        EncodedBytes::copy_of(data),
         ImageSizeSpec::default(),
         ImageRotation::None,
         ImageRealization::with_device_scale(1.0, 1.0),
