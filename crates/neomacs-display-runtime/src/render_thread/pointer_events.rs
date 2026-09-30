@@ -16,14 +16,43 @@ use crate::thread_comm::{
 };
 use neomacs_display_protocol::PresentationFramePoint;
 use neomacs_display_protocol::frame_chrome::{ChromeAction, FrameChromeKind};
+#[cfg(any(test, feature = "webview"))]
+use neomacs_webview::WebViewScrollDelta;
 #[cfg(feature = "webview")]
 use neomacs_webview::{
-    ButtonState, PointerButton, WebContentPoint, WebViewInput, WebViewInputTarget,
-    WebViewModifiers, WebViewScrollDelta,
+    ButtonState, PointerButton, WebContentPoint, WebViewInput, WebViewInputTarget, WebViewModifiers,
 };
+
 use winit::dpi::PhysicalPosition;
 use winit::event::{DeviceId, ElementState, MouseButton, MouseScrollDelta, TouchPhase};
 use winit::window::WindowId;
+
+// Embedded browsers own their distance policy and fractional viewport. Do not
+// impose the editor's integral Lisp boundary on their input.
+#[cfg(any(test, feature = "webview"))]
+fn webview_scroll_delta(delta: MouseScrollDelta, scale: f64) -> Option<WebViewScrollDelta> {
+    if !scale.is_finite() || scale <= 0.0 {
+        return None;
+    }
+    match delta {
+        MouseScrollDelta::LineDelta(x, y) | MouseScrollDelta::ContinuousLineDelta(x, y)
+            if x.is_finite() && y.is_finite() =>
+        {
+            Some(WebViewScrollDelta::Lines { x, y })
+        }
+        MouseScrollDelta::PixelDelta(p) if p.x.is_finite() && p.y.is_finite() => {
+            Some(WebViewScrollDelta::Pixels {
+                x: (p.x / scale) as f32,
+                y: (p.y / scale) as f32,
+            })
+        }
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+#[path = "pointer_events/tests/webview_scroll_test.rs"]
+mod webview_scroll_test;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum PointerOwner {
@@ -1744,21 +1773,14 @@ impl RenderApp {
                 modifiers: self.modifiers,
                 device,
             };
-            let Some(delta) = window_state
+            let converted = window_state
                 .render
                 .scroll_input
-                .convert(delta, scroll_target, phase)
-            else {
-                return;
-            };
+                .convert(delta, scroll_target, phase);
             #[cfg(feature = "webview")]
-            let webview_delivery =
+            let webview_delivery = webview_scroll_delta(delta, scale).and_then(|delta| {
                 Self::webview_target_for_frame_window(&window_state.render, target_fid, ev_x, ev_y)
                     .map(|hit| {
-                        let delta = match delta {
-                            ScrollDelta::Lines { x, y } => WebViewScrollDelta::Lines { x, y },
-                            ScrollDelta::Pixels { x, y } => WebViewScrollDelta::Pixels { x, y },
-                        };
                         (
                             WebViewDeliveryTarget::Current(hit.view),
                             WebViewInput::Scroll {
@@ -1767,61 +1789,64 @@ impl RenderApp {
                                 modifiers: Self::webview_modifiers(self.modifiers),
                             },
                         )
-                    });
-            let action = PointerAction::Scroll {
-                delta,
-                modifiers: self.modifiers,
-            };
-            let input = InputEvent::PositionedPointer(PositionedPointerInput {
-                position,
-                target,
-                action,
+                    })
             });
-            let (receipt, token) = self.comms.send_input_with_receipt(input);
-            if let Some(receipt) = &receipt
-                && let Some(state) = self.frame_windows.get_by_winit_mut(window_id)
-            {
-                state
-                    .render
-                    .compositor
-                    .input_scroll
-                    .observe_input(receipt.clone(), token);
-            }
-            if let (
-                ScrollDelta::Pixels {
-                    x: horizontal,
-                    y: vertical,
-                },
-                Some(receipt),
-            ) = (delta, receipt)
-                && self.modifiers == 0
-                && horizontal.abs() <= vertical.abs()
-                && let Some(state) = self.frame_windows.get_by_winit_mut(window_id)
-                && state.render.emacs_frame_id == target_fid
-                && matches!(
-                    state.render.compositor.layout,
-                    super::frame_compositor::layout_driver::LayoutDriver::Settled
-                )
-                && !state.render.compositor.transitions.has_active()
-                && !state
-                    .render
-                    .compositor
-                    .renderer_effects
-                    .scroll_effects_active()
-                && let Some(frame) = state.render.compositor.current_frame.as_ref()
-                && state.render.compositor.input_scroll.push(
-                    frame,
-                    ev_x,
-                    ev_y,
-                    -vertical.round(),
-                    receipt,
-                    token,
-                )
-            {
-                state.render.compositor.current_scene_generation =
-                    super::frame_state::next_scene_generation();
-                state.render.compositor.current_row_damage = None;
-                state.render.mark_dirty();
+            if let Some(delta) = converted {
+                let action = PointerAction::Scroll {
+                    delta,
+                    modifiers: self.modifiers,
+                };
+                let input = InputEvent::PositionedPointer(PositionedPointerInput {
+                    position,
+                    target,
+                    action,
+                });
+                let (receipt, token) = self.comms.send_input_with_receipt(input);
+                if let Some(receipt) = &receipt
+                    && let Some(state) = self.frame_windows.get_by_winit_mut(window_id)
+                {
+                    state
+                        .render
+                        .compositor
+                        .input_scroll
+                        .observe_input(receipt.clone(), token);
+                }
+                if let (
+                    ScrollDelta::Pixels {
+                        x: horizontal,
+                        y: vertical,
+                    },
+                    Some(receipt),
+                ) = (delta, receipt)
+                    && self.modifiers == 0
+                    && horizontal.abs() <= vertical.abs()
+                    && let Some(state) = self.frame_windows.get_by_winit_mut(window_id)
+                    && state.render.emacs_frame_id == target_fid
+                    && matches!(
+                        state.render.compositor.layout,
+                        super::frame_compositor::layout_driver::LayoutDriver::Settled
+                    )
+                    && !state.render.compositor.transitions.has_active()
+                    && !state
+                        .render
+                        .compositor
+                        .renderer_effects
+                        .scroll_effects_active()
+                    && let Some(frame) = state.render.compositor.current_frame.as_ref()
+                    && state.render.compositor.input_scroll.push(
+                        frame,
+                        ev_x,
+                        ev_y,
+                        -vertical.round(),
+                        receipt,
+                        token,
+                    )
+                {
+                    state.render.compositor.current_scene_generation =
+                        super::frame_state::next_scene_generation();
+                    state.render.compositor.current_row_damage = None;
+                    state.render.mark_dirty();
+                }
             }
             #[cfg(feature = "webview")]
             if let Some((delivery, input)) = webview_delivery
