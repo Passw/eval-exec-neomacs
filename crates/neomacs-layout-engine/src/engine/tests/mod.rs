@@ -15372,6 +15372,147 @@ fn layout_frame_rust_crops_a_mid_row_image_on_a_truncating_row() {
     );
 }
 
+/// A mid-row image on a WORD-WRAPPING row takes the word in front of it down.
+///
+/// `display_line` does not move a display element that does not fit down on its
+/// own while the row holds a word-wrap break candidate: `else if (wrap_row_used
+/// > 0) goto back_to_wrap` wins over the "Restore positions to values before the
+/// element" arm, so the row is cut back to the candidate and the word in front
+/// of the element is re-produced on the continuation row with it
+/// (src/xdisp.c:26379-26406 against :26433-26475, emacs-31.1).
+///
+/// Measured, GNU Emacs 31.1 under Xvfb, 720 px text area, 9 px column, 40
+/// columns of text then " zzz" and a 400 px image: the first screen line is
+/// [1..42) -- the text and the space before the word -- and the second is
+/// [42..47), "zzz" followed by the whole image
+/// (`tmp/midrow-image/case-1.txt`); the same content with `word-wrap` nil keeps
+/// the word on the first line (`case-3.txt`).
+#[test]
+fn layout_frame_rust_word_wrap_takes_the_preceding_word_with_the_image() {
+    let mut eval = Context::new();
+    eval.set_display_host(Box::new(MidRowImageHost));
+    let buf_id = eval
+        .buffer_manager()
+        .current_buffer()
+        .expect("current buffer")
+        .id();
+    let frame_id =
+        eval.frame_manager_mut()
+            .create_frame("layout-word-wrap-image", 640, 400, buf_id);
+    eval.frame_manager_mut()
+        .get_mut(frame_id)
+        .expect("frame")
+        .set_window_system(Some(Value::symbol("neo")));
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame_id);
+    let probe = engine
+        .last_frame_display_state
+        .as_ref()
+        .expect("probe display state");
+    let entry = widest_text_body_window_matrix(probe);
+    let text_width = entry.text_pixel_bounds.width;
+    let char_width = probe.char_width;
+    let word = "zzz";
+    // Columns the row holds before the image: `filler` x's, a space, the word,
+    // and the character the image replaces.  The image starts far enough in to
+    // overhang the row by more than a rounding error, while the word and the
+    // image still fit a row of their own.
+    let lead = ((text_width - 200.0) / char_width).floor() as usize + 4;
+    let filler = lead - word.len() - 2;
+    assert!(filler > 8, "the probe row holds enough columns: {filler}");
+    assert!(
+        (word.len() + 1) as f32 * char_width + 200.0 <= text_width,
+        "the word and the image fit a continuation row: {text_width}px"
+    );
+
+    {
+        let buf = eval.buffer_manager_mut().get_mut(buf_id).expect("buffer");
+        // The image replaces the character right after the word, so the row
+        // breaks at the space and the word travels with it.
+        buf.insert(&format!("{} {}Q\n", "x".repeat(filler), word));
+        buf.put_text_property(
+            filler + word.len() + 2,
+            filler + word.len() + 3,
+            Value::symbol("display"),
+            Value::list(vec![
+                Value::symbol("image"),
+                Value::keyword("type"),
+                Value::symbol("png"),
+                Value::keyword("file"),
+                Value::string("./tmp/midrow-image/mid-row.png"),
+            ]),
+        );
+        buf.set_buffer_local("truncate-lines", Value::NIL);
+        buf.set_buffer_local("word-wrap", Value::T);
+    }
+
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame_id);
+
+    let state = engine
+        .last_frame_display_state
+        .as_ref()
+        .expect("display state");
+    let entry = widest_text_body_window_matrix(state);
+    let text_rows: Vec<&neomacs_display_protocol::glyph_matrix::MatrixRow> = entry
+        .matrix
+        .rows
+        .iter()
+        .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        .collect();
+    let row_text = |row: &neomacs_display_protocol::glyph_matrix::MatrixRow| -> String {
+        row.glyphs[GlyphArea::Text.index()]
+            .iter()
+            .filter_map(|glyph| match glyph.glyph_type {
+                GlyphType::Char { ch } => Some(ch),
+                _ => None,
+            })
+            .collect()
+    };
+
+    assert!(
+        !row_text(text_rows[0]).contains('z'),
+        "the word the row broke before stays off the first row: {:?}",
+        row_text(text_rows[0])
+    );
+    assert_eq!(
+        row_text(text_rows[0]),
+        format!("{} ", "x".repeat(filler)),
+        "the first row keeps the text up to the break candidate"
+    );
+    // The continuation row carries the word and then the image.  It also holds
+    // the character the image's `display` property covers: this port appends
+    // the covered character's own glyph as well as the replacement, which GNU
+    // does not -- the property replaces the glyph there.  That is a
+    // pre-existing divergence of the display-property producer, unchanged by
+    // this rule and visible on any row a replacement lands on
+    // (`layout_frame_rust_wraps_a_mid_row_image_onto_the_next_row` shows the
+    // same glyph on the row before the image).
+    let continuation = &text_rows[1].glyphs[GlyphArea::Text.index()];
+    assert!(
+        row_text(text_rows[1]).starts_with(word),
+        "the word moves down WITH the image, ahead of it on the continuation row: {:?}",
+        row_text(text_rows[1])
+    );
+    assert!(
+        matches!(
+            continuation.last().expect("the image").glyph_type,
+            GlyphType::Image { .. }
+        ),
+        "the image follows the word it did not fit behind: {continuation:?}"
+    );
+    let GlyphType::Image { image_id, .. } = continuation.last().expect("the image").glyph_type
+    else {
+        unreachable!("checked just above")
+    };
+    assert_eq!(image_id, 7);
+    assert_eq!(
+        continuation.last().expect("the image").pixel_width,
+        200.0,
+        "re-produced whole on a row of its own"
+    );
+}
+
 #[test]
 fn layout_frame_rust_emits_inline_image_glyphs_for_display_image_specs() {
     let mut eval = Context::new();
