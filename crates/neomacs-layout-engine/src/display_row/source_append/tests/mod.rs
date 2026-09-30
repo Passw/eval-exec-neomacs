@@ -12316,6 +12316,146 @@ fn display_replacement_append_context_crops_an_image_wider_than_the_text_area() 
     assert!((image.3.width() - 154.0 / 300.0).abs() < 1e-3);
 }
 
+/// A row that refuses an image says so.
+///
+/// The refusal is what lets the buffer renderer move the image down to the next
+/// row (GNU `display_line`, src/xdisp.c:26448-26475).  An append that reported
+/// only an unchanged pen left the caller no way to tell a refused replacement
+/// from a placed one, so the covered buffer text stayed and the image vanished.
+#[test]
+fn display_replacement_row_render_reports_an_image_the_row_refuses() {
+    let mut eval = Context::new();
+    let buf_id = eval
+        .buffer_manager()
+        .current_buffer()
+        .expect("current buffer")
+        .id();
+    let frame_id = eval
+        .frame_manager_mut()
+        .create_frame("refused-mid-row-image", 320, 120, buf_id);
+    let window_id = eval
+        .frame_manager()
+        .get(frame_id)
+        .expect("frame")
+        .selected_window;
+    let mut output_emitter =
+        crate::window_output::WindowOutputEmitter::new(frame_id, window_id, 0, 0.0, 0.0);
+    output_emitter.begin_update(&mut eval);
+    output_emitter.begin_text_row(&mut eval, 0, 0, 0.0, 0.0);
+    let table = FaceTable::new();
+    let face_resolver = crate::neovm_bridge::FaceResolver::new(
+        &table,
+        0x00ffffff,
+        0x000000,
+        14.0,
+        Some("neo".to_string()),
+    );
+    let base_face = face_resolver.default_face();
+    let mut font_metrics = None;
+
+    let mut builder = crate::output::builder::DisplayOutputBuilder::new();
+    let text_bounds = Rect::new(10.0, 20.0, 160.0, 64.0);
+    builder.begin_window_with_text_bounds(
+        77,
+        1,
+        24,
+        Rect::new(0.0, 0.0, 200.0, 80.0),
+        text_bounds,
+        true,
+    );
+    builder.begin_row(0, GlyphRowRole::Text);
+    let surface = DisplayRowAppendSurface::new(
+        DisplayRowAppendArea::new(text_bounds.x, 160.0, 160.0, 0.0, 0.0),
+        DisplayTabPolicy::every(8),
+    );
+    let mut geometry =
+        DisplayRowGeometryDefaults::new(0.0, 16.0, 12.0, DisplayRowMeasurementMode::ConcreteFont)
+            .initial_state();
+    let active_face = test_active_face_state(FaceId::new(3), 8.0);
+    let mut face_ids = FrameFaceAttempt::for_test_with_next_id(4);
+    builder.set_face_attempt(face_ids.clone());
+
+    // The row already holds text, so the image is a mid-row glyph rather than
+    // the row's first: GNU's crop applies to a glyph at column zero and leaves a
+    // mid-row one whole (`produce_image_glyph`, src/xdisp.c:32492-32509).
+    for index in 0..18 {
+        write_char_to_current_row_with_width(&mut builder, 'x', FaceId::new(3), index, 8.0);
+    }
+
+    // 30px of image left at x = 150 of a 160px-wide text area: too wide to fit,
+    // but narrower than a quarter of the row, so GNU leaves the glyph whole
+    // instead of cropping it, and this row's text-area edge policy rejects it.
+    let media_item = DisplayReplacementMediaSourceItem::new(
+        DisplayMediaReplacement::image(DisplayImageItem {
+            image_id: 42,
+            source_rect: neomacs_display_protocol::ImageSourceRect::FULL,
+            width: 30.0,
+            height: 32.0,
+            ascent: 32.0,
+            horizontal_margin: 0.0,
+            vertical_margin: 0.0,
+            opaque_background: None,
+        }),
+        active_face.metrics().row_height(),
+        active_face.metrics().ascent(),
+        false,
+    );
+    let replacement_source = crate::display_item::BufferDisplayReplacementSource::new(
+        buf_id,
+        CharPos0::new(0),
+        EmacsBytePos::new(0),
+    );
+    let snapshot = current_buffer_snapshot(&eval, buf_id);
+    let plan = DisplayPropertyReplacementRowRenderRequest::from_resolved_source_item(
+        replacement_source,
+        DisplayPropertyReplacementSourceItem::Media(
+            DisplayReplacementMediaSourceResolution::Media(media_item),
+        ),
+        0.0,
+        DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
+        DisplayRowPosition::new(150.0, 18),
+    );
+    let render = plan.begin_render_to_text_rows(
+        &snapshot,
+        &mut text_row_source_render_state(
+            &mut builder,
+            &mut output_emitter,
+            &mut eval,
+            &mut font_metrics,
+            &face_resolver,
+        ),
+        &mut face_ids,
+        &surface,
+        &mut geometry,
+        &active_face,
+    );
+    let DisplayPropertyReplacementRowRender::Applied(outcome) = render else {
+        panic!("a media replacement is atomic");
+    };
+
+    assert_eq!(
+        outcome.placement(),
+        DisplayReplacementPlacement::RefusedWhole,
+        "the row refused the image and said so"
+    );
+    assert_eq!(
+        outcome.end_position(),
+        DisplayRowPosition::new(150.0, 18),
+        "a refused replacement leaves the pen where it was"
+    );
+    builder
+        .edit_current_row_for_test(|row| {
+            let text = &row.glyphs[GlyphArea::Text.index()];
+            assert_eq!(text.len(), 18, "only the row's text is on the row");
+            assert!(
+                text.iter()
+                    .all(|glyph| !matches!(glyph.glyph_type, GlyphType::Image { .. })),
+                "not one glyph of the refused image is on the row"
+            );
+        })
+        .expect("current row");
+}
+
 #[test]
 fn display_replacement_append_context_installs_video_replacements() {
     let mut eval = Context::new();

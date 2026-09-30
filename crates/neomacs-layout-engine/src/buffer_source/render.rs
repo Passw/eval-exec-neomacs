@@ -251,6 +251,25 @@ impl<'rows, 'request, 'emit, 'surface, 'face>
         !continuation.should_break()
     }
 
+    /// Render one `display` replacement, moving a replacement the row refuses
+    /// down to the next row.
+    ///
+    /// GNU `display_line` does not drop a display element that draws past the
+    /// right edge of a *continued* row: it removes it from the row, restores the
+    /// iterator to before it, marks the row continued, and produces the element
+    /// again at the start of the next row (`display_line`,
+    /// src/xdisp.c:26448-26475).  That is also where `produce_image_glyph`'s
+    /// wide-glyph crop does not apply, because the image starts at column zero
+    /// on the new row (:32492-32509), so a mid-row image that does not fit is
+    /// displayed below rather than cropped or lost.
+    ///
+    /// The move happens at most once per replacement: GNU's own guarantee is
+    /// that a glyph at `hpos == 0` is kept (it crops to the row instead of
+    /// refusing), so a replacement the *fresh* row also refuses -- one with no
+    /// room at all, the degenerate geometry this port documents on
+    /// `DisplayImageOverflowAction` -- takes the row's own answer instead of
+    /// being deferred for ever.  A truncating row does not move the
+    /// replacement down either: GNU draws that glyph past the edge.
     fn consume_replacement<B: LayoutBufferView>(
         mut self,
         source_walk: &mut BufferSourceWalk<'request, B>,
@@ -261,39 +280,97 @@ impl<'rows, 'request, 'emit, 'surface, 'face>
     where
         'surface: 'request,
     {
-        let replacement_context = BufferDisplayPropertyTextReplacementRenderContext::new(
-            replacement,
-            self.loop_context.text_start_byte(),
-            self.text,
-            self.loop_context.content_x(),
-            self.params,
-            0.0,
-            self.loop_context.char_height(),
-            self.active_face_state,
-            self.state.progress.row_progress().x(),
-            self.state.progress.row_position(),
-        );
-        match replacement_context.render_and_apply(
-            buffer,
-            BufferDisplayPropertyTextReplacementRenderState::new(
+        let mut moved_to_next_row = false;
+        loop {
+            // GNU removes the element and re-produces it on the next row only
+            // while the row can continue; a truncating row draws past its edge
+            // instead, and a replacement a *fresh* row also refuses (a row with
+            // no room at all) has nowhere left to go.
+            let move_to_next_row =
+                !moved_to_next_row && self.params.wrap_mode != crate::types::LineWrapMode::Truncate;
+            let replacement_context = BufferDisplayPropertyTextReplacementRenderContext::new(
+                replacement.clone(),
+                self.loop_context.text_start_byte(),
+                self.text,
+                self.loop_context.content_x(),
+                self.params,
+                0.0,
+                self.loop_context.char_height(),
+                self.active_face_state,
+                self.state.progress.row_progress().x(),
+                self.state.progress.row_position(),
+            );
+            let rendered_state = BufferDisplayPropertyTextReplacementRenderState::new(
                 self.state.source_render.reborrow(),
                 self.state.face_ids,
                 self.state.surface.append_surface,
                 self.state.row_build.row_geometry,
                 self.active_face_state,
-            ),
-            &mut self.state.progress,
-            self.state.cursor_info,
-            self.loop_context.point_charpos(),
-        ) {
-            BufferDisplayPropertyTextReplacementApplyOutcome::Applied => true,
-            BufferDisplayPropertyTextReplacementApplyOutcome::String(session) => self
-                .render_display_string_session(source_walk, buffer, &replacement_context, session),
-            BufferDisplayPropertyTextReplacementApplyOutcome::Fallback(source_item) => {
-                self.render_source_item(source_walk, layout_resolution_context, source_item, buffer)
+            );
+            let outcome = if move_to_next_row {
+                replacement_context.render_and_report_refusal(
+                    buffer,
+                    rendered_state,
+                    &mut self.state.progress,
+                    self.state.cursor_info,
+                    self.loop_context.point_charpos(),
+                )
+            } else {
+                replacement_context.render_and_apply(
+                    buffer,
+                    rendered_state,
+                    &mut self.state.progress,
+                    self.state.cursor_info,
+                    self.loop_context.point_charpos(),
+                )
+            };
+            match outcome {
+                BufferDisplayPropertyTextReplacementApplyOutcome::Applied => return true,
+                BufferDisplayPropertyTextReplacementApplyOutcome::RefusedWhole => {
+                    moved_to_next_row = true;
+                    // The refused replacement consumed no buffer text and drew
+                    // no glyph, so the row ends exactly where it began and the
+                    // walk position still names the covered character.
+                    if self.emit_replacement_visual_wrap(buffer).should_break() {
+                        return false;
+                    }
+                }
+                BufferDisplayPropertyTextReplacementApplyOutcome::String(session) => {
+                    return self.render_display_string_session(
+                        source_walk,
+                        buffer,
+                        &replacement_context,
+                        session,
+                    );
+                }
+                BufferDisplayPropertyTextReplacementApplyOutcome::Fallback(source_item) => {
+                    return self.render_source_item(
+                        source_walk,
+                        layout_resolution_context,
+                        source_item,
+                        buffer,
+                    );
+                }
+                BufferDisplayPropertyTextReplacementApplyOutcome::Stop => return false,
             }
-            BufferDisplayPropertyTextReplacementApplyOutcome::Stop => false,
         }
+    }
+
+    /// End the current row for a replacement that has to move down, and start
+    /// the continuation row the retry renders into.
+    ///
+    /// A visual row break, not a display-string one: the replacement belongs to
+    /// a buffer character, so the new row starts at that character and the
+    /// row's end source stays `Buffer`.
+    fn emit_replacement_visual_wrap<B: LayoutBufferView>(
+        &mut self,
+        buffer: &B,
+    ) -> DisplayRowTransitionContinuation {
+        let continuation = emit_nested_source_visual_wrap(self.loop_context, self.state.reborrow());
+        if !continuation.should_break() {
+            self.render_pending_row_prelude(buffer);
+        }
+        continuation
     }
 
     fn render_display_string_session<B: LayoutBufferView>(

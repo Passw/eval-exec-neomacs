@@ -762,6 +762,17 @@ impl<'rows, 'emit, 'surface>
                     BufferDisplayPropertyTextReplacementApplyOutcome::Applied => {
                         render_position = self.progress.row_position();
                     }
+                    BufferDisplayPropertyTextReplacementApplyOutcome::RefusedWhole => {
+                        // The fit proof admits only replacements that fit, and
+                        // a refused one is by definition a replacement that did
+                        // not fit; a row that reaches here must not be treated
+                        // as routed.
+                        debug_assert!(
+                            false,
+                            "the routed-row fit proof must exclude a replacement the row refuses"
+                        );
+                        return note_route_stopped(PlainRowRouteOutcome::Stopped);
+                    }
                     BufferDisplayPropertyTextReplacementApplyOutcome::String(mut session) => {
                         let Some(outcome) = session.render_next_row(
                             &mut self.source_render.reborrow(),

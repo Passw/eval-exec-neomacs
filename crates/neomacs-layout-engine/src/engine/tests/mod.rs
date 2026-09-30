@@ -14962,6 +14962,171 @@ fn layout_frame_rust_honors_display_replacement_string_face_properties() {
     );
 }
 
+/// Every image this host resolves is laid out 200x80, the size the GUI repro
+/// (`tmp/wrap-mid`) uses: wide enough not to fit in the space left beside a
+/// nearly full row of text, narrow enough to fit a row of its own.
+struct MidRowImageHost;
+
+impl DisplayHost for MidRowImageHost {
+    fn realize_gui_frame(&mut self, _request: GuiFrameHostRequest) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn resize_gui_frame(&mut self, _request: GuiFrameHostRequest) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn image_catalog(&self) -> Option<&dyn ImageCatalog> {
+        Some(self)
+    }
+}
+
+/// The buffer's own window matrix: the one with the most rows.  A fresh frame
+/// also carries a one-row minibuffer matrix, whose window id does not track the
+/// window the buffer is displayed in.
+fn widest_text_body_window_matrix(
+    state: &neomacs_display_protocol::glyph_matrix::FrameDisplayState,
+) -> &neomacs_display_protocol::glyph_matrix::WindowMatrixEntry {
+    state
+        .window_matrices
+        .iter()
+        .max_by_key(|entry| entry.matrix.rows.len())
+        .expect("a window matrix")
+}
+
+impl ImageCatalog for MidRowImageHost {
+    fn lookup(&self, _request: ImageResolveRequest, _limit: ImageSizeLimit) -> ImageLookup {
+        ImageLookup::Pending(PendingImage::new(
+            test_image_load(7),
+            neomacs_display_protocol::ImageLayoutExtent::new(200, 80),
+        ))
+    }
+}
+
+/// A mid-row image on a WRAPPING row moves down whole.
+///
+/// GNU `display_line` never drops a display element that draws past the right
+/// edge of a continued row: it unproduces it, restores the iterator to before
+/// it and produces it again at the start of the next row (src/xdisp.c:26448-26475,
+/// "Restore positions to values before the element"), which is also where
+/// `produce_image_glyph`'s wide-glyph crop does not apply because the image now
+/// starts at column zero (:32492-32509).  Before this port the row writer
+/// rejected the glyph and the clipped-item remainder answered "nothing to
+/// remember", so the image was never produced again on any row.
+///
+/// The filler length is measured from the frame's own text metrics so the image
+/// lands mid-row whatever the default font measures, and the numbers are the
+/// repro's: a whole-row-wide image at the far end of a full row of text.
+#[test]
+fn layout_frame_rust_wraps_a_mid_row_image_onto_the_next_row() {
+    let mut eval = Context::new();
+    eval.set_display_host(Box::new(MidRowImageHost));
+    let buf_id = eval
+        .buffer_manager()
+        .current_buffer()
+        .expect("current buffer")
+        .id();
+    let frame_id = eval
+        .frame_manager_mut()
+        .create_frame("layout-wrap-mid-image", 640, 400, buf_id);
+    // Media replacement is meaningful only on a graphical frame.
+    eval.frame_manager_mut()
+        .get_mut(frame_id)
+        .expect("frame")
+        .set_window_system(Some(Value::symbol("neo")));
+    // First pass: the frame's own metrics, so the filler can be sized to leave
+    // less than the image's width on the row it lands on.
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame_id);
+    let probe = engine
+        .last_frame_display_state
+        .as_ref()
+        .expect("probe display state");
+    let entry = widest_text_body_window_matrix(probe);
+    let text_width = entry.text_pixel_bounds.width;
+    let char_width = probe.char_width;
+    assert!(char_width > 0.0, "the frame measures a positive char width");
+    // Five cells short of a full row leaves far less than 200px for the image.
+    let filler = (text_width / char_width).floor() as usize - 5;
+    assert!(filler > 8, "the probe row holds enough columns: {filler}");
+    assert!(
+        200.0 <= text_width,
+        "the image fits a row of its own: {text_width}px"
+    );
+
+    {
+        let buf = eval.buffer_manager_mut().get_mut(buf_id).expect("buffer");
+        buf.insert(&format!("{}i\n", "x".repeat(filler)));
+        buf.put_text_property(
+            filler + 1,
+            filler + 2,
+            Value::symbol("display"),
+            Value::list(vec![
+                Value::symbol("image"),
+                Value::keyword("type"),
+                Value::symbol("png"),
+                Value::keyword("file"),
+                Value::string("./tmp/wrap-mid/mid-row.png"),
+            ]),
+        );
+        buf.set_buffer_local("truncate-lines", Value::NIL);
+    }
+
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame_id);
+
+    let state = engine
+        .last_frame_display_state
+        .as_ref()
+        .expect("display state");
+    let entry = widest_text_body_window_matrix(state);
+    let text_rows: Vec<&neomacs_display_protocol::glyph_matrix::MatrixRow> = entry
+        .matrix
+        .rows
+        .iter()
+        .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        .collect();
+
+    let image_row = text_rows
+        .iter()
+        .position(|row| {
+            row.glyphs[GlyphArea::Text.index()]
+                .iter()
+                .any(|glyph| matches!(glyph.glyph_type, GlyphType::Image { .. }))
+        })
+        .expect("the wrapped image is displayed on a continuation row");
+    assert_eq!(
+        image_row, 1,
+        "the image moves to the row after the one it did not fit in"
+    );
+
+    let image_glyph = &text_rows[image_row].glyphs[GlyphArea::Text.index()][0];
+    let GlyphType::Image { image_id, .. } = image_glyph.glyph_type else {
+        panic!("the image starts the continuation row: {image_glyph:?}");
+    };
+    assert_eq!(image_id, 7);
+    assert_eq!(
+        image_glyph.pixel_width, 200.0,
+        "a deferred image is re-produced whole on the next row, not cropped"
+    );
+
+    let first_row_text = &text_rows[0].glyphs[GlyphArea::Text.index()];
+    assert!(
+        first_row_text
+            .iter()
+            .all(|glyph| !matches!(glyph.glyph_type, GlyphType::Image { .. })),
+        "the row the image did not fit in keeps only its text"
+    );
+    assert_eq!(
+        first_row_text
+            .iter()
+            .filter(|glyph| matches!(glyph.glyph_type, GlyphType::Char { ch: 'x' }))
+            .count(),
+        filler,
+        "the text row is unchanged by the deferral"
+    );
+}
+
 #[test]
 fn layout_frame_rust_emits_inline_image_glyphs_for_display_image_specs() {
     let mut eval = Context::new();

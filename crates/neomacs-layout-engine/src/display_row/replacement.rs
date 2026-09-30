@@ -697,7 +697,7 @@ impl DisplayReplacementItemAppendTemplate {
         position: DisplayRowPosition,
         pointer_appearance: Option<DisplayPointerAppearance>,
         box_vertical_edges: neomacs_display_protocol::face::BoxVerticalEdges,
-    ) -> DisplayRowPosition {
+    ) -> (DisplayRowPosition, DisplayReplacementPlacement) {
         let geometry_update = self.row_geometry_update;
         if let DisplayReplacementItemRowGeometryUpdate::BeforeAppendGlyphMetrics {
             height_px,
@@ -711,7 +711,7 @@ impl DisplayReplacementItemAppendTemplate {
             face_ids,
             self.into_request(position, pointer_appearance, box_vertical_edges),
         ) else {
-            return position;
+            return (position, DisplayReplacementPlacement::Placed);
         };
         if let DisplayReplacementItemRowGeometryUpdate::AfterAppendGlyphMetrics {
             height_px,
@@ -724,7 +724,14 @@ impl DisplayReplacementItemAppendTemplate {
             // loses its descent whenever another glyph raises that baseline.
             row_geometry.include_glyph_vertical_metrics(height_px, ascent_px);
         }
-        progress.end()
+        // One glyph per appended item: a count of zero is the row's refusal,
+        // not a zero-width placement.
+        let placement = if progress.emitted_glyphs() == 0 {
+            DisplayReplacementPlacement::RefusedWhole
+        } else {
+            DisplayReplacementPlacement::Placed
+        };
+        (progress.end(), placement)
     }
 }
 
@@ -952,11 +959,27 @@ impl DisplayPropertyReplacementRowRenderRequest {
     }
 }
 
+/// Whether an atomic `display` replacement reached the row it was appended to.
+///
+/// GNU `display_line` refuses a display element that draws past the right edge
+/// of a *continued* row, removes it from the row and re-produces it at the
+/// start of the next one (src/xdisp.c:26448-26475).  A caller that cannot see
+/// that refusal keeps the covered buffer text and drops the replacement, so
+/// the row shows nothing where the buffer asked for an image.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum DisplayReplacementPlacement {
+    /// The replacement is on the row and its advance moved the pen.
+    Placed,
+    /// Not one glyph of the replacement is on the row; the pen is unchanged.
+    RefusedWhole,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct DisplayPropertyReplacementAppendOutcome {
     start_position: DisplayRowPosition,
     end_position: DisplayRowPosition,
     cursor_policy: DisplayPropertyReplacementCursorPolicy,
+    placement: DisplayReplacementPlacement,
 }
 
 impl DisplayPropertyReplacementAppendOutcome {
@@ -965,11 +988,30 @@ impl DisplayPropertyReplacementAppendOutcome {
         end_position: DisplayRowPosition,
         cursor_policy: DisplayPropertyReplacementCursorPolicy,
     ) -> Self {
+        Self::with_placement(
+            start_position,
+            end_position,
+            cursor_policy,
+            DisplayReplacementPlacement::Placed,
+        )
+    }
+
+    pub(crate) fn with_placement(
+        start_position: DisplayRowPosition,
+        end_position: DisplayRowPosition,
+        cursor_policy: DisplayPropertyReplacementCursorPolicy,
+        placement: DisplayReplacementPlacement,
+    ) -> Self {
         Self {
             start_position,
             end_position,
             cursor_policy,
+            placement,
         }
+    }
+
+    pub(crate) fn placement(self) -> DisplayReplacementPlacement {
+        self.placement
     }
 
     pub(crate) fn start_position(self) -> DisplayRowPosition {
@@ -1140,7 +1182,7 @@ impl DisplayPropertyReplacementAppendPlan {
                     glyph_y_offset,
                     fallback_metrics,
                 );
-                let end_position = item.append_to_text_row(
+                let (end_position, placement) = item.append_to_text_row(
                     append_context,
                     row_geometry,
                     state,
@@ -1150,10 +1192,11 @@ impl DisplayPropertyReplacementAppendPlan {
                     box_vertical_edges,
                 );
                 DisplayPropertyReplacementRowRender::Applied(
-                    DisplayPropertyReplacementAppendOutcome::new(
+                    DisplayPropertyReplacementAppendOutcome::with_placement(
                         start_position,
                         end_position,
                         cursor_policy,
+                        placement,
                     ),
                 )
             }
@@ -1258,9 +1301,13 @@ impl DisplayPropertyReplacementAtomicAppendPlanItem {
         position: DisplayRowPosition,
         pointer_appearance: Option<DisplayPointerAppearance>,
         box_vertical_edges: neomacs_display_protocol::face::BoxVerticalEdges,
-    ) -> DisplayRowPosition {
+    ) -> (DisplayRowPosition, DisplayReplacementPlacement) {
         match self {
-            Self::Empty => position,
+            // Neither arm draws a glyph in the text flow -- `Empty` draws
+            // nothing, and `Margin` writes into its own structural lane, whose
+            // `ClipToStructuralLane` policy is not this refusal -- so neither
+            // can be refused here.
+            Self::Empty => (position, DisplayReplacementPlacement::Placed),
             Self::Margin {
                 emission,
                 face_scope,
@@ -1279,7 +1326,7 @@ impl DisplayPropertyReplacementAtomicAppendPlanItem {
                         crate::display_row::source_render::DisplayStructuralAreaOrder::AfterExisting
                     },
                 );
-                position
+                (position, DisplayReplacementPlacement::Placed)
             }
             Self::Item(item) => item.append_to_text_row(
                 replacement_append_context,
