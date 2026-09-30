@@ -84,10 +84,14 @@ the observed now with a zero interval — sampling is monotonic in `now`, so an
 early sample can at worst retract one poll early.
 
 **Quality policy.** A software adapter (`QualityMode::SoftwareCompatibility`)
-declines the whole family (`child_frame_animations.off` in
-`software_compat_visual_config`), for the same reason it declines pane
-morphs: a fade redraws the parent surface every tick, and a software
-rasterizer has no spare budget for that.
+does **not** decline this family, unlike pane morphs. A morph animates the
+whole tiling and needs the previous picture composed offscreen; a child-frame
+fade draws the popup's own pixels onto the retained root scene — the same
+work the popup itself already costs every frame — and the software-mode GUI
+suites (close confirmation, this verification) already sustain display-rate
+demand for exactly that kind of redraw. Turning slots off remains the user's
+`enabled` setting. `software_compat_visual_config` therefore leaves
+`child_frame_animations` untouched.
 
 **Policy publication.** `RenderQualityPolicy::child_frame_motion()` resolves
 the four specs plus slide distances from the effective visual config; they
@@ -131,18 +135,39 @@ verifies the options still match the Rust schema at load time.
   indistinguishable; interleaving would require merging two z-ordered
   streams at draw time.
 
-## Testing
+**The retained-static texture must not freeze a fade.** The retained
+cursorless scene is rebuilt only on a scene-generation change, and a
+lifecycle event changes the scene *without* an ingest: the texture would
+otherwise hold the departed popup at whatever alpha the last build saw, and
+every composite-only present after the fade would blit it back at full
+opacity. Three pieces keep it honest: the retained path is ineligible while
+`has_animation_activity()` reports a running animation or a retained corpse;
+the scene generation is bumped when a subtree is retired; and finished open
+animations are cleared after their pass so the ineligibility ends.
 
-* Protocol: `child_frame_animation/tests/mod.rs` — motion conversion, clamp
-  semantics, zero-duration, master switch, registry round-trip including the
-  `slide-pixels` property.
-* Manager: `render_thread/child_frames/tests/mod.rs` — open animation
-  sampling, content-refresh carry-over, instant no-op, retire-to-dying
-  subtree semantics, instant close, resurrection on re-delivery, prune
-  timing, dying z-order.
-* Renderer: alpha path compiles through the existing offscreen
-  `render_frame_content` call sites (five updated with alpha 1.0).
-* Manual: `test/neomacs/child-frame-animation-test.el` — visual appear,
-  disappear, slowdown, master-off.
-* Time discipline: the render-thread wall-clock guard still passes; the
-  lifecycle origins use `observe_platform_now()` like the motion tests.
+## Verification
+
+End to end, over composited pixels: `crates/neomacs-gui-tests/
+tests/child_frame_animation.rs` runs a popup through its whole lifecycle on
+a headless sway session (`grim` captures the compositor's output — the
+render thread's own readback deliberately sees only the root scene). With
+`slowdown 20` (the clamp ceiling, 3s fades) it asserts:
+
+* the open fade: captures at 1s cadence go background → mid-ramp → settled;
+  the render thread's own alpha log shows the living popup's alpha rising
+  monotonically from < 0.5 to > 0.9;
+* the settled popup clearly present over the background;
+* the close fade: four captures strictly brightening from the settled
+  popup, reaching at least halfway; the dying alpha log falling
+  monotonically from ~0.99 to ~0.00002 over the full 3s tween;
+* after the prune, the popup's region equals the pre-popup background —
+  the corpse's pixels are actually cleared, which is what the
+  retained-texture fixes above exist to guarantee;
+* `compositor_remove animated=true` and the retire/prune lifecycle in the
+  log.
+
+Stable across three consecutive runs (~16s each). Unit coverage: protocol
+(motion conversion, clamp semantics, registry round-trip), manager
+(sampling, carry-over, instant no-op, retire-to-dying subtree semantics,
+instant close, resurrection on re-delivery, prune timing, dying z-order),
+time discipline (wall-clock guard), renderer pixel tests.
