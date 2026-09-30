@@ -22,6 +22,7 @@ pub mod install;
 pub mod seal;
 pub mod source_lock;
 #[cfg(test)]
+#[path = "tests/test_support.rs"]
 pub(crate) mod test_support;
 
 pub use activation::{LoadSuffixes, PackageActivation, package_activation_elisp};

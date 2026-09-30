@@ -3666,5 +3666,5 @@ fn scan_backward_bytes(
 mod tests;
 
 #[cfg(test)]
-#[path = "buffer_text_chain_test.rs"]
+#[path = "tests/buffer_text_chain_test.rs"]
 mod chain_test;

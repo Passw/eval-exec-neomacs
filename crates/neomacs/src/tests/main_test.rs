@@ -83,7 +83,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 #[cfg(target_os = "linux")]
-#[path = "../platform_startup_test.rs"]
+#[path = "../tests/platform_startup_test.rs"]
 mod platform_fonts;
 
 fn gui_display() -> BootstrapDisplayConfig {

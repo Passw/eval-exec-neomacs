@@ -2425,12 +2425,15 @@ impl Drop for TaggedHeap {
 pub(crate) mod alloc_probe;
 
 #[cfg(test)]
+#[path = "gc/tests/layout_stats_tests.rs"]
 mod layout_stats_tests;
 
 #[cfg(test)]
+#[path = "gc/tests/pacer_tests.rs"]
 mod pacer_tests;
 
 #[cfg(test)]
+#[path = "gc/tests/ownership_tests.rs"]
 mod ownership_tests;
 
 /// FLOAT ARENA PAGES test suite. Every scenario runs twice: plain and with
@@ -2440,6 +2443,7 @@ mod ownership_tests;
 /// relies on nextest's process-per-test model for the env var and the global
 /// `LIVE_FLOAT_PAGES` counter.
 #[cfg(test)]
+#[path = "gc/tests/float_arena_tests.rs"]
 mod float_arena_tests;
 
 /// ARENA PROMOTION + RETIREMENT test suite (stage 3, commit 4): the
@@ -2449,6 +2453,7 @@ mod float_arena_tests;
 /// remembered-set scan. Scenarios run plain and (where the partition
 /// verifiers add coverage) with `NEOVM_GC_VERIFY_PARTITION=1`.
 #[cfg(test)]
+#[path = "gc/tests/arena_promotion_tests.rs"]
 mod arena_promotion_tests;
 
 /// BYTECODE ARENA test suite (task 03/3a): page-span oracle exactness for the
@@ -2463,6 +2468,7 @@ mod arena_promotion_tests;
 /// teardown counters, and the test-only constants-mutation seam. Scenarios
 /// run plain and (where the partition matters) VERIFY_PARTITION-armed.
 #[cfg(test)]
+#[path = "gc/tests/bytecode_arena_tests.rs"]
 mod bytecode_arena_tests;
 
 /// LAMBDA + MACRO ARENA test suite (task 03/3b): the 128B power-of-two class
@@ -2479,6 +2485,7 @@ mod bytecode_arena_tests;
 /// exactness/sweep/tenure/teardown battery proving its own arena. Scenarios
 /// run plain and (where the partition matters) VERIFY_PARTITION-armed.
 #[cfg(test)]
+#[path = "gc/tests/lambda_macro_arena_tests.rs"]
 mod lambda_macro_arena_tests;
 
 /// RECORD ARENA test suite (task 03/3b): the 64B class (1024 slots/page,
@@ -2492,6 +2499,7 @@ mod lambda_macro_arena_tests;
 /// parity survival, and the WindowConfiguration dual-tag sharing the arena.
 /// Scenarios run plain and (where the partition matters) VERIFY_PARTITION.
 #[cfg(test)]
+#[path = "gc/tests/record_arena_tests.rs"]
 mod record_arena_tests;
 
 /// SYMBOL-WITH-POS ARENA test suite (task 03/3b): the 64B class (1024
@@ -2585,6 +2593,7 @@ mod census_tests;
 #[path = "gc/tests/chunk_map_tests.rs"]
 mod chunk_map_tests;
 #[cfg(test)]
+#[path = "gc/tests/cons_alloc_tests.rs"]
 mod cons_alloc_tests;
 /// A fake pdump image in one allocation (see the module doc for why one).
 #[cfg(test)]
@@ -2596,6 +2605,7 @@ pub(crate) mod fake_image;
 #[path = "gc/tests/generation_tests.rs"]
 mod generation_tests;
 #[cfg(test)]
+#[path = "gc/tests/marker_arena_tests.rs"]
 mod marker_arena_tests;
 /// Record and closure slot stores are atomic: race-free against an atomic
 /// reader, same semantics, same barrier through a concurrent mark.
@@ -2603,6 +2613,7 @@ mod marker_arena_tests;
 #[path = "gc/tests/slot_store_tests.rs"]
 mod slot_store_tests;
 #[cfg(test)]
+#[path = "gc/tests/symbol_with_pos_arena_tests.rs"]
 mod symbol_with_pos_arena_tests;
 /// `NEOVM_GC_VEC_SCAN=defer` (F-G): no Tier-B snapshot, page vectors traced
 /// by reachability at the termination, with and without the chunk map.
