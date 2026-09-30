@@ -915,11 +915,6 @@ impl DisplayRowAppendFrame {
         self.face_space_width
     }
 
-    /// See [`DisplayRowLineWrap`].
-    pub(crate) fn line_wrap(&self) -> DisplayRowLineWrap {
-        self.line_wrap
-    }
-
     pub(crate) fn width_for_columns(&self, columns: usize) -> f32 {
         columns as f32 * self.geometry().char_width().max(1.0)
     }
