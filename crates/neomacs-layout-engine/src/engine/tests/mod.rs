@@ -28,7 +28,7 @@ mod face_identity;
 #[path = "../../engine_font_selection_test.rs"]
 mod font_selection;
 
-#[path = "../../engine_line_spacing_test.rs"]
+#[path = "../../tests/engine_line_spacing_test.rs"]
 mod line_spacing;
 
 #[path = "../../engine_display_motion_test.rs"]

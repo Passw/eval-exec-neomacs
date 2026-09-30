@@ -2,6 +2,42 @@
 use super::*;
 
 #[test]
+fn text_cursor_keeps_its_metrics_when_line_spacing_enlarges_the_row() {
+    let (mut eval, frame, buffer, _window) = incr_editing_frame("alpha\nbeta\n", 800, 240);
+    realize_test_gui_frame(&mut eval, frame);
+    let mut engine = LayoutEngine::new();
+    engine.enable_cosmic_metrics();
+    let FrameLayoutAttempt::Prepared(unspaced) = engine.redisplay_frame_attempt(&mut eval, frame)
+    else {
+        panic!("unspaced frame should prepare");
+    };
+    eval.buffer_manager_mut()
+        .get_mut(buffer)
+        .unwrap()
+        .set_buffer_local("line-spacing", Value::fixnum(5));
+    let FrameLayoutAttempt::Prepared(spaced) = engine.redisplay_frame_attempt(&mut eval, frame)
+    else {
+        panic!("spaced frame should prepare");
+    };
+    let unspaced = unspaced.materialize();
+    let spaced = spaced.materialize();
+    let before = unspaced.active_cursor().expect("unspaced text cursor");
+    let after = spaced.active_cursor().expect("spaced text cursor");
+    let (_, row_y, _, row_height) = spaced
+        .slot_glyph(after.slot_id)
+        .unwrap()
+        .cell_rect()
+        .unwrap();
+    assert_eq!(after.height, before.height, "spacing is not cursor height");
+    assert_eq!(
+        after.ascent, before.ascent,
+        "spacing must not move the baseline"
+    );
+    assert_eq!(row_height, after.height + 5.0);
+    assert_eq!(after.y, row_y);
+}
+
+#[test]
 fn newline_spacing_is_preserved_when_point_enters_an_empty_line() {
     let (mut eval, frame, _buffer, window) = incr_editing_frame("alpha\n\nbeta\n", 800, 240);
     realize_test_gui_frame(&mut eval, frame);
