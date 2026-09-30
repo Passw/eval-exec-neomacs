@@ -747,6 +747,180 @@ impl From<ImageNativeExtent> for ImageIntrinsicExtent {
     }
 }
 
+/// GNU `max-image-size` resolved into the native-pixel bound it implies.
+///
+/// GNU refuses an image whose *native* extent — before `:width`, `:max-width`
+/// and `:rotation` — exceeds the limit, and it does so before the loader has
+/// allocated a single pixel (`check_image_size`, `src/image.c:1811-1836`):
+///
+/// - an integer limits both axes to that many pixels;
+/// - a float limits each axis to that fraction of the frame's own pixel extent,
+///   so the two axes carry *different* bounds;
+/// - anything non-numeric is no limit at all.
+///
+/// Resolving a Lisp value plus a frame into this one value, on the frame the
+/// image is being looked up on, is what lets the refusal happen at the load
+/// rather than after it: the comparison at the decoder cannot disagree with the
+/// comparison at the caller, and a loader cannot be in the state of "the limit
+/// was never resolved".
+///
+/// The bound is stored as a native-pixel extent rather than as the raw float
+/// because [`ImageNativeExtent`] saturates at `u32::MAX`: a ratio larger than
+/// any representable image degenerates to [`Self::UNLIMITED`] instead of
+/// becoming an "infinite but not really" special case every caller must
+/// remember to handle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ImageSizeLimit {
+    maximum: ImageNativeExtent,
+}
+
+impl ImageSizeLimit {
+    /// No limit: GNU's non-numeric `max-image-size`, and the saturation point
+    /// of every bound wider than the extent type can represent.
+    pub const UNLIMITED: Self = Self {
+        maximum: ImageNativeExtent::new(u32::MAX, u32::MAX),
+    };
+
+    /// GNU's `FIXNUMP (Vmax_image_size)` arm: one absolute pixel bound for both
+    /// axes. A non-positive value permits nothing, which is the same verdict
+    /// `width <= XFIXNUM (Vmax_image_size)` reaches for every real extent.
+    #[must_use]
+    pub fn from_axis_pixels(pixels: i64) -> Self {
+        let bound = match u32::try_from(pixels) {
+            Ok(bound) => bound,
+            Err(_) if pixels < 0 => 0,
+            Err(_) => u32::MAX,
+        };
+        Self {
+            maximum: ImageNativeExtent::new(bound, bound),
+        }
+    }
+
+    /// GNU's `FLOATP (Vmax_image_size)` arm: a fraction of this frame's pixel
+    /// extent, per axis.
+    ///
+    /// `frame` is `None` for GNU's null-frame case, which compares against a
+    /// fixed 1024x1024 (`src/image.c:1830`).
+    #[must_use]
+    pub fn from_frame_ratio(ratio: f64, frame: Option<ImageNativeExtent>) -> Self {
+        let (frame_width, frame_height) = match frame {
+            Some(frame) => (f64::from(frame.width()), f64::from(frame.height())),
+            None => (1024.0, 1024.0),
+        };
+        Self {
+            maximum: ImageNativeExtent::new(
+                ratio_bound(ratio * frame_width),
+                ratio_bound(ratio * frame_height),
+            ),
+        }
+    }
+
+    /// The largest native extent this limit admits.
+    #[must_use]
+    pub const fn maximum(self) -> ImageNativeExtent {
+        self.maximum
+    }
+
+    /// GNU `check_image_size` for a decoded, integer-valued native extent.
+    #[must_use]
+    pub const fn permits(self, native: ImageNativeExtent) -> bool {
+        // GNU's first arm: a non-positive extent is not a size at all
+        // (`src/image.c:1816`). Header-derived extents are always positive, so
+        // this only ever fires for a caller that invented one.
+        if native.width() == 0 || native.height() == 0 {
+            return false;
+        }
+        native.width() <= self.maximum.width() && native.height() <= self.maximum.height()
+    }
+
+    /// [`Self::permits`] for a source extent that has not been rounded to
+    /// pixels yet.
+    ///
+    /// GNU compares integer decoded dimensions, so a fractional extent is
+    /// compared with its ceiling: a vector document that is over the limit
+    /// after rounding is over the limit.
+    #[must_use]
+    pub fn permits_intrinsic(self, intrinsic: ImageIntrinsicExtent) -> bool {
+        let (width, height) = intrinsic.dimensions();
+        self.permits(ImageNativeExtent::new(
+            intrinsic_bound(width),
+            intrinsic_bound(height),
+        ))
+    }
+}
+
+impl Default for ImageSizeLimit {
+    /// GNU's documented default: `MAX_IMAGE_SIZE 10.0` (`src/image.c:1740`)
+    /// measured against GNU's own unknown-frame size.
+    fn default() -> Self {
+        Self::from_frame_ratio(10.0, None)
+    }
+}
+
+/// `width <= X` for an integer width is `width <= floor (X)`.
+///
+/// A bound that is not a number, or not positive, admits nothing — which is
+/// the verdict the comparison itself reaches, since every comparison against a
+/// NaN is false. An infinite ratio is GNU's "no limit at all" and saturates to
+/// the widest extent the type can hold.
+fn ratio_bound(bound: f64) -> u32 {
+    if bound.is_nan() || bound <= 0.0 {
+        return 0;
+    }
+    if bound >= f64::from(u32::MAX) {
+        return u32::MAX;
+    }
+    bound.floor() as u32
+}
+
+/// The integer extent a fractional source extent is compared as.
+fn intrinsic_bound(dimension: f64) -> u32 {
+    if dimension.is_nan() || dimension <= 0.0 {
+        return 0;
+    }
+    if dimension >= f64::from(u32::MAX) {
+        return u32::MAX;
+    }
+    dimension.ceil() as u32
+}
+
+/// An image the loader refuses because of [`ImageSizeLimit`].
+///
+/// GNU reports this through `image_size_error` (`src/image.c:1432`), which logs
+/// [`Self::MESSAGE`] rather than signalling: redisplay must not be interrupted
+/// by an image it cannot show, and the failed image keeps its placeholder slot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OversizedImage {
+    extent: ImageNativeExtent,
+    limit: ImageSizeLimit,
+}
+
+impl OversizedImage {
+    /// GNU's `image_size_error` text, verbatim.
+    pub const MESSAGE: &'static str = "Invalid image size (see `max-image-size')";
+
+    #[must_use]
+    pub const fn new(extent: ImageNativeExtent, limit: ImageSizeLimit) -> Self {
+        Self { extent, limit }
+    }
+
+    /// The native extent that was refused.
+    #[must_use]
+    pub const fn extent(self) -> ImageNativeExtent {
+        self.extent
+    }
+
+    /// The limit that refused it.
+    #[must_use]
+    pub const fn limit(self) -> ImageSizeLimit {
+        self.limit
+    }
+}
+
+#[cfg(test)]
+#[path = "image/tests/image_size_limit_test.rs"]
+mod image_size_limit_tests;
+
 /// All extents derived for one decoded image realization.
 ///
 /// Keeping the spaces in one value gives bitmap and SVG decoders one sizing
