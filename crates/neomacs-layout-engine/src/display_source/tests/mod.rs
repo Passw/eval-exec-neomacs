@@ -76,6 +76,107 @@ fn display_source_step_item_splits_text_run_at_buffer_charpos() {
     );
 }
 
+#[test]
+fn character_fallback_retains_source_and_layout_when_shortening_a_run() {
+    for text in ["abc", "éβx", "中\tq", "\txyz", "x", "é"] {
+        for composition in [
+            DisplayTextComposition::Independent,
+            DisplayTextComposition::UnicodeFallback,
+        ] {
+            for edges in [
+                BoxVerticalEdges::Both,
+                BoxVerticalEdges::Left,
+                BoxVerticalEdges::Right,
+                BoxVerticalEdges::Neither,
+            ] {
+                let item = DisplayItem::new(
+                    SourceSpan::new(
+                        DisplaySourcePosition::buffer(
+                            BufferId(7),
+                            CharPos0::new(5),
+                            EmacsBytePos::new(110),
+                        ),
+                        DisplaySourcePosition::buffer(
+                            BufferId(7),
+                            CharPos0::new(5 + text.chars().count()),
+                            EmacsBytePos::new(110 + text.len()),
+                        ),
+                    ),
+                    RenderFaceRef::FaceId(FaceId::new(3)),
+                    DisplayItemKind::TextRun(DisplayTextRun::with_composition(
+                        text,
+                        composition.clone(),
+                    )),
+                )
+                .with_layout(DisplayItemLayout {
+                    raise: Some(0.3),
+                    height: Some(1.5),
+                    space_width: Some(2.0),
+                    break_after_row: true,
+                })
+                .with_box_run_topology(true, edges);
+                let mut step = DisplaySourceStepItem::new(
+                    DisplaySourceItem::new_for_test(item, 10, 5, text.chars().next()),
+                    100,
+                )
+                .expect("buffer run");
+                let expected = step
+                    .clone()
+                    .first_text_run_char(100)
+                    .unwrap_or_else(|| step.clone());
+                step.retain_first_text_run_char(100);
+                assert_eq!(step, expected, "{text:?}, {edges:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn character_fallback_keeps_compositions_and_nonbuffer_sources_intact() {
+    let span = SourceSpan::new(
+        DisplaySourcePosition::buffer(BufferId(7), CharPos0::new(5), EmacsBytePos::new(110)),
+        DisplaySourcePosition::buffer(BufferId(7), CharPos0::new(8), EmacsBytePos::new(113)),
+    );
+    let kinds = [
+        DisplayItemKind::TextRun(DisplayTextRun::with_composition(
+            "abc",
+            DisplayTextComposition::Automatic(
+                neomacs_display_protocol::glyph_matrix::TerminalComposition {
+                    cells: Box::new([]),
+                    width_cols: 3,
+                },
+            ),
+        )),
+        DisplayItemKind::SourceMappedText(DisplaySourceMappedText::new("abc")),
+        DisplayItemKind::ControlChar { ch: '\t' },
+    ];
+    for kind in kinds {
+        let item = DisplayItem::new(span.clone(), RenderFaceRef::Inherit, kind);
+        let mut step = DisplaySourceStepItem::new(
+            DisplaySourceItem::new_for_test(item, 10, 5, Some('a')),
+            100,
+        )
+        .expect("display element");
+        let expected = step.clone();
+        step.retain_first_text_run_char(100);
+        assert_eq!(step, expected);
+    }
+    let item = DisplayItem::new(
+        SourceSpan::new(
+            DisplaySourcePosition::lisp_string(1, 0, 0),
+            DisplaySourcePosition::lisp_string(1, 3, 3),
+        ),
+        RenderFaceRef::Inherit,
+        DisplayItemKind::TextRun(DisplayTextRun::independent("abc")),
+    );
+    let mut step =
+        DisplaySourceStepItem::new(DisplaySourceItem::new_for_test(item, 0, 0, Some('a')), 0)
+            .expect("string source");
+    let expected = step.clone();
+    step.retain_first_text_run_char(0);
+    assert_eq!(step, expected);
+}
+
 fn snapshot_with_text(text: &str) -> (BufferId, LayoutBufferSnapshot, CharPos0) {
     let mut eval = Context::new();
     let buffer_id = eval

@@ -20,19 +20,6 @@ use crate::display_source_progress::DisplaySourceProgressState;
 use crate::neovm_bridge::LayoutBufferView;
 use crate::types::LineWrapMode;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum WholeTextRunRenderDecision {
-    Render,
-    Fallback(WholeTextRunFallbackReason),
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum WholeTextRunFallbackReason {
-    NotTextRun,
-    MissingSourceEnd,
-    DoesNotFit,
-}
-
 #[derive(Clone, Copy)]
 pub(crate) struct BufferSourceTextRunRenderRequest {
     text_origin: DisplaySourceTextOrigin,
@@ -127,37 +114,6 @@ impl BufferSourceTextRunRenderRequest {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn render_if_fits_and_apply<B: LayoutBufferView>(
-        self,
-        source_item: DisplaySourceStepItem,
-        active_face_state: &DisplayRowActiveFaceState,
-        append_context: &BufferSourceRowAppendContext<'_, '_, B>,
-        cursor_info: &mut CursorCaptureState,
-        trailing_whitespace: &mut TrailingWhitespaceRenderState,
-        word_wrap: &mut WordWrapRenderState,
-        predecessor_row_extend: Option<DisplayRowExtendFace>,
-        source_render: &mut TextRowSourceRenderState<'_>,
-        progress: &mut DisplaySourceProgressState<'_>,
-    ) -> Option<BufferSourceItemRenderOutcome> {
-        if self.render_decision(&source_item, append_context, source_render)
-            != WholeTextRunRenderDecision::Render
-        {
-            return None;
-        }
-        Some(self.render_and_apply(
-            source_item,
-            active_face_state,
-            append_context,
-            cursor_info,
-            trailing_whitespace,
-            word_wrap,
-            predecessor_row_extend,
-            source_render,
-            progress,
-        ))
-    }
-
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn render_and_apply<B: LayoutBufferView + ?Sized>(
         self,
         source_item: DisplaySourceStepItem,
@@ -230,26 +186,22 @@ impl BufferSourceTextRunRenderRequest {
         BufferSourceItemRenderOutcome::Rendered
     }
 
-    fn render_decision<B: LayoutBufferView>(
+    /// Inspect the run before transferring ownership to the renderer. A
+    /// rejected run is still needed by the character/overflow path.
+    pub(crate) fn can_render_whole_run<B: LayoutBufferView>(
         self,
         source_item: &DisplaySourceStepItem,
         append_context: &BufferSourceRowAppendContext<'_, '_, B>,
         source_render: &mut TextRowSourceRenderState<'_>,
-    ) -> WholeTextRunRenderDecision {
+    ) -> bool {
         if source_item.text_run().is_none() {
-            return WholeTextRunRenderDecision::Fallback(WholeTextRunFallbackReason::NotTextRun);
+            return false;
         }
         if source_item.source_end_charpos().is_none() || source_item.source_end_byte_idx().is_none()
         {
-            return WholeTextRunRenderDecision::Fallback(
-                WholeTextRunFallbackReason::MissingSourceEnd,
-            );
+            return false;
         }
-        if self.source_display_item_fits_text_row(source_item, append_context, source_render) {
-            WholeTextRunRenderDecision::Render
-        } else {
-            WholeTextRunRenderDecision::Fallback(WholeTextRunFallbackReason::DoesNotFit)
-        }
+        self.source_display_item_fits_text_row(source_item, append_context, source_render)
     }
 
     fn source_display_item_fits_text_row<B: LayoutBufferView>(

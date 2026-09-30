@@ -322,17 +322,22 @@ impl<'a> BufferSourceItemRenderRequest<'a> {
             append_geometry,
         );
 
-        if let Some(outcome) = text_run_request.render_if_fits_and_apply(
-            source_item.clone(),
-            &active_face_state,
+        if text_run_request.can_render_whole_run(
+            &source_item,
             &buffer_row_append_context,
-            cursor_info,
-            row_carryover.trailing_whitespace,
-            row_carryover.word_wrap,
-            predecessor_row_extend,
             &mut source_render,
-            &mut progress,
         ) {
+            let outcome = text_run_request.render_and_apply(
+                source_item,
+                &active_face_state,
+                &buffer_row_append_context,
+                cursor_info,
+                row_carryover.trailing_whitespace,
+                row_carryover.word_wrap,
+                predecessor_row_extend,
+                &mut source_render,
+                &mut progress,
+            );
             source_render.include_current_row_metrics(row_build.row_geometry);
             return outcome;
         }

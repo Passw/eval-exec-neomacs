@@ -59,9 +59,7 @@ pub(crate) fn render_source_char_and_apply<B: LayoutBufferView>(
     // producer's position IS the resume state. The remainder used to be
     // split into N single-character items and pushed back through a pending
     // queue for later iterations to pop.
-    if let Some(first) = source_item.clone().first_text_run_char(text_start_byte) {
-        source_item = first;
-    }
+    source_item.retain_first_text_run_char(text_start_byte);
 
     let (source_step_char, source_end_charpos, source_end_byte_idx, source_item) =
         source_item.into_render_parts();

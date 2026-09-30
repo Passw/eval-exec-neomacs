@@ -803,8 +803,51 @@ impl DisplaySourceStepItem {
         Some(&run.text)
     }
 
-    /// The first character of a multi-character text run as its own step item.
-    /// See [`DisplaySourceItem::first_text_run_char`].
+    /// Keep the first character without cloning the run before discovering
+    /// whether it needs splitting. Other source kinds and compositions are
+    /// left intact; their renderer owns the whole display element.
+    pub(crate) fn retain_first_text_run_char(&mut self, text_start_byte: usize) {
+        let DisplayItemKind::TextRun(run) = &mut self.item.kind else {
+            return;
+        };
+        if matches!(run.composition, DisplayTextComposition::Automatic(_)) {
+            return;
+        }
+        let Some(ch) = run.text.chars().next() else {
+            return;
+        };
+        if run.text.len() == ch.len_utf8() {
+            return;
+        }
+        let DisplaySourcePosition::Buffer { buffer_id, .. } = self.item.span.start else {
+            return;
+        };
+        let start_byte_idx = self.source_step_char.start_byte_idx();
+        let start_charpos = self.source_step_char.start_charpos();
+        let end_byte_idx = start_byte_idx.saturating_add(ch.len_utf8());
+        let end_charpos = start_charpos.saturating_add(1);
+        run.text = run.text[..ch.len_utf8()].into();
+        self.item.span = SourceSpan::new(
+            DisplaySourcePosition::buffer(
+                buffer_id,
+                CharPos0::new(start_charpos.max(0) as usize),
+                EmacsBytePos::new(text_start_byte.saturating_add(start_byte_idx)),
+            ),
+            DisplaySourcePosition::buffer(
+                buffer_id,
+                CharPos0::new(end_charpos.max(0) as usize),
+                EmacsBytePos::new(text_start_byte.saturating_add(end_byte_idx)),
+            ),
+        );
+        self.item.box_vertical_edges =
+            BoxVerticalEdges::from_ownership(self.item.box_vertical_edges.owns_left(), false);
+        self.source_step_char = DisplaySourceStepChar::new(ch, start_byte_idx, start_charpos);
+        self.source_end_charpos = Some(end_charpos);
+        self.source_end_byte_idx = Some(end_byte_idx);
+        self.is_explicit_line_break = false;
+    }
+
+    #[cfg(test)]
     pub(crate) fn first_text_run_char(self, text_start_byte: usize) -> Option<Self> {
         let source_step_char = self.source_step_char;
         let source_item = DisplaySourceItem::new(
@@ -1024,6 +1067,7 @@ impl DisplaySourceItem {
     /// rest: the next production reads the remainder straight from the cursor,
     /// so no remainder is materialized here (the whole-run split into N items
     /// existed only to feed them back through a queue).
+    #[cfg(test)]
     pub(crate) fn first_text_run_char(self, text_start_byte: usize) -> Option<Self> {
         if !self.is_multi_char_text_run() {
             return None;
@@ -1253,6 +1297,7 @@ fn display_item_buffer_end_byte_idx(item: &DisplayItem, text_start_byte: usize) 
     end_byte_pos.get().checked_sub(text_start_byte)
 }
 
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 fn direct_text_run_char_item(
     buffer_id: BufferId,
