@@ -2278,3 +2278,68 @@ fn a_frame_drawn_mid_decode_shows_only_the_rows_that_have_arrived() {
         boundary + 2
     );
 }
+
+/// A decode that fails after bands have been written leaves nothing behind: the
+/// rows it filled are rows of an image that will never arrive, and a texture
+/// holding them would draw part of a picture forever.
+///
+/// The fixture is a real PNG cut short — header and some rows — so the decode
+/// genuinely produces bands and then genuinely fails, which is the case a
+/// truncated download is.
+#[test]
+fn a_failed_banded_decode_leaves_no_partial_texture() {
+    let Some(mut h) = try_harness() else {
+        eprintln!("SKIP: no GPU adapter");
+        return;
+    };
+
+    let (width, height) = (5000u32, 1000u32);
+    let full = banding_png(width, height);
+    let data = &full[..full.len() * 2 / 5];
+    h.renderer.load_image_data_with_id(
+        test_image_load(909),
+        data,
+        ImageSizeSpec::default(),
+        ImageRotation::None,
+        ImageRealization::with_device_scale(1.0, 1.0),
+        ImageColorContext::default(),
+        ImageMaskPolicy::Preserve,
+        ImageFrameIndex::default(),
+        ImageSequenceId::new(909).expect("non-zero test sequence"),
+        neomacs_renderer_wgpu::SvgResourceContext::Isolated,
+    );
+    let image_id = ImageId::new(909);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    let mut saw_band = false;
+    while std::time::Instant::now() < deadline {
+        h.renderer.process_pending_images();
+        saw_band |= h
+            .renderer
+            .image_cache()
+            .get(image_id)
+            .is_some_and(|cached| !cached.filled.is_complete());
+        if matches!(
+            h.renderer.image_cache().get_state(image_id),
+            Some(neomacs_renderer_wgpu::ImageState::Failed(_))
+        ) {
+            break;
+        }
+        std::thread::yield_now();
+    }
+
+    assert!(
+        saw_band,
+        "the truncated source bands before it fails, which is what makes the cleanup a case"
+    );
+    assert!(
+        matches!(
+            h.renderer.image_cache().get_state(image_id),
+            Some(neomacs_renderer_wgpu::ImageState::Failed(_))
+        ),
+        "a source that cannot be decoded fails"
+    );
+    assert!(
+        h.renderer.image_cache().get(image_id).is_none(),
+        "a failed decode keeps no texture, partial or otherwise"
+    );
+}
