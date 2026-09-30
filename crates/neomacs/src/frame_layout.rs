@@ -143,6 +143,17 @@ pub fn install_frame_snapshot_fn(evaluator: &mut Context) {
 /// This targets one window through the canonical row producer without entering
 /// the renderer presentation lifecycle. Both GUI and TTY install this adapter;
 /// batch mode intentionally does not.
+/// Issue #447: install the font-shaping driver (GNU `font->driver->shape`)
+/// on the evaluator. The driver reenters the redisplay runtime and shapes
+/// ligature/composition gstrings through the layout engine's font system —
+/// the same cosmic machinery the row walk uses, so the font's `liga`
+/// feature applies.
+pub fn install_font_shape_driver(evaluator: &mut Context) {
+    evaluator.font_shape_fn = Some(Box::new(|eval, gstring, direction| {
+        REDISPLAY_RUNTIME.with(|runtime| runtime.shape_gstring(gstring, direction))
+    }));
+}
+
 pub fn install_window_layout_query_fn(evaluator: &mut Context) {
     evaluator.display_idle_maintenance_fn = Some(Box::new(|eval| {
         REDISPLAY_RUNTIME.with(|runtime| runtime.maintain_scroll_coverage(eval))
@@ -289,4 +300,5 @@ pub fn install_tty_redisplay_callback_with_popup_redraw(
     }));
     install_frame_snapshot_fn(evaluator);
     install_window_layout_query_fn(evaluator);
+    install_font_shape_driver(evaluator);
 }

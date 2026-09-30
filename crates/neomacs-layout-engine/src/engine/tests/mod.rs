@@ -36824,7 +36824,7 @@ fn wide_char_cut_at_truncation_edge_leaves_both_cells_to_the_marker() {
 }
 
 #[test]
-fn probe_ligature_rule_on_gui_frame() {
+fn ligature_rule_composes_through_the_font_shape_driver() {
     // Issue #447: a ligature.el-style composition rule (font-shape-gstring
     // over a matched run) on a GUI frame must compose the matched sequence
     // into a composed glyph shaped through the font.
@@ -36839,13 +36839,33 @@ fn probe_ligature_rule_on_gui_frame() {
         buf.insert("a -> b\nc ->> d\n");
     }
     eval.buffer_manager_mut().set_current(buf_id);
+    // QUOTED rules (the wiki pattern): the rule vector is data — the
+    // function symbol reaches auto-compose-chars' funcall through the
+    // function cell, no variable binding involved.
     let rule = "(progn \
          (setq auto-composition-mode t auto-composition-function 'auto-compose-chars \
          composition-function-table (make-char-table nil)) \
          (aset composition-function-table ?- \
-           (list (vector \"\\\\(?:->\\\\)\" 0 font-shape-gstring))))";
+           '([\"\\\\(?:->\\\\)\" 0 font-shape-gstring])) \
+         (aset composition-function-table ?> \
+           '([\"\\\\(?:->>\\\\|->\\\\)\" 0 font-shape-gstring])))";
     let ok = eval.eval_str(rule);
     eprintln!("i447dbg rule eval: {ok:?}");
+
+    // The installed font-shaping driver: the layout engine's own font
+    // system, exactly what RedisplayRuntime::shape_gstring exposes.
+    let metrics = std::sync::Arc::new(std::sync::Mutex::new(
+        crate::font::metrics::FontMetricsService::new(),
+    ));
+    let driver_metrics = metrics.clone();
+    eval.font_shape_fn = Some(Box::new(move |_eval, mut gstring, direction| {
+        let mut metrics = driver_metrics.lock().expect("driver metrics");
+        crate::font::metrics::FontMetricsService::shape_gstring_through_font(
+            &mut metrics,
+            &mut gstring,
+            direction,
+        )
+    }));
     let frame_id = eval
         .frame_manager_mut()
         .create_frame("ligature-probe", 200, 160, buf_id);
