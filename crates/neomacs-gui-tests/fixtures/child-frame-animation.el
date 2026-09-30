@@ -21,7 +21,10 @@
 (defvar child-frame-animation-open-slide-pixels 0.0)
 (defvar child-frame-animation-open-scale-from 0.6)
 (defvar child-frame-animation-close-scale-from 0.6)
+(defvar child-frame-animation-resize-enabled t)
 
+(defvar child-frame-animation-popup-size-before 0)
+(defvar child-frame-animation-popup-size-after 0)
 (defvar child-frame-animation-sample 0)
 (defvar child-frame-animation-popup nil)
 
@@ -33,6 +36,8 @@
                (phase . ,phase)
                (slowdown . ,(plist-get (neomacs-effect-get 'child-frame-animations)
                                        :slowdown))
+               (popup-width-before . ,child-frame-animation-popup-size-before)
+               (popup-width-after . ,child-frame-animation-popup-size-after)
                (snapshot-env . ,(getenv "NEOMACS_GUI_ANIMATION_SNAPSHOT_JSON")))))))
 
 (defun child-frame-animation-setup ()
@@ -50,6 +55,10 @@
    'neomacs-child-frame-open-scale-from child-frame-animation-open-scale-from)
   (customize-set-variable
    'neomacs-child-frame-close-scale-from child-frame-animation-close-scale-from)
+  ;; The resize content crossfade: a size-changing update crossfades the
+  ;; previous presentation's picture into the new one instead of snapping.
+  (customize-set-variable
+   'neomacs-child-frame-resize-enabled child-frame-animation-resize-enabled)
   (switch-to-buffer (get-buffer-create "*child-frame-animation-parent*"))
   (insert "parent content line\n")
   ;; Publish before any popup exists: the test takes its background
@@ -88,13 +97,30 @@
                       (getenv "NEOMACS_GUI_ANIMATION_SNAPSHOT_JSON") t 'json)
                    (error (child-frame-animation-write
                            (format "snapshot-error %S" err))))))
-  (run-at-time 7.0 nil
+  ;; Grow the popup mid-life: the size-changing update crossfades the old
+  ;; picture into the bigger one over the resize slot's 3s curve.
+  (run-at-time 5.0 nil
+               (lambda ()
+                 ;; The phase goes out first: the crossfade begins when the
+                 ;; render thread ingests the resized payload, which races
+                 ;; this write, and the test's first capture must land
+                 ;; inside the tween rather than after it.
+                 (child-frame-animation-write "resized")
+                 (setq child-frame-animation-popup-size-before
+                       (frame-pixel-width child-frame-animation-popup))
+                 (set-frame-size child-frame-animation-popup 400 180 t)
+                 ;; The resized payload reaches the render thread only
+                 ;; through a redisplay that re-publishes the child frame.
+                 (redisplay t)
+                 (setq child-frame-animation-popup-size-after
+                       (frame-pixel-width child-frame-animation-popup))))
+  (run-at-time 9.5 nil
                (lambda ()
                  (delete-frame child-frame-animation-popup)
                  (child-frame-animation-write "deleted")))
-  ;; The close fade ends at 10.0s; the dying entry is pruned right after.
-  (run-at-time 10.5 nil (lambda () (child-frame-animation-write "pruned")))
-  (run-at-time 13.0 nil (lambda () (kill-emacs 0))))
+  ;; The close fade ends at 12.5s; the dying entry is pruned right after.
+  (run-at-time 13.0 nil (lambda () (child-frame-animation-write "pruned")))
+  (run-at-time 15.0 nil (lambda () (kill-emacs 0))))
 
 ;; Let the initial native configure establish the parent dimensions first.
 (run-at-time 1.5 nil #'child-frame-animation-setup)

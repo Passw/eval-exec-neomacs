@@ -1,11 +1,27 @@
 //! Child frame rendering methods for WgpuRenderer.
 
 use super::super::glyph_atlas::WgpuGlyphAtlas;
-use super::super::vertex::{RectVertex, RoundedRectVertex};
+use super::super::vertex::{GlyphVertex, RectVertex, RoundedRectVertex};
 use super::WgpuRenderer;
 use neomacs_display_protocol::frame_glyphs::FrameGlyphBuffer;
 use neomacs_display_protocol::types::{AnimatedCursor, Color};
 use neomacs_display_protocol::{PointerAppearanceSelection, RootSurfaceRect};
+
+impl WgpuRenderer {
+    /// The scissor rect a child frame's clip resolves to on this surface.
+    ///
+    /// The crossfade quad needs the same clip the frame's own chrome
+    /// computes internally, so the fading old picture cannot paint outside
+    /// the popup's placed area.
+    pub fn child_frame_scissor(
+        &self,
+        clip: RootSurfaceRect,
+        surface_width: u32,
+        surface_height: u32,
+    ) -> Option<(u32, u32, u32, u32)> {
+        child_scissor(clip, self.scale_factor, surface_width, surface_height)
+    }
+}
 
 fn child_scissor(
     clip: RootSurfaceRect,
@@ -29,6 +45,91 @@ fn child_scissor(
 }
 
 impl WgpuRenderer {
+    /// Draw one snapshot's picture as an alpha-blended quad.
+    ///
+    /// The resize content crossfade's old-content layer: the previous
+    /// presentation's picture, leased from the snapshot pool, fading out
+    /// beneath the freshly installed frame. The image pipeline's blended
+    /// variant composites `tex_color * vertex_color`, so the alpha rides on
+    /// the vertex color and the draw-parameters snapshot stays the shared
+    /// identity one.
+    pub fn draw_child_crossfade_quad(
+        &mut self,
+        view: &wgpu::TextureView,
+        snapshot_bind_group: &wgpu::BindGroup,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        surface_width: u32,
+        surface_height: u32,
+        alpha: f32,
+        scissor: Option<(u32, u32, u32, u32)>,
+    ) {
+        let logical_w = surface_width as f32 / self.scale_factor;
+        let logical_h = surface_height as f32 / self.scale_factor;
+        let draw = self.parameters([logical_w, logical_h], 0.0);
+
+        let (r, g, b, a) = (1.0_f32, 1.0_f32, 1.0_f32, alpha.clamp(0.0, 1.0));
+        let color = [r, g, b, a];
+        let mut vertices = Vec::with_capacity(6);
+        let quad = |vertices: &mut Vec<GlyphVertex>, x0: f32, y0: f32, x1: f32, y1: f32| {
+            for (position, tex_coords) in [
+                ([x0, y0], [0.0, 0.0]),
+                ([x1, y0], [1.0, 0.0]),
+                ([x1, y1], [1.0, 1.0]),
+                ([x0, y0], [0.0, 0.0]),
+                ([x1, y1], [1.0, 1.0]),
+                ([x0, y1], [0.0, 1.0]),
+            ] {
+                vertices.push(GlyphVertex {
+                    position,
+                    tex_coords,
+                    color,
+                });
+            }
+        };
+        quad(&mut vertices, x, y, x + width, y + height);
+        if let Some(upload) = self
+            .arenas
+            .glyph
+            .upload(&self.device, &self.queue, &vertices)
+        {
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Child Frame Crossfade Quad Encoder"),
+                });
+            {
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Child Frame Crossfade Quad Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                        depth_slice: None,
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                    multiview_mask: None,
+                });
+                if let Some((sx, sy, sw, sh)) = scissor {
+                    pass.set_scissor_rect(sx, sy, sw, sh);
+                }
+                pass.set_pipeline(&self.pipelines.image);
+                pass.set_bind_group(0, draw.binding(), &[]);
+                pass.set_bind_group(1, snapshot_bind_group, &[]);
+                pass.set_vertex_buffer(0, upload.buffer_slice());
+                pass.draw(0..vertices.len() as u32, 0..1);
+            }
+            self.queue.submit(std::iter::once(encoder.finish()));
+        }
+    }
+
     /// Render a child frame as a floating overlay on top of the parent frame.
     ///
     /// Draws shadow, background fill, and rounded border, delegates all glyph

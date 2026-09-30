@@ -124,6 +124,12 @@ fn locate_popup(pixels: &image::DynamicImage) -> Option<(u32, u32, u32, u32)> {
 /// right edge crossing it is pixel evidence of the pop.
 const STRIP: (u32, u32, u32, u32) = (432, 200, 100, 80);
 
+/// The strip the resize crossfade is read over: beyond the settled
+/// popup's original right edge (240 + ~308 outer), inside the grown
+/// popup's, so the new picture's fade-in over it is pixel evidence of the
+/// crossfade rather than a lifecycle fade.
+const RESIZE_STRIP: (u32, u32, u32, u32) = (560, 210, 80, 80);
+
 fn region_mean(pixels: &image::DynamicImage, rect: (u32, u32, u32, u32)) -> f64 {
     let (x, y, width, height) = rect;
     pixels
@@ -270,6 +276,28 @@ focus_follows_mouse yes
     );
     capture(&display_env, &artifacts, "settled.png");
 
+    // --- The resize content crossfade: the popup grows mid-life, and the
+    // previous presentation's picture crossfades into the bigger one. The
+    // strip beyond the old size fills with red as the new frame's picture
+    // fades in over it.
+    let resized = state_with_phase(
+        &state_path,
+        sample_count,
+        "resized",
+        Duration::from_secs(60),
+    );
+    sample_count = resized["sample"].as_u64().unwrap();
+    let mut resized_strip = Vec::new();
+    for (delay, name) in [
+        (500, "resize-1.png"),
+        (500, "resize-2.png"),
+        (500, "resize-3.png"),
+    ] {
+        thread::sleep(Duration::from_millis(delay));
+        let pixels = capture(&display_env, &artifacts, name);
+        resized_strip.push(region_mean(&pixels, RESIZE_STRIP));
+    }
+
     let deleted = state_with_phase(
         &state_path,
         sample_count,
@@ -335,11 +363,13 @@ focus_follows_mouse yes
         "open-fade means must not brighten: {opening:?}"
     );
 
-    // The living draw's own alpha series, from before the dismissal:
-    // transparent to opaque, monotonically.
+    // The living draw's own alpha series, from before the resize
+    // crossfade starts: transparent to opaque, monotonically. The resize
+    // crossfade's own mix series (which restarts from zero by design) is
+    // asserted separately below.
     let removal_line = log
         .lines()
-        .position(|line| line.contains("compositor_remove"))
+        .position(|line| line.contains("resize_crossfade_started"))
         .unwrap_or(log.lines().count());
     let open_alphas: Vec<f64> = log
         .lines()
@@ -424,9 +454,8 @@ focus_follows_mouse yes
         "settled popup ({full:.3}) must be clearly present over the background ({background:.3})"
     );
     assert!(
-        (full_strip - opening_strip[2]).abs() < 0.05,
-        "the settled strip must match the last mid-open strip (both covered): {full_strip:.3} vs {}",
-        opening_strip[2]
+        full_strip < background - 0.5,
+        "the settled strip must be covered (popup red over it): {full_strip:.3}"
     );
 
     // --- Close fade: strictly brightening toward the background. The
@@ -452,6 +481,48 @@ focus_follows_mouse yes
     assert!(
         fading_strip.windows(2).all(|pair| pair[1] > pair[0]),
         "close-fade strip means must strictly rise as the frame shrinks: {fading_strip:?}"
+    );
+
+    // --- The resize crossfade: the new picture fills the grown area.
+    assert!(
+        resized_strip.windows(2).all(|pair| pair[1] < pair[0]),
+        "resize-crossfade strip means must strictly fall as the new picture arrives: {resized_strip:?}"
+    );
+    assert!(
+        resized_strip[0] > background - 0.1,
+        "the resize strip must start as background (beyond the old frame): {}",
+        resized_strip[0]
+    );
+    let log = fs::read_to_string(artifacts.join("neomacs.log")).unwrap_or_default();
+    let crossfade_start = log
+        .lines()
+        .position(|line| line.contains("resize_crossfade_started"))
+        .expect("the resize crossfade must have started");
+    let crossfade_mixes: Vec<f64> = log
+        .lines()
+        .skip(crossfade_start)
+        .filter(|line| line.contains("render_child_frame_start"))
+        .take_while(|line| !line.contains("compositor_remove"))
+        .filter_map(|line| {
+            line.split("alpha=")
+                .nth(1)
+                .and_then(|rest| rest.split_whitespace().next())
+                .and_then(|value| value.trim_end_matches(',').parse::<f64>().ok())
+        })
+        .filter(|alpha| *alpha < 1.0)
+        .collect();
+    assert!(
+        crossfade_mixes.len() >= 3,
+        "the crossfade must have drawn several times mid-mix"
+    );
+    assert!(
+        crossfade_mixes.windows(2).all(|pair| pair[1] >= pair[0]),
+        "crossfade mix must not decrease: {crossfade_mixes:?}"
+    );
+    assert!(
+        *crossfade_mixes.first().unwrap() < 0.5,
+        "the crossfade must start near the old picture: first {}",
+        crossfade_mixes.first().unwrap()
     );
 
     // --- Pruned: the popup is gone; the region reads as plain background ---
@@ -513,9 +584,12 @@ focus_follows_mouse yes
         dying_scales.windows(2).all(|pair| pair[1] <= pair[0]),
         "dying-frame scales must not grow: {dying_scales:?}"
     );
+    // The first dying draw lands a frame or two after the retire, so the
+    // tween has already advanced by its scheduler latency: near the settled
+    // size, not exactly at it.
     assert!(
-        *dying_scales.first().unwrap() > 0.98,
-        "the close pop must start at the settled size: first {}",
+        *dying_scales.first().unwrap() > 0.9,
+        "the close pop must start near the settled size: first {}",
         dying_scales.first().unwrap()
     );
     assert!(

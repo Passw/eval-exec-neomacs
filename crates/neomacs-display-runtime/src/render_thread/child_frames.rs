@@ -14,6 +14,7 @@ use std::collections::HashMap;
 
 use neomacs_display_protocol::frame_time::{EventTime, FrameSample};
 use neomacs_display_protocol::motion_spec::MotionSpec;
+use neomacs_renderer_wgpu::SnapshotLease;
 
 use crate::core::frame_glyphs::FrameGlyphBuffer;
 use crate::render_thread::frame_compositor::motion::Motion;
@@ -80,6 +81,22 @@ pub(crate) struct ChildFrameEntry {
     pub ingest_seq: u64,
     /// The lifecycle animation in progress, if one was started.
     pub animation: Option<EntryAnimation>,
+    /// A content crossfade from the previous presentation's picture, when a
+    /// size-changing update arrived with the resize slot enabled.
+    pub crossfade: Option<EntryCrossfade>,
+}
+
+/// A content crossfade between the previous presentation's picture and the
+/// freshly installed one.
+pub(crate) struct EntryCrossfade {
+    pub motion: Motion,
+    /// The old content's picture, leased from the snapshot pool. Dropping
+    /// the entry returns the lease.
+    pub old: SnapshotLease,
+    /// The old content's logical size, which may differ from the new
+    /// frame's.
+    pub old_width: f32,
+    pub old_height: f32,
 }
 
 /// A child frame whose deletion is animating out.
@@ -219,6 +236,83 @@ impl ChildFrameManager {
         !self.dying.is_empty()
     }
 
+    /// Attach a resize content crossfade to a freshly updated entry.
+    ///
+    /// Called after `update_frame` replaced the payload: the leased picture
+    /// is the pre-update content, and the crossfade blends it into the new
+    /// payload's picture over the resize slot's curve.
+    pub fn begin_resize_crossfade(
+        &mut self,
+        frame_id: u64,
+        old: SnapshotLease,
+        old_width: f32,
+        old_height: f32,
+        spec: MotionSpec,
+        origin: EventTime,
+    ) {
+        if let Some(entry) = self.frames.get_mut(&frame_id)
+            && let Some(motion) = Motion::start(spec, origin)
+        {
+            entry.crossfade = Some(EntryCrossfade {
+                motion,
+                old,
+                old_width,
+                old_height,
+            });
+            tracing::info!(
+                frame_id,
+                old_width,
+                old_height,
+                "child_frame_lifecycle: resize_crossfade_started"
+            );
+        }
+    }
+
+    /// Drop crossfades whose mix has finished at `sample`; the leases they
+    /// held return to the pool. Returns whether anything was removed, so the
+    /// caller repaints once more.
+    pub fn prune_crossfades(&mut self, sample: FrameSample) -> bool {
+        let before = self
+            .frames
+            .values()
+            .filter(|entry| entry.crossfade.is_some())
+            .count();
+        for entry in self.frames.values_mut() {
+            if entry
+                .crossfade
+                .as_ref()
+                .is_some_and(|crossfade| crossfade.motion.sample(sample).finished)
+            {
+                entry.crossfade = None;
+            }
+        }
+        let after = self
+            .frames
+            .values()
+            .filter(|entry| entry.crossfade.is_some())
+            .count();
+        before != after
+    }
+
+    /// Drop every crossfade, returning their leases to the pool. The
+    /// device-loss path calls this: the leased textures died with the
+    /// device.
+    pub fn drop_all_crossfades(&mut self) {
+        for entry in self.frames.values_mut() {
+            entry.crossfade = None;
+        }
+    }
+
+    /// Whether any living entry carries a crossfade whose mix is unfinished.
+    pub fn has_active_crossfade(&self, sample: FrameSample) -> bool {
+        self.frames.values().any(|entry| {
+            entry
+                .crossfade
+                .as_ref()
+                .is_some_and(|crossfade| !crossfade.motion.sample(sample).finished)
+        })
+    }
+
     /// Clear a finished lifecycle animation so `has_animation_activity`
     /// stops reporting it.
     pub fn clear_finished_animation(&mut self, frame_id: u64) {
@@ -236,7 +330,9 @@ impl ChildFrameManager {
     /// it while a lifecycle animation runs would show the corpse at whatever
     /// alpha it had when the texture was last built.
     pub fn has_animation_activity(&self) -> bool {
-        self.frames.values().any(|entry| entry.animation.is_some()) || self.has_dying()
+        self.frames.values().any(|entry| entry.animation.is_some())
+            || self.has_dying()
+            || self.frames.values().any(|entry| entry.crossfade.is_some())
     }
 
     /// Whether any child frame is mid-animation and needs another frame.
@@ -342,6 +438,10 @@ impl ChildFrameManager {
                 // and restarting its fade on every keystroke would read as
                 // flicker.
                 animation: previous_animation,
+                // A payload replace starts its own crossfade story; any
+                // in-flight one belongs to the replaced payload and drops
+                // with it.
+                crossfade: None,
             },
         );
 

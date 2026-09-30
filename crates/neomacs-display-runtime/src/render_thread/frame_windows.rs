@@ -2603,6 +2603,10 @@ impl GuiFrameWindowManager {
     pub(super) fn clear_gpu_resident_state(&mut self) {
         self.for_each_top_level_window_mut(|window_state| {
             let render = &mut window_state.render;
+            // Resize crossfades lease snapshot-pool textures; theirs died
+            // with the device and the crossfades themselves have no meaning
+            // on a rebuilt device. CPU child-frame state is kept.
+            render.compositor.child_frames.drop_all_crossfades();
             // Glyph atlas textures (recreated against the new device by
             // populate_glyph_atlas / recreate_secondary_native_surfaces).
             render.compositor.glyph_atlas = None;

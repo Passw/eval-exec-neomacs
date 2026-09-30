@@ -107,6 +107,9 @@ pub(super) fn render_frame_content_overlays(
     // path's activity check does not pin the surface to full renders
     // forever after the first popup.
     let mut finished_animations = Vec::new();
+    // Whether the corpse-clearing (or crossfade-closing) repaint was
+    // requested this pass.
+    let mut crossfade_finished = false;
     renderer.with_frame_effects(&mut render.compositor.renderer_effects, |renderer| {
         // One merged draw order: living frames and dying corpses
         // interleaved in z-path order, a corpse drawing before a living
@@ -116,7 +119,16 @@ pub(super) fn render_frame_content_overlays(
         // arriving.
         let merged = render.compositor.child_frames.merged_render_order();
         for (child_id, dying) in merged {
-            let (child_frame, base_x, base_y, clip_in_root, alpha, offset_y, scale) = if dying {
+            let (
+                child_frame,
+                base_x,
+                base_y,
+                clip_in_root,
+                alpha,
+                offset_y,
+                crossfade_layer,
+                scale,
+            ) = if dying {
                 let Some(dying_entry) = render.compositor.child_frames.dying_entry(child_id) else {
                     continue;
                 };
@@ -157,6 +169,7 @@ pub(super) fn render_frame_content_overlays(
                     clip_in_root,
                     alpha,
                     offset_y,
+                    None,
                     scale,
                 )
             } else {
@@ -220,7 +233,37 @@ pub(super) fn render_frame_content_overlays(
                 if finished && child_entry.animation.is_some() {
                     finished_animations.push(child_id);
                 }
-                if alpha <= 0.0 {
+                // A resize content crossfade layers the previous
+                // presentation's picture beneath the new frame: the old
+                // picture fades out as the new one fades in. When the mix
+                // finishes, the crossfade drops and the next frame draws the
+                // new payload alone.
+                let mut crossfade_layer: Option<(
+                    &neomacs_renderer_wgpu::SnapshotLease,
+                    f32,
+                    f32,
+                    f32,
+                )> = None;
+                if let Some(crossfade) = child_entry.crossfade.as_ref() {
+                    let progress = crossfade.motion.sample(sample);
+                    if progress.finished {
+                        crossfade_finished = true;
+                    } else {
+                        child_animation_active = true;
+                        let mix = progress.content_mix.get();
+                        crossfade_layer = Some((
+                            &crossfade.old,
+                            crossfade.old_width,
+                            crossfade.old_height,
+                            mix,
+                        ));
+                    }
+                }
+                // The new frame's alpha rides the crossfade's mix when one
+                // is running, so the old picture genuinely shows through.
+                let effective_alpha =
+                    alpha * crossfade_layer.as_ref().map_or(1.0, |(_, _, _, mix)| *mix);
+                if effective_alpha <= 0.0 {
                     continue;
                 }
                 let neomacs_display_protocol::PresentedClip::Rect(clip_in_root) =
@@ -233,8 +276,9 @@ pub(super) fn render_frame_content_overlays(
                     child_entry.abs_x,
                     child_entry.abs_y,
                     clip_in_root,
-                    alpha,
+                    effective_alpha,
                     offset_y,
+                    crossfade_layer,
                     scale,
                 )
             };
@@ -251,6 +295,28 @@ pub(super) fn render_frame_content_overlays(
                     "child_frame_lifecycle: render_dying_child_frame"
                 );
             } else {
+                // A resize content crossfade layers the previous
+                // presentation's picture beneath the new frame; the quad
+                // only draws while the mix is still running.
+                if let Some((old, old_width, old_height, mix)) = crossfade_layer {
+                    renderer.draw_child_crossfade_quad(
+                        surface_view,
+                        old.bind_group(),
+                        base_x,
+                        base_y,
+                        old_width,
+                        old_height,
+                        native.content_size().0,
+                        native.content_size().1,
+                        1.0 - mix,
+                        renderer.child_frame_scissor(
+                            clip_in_root,
+                            native.content_size().0,
+                            native.content_size().1,
+                        ),
+                    );
+                    frame_stats::count(&frame_stats::CHILD_FRAME_CROSSFADE_QUADS);
+                }
                 tracing::debug!(
                     parent_frame_id = render.emacs_frame_id,
                     frame_id = child_id,
@@ -296,7 +362,6 @@ pub(super) fn render_frame_content_overlays(
             }
         }
     });
-    // The pass reports continued animation    });
     // The pass reports continued animation the only way it may: by marking
     // the frame dirty, so the scheduler asks for another one. Finished dying
     // frames are pruned afterwards, on the same sample they were drawn with.
@@ -308,6 +373,10 @@ pub(super) fn render_frame_content_overlays(
             .compositor
             .child_frames
             .clear_finished_animation(frame_id);
+    }
+    if crossfade_finished && render.compositor.child_frames.prune_crossfades(sample) {
+        // The mix ended: one more repaint draws the new payload alone.
+        render.mark_dirty();
     }
     if render.compositor.child_frames.has_dying()
         && render.compositor.child_frames.prune_dying(sample)
