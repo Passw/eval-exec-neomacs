@@ -2,6 +2,11 @@ use super::*;
 use crate::buffer::buffer::BUFFER_SLOT_BUFFER_FILE_CODING_SYSTEM;
 use crate::buffer::{BufferTextBackendKind, CharPos0, LispCharPos1};
 use crate::emacs_core::Context;
+use crate::emacs_core::eval::DisplayHost;
+use crate::emacs_core::image_catalog::{
+    ImageCatalog, ImageId, ImageLayoutExtent, ImageLoadAttempt, ImageLoadToken, ImageLookup,
+    ImageMaskKind, ImageResolveRequest, ImageSizeLimit, ReadyImage, ResolvedImageMetadata,
+};
 use crate::emacs_core::intern::intern;
 use crate::emacs_core::value::{
     StringTextPropertyRun, ValueKind, get_string_text_properties_table_for_value,
@@ -2187,6 +2192,355 @@ fn pixel_size_tty_context() -> (Context, i64) {
     }
     let selected_window = eval.frames.get(frame_id).expect("frame").selected_window.0 as i64;
     (eval, selected_window)
+}
+
+// ---------------------------------------------------------------------------
+// `display` properties that measure in PIXELS: images.
+//
+// GNU's `window_text_pixel_size` runs the ordinary display iterator
+// (`start_display` + `move_it_to`, src/xdisp.c:11719-12037), so an image
+// contributes `it.pixel_width` to the row's advance and its own
+// ascent/descent to the row's height (`produce_image_glyph`,
+// src/xdisp.c:32447-32513; `image_ascent`, src/image.c:1887-1924).  The
+// reference values in these tests are GNU 31.1 running against a real X frame
+// with a 9x20 cell whose font splits into (ascent, descent) = (15, 5); the
+// recorded runs are in `tmp/textsize/gnu.txt`, `gnu2.txt` and `gnu5.txt`.
+// `IMPLEMENTATION.md`-style probes and the observation log live under
+// `tmp/textsize/`.
+// ---------------------------------------------------------------------------
+
+/// A window-system frame for the image tests: a 10x20 cell whose font splits
+/// into (ascent, descent) = (15, 5), exactly the split GNU 31.1 reported for
+/// its default font in the reference run.
+fn pixel_size_image_context() -> (Context, i64) {
+    let mut eval = interactive_context();
+    let buf_id = eval.buffers.current_buffer().expect("current buffer").id;
+    let frame_id = eval
+        .frames
+        .create_frame("xdisp-image-pixels", 200, 24, buf_id);
+    {
+        let frame = eval.frames.get_mut(frame_id).expect("frame");
+        frame.char_width = 10.0;
+        frame.char_height = 20.0;
+        frame.font_pixel_size = 16.0;
+        frame.set_window_system(Some(Value::symbol("x")));
+    }
+    eval.set_display_host(Box::new(DecodedImageHost));
+    let selected_window = eval.frames.get(frame_id).expect("frame").selected_window.0 as i64;
+    (eval, selected_window)
+}
+
+/// An image catalog whose every lookup resolves immediately to the size the
+/// spec asked for.  A real decoder decodes the bitmap and then applies GNU's
+/// `compute_image_size`; pinning `:width`/`:height` makes the decoded size the
+/// requested one, which is how the reported repro built its image.
+#[derive(Default)]
+struct DecodedImageHost;
+
+impl DisplayHost for DecodedImageHost {
+    fn realize_gui_frame(
+        &mut self,
+        _request: crate::emacs_core::eval::GuiFrameHostRequest,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn resize_gui_frame(
+        &mut self,
+        _request: crate::emacs_core::eval::GuiFrameHostRequest,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn image_catalog(&self) -> Option<&dyn ImageCatalog> {
+        Some(self)
+    }
+}
+
+impl ImageCatalog for DecodedImageHost {
+    fn lookup(&self, request: ImageResolveRequest, _limit: ImageSizeLimit) -> ImageLookup {
+        let extent = request.size.placeholder_extent().unwrap_or((40, 30));
+        let (width, height) = request.size.desired(
+            extent.0,
+            extent.1,
+            f64::from(request.realization.layout_scale()),
+        );
+        ImageLookup::Ready(ReadyImage {
+            load: ImageLoadToken::new(
+                ImageId::new(7),
+                ImageLoadAttempt::new(1).expect("nonzero test attempt"),
+            ),
+            metadata: ResolvedImageMetadata::from_layout(
+                ImageLayoutExtent::new(width.max(1), height.max(1)),
+                request.realization,
+                0,
+                true,
+                ImageMaskKind::Clipping,
+            ),
+        })
+    }
+}
+
+/// `(image :type png :file FILE :width W :height H ...)`, the spec
+/// `insert-image` puts in a `display` property.
+fn image_display_spec(width: u32, height: u32, extra: &[(&str, Value)]) -> Value {
+    let mut items = vec![
+        Value::symbol("image"),
+        Value::keyword(":type"),
+        Value::symbol("png"),
+        Value::keyword(":file"),
+        Value::string("neomacs-test-image.png"),
+        Value::keyword(":width"),
+        Value::fixnum(i64::from(width)),
+        Value::keyword(":height"),
+        Value::fixnum(i64::from(height)),
+    ];
+    for (key, value) in extra {
+        items.push(Value::keyword(key));
+        items.push(*value);
+    }
+    Value::list(items)
+}
+
+/// A probe buffer under construction: literal text plus `display` runs, with
+/// buffer positions derived from the text as it is appended.
+struct ImageProbe {
+    text: String,
+    display_runs: Vec<(i64, i64, Value)>,
+}
+
+impl ImageProbe {
+    fn new() -> Self {
+        Self {
+            text: String::new(),
+            display_runs: Vec::new(),
+        }
+    }
+
+    fn text(mut self, text: &str) -> Self {
+        self.text.push_str(text);
+        self
+    }
+
+    /// The single space GNU's `insert-image` inserts, carrying `spec` in its
+    /// `display` property.
+    fn image(mut self, spec: Value) -> Self {
+        let start = self.text.chars().count() as i64 + 1;
+        self.text.push(' ');
+        let end = self.text.chars().count() as i64 + 1;
+        self.display_runs.push((start, end, spec));
+        self
+    }
+
+    /// Measure the probe in a window-system frame with a 10x20 cell.
+    fn measure(self, x_limit: Value, y_limit: Value) -> (i64, i64) {
+        let (mut eval, selected_window) = pixel_size_image_context();
+        let buf_id = eval.buffers.current_buffer().expect("current buffer").id;
+        {
+            let buffer = eval.buffers.get_mut(buf_id).expect("buffer");
+            buffer.insert(&self.text);
+        }
+        for (start, end, spec) in self.display_runs {
+            crate::emacs_core::textprop::builtin_put_text_property(
+                &mut eval,
+                vec![
+                    Value::fixnum(start),
+                    Value::fixnum(end),
+                    Value::symbol("display"),
+                    spec,
+                ],
+            )
+            .expect("put display property");
+        }
+        let size = builtin_window_text_pixel_size_ctx(
+            &mut eval,
+            vec![
+                Value::make_window(selected_window as u64),
+                Value::NIL,
+                Value::NIL,
+                x_limit,
+                y_limit,
+            ],
+        )
+        .expect("window-text-pixel-size");
+        (
+            size.cons_car().as_int().expect("integer width"),
+            size.cons_cdr().as_int().expect("integer height"),
+        )
+    }
+}
+
+/// The reported repro: `ab` + a 200x80 image + `cd`.
+///
+/// GNU 31.1, 9x20 cell: `(236 . 80)` — 2 text cells + 200 px + 2 text cells
+/// wide, and the row is the image's 80 px tall.  Neomacs measured `(45 . 20)`,
+/// counting the image as one 9 px column and one 20 px row.
+#[test]
+fn window_text_pixel_size_measures_an_image_display_property() {
+    crate::test_utils::init_test_tracing();
+    assert_eq!(
+        ImageProbe::new()
+            .text("ab")
+            .image(image_display_spec(200, 80, &[]))
+            .text("cd\n")
+            .measure(Value::NIL, Value::NIL),
+        (240, 80),
+        "2 cells + 200px image + 2 cells, row height = image height"
+    );
+
+    // An image at the very start of the measured range.
+    assert_eq!(
+        ImageProbe::new()
+            .image(image_display_spec(200, 80, &[]))
+            .text("cd\n")
+            .measure(Value::NIL, Value::NIL),
+        (220, 80),
+        "200px image + 2 cells"
+    );
+
+    // ... and one ending the range.
+    assert_eq!(
+        ImageProbe::new()
+            .text("ab")
+            .image(image_display_spec(200, 80, &[]))
+            .measure(Value::NIL, Value::NIL),
+        (220, 80),
+        "2 cells + 200px image"
+    );
+}
+
+/// Two images on one line, with text between them: the advances add.
+#[test]
+fn window_text_pixel_size_sums_two_images_on_one_row() {
+    crate::test_utils::init_test_tracing();
+    assert_eq!(
+        ImageProbe::new()
+            .image(image_display_spec(60, 40, &[]))
+            .text("x")
+            .image(image_display_spec(200, 80, &[]))
+            .text("\n")
+            .measure(Value::NIL, Value::NIL),
+        (270, 80),
+        "60 + 10 + 200 px wide; the tallest element (80) sets the row height"
+    );
+}
+
+/// The tallest row element sets the row height, and rows add up.
+#[test]
+fn window_text_pixel_size_uses_the_tallest_row_element_for_height() {
+    crate::test_utils::init_test_tracing();
+    // A text row over an image-only row.
+    assert_eq!(
+        ImageProbe::new()
+            .text("ab\n")
+            .image(image_display_spec(200, 80, &[]))
+            .text("\n")
+            .measure(Value::NIL, Value::NIL),
+        (200, 100),
+        "the widest row is the image's 200 px; the height is 20 + 80"
+    );
+
+    // An image taller than the frame's line height, on the same row as text.
+    assert_eq!(
+        ImageProbe::new()
+            .text("ab")
+            .image(image_display_spec(40, 300, &[]))
+            .text("cd\n")
+            .measure(Value::NIL, Value::NIL),
+        (240, 300),
+        "a 300px-tall image grows the text row to 300"
+    );
+}
+
+/// X-LIMIT is the maximum width the function can return, and an image is
+/// cropped at that row edge — the remainder of the image is not displayed, so
+/// it contributes nothing.
+#[test]
+fn window_text_pixel_size_crops_an_image_at_the_x_limit() {
+    crate::test_utils::init_test_tracing();
+    assert_eq!(
+        ImageProbe::new()
+            .text("ab")
+            .image(image_display_spec(200, 80, &[]))
+            .text("cd\n")
+            .measure(Value::fixnum(120), Value::NIL),
+        (120, 80),
+        "the image is cropped at the 120 px row edge; the row is still 80 px tall"
+    );
+
+    // The image starts exactly at the limit: the row is truncated before it is
+    // produced, so it does not even contribute its height.
+    assert_eq!(
+        ImageProbe::new()
+            .text("ab")
+            .image(image_display_spec(200, 80, &[]))
+            .text("cd\n")
+            .measure(Value::fixnum(20), Value::NIL),
+        (20, 20),
+        "an image that starts at the row edge is not displayed at all"
+    );
+
+    // A limit that the image fits inside leaves the measurement alone.
+    assert_eq!(
+        ImageProbe::new()
+            .text("ab")
+            .image(image_display_spec(200, 80, &[]))
+            .text("cd\n")
+            .measure(Value::fixnum(400), Value::NIL),
+        (240, 80),
+        "x-limit above the row width does not clip it"
+    );
+}
+
+/// Y-LIMIT is in pixels; a limit wide enough for the image row measures it in
+/// full.
+#[test]
+fn window_text_pixel_size_measures_an_image_row_under_the_y_limit() {
+    crate::test_utils::init_test_tracing();
+    assert_eq!(
+        ImageProbe::new()
+            .text("ab\n")
+            .image(image_display_spec(200, 80, &[]))
+            .text("\n")
+            .measure(Value::NIL, Value::fixnum(100)),
+        (200, 100),
+        "a 100 px y-limit covers both rows (20 + 80)"
+    );
+}
+
+/// A terminal frame displays no images (GNU `valid_image_p` is false without a
+/// window system, src/xdisp.c `handle_single_display_spec`), so the covered
+/// space is ordinary text there.  Measured on GNU 31.1 under a pty
+/// (`tmp/textsize/gnu7-tty.txt`): `ab` + image + `cd` measures `(5 . 1)`.
+#[test]
+fn window_text_pixel_size_ignores_images_on_a_terminal_frame() {
+    crate::test_utils::init_test_tracing();
+    let (mut eval, selected_window) = pixel_size_tty_context();
+    let buf_id = eval.buffers.current_buffer().expect("current buffer").id;
+    {
+        let buffer = eval.buffers.get_mut(buf_id).expect("buffer");
+        buffer.insert("ab cd\n");
+    }
+    crate::emacs_core::textprop::builtin_put_text_property(
+        &mut eval,
+        vec![
+            Value::fixnum(3),
+            Value::fixnum(4),
+            Value::symbol("display"),
+            image_display_spec(200, 80, &[]),
+        ],
+    )
+    .expect("put display property");
+    let size = builtin_window_text_pixel_size_ctx(
+        &mut eval,
+        vec![Value::make_window(selected_window as u64)],
+    )
+    .expect("window-text-pixel-size");
+    assert_eq!(
+        (size.cons_car(), size.cons_cdr()),
+        (Value::fixnum(5), Value::fixnum(1)),
+        "the covered space is measured as one column on a terminal"
+    );
 }
 
 /// A space carrying `display (space :align-to 80)` must measure as if the text
