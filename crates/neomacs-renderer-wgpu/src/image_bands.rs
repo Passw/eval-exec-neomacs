@@ -297,23 +297,32 @@ impl BandMap {
         // `row_at` is monotone, so this cannot underflow; it is zero only when
         // both ends rounded to the same row.
         let rows = NonZeroU32::new(end.saturating_sub(start))?;
-        let source = image::RgbaImage::from_raw(
-            band.width(),
-            band.rows().len().get(),
-            band.pixels().to_vec(),
-        )?;
-        let resized = image::imageops::resize(
-            &source,
-            self.raster.width(),
-            rows.get(),
-            image::imageops::FilterType::Lanczos3,
-        );
+        // The same fast path the whole-image upload takes: a source realized at
+        // its own size is not resampled at all. It is also the case where the
+        // preview is not an approximation of the finished pixels but the
+        // finished pixels, since both sides then skip the same filter.
+        let source_rows = band.rows().len().get();
+        let pixels: Arc<[u8]> = if self.raster.width() == band.width() && rows.get() == source_rows
+        {
+            band.pixels().into()
+        } else {
+            let source =
+                image::RgbaImage::from_raw(band.width(), source_rows, band.pixels().to_vec())?;
+            image::imageops::resize(
+                &source,
+                self.raster.width(),
+                rows.get(),
+                image::imageops::FilterType::Lanczos3,
+            )
+            .into_raw()
+            .into()
+        };
         Some(RasterBand {
             placement: BandPlacement {
                 raster: self.raster,
                 rows: TextureRows { start, len: rows },
             },
-            pixels: resized.into_raw().into(),
+            pixels,
         })
     }
 }

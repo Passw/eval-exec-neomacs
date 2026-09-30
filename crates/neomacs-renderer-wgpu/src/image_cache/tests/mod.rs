@@ -1975,9 +1975,10 @@ fn every_band_lands_in_the_raster_the_finished_upload_resolves() {
     let (width, height) = (2000_u32, 2000_u32);
     let data = varying_png(width, height);
     let scales = [
+        // Native size: the raster is the source, and every band is its own rows.
         1.0_f32,
-        // Magnified: the raster is 3125 rows from 2000, a ratio that lands
-        // between texture rows at every band boundary.
+        // Magnified: the raster is 3125 rows from 2000, a ratio whose band
+        // boundaries all land between texture rows.
         1.25,
     ];
     for scale in scales {
