@@ -236,8 +236,10 @@ impl RenderQualityPolicy {
         ChildFrameMotionSpecs {
             open: config.child_frame_open.motion(globals),
             open_slide: config.child_frame_open.slide_pixels,
+            open_scale_from: config.child_frame_open.scale_from,
             close: config.child_frame_close.motion(globals),
             close_slide: config.child_frame_close.slide_pixels,
+            close_scale_from: config.child_frame_close.scale_from,
             movement: config.child_frame_movement.motion(globals),
             resize: config.child_frame_resize.motion(globals),
         }
@@ -349,10 +351,14 @@ pub(super) struct ChildFrameMotionSpecs {
     pub(super) open: MotionSpec,
     /// Vertical displacement of an appearing frame, in logical pixels.
     pub(super) open_slide: f32,
+    /// The scale an appearing frame grows from; 1.0 scales nothing.
+    pub(super) open_scale_from: f32,
     /// Opacity of a child frame that is going away.
     pub(super) close: MotionSpec,
     /// Vertical displacement of a departing frame, in logical pixels.
     pub(super) close_slide: f32,
+    /// The scale a departing frame shrinks toward; 1.0 scales nothing.
+    pub(super) close_scale_from: f32,
     /// Placement drift toward a re-anchored frame.
     pub(super) movement: MotionSpec,
     /// Reserved for content-crossfade resizes; resolves Instant today.
@@ -364,8 +370,10 @@ impl ChildFrameMotionSpecs {
     pub(super) const INSTANT: Self = Self {
         open: MotionSpec::Instant,
         open_slide: 0.0,
+        open_scale_from: 1.0,
         close: MotionSpec::Instant,
         close_slide: 0.0,
+        close_scale_from: 1.0,
         movement: MotionSpec::Instant,
         resize: MotionSpec::Instant,
     };

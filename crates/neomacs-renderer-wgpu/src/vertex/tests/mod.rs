@@ -31,8 +31,10 @@ fn rounded_rect_vertex_size() {
 
 #[test]
 fn uniforms_size() {
-    // screen_size: [f32; 2] = 8, time: f32 = 4, content_alpha: f32 = 4 => 16 bytes
-    assert_eq!(size_of::<Uniforms>(), 16);
+    // screen_size: [f32; 2] = 8, time = 4, content_alpha = 4,
+    // content_scale = 4, _pivot_padding = 4, content_pivot: [f32; 2] = 8
+    // => 32 bytes (the uniform address space's 16-byte multiple)
+    assert_eq!(size_of::<Uniforms>(), 32);
 }
 
 // ---- Alignment tests (all repr(C) with f32 fields, should be 4-byte aligned) ----

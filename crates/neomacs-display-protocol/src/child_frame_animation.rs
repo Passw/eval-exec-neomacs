@@ -69,6 +69,16 @@ pub struct ChildFrameAnimation {
     /// same curve as the fade, so a spring-shaped slot overshoots through its
     /// placement and settles back — the property a pop-in reads as.
     pub slide_pixels: f32,
+    /// The scale the frame starts from, as a fraction of its settled size.
+    ///
+    /// `1.0` (every slot's default) scales nothing: the transform is an
+    /// identity in the draw pipeline and costs nothing. Below 1.0, an
+    /// arriving frame grows from this fraction of its size — anchored at
+    /// its own top-left, so it grows outward from the point that anchored
+    /// it — while a departing frame shrinks toward it. The scale shares the
+    /// slot's curve, unclamped like the slide: a spring's overshoot past
+    /// 1.0 is the point.
+    pub scale_from: f32,
 }
 
 impl ChildFrameAnimation {
@@ -85,6 +95,7 @@ impl ChildFrameAnimation {
             damping_ratio: 1.0,
             stiffness: 800,
             slide_pixels,
+            scale_from: 1.0,
         }
     }
 
@@ -101,6 +112,7 @@ impl ChildFrameAnimation {
             damping_ratio,
             stiffness,
             slide_pixels: 0.0,
+            scale_from: 1.0,
         }
     }
 
@@ -237,6 +249,7 @@ crate::effect_schema!(ChildFrameAnimation {
     damping_ratio: f32,
     stiffness: u32,
     slide_pixels: f32,
+    scale_from: f32,
 });
 crate::effect_schema!(ChildFrameAnimationsConfig {
     off: bool,

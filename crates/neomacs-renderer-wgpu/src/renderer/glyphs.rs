@@ -2033,6 +2033,9 @@ impl WgpuRenderer {
             screen_size: [logical_w, logical_h],
             time: elapsed,
             content_alpha: 1.0,
+            content_scale: 1.0,
+            _pivot_padding: 0.0,
+            content_pivot: [0.0; 2],
         };
         let draw = self.parameters(uniforms.screen_size, uniforms.time);
         (logical_w, logical_h, draw)

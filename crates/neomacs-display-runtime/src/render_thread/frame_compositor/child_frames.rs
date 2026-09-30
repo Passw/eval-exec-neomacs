@@ -44,9 +44,13 @@ impl GuiFrameRenderState {
         );
         let origin = observe_platform_now();
         let removed = if animates {
-            self.compositor
-                .child_frames
-                .retire_frame(frame_id, close_spec, origin, close_slide)
+            self.compositor.child_frames.retire_frame(
+                frame_id,
+                close_spec,
+                origin,
+                close_slide,
+                motion.close_scale_from,
+            )
         } else {
             self.compositor.child_frames.remove_frame(frame_id)
         };
@@ -175,6 +179,7 @@ impl GuiFrameRenderState {
                         motion.open,
                         observe_platform_now(),
                         motion.open_slide,
+                        motion.open_scale_from,
                     );
                     self.compositor.dirty = true;
                 }

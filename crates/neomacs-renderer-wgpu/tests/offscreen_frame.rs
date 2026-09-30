@@ -197,6 +197,8 @@ fn child_frame_box_line_width_is_one_device_pixel_at_two_x_scale() {
         None,
         None,
         1.0,
+        1.0,
+        [0.0; 2],
     );
     let buf = read_back(&h);
 
@@ -982,6 +984,8 @@ fn child_frame_negative_box_border_does_not_cover_a_one_cell_glyph() {
         None,
         None,
         1.0,
+        1.0,
+        [0.0; 2],
     );
     let buf = read_back(&h);
     assert!(
@@ -1087,6 +1091,8 @@ fn child_frame_rounded_extend_box_has_no_terminal_vertical_edge() {
         None,
         None,
         1.0,
+        1.0,
+        [0.0; 2],
     );
     assert_open_ended_box(&read_back(&h));
 }
@@ -1132,6 +1138,8 @@ fn child_frame_sharp_extend_box_has_no_terminal_vertical_edge() {
         None,
         None,
         1.0,
+        1.0,
+        [0.0; 2],
     );
     assert_open_ended_box(&read_back(&h));
 }
@@ -1939,6 +1947,8 @@ fn child_filled_box_motion_uses_the_same_inverse_video_contract() {
             None,
             None,
             1.0,
+            1.0,
+            [0.0; 2],
         );
         read_tex(&h.renderer, &texture)
     };

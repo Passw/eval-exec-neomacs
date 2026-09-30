@@ -61,21 +61,37 @@ impl WgpuRenderer {
         shadow_opacity: f32,
         pointer_selection: Option<PointerAppearanceSelection>,
         alpha: f32,
+        scale: f32,
+        pivot: [f32; 2],
     ) {
         let alpha = if alpha.is_finite() {
             alpha.clamp(0.0, 1.0)
         } else {
             1.0
         };
+        // An identity scale normalizes to (1.0, origin) so the draw-parameters
+        // cache key -- and therefore the immutable uniform snapshot -- is
+        // byte-identical to the pre-scale pipeline for every settled frame.
+        let (scale, pivot) = if !scale.is_finite() || (scale - 1.0).abs() < f32::EPSILON {
+            (1.0, [0.0_f32; 2])
+        } else {
+            (scale, pivot)
+        };
         let logical_w = surface_width as f32 / self.scale_factor;
         let logical_h = surface_height as f32 / self.scale_factor;
-        // Same cache key as `parameters()` when alpha is 1.0, so a settled
-        // child frame reuses the identical immutable snapshot.
-        let draw = self.parameters_with_alpha([logical_w, logical_h], 0.0, alpha);
+        // Same cache key as `parameters()` when alpha is 1.0 and the scale is
+        // the identity, so a settled child frame reuses the identical
+        // immutable snapshot.
+        let draw = self.parameters_for([logical_w, logical_h], 0.0, alpha, scale, pivot);
 
         let bw = child.border_width;
-        let frame_w = child.width;
-        let frame_h = child.height;
+        // The CPU-built chrome geometry scales by the same factor the vertex
+        // shader applies to glyph positions: the frame grows out of its
+        // top-left anchor, so the chrome's width and height shrink toward it
+        // and its radii and border widths thin proportionally.
+        let frame_w = child.width * scale;
+        let frame_h = child.height * scale;
+        let corner_radius = corner_radius * scale;
         let bg_alpha = child.background_alpha * alpha;
         let Some(scissor) = child_scissor(
             clip_in_root,
@@ -239,7 +255,7 @@ impl WgpuRenderer {
                 } else {
                     Color::new(0.5, 0.5, 0.5, 0.3).srgb_to_linear()
                 };
-                let effective_bw = if bw > 0.0 { bw } else { 1.0 };
+                let effective_bw = (if bw > 0.0 { bw } else { 1.0 }) * scale;
                 self.add_rounded_rect(
                     &mut border_verts,
                     offset_x,
@@ -359,10 +375,11 @@ impl WgpuRenderer {
             pointer_selection,
             Some(scissor),
             alpha,
+            scale,
+            pivot,
         );
 
-        let outer_bw = child
-            .outer_border_width
+        let outer_bw = (child.outer_border_width * scale)
             .max(0.0)
             .min(frame_w.max(0.0) / 2.0)
             .min(frame_h.max(0.0) / 2.0);

@@ -116,7 +116,7 @@ pub(super) fn render_frame_content_overlays(
         // arriving.
         let merged = render.compositor.child_frames.merged_render_order();
         for (child_id, dying) in merged {
-            let (child_frame, base_x, base_y, clip_in_root, alpha, offset_y) = if dying {
+            let (child_frame, base_x, base_y, clip_in_root, alpha, offset_y, scale) = if dying {
                 let Some(dying_entry) = render.compositor.child_frames.dying_entry(child_id) else {
                     continue;
                 };
@@ -141,6 +141,10 @@ pub(super) fn render_frame_content_overlays(
                     continue;
                 }
                 let offset_y = animation.slide_pixels * progress.progress;
+                // The departing frame shrinks toward its configured start
+                // scale on the slot's own curve, unclamped: a spring's
+                // overshoot below the target scale is the point.
+                let scale = 1.0 - (1.0 - animation.scale_from) * progress.progress;
                 let neomacs_display_protocol::PresentedClip::Rect(clip_in_root) =
                     dying_entry.entry.clip_in_root
                 else {
@@ -153,6 +157,7 @@ pub(super) fn render_frame_content_overlays(
                     clip_in_root,
                     alpha,
                     offset_y,
+                    scale,
                 )
             } else {
                 let Some(child_entry) = render.compositor.child_frames.frames.get(&child_id) else {
@@ -171,20 +176,31 @@ pub(super) fn render_frame_content_overlays(
                 // opacity, at its placed position -- byte-identical to the
                 // pre-animation path, which is what keeps this feature free
                 // when it is off.
-                let (alpha, offset_y, finished) =
+                let (alpha, offset_y, scale, finished) =
                     child_entry
                         .animation
                         .as_ref()
-                        .map_or((1.0, 0.0, true), |animation| {
+                        .map_or((1.0, 0.0, 1.0, true), |animation| {
                             let progress = animation.motion.sample(sample);
                             if progress.finished {
-                                (1.0, 0.0, true)
+                                (1.0, 0.0, 1.0, true)
                             } else {
                                 child_animation_active = true;
+                                // The scale rides the slot's own curve,
+                                // unclamped like the slide: a spring's
+                                // overshoot past the settled size is the
+                                // point of the pop.
+                                let scale = if animation.closing {
+                                    1.0 - (1.0 - animation.scale_from) * progress.progress
+                                } else {
+                                    animation.scale_from
+                                        + (1.0 - animation.scale_from) * progress.progress
+                                };
                                 if animation.closing {
                                     (
                                         1.0 - progress.content_mix.get(),
                                         animation.slide_pixels * progress.progress,
+                                        scale,
                                         false,
                                     )
                                 } else {
@@ -195,6 +211,7 @@ pub(super) fn render_frame_content_overlays(
                                     (
                                         progress.content_mix.get(),
                                         animation.slide_pixels * (1.0 - progress.progress),
+                                        scale,
                                         false,
                                     )
                                 }
@@ -218,6 +235,7 @@ pub(super) fn render_frame_content_overlays(
                     clip_in_root,
                     alpha,
                     offset_y,
+                    scale,
                 )
             };
             let pointer_selection = pointer_appearance.selection_for(child_frame);
@@ -229,6 +247,7 @@ pub(super) fn render_frame_content_overlays(
                     parent_frame_id = render.emacs_frame_id,
                     frame_id = child_id,
                     alpha,
+                    scale,
                     "child_frame_lifecycle: render_dying_child_frame"
                 );
             } else {
@@ -240,6 +259,7 @@ pub(super) fn render_frame_content_overlays(
                     width = child_frame.width,
                     height = child_frame.height,
                     alpha,
+                    scale,
                     glyphs = child_frame.glyphs.len(),
                     "child_frame_lifecycle: render_child_frame_start"
                 );
@@ -262,6 +282,10 @@ pub(super) fn render_frame_content_overlays(
                 child_frame_style.shadow_opacity,
                 pointer_selection,
                 alpha,
+                scale,
+                // The scale anchors at the frame's drawn top-left, so the
+                // picture grows outward from the point that anchored it.
+                [base_x, base_y + offset_y],
             );
             if !dying {
                 tracing::debug!(

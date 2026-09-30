@@ -48,10 +48,25 @@ struct Uniforms {
     screen_size: vec2<f32>,
     time: f32,
     content_alpha: f32,
+    content_scale: f32,
+    // Keeps content_pivot at an 8-byte-aligned offset, matching the CPU side.
+    _pivot_padding: f32,
+    content_pivot: vec2<f32>,
 }
 
 @group(0) @binding(0)
 var<uniform> uniforms: Uniforms;
+
+// Child-frame picture transform: scale positions away from the anchor. The
+// CPU side normalizes the identity to (1.0, (0,0)), which makes this a
+// no-op for every settled frame.
+fn scale_position(p: vec2<f32>) -> vec2<f32> {
+    return vec2<f32>(
+        uniforms.content_pivot.x + (p.x - uniforms.content_pivot.x) * uniforms.content_scale,
+        uniforms.content_pivot.y + (p.y - uniforms.content_pivot.y) * uniforms.content_scale,
+    );
+}
+
 
 // ─── Helper Functions ────────────────────────────────────────────────
 
@@ -128,14 +143,21 @@ fn rect_angle(pos: vec2<f32>, center: vec2<f32>) -> f32 {
 @vertex
 fn vs_main(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    let x = (in.position.x / uniforms.screen_size.x) * 2.0 - 1.0;
-    let y = 1.0 - (in.position.y / uniforms.screen_size.y) * 2.0;
+    let scaled = scale_position(in.position);
+    let x = (scaled.x / uniforms.screen_size.x) * 2.0 - 1.0;
+    let y = 1.0 - (scaled.y / uniforms.screen_size.y) * 2.0;
     out.clip_position = vec4<f32>(x, y, 0.0, 1.0);
     out.color = in.color;
-    out.rect_min = in.rect_min;
-    out.rect_max = in.rect_max;
-    out.params = in.params;
-    out.frag_pos = in.position;
+    // The SDF reads these as geometry: scale them with the positions, and
+    // thin the border width and radius by the same factor so the shape
+    // scales as a whole.
+    out.rect_min = scale_position(in.rect_min);
+    out.rect_max = scale_position(in.rect_max);
+    out.params = vec2<f32>(
+        in.params.x * uniforms.content_scale,
+        in.params.y * uniforms.content_scale,
+    );
+    out.frag_pos = scaled;
     out.style_params = in.style_params;
     out.color2 = in.color2;
     return out;

@@ -32,6 +32,9 @@ pub(crate) struct EntryAnimation {
     /// How far the frame displaces vertically while it animates, in logical
     /// pixels. Zero is a pure fade.
     pub slide_pixels: f32,
+    /// The scale the frame starts from; 1.0 scales nothing. The draw pass
+    /// turns this into the frame's interpolated scale around its anchor.
+    pub scale_from: f32,
     /// Whether the frame is leaving (`true`) or arriving (`false`).
     ///
     /// One direction flag instead of two animation fields: the close path
@@ -48,11 +51,13 @@ impl EntryAnimation {
         spec: MotionSpec,
         origin: EventTime,
         slide_pixels: f32,
+        scale_from: f32,
         closing: bool,
     ) -> Option<Self> {
         Motion::start(spec, origin).map(|motion| Self {
             motion,
             slide_pixels,
+            scale_from,
             closing,
         })
     }
@@ -130,9 +135,11 @@ impl ChildFrameManager {
         spec: MotionSpec,
         origin: EventTime,
         slide_pixels: f32,
+        scale_from: f32,
     ) {
         if let Some(entry) = self.frames.get_mut(&frame_id)
-            && let Some(animation) = EntryAnimation::start(spec, origin, slide_pixels, false)
+            && let Some(animation) =
+                EntryAnimation::start(spec, origin, slide_pixels, scale_from, false)
         {
             entry.animation = Some(animation);
         }
@@ -152,6 +159,7 @@ impl ChildFrameManager {
         spec: MotionSpec,
         origin: EventTime,
         slide_pixels: f32,
+        scale_from: f32,
     ) -> bool {
         if !self.frames.contains_key(&frame_id) {
             tracing::debug!(
@@ -166,7 +174,9 @@ impl ChildFrameManager {
             let Some(entry) = self.frames.remove(&id) else {
                 continue;
             };
-            if let Some(animation) = EntryAnimation::start(spec, origin, slide_pixels, true) {
+            if let Some(animation) =
+                EntryAnimation::start(spec, origin, slide_pixels, scale_from, true)
+            {
                 retired.push(DyingChildFrame { entry, animation });
             }
         }
@@ -197,13 +207,6 @@ impl ChildFrameManager {
             );
         }
         pruned
-    }
-
-    /// The dying entries that should still be drawn, in their own z-order.
-    pub fn dying_sorted_for_rendering(&self) -> impl Iterator<Item = &DyingChildFrame> {
-        let mut dying = self.dying.iter().collect::<Vec<_>>();
-        dying.sort_by(|a, b| a.entry.z_path.cmp(&b.entry.z_path));
-        dying.into_iter()
     }
 
     pub fn dying_entry(&self, frame_id: u64) -> Option<&DyingChildFrame> {

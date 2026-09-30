@@ -1040,7 +1040,7 @@ fn open_animation_advances_by_sampling_not_stepping() {
     let mut mgr = make_manager();
     mgr.update_frame(make_child_buf(1, 0.0, 0.0, 100.0, 100.0, 0));
     let origin = origin_now();
-    mgr.begin_open_animation(1, tween_100ms(), origin, 8.0);
+    mgr.begin_open_animation(1, tween_100ms(), origin, 8.0, 1.0);
 
     // Sampling, not stepping: the same instant gives the same answer.
     let early = mgr
@@ -1083,7 +1083,7 @@ fn open_animation_advances_by_sampling_not_stepping() {
 fn open_animation_survives_a_content_refresh() {
     let mut mgr = make_manager();
     mgr.update_frame(make_child_buf(1, 0.0, 0.0, 100.0, 100.0, 0));
-    mgr.begin_open_animation(1, tween_100ms(), origin_now(), 8.0);
+    mgr.begin_open_animation(1, tween_100ms(), origin_now(), 8.0, 1.0);
 
     // A completion popup redraws per keystroke; the fade must continue, not
     // restart.
@@ -1095,7 +1095,7 @@ fn open_animation_survives_a_content_refresh() {
 fn an_instant_open_spec_builds_no_animation_state() {
     let mut mgr = make_manager();
     mgr.update_frame(make_child_buf(1, 0.0, 0.0, 100.0, 100.0, 0));
-    mgr.begin_open_animation(1, instant(), origin_now(), 8.0);
+    mgr.begin_open_animation(1, instant(), origin_now(), 8.0, 1.0);
     assert!(mgr.frames.get(&1).unwrap().animation.is_none());
 }
 
@@ -1106,7 +1106,7 @@ fn retire_moves_the_subtree_to_dying_and_out_of_interaction() {
     mgr.update_frame(make_nested_buf(2, 1, 0.0, 100.0, 100.0, 100.0, 0)); // child of 1
 
     let origin = origin_now();
-    assert!(mgr.retire_frame(1, tween_100ms(), origin, 6.0));
+    assert!(mgr.retire_frame(1, tween_100ms(), origin, 6.0, 1.0));
 
     // Gone from every interaction path...
     assert!(!mgr.frames.contains_key(&1));
@@ -1140,7 +1140,7 @@ fn an_instant_close_drops_outright_with_no_dying_entry() {
     let mut mgr = make_manager();
     mgr.update_frame(make_child_buf(1, 0.0, 0.0, 100.0, 100.0, 0));
     let origin = origin_now();
-    assert!(mgr.retire_frame(1, instant(), origin, 6.0));
+    assert!(mgr.retire_frame(1, instant(), origin, 6.0, 1.0));
     assert!(mgr.dying.is_empty());
     assert!(mgr.frames.is_empty());
 }
@@ -1153,8 +1153,8 @@ fn reinstalling_a_dying_frame_id_resurrects_it_alone() {
     mgr.update_frame(make_child_buf(1, 0.0, 0.0, 100.0, 100.0, 0));
     mgr.update_frame(make_child_buf(2, 0.0, 100.0, 100.0, 100.0, 0));
     let origin = origin_now();
-    mgr.retire_frame(1, tween_100ms(), origin, 0.0);
-    mgr.retire_frame(2, tween_100ms(), origin, 0.0);
+    mgr.retire_frame(1, tween_100ms(), origin, 0.0, 1.0);
+    mgr.retire_frame(2, tween_100ms(), origin, 0.0, 1.0);
     assert_eq!(mgr.dying.len(), 2);
 
     mgr.update_frame(make_child_buf(1, 0.0, 0.0, 100.0, 100.0, 0));
@@ -1175,8 +1175,8 @@ fn prune_dying_drops_only_finished_entries() {
     mgr.update_frame(make_child_buf(1, 0.0, 0.0, 100.0, 100.0, 0));
     mgr.update_frame(make_child_buf(2, 0.0, 100.0, 100.0, 100.0, 0));
     let origin = origin_now();
-    mgr.retire_frame(1, tween_100ms(), origin, 0.0);
-    mgr.retire_frame(2, tween_100ms(), origin, 0.0);
+    mgr.retire_frame(1, tween_100ms(), origin, 0.0, 1.0);
+    mgr.retire_frame(2, tween_100ms(), origin, 0.0, 1.0);
     assert_eq!(mgr.dying.len(), 2);
 
     mgr.prune_dying(sample_at(origin, 10));
@@ -1195,8 +1195,8 @@ fn merged_render_order_interleaves_living_and_dying_by_z() {
     mgr.update_frame(make_child_buf(3, 0.0, 0.0, 100.0, 100.0, 1));
     mgr.update_frame(make_child_buf(4, 0.0, 0.0, 100.0, 100.0, 1));
     let origin = origin_now();
-    mgr.retire_frame(2, tween_100ms(), origin, 0.0);
-    mgr.retire_frame(4, tween_100ms(), origin, 0.0);
+    mgr.retire_frame(2, tween_100ms(), origin, 0.0, 1.0);
+    mgr.retire_frame(4, tween_100ms(), origin, 0.0, 1.0);
 
     let order: Vec<u64> = mgr
         .merged_render_order()
@@ -1219,7 +1219,7 @@ fn merged_render_order_puts_a_corpse_beneath_a_living_frame_at_equal_z() {
     mgr.update_frame(make_child_buf(1, 0.0, 0.0, 100.0, 100.0, 7));
     mgr.update_frame(make_child_buf(2, 0.0, 0.0, 100.0, 100.0, 7));
     let origin = origin_now();
-    mgr.retire_frame(1, tween_100ms(), origin, 0.0);
+    mgr.retire_frame(1, tween_100ms(), origin, 0.0, 1.0);
 
     let order = mgr.merged_render_order();
     assert_eq!(order, vec![(1, true), (2, false)]);

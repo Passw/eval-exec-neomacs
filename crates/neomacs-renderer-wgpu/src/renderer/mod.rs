@@ -1953,7 +1953,21 @@ impl WgpuRenderer {
     /// carrying that in the shared uniform snapshot is what keeps the
     /// multiply out of every vertex builder.
     fn parameters_with_alpha(&self, size: [f32; 2], time: f32, alpha: f32) -> draw::DrawParameters {
-        self.draw_parameters.get(&self.device, size, time, alpha)
+        self.parameters_for(size, time, alpha, 1.0, [0.0; 2])
+    }
+
+    /// Draw parameters carrying the full child-frame picture transform:
+    /// alpha, scale and its anchor.
+    fn parameters_for(
+        &self,
+        size: [f32; 2],
+        time: f32,
+        alpha: f32,
+        scale: f32,
+        pivot: [f32; 2],
+    ) -> draw::DrawParameters {
+        self.draw_parameters
+            .get(&self.device, size, time, alpha, scale, pivot)
     }
 
     fn frame_parameters(&self) -> draw::DrawParameters {

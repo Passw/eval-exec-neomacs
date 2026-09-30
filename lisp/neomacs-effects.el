@@ -79,6 +79,9 @@ DEFAULTS also accepts three keys that shape the options rather than the slot:
 paragraph that paragraph family keeps about the offscreen composition ring,
 which only applies to slots whose animation reads the previous frame;
 `:slide' non-nil adds the slot's extra `slide-pixels' option, which the
+;; schema publishes for slots that displace; `:scale' non-nil adds the
+;; slot's `scale-from' option the same way. Both are optional because the
+;; window-animation slots publish neither.
 schema publishes for slots that displace while they fade."
   (let* ((name (symbol-name slot))
          (sym (lambda (property) (intern (format "neomacs-%s-%s" name property))))
@@ -203,21 +206,37 @@ of a second.  This is the same number a niri configuration gives as
                  (set-default symbol value)
                  (neomacs-effects--set ',slot :stiffness value)))
 
-       ,@(when (plist-get defaults :slide)
-           `((defcustom ,(funcall sym "slide-pixels")
-                 ,(funcall get :slide 0.0)
-               ,(format "How far %s displaces vertically while it animates.
+       ,@(append
+          (when (plist-get defaults :slide)
+            `((defcustom ,(funcall sym "slide-pixels")
+                  ,(funcall get :slide 0.0)
+                ,(format "How far %s displaces vertically while it animates.
 
 An arriving frame starts this many logical pixels below its placement and
 rises onto it; a departing frame falls this far while it fades.  Zero
 reduces %s to a pure fade.  The displacement shares the slot's own curve,
 so a spring-shaped slot overshoots through its placement and settles back."
-                summary name)
-               :type 'number
-               :group ',group
-               :set (lambda (symbol value)
-                      (set-default symbol value)
-                      (neomacs-effects--set ',slot :slide-pixels value))))))))
+                 summary name)
+                :type 'number
+                :group ',group
+                :set (lambda (symbol value)
+                       (set-default symbol value)
+                       (neomacs-effects--set ',slot :slide-pixels value)))))
+          (when (plist-get defaults :scale)
+            `((defcustom ,(funcall sym "scale-from")
+                  ,(funcall get :scale 1.0)
+                ,(format "The scale %s starts from, as a fraction of its settled size.
+
+1.0 scales nothing.  Below 1.0, an arriving frame grows from this fraction of
+its size and a departing frame shrinks toward it, anchored at the frame's own
+top-left so the picture grows outward from the point that anchored it.  The
+scale shares the slot's own curve, unclamped like the slide: a spring's
+overshoot past the settled size is the point." summary)
+                :type 'number
+                :group ',group
+                :set (lambda (symbol value)
+                       (set-default symbol value)
+                       (neomacs-effects--set ',slot :scale-from value)))))))))
 
 (neomacs-effects--defslot window-open
   "a window appearing"
@@ -275,7 +294,7 @@ popups are the kind that follow the cursor."
   :group 'neomacs-child-frame
   :master 'neomacs-child-frame-animations-off
   :enabled-doc "Nothing else needs to be composed offscreen for it."
-  :kind 'easing :duration 0.15 :easing 'ease-out-expo :slide 8.0)
+  :kind 'easing :duration 0.15 :easing 'ease-out-expo :slide 8.0 :scale 1.0)
 
 (neomacs-effects--defslot child-frame-close
   "a child frame going away"
@@ -283,7 +302,7 @@ popups are the kind that follow the cursor."
   :group 'neomacs-child-frame
   :master 'neomacs-child-frame-animations-off
   :enabled-doc "Nothing else needs to be composed offscreen for it."
-  :kind 'easing :duration 0.15 :easing 'ease-out-quad :slide 0.0)
+  :kind 'easing :duration 0.15 :easing 'ease-out-quad :slide 0.0 :scale 1.0)
 
 (neomacs-effects--defslot child-frame-movement
   "a child frame whose anchor moved"
@@ -291,7 +310,7 @@ popups are the kind that follow the cursor."
   :group 'neomacs-child-frame
   :master 'neomacs-child-frame-animations-off
   :enabled-doc "Nothing else needs to be composed offscreen for it."
-  :slide 0.0)
+  :slide 0.0 :scale 1.0)
 
 (neomacs-effects--defslot child-frame-resize
   "a child frame whose size changes"
@@ -302,7 +321,7 @@ popups are the kind that follow the cursor."
 Turning this on today does nothing: the slot is wired for a future
 content-crossfade, and until then a resize is instant, exactly as GNU Emacs
 does it."
-  :slide 0.0)
+  :slide 0.0 :scale 1.0)
 
 
 ;;;; Global controls

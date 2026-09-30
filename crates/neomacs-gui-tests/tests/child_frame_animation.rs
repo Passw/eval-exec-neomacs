@@ -119,6 +119,11 @@ fn locate_popup(pixels: &image::DynamicImage) -> Option<(u32, u32, u32, u32)> {
     (width >= 200 && height >= 80).then_some((x, y, width, height))
 }
 
+/// The strip the scale sweep is read over: inside the settled frame's
+/// red background, outside the frame at `scale_from` (0.6), so the frame's
+/// right edge crossing it is pixel evidence of the pop.
+const STRIP: (u32, u32, u32, u32) = (432, 200, 100, 80);
+
 fn region_mean(pixels: &image::DynamicImage, rect: (u32, u32, u32, u32)) -> f64 {
     let (x, y, width, height) = rect;
     pixels
@@ -215,9 +220,11 @@ focus_follows_mouse yes
     // ceiling): pixel evidence that the popup goes from absent to present
     // across the ramp. The exact curve is asserted from the render thread's
     // own alpha log below, which does not depend on capture latency.
+    let mut opening_strip = Vec::new();
     for name in ["mid-open-1.png", "mid-open-2.png", "mid-open-3.png"] {
-        capture(&display_env, &artifacts, name);
+        let pixels = capture(&display_env, &artifacts, name);
         opening.push(name.to_owned());
+        opening_strip.push(region_mean(&pixels, STRIP));
         thread::sleep(Duration::from_millis(500));
     }
 
@@ -273,6 +280,7 @@ focus_follows_mouse yes
     // Four captures across the 3s close fade: opacity falls, so the region
     // mean climbs toward the background. Capture cadence (~0.7s including
     // the compositor round-trip) resolves the ramp at this length.
+    let mut fading_strip = Vec::new();
     for (delay, name) in [
         (300, "fade-1.png"),
         (700, "fade-2.png"),
@@ -280,7 +288,8 @@ focus_follows_mouse yes
         (700, "fade-4.png"),
     ] {
         thread::sleep(Duration::from_millis(delay));
-        capture(&display_env, &artifacts, name);
+        let pixels = capture(&display_env, &artifacts, name);
+        fading_strip.push(region_mean(&pixels, STRIP));
     }
 
     state_with_phase(&state_path, sample_count, "pruned", Duration::from_secs(60));
@@ -302,11 +311,13 @@ focus_follows_mouse yes
         .map(|name| region_mean(&image::open(artifacts.join(name)).unwrap(), rect))
         .collect();
     let full = region_mean(&settled_image, rect);
+    let full_strip = region_mean(&settled_image, STRIP);
     let fading: Vec<f64> = ["fade-1.png", "fade-2.png", "fade-3.png", "fade-4.png"]
         .iter()
         .map(|name| region_mean(&image::open(artifacts.join(name)).unwrap(), rect))
         .collect();
     let pruned = region_mean(&image::open(artifacts.join("pruned.png")).unwrap(), rect);
+    let pruned_strip = region_mean(&image::open(artifacts.join("pruned.png")).unwrap(), STRIP);
 
     // --- Open fade: pixel evidence that the popup is present by the end
     // of the captures. The exact ramp shape is asserted from the render
@@ -361,10 +372,61 @@ focus_follows_mouse yes
         open_alphas.last().unwrap()
     );
 
+    // The living draw's own scale series, same lines: growing from the
+    // configured start scale to the settled 1.0, monotonically.
+    let open_scales: Vec<f64> = log
+        .lines()
+        .take(removal_line)
+        .filter(|line| line.contains("render_child_frame_start"))
+        .filter_map(|line| {
+            line.split("scale=")
+                .nth(1)
+                .and_then(|rest| rest.split_whitespace().next())
+                .and_then(|value| value.trim_end_matches(',').parse::<f64>().ok())
+        })
+        .filter(|scale| (*scale - 1.0).abs() > f64::EPSILON)
+        .collect();
+    assert!(
+        open_scales.len() >= 3,
+        "the living popup must have been drawn several times mid-pop"
+    );
+    assert!(
+        open_scales.windows(2).all(|pair| pair[1] >= pair[0]),
+        "open-fade scales must not shrink: {open_scales:?}"
+    );
+    assert!(
+        *open_scales.first().unwrap() < 0.75,
+        "the open pop must start from the configured scale: first {}",
+        open_scales.first().unwrap()
+    );
+    assert!(
+        (*open_scales.last().unwrap() - 1.0).abs() < 0.02,
+        "the open pop must settle at the full size: last {}",
+        open_scales.last().unwrap()
+    );
+
+    // --- Open pop: the scale sweeps the strip from background to covered.
+    // The frame grows out of its top-left anchor, so the strip -- covered
+    // by the settled frame, clear of it at the start scale -- is
+    // progressively eaten by red.
+    assert!(
+        opening_strip.windows(2).all(|pair| pair[0] > pair[1]),
+        "open-fade strip means must strictly fall as the frame grows: {opening_strip:?}"
+    );
+    assert!(
+        opening_strip[0] > background - 0.1,
+        "the strip must start as background at the start scale: {}",
+        opening_strip[0]
+    );
     // --- Settled: fully opaque popup over the background ---
     assert!(
         full < background - 0.2,
         "settled popup ({full:.3}) must be clearly present over the background ({background:.3})"
+    );
+    assert!(
+        (full_strip - opening_strip[2]).abs() < 0.05,
+        "the settled strip must match the last mid-open strip (both covered): {full_strip:.3} vs {}",
+        opening_strip[2]
     );
 
     // --- Close fade: strictly brightening toward the background. The
@@ -386,10 +448,20 @@ focus_follows_mouse yes
         fading[3]
     );
 
+    // --- Close pop: the shrinking frame uncovers the strip again.
+    assert!(
+        fading_strip.windows(2).all(|pair| pair[1] > pair[0]),
+        "close-fade strip means must strictly rise as the frame shrinks: {fading_strip:?}"
+    );
+
     // --- Pruned: the popup is gone; the region reads as plain background ---
     assert!(
         (pruned - background).abs() < 0.02,
         "pruned region ({pruned:.3}) must equal the pre-popup background ({background:.3})"
+    );
+    assert!(
+        (pruned_strip - background).abs() < 0.02,
+        "pruned strip ({pruned_strip:.3}) must equal the pre-popup background ({background:.3})"
     );
 
     // --- The render thread's own log carries the dying alpha series ---
@@ -419,5 +491,36 @@ focus_follows_mouse yes
         *alphas.last().unwrap() < 0.1,
         "the fade must reach opacity: last {}",
         alphas.last().unwrap()
+    );
+
+    // The dying frame's own scale series, same lines: shrinking from the
+    // settled 1.0 toward the configured start scale, monotonically.
+    let dying_scales: Vec<f64> = log
+        .lines()
+        .filter(|line| line.contains("render_dying_child_frame"))
+        .filter_map(|line| {
+            line.split("scale=")
+                .nth(1)
+                .and_then(|rest| rest.split_whitespace().next())
+                .and_then(|value| value.trim_end_matches(',').parse::<f64>().ok())
+        })
+        .collect();
+    assert!(
+        dying_scales.len() >= 3,
+        "the dying frame must have been drawn several times mid-shrink"
+    );
+    assert!(
+        dying_scales.windows(2).all(|pair| pair[1] <= pair[0]),
+        "dying-frame scales must not grow: {dying_scales:?}"
+    );
+    assert!(
+        *dying_scales.first().unwrap() > 0.98,
+        "the close pop must start at the settled size: first {}",
+        dying_scales.first().unwrap()
+    );
+    assert!(
+        *dying_scales.last().unwrap() < 0.75,
+        "the close pop must shrink past the start scale's neighborhood: last {}",
+        dying_scales.last().unwrap()
     );
 }

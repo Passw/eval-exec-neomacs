@@ -19,6 +19,8 @@
 ;; display host is live.
 (defvar child-frame-animation-slowdown 20.0)
 (defvar child-frame-animation-open-slide-pixels 0.0)
+(defvar child-frame-animation-open-scale-from 0.6)
+(defvar child-frame-animation-close-scale-from 0.6)
 
 (defvar child-frame-animation-sample 0)
 (defvar child-frame-animation-popup nil)
@@ -40,6 +42,14 @@
   ;; sample reads one fixed region. The slide itself is pinned by unit tests.
   (customize-set-variable
    'neomacs-child-frame-open-slide-pixels child-frame-animation-open-slide-pixels)
+  ;; The pop: both fades scale the frame between 60% and 100% of its
+  ;; settled size, anchored at its top-left, so the pixel test can watch
+  ;; the frame's right edge sweep across a strip that the settled frame
+  ;; covers and the start scale does not.
+  (customize-set-variable
+   'neomacs-child-frame-open-scale-from child-frame-animation-open-scale-from)
+  (customize-set-variable
+   'neomacs-child-frame-close-scale-from child-frame-animation-close-scale-from)
   (switch-to-buffer (get-buffer-create "*child-frame-animation-parent*"))
   (insert "parent content line\n")
   ;; Publish before any popup exists: the test takes its background
