@@ -1097,7 +1097,9 @@ impl ScanState {
                 let next_tab_x = (1.0 + (x / tab_width).floor()) * tab_width;
                 let advance = (next_tab_x - x).max(0.0);
                 if self.line.pixels == 0.0 {
-                    self.advance_columns(advance / self.cell.width);
+                    // A text-only row's stops are whole columns; rounding the
+                    // division keeps that exact for a fractional cell width.
+                    self.advance_columns((advance / self.cell.width).round());
                 } else {
                     self.push_element(ElementExtent {
                         advance,
