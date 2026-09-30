@@ -2047,3 +2047,105 @@ fn backward_page_growth_handles_different_physical_line_lengths() {
         calls.get()
     );
 }
+
+#[test]
+fn pixel_only_queries_reuse_rows_when_point_is_outside_the_viewport() {
+    use crate::engine::viewport_retry_depth_probe as probe;
+    use neovm_core::window::WindowLayoutQueryScope;
+    for decoration in [
+        "nil",
+        "(put-text-property 1 121 'face '(:height 1.5))",
+        r#"(progn (put-text-property 1 121 'line-height 1.3)
+            (put-text-property 31 35 'display '(raise 0.2))
+            (let ((o (make-overlay 90 110)))
+              (overlay-put o 'before-string "prefix")
+              (overlay-put o 'after-string "suffix")
+              (overlay-put o 'face '(:height 1.2))))"#,
+    ] {
+        let mut eval = Context::new();
+        let buffer = eval.buffer_manager().current_buffer().unwrap().id();
+        eval.buffer_manager_mut()
+            .get_mut(buffer)
+            .unwrap()
+            .insert(&"ordinary row\n".repeat(200));
+        let frame = eval
+            .frame_manager_mut()
+            .create_frame("query-outside-point", 400, 170, buffer);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        let window = eval.frame_manager().get(frame).unwrap().selected_window;
+        eval.eval_str("(setq mode-line-format nil header-line-format nil tab-line-format nil) (goto-char 1000) (set-window-vscroll nil 2 t t)").unwrap();
+        eval.eval_str(decoration).unwrap();
+        let mut query = LayoutEngine::new_without_font_metrics();
+        let initial = query
+            .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+            .unwrap();
+        let snapshot = initial.geometry().unwrap();
+        assert!(
+            snapshot.logical_cursor.is_none(),
+            "fixture has visible logical cursor: {decoration}"
+        );
+        assert!(
+            snapshot.phys_cursor.is_none(),
+            "fixture has visible physical cursor: {decoration}"
+        );
+        assert!(
+            snapshot
+                .point_for_buffer_pos(neovm_core::buffer::LispCharPos1::from_one_based_usize(1000))
+                .is_none()
+        );
+        let mut reused = 0;
+        for pixels in 3..16 {
+            eval.eval_str(&format!("(set-window-vscroll nil {pixels} t t)"))
+                .unwrap();
+            probe::reset();
+            let actual = query
+                .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+                .unwrap();
+            reused += usize::from(probe::max_depth() == 0);
+            let mut fresh = WindowLayoutQueryEngine::new_without_font_metrics();
+            let expected = fresh
+                .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+                .unwrap();
+            assert_eq!(actual.end(), expected.end(), "{decoration} pixels={pixels}");
+            assert_eq!(
+                actual.geometry(),
+                expected.geometry(),
+                "{decoration} pixels={pixels}"
+            );
+        }
+        if decoration.contains("line-height") {
+            // Fractional line heights round adjacent rows differently; the
+            // unchanged-row placement guard intentionally stays conservative.
+            assert_eq!(reused, 0, "noncontiguous rows reused: {decoration}");
+        } else {
+            assert!(
+                reused > 0,
+                "unchanged cursorless rows walked again: {decoration}"
+            );
+        }
+        for change in [
+            "(goto-char 1001)",
+            "(put-text-property 1 8 'face '(:height 175))",
+            r#"(overlay-put (make-overlay 1 20) 'display "replacement")"#,
+        ] {
+            eval.eval_str(change).unwrap();
+            probe::reset();
+            let actual = query
+                .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+                .unwrap();
+            assert!(
+                probe::max_depth() > 0,
+                "cursorless query reused changed inputs: {change}"
+            );
+            let mut fresh = WindowLayoutQueryEngine::new_without_font_metrics();
+            let expected = fresh
+                .query_window_layout(&mut eval, frame, window, WindowLayoutQueryScope::Viewport)
+                .unwrap();
+            assert_eq!(actual.end(), expected.end(), "{change}");
+            assert_eq!(actual.geometry(), expected.geometry(), "{change}");
+        }
+    }
+}

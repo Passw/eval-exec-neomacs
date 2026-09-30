@@ -49,25 +49,29 @@ pub(super) fn reposition(
     {
         return None;
     }
-    // Cursor clipping is not a translation. Only re-place a cursor whose
-    // source row is fully visible before and after the move.
-    let point = snapshot.point_for_buffer_pos(source_point)?;
-    let point_row = snapshot.rows.iter().find(|row| row.row == point.row)?;
-    for offset in [0, dy] {
-        if point_row.y.checked_add(offset)? < top
-            || point_row
-                .y
-                .checked_add(point_row.height)?
-                .checked_add(offset)?
-                > bottom
-        {
-            return None;
-        }
-        if let Some(cursor) = &snapshot.phys_cursor
-            && (cursor.y.checked_add(offset)? < 0
-                || cursor.y.checked_add(cursor.height)?.checked_add(offset)? > bottom - top)
-        {
-            return None;
+    // An unchanged row set keeps an absent cursor absent. Visible cursors
+    // still need the clipping checks before their coordinates can translate.
+    if snapshot.logical_cursor.is_some() || snapshot.phys_cursor.is_some() {
+        // Cursor clipping is not a translation. Only re-place a cursor whose
+        // source row is fully visible before and after the move.
+        let point = snapshot.point_for_buffer_pos(source_point)?;
+        let point_row = snapshot.rows.iter().find(|row| row.row == point.row)?;
+        for offset in [0, dy] {
+            if point_row.y.checked_add(offset)? < top
+                || point_row
+                    .y
+                    .checked_add(point_row.height)?
+                    .checked_add(offset)?
+                    > bottom
+            {
+                return None;
+            }
+            if let Some(cursor) = &snapshot.phys_cursor
+                && (cursor.y.checked_add(offset)? < 0
+                    || cursor.y.checked_add(cursor.height)?.checked_add(offset)? > bottom - top)
+            {
+                return None;
+            }
         }
     }
     let mut placed = snapshot.clone();
