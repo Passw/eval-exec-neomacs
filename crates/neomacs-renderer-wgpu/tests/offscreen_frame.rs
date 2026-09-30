@@ -2146,125 +2146,65 @@ fn drive_banded_load(
     partial
 }
 
-/// Mitchell–Netravali with `B = C = 1/3`, from the paper's `B`/`C` form.
-///
-/// The kernel the banded path filters with, stated here rather than reached
-/// into the crate for, so the acceptance test's expectation does not depend on
-/// the implementation it checks.
-fn mitchell(distance: f64) -> f64 {
-    const B: f64 = 1.0 / 3.0;
-    const C: f64 = 1.0 / 3.0;
-    let x = distance.abs();
-    let (square, cube) = (x * x, x * x * x);
-    let branches = if x < 1.0 {
-        (12.0 - 9.0 * B - 6.0 * C) * cube + (-18.0 + 12.0 * B + 6.0 * C) * square + (6.0 - 2.0 * B)
-    } else if x < 2.0 {
-        (-B - 6.0 * C) * cube
-            + (6.0 * B + 30.0 * C) * square
-            + (-12.0 * B - 48.0 * C) * x
-            + (8.0 * B + 24.0 * C)
-    } else {
-        0.0
-    };
-    branches / 6.0
-}
-
-/// One unit of weight, the divisor a weight is stored in.
-const WEIGHT_ONE: f64 = 65536.0;
-
-/// The resample of `rgba` into `raster`, one axis at a time, written out the
-/// obvious way: every output sample walks the inputs its support covers and
-/// weights each by the kernel.
+/// The area average of `rgba` into `raster`, one axis at a time, written out
+/// the obvious way: every output sample walks the inputs it covers and weights
+/// each by the overlap.
 ///
 /// This is the definition the banded path implements with a streaming target,
 /// stated here so the acceptance test's expectation is independent of that
-/// implementation. Output `o` is centred at `(o + 0.5) * n / m` in input
-/// coordinates, where input texel `i` spans `[i, i + 1)`; the kernel's support
-/// is two output texels, so it is `2n/m` input texels either side, and a tap is
-/// any texel whose centre lies inside that. Weights are the kernel's value at
-/// each tap, scaled by [`WEIGHT_ONE`] and normalized by the sum of the taps
-/// that fell inside the source; the sample is the weighted sum divided by the
-/// sum of the *quantized* weights, rounded, and clamped to `[0, 255]` because a
-/// kernel with negative lobes can leave the range its inputs span.
-///
-/// An axis with as many outputs as inputs is copied rather than filtered: that
-/// is what the path promises for an image shown at its own size, and it is the
-/// one place the definition is deliberately not the kernel, whose taps at scale
-/// one weigh `1/18, 8/9, 1/18, 0` rather than an impulse.
-fn mitchell_resample(
+/// implementation. An output covers the input interval `[o * n / m, (o + 1) *
+/// n / m)` and an input covers `[i, i + 1)`; their overlap, in units of `1/m`,
+/// is the weight, and one output's weights sum to `n`.
+fn area_average(
     rgba: &[u8],
     (width, height): (u32, u32),
     (out_width, out_height): (u32, u32),
 ) -> Vec<u8> {
-    /// The taps of one output, as `(input index, weight)`.
-    fn taps(centre: f64, scale: f64, input: u32) -> (Vec<(usize, f64)>, f64) {
-        let half = 2.0 * scale;
-        let first = ((centre - half - 0.5).floor().max(0.0)) as u32;
-        let last = ((centre + half - 0.5).ceil().min(f64::from(input - 1))) as u32;
-        let weighted: Vec<(usize, f64)> = (first..=last)
-            .map(|i| (i as usize, ((f64::from(i) + 0.5) - centre).abs() / scale))
-            .map(|(i, distance)| (i, mitchell(distance)))
-            .collect();
-        let sum = weighted.iter().map(|(_, weight)| *weight).sum();
-        (weighted, sum)
+    fn weights(lo: u64, hi: u64, step: u64) -> impl Iterator<Item = (usize, u64)> {
+        (lo / step..hi.div_ceil(step)).filter_map(move |i| {
+            let overlap = hi.min((i + 1) * step) - lo.max(i * step);
+            (overlap > 0).then_some((i as usize, overlap))
+        })
     }
-    let round = |sum: i64, total: i64| (sum + total / 2).div_euclid(total).clamp(0, 255) as u8;
-    let texel = |row: &[u8], at: usize, sums: &mut [i64; 4], weight: i64| {
-        for (c, sum) in sums.iter_mut().enumerate() {
-            *sum += weight * i64::from(row[at + c]);
-        }
-    };
+    let round = |sum: u64, total: u64| ((sum + total / 2) / total) as u8;
 
     let mut lines = Vec::with_capacity(height as usize * out_width as usize * 4);
-    let x_scale = f64::from(width) / f64::from(out_width);
     for row in rgba.chunks_exact(width as usize * 4) {
         let mut line = vec![0_u8; out_width as usize * 4];
-        if width == out_width {
-            line.copy_from_slice(row);
-            lines.extend_from_slice(&line);
-            continue;
-        }
-        for (o, out) in line.chunks_exact_mut(4).enumerate() {
-            let (taps, sum) = taps((o as f64 + 0.5) * x_scale, x_scale, width);
-            let mut sums = [0_i64; 4];
-            let mut total = 0_i64;
-            for (i, weight) in taps {
-                let weight = (weight * WEIGHT_ONE / sum).round() as i64;
-                total += weight;
-                texel(row, i * 4, &mut sums, weight);
+        for (o, texel) in line.chunks_exact_mut(4).enumerate() {
+            let (lo, hi) = (
+                o as u64 * u64::from(width),
+                (o as u64 + 1) * u64::from(width),
+            );
+            let mut sums = [0_u64; 4];
+            for (i, weight) in weights(lo, hi, u64::from(out_width)) {
+                for (c, sum) in sums.iter_mut().enumerate() {
+                    *sum += weight * u64::from(row[i * 4 + c]);
+                }
             }
-            for (channel, sum) in out.iter_mut().zip(sums) {
-                *channel = round(sum, total);
+            for (channel, sum) in texel.iter_mut().zip(sums) {
+                *channel = round(sum, u64::from(width));
             }
         }
         lines.extend_from_slice(&line);
     }
 
     let mut out = vec![0_u8; out_width as usize * out_height as usize * 4];
-    let y_scale = f64::from(height) / f64::from(out_height);
     for column in 0..out_width as usize {
         for o in 0..out_height {
+            let (lo, hi) = (
+                u64::from(o) * u64::from(height),
+                (u64::from(o) + 1) * u64::from(height),
+            );
+            let mut sums = [0_u64; 4];
+            for (i, weight) in weights(lo, hi, u64::from(out_height)) {
+                for (c, sum) in sums.iter_mut().enumerate() {
+                    *sum += weight * u64::from(lines[i * out_width as usize * 4 + column * 4 + c]);
+                }
+            }
             let at = (o as usize * out_width as usize + column) * 4;
-            if height == out_height {
-                let from = (o as usize * out_width as usize + column) * 4;
-                out[at..at + 4].copy_from_slice(&lines[from..from + 4]);
-                continue;
-            }
-            let (taps, sum) = taps((f64::from(o) + 0.5) * y_scale, y_scale, height);
-            let mut sums = [0_i64; 4];
-            let mut total = 0_i64;
-            for (i, weight) in taps {
-                let weight = (weight * WEIGHT_ONE / sum).round() as i64;
-                total += weight;
-                texel(
-                    &lines,
-                    (i * out_width as usize + column) * 4,
-                    &mut sums,
-                    weight,
-                );
-            }
             for (channel, sum) in out[at..at + 4].iter_mut().zip(sums) {
-                *channel = round(sum, total);
+                *channel = round(sum, u64::from(height));
             }
         }
     }
@@ -2277,16 +2217,16 @@ fn mitchell_resample(
 ///
 /// The expected bytes are stated here without reference to the cache: `image`'s
 /// own decode of the fixture, reduced to the raster the texture limit clamps it
-/// to by the Mitchell resample above.
+/// to by the area average above.
 ///
 /// This replaces an equality against `image::imageops::resize(…, Lanczos3)`.
 /// That contract said a banded decode ends as the *whole-image path's* bytes,
 /// which was true while both paths resampled with Lanczos3 and is exactly what
-/// step 4 changes: the banded path now decodes straight into its target, so
-/// there is no whole-image buffer for it to agree with. The contract that
-/// survives — and that this test is — is that the finished texture is the bytes
-/// the decode's own filter defines, and that the bands along the way fill it
-/// from row zero.
+/// step 4 changes: the banded path now decodes straight into its target with a
+/// box filter, so there is no whole-image buffer for it to agree with. The
+/// contract that survives — and that this test is — is that the finished
+/// texture is the bytes the decode's own filter defines, and that the bands
+/// along the way fill it from row zero.
 #[test]
 fn a_banded_image_ends_in_the_texture_its_own_filter_defines() {
     let Some(mut h) = try_harness() else {
@@ -2332,14 +2272,14 @@ fn a_banded_image_ends_in_the_texture_its_own_filter_defines() {
     let whole = image::load_from_memory(&data)
         .expect("the fixture decodes")
         .to_rgba8();
-    let expected = mitchell_resample(whole.as_raw(), (width, height), (4096, 819));
+    let expected = area_average(whole.as_raw(), (width, height), (4096, 819));
     assert_eq!(
         read_back, expected,
-        "the finished texture must be the Mitchell resample of the source"
+        "the finished texture must be the area average of the source"
     );
-    // The control: the whole-image path's Lanczos3 resize to the same raster is
-    // a different picture, so the equality above is a statement about the
-    // banded path's filter and not about any resample.
+    // The control: the filter this replaced — the whole-image path's Lanczos3
+    // resize to the same raster — is a different picture, so the equality above
+    // is a statement about the banded path's filter and not about any resample.
     let lanczos = image::imageops::resize(&whole, 4096, 819, image::imageops::FilterType::Lanczos3)
         .into_raw();
     assert_ne!(
