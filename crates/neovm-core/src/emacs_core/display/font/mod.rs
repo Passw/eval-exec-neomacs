@@ -3887,6 +3887,42 @@ pub(crate) fn font_match_p(args: Vec<Value>) -> EvalResult {
 /// an already-cached ID, then dispatch to the opened font driver.  Neomacs's
 /// shaping driver is not yet exposed at this Lisp seam, so an uncached valid
 /// gstring currently reports no shaped result.
+/// Family and pixel size of an opened font object, for shapers outside
+/// neovm-core (the gstring shaping driver lives in the display layer).
+pub fn font_object_family_and_pixel_size(value: &Value) -> Option<(String, f64)> {
+    let data = value.as_font_data()?;
+    let mut family = None;
+    let mut pixel_size = None;
+    // fields: keyword/value pairs after the FONT_OBJECT tag.
+    let mut index = 1;
+    while index + 1 < data.fields.len() {
+        let key = data.fields[index].as_keyword()?;
+        let keyword = key.as_symbol_name().unwrap_or("");
+        let value = &data.fields[index + 1];
+        match keyword {
+            "family" => {
+                family = value
+                    .as_symbol_name()
+                    .map(str::to_owned)
+                    .or_else(|| value.as_utf8_str());
+            }
+            "size" | "height" => {
+                pixel_size = value
+                    .as_fixnum()
+                    .map(|n| n as f64)
+                    .or_else(|| value.as_float());
+            }
+            _ => {}
+        }
+        index += 2;
+    }
+    let family = family?;
+    let pixel_size = pixel_size
+        .or_else(|| Some(data.metrics.pixel_size()?))
+        .unwrap_or(14.0);
+    Some((family, pixel_size))
+}
+
 /// The result of a font-shaper driver over one gstring — GNU's
 /// `font->driver->shape` return contract (src/font.c Ffont_shape_gstring).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
