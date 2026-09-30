@@ -1944,40 +1944,64 @@ impl<'layout, 'row, 'measurer> DisplayRowProgressWriter<'layout, 'row, 'measurer
                         .with_box_vertical_edges(box_vertical_edges)
                         .with_pointer_appearance(pointer_appearance.clone()),
                 );
+                let appended_is_stretch = self.writer.row.glyphs
+                    [self.writer.area_index()][before_len..]
+                    .iter()
+                    .any(|glyph| matches!(glyph.glyph_type, GlyphType::Stretch { .. }));
                 let mut status = DisplayRowAppendStatus::Complete;
                 if written.has_positive_width()
                     && self.position.x_px() + written.width_px() > self.max_x_px
                     && right_edge_admission == DisplayItemRightEdgeAdmission::EnforceRowBoundary
                 {
                     let available_px = (self.max_x_px - self.position.x_px()).max(0.0);
-                    match self.writer.overflow_policy() {
-                        DisplayRowOverflowPolicy::RejectOverflowingGlyph
-                        | DisplayRowOverflowPolicy::ClipToStructuralLane
-                            if available_px <= 0.0 =>
-                        {
-                            checkpoint.restore(self.writer.row);
-                            return DisplayRowAppendProgress::new(
-                                start,
-                                self.position,
-                                metrics,
-                                DisplayRowAppendStatus::Clipped,
-                                slots,
-                            );
-                        }
-                        DisplayRowOverflowPolicy::RejectOverflowingGlyph => {
-                            checkpoint.restore(self.writer.row);
-                            return DisplayRowAppendProgress::new(
-                                start,
-                                self.position,
-                                metrics,
-                                DisplayRowAppendStatus::Clipped,
-                                slots,
-                            );
-                        }
-                        DisplayRowOverflowPolicy::ClipToStructuralLane => {
-                            self.clip_new_glyphs_to_available_width(before_len, available_px);
-                            written = self.metrics_since(before_len);
-                            status = DisplayRowAppendStatus::Clipped;
+                    // GNU `append_stretch_glyph` crops a stretch glyph to the
+                    // visible room while `display_line` advances
+                    // `it->current_x` by the FULL `it->pixel_width`
+                    // (src/xdisp.c): the row is then over-full, every
+                    // following element finds no room, and a truncating row
+                    // ends with the truncation glyph in the last column.
+                    // Rejecting the stretch whole left the pen unmoved and
+                    // silently consumed the spec — issue #446's `:align-to`
+                    // row went on painting the text that follows it
+                    // (`EEEE-000FF$` where GNU shows `EEEE-000  $`).
+                    let stretch_overflows_truncating_row = appended_is_stretch
+                        && self.writer.layout.role == GlyphRowRole::Text
+                        && self.writer.layout.line_wrap == DisplayRowLineWrap::Truncate;
+                    if stretch_overflows_truncating_row {
+                        // Keep the appended glyph: its cells are cropped at
+                        // the window by the raster, and the pen advances by
+                        // the full width below, exactly as GNU's does.
+                        status = DisplayRowAppendStatus::Clipped;
+                    } else {
+                        match self.writer.overflow_policy() {
+                            DisplayRowOverflowPolicy::RejectOverflowingGlyph
+                            | DisplayRowOverflowPolicy::ClipToStructuralLane
+                                if available_px <= 0.0 =>
+                            {
+                                checkpoint.restore(self.writer.row);
+                                return DisplayRowAppendProgress::new(
+                                    start,
+                                    self.position,
+                                    metrics,
+                                    DisplayRowAppendStatus::Clipped,
+                                    slots,
+                                );
+                            }
+                            DisplayRowOverflowPolicy::RejectOverflowingGlyph => {
+                                checkpoint.restore(self.writer.row);
+                                return DisplayRowAppendProgress::new(
+                                    start,
+                                    self.position,
+                                    metrics,
+                                    DisplayRowAppendStatus::Clipped,
+                                    slots,
+                                );
+                            }
+                            DisplayRowOverflowPolicy::ClipToStructuralLane => {
+                                self.clip_new_glyphs_to_available_width(before_len, available_px);
+                                written = self.metrics_since(before_len);
+                                status = DisplayRowAppendStatus::Clipped;
+                            }
                         }
                     }
                 }

@@ -392,7 +392,13 @@ fn display_row_progress_writer_clips_glyphless_before_row_mutation() {
 }
 
 #[test]
-fn display_row_progress_writer_clips_stretch_before_row_mutation() {
+fn display_row_progress_writer_keeps_a_right_edge_crossing_stretch_at_full_advance() {
+    // GNU `append_stretch_glyph` (xdisp.c) appends the stretch glyph at its
+    // FULL resolved width -- the painting crops it at the window -- and
+    // `display_line` advances `it->current_x` by that full width, so the row
+    // is over-full and the text after the stretch is not drawn (issue #446:
+    // rejecting the stretch whole left the pen unmoved and painted the text
+    // that follows it).
     let mut row = neomacs_display_protocol::glyph_matrix::GlyphRow::new(GlyphRowRole::Text);
     let row_layout = layout();
     let mut writer = DisplayRowProgressWriter::new(
@@ -405,10 +411,14 @@ fn display_row_progress_writer_clips_stretch_before_row_mutation() {
     let progress = writer.push_item(stretch_item(DisplayLength::Pixels(24.0)));
 
     assert_eq!(progress.status(), DisplayRowAppendStatus::Clipped);
-    assert_eq!(progress.end(), DisplayRowPosition::new(64.0, 8));
-    assert!(progress.slots().is_empty());
-    assert!(row.glyphs[GlyphArea::Text.index()].is_empty());
-    assert!(!row.displays_text);
+    assert_eq!(progress.end(), DisplayRowPosition::new(88.0, 11));
+    assert_eq!(row.glyphs[GlyphArea::Text.index()].len(), 1);
+    assert_eq!(
+        row.glyphs[GlyphArea::Text.index()][0].pixel_width,
+        24.0,
+        "the stretch glyph is kept whole; the display crops it at the window"
+    );
+    assert!(row.displays_text);
 }
 
 #[test]

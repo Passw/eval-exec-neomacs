@@ -24438,6 +24438,79 @@ fn face_boundary_on_zero_width_extender_keeps_row_glyphs() {
     );
 }
 
+#[test]
+fn align_to_stretch_past_the_right_edge_truncates_like_gnu() {
+    // Issue #446 (static half): with truncation on, a `(space :align-to N)`
+    // whose target lies past the window's usable right edge must NOT collapse
+    // so the text after it paints inside the window. GNU clips the stretch at
+    // the edge, advances the pen by the FULL resolved width, and truncates the
+    // row there: the following text is undrawn and the last column carries the
+    // truncation glyph (xdisp.c display_line; the issue's `EEEE-000  $` vs
+    // Neomacs's `EEEE-000FF$`).
+    let text = "EEEE\u{0020}FFFF tail\n";
+    let mut eval = Context::new();
+    let buf_id = eval
+        .buffer_manager()
+        .current_buffer()
+        .expect("current buffer")
+        .id();
+    {
+        let buf = eval.buffer_manager_mut().get_mut(buf_id).expect("buffer");
+        buf.insert(text);
+    }
+    eval.buffer_manager_mut().set_current(buf_id);
+    // The recipe's `M-x toggle-truncate-lines`: the row must truncate, not wrap.
+    eval.eval_str("(setq truncate-lines t)").expect("truncate lines");
+    // 1-based chars [5, 6) = the space; its display spec targets column 105 in
+    // a 100-column window, so FFFF would start entirely PAST the edge — GNU
+    // draws none of it.
+    eval.eval_str("(put-text-property 5 6 'display '(space :align-to 105))")
+        .expect("align-to space spec");
+    let frame_id = eval
+        .frame_manager_mut()
+        .create_frame("align-to-past-right-edge", 100, 160, buf_id);
+    {
+        let frame = eval.frame_manager_mut().get_mut(frame_id).expect("frame");
+        frame.char_width = 1.0;
+        frame.char_height = 1.0;
+    }
+    let selected_window = eval
+        .frame_manager()
+        .get(frame_id)
+        .expect("frame")
+        .selected_window;
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame_id);
+    let state = engine
+        .last_frame_display_state
+        .as_ref()
+        .expect("display state");
+    let entry = state
+        .window_matrices
+        .iter()
+        .find(|entry| entry.window_id.get() == selected_window.0 as i64)
+        .expect("selected window matrix");
+    let rows: Vec<_> = entry
+        .matrix
+        .rows
+        .iter()
+        .filter(|row| row.enabled && row.role == GlyphRowRole::Text)
+        .cloned()
+        .collect();
+    assert!(rows.len() >= 2, "both lines must lay out");
+    let text_glyphs = &rows[0].glyphs[GlyphArea::Text.index()];
+    // GNU's row: `EEEE` (the text before the spec), the stretch's cells
+    // cropped to the window as blanks, and the truncation glyph in the LAST
+    // column — 100 cells for the 100-column frame. The text after the spec is
+    // undrawn.
+    let expected = format!("EEEE{}$", " ".repeat(95));
+    assert_eq!(
+        glyphs_logical_text(text_glyphs),
+        expected,
+        "a past-the-edge align-to stretch must fill its row and truncate,          leaving the text after it undrawn"
+    );
+}
+
 /// Engagement proof for the composed-cluster extension (flag-on suite gate):
 /// a combining-mark row must actually take the routed acquisition.
 /// Trivially passes when the flag is off.
