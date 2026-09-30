@@ -119,21 +119,25 @@ verifies the options still match the Rust schema at load time.
 (setq neomacs-child-frame-animations-off t)             ; reclaim it all
 ```
 
-## Known scope cuts
+## Shipped after the first pass
 
-* `child-frame-resize` is wired but instant today. The glyph content of a
-  child frame is fixed per update, so a geometry animation between two sizes
-  would stretch one picture across both rects. The honest implementation is
-  a content crossfade between two updates (snapshot ring keyed per child) —
-  the slot and its policy plumbing are ready for it.
-* Scale/pop-in (a scale term around the frame's origin) is not implemented:
-  it needs a scale+pivot term in the glyph pipeline, which the 16-byte shared
-  uniform snapshot has no room for. Fade+slide covers the value a pop-in
-  reads as.
-* Dying frames draw beneath all living frames rather than interleaved at
-  their exact z-path. For the common one-popup-at-a-time dismissal this is
-  indistinguishable; interleaving would require merging two z-ordered
-  streams at draw time.
+* **Scale/pop-in** (`scale_from`, default 1.0 — off). The shared uniform
+  snapshot grew to 32 bytes carrying `content_scale` and `content_pivot`;
+  seven shaders scale positions away from the anchor, the rounded-rect SDF
+  scales its rect bounds and thins its border width and radius by the same
+  factor, and the CPU-built chrome geometry scales identically. The identity
+  normalizes to (1.0, origin) so every settled frame reuses the exact
+  draw-parameters entry the pre-scale pipeline produced.
+* **Resize content crossfade**: a size-changing update leases the previous
+  presentation's picture from the snapshot pool, paints it, and crossfades —
+  the old picture fading out beneath the new frame, whose alpha rides the
+  mix — over the resize slot's curve. Ships off (`resize` slot disabled by
+  default); any failure (slot off, size unchanged, pool refusing the lease)
+  degrades to GNU's instant swap. Leases return on finish and on device
+  loss.
+* **Dying frames interleave** into the z-ordered draw (`merged_render_order`),
+  a corpse drawing before a living frame at equal z — the dismissed popup
+  recedes beneath the popup that replaced it.
 
 **The retained-static texture must not freeze a fade.** The retained
 cursorless scene is rebuilt only on a scene-generation change, and a
@@ -163,10 +167,13 @@ render thread's own readback deliberately sees only the root scene). With
 * after the prune, the popup's region equals the pre-popup background —
   the corpse's pixels are actually cleared, which is what the
   retained-texture fixes above exist to guarantee;
+* the resize content crossfade: the popup grows mid-life, the strip beyond
+  its old size fills with red as the new picture fades in (strictly falling
+  captures, the crossfade's own mix series rising from < 0.5 in the log);
 * `compositor_remove animated=true` and the retire/prune lifecycle in the
   log.
 
-Stable across three consecutive runs (~16s each). Unit coverage: protocol
+Stable across seven consecutive runs (~20s each). Unit coverage: protocol
 (motion conversion, clamp semantics, registry round-trip), manager
 (sampling, carry-over, instant no-op, retire-to-dying subtree semantics,
 instant close, resurrection on re-delivery, prune timing, dying z-order),
