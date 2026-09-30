@@ -597,13 +597,19 @@ impl DisplayRowTextOverflowDecision {
             // both its cells with the truncation glyph
             // (xdisp.c:26611-26641). This port refuses it here and writes
             // blank + marker — a tracked one-cell divergence (the upstream
-            // ibuffer_truncated_wide_name test). Admitting the glyph from
-            // this fit check alone regresses worse: the append ends through
-            // the writer's Clipped status path, which never raises the
-            // Truncated row flag, and the marker disappears entirely. The
-            // admission must route through the overflow arm (or the Clipped
-            // path must raise the flag) — see the marker-fill support in
-            // RightEdgeMarkerItemSource, already in place.
+            // ibuffer_truncated_wide_name test, pinned at the engine level
+            // by wide_char_cut_at_truncation_edge_leaves_both_cells_to_the_marker).
+            //
+            // Admitting it is NOT a local change: an attempted routing
+            // (WideCutTruncate through the overflow arm, appending via the
+            // prepared append before the truncation skip) corrupted the
+            // FOLLOWING line's point/face bookkeeping — the appended glyph
+            // bypasses the walk's face-checkpoint lifecycle, so the next
+            // line's face runs resolved one character off (missing point for
+            // the line's first char, fallback-width 好 glyphs). The
+            // marker-fill support (RightEdgeMarkerItemSource's marker-filled
+            // padding) is in place; the admission must integrate with the
+            // face-scan/checkpoint lifecycle first.
             Self::Truncate
         } else if word_wrap.has_candidate() {
             Self::WordWrap {

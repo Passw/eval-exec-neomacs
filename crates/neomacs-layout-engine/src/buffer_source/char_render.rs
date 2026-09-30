@@ -205,7 +205,12 @@ pub(crate) fn render_source_char_and_apply<B: LayoutBufferView>(
             loop_context.frame_background(),
         ),
     )
-    .render_if_needed_and_apply(source_walk, text, state.reborrow());
+    .render_if_needed_and_apply(
+        append_context,
+        source_walk,
+        text,
+        state.reborrow(),
+    );
     if overflow_outcome.should_break() {
         return BufferSourceItemRenderOutcome::Stop;
     }
@@ -371,7 +376,7 @@ fn render_display_table_vector_and_apply<B: LayoutBufferView>(
                 state.progress.apply_row_position(append_progress.end());
                 if params.wrap_mode == crate::types::LineWrapMode::Truncate {
                     let overflow_outcome = BufferSourceOverflowRenderRequest::new(
-                        prepared_append,
+                        &prepared_append,
                         source_step_char,
                         BufferSourceOverflowRenderContext::new(
                             source_step_char.ch(),
@@ -391,6 +396,7 @@ fn render_display_table_vector_and_apply<B: LayoutBufferView>(
                         ),
                     )
                     .render_if_needed_and_apply(
+                        append_context,
                         source_walk,
                         text,
                         state.reborrow(),

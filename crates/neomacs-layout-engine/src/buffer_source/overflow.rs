@@ -4,6 +4,7 @@
 //! special display items while delegating actual item appends to the shared row
 //! source append pipeline.
 
+use crate::buffer_source::item_append::BufferSourceRowAppendContext;
 use crate::buffer_source::loop_state::BufferSourceLoopMutableState;
 use crate::buffer_source::walk::{BufferSourceRewind, BufferSourceWalk};
 use crate::display_row::append_context::RightEdgeMarkerColumn;
@@ -178,8 +179,10 @@ impl<'a> BufferSourceOverflowRenderRequest<'a> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn render_if_needed_and_apply<B: LayoutBufferView>(
         self,
+        append_context: &BufferSourceRowAppendContext<'_, '_, B>,
         source_walk: &mut BufferSourceWalk<'_, B>,
         text: &[u8],
         state: BufferSourceLoopMutableState<'_, '_, '_>,

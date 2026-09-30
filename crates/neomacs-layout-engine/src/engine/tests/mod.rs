@@ -18470,6 +18470,7 @@ fn layout_frame_rust_keeps_mixed_width_advances_correct_after_mid_line_face_chan
         .redisplay_snapshot(selected_window)
         .expect("display snapshot");
     let all_points = snapshot.points.clone();
+    eprintln!("i446dbg all_points = {all_points:?}");
     let a = snapshot
         .point_for_buffer_pos(LispCharPos1::from_one_based_usize(sample_pos))
         .expect("a");
@@ -18596,6 +18597,7 @@ fn layout_frame_rust_keeps_face_positions_after_truncated_multibyte_line() {
         .redisplay_snapshot(selected_window)
         .expect("display snapshot");
     let all_points = snapshot.points.clone();
+    eprintln!("i446dbg all_points = {all_points:?}");
     let a = snapshot
         .point_for_buffer_pos(LispCharPos1::from_one_based_usize(sample_pos))
         .expect("a");

@@ -3992,7 +3992,7 @@ fn buffer_text_overflow_render_request_handles_character_wrap_transition() {
     let row_limit = context.row_limit;
     let table = FaceTable::new();
     let face_resolver = FaceResolver::new(&table, 0x00ffffff, 0x000000, 14.0, None);
-    let mut font_metrics = None;
+    let mut font_metrics: Option<FontMetricsService> = None;
     let mut cursor_info = CursorCaptureState::new();
     let mut face_ids = FrameFaceAttempt::for_test_with_next_id(1);
     context.builder.set_face_attempt(face_ids.clone());
@@ -4007,6 +4007,28 @@ fn buffer_text_overflow_render_request_handles_character_wrap_transition() {
         4,
     );
     let snapshot = current_buffer_snapshot(&context.eval, buf_id);
+    let resolver = FaceResolver::new(&FaceTable::new(), 0x00ffffff, 0x000000, 14.0, None);
+    let base = resolver.default_face().clone();
+    let mut font_metrics = None;
+    let measured = DisplayRowMeasurementPolicy::for_mode(DisplayRowMeasurementMode::LogicalCells)
+        .measured_face(
+            FaceId::new(7),
+            &base,
+            None,
+            8.0,
+            DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
+            &mut font_metrics,
+        );
+    let active_face = DisplayRowActiveFaceState::new(base, measured);
+    let append_context = BufferSourceRowAppendContext::new_with_face_attempt(
+        &snapshot,
+        buf_id,
+        &surface,
+        &active_face,
+        0.0,
+        DisplayRowFallbackMetrics::from_default_face_extents(8.0, 16.0, 12.0),
+        face_ids.clone(),
+    );
     let mut source_walk = BufferSourceWalk::new(buf_id, &snapshot, charpos, 0);
 
     let outcome = BufferSourceOverflowRenderRequest::new(
@@ -4034,6 +4056,7 @@ fn buffer_text_overflow_render_request_handles_character_wrap_transition() {
         ),
     )
     .render_if_needed_and_apply(
+        &append_context,
         &mut source_walk,
         text,
         BufferSourceLoopMutableState::new(
