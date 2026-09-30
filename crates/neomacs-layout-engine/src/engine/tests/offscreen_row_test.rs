@@ -3043,6 +3043,135 @@ fn rich_fractional_reversal_starts_the_nearest_physical_bridge() {
     check_short_urgent_backward_bridge(true);
 }
 
+#[test]
+fn fractional_reversal_extends_the_prepared_edge_instead_of_recapturing_it() {
+    check_fractional_reversal_prepared_edge(false);
+}
+
+#[test]
+fn fractional_reversal_restarts_preparation_after_the_queue_is_idle() {
+    check_fractional_reversal_prepared_edge(true);
+}
+
+fn check_fractional_reversal_prepared_edge(idle: bool) {
+    let line = "ordinary offscreen text\n";
+    let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 800, 600);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let origin = 120 * line.len();
+    let point = eval
+        .buffer_manager()
+        .get(buffer)
+        .unwrap()
+        .char_pos_to_emacs_byte_pos_clamped(CharPos0::new(origin + 100))
+        .get();
+    scroll_window_to(&mut eval, frame, window, buffer, origin as i64 + 1, point);
+    let hide = |eval: &mut Context, pixels: i32| {
+        if let neovm_core::window::Window::Leaf {
+            force_start,
+            vscroll,
+            ..
+        } = eval
+            .frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .find_window_mut(window)
+            .unwrap()
+        {
+            *force_start = true;
+            *vscroll = -pixels;
+        }
+    };
+    hide(&mut eval, 8);
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    engine.maintain_scroll_coverage(&eval);
+    let mut prepared_start = origin - line.len();
+    engine
+        .request_scroll_bridge(
+            &eval,
+            frame,
+            window,
+            CharPos0::new(prepared_start),
+            CharPos0::new(origin),
+        )
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !engine
+        .scroll_coverage
+        .drain(&mut engine.prepared_viewports)
+        .unwrap()
+    {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    engine.layout_frame_rust(&mut eval, frame);
+    let owner = DisplayWindowId::new(window.0 as i64);
+    assert_eq!(
+        engine.prepared_viewports.backward_start(
+            frame,
+            owner,
+            &engine.retained_window_matrices[&owner].key
+        ),
+        Some(CharPos0::new(prepared_start))
+    );
+    if idle {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while engine.maintain_scroll_coverage(&eval).is_some() {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::yield_now();
+        }
+        engine.layout_frame_rust(&mut eval, frame);
+        assert!(engine.maintain_scroll_coverage(&eval).is_none());
+        prepared_start = engine
+            .prepared_viewports
+            .backward_start(frame, owner, &engine.retained_window_matrices[&owner].key)
+            .unwrap()
+            .get();
+    } else {
+        engine
+            .begin_scroll_coverage(
+                &eval,
+                frame,
+                window,
+                CharPos0::new(origin + 60 * line.len()),
+            )
+            .unwrap();
+    }
+    hide(&mut eval, 4);
+    engine.layout_frame_rust(&mut eval, frame);
+    let visible = selected_window_layout_trace(&eval, &engine, frame);
+    engine.maintain_scroll_coverage(&eval);
+    let next = engine
+        .scroll_coverage
+        .pending_source_start_for_test()
+        .expect("fractional reversal must schedule work even after the queue is idle");
+    assert!(
+        next < prepared_start,
+        "fractional reversal must acquire outside the prepared edge {prepared_start}, got {next}"
+    );
+    if !idle {
+        assert_eq!(
+            next,
+            prepared_start - line.len(),
+            "urgent preparation takes the nearest line"
+        );
+    }
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while engine.maintain_scroll_coverage(&eval).is_some() {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    eval.gc_collect_exact();
+    engine.layout_frame_rust(&mut eval, frame);
+    assert_eq!(visible, selected_window_layout_trace(&eval, &engine, frame));
+    let mut fresh = LayoutEngine::new();
+    fresh.layout_frame_rust(&mut eval, frame);
+    assert_eq!(visible, selected_window_layout_trace(&eval, &fresh, frame));
+}
+
 fn check_short_urgent_backward_bridge(rich: bool) {
     let line = "ordinary offscreen text\n";
     let (mut eval, frame, buffer, window) = if rich {

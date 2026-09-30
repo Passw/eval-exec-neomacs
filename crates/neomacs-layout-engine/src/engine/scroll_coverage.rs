@@ -411,6 +411,7 @@ impl LayoutEngine {
                                 &retained.key,
                             )
                             || observed.key.window_start != retained.key.window_start
+                            || observed.key.vscroll != retained.key.vscroll
                     })
             })
         })?;
@@ -442,6 +443,12 @@ impl LayoutEngine {
                         observed.moving_backward
                     }
                 });
+        let reversing_backward = moving_backward
+            && self
+                .scroll_coverage
+                .windows
+                .get(&window_id)
+                .is_some_and(|observed| !observed.moving_backward);
         let urgent_backward = moving_backward
             && self.last_frame_display_state.as_ref().is_none_or(|state| {
                 state
@@ -461,9 +468,11 @@ impl LayoutEngine {
         if !compatible {
             self.scroll_coverage.cancel_active();
         }
-        if !compatible || moved {
+        if !compatible || moved || reversing_backward {
             // Placement-only changes retarget future work without starving
             // the page already being captured during continuous scrolling.
+            // A fractional reversal also needs the current exported edge:
+            // the old bridge may now lie entirely inside prepared coverage.
             let mut targets = Vec::with_capacity(3);
             let buffer = evaluator
                 .buffer_manager()
