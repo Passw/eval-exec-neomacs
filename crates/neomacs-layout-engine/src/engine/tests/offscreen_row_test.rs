@@ -3034,6 +3034,95 @@ fn check_active_capture_reversal(rich: bool, fractional: bool, prepared: bool, p
 }
 
 #[test]
+fn fragmented_urgent_bridge_reaches_worker_in_one_maintenance_wake() {
+    let line = format!("{}\n", "wrapped offscreen text ".repeat(12));
+    let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 320, 200);
+    eval.frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .window_system = Some(Value::symbol("neomacs"));
+    let origin = 120 * line.len();
+    scroll_window_to(
+        &mut eval,
+        frame,
+        window,
+        buffer,
+        origin as i64 + 1,
+        origin + 100,
+    );
+    let set_hidden = |eval: &mut Context, hidden: i32| {
+        if let neovm_core::window::Window::Leaf {
+            force_start,
+            vscroll,
+            ..
+        } = eval
+            .frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .find_window_mut(window)
+            .unwrap()
+        {
+            *force_start = true;
+            *vscroll = -hidden;
+        }
+    };
+    set_hidden(&mut eval, 8);
+    let mut engine = LayoutEngine::new();
+    engine.layout_frame_rust(&mut eval, frame);
+    engine.maintain_scroll_coverage(&eval);
+    set_hidden(&mut eval, 4);
+    engine.layout_frame_rust(&mut eval, frame);
+    let visible = selected_window_layout_trace(&eval, &engine, frame);
+    engine.maintain_scroll_coverage(&eval);
+    assert_eq!(
+        engine.scroll_coverage.pending_source_start_for_test(),
+        Some(origin - line.len()),
+        "prepare the nearest physical bridge"
+    );
+    assert!(
+        engine
+            .scroll_coverage
+            .active_capture_start_for_test()
+            .is_none(),
+        "a small fragmented bridge must reach the parallel worker before another evaluator wake"
+    );
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !engine
+        .scroll_coverage
+        .drain(&mut engine.prepared_viewports)
+        .unwrap()
+    {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::yield_now();
+    }
+    eval.gc_collect_exact();
+    engine.layout_frame_rust(&mut eval, frame);
+    let owner = DisplayWindowId::new(window.0 as i64);
+    let coverage = engine
+        .last_frame_display_state
+        .as_ref()
+        .unwrap()
+        .scroll_coverage
+        .iter()
+        .find(|coverage| coverage.content.window_id == owner)
+        .expect("connected prepared bridge");
+    assert!(
+        coverage.viewport.y + coverage.origin - coverage.content.text_clip_bounds.unwrap().y > 34.0,
+        "the completed bridge must provide useful backward pixel headroom"
+    );
+    assert!(
+        visible == selected_window_layout_trace(&eval, &engine, frame),
+        "preparation changed the viewport"
+    );
+    let mut fresh = LayoutEngine::new();
+    fresh.layout_frame_rust(&mut eval, frame);
+    assert!(
+        visible == selected_window_layout_trace(&eval, &fresh, frame),
+        "viewport differs from fresh layout"
+    );
+}
+
+#[test]
 fn urgent_backward_bridge_publishes_after_one_physical_line() {
     check_short_urgent_backward_bridge(false);
 }
