@@ -215,31 +215,51 @@ impl PreparedViewports {
                     .iter()
                     .find(|export| (export.frame, export.window) == owner)
                 {
-                    // FIFO can remove the only bridge beside the viewport
-                    // while retaining farther pages that depended on it.
-                    // Preserve owner fairness and the history allowance;
-                    // within that owner's pages, drop the farthest. A full
-                    // page can be the only bridge too. Protect the newest
-                    // full page from immediate eviction: it may answer the
-                    // upcoming command rather than the current viewport.
-                    let distance = |entry: &PreparedViewport| {
-                        let source = text_source_range(&entry.retained);
-                        export
+                    // Preserve owner fairness and the history allowance.
+                    // Overlapping full previews can all have zero distance,
+                    // making a new connecting bridge the farthest page.
+                    // Evict redundant source coverage first, then the farthest.
+                    // Protect the newest full page for the upcoming command.
+                    // Ranges are eviction hints only; export still proves read
+                    // validity, wrap compatibility and row adjacency.
+                    let mut ranges: Vec<_> = self
+                        .entries
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, entry)| entry.computed && (entry.frame, entry.window) == owner)
+                        .map(|(index, entry)| (index, text_source_range(&entry.retained)))
+                        .collect();
+                    ranges.push((usize::MAX, export.visible_source.clone()));
+                    ranges.sort_unstable_by_key(|(_, range)| range.start);
+                    let score = |index: usize| {
+                        let source = &ranges.iter().find(|(entry, _)| *entry == index).unwrap().1;
+                        let mut covered = source.start;
+                        for (other, range) in &ranges {
+                            if *other == index {
+                                continue;
+                            }
+                            if range.start > covered || covered >= source.end {
+                                break;
+                            }
+                            covered = covered.max(range.end);
+                        }
+                        let distance = export
                             .visible_source
                             .start
                             .saturating_sub(source.end)
-                            .max(source.start.saturating_sub(export.visible_source.end))
+                            .max(source.start.saturating_sub(export.visible_source.end));
+                        (covered >= source.end, distance)
                     };
-                    let mut farthest = distance(&self.entries[victim]);
+                    let mut worst = score(victim);
                     for (index, entry) in self.entries.iter().enumerate() {
                         if entry.computed
                             && !(entry.complete_viewport && index + 1 == self.entries.len())
                             && (entry.frame, entry.window) == owner
                         {
-                            let gap = distance(entry);
-                            if gap > farthest {
+                            let candidate = score(index);
+                            if candidate > worst {
                                 victim = index;
-                                farthest = gap;
+                                worst = candidate;
                             }
                         }
                     }

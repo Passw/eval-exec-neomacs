@@ -4431,3 +4431,134 @@ fn distant_worker_bridges_do_not_evict_the_connected_viewport_seam() {
         assert_eq!(actual, selected_window_layout_trace(&eval, &fresh, frame));
     }
 }
+
+#[test]
+fn overlapping_prepared_pages_do_not_discard_a_new_backward_bridge() {
+    check_backward_bridge_admission_under_overlapping_page_pressure(false);
+}
+
+#[test]
+fn rich_overlapping_prepared_pages_do_not_discard_a_new_backward_bridge() {
+    check_backward_bridge_admission_under_overlapping_page_pressure(true);
+}
+
+fn check_backward_bridge_admission_under_overlapping_page_pressure(rich: bool) {
+    let line = "nearby prepared row\n";
+    let (mut eval, frame, buffer, window) = if rich {
+        shared_rich_scrolling_frame(1000, 900)
+    } else {
+        let (mut eval, frame, buffer, window) = incr_editing_frame(&line.repeat(400), 800, 600);
+        eval.frame_manager_mut()
+            .get_mut(frame)
+            .unwrap()
+            .window_system = Some(Value::symbol("neomacs"));
+        (eval, frame, buffer, window)
+    };
+    assert!(eval.frame_manager_mut().select_frame(frame));
+    let base = if rich { 2 * 110080 } else { 116 * line.len() };
+    let starts: Vec<_> = (0..=8)
+        .map(|offset| {
+            let value = eval
+                .eval_str(&format!(
+                    "(save-excursion (goto-char {}) (forward-line {offset}) (point))",
+                    base + 1
+                ))
+                .unwrap();
+            CharPos0::new(value.as_fixnum().unwrap() as usize - 1)
+        })
+        .collect();
+    let visible_start = starts[5];
+    let point = eval
+        .buffer_manager()
+        .get(buffer)
+        .unwrap()
+        .char_pos_to_emacs_byte_pos_clamped(visible_start)
+        .get();
+    scroll_window_to(
+        &mut eval,
+        frame,
+        window,
+        buffer,
+        visible_start.get() as i64 + 1,
+        point,
+    );
+    if let neovm_core::window::Window::Leaf {
+        point,
+        force_start,
+        vscroll,
+        ..
+    } = eval
+        .frame_manager_mut()
+        .get_mut(frame)
+        .unwrap()
+        .find_window_mut(window)
+        .unwrap()
+    {
+        *point = LispCharPos1::from_one_based_usize(visible_start.get() + 1);
+        *force_start = true;
+        *vscroll = -4;
+    }
+    let mut engine = LayoutEngine::new();
+    engine.set_font_sizing(crate::font::sizing::FontSizing::wayland());
+    engine.layout_frame_rust(&mut eval, frame);
+    // Every cached page overlaps the visible source range, so its eviction
+    // distance is zero. The new bridge lies farther away but is the only way
+    // to extend the already published backward seam.
+    for &start in &starts[1..] {
+        engine
+            .request_scroll_coverage(&eval, frame, window, start)
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !engine
+            .scroll_coverage
+            .drain(&mut engine.prepared_viewports)
+            .unwrap()
+        {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "worker page never ready"
+            );
+            std::thread::yield_now();
+        }
+    }
+    engine.layout_frame_rust(&mut eval, frame);
+    let owner = DisplayWindowId::new(window.0 as i64);
+    let before = selected_window_layout_trace(&eval, &engine, frame);
+    assert_eq!(
+        engine.prepared_viewports.backward_start(
+            frame,
+            owner,
+            &engine.retained_window_matrices[&owner].key
+        ),
+        Some(starts[1])
+    );
+    engine
+        .request_scroll_bridge(&eval, frame, window, starts[0], starts[1])
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !engine
+        .scroll_coverage
+        .drain(&mut engine.prepared_viewports)
+        .unwrap()
+    {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "worker bridge never ready"
+        );
+        std::thread::yield_now();
+    }
+    engine.layout_frame_rust(&mut eval, frame);
+    assert_eq!(
+        engine.prepared_viewports.backward_start(
+            frame,
+            owner,
+            &engine.retained_window_matrices[&owner].key
+        ),
+        Some(starts[0]),
+        "new bridge was discarded before publication under overlapping-page pressure"
+    );
+    assert!(
+        selected_window_layout_trace(&eval, &engine, frame) == before,
+        "bridge changed accepted visible geometry"
+    );
+}
