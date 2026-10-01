@@ -944,7 +944,14 @@ fn expand_pattern_value(pattern: Value) -> Result<String, Flow> {
         return Ok(format!("[{}]", pieces.join(" ")));
     }
 
-    if let Some(items) = crate::emacs_core::value::list_to_vec(&pattern) {
+    // GNU: only a VECTOR or a non-empty CONS takes the recursive arm —
+    // `nil` is neither (NILP), so it falls through to prin1_to_string and
+    // expands to `nil` (the anonymous node marker). Treating nil as an
+    // empty list produced `()`, a node pattern with no type name that
+    // matches nothing (issue #416).
+    if let Some(items) = crate::emacs_core::value::list_to_vec(&pattern)
+        && !pattern.is_nil()
+    {
         let mut pieces = Vec::with_capacity(items.len());
         for item in items {
             pieces.push(expand_pattern_value(item)?);

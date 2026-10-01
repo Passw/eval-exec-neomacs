@@ -10700,6 +10700,29 @@ fn treesit_query_expand_and_pattern_expand_follow_gnu_sexp_forms() {
 }
 
 #[test]
+fn treesit_query_expand_preserves_nil_as_the_anonymous_node_marker() {
+    // Issue #416: nil in a query sexp is the anonymous node marker and must
+    // expand to its prin1 form `nil`, not the empty-list `()` — `(())` is a
+    // node pattern with no type name and matches nothing.
+    crate::test_utils::init_test_tracing();
+    assert_eq!(
+        crate::emacs_core::builtins::builtin_treesit_query_expand(vec![Value::list(
+            vec![
+                Value::list(vec![Value::NIL]),
+                Value::symbol("@f"),
+            ],
+        )])
+        .unwrap(),
+        Value::string("(nil) @f"),
+    );
+    assert_eq!(
+        crate::emacs_core::builtins::builtin_treesit_pattern_expand(vec![Value::NIL])
+            .unwrap(),
+        Value::string("nil"),
+    );
+}
+
+#[test]
 fn treesit_query_compile_eager_missing_language_signals_treesit_query_error() {
     crate::test_utils::init_test_tracing();
     let mut eval = Context::new();
