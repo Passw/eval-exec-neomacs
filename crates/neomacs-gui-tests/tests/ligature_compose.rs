@@ -41,7 +41,8 @@ fn run_case(tag: &str, ligature_enabled: bool) -> (PathBuf, PathBuf) {
     .with_env("RUST_LOG", "info")
     .with_env("NEOMACS_LIGATURE_ENABLED", if ligature_enabled { "1" } else { "0" })
     .with_env("NEOMACS_SELECTION_READY", ready.to_string_lossy())
-    .with_env("NEOMACS_DEBUG_SURFACE_READBACK", "10000");
+    .with_env("NEOMACS_DEBUG_SURFACE_READBACK", "10000")
+    .with_env("NEOMACS_TRACE_COMPOSITION", "1");
     for (key, value) in session.env() {
         plan = plan.with_env(key.clone(), value.clone());
     }

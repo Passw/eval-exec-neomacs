@@ -32,4 +32,21 @@
          (copy-file (getenv "NEOMACS_DEBUG_SURFACE_READBACK_PNG")
                     (concat (getenv "NEOMACS_GUI_FRAME_SNAPSHOT_JSON") ".png") t)
          (kill-emacs 0)))))
-   (with-temp-file (getenv "NEOMACS_SELECTION_READY") (insert "ready"))))
+   (with-temp-file (getenv "NEOMACS_SELECTION_READY")
+     (insert "ready\n")
+     (prin1 (list :auto-comp-mode auto-composition-mode
+                  :auto-comp-fn auto-composition-function
+                  :table-rule (aref composition-function-table ?-)
+                  :buffer (buffer-name))
+            (current-buffer)))
+   ;; Force a redisplay AFTER the rule is armed so the display walk consults
+   ;; the composition table with the rule present, then dump the same state
+   ;; again post-redisplay for the diag file.
+   (redisplay t)
+   (run-at-time 2 nil
+     (lambda ()
+       (let ((diag (concat (getenv "NEOMACS_GUI_FRAME_SNAPSHOT_JSON") ".diag")))
+         (with-temp-file diag
+           (prin1 (list :auto-comp-mode auto-composition-mode
+                        :table-rule (aref composition-function-table ?-)))))
+       (kill-emacs 0)))))

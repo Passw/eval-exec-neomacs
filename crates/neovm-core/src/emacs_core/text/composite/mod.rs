@@ -1002,11 +1002,30 @@ fn select_automatic_composition_spans(
     let ascii_rules: [Value; 128] = std::array::from_fn(|ch| {
         super::chartable::ct_lookup(&composition_function_table, ch as i64).unwrap_or(Value::NIL)
     });
+    if std::env::var_os("NEOMACS_TRACE_COMPOSITION").is_some() {
+        eprintln!(
+            "i447trace: select spans text_len={} char_count={} ascii_rule_dash={:?}",
+            text.len(),
+            char_count,
+            ascii_rules
+                .get(0x2D)
+                .map(|rule| !rule.is_nil())
+        );
+    }
 
     let bytes = text.as_bytes();
     let mut spans = Vec::new();
     let mut committed_end = 0usize;
     let mut trigger = 0usize;
+    let trace = std::env::var_os("NEOMACS_TRACE_COMPOSITION").is_some();
+    if trace {
+        eprintln!(
+            "i447trace: spans_in text_len={} char_count={} ascii_rules_nonnil={} ",
+            text.len(),
+            char_count,
+            ascii_rules.iter().filter(|rule| !rule.is_nil()).count()
+        );
+    }
     while trigger < char_count {
         let offset = byte_offsets[trigger];
         let lead = bytes[offset];
