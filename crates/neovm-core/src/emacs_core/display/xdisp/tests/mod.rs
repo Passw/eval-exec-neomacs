@@ -2225,6 +2225,19 @@ fn pixel_size_image_context() -> (Context, i64) {
         frame.font_pixel_size = 16.0;
         frame.font_ascent = 15.0;
         frame.set_window_system(Some(Value::symbol("x")));
+        // `create_frame' sized the window in pixels from the frame's UNSCALED
+        // cell, so it is 200 px wide however wide the cell is.  X-LIMIT nil
+        // means the window's body width (GNU `init_iterator`:
+        // `it.last_visible_x = it.first_visible_x + body_width`), so a
+        // 200 px window would truncate every one of these rows; give it the
+        // real reference frame's 80 columns instead, as the GNU runs in
+        // `tmp/textsize/` had.
+        frame.root_window_mut().set_bounds(crate::window::Rect::new(
+            0.0,
+            0.0,
+            80.0 * 10.0,
+            24.0 * 20.0,
+        ));
     }
     eval.set_display_host(Box::new(DecodedImageHost));
     let selected_window = eval.frames.get(frame_id).expect("frame").selected_window.0 as i64;
@@ -2341,6 +2354,12 @@ impl ImageProbe {
             let buffer = eval.buffers.get_mut(buf_id).expect("buffer");
             buffer.insert(&self.text);
         }
+        // The reference runs (`tmp/textsize/probe.el`) set `truncate-lines' in
+        // the measured buffer before every measurement, so the row edge a
+        // straying element meets is GNU's TRUNCATE and not WINDOW_WRAP.
+        eval.buffers
+            .set_buffer_local_property(buf_id, "truncate-lines", Value::T)
+            .expect("enable truncation in measured buffer");
         for (start, end, spec) in self.display_runs {
             crate::emacs_core::textprop::builtin_put_text_property(
                 &mut eval,
@@ -6851,8 +6870,414 @@ fn window_text_pixel_size_honours_its_y_limit_like_gnu() {
                    (window-text-pixel-size (selected-window) nil t 40 10 t)
                    (window-text-pixel-size (selected-window) 1 200 nil 5 t)))"#,
     );
+    // The y-limit stops the walk at the row whose pixel span CONTAINS it and
+    // retracts that row (`move_it_to` restores the iterator to the row's start
+    // before `window_text_pixel_size` reads `max_current_x`), so a limit that
+    // lands inside a row drops that row's width and clamps the height to the
+    // limit.  That is why the `x-limit 40 y-limit 10` case reports 19 -- the
+    // width of rows 0..9, whose text is 19 characters -- and not the 20 of row
+    // 10, which is the row the limit landed in.  GNU 31.1 on the same buffer
+    // shape at a 20-pixel row height (`tmp/textsize2/gnu-ylines.txt`):
+    // `y-limit 200` -> (171 . 220), `y-limit 220` -> (180 . 240) -- 171 is
+    // rows 0..9 and 180 is rows 0..10, so exactly the row the limit lands in is
+    // the one that stops counting.
     assert_eq!(
         observed,
-        "OK (1 (21 . 301) (19 . 2) (19 . 6) (20 . 51) (21 . 301) (20 . 11) (19 . 6))"
+        "OK (1 (21 . 301) (19 . 2) (19 . 6) (20 . 51) (21 . 301) (19 . 11) (19 . 6))"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// FROM, X-LIMIT nil and Y-LIMIT: the three `window-text-pixel-size` rules the
+// image pass left unimplemented.
+//
+// Every expected value below is GNU 31.1's, recorded by driving the real
+// binary on an X frame whose cell is 9x20 (`tmp/textsize2/gnu-fxy.txt`); the
+// probes here use the same frame as the image tests -- an 80-column, 24-row
+// window on a 10x20 cell -- so a pure-text number is GNU's scaled by 10/9.
+// ---------------------------------------------------------------------------
+
+/// Measure literal `text` on the reference frame with an explicit FROM/TO.
+///
+/// `from`/`to` are 1-based character positions, as Lisp passes them; `None`
+/// means the default (point-min / point-max).  `truncate` selects the buffer's
+/// `truncate-lines`, which decides whether the row edge truncates or wraps.
+fn probe_text_region(
+    text: &str,
+    truncate: bool,
+    from: Option<i64>,
+    to: Option<i64>,
+    x_limit: Value,
+    y_limit: Value,
+) -> (i64, i64) {
+    let (mut eval, selected_window) = pixel_size_image_context();
+    let buf_id = eval.buffers.current_buffer().expect("current buffer").id;
+    eval.buffers.get_mut(buf_id).expect("buffer").insert(text);
+    eval.buffers
+        .set_buffer_local_property(
+            buf_id,
+            "truncate-lines",
+            if truncate { Value::T } else { Value::NIL },
+        )
+        .expect("set truncate-lines");
+    let position = |value: Option<i64>| value.map(Value::fixnum).unwrap_or(Value::NIL);
+    let size = builtin_window_text_pixel_size_ctx(
+        &mut eval,
+        vec![
+            Value::make_window(selected_window as u64),
+            position(from),
+            position(to),
+            x_limit,
+            y_limit,
+        ],
+    )
+    .expect("window-text-pixel-size");
+    (
+        size.cons_car().as_int().expect("integer width"),
+        size.cons_cdr().as_int().expect("integer height"),
+    )
+}
+
+/// The body width of the reference frame's selected window, in pixels.
+///
+/// GNU's X-LIMIT nil means exactly this (`it.last_visible_x =
+/// it.first_visible_x + body_width`), so the expectations are expressed
+/// against it rather than against a hard-coded number.
+fn reference_frame_body_width() -> i64 {
+    let (eval, selected_window) = pixel_size_image_context();
+    let fid = eval
+        .frames
+        .find_window_frame_id(crate::window::WindowId(selected_window as u64))
+        .expect("frame of the selected window");
+    let frame = eval.frames.get(fid).expect("frame");
+    let window = frame
+        .find_window(crate::window::WindowId(selected_window as u64))
+        .expect("window");
+    crate::emacs_core::window_cmds::window_body_width_pixels(&eval.frames, fid, window)
+}
+
+/// FROM does not clip the left side: GNU measures from the start of FROM's
+/// DISPLAY LINE and subtracts only FROM's own x, so every start position on a
+/// line reports the whole line.
+///
+/// `window_text_pixel_size` rewinds the iterator to the display line's start
+/// (`move_it_by_lines (&it, 0)` then `it.current_x = it.hpos =
+/// it.wrap_prefix_width = 0`, src/xdisp.c:11833-11899) before walking to FROM.
+/// Neomacs started counting at FROM, giving `abcd\n` 36/27/18/9 for FROM 1..4
+/// where GNU gives 36 four times.
+#[test]
+fn window_text_pixel_size_measures_from_the_start_of_froms_display_line() {
+    crate::test_utils::init_test_tracing();
+    for from in 1..=4 {
+        assert_eq!(
+            probe_text_region("abcd\n", true, Some(from), None, Value::NIL, Value::NIL),
+            (40, 20),
+            "GNU: (36 . 20) from every start position on the line (FROM {from})"
+        );
+    }
+    // FROM on the newline: GNU treats it as the next line's origin, so the
+    // walk crosses into the empty final row and reports nothing of the text.
+    assert_eq!(
+        probe_text_region("abcd\n", true, Some(5), None, Value::NIL, Value::NIL),
+        (0, 20),
+        "GNU: (0 . 20) -- the newline takes no place on display"
+    );
+    // FROM at point-max, on the empty row the trailing newline opens: the walk
+    // never produces a glyph.
+    assert_eq!(
+        probe_text_region("abcd\n", true, Some(6), None, Value::NIL, Value::NIL),
+        (0, 0),
+        "GNU: (0 . 0) at point-max"
+    );
+}
+
+/// The prefix is subtracted back off while the region stays on ONE display
+/// line, and only then: GNU drops `start_x` once the walk crosses a
+/// display-line boundary (`if (it.current_y > start_y) start_x = 0`,
+/// src/xdisp.c:12004), so a region spanning two rows is as wide as its widest
+/// row measured from that row's own left edge.
+#[test]
+fn window_text_pixel_size_subtracts_from_only_within_one_display_line() {
+    crate::test_utils::init_test_tracing();
+    // `abcdefgh\n`, FROM 2.  TO 5 stays on the row: GNU (27 . 20) = 3 cells.
+    assert_eq!(
+        probe_text_region("abcdefgh\n", true, Some(2), Some(5), Value::NIL, Value::NIL),
+        (30, 20),
+        "GNU: (27 . 20)"
+    );
+    // TO 9 is the newline, so the walk still stops on row 1.
+    assert_eq!(
+        probe_text_region("abcdefgh\n", true, Some(2), Some(9), Value::NIL, Value::NIL),
+        (70, 20),
+        "GNU: (63 . 20)"
+    );
+    // TO = point-max consumes the newline, the walk crosses, and the whole
+    // row (8 cells) is reported: GNU (72 . 20).
+    assert_eq!(
+        probe_text_region("abcdefgh\n", true, Some(2), None, Value::NIL, Value::NIL),
+        (80, 20),
+        "GNU: (72 . 20)"
+    );
+    // FROM == TO: the row FROM sits on, with no width.
+    assert_eq!(
+        probe_text_region("abcdefgh\n", true, Some(2), Some(2), Value::NIL, Value::NIL),
+        (0, 20),
+        "GNU: (0 . 20)"
+    );
+    assert_eq!(
+        probe_text_region("abcdefgh\n", true, Some(1), Some(1), Value::NIL, Value::NIL),
+        (0, 0),
+        "GNU: (0 . 0) -- FROM is the row's first position, so nothing was produced"
+    );
+    // Two rows, FROM mid-row-1, TO mid-row-2: the walk crosses and reports the
+    // first row whole.
+    assert_eq!(
+        probe_text_region(
+            "abcd\nefgh\n",
+            true,
+            Some(2),
+            Some(7),
+            Value::NIL,
+            Value::NIL
+        ),
+        (40, 40),
+        "GNU: (36 . 40)"
+    );
+    assert_eq!(
+        probe_text_region(
+            "abcd\nefgh\n",
+            true,
+            Some(2),
+            Some(4),
+            Value::NIL,
+            Value::NIL
+        ),
+        (20, 20),
+        "GNU: (18 . 20) -- same row, so FROM IS subtracted"
+    );
+}
+
+/// X-LIMIT nil means the window's BODY width, exactly as it does for GNU:
+/// `init_iterator` sets `it.last_visible_x = it.first_visible_x + body_width`
+/// (src/xdisp.c:3507) and `window_text_pixel_size` only overrides it when the
+/// caller passes a limit (src/xdisp.c:11924).
+///
+/// Neomacs applied that default to terminal frames only, in columns, so a GUI
+/// frame's truncated long line measured 1800 px against GNU's 720.
+#[test]
+fn window_text_pixel_size_defaults_x_limit_to_the_window_body_width() {
+    crate::test_utils::init_test_tracing();
+    let body = reference_frame_body_width();
+    assert!(body > 0, "the reference frame has a body");
+    let long = format!("{}\n", "x".repeat(200));
+
+    assert_eq!(
+        probe_text_region(&long, true, None, None, Value::NIL, Value::NIL),
+        (body, 20),
+        "a truncated long line cannot measure wider than the window body"
+    );
+    // An explicit limit replaces the body edge whole, so `t` -- "the maximum
+    // possible value" -- shows the whole line.
+    assert_eq!(
+        probe_text_region(&long, true, None, None, Value::T, Value::NIL),
+        (2000, 20),
+        "X-LIMIT t leaves the row unbounded: 200 cells"
+    );
+    assert_eq!(
+        probe_text_region(&long, true, None, None, Value::fixnum(body), Value::NIL),
+        (body, 20),
+        "an explicit limit equal to the body width measures the same"
+    );
+    // A short line is unaffected by the default.
+    assert_eq!(
+        probe_text_region("abcd\n", true, None, None, Value::NIL, Value::NIL),
+        (40, 20),
+        "the default limit only bites when the row would exceed it"
+    );
+}
+
+/// With `truncate-lines` nil the row edge is where the row CONTINUES, and
+/// FROM's display line is the wrapped row, not the logical line.
+///
+/// GNU's `abcd` + 196 `x` + newline in an 80-column window is three rows of
+/// 80, 80 and 40 characters; FROM 41 sits on the first of them, so the
+/// measurement covers all three (GNU: (720 . 60)) and FROM 81 covers the last
+/// two (GNU: (720 . 40)).
+#[test]
+fn window_text_pixel_size_rewinds_to_the_wrapped_display_line() {
+    crate::test_utils::init_test_tracing();
+    let long = format!("{}\n", "x".repeat(200));
+    let body = reference_frame_body_width();
+    assert_eq!(
+        probe_text_region(&long, false, Some(41), None, Value::NIL, Value::NIL),
+        (body, 60),
+        "GNU: (720 . 60) -- FROM 41 is on the first wrapped row"
+    );
+    assert_eq!(
+        probe_text_region(&long, false, Some(81), None, Value::NIL, Value::NIL),
+        (body, 40),
+        "GNU: (720 . 40) -- FROM 81 starts the second wrapped row, so the \
+         first row contributes neither width nor height"
+    );
+}
+
+/// An empty display line is a full row, and the row a newline ends is one cell
+/// tall even when it holds nothing else.
+///
+/// GNU reads `it.max_ascent + it.max_descent`, which a row break resets to
+/// zero; the newline is a produced element like any other, so it puts the
+/// font's own split back.  `abcd\n\nefgh\n` therefore measures three rows
+/// (GNU: (36 . 60)), not two, while a row the walk never entered stays zero
+/// (`FROM == TO` at a row's first position is `(0 . 0)`).
+#[test]
+fn window_text_pixel_size_counts_empty_display_lines() {
+    crate::test_utils::init_test_tracing();
+    for (text, expected) in [
+        ("abcd\n\nefgh\n", (40, 60)),
+        ("abcd\n\n", (40, 40)),
+        ("\nabcd\n", (40, 40)),
+        ("\n", (0, 20)),
+        ("abcd\n\n\nefgh\n", (40, 80)),
+    ] {
+        assert_eq!(
+            probe_text_region(text, true, None, None, Value::NIL, Value::NIL),
+            expected,
+            "GNU's height for {text:?}: {expected:?} scaled to a 10x20 cell"
+        );
+    }
+    // FROM 6 of `abcd\n\nefgh\n` is the empty row's own newline.
+    assert_eq!(
+        probe_text_region(
+            "abcd\n\nefgh\n",
+            true,
+            Some(6),
+            Some(7),
+            Value::NIL,
+            Value::NIL
+        ),
+        (0, 20),
+        "GNU: (0 . 20)"
+    );
+}
+
+/// Y-LIMIT both stops the walk and clamps the returned height, in pixels.
+///
+/// GNU's `move_it_to` stops at the first row whose pixel span CONTAINS the
+/// limit, restores the iterator to that row's start -- so the row contributes
+/// no width -- and clamps the height to the limit (`if (y > max_y) y = max_y`,
+/// src/xdisp.c:12012).  A row that TO is reached inside is not retracted:
+/// reaching TO breaks the walk before the y test runs.
+///
+/// Neomacs capped the number of scanned ROWS and never clamped, so `ab` + a
+/// 200x80 image + `cd` with Y-LIMIT 40 reported the image row in full where
+/// GNU reports `(0 . 40)`.
+#[test]
+fn window_text_pixel_size_clamps_its_height_to_the_y_limit() {
+    crate::test_utils::init_test_tracing();
+    // The image row is 80 px tall: a limit inside it retracts the row and
+    // clamps the height.
+    for limit in [1, 40, 79] {
+        assert_eq!(
+            ImageProbe::new()
+                .text("ab")
+                .image(image_display_spec(200, 80, &[]))
+                .text("cd\n")
+                .measure(Value::NIL, Value::fixnum(limit)),
+            (0, limit),
+            "GNU: (0 . {limit}) -- the row Y-LIMIT lands in is retracted"
+        );
+    }
+    // A limit at or past the row's bottom leaves the measurement alone.
+    assert_eq!(
+        ImageProbe::new()
+            .text("ab")
+            .image(image_display_spec(200, 80, &[]))
+            .text("cd\n")
+            .measure(Value::NIL, Value::fixnum(80)),
+        (240, 80),
+        "GNU: (236 . 80) -- 80 is the row's bottom, so the row is produced"
+    );
+    // A pure text row: the limit inside it retracts the row, so the width is
+    // zero and the height is the limit.
+    assert_eq!(
+        probe_text_region("abcd\n", true, None, None, Value::NIL, Value::fixnum(10)),
+        (0, 10),
+        "GNU: (0 . 10)"
+    );
+    assert_eq!(
+        probe_text_region("abcd\n", true, None, None, Value::NIL, Value::fixnum(20)),
+        (40, 20),
+        "GNU: (36 . 20) -- the limit is the row's bottom"
+    );
+    // Two rows: a limit inside the SECOND row keeps the first row's width.
+    assert_eq!(
+        probe_text_region(
+            "abcd\nefgh\n",
+            true,
+            None,
+            None,
+            Value::NIL,
+            Value::fixnum(30)
+        ),
+        (40, 30),
+        "GNU: (36 . 30)"
+    );
+    assert_eq!(
+        probe_text_region(
+            "abcd\nefgh\n",
+            true,
+            None,
+            None,
+            Value::NIL,
+            Value::fixnum(40)
+        ),
+        (40, 40),
+        "GNU: (36 . 40)"
+    );
+}
+
+/// The y-limit retraction happens at FROM's row too, and GNU then reports
+/// `x - start_x` with `x` restored to zero -- a NEGATIVE width.
+///
+/// This is GNU's own arithmetic, not a Neomacs invention: `move_it_to` restores
+/// the iterator to the row start (so `max_current_x` is 0) and
+/// `window_text_pixel_size` still subtracts `start_x`, which the rewind had set
+/// to FROM's position in the row (`tmp/textsize2/gnu-fxy.txt`:
+/// `A.ylimit-midrow` = (-18 . 19) for FROM 3 of `abcdefgh\n` with Y-LIMIT 19).
+/// Reporting a simpler `0` here would be a divergence from GNU that a probe
+/// script comparing the two would have to explain away.
+#[test]
+fn window_text_pixel_size_reports_gnus_negative_width_for_a_retracted_from_row() {
+    crate::test_utils::init_test_tracing();
+    assert_eq!(
+        probe_text_region(
+            "abcdefgh\n",
+            true,
+            Some(3),
+            None,
+            Value::NIL,
+            Value::fixnum(19)
+        ),
+        (-20, 19),
+        "GNU: (-18 . 19)"
+    );
+    assert_eq!(
+        probe_text_region(
+            "abcdefgh\n",
+            true,
+            Some(3),
+            None,
+            Value::NIL,
+            Value::fixnum(20)
+        ),
+        (80, 20),
+        "GNU: (72 . 20) -- the limit is the row's bottom, so nothing retracts"
+    );
+    // FROM on the newline with TO == FROM: GNU zeroes the walk's x there
+    // without touching `start_x`, so the width is `-start_x`.
+    assert_eq!(
+        probe_text_region("abcd\n", true, Some(5), Some(5), Value::NIL, Value::NIL),
+        (-40, 20),
+        "GNU: (-36 . 20)"
     );
 }
